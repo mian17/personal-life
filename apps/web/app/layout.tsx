@@ -3,6 +3,8 @@ import './globals.css';
 export const metadata = {
   title: 'Personal Life',
   description: 'Personal notes API and UI',
+  manifest: '/manifest.json',
+  icons: { icon: '/icon.svg' },
 };
 
 export const viewport = {

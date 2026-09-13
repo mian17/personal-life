@@ -47,9 +47,9 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 ---
 
 ## Checkpoint: Foundation
-- [ ] `npm run build` succeeds for all workspaces
-- [ ] API starts and creates the SQLite schema
-- [ ] Review before Phase 2
+- [x] `npm run build` succeeds for all workspaces
+- [x] API starts and creates the SQLite schema
+- [x] Review before Phase 2
 
 ---
 
@@ -116,10 +116,10 @@ shared DTOs (non-empty bounded body; trimmed, deduped, bounded tag names).
 ---
 
 ## Checkpoint: API Core
-- [ ] Notes CRUD works via curl with the token
-- [ ] Tag filter returns correct subsets
-- [ ] `npm test` green
-- [ ] Review before Phase 3
+- [x] Notes CRUD works via curl with the token
+- [x] Tag filter returns correct subsets
+- [x] `npm test` green
+- [x] Review before Phase 3
 
 ---
 
@@ -183,8 +183,8 @@ chips to filter.
 
 ## Checkpoint: End-to-End
 - [ ] Note captured from phone browser over Tailscale appears in the list
-- [ ] Filter by tag works from the UI
-- [ ] Review before Phase 4
+- [x] Filter by tag works from the UI
+- [x] Review before Phase 4
 
 ---
 
@@ -195,12 +195,12 @@ owner login; unmatched requests are refused. Document the session-cookie fallbac
 README/spec note (not implemented).
 
 **Acceptance criteria:**
-- [ ] Request without the header (or with wrong login) → refused.
-- [ ] Request with the correct header → normal app.
+- [x] Request without the header (or with wrong login) → refused.
+- [x] Request with the correct header → normal app.
 
 **Verification:**
-- [ ] Manual: curl the tailnet URL with/without the header.
-- [ ] Build passes.
+- [x] Manual: curl the tailnet URL with/without the header.
+- [x] Build passes.
 
 **Dependencies:** Task 8
 **Files:** `apps/web/middleware.ts`, `apps/web/.env.example`
@@ -214,12 +214,12 @@ README/spec note (not implemented).
 add-to-home-screen.
 
 **Acceptance criteria:**
-- [ ] Edit updates the note; delete removes it; list reflects both.
-- [ ] `manifest.json` present; installable to home screen.
+- [x] Edit updates the note; delete removes it; list reflects both.
+- [x] `manifest.json` present; installable to home screen.
 
 **Verification:**
-- [ ] Manual: edit + delete on phone viewport.
-- [ ] Build passes.
+- [x] Manual: edit + delete on phone viewport.
+- [x] Build passes.
 
 **Dependencies:** Task 9
 **Files:** `apps/web/app/**`, `apps/web/public/manifest.json`
@@ -228,7 +228,7 @@ add-to-home-screen.
 ---
 
 ## Checkpoint: Complete
-- [ ] Non-tailnet/unauthenticated access refused
-- [ ] API e2e test passes against a temp DB
+- [x] Non-tailnet/unauthenticated access refused
+- [x] API e2e test passes against a temp DB
 - [ ] Manual phone verification of full flow
 - [ ] All spec success criteria (1–6) met
