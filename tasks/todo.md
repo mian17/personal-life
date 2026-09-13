@@ -31,14 +31,14 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 `Tag`, and `note_tag` entities matching the spec data model.
 
 **Acceptance criteria:**
-- [ ] API boots with TypeORM pointed at `data/life.db` (path from env).
-- [ ] Entities: `Note(id, body, createdAt, updatedAt)`, `Tag(id, name unique)`,
+- [x] API boots with TypeORM pointed at `data/life.db` (path from env).
+- [x] Entities: `Note(id, body, createdAt, updatedAt)`, `Tag(id, name unique)`,
       many-to-many join, cascade deletes.
-- [ ] Schema auto-syncs on startup in dev.
+- [x] Schema auto-syncs on startup in dev.
 
 **Verification:**
-- [ ] `npm test` (placeholder) / `npm run build` passes.
-- [ ] Manual: start API, confirm `data/life.db` created with the three tables.
+- [x] `npm test` (placeholder) / `npm run build` passes.
+- [x] Manual: start API, confirm `data/life.db` created with the three tables.
 
 **Dependencies:** Task 1
 **Files:** `apps/api/src/app.module.ts`, `apps/api/src/**/*.entity.ts`, `apps/api/.env.example`
