@@ -100,6 +100,19 @@ export class NotesService {
     return toDto(note);
   }
 
+  async update(id: string, body?: string, tagNames?: string[]): Promise<NoteDto> {
+    const note = await this.notes.findOne({ where: { id }, relations: { tags: true } });
+    if (!note) throw new NotFoundException('Note not found');
+    if (body !== undefined) note.body = body;
+    if (tagNames !== undefined) note.tags = await this.resolveTags(normalizeTags(tagNames));
+    return toDto(await this.notes.save(note));
+  }
+
+  async remove(id: string): Promise<void> {
+    const result = await this.notes.delete({ id });
+    if (!result.affected) throw new NotFoundException('Note not found');
+  }
+
   async listTags(): Promise<{ id: number; name: string }[]> {
     const tags = await this.tags.find({ order: { name: 'ASC' } });
     return tags.map((t) => ({ id: t.id, name: t.name }));

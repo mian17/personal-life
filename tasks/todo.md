@@ -80,13 +80,13 @@ create.
 `GET /api/tags`, and `?tag=` / `?q=` filtering on the list.
 
 **Acceptance criteria:**
-- [ ] PATCH updates body and reconciles tags.
-- [ ] DELETE removes the note and its join rows.
-- [ ] `?tag=` and `?q=` return correct subsets; `GET /api/tags` lists tags.
+- [x] PATCH updates body and reconciles tags.
+- [x] DELETE removes the note and its join rows.
+- [x] `?tag=` and `?q=` return correct subsets; `GET /api/tags` lists tags.
 
 **Verification:**
-- [ ] Manual curl: update, delete, filter by tag, text query.
-- [ ] Build passes.
+- [x] Manual curl: update, delete, filter by tag, text query.
+- [x] Build passes.
 
 **Dependencies:** Task 3
 **Files:** `apps/api/src/notes/*.ts`, `apps/api/src/tags/*.ts`
