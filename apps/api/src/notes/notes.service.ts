@@ -114,7 +114,11 @@ export class NotesService {
   }
 
   async listTags(): Promise<{ id: number; name: string }[]> {
-    const tags = await this.tags.find({ order: { name: 'ASC' } });
+    const tags = await this.tags
+      .createQueryBuilder('tag')
+      .innerJoin('tag.notes', 'note')
+      .orderBy('tag.name', 'ASC')
+      .getMany();
     return tags.map((t) => ({ id: t.id, name: t.name }));
   }
 }

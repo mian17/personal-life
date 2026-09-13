@@ -53,6 +53,20 @@ describe('Notes API (e2e)', () => {
     expect(reread.body.createdAt).toBe(iso);
   });
 
+  it('hides tags that no longer have notes', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'x', tags: ['orphan'] }),
+    ).expect(201);
+
+    const withNote = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
+    expect(withNote.body.map((t: { name: string }) => t.name)).toContain('orphan');
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${created.body.id}`)).expect(200);
+
+    const afterDelete = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
+    expect(afterDelete.body.map((t: { name: string }) => t.name)).not.toContain('orphan');
+  });
+
   it('supports the full note lifecycle with tag filtering', async () => {
     const created = await auth(
       request(app.getHttpServer()).post('/api/notes').send({ body: 'hello', tags: ['Work'] }),
