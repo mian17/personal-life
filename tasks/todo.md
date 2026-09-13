@@ -129,13 +129,13 @@ shared DTOs (non-empty bounded body; trimmed, deduped, bounded tag names).
 bearer `API_TOKEN` when calling NestJS on loopback `:3001`.
 
 **Acceptance criteria:**
-- [ ] `apps/web` serves a page at `:3000`.
-- [ ] `/api/*` server-side calls reach NestJS with the token; browser never sees the token.
-- [ ] Root `npm run dev` starts both.
+- [x] `apps/web` serves a page at `:3000`.
+- [x] `/api/*` server-side calls reach NestJS with the token; browser never sees the token.
+- [x] Root `npm run dev` starts both.
 
 **Verification:**
-- [ ] Manual: page loads; a proxied call returns API data.
-- [ ] Build passes.
+- [x] Manual: page loads; a proxied call returns API data.
+- [x] Build passes.
 
 **Dependencies:** Task 5
 **Files:** `apps/web/app/**`, `apps/web/lib/api.ts`, `apps/web/next.config.*`
@@ -149,12 +149,12 @@ bearer `API_TOKEN` when calling NestJS on loopback `:3001`.
 Save via a Server Action.
 
 **Acceptance criteria:**
-- [ ] Submitting creates a note and reflects it.
-- [ ] Layout is usable at phone viewport (safe-area insets, large tap targets).
+- [x] Submitting creates a note and reflects it.
+- [x] Layout is usable at phone viewport (safe-area insets, large tap targets).
 
 **Verification:**
-- [ ] Manual: capture on desktop + phone viewport.
-- [ ] Build passes.
+- [x] Manual: capture on desktop + phone viewport.
+- [x] Build passes.
 
 **Dependencies:** Task 6
 **Files:** `apps/web/app/page.tsx`, `apps/web/app/actions.ts`
@@ -168,12 +168,12 @@ Save via a Server Action.
 chips to filter.
 
 **Acceptance criteria:**
-- [ ] List renders reverse-chron with tags.
-- [ ] Tapping a tag filters the list; clearing restores all.
+- [x] List renders reverse-chron with tags.
+- [x] Tapping a tag filters the list; clearing restores all.
 
 **Verification:**
-- [ ] Manual: create several tagged notes; filter works.
-- [ ] Build passes.
+- [x] Manual: create several tagged notes; filter works.
+- [x] Build passes.
 
 **Dependencies:** Task 7
 **Files:** `apps/web/app/page.tsx`, `apps/web/app/**/note-list.tsx`

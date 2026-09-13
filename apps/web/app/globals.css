@@ -1,0 +1,151 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b22;
+  --text: #e8eaf0;
+  --muted: #8b93a7;
+  --accent: #5b8cff;
+  --danger: #ff6b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, sans-serif;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom));
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+
+textarea,
+input {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #2a2f3a;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 0.85rem 1.25rem;
+  border-radius: 10px;
+  border: 0;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.capture {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.capture button {
+  width: 100%;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+}
+
+.filters a,
+.chip {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.filters a.active,
+.chip.active {
+  background: var(--accent);
+  color: white;
+}
+
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.note {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.note .body {
+  margin: 0 0 0.6rem;
+  white-space: pre-wrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.meta form {
+  margin-left: auto;
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  padding: 0.35rem 0.5rem;
+  min-height: 0;
+  font-weight: 500;
+}
+
+.editor {
+  margin-top: 0.6rem;
+}
+
+.editor summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.editor form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.empty {
+  color: var(--muted);
+}

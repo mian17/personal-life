@@ -8,5 +8,5 @@
     "strictPropertyInitialization": false,
     "declaration": false
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*"]
 }
