@@ -10,14 +10,14 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 `packages/shared`; wire root scripts and TypeScript config.
 
 **Acceptance criteria:**
-- [ ] Root `package.json` declares workspaces and `dev`/`build`/`test`/`lint` scripts.
-- [ ] `apps/api`, `apps/web`, `packages/shared` exist with their own `package.json`.
-- [ ] `packages/shared` exports `Note`, `Tag`, and DTO types.
-- [ ] `npm install` succeeds from root.
+- [x] Root `package.json` declares workspaces and `dev`/`build`/`test`/`lint` scripts.
+- [x] `apps/api`, `apps/web`, `packages/shared` exist with their own `package.json`.
+- [x] `packages/shared` exports `Note`, `Tag`, and DTO types.
+- [x] `npm install` succeeds from root.
 
 **Verification:**
-- [ ] `npm run build` succeeds (empty packages build).
-- [ ] Manual: `npm install` clean.
+- [x] `npm run build` succeeds (empty packages build).
+- [x] Manual: `npm install` clean.
 
 **Dependencies:** None
 **Files:** `package.json`, `tsconfig.base.json`, `apps/*/package.json`, `packages/shared/**`
