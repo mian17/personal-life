@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Note } from '@life/shared';
 import { removeNote } from './actions';
 import { NoteEditor } from './note-editor';
+import { LocalTime } from './local-time';
 
 export function NoteList({ notes, activeTag }: { notes: Note[]; activeTag?: string }) {
   if (notes.length === 0) {
@@ -22,7 +23,7 @@ export function NoteList({ notes, activeTag }: { notes: Note[]; activeTag?: stri
                 {tag.name}
               </Link>
             ))}
-            <time dateTime={note.createdAt}>{note.createdAt.slice(0, 10)}</time>
+            <LocalTime iso={note.createdAt} />
             <form action={removeNote}>
               <input type="hidden" name="id" value={note.id} />
               <button type="submit" className="danger">

@@ -34,6 +34,25 @@ describe('Notes API (e2e)', () => {
     ).expect(400);
   });
 
+  it('stores and returns timestamps as UTC', async () => {
+    const before = Date.now();
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'utc check' }),
+    ).expect(201);
+    const after = Date.now();
+
+    const iso = created.body.createdAt;
+    expect(iso.endsWith('Z')).toBe(true);
+    const ts = Date.parse(iso);
+    expect(ts).toBeGreaterThanOrEqual(before - 2000);
+    expect(ts).toBeLessThanOrEqual(after + 2000);
+
+    const reread = await auth(
+      request(app.getHttpServer()).get(`/api/notes/${created.body.id}`),
+    ).expect(200);
+    expect(reread.body.createdAt).toBe(iso);
+  });
+
   it('supports the full note lifecycle with tag filtering', async () => {
     const created = await auth(
       request(app.getHttpServer()).post('/api/notes').send({ body: 'hello', tags: ['Work'] }),
