@@ -100,14 +100,14 @@ create.
 shared DTOs (non-empty bounded body; trimmed, deduped, bounded tag names).
 
 **Acceptance criteria:**
-- [ ] Missing/wrong token → 401.
-- [ ] Invalid body/tags → 400 with a clear message.
-- [ ] Valid requests unaffected.
+- [x] Missing/wrong token → 401.
+- [x] Invalid body/tags → 400 with a clear message.
+- [x] Valid requests unaffected.
 
 **Verification:**
-- [ ] Jest + supertest e2e: create → list → filter by tag → update → delete against a temp
+- [x] Jest + supertest e2e: create → list → filter by tag → update → delete against a temp
       SQLite file; plus 401 and 400 cases.
-- [ ] `npm test` passes.
+- [x] `npm test` passes.
 
 **Dependencies:** Task 4
 **Files:** `apps/api/src/auth/*.ts`, `apps/api/src/**/*.dto.ts`, `apps/api/test/*.e2e-spec.ts`
