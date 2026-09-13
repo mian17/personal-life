@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { Note } from './notes/note.entity';
 import { Tag } from './notes/tag.entity';
+import { NotesModule } from './notes/notes.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { Tag } from './notes/tag.entity';
       entities: [Note, Tag],
       synchronize: true,
     }),
+    NotesModule,
   ],
 })
 export class AppModule {}

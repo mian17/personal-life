@@ -60,13 +60,13 @@ cursor-paginated, `limit` default 50), and `GET /api/notes/:id`, including tag u
 create.
 
 **Acceptance criteria:**
-- [ ] Create returns the note with its tags.
-- [ ] List is reverse-chron and honors `limit`/`cursor`.
-- [ ] `GET /:id` 404s for unknown ids.
+- [x] Create returns the note with its tags.
+- [x] List is reverse-chron and honors `limit`/`cursor`.
+- [x] `GET /:id` 404s for unknown ids.
 
 **Verification:**
-- [ ] e2e test (added Task 5) or curl: create then list returns the note.
-- [ ] Manual curl check.
+- [x] e2e test (added Task 5) or curl: create then list returns the note.
+- [x] Manual curl check.
 
 **Dependencies:** Task 2
 **Files:** `apps/api/src/notes/*.ts`, `packages/shared/**`
