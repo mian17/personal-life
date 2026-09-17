@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Note } from '@life/shared';
-import { createNoteAction, saveNote } from './actions';
+import { createNoteAction, deleteNoteAction, saveNote } from './actions';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -27,15 +27,18 @@ export function NoteEditor({ note }: { note?: Note }) {
   const [body, setBody] = useState(note?.body ?? '');
   const [tags, setTags] = useState(initialTags);
   const [status, setStatus] = useState<Status>('idle');
+  const [noteId, setNoteId] = useState<string | null>(note?.id ?? null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
+  const deletingRef = useRef(false);
   // Once a create PATCHes an id, all later saves must update it — never POST again.
   const idRef = useRef<string | null>(note?.id ?? null);
   const latestRef = useRef({ body: note?.body ?? '', tags: initialTags });
 
   const save = useCallback(async () => {
+    if (deletingRef.current) return;
     if (inFlightRef.current) {
       dirtyRef.current = true;
       return;
@@ -54,11 +57,13 @@ export function NoteEditor({ note }: { note?: Note }) {
       if (id === null) {
         const created = await createNoteAction(nextBody, parseTags(nextTags));
         idRef.current = created.id;
+        setNoteId(created.id);
         window.history.replaceState(null, '', `/notes/${created.id}`);
       } else {
         await saveNote(id, nextBody, parseTags(nextTags));
       }
       inFlightRef.current = false;
+      if (deletingRef.current) return;
       if (dirtyRef.current) {
         void save();
       } else {
@@ -78,6 +83,25 @@ export function NoteEditor({ note }: { note?: Note }) {
     }
     await save();
   }, [save]);
+
+  const remove = useCallback(async () => {
+    const id = idRef.current;
+    if (id === null) return;
+    deletingRef.current = true;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    dirtyRef.current = false;
+    try {
+      await deleteNoteAction(id);
+    } catch {
+      deletingRef.current = false;
+      setStatus('error');
+      return;
+    }
+    router.push('/');
+  }, [router]);
 
   function schedule() {
     dirtyRef.current = true;
@@ -120,6 +144,11 @@ export function NoteEditor({ note }: { note?: Note }) {
         <span className="editor-status" role="status" aria-live="polite">
           {STATUS_TEXT[status]}
         </span>
+        {noteId !== null && (
+          <button type="button" className="editor-delete" onClick={() => void remove()}>
+            Delete
+          </button>
+        )}
       </div>
       <textarea
         ref={textareaRef}

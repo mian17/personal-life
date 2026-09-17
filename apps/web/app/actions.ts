@@ -44,3 +44,8 @@ export async function removeNote(formData: FormData) {
   await deleteNote(String(formData.get('id')));
   revalidatePath('/');
 }
+
+export async function deleteNoteAction(id: string) {
+  await deleteNote(id);
+  revalidatePath('/');
+}
