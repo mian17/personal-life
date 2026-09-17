@@ -29,6 +29,10 @@ export function listNotes(tag?: string, q?: string): Promise<NotePage> {
   return call<NotePage>(`/api/notes${qs ? `?${qs}` : ''}`);
 }
 
+export function getNote(id: string): Promise<Note> {
+  return call<Note>(`/api/notes/${id}`);
+}
+
 export function listTags(): Promise<Tag[]> {
   return call<Tag[]>('/api/tags');
 }

@@ -26,6 +26,12 @@ export async function editNote(formData: FormData) {
   revalidatePath('/');
 }
 
+export async function saveNote(id: string, body: string, tags: string[]) {
+  if (!body.trim()) return;
+  await updateNote(id, { body, tags });
+  revalidatePath('/');
+}
+
 export async function removeNote(formData: FormData) {
   await deleteNote(String(formData.get('id')));
   revalidatePath('/');
