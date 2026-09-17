@@ -51,8 +51,10 @@ Open `https://<host>.<tailnet>.ts.net` on the phone and "Add to Home Screen".
    never sees the token.
 4. API scripts run on the host and use `API_TOKEN` directly.
 
-For local browser development without Tailscale, set `DEV_AUTH_BYPASS=true` in
-`apps/web/.env` (never in production).
+For local browser development without Tailscale, no configuration is needed: when
+`NODE_ENV=development` (set by `npm run dev`) both gates above are skipped, so localhost
+works with no identity header or `API_TOKEN`. Production behavior is unchanged. The
+`DEV_AUTH_BYPASS` variable in `apps/web/.env.example` is unused and has no effect.
 
 Fallback if identity headers are ever unavailable: exchange `API_TOKEN` for a signed
 `HttpOnly` session cookie via a one-time login.
@@ -70,8 +72,14 @@ npm run lint
 Single SQLite file (default `apps/api/data/life.db`, override with `DB_PATH`). Copying the
 file is a complete backup.
 
+`npm run dev` sets `NODE_ENV=development` and `DB_PATH=data/scratch.db`, so development
+writes to a throwaway `apps/api/data/scratch.db` and never touches your personal notes.
+`npm run start` uses the real DB.
+
 ## Docs
 
 - Intent: `docs/intent/personal-life-api.md`
 - Spec: `docs/specs/SPEC-notes.md`
 - Plan / tasks: `tasks/plan.md`, `tasks/todo.md`
+- Notes UI spec: `docs/specs/SPEC-notes-ui.md`
+- Notes UI plan / tasks: `tasks/plan-notes-ui.md`, `tasks/todo-notes-ui.md`
