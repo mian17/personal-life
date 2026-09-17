@@ -81,6 +81,25 @@ export function NoteEditor({ note }: { note?: Note }) {
     await save();
   }, [save]);
 
+  // Server Actions do not survive navigation, so a pending edit is sent via a
+  // keepalive fetch that the browser finishes after the page is gone.
+  const flushKeepalive = useCallback(() => {
+    if (!dirtyRef.current || idRef.current === null || deletingRef.current) return;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const nextBody = bodyRef.current;
+    const nextTags = dedupeTags([...parseInlineTags(nextBody), ...retainedRef.current]);
+    dirtyRef.current = false;
+    void fetch(`/api/notes/${idRef.current}/flush`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ body: nextBody, tags: nextTags }),
+    });
+  }, []);
+
   const remove = useCallback(async () => {
     const id = idRef.current;
     if (id === null) return;
@@ -125,12 +144,22 @@ export function NoteEditor({ note }: { note?: Note }) {
   }, []);
 
   useEffect(() => {
+    function onHide() {
+      // Existing notes go through the keepalive BFF route; a brand-new note has
+      // no id yet, so its initial create still has to use the Server Action.
+      if (idRef.current !== null) flushKeepalive();
+      else void flush();
+    }
     function onVisibility() {
-      if (document.visibilityState === 'hidden') void flush();
+      if (document.visibilityState === 'hidden') onHide();
     }
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [flush]);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onHide);
+    };
+  }, [flush, flushKeepalive]);
 
   const inlineNames = new Set(parseInlineTags(body).map((t) => t.toLowerCase()));
   const legacyChips = retained.filter((name) => !inlineNames.has(name.toLowerCase()));
