@@ -35,36 +35,36 @@ note → create/delete → inline tags → search → keepalive durability → b
 Tracked in `tasks/todo-notes-ui.md`. Ordered by dependency.
 
 ### Phase 1: Theme foundation
-- [ ] Task 1: Light/dark tokens + System/Light/Dark toggle
+- [x] Task 1: Light/dark tokens + System/Light/Dark toggle
 
 ### Checkpoint: Theme
-- [ ] App renders in both schemes; forced choice persists without flash
+- [x] App renders in both schemes; forced choice persists without flash
 
 ### Phase 2: Core editing (vertical slice)
-- [ ] Task 2: Open an existing note in a full-screen editor with autosave + Done
-- [ ] Task 3: Home list restyle + tap navigation + "+"; remove capture box
-- [ ] Task 4: Create a new note (`/notes/new` → POST → redirect to its route)
-- [ ] Task 5: Delete a note from the editor
-- [ ] Task 6: Inline `#tags` + retained legacy tag chips
+- [x] Task 2: Open an existing note in a full-screen editor with autosave + Done
+- [x] Task 3: Home list restyle + tap navigation + "+"; remove capture box
+- [x] Task 4: Create a new note (`/notes/new` → POST → redirect to its route)
+- [x] Task 5: Delete a note from the editor
+- [x] Task 6: Inline `#tags` + retained legacy tag chips
 
 ### Checkpoint: Core Editing
-- [ ] Tap → type → autosave → Done → list reflects title/snippet works end to end
-- [ ] Create and delete work without a page reload
+- [x] Tap → type → autosave → Done → list reflects title/snippet works end to end
+- [x] Create and delete work without a page reload
 
 ### Phase 3: Search + durability
-- [ ] Task 7: Debounced search field (`?q=`, server round trip)
-- [ ] Task 8: Keepalive flush on navigation + BFF route
+- [x] Task 7: Debounced search field (`?q=`, server round trip)
+- [x] Task 8: Keepalive flush on navigation + BFF route
 
 ### Checkpoint: Features
-- [ ] Search filters the list; clearing restores it
-- [ ] Editing then immediately navigating away does not lose the last keystrokes
+- [x] Search filters the list; clearing restores it
+- [x] Editing then immediately navigating away does not lose the last keystrokes
 
 ### Phase 4: Verification
-- [ ] Task 9: Browser verification (playwright-cli, scratch DB) + `npm test` / `npm run lint`
+- [x] Task 9: Browser verification (playwright-cli, scratch DB) + `npm test` / `npm run lint`
 
 ### Checkpoint: Complete
-- [ ] All 11 spec success criteria met
-- [ ] `life.db` untouched by a dev session
+- [x] All 11 spec success criteria met
+- [x] `life.db` untouched by a dev session
 
 ## Risks and Mitigations
 

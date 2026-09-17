@@ -13,15 +13,15 @@ an inline pre-paint script in `layout.tsx` that applies the persisted choice. Se
 `color-scheme: light dark` and a light/dark `themeColor` pair.
 
 **Acceptance criteria:**
-- [ ] Light and dark palettes both render with readable contrast.
-- [ ] Toggle cycles System → Light → Dark; `aria-label`/`aria-pressed` present.
-- [ ] Forced choice persists across reload with no flash of the wrong theme.
-- [ ] System (default) follows `prefers-color-scheme`.
-- [ ] No new dependency.
+- [x] Light and dark palettes both render with readable contrast.
+- [x] Toggle cycles System → Light → Dark; `aria-label`/`aria-pressed` present.
+- [x] Forced choice persists across reload with no flash of the wrong theme.
+- [x] System (default) follows `prefers-color-scheme`.
+- [x] No new dependency.
 
 **Verification:**
-- [ ] Manual: toggle each state, reload, inspect in both OS schemes.
-- [ ] `npm run lint` passes.
+- [x] Manual: toggle each state, reload, inspect in both OS schemes.
+- [x] `npm run lint` passes.
 
 **Dependencies:** None
 **Files:** `apps/web/app/globals.css`, `apps/web/app/theme-toggle.tsx`, `apps/web/app/layout.tsx`, `apps/web/app/page.tsx`
@@ -38,15 +38,15 @@ full-height autofocused textarea, 400ms debounced autosave through the existing
 control that flushes then returns to `/`.
 
 **Acceptance criteria:**
-- [ ] `/notes/[id]` opens full screen with the cursor in the body; typing starts with no extra tap.
-- [ ] Pausing typing autosaves; indicator shows `Saving…` → `Saved`.
-- [ ] Reloading after an edit shows the persisted body.
-- [ ] Done flushes the pending save and returns to the list.
-- [ ] Unknown id renders a not-found state, not a crash.
+- [x] `/notes/[id]` opens full screen with the cursor in the body; typing starts with no extra tap.
+- [x] Pausing typing autosaves; indicator shows `Saving…` → `Saved`.
+- [x] Reloading after an edit shows the persisted body.
+- [x] Done flushes the pending save and returns to the list.
+- [x] Unknown id renders a not-found state, not a crash.
 
 **Verification:**
-- [ ] Manual: edit, pause, reload, confirm persistence.
-- [ ] `npm run build` succeeds.
+- [x] Manual: edit, pause, reload, confirm persistence.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** None (list navigation wired in Task 3)
 **Files:** `apps/web/app/notes/[id]/page.tsx`, `apps/web/app/note-editor.tsx`, `apps/web/lib/api.ts`, `apps/web/app/actions.ts`
@@ -62,15 +62,15 @@ control that flushes then returns to `/`.
 per-row Delete button; keep the existing tag filter chips.
 
 **Acceptance criteria:**
-- [ ] No capture textarea on `/`.
-- [ ] Rows show title, snippet, and date; tapping a row opens its editor.
-- [ ] No Edit disclosure or per-row Delete button remains.
-- [ ] "+" navigates to `/notes/new`.
-- [ ] Tag filter chips still filter via `?tag=`.
+- [x] No capture textarea on `/`.
+- [x] Rows show title, snippet, and date; tapping a row opens its editor.
+- [x] No Edit disclosure or per-row Delete button remains.
+- [x] "+" navigates to `/notes/new`.
+- [x] Tag filter chips still filter via `?tag=`.
 
 **Verification:**
-- [ ] Manual: tap through the list; confirm filter still works.
-- [ ] `npm run build` succeeds.
+- [x] Manual: tap through the list; confirm filter still works.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
 **Files:** `apps/web/app/page.tsx`, `apps/web/app/note-list.tsx`, `apps/web/app/globals.css`
@@ -85,14 +85,14 @@ row is created until the first meaningful input; the first save `POST`s via `cre
 `router.replace`s to `/notes/[id]`. Leaving without typing creates nothing.
 
 **Acceptance criteria:**
-- [ ] Opening `/notes/new` creates no row.
-- [ ] Typing then saving creates exactly one note and replaces the URL with `/notes/[id]`.
-- [ ] Back gesture and refresh after creation behave correctly.
-- [ ] Empty/whitespace-only body is not saved.
+- [x] Opening `/notes/new` creates no row.
+- [x] Typing then saving creates exactly one note and replaces the URL with `/notes/[id]`.
+- [x] Back gesture and refresh after creation behave correctly.
+- [x] Empty/whitespace-only body is not saved.
 
 **Verification:**
-- [ ] Manual: create a note from scratch; confirm list shows one new row.
-- [ ] `npm run build` succeeds.
+- [x] Manual: create a note from scratch; confirm list shows one new row.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
 **Files:** `apps/web/app/notes/new/page.tsx`, `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`, `apps/web/lib/api.ts`
@@ -107,13 +107,13 @@ existing `removeNote` Server Action and returns to `/`. Remove `removeNote` usag
 list (already dropped in Task 3).
 
 **Acceptance criteria:**
-- [ ] Delete removes the note and returns to the list.
-- [ ] The deleted note no longer appears in the list.
-- [ ] No confirmation dialog is required (single-user, low stakes).
+- [x] Delete removes the note and returns to the list.
+- [x] The deleted note no longer appears in the list.
+- [x] No confirmation dialog is required (single-user, low stakes).
 
 **Verification:**
-- [ ] Manual: delete a note; confirm it is gone after reload.
-- [ ] `npm run build` succeeds.
+- [x] Manual: delete a note; confirm it is gone after reload.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
 **Files:** `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`
@@ -129,15 +129,15 @@ existing `tags[]`. Display stored tags absent inline as low-emphasis removable c
 tags = inline hashtags ∪ retained chips. Parse on save only, never per keystroke.
 
 **Acceptance criteria:**
-- [ ] Inline `#work` in the body becomes a `work` tag on save.
-- [ ] Duplicate/mixed-case inline tags dedupe to one tag.
-- [ ] A stored tag with no inline token appears as a removable chip and is retained on save.
-- [ ] Removing a chip drops that tag on the next save.
-- [ ] Typing a partial `#` does not create a tag until save.
+- [x] Inline `#work` in the body becomes a `work` tag on save.
+- [x] Duplicate/mixed-case inline tags dedupe to one tag.
+- [x] A stored tag with no inline token appears as a removable chip and is retained on save.
+- [x] Removing a chip drops that tag on the next save.
+- [x] Typing a partial `#` does not create a tag until save.
 
 **Verification:**
-- [ ] Manual: create tags inline, confirm the tag filter lists them; test legacy retention.
-- [ ] `npm run lint` passes.
+- [x] Manual: create tags inline, confirm the tag filter lists them; test legacy retention.
+- [x] `npm run lint` passes.
 
 **Dependencies:** Task 2
 **Files:** `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`
@@ -146,10 +146,10 @@ tags = inline hashtags ∪ retained chips. Parse on save only, never per keystro
 ---
 
 ## Checkpoint: Core Editing
-- [ ] Tap → type → autosave → Done → list reflects title/snippet works end to end
-- [ ] Create and delete work without a page reload
-- [ ] Both themes render correctly
-- [ ] Review before Phase 3
+- [x] Tap → type → autosave → Done → list reflects title/snippet works end to end
+- [x] Create and delete work without a page reload
+- [x] Both themes render correctly
+- [x] Review before Phase 3
 
 ---
 
@@ -161,14 +161,14 @@ from `GET /api/notes?q=`. Empty input clears `?q=`. No Search button. Preserve `
 composing the URL.
 
 **Acceptance criteria:**
-- [ ] Typing filters the list after a debounced server round trip.
-- [ ] Clearing the field restores all notes.
-- [ ] Tag filter and search compose correctly.
-- [ ] No Search button; no new API surface.
+- [x] Typing filters the list after a debounced server round trip.
+- [x] Clearing the field restores all notes.
+- [x] Tag filter and search compose correctly.
+- [x] No Search button; no new API surface.
 
 **Verification:**
-- [ ] Manual: search a known substring; confirm correct subset and clearing.
-- [ ] `npm run build` succeeds.
+- [x] Manual: search a known substring; confirm correct subset and clearing.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** Task 3
 **Files:** `apps/web/app/search-box.tsx`, `apps/web/app/page.tsx`
@@ -184,14 +184,14 @@ save via `fetch(..., { keepalive: true })` so an edit survives reload, back gest
 change.
 
 **Acceptance criteria:**
-- [ ] Editing then immediately navigating away does not lose the last keystrokes.
-- [ ] The flush route requires no token from the browser and is server-side only.
-- [ ] No pending save when there is nothing to flush (no spurious request).
-- [ ] `keepalive` stays within the 64KB cap for a max-length body.
+- [x] Editing then immediately navigating away does not lose the last keystrokes.
+- [x] The flush route requires no token from the browser and is server-side only.
+- [x] No pending save when there is nothing to flush (no spurious request).
+- [x] `keepalive` stays within the 64KB cap for a max-length body.
 
 **Verification:**
-- [ ] Manual: type, immediately go back, reopen; content is present.
-- [ ] `npm run build` succeeds.
+- [x] Manual: type, immediately go back, reopen; content is present.
+- [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
 **Files:** `apps/web/app/api/notes/[id]/flush/route.ts`, `apps/web/app/note-editor.tsx`, `apps/web/lib/api.ts`
@@ -207,14 +207,14 @@ search, tag filter, create, theme states, and refresh persistence. Run `npm test
 `npm run lint`. Confirm `life.db` mtime is unchanged.
 
 **Acceptance criteria:**
-- [ ] All spec success criteria 1–11 confirmed with evidence.
-- [ ] `npm test` passes (API e2e unchanged).
-- [ ] `npm run lint` passes for all workspaces.
-- [ ] `apps/api/data/life.db` mtime unchanged after the session.
+- [x] All spec success criteria 1–11 confirmed with evidence.
+- [x] `npm test` passes (API e2e unchanged).
+- [x] `npm run lint` passes for all workspaces.
+- [x] `apps/api/data/life.db` mtime unchanged after the session.
 
 **Verification:**
-- [ ] `npm test`, `npm run lint`.
-- [ ] `playwright-cli` snapshots/screenshots for each flow.
+- [x] `npm test`, `npm run lint`.
+- [x] `playwright-cli` snapshots/screenshots for each flow.
 
 **Dependencies:** Tasks 1–8
 **Files:** none (verification only; scratch DB artifacts)
@@ -223,7 +223,7 @@ search, tag filter, create, theme states, and refresh persistence. Run `npm test
 ---
 
 ## Checkpoint: Complete
-- [ ] All 11 spec success criteria met
-- [ ] `npm test` / `npm run lint` green
-- [ ] `life.db` untouched by a dev session
-- [ ] Ready for review / commit
+- [x] All 11 spec success criteria met
+- [x] `npm test` / `npm run lint` green
+- [x] `life.db` untouched by a dev session
+- [x] Ready for review / commit
