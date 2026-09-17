@@ -261,13 +261,37 @@ button {
   font-size: 1.05rem;
 }
 
-.editor-tags {
+.editor-legacy-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin-top: 0.5rem;
-  padding: 0.6rem 0;
-  border: 0;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--border);
-  border-radius: 0;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.tag-chip-remove {
+  min-height: 0;
+  padding: 0 0.35rem;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.tag-chip-remove:hover {
+  color: var(--danger);
 }
