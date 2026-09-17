@@ -127,6 +127,10 @@ button {
   min-height: 48px;
 }
 
+.search-box {
+  margin: 0 0 1rem;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;

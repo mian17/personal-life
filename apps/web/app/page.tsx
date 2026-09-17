@@ -1,17 +1,26 @@
 import { listNotes, listTags } from '@/lib/api';
 import { NoteList } from './note-list';
+import { SearchBox } from './search-box';
 import { ThemeToggle } from './theme-toggle';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
+function filterHref(q?: string, tag?: string): string {
+  const params = new URLSearchParams();
+  if (tag) params.set('tag', tag);
+  if (q) params.set('q', q);
+  const qs = params.toString();
+  return qs ? `/?${qs}` : '/';
+}
+
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ tag?: string }>;
+  searchParams: Promise<{ tag?: string; q?: string }>;
 }) {
-  const { tag } = await searchParams;
-  const [{ notes }, tags] = await Promise.all([listNotes(tag), listTags()]);
+  const { tag, q } = await searchParams;
+  const [{ notes }, tags] = await Promise.all([listNotes(tag, q), listTags()]);
 
   return (
     <main>
@@ -25,13 +34,15 @@ export default async function Home({
         </div>
       </header>
 
+      <SearchBox q={q} tag={tag} />
+
       {tags.length > 0 && (
         <nav className="filters">
-          {tag && <Link href="/">All</Link>}
+          {tag && <Link href={filterHref(q)}>All</Link>}
           {tags.map((t) => (
             <Link
               key={t.id}
-              href={`/?tag=${encodeURIComponent(t.name)}`}
+              href={filterHref(q, t.name)}
               className={tag === t.name ? 'active' : ''}
             >
               {t.name}
