@@ -5,6 +5,35 @@
   --muted: #8b93a7;
   --accent: #5b8cff;
   --danger: #ff6b6b;
+  --border: #2a2f3a;
+  color-scheme: light dark;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --text: #1a1d24;
+  --muted: #5c6577;
+  --accent: #2f6bff;
+  --danger: #d64545;
+  --border: #dfe3ea;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1a1d24;
+    --muted: #5c6577;
+    --accent: #2f6bff;
+    --danger: #d64545;
+    --border: #dfe3ea;
+  }
 }
 
 * {
@@ -31,12 +60,32 @@ h1 {
   margin: 0 0 1rem;
 }
 
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+header h1 {
+  margin: 0;
+}
+
+.theme-toggle {
+  min-height: 0;
+  padding: 0.5rem 0.9rem;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
 textarea,
 input {
   width: 100%;
   padding: 0.75rem;
   border-radius: 10px;
-  border: 1px solid #2a2f3a;
+  border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
   font: inherit;

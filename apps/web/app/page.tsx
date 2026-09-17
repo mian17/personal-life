@@ -1,6 +1,7 @@
 import { addNote } from './actions';
 import { listNotes, listTags } from '@/lib/api';
 import { NoteList } from './note-list';
+import { ThemeToggle } from './theme-toggle';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,7 @@ export default async function Home({
     <main>
       <header>
         <h1>Notes</h1>
+        <ThemeToggle />
       </header>
 
       <form action={addNote} className="capture">
