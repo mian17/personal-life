@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "nest start --watch",
+    "dev": "DB_PATH=data/scratch.db nest start --watch",
     "start": "node dist/main.js",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"

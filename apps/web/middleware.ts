@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
+  // Dev skips auth so localhost works without headers; production logic below is unchanged.
+  if (process.env.NODE_ENV === 'development') return NextResponse.next();
+
   // Serve-proxied traffic carries x-forwarded-host; direct local traffic does not.
   // The web app binds to loopback, so header-less requests can only be the local host.
   const viaServe = req.headers.has('x-forwarded-host');

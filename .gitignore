@@ -1,7 +1,9 @@
 node_modules/
 dist/
 .next/
+*.tsbuildinfo
 data/
 *.log
 .env
 .env.local
+.playwright-cli/
