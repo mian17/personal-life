@@ -30,11 +30,12 @@ export function ThemeToggle() {
     setTheme(readStored());
   }, []);
 
+  const nextTheme = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
+
   function cycle() {
-    const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-    setTheme(next);
-    window.localStorage.setItem('theme', next);
-    apply(next);
+    setTheme(nextTheme);
+    window.localStorage.setItem('theme', nextTheme);
+    apply(nextTheme);
   }
 
   return (
@@ -42,7 +43,7 @@ export function ThemeToggle() {
       type="button"
       onClick={cycle}
       className="theme-toggle"
-      aria-label={`Theme: ${LABELS[theme]}. Activate for ${LABELS[ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length]]}.`}
+      aria-label={`Theme: ${LABELS[theme]}. Activate for ${LABELS[nextTheme]}.`}
       aria-pressed={theme !== 'system'}
     >
       {LABELS[theme]}
