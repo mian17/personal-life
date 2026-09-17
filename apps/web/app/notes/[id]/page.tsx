@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation';
 import type { Note } from '@life/shared';
-import { getNote } from '@/lib/api';
+import { ApiError, getNote } from '@/lib/api';
 import { NoteEditor } from '../../note-editor';
 
 async function loadNote(id: string): Promise<Note> {
   try {
     return await getNote(id);
   } catch (error) {
-    if (error instanceof Error && error.message.includes('API 404')) {
+    if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
     throw error;

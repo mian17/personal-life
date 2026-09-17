@@ -1,19 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { NOTE_BODY_MAX, TAG_NAME_MAX } from '@life/shared';
+import { NOTE_BODY_MAX } from '@life/shared';
 import { updateNote } from '@/lib/api';
-
-function isTagArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) &&
-    value.every((item: unknown) => typeof item === 'string' && item.length <= TAG_NAME_MAX)
-  );
-}
-
-function apiErrorStatus(error: unknown): number | null {
-  if (!(error instanceof Error)) return null;
-  const match = /^API (\d{3}) on /.exec(error.message);
-  return match ? Number(match[1]) : null;
-}
+import { apiErrorStatus, isTagArray } from '@/lib/flush-payload';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -15,6 +15,15 @@ const STATUS_TEXT: Record<Status, string> = {
   error: "Couldn't save",
 };
 
+function tagsFor(body: string, retained: readonly string[]): string[] {
+  // Inline hashtags win casing; retained legacy tags union in.
+  return dedupeTags([...parseInlineTags(body), ...retained]);
+}
+
+function sameTags(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((tag, i) => tag === b[i]);
+}
+
 export function NoteEditor({ note }: { note?: Note }) {
   const router = useRouter();
   const initialLegacy = note?.tags.map((t) => t.name) ?? [];
@@ -31,6 +40,8 @@ export function NoteEditor({ note }: { note?: Note }) {
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
   const retainedRef = useRef<string[]>(initialLegacy);
+  // The body/tags the in-flight request is persisting, so a newer edit can win.
+  const sentRef = useRef<{ body: string; tags: string[] } | null>(null);
 
   const save = useCallback(async () => {
     if (deletingRef.current) return;
@@ -40,14 +51,14 @@ export function NoteEditor({ note }: { note?: Note }) {
     }
     if (!dirtyRef.current) return;
     const nextBody = bodyRef.current;
+    const nextTags = tagsFor(nextBody, retainedRef.current);
     if (idRef.current === null && !nextBody.trim()) {
       dirtyRef.current = false;
       return;
     }
-    // Tags are derived here, on save only: inline hashtags win casing, retained legacy tags union in.
-    const nextTags = dedupeTags([...parseInlineTags(nextBody), ...retainedRef.current]);
     inFlightRef.current = true;
     dirtyRef.current = false;
+    sentRef.current = { body: nextBody, tags: nextTags };
     setStatus('saving');
     try {
       const id = idRef.current;
@@ -56,17 +67,29 @@ export function NoteEditor({ note }: { note?: Note }) {
         idRef.current = created.id;
         setNoteId(created.id);
         window.history.replaceState(null, '', `/notes/${created.id}`);
-      } else {
-        await saveNote(id, nextBody, nextTags);
+      } else if (!(await saveNote(id, nextBody, nextTags))) {
+        // Empty body on an existing note is rejected, so it stays dirty and unsaved.
+        sentRef.current = null;
+        inFlightRef.current = false;
+        dirtyRef.current = true;
+        setStatus('error');
+        return;
       }
+      const sent = sentRef.current;
+      sentRef.current = null;
       inFlightRef.current = false;
       if (deletingRef.current) return;
-      if (dirtyRef.current) {
+      const latestTags = tagsFor(bodyRef.current, retainedRef.current);
+      const changed =
+        sent === null || bodyRef.current !== sent.body || !sameTags(latestTags, sent.tags);
+      if (dirtyRef.current || changed) {
+        dirtyRef.current = true;
         void save();
       } else {
         setStatus('saved');
       }
     } catch {
+      sentRef.current = null;
       inFlightRef.current = false;
       dirtyRef.current = true;
       setStatus('error');
@@ -83,21 +106,53 @@ export function NoteEditor({ note }: { note?: Note }) {
 
   // Server Actions do not survive navigation, so a pending edit is sent via a
   // keepalive fetch that the browser finishes after the page is gone.
-  const flushKeepalive = useCallback(() => {
-    if (!dirtyRef.current || idRef.current === null || deletingRef.current) return;
+  const flushKeepalive = useCallback((allowCreate: boolean) => {
+    if (deletingRef.current) return;
+    // Hidden-but-alive (tab switch, app background): a new note must not be
+    // created here, because idRef and the URL stay null/'/notes/new'. Returning
+    // to type would then POST again and duplicate it. Leave it dirty for the
+    // normal debounced save. Only pagehide (allowCreate) may create.
+    if (idRef.current === null && !allowCreate) return;
+    const nextBody = bodyRef.current;
+    const nextTags = tagsFor(nextBody, retainedRef.current);
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    const nextBody = bodyRef.current;
-    const nextTags = dedupeTags([...parseInlineTags(nextBody), ...retainedRef.current]);
-    dirtyRef.current = false;
-    void fetch(`/api/notes/${idRef.current}/flush`, {
-      method: 'PATCH',
-      keepalive: true,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ body: nextBody, tags: nextTags }),
-    });
+    const fail = () => {
+      dirtyRef.current = true;
+      setStatus('error');
+    };
+    // A rejected fetch or a non-2xx (e.g. the API rejecting an empty body) both
+    // leave the edit dirty so it can be retried.
+    const send = (url: string, method: 'POST' | 'PATCH') => {
+      dirtyRef.current = false;
+      void fetch(url, {
+        method,
+        keepalive: true,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body: nextBody, tags: nextTags }),
+      })
+        .then((res) => {
+          if (!res.ok) fail();
+        })
+        .catch(fail);
+    };
+    if (idRef.current === null) {
+      // A create already in flight carries this note; a second POST would
+      // duplicate it. A non-dirty note was already flushed this lifecycle.
+      if (inFlightRef.current || !dirtyRef.current || !nextBody.trim()) return;
+      send('/api/notes/flush', 'POST');
+      return;
+    }
+    if (!dirtyRef.current) return;
+    if (!nextBody.trim()) {
+      fail();
+      return;
+    }
+    // Send even while a save is in flight: if an older PATCH lands after this
+    // newer body, save() re-issues the latest body once it resolves.
+    send(`/api/notes/${idRef.current}/flush`, 'PATCH');
   }, []);
 
   const remove = useCallback(async () => {
@@ -113,6 +168,7 @@ export function NoteEditor({ note }: { note?: Note }) {
       await deleteNoteAction(id);
     } catch {
       deletingRef.current = false;
+      dirtyRef.current = true;
       setStatus('error');
       return;
     }
@@ -144,22 +200,23 @@ export function NoteEditor({ note }: { note?: Note }) {
   }, []);
 
   useEffect(() => {
-    function onHide() {
-      // Existing notes go through the keepalive BFF route; a brand-new note has
-      // no id yet, so its initial create still has to use the Server Action.
-      if (idRef.current !== null) flushKeepalive();
-      else void flush();
+    function onPageHide() {
+      // The page is actually leaving: a new note may be created here, and this
+      // is the final act — there is no live page left to duplicate from.
+      flushKeepalive(true);
     }
     function onVisibility() {
-      if (document.visibilityState === 'hidden') onHide();
+      // Hidden but alive: existing notes keepalive-PATCH, new notes stay dirty
+      // for the normal debounced save (see flushKeepalive).
+      if (document.visibilityState === 'hidden') flushKeepalive(false);
     }
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onHide);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('pagehide', onPageHide);
     };
-  }, [flush, flushKeepalive]);
+  }, [flushKeepalive]);
 
   const inlineNames = new Set(parseInlineTags(body).map((t) => t.toLowerCase()));
   const legacyChips = retained.filter((name) => !inlineNames.has(name.toLowerCase()));
@@ -200,7 +257,7 @@ export function NoteEditor({ note }: { note?: Note }) {
         onBlur={() => void flush()}
       />
       {legacyChips.length > 0 && (
-        <div className="editor-legacy-tags" aria-label="Saved tags">
+        <div className="editor-legacy-tags" role="group" aria-label="Saved tags">
           {legacyChips.map((name) => (
             <span key={name} className="tag-chip">
               {name}

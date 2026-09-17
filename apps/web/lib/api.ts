@@ -3,6 +3,16 @@ import type { CreateNoteInput, Note, NotePage, Tag, UpdateNoteInput } from '@lif
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
 
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 function authHeaders(): HeadersInit {
   const token = process.env.API_TOKEN;
   if (!token) throw new Error('API_TOKEN is not set');
@@ -16,7 +26,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     cache: 'no-store',
   });
   if (!res.ok) {
-    throw new Error(`API ${res.status} on ${path}`);
+    throw new ApiError(res.status, `API ${res.status} on ${path}`);
   }
   return res.json() as Promise<T>;
 }

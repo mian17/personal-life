@@ -29,7 +29,7 @@ export function SearchBox({ q = '', tag }: { q?: string; tag?: string }) {
         params.set('q', value);
       }
       const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : '/');
+      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
     }, 300);
 
     return () => clearTimeout(timer);
