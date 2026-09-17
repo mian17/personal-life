@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Note } from '@life/shared';
-import { saveNote } from './actions';
+import { createNoteAction, saveNote } from './actions';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -21,17 +21,19 @@ function parseTags(value: string): string[] {
     .filter(Boolean);
 }
 
-export function NoteEditor({ note }: { note: Note }) {
+export function NoteEditor({ note }: { note?: Note }) {
   const router = useRouter();
-  const initialTags = note.tags.map((t) => t.name).join(', ');
-  const [body, setBody] = useState(note.body);
+  const initialTags = note ? note.tags.map((t) => t.name).join(', ') : '';
+  const [body, setBody] = useState(note?.body ?? '');
   const [tags, setTags] = useState(initialTags);
   const [status, setStatus] = useState<Status>('idle');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
-  const latestRef = useRef({ body: note.body, tags: initialTags });
+  // Once a create PATCHes an id, all later saves must update it — never POST again.
+  const idRef = useRef<string | null>(note?.id ?? null);
+  const latestRef = useRef({ body: note?.body ?? '', tags: initialTags });
 
   const save = useCallback(async () => {
     if (inFlightRef.current) {
@@ -39,11 +41,23 @@ export function NoteEditor({ note }: { note: Note }) {
       return;
     }
     if (!dirtyRef.current) return;
+    const { body: nextBody, tags: nextTags } = latestRef.current;
+    if (idRef.current === null && !nextBody.trim()) {
+      dirtyRef.current = false;
+      return;
+    }
     inFlightRef.current = true;
     dirtyRef.current = false;
     setStatus('saving');
     try {
-      await saveNote(note.id, latestRef.current.body, parseTags(latestRef.current.tags));
+      const id = idRef.current;
+      if (id === null) {
+        const created = await createNoteAction(nextBody, parseTags(nextTags));
+        idRef.current = created.id;
+        window.history.replaceState(null, '', `/notes/${created.id}`);
+      } else {
+        await saveNote(id, nextBody, parseTags(nextTags));
+      }
       inFlightRef.current = false;
       if (dirtyRef.current) {
         void save();
@@ -55,7 +69,7 @@ export function NoteEditor({ note }: { note: Note }) {
       dirtyRef.current = true;
       setStatus('error');
     }
-  }, [note.id]);
+  }, [router]);
 
   const flush = useCallback(async () => {
     if (timerRef.current) {
