@@ -1,4 +1,3 @@
-import { addNote } from './actions';
 import { listNotes, listTags } from '@/lib/api';
 import { NoteList } from './note-list';
 import { ThemeToggle } from './theme-toggle';
@@ -18,20 +17,13 @@ export default async function Home({
     <main>
       <header>
         <h1>Notes</h1>
-        <ThemeToggle />
+        <div className="header-actions">
+          <ThemeToggle />
+          <Link href="/notes/new" className="add-note" aria-label="New note">
+            +
+          </Link>
+        </div>
       </header>
-
-      <form action={addNote} className="capture">
-        <textarea
-          name="body"
-          placeholder="What's on your mind?"
-          rows={4}
-          autoFocus
-          required
-        />
-        <input name="tags" placeholder="tags, comma separated" enterKeyHint="done" />
-        <button type="submit">Save</button>
-      </form>
 
       {tags.length > 0 && (
         <nav className="filters">
@@ -48,7 +40,7 @@ export default async function Home({
         </nav>
       )}
 
-      <NoteList notes={notes} activeTag={tag} />
+      <NoteList notes={notes} />
     </main>
   );
 }

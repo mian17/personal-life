@@ -72,12 +72,32 @@ header h1 {
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .theme-toggle {
   min-height: 0;
   padding: 0.5rem 0.9rem;
   background: var(--panel);
   color: var(--text);
   font-size: 0.85rem;
+}
+
+.add-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 1.5rem;
+  line-height: 1;
+  text-decoration: none;
 }
 
 textarea,
@@ -107,15 +127,6 @@ button {
   min-height: 48px;
 }
 
-.capture {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.capture button {
-  width: 100%;
-}
-
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -123,8 +134,7 @@ button {
   margin: 1.25rem 0;
 }
 
-.filters a,
-.chip {
+.filters a {
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
   background: var(--panel);
@@ -133,8 +143,7 @@ button {
   font-size: 0.85rem;
 }
 
-.filters a.active,
-.chip.active {
+.filters a.active {
   background: var(--accent);
   color: white;
 }
@@ -144,59 +153,64 @@ button {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .note {
   background: var(--panel);
   border-radius: 12px;
-  padding: 0.9rem;
+  overflow: hidden;
 }
 
-.note .body {
-  margin: 0 0 0.6rem;
-  white-space: pre-wrap;
-}
-
-.meta {
+.note-link {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.note-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.note-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-snippet {
+  color: var(--muted);
+  font-size: 0.9rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-link time {
+  flex-shrink: 0;
+  color: var(--muted);
   font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.meta form {
-  margin-left: auto;
-}
-
-.danger {
-  background: transparent;
-  color: var(--danger);
-  padding: 0.35rem 0.5rem;
-  min-height: 0;
-  font-weight: 500;
-}
-
-.editor {
-  margin-top: 0.6rem;
-}
-
-.editor summary {
-  color: var(--muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.editor form {
-  display: grid;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  white-space: nowrap;
 }
 
 .empty {
   color: var(--muted);
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty p {
+  margin: 0.25rem 0;
 }
 
 .editor-screen {

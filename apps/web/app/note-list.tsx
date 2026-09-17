@@ -1,39 +1,44 @@
 import Link from 'next/link';
 import type { Note } from '@life/shared';
-import { removeNote } from './actions';
-import { NoteEditor } from './note-editor';
 import { LocalTime } from './local-time';
 
-export function NoteList({ notes, activeTag }: { notes: Note[]; activeTag?: string }) {
+function splitBody(body: string): { title: string; snippet: string } {
+  const normalized = body.replace(/\r\n/g, '\n').trim();
+  const newline = normalized.indexOf('\n');
+  if (newline === -1) {
+    return { title: normalized, snippet: '' };
+  }
+  return {
+    title: normalized.slice(0, newline).trim(),
+    snippet: normalized.slice(newline + 1).trim(),
+  };
+}
+
+export function NoteList({ notes }: { notes: Note[] }) {
   if (notes.length === 0) {
-    return <p className="empty">No notes yet.</p>;
+    return (
+      <div className="empty">
+        <p>No notes yet.</p>
+        <p>Tap + to write your first note.</p>
+      </div>
+    );
   }
   return (
     <ul className="notes">
-      {notes.map((note) => (
-        <li key={note.id} className="note">
-          <p className="body">{note.body}</p>
-          <div className="meta">
-            {note.tags.map((tag) => (
-              <Link
-                key={tag.id}
-                href={`/?tag=${encodeURIComponent(tag.name)}`}
-                className={`chip${activeTag === tag.name ? ' active' : ''}`}
-              >
-                {tag.name}
-              </Link>
-            ))}
-            <LocalTime iso={note.createdAt} />
-            <form action={removeNote}>
-              <input type="hidden" name="id" value={note.id} />
-              <button type="submit" className="danger">
-                Delete
-              </button>
-            </form>
-          </div>
-          <NoteEditor note={note} />
-        </li>
-      ))}
+      {notes.map((note) => {
+        const { title, snippet } = splitBody(note.body);
+        return (
+          <li key={note.id} className="note">
+            <Link href={`/notes/${note.id}`} className="note-link">
+              <span className="note-text">
+                <span className="note-title">{title}</span>
+                {snippet && <span className="note-snippet">{snippet}</span>}
+              </span>
+              <LocalTime iso={note.createdAt} />
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
