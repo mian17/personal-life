@@ -243,7 +243,6 @@ button {
   flex-direction: column;
   min-height: 100dvh;
   padding: max(0.75rem, env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
-  -webkit-tap-highlight-color: transparent;
 }
 
 .editor-toolbar {
@@ -329,6 +328,7 @@ button {
   background: transparent;
   resize: none;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
   font-size: 1.05rem;
 }
 
