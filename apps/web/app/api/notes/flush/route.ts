@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const note = await createNote({ body: payload.body, tags: payload.tags });
-    return NextResponse.json({ ok: true, id: note.id, updatedAt: note.updatedAt }, { status: 201 });
+    return NextResponse.json(
+      { ok: true, id: note.id, version: note.version, updatedAt: note.updatedAt },
+      { status: 201 },
+    );
   } catch (error) {
     const status = apiErrorStatus(error);
     if (status === 400) return NextResponse.json({ error: 'invalid input' }, { status: 400 });

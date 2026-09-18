@@ -5,13 +5,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Note } from '@life/shared';
 import { dedupeTags, parseInlineTags } from './tags';
 
-type Status = 'idle' | 'saving' | 'saved' | 'error';
+type Status = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
 
 const STATUS_TEXT: Record<Status, string> = {
   idle: '',
   saving: 'Saving…',
   saved: 'Saved',
   error: "Couldn't save",
+  conflict: 'Changed on another device',
 };
 
 function tagsFor(body: string, retained: readonly string[]): string[] {
@@ -23,12 +24,17 @@ function sameTags(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((tag, i) => tag === b[i]);
 }
 
+function noteTagNames(note: Note): string[] {
+  return note.tags.map((t) => t.name);
+}
+
 export function NoteEditor({ note }: { note?: Note }) {
   const router = useRouter();
-  const initialLegacy = note?.tags.map((t) => t.name) ?? [];
+  const initialLegacy = note ? noteTagNames(note) : [];
   const [body, setBody] = useState(note?.body ?? '');
   const [retained, setRetained] = useState<string[]>(initialLegacy);
   const [status, setStatus] = useState<Status>('idle');
+  const [conflictNote, setConflictNote] = useState<Note | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
@@ -36,6 +42,12 @@ export function NoteEditor({ note }: { note?: Note }) {
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
   const retainedRef = useRef<string[]>(initialLegacy);
+  // Server version last seen from a successful read/write; sent as expectedVersion
+  // so a PATCH from a stale tab is rejected (409) instead of silently overwriting.
+  const versionRef = useRef(note?.version ?? 0);
+  // The server note that won the race. Kept in a ref so save()/leave() can read it
+  // synchronously, and in state so the conflict bar renders.
+  const conflictRef = useRef<Note | null>(null);
   // The body/tags the in-flight request is persisting, so a newer edit can win.
   const sentRef = useRef<{ body: string; tags: string[] } | null>(null);
   // One shared drain promise: concurrent calls (debounce + blur + explicit Save)
@@ -44,9 +56,25 @@ export function NoteEditor({ note }: { note?: Note }) {
   // once all pending work is sent; it resolves true only when nothing is left dirty.
   const drainRef = useRef<Promise<boolean> | null>(null);
 
+  const enterConflict = useCallback((server: Note) => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    conflictRef.current = server;
+    setConflictNote(server);
+    // The local edit is retained (dirty) but autosave stays paused until the user
+    // picks Load latest or Keep mine; a retry with the same stale version would
+    // only 409 again.
+    dirtyRef.current = true;
+    sentRef.current = null;
+    setStatus('conflict');
+  }, []);
+
   const save = useCallback((): Promise<boolean> => {
     const running = drainRef.current;
     if (running) return running;
+    if (conflictRef.current) return Promise.resolve(false);
     const drain = (async (): Promise<boolean> => {
       for (;;) {
         if (!dirtyRef.current) return true;
@@ -76,21 +104,44 @@ export function NoteEditor({ note }: { note?: Note }) {
           const res = await fetch(id === null ? '/api/notes/flush' : `/api/notes/${id}/flush`, {
             method: id === null ? 'POST' : 'PATCH',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ body: nextBody, tags: nextTags }),
+            body: JSON.stringify(
+              id === null
+                ? { body: nextBody, tags: nextTags }
+                : { body: nextBody, tags: nextTags, expectedVersion: versionRef.current },
+            ),
           });
-          if (!res.ok) {
+          if (res.status === 409) {
+            // Stop the drain and keep the local edit. The response carries the
+            // current server note so the user can choose without another request.
+            let server: Note | null = null;
+            try {
+              const data = (await res.json()) as { note?: Note };
+              server = data.note ?? null;
+            } catch {
+              server = null;
+            }
+            if (server) {
+              enterConflict(server);
+            } else {
+              dirtyRef.current = true;
+              sentRef.current = null;
+              setStatus('error');
+            }
+            failed = true;
+          } else if (!res.ok) {
             sentRef.current = null;
             dirtyRef.current = true;
             failed = true;
             setStatus('error');
           } else {
-            if (id === null) {
-              const created = (await res.json()) as { id: string };
-              idRef.current = created.id;
+            const data = (await res.json()) as { id?: string; version?: number };
+            if (id === null && typeof data.id === 'string') {
+              idRef.current = data.id;
               // replaceState, not router.replace: a router transition is exactly what
               // used to remount the editor and reset the caret.
-              window.history.replaceState(null, '', `/notes/${created.id}`);
+              window.history.replaceState(null, '', `/notes/${data.id}`);
             }
+            if (typeof data.version === 'number') versionRef.current = data.version;
             const sent = sentRef.current;
             sentRef.current = null;
             const latestTags = tagsFor(bodyRef.current, retainedRef.current);
@@ -120,7 +171,7 @@ export function NoteEditor({ note }: { note?: Note }) {
       if (drainRef.current === drain) drainRef.current = null;
     });
     return drain;
-  }, []);
+  }, [enterConflict]);
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (timerRef.current) {
@@ -159,14 +210,32 @@ export function NoteEditor({ note }: { note?: Note }) {
     // leave the edit dirty so it can be retried.
     const send = (url: string, method: 'POST' | 'PATCH') => {
       dirtyRef.current = false;
+      const payload: { body: string; tags: string[]; expectedVersion?: number } = {
+        body: nextBody,
+        tags: nextTags,
+      };
+      // Best-effort concurrency guard: a stale keepalive PATCH must not clobber
+      // another writer. A conflict here only marks the editor paused, never retries.
+      if (method === 'PATCH') payload.expectedVersion = versionRef.current;
       void fetch(url, {
         method,
         keepalive: true,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ body: nextBody, tags: nextTags }),
+        body: JSON.stringify(payload),
       })
-        .then((res) => {
-          if (!res.ok) fail();
+        .then(async (res) => {
+          if (res.ok) return;
+          if (res.status === 409) {
+            try {
+              const data = (await res.json()) as { note?: Note };
+              if (data.note) enterConflict(data.note);
+              else fail();
+            } catch {
+              fail();
+            }
+            return;
+          }
+          fail();
         })
         .catch(fail);
     };
@@ -185,10 +254,13 @@ export function NoteEditor({ note }: { note?: Note }) {
     // Send even while a save is in flight: if an older PATCH lands after this
     // newer body, save() re-issues the latest body once it resolves.
     send(`/api/notes/${idRef.current}/flush`, 'PATCH');
-  }, []);
+  }, [enterConflict]);
 
   function schedule() {
     dirtyRef.current = true;
+    // While conflicted, hold the debounce: autosaving with a stale version only
+    // re-409s, and the user has an explicit choice to make first.
+    if (conflictRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
@@ -202,6 +274,35 @@ export function NoteEditor({ note }: { note?: Note }) {
     setRetained(next);
     schedule();
   }
+
+  const loadLatest = useCallback(() => {
+    const server = conflictRef.current;
+    if (!server) return;
+    conflictRef.current = null;
+    setConflictNote(null);
+    bodyRef.current = server.body;
+    setBody(server.body);
+    const names = noteTagNames(server);
+    retainedRef.current = names;
+    setRetained(names);
+    versionRef.current = server.version;
+    dirtyRef.current = false;
+    sentRef.current = null;
+    setStatus('idle');
+  }, []);
+
+  const keepMine = useCallback(() => {
+    const server = conflictRef.current;
+    if (!server) return;
+    // Adopt the server's current version and force the overwrite in one PATCH.
+    versionRef.current = server.version;
+    conflictRef.current = null;
+    setConflictNote(null);
+    dirtyRef.current = true;
+    sentRef.current = null;
+    setStatus('saving');
+    void save();
+  }, [save]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -251,6 +352,19 @@ export function NoteEditor({ note }: { note?: Note }) {
           Save
         </button>
       </div>
+      {conflictNote && (
+        <div className="editor-conflict" role="alert">
+          <p className="editor-conflict-text">This note changed on another device.</p>
+          <div className="editor-conflict-actions">
+            <button type="button" className="editor-conflict-load" onClick={loadLatest}>
+              Load latest
+            </button>
+            <button type="button" className="editor-conflict-overwrite" onClick={keepMine}>
+              Keep mine (overwrite)
+            </button>
+          </div>
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         className="editor-body"

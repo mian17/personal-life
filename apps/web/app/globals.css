@@ -278,6 +278,47 @@ button {
   font-size: 0.85rem;
 }
 
+.editor-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.editor-conflict-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.editor-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editor-conflict-actions button {
+  min-height: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.editor-conflict-load {
+  background: var(--accent);
+}
+
+.editor-conflict-overwrite {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
 .editor-body {
   flex: 1;
   width: 100%;

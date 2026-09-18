@@ -9,6 +9,7 @@ export interface Note {
   tags: Tag[];
   createdAt: string;
   updatedAt: string;
+  version: number;
 }
 
 export interface CreateNoteInput {
@@ -19,6 +20,7 @@ export interface CreateNoteInput {
 export interface UpdateNoteInput {
   body?: string;
   tags?: string[];
+  expectedVersion?: number;
 }
 
 export interface NotePage {

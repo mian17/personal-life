@@ -10,7 +10,7 @@ function isTagArray(value: unknown): value is string[] {
 }
 
 export type FlushPayload =
-  | { ok: true; body: string; tags: string[] }
+  | { ok: true; body: string; tags: string[]; expectedVersion?: number }
   | { ok: false; error: string };
 
 export async function readFlushPayload(req: Request): Promise<FlushPayload> {
@@ -25,15 +25,30 @@ export async function readFlushPayload(req: Request): Promise<FlushPayload> {
     return { ok: false, error: 'invalid body' };
   }
 
-  const { body, tags } = payload as { body?: unknown; tags?: unknown };
+  const { body, tags, expectedVersion } = payload as {
+    body?: unknown;
+    tags?: unknown;
+    expectedVersion?: unknown;
+  };
   if (typeof body !== 'string' || body.length > NOTE_BODY_MAX) {
     return { ok: false, error: 'invalid body' };
   }
   if (!isTagArray(tags)) {
     return { ok: false, error: 'invalid tags' };
   }
-
-  return { ok: true, body, tags };
+  // Absent means unconditional (create / legacy client); present must be a valid
+  // non-negative integer so a malformed version fails loudly instead of editing.
+  if (expectedVersion === undefined) {
+    return { ok: true, body, tags };
+  }
+  if (
+    typeof expectedVersion !== 'number' ||
+    !Number.isInteger(expectedVersion) ||
+    expectedVersion < 0
+  ) {
+    return { ok: false, error: 'invalid version' };
+  }
+  return { ok: true, body, tags, expectedVersion };
 }
 
 export function apiErrorStatus(error: unknown): number | null {

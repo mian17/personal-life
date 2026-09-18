@@ -17,6 +17,9 @@ export class Note {
   @Column({ type: 'text' })
   body: string;
 
+  @Column({ type: 'integer', default: 0 })
+  version: number;
+
   @ManyToMany(() => Tag, (tag) => tag.notes, { cascade: true })
   @JoinTable({ name: 'note_tag' })
   tags: Tag[];

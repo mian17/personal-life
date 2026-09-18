@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Note } from './note.entity';
@@ -24,6 +24,7 @@ function toDto(note: Note): NoteDto {
     tags: (note.tags ?? []).map((t) => ({ id: t.id, name: t.name })),
     createdAt: note.createdAt.toISOString(),
     updatedAt: note.updatedAt.toISOString(),
+    version: note.version,
   };
 }
 
@@ -50,6 +51,7 @@ export class NotesService {
   async create(body: string, tagNames: string[] | undefined): Promise<NoteDto> {
     const note = this.notes.create({
       body,
+      version: 0,
       tags: await this.resolveTags(normalizeTags(tagNames)),
     });
     return toDto(await this.notes.save(note));
@@ -100,11 +102,20 @@ export class NotesService {
     return toDto(note);
   }
 
-  async update(id: string, body?: string, tagNames?: string[]): Promise<NoteDto> {
+  async update(
+    id: string,
+    body?: string,
+    tagNames?: string[],
+    expectedVersion?: number,
+  ): Promise<NoteDto> {
     const note = await this.notes.findOne({ where: { id }, relations: { tags: true } });
     if (!note) throw new NotFoundException('Note not found');
+    if (expectedVersion !== undefined && note.version !== expectedVersion) {
+      throw new ConflictException('Note was modified');
+    }
     if (body !== undefined) note.body = body;
     if (tagNames !== undefined) note.tags = await this.resolveTags(normalizeTags(tagNames));
+    note.version += 1;
     return toDto(await this.notes.save(note));
   }
 

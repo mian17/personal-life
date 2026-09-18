@@ -25,7 +25,7 @@ export class NotesController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateNoteDto) {
-    return this.notes.update(id, dto.body, dto.tags);
+    return this.notes.update(id, dto.body, dto.tags, dto.expectedVersion);
   }
 
   @Delete(':id')

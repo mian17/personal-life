@@ -93,4 +93,76 @@ describe('Notes API (e2e)', () => {
     await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
     await auth(request(app.getHttpServer()).get(`/api/notes/${id}`)).expect(404);
   });
+
+  it('creates notes with the documented initial version', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'versioned create' }),
+    ).expect(201);
+    expect(created.body.version).toBe(0);
+  });
+
+  it('returns version as a number on GET', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'versioned read' }),
+    ).expect(201);
+
+    const fetched = await auth(
+      request(app.getHttpServer()).get(`/api/notes/${created.body.id}`),
+    ).expect(200);
+    expect(typeof fetched.body.version).toBe('number');
+    expect(fetched.body.version).toBe(0);
+  });
+
+  it('increments version on a PATCH with the correct expectedVersion', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'optimistic ok' }),
+    ).expect(201);
+
+    const updated = await auth(
+      request(app.getHttpServer())
+        .patch(`/api/notes/${created.body.id}`)
+        .send({ body: 'optimistic edited', expectedVersion: 0 }),
+    ).expect(200);
+    expect(updated.body.version).toBe(1);
+    expect(updated.body.body).toBe('optimistic edited');
+  });
+
+  it('rejects a stale expectedVersion with 409 and leaves the note unchanged', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'conflict base' }),
+    ).expect(201);
+
+    const first = await auth(
+      request(app.getHttpServer())
+        .patch(`/api/notes/${created.body.id}`)
+        .send({ body: 'conflict first', expectedVersion: 0 }),
+    ).expect(200);
+    expect(first.body.version).toBe(1);
+
+    await auth(
+      request(app.getHttpServer())
+        .patch(`/api/notes/${created.body.id}`)
+        .send({ body: 'conflict stale', expectedVersion: 0 }),
+    ).expect(409);
+
+    const reread = await auth(
+      request(app.getHttpServer()).get(`/api/notes/${created.body.id}`),
+    ).expect(200);
+    expect(reread.body.body).toBe('conflict first');
+    expect(reread.body.version).toBe(1);
+  });
+
+  it('still patches without expectedVersion (legacy last-write-wins)', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'legacy base' }),
+    ).expect(201);
+
+    const updated = await auth(
+      request(app.getHttpServer())
+        .patch(`/api/notes/${created.body.id}`)
+        .send({ body: 'legacy edited' }),
+    ).expect(200);
+    expect(updated.body.body).toBe('legacy edited');
+    expect(updated.body.version).toBe(1);
+  });
 });

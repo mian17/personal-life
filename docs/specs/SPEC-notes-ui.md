@@ -102,8 +102,15 @@ tag(id, name unique)
 note_tag(note_id, tag_id)
 ```
 
-Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
-`GET /api/notes/:id`, `PATCH /api/notes/:id`, `DELETE /api/notes/:id`, `GET /api/tags`.
+Endpoints: `POST /api/notes`, `GET /api/notes?tag=&q=`, `GET /api/notes/:id`,
+`PATCH /api/notes/:id`, `DELETE /api/notes/:id`, `GET /api/tags`.
+
+An explicit integer `version` column was added to support optimistic concurrency (the
+second-resolution `updatedAt` is not a usable conflict token). Every note starts at
+`version: 0`; each successful PATCH increments it. A PATCH may carry
+`expectedVersion`; when it does not match the stored version the API returns **409
+Conflict** without modifying the note. A PATCH without `expectedVersion` keeps the legacy
+last-write-wins behavior (still incrementing the version).
 
 ## UX Specification
 
@@ -130,6 +137,11 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
   `Saving…` / `Saved` / `Couldn't save`. Also flush on blur. The debounce, blur, and the
   explicit Save/Back controls coalesce through one in-flight drain, so they never fire
   redundant overlapping requests.
+- **Conflict handling:** every autosave PATCH sends `expectedVersion`. On a 409 the editor
+  pauses autosave, keeps the local text, and shows a conflict bar with **Load latest**
+  (adopt the server note) and **Keep mine (overwrite)** (adopt the server version and force
+  one PATCH). This replaces silent last-write-wins when the same note is edited in two
+  tabs. Back/Save do not navigate while a conflict is unresolved.
 - **Transport:** the editor writes through the BFF route handlers
   (`POST /api/notes/flush`, `PATCH /api/notes/[id]/flush`) with plain `fetch`, not Server
   Actions. Server Actions refresh the current route, which remounts the editor on the
@@ -211,7 +223,8 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 6. Typing in the search field filters the list to matching notes after a debounced server
    round trip; clearing it restores all notes.
 7. Tag filtering via `?tag=` still works and the existing tags are never silently dropped
-   on edit.
+   on edit. Concurrent edits of the same note are detected (409) and resolved explicitly
+   via Load latest / Keep mine rather than silently overwritten.
 8. The list shows title (first line), snippet, and date per row; no Edit disclosure, and each
    row has a Delete control at the right.
 9. The app renders correctly in both light and dark schemes, and the theme control cycles
