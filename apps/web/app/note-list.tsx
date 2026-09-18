@@ -33,9 +33,16 @@ export function NoteList({ notes }: { notes: Note[] }) {
             <Link href={`/notes/${note.id}`} className="note-link">
               <span className="note-text">
                 <span className="note-title">{title}</span>
-                {snippet && <span className="note-snippet">{snippet}</span>}
+                <span className="note-sub">
+                  <LocalTime iso={note.createdAt} />
+                  {snippet && (
+                    <>
+                      <span className="note-sep">|</span>
+                      <span className="note-snippet">{snippet}</span>
+                    </>
+                  )}
+                </span>
               </span>
-              <LocalTime iso={note.createdAt} />
             </Link>
             <form action={deleteNoteAction.bind(null, note.id)}>
               <button type="submit" className="note-delete" aria-label={`Delete ${title}`}>
