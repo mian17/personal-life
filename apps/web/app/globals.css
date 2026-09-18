@@ -243,6 +243,7 @@ button {
   flex-direction: column;
   min-height: 100dvh;
   padding: max(0.75rem, env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
 }
 
 .editor-toolbar {
