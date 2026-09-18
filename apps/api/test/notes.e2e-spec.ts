@@ -165,4 +165,118 @@ describe('Notes API (e2e)', () => {
     expect(updated.body.body).toBe('legacy edited');
     expect(updated.body.version).toBe(1);
   });
+
+  it('moves a deleted note to trash and hides it from the main list', async () => {
+    const created = await auth(
+      request(app.getHttpServer())
+        .post('/api/notes')
+        .send({ body: 'trash me', tags: ['trashy'] }),
+    ).expect(201);
+    const id = created.body.id;
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+
+    const listed = await auth(request(app.getHttpServer()).get('/api/notes')).expect(200);
+    expect(listed.body.notes.map((n: { id: string }) => n.id)).not.toContain(id);
+
+    const trash = await auth(request(app.getHttpServer()).get('/api/notes/trash')).expect(200);
+    const trashed = trash.body.notes.find((n: { id: string }) => n.id === id);
+    expect(trashed).toBeDefined();
+    expect(trashed.deletedAt).not.toBeNull();
+  });
+
+  it('returns 404 for a trashed note on GET /:id and PATCH', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'hidden' }),
+    ).expect(201);
+    const id = created.body.id;
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+    await auth(request(app.getHttpServer()).get(`/api/notes/${id}`)).expect(404);
+    await auth(
+      request(app.getHttpServer()).patch(`/api/notes/${id}`).send({ body: 'nope' }),
+    ).expect(404);
+  });
+
+  it('restores a trashed note with the same createdAt, tags, and version', async () => {
+    const created = await auth(
+      request(app.getHttpServer())
+        .post('/api/notes')
+        .send({ body: 'restore me', tags: ['keep'] }),
+    ).expect(201);
+    const id = created.body.id;
+    const createdAt = created.body.createdAt;
+
+    const updated = await auth(
+      request(app.getHttpServer())
+        .patch(`/api/notes/${id}`)
+        .send({ body: 'restore me edited' }),
+    ).expect(200);
+    expect(updated.body.version).toBe(1);
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+
+    const restored = await auth(
+      request(app.getHttpServer()).post(`/api/notes/${id}/restore`),
+    ).expect(201);
+    expect(restored.body.createdAt).toBe(createdAt);
+    expect(restored.body.tags.map((t: { name: string }) => t.name)).toEqual(['keep']);
+    expect(restored.body.version).toBe(1);
+    expect(restored.body.deletedAt).toBeNull();
+
+    const listed = await auth(request(app.getHttpServer()).get('/api/notes')).expect(200);
+    expect(listed.body.notes.map((n: { id: string }) => n.id)).toContain(id);
+  });
+
+  it('does not change version on trash or restore', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'version stable' }),
+    ).expect(201);
+    const id = created.body.id;
+    expect(created.body.version).toBe(0);
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+    const trash = await auth(request(app.getHttpServer()).get('/api/notes/trash')).expect(200);
+    const trashed = trash.body.notes.find((n: { id: string }) => n.id === id);
+    expect(trashed.version).toBe(0);
+
+    const restored = await auth(
+      request(app.getHttpServer()).post(`/api/notes/${id}/restore`),
+    ).expect(201);
+    expect(restored.body.version).toBe(0);
+  });
+
+  it('permanently deletes a note from trash and 404s on a second call', async () => {
+    const created = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'delete forever' }),
+    ).expect(201);
+    const id = created.body.id;
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}/permanent`)).expect(200);
+
+    const trash = await auth(request(app.getHttpServer()).get('/api/notes/trash')).expect(200);
+    expect(trash.body.notes.map((n: { id: string }) => n.id)).not.toContain(id);
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${id}/permanent`)).expect(404);
+  });
+
+  it('empties the trash and returns the deleted count', async () => {
+    const a = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'empty a' }),
+    ).expect(201);
+    const b = await auth(
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'empty b' }),
+    ).expect(201);
+
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${a.body.id}`)).expect(200);
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${b.body.id}`)).expect(200);
+
+    const emptied = await auth(request(app.getHttpServer()).delete('/api/notes/trash')).expect(200);
+    expect(emptied.body.ok).toBe(true);
+    expect(emptied.body.count).toBeGreaterThanOrEqual(2);
+
+    const trash = await auth(request(app.getHttpServer()).get('/api/notes/trash')).expect(200);
+    expect(trash.body.notes).toHaveLength(0);
+  });
 });

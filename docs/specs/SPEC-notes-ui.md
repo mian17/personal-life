@@ -63,8 +63,11 @@ apps/web/app/
   notes/
     new/page.tsx      New-note editor route (no DB row until first save)
     [id]/page.tsx     Existing-note editor route
+  trash/page.tsx      Trash list: restore, delete forever, empty trash
   note-editor.tsx     Full-screen client editor (autosave, save)
   note-list.tsx       List rows (title/snippet/date), tap → editor
+  note-title.ts       Shared body → title/snippet split
+  confirm-submit.tsx  Client submit button gated by window.confirm
   search-box.tsx      Client search input; debounced ?q= update
   theme-toggle.tsx    Client System/Light/Dark control; persists to localStorage
   actions.ts          Server Actions: create, update, delete (reused)
@@ -190,14 +193,50 @@ last-write-wins behavior (still incrementing the version).
   `viewport.themeColor` gains a light/dark pair.
 - This is a token-level restyle shared by both themes; no layout or component change.
 
+### Trash (`/trash`)
+
+- Entry point: a Lucide `Trash2` icon link in the home header (`aria-label="Trash"`), next
+  to the theme toggle. No badge or count.
+- The list `×` performs a **silent soft-delete** (no confirmation): the note is moved to
+  trash and disappears from the list, search, and tag filters. Recoverable, so it carries no
+  friction.
+- `GET /api/notes/trash` lists trashed notes (same `{ notes, nextCursor }` shape). Each row
+  reuses the main list's title/snippet split and shows the deleted date via `LocalTime` on
+  `deletedAt`.
+- Per-row actions: **Restore** (`POST /api/notes/:id/restore`, no confirmation) and
+  **Delete forever** (`DELETE /api/notes/:id/permanent`, `confirm()` required). Both are
+  Server Actions.
+- Bulk action: **Empty Trash** (`DELETE /api/notes/trash`, `confirm()` required) shown only
+  when the trash is non-empty.
+- Confirmations use a small client `ConfirmSubmit` button that calls `window.confirm` and
+  cancels submission when dismissed. Restore does not confirm.
+- v1 renders a single page of up to 50 notes; `nextCursor` is ignored (no pagination UI) but
+  must not crash.
+- A soft-deleted note keeps its original `createdAt` and tags; restoring returns it to that
+  position with tags intact. Nothing is destroyed except via the explicit permanent actions.
+
+### Icon migration
+
+All text/glyph icons are replaced with `lucide-react`:
+
+- list delete `×` → `Trash2`; header trash link → `Trash2`
+- editor back `‹` → `ChevronLeft`; tag-chip remove `×` → `X`
+- floating new-note `+` → `Plus` (the `.add-note` pseudo-element cross is removed; the link
+  centers its child icon)
+- theme toggle text (`System`/`Light`/`Dark`) → icon-only `Monitor` / `Sun` / `Moon`, keeping
+  the existing `aria-label` / `aria-pressed` semantics and System → Light → Dark cycle
+
 ## Testing Strategy
 
-- **API:** unchanged — the existing Jest + supertest e2e (`apps/api/test/notes.e2e-spec.ts`)
-  must stay green. No new API tests; the API is untouched.
+- **API:** the Jest + supertest e2e (`apps/api/test/notes.e2e-spec.ts`) must stay green and
+  now covers trash: soft-delete hides the note from the list, `GET /:id` 404s when trashed,
+  restore preserves `createdAt`/tags/version, permanent delete 404s on a second call, and
+  empty-trash returns the deleted count.
 - **Web:** no new automated UI test in this pass. Verification is manual + scripted browser
   checks with `playwright-cli` against the **scratch DB**, covering: tap-to-open, immediate
   typing, autosave status, explicit save, delete, search filtering, tag filter, and a
-  refresh-to-confirm persistence check.
+  refresh-to-confirm persistence check. Trash adds: soft-delete → trash list → restore and
+  delete-forever confirmation flows.
 - Web verification must never load or mutate the real `life.db`.
 
 ## Boundaries

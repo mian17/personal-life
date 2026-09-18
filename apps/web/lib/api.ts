@@ -58,3 +58,19 @@ export function updateNote(id: string, input: UpdateNoteInput): Promise<Note> {
 export function deleteNote(id: string): Promise<{ ok: boolean }> {
   return call<{ ok: boolean }>(`/api/notes/${id}`, { method: 'DELETE' });
 }
+
+export function listTrash(): Promise<NotePage> {
+  return call<NotePage>('/api/notes/trash');
+}
+
+export function restoreNote(id: string): Promise<Note> {
+  return call<Note>(`/api/notes/${id}/restore`, { method: 'POST' });
+}
+
+export function deleteNotePermanently(id: string): Promise<{ ok: boolean }> {
+  return call<{ ok: boolean }>(`/api/notes/${id}/permanent`, { method: 'DELETE' });
+}
+
+export function emptyTrash(): Promise<{ ok: boolean; count: number }> {
+  return call<{ ok: boolean; count: number }>('/api/notes/trash', { method: 'DELETE' });
+}

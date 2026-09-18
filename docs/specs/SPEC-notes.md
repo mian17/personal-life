@@ -69,30 +69,47 @@ export class CreateNoteDto {
 ## Data Model
 
 ```
-note(id TEXT PK, body TEXT NOT NULL, created_at TEXT, updated_at TEXT)
+note(id TEXT PK, body TEXT NOT NULL, created_at TEXT, updated_at TEXT, deleted_at TEXT NULL)
 tag(id INTEGER PK, name TEXT UNIQUE)
 note_tag(note_id → note ON DELETE CASCADE, tag_id → tag ON DELETE CASCADE, PK(note_id, tag_id))
 ```
 
 `ponytail:` tags as their own table (not a CSV) because filtering is the first feature past
 capture. `ponytail:` search via `LIKE`; FTS5 only if quality bites. `ponytail:` no `type`
-column until a second note-like kind appears.
+column until a second note-like kind appears. `ponytail:` soft-delete is a nullable
+`deleted_at` timestamp (null = active); no separate trash table and no scheduled purge,
+matching the confirmed intent's "trash never purges on its own".
 
 ## API Surface
 
 All under `/api`, guarded by a single bearer-token guard (`API_TOKEN`); no users/sessions.
 
 ```
-POST   /api/notes      { body, tags[] }
+POST   /api/notes               { body, tags[] }
 GET    /api/notes?tag=&q=&limit=&cursor=
+GET    /api/notes/trash?limit=&cursor=
+DELETE /api/notes/trash
 GET    /api/notes/:id
-PATCH  /api/notes/:id  { body?, tags? }
+PATCH  /api/notes/:id           { body?, tags? }
 DELETE /api/notes/:id
+POST   /api/notes/:id/restore
+DELETE /api/notes/:id/permanent
 GET    /api/tags
 ```
 
 - `tags` on write = array of names; API upserts and reconciles `note_tag`.
 - List reverse-chron, cursor-paginated (`created_at` + `id`), `limit` default 50.
+- `DELETE /api/notes/:id` is a **soft** delete: sets `deleted_at`; the note leaves the
+  list, `GET /:id`, and tag filters but remains recoverable. Trash/restore never change
+  `version`.
+- `GET /api/notes/trash` lists only soft-deleted notes, ordered `deleted_at DESC, id DESC`,
+  cursor-paginated (`deleted_at` + `id`); same `limit` rules as the main list.
+- `DELETE /api/notes/trash` empties the trash (`{ ok: true, count }`).
+- `POST /api/notes/:id/restore` clears `deleted_at`, preserving `createdAt`, tags, and
+  `version`.
+- `DELETE /api/notes/:id/permanent` hard-deletes a trashed note; 404 if it is not in trash.
+- Static `trash` routes are declared before `:id` routes so `/trash` is not parsed as an id.
+- Trashed notes are excluded from `GET /api/tags` (a tag with only trashed notes is hidden).
 
 ## Authentication & Authorization
 
@@ -118,7 +135,11 @@ No authorization (single user owns everything). Authentication boundary:
 ## Testing Strategy
 
 - **API:** one Jest + supertest e2e covering create → list → filter by tag → update →
-  delete, against a temp SQLite file. The single runnable check.
+  delete, against a temp SQLite file. The single runnable check. Trash coverage: a
+  soft-deleted note is absent from the list and `GET /:id` (404) but present in
+  `GET /api/notes/trash`; restore returns it with the same `createdAt`, tags, and
+  `version`; permanent delete removes it from trash and 404s on a second call; and
+  `DELETE /api/notes/trash` empties the trash and returns a `count`.
 - **Web:** manually verified at phone viewport; no automated UI test in v1.
 
 ## Boundaries

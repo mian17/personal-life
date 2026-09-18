@@ -20,6 +20,9 @@ export class Note {
   @Column({ type: 'integer', default: 0 })
   version: number;
 
+  @Column({ type: 'datetime', nullable: true })
+  deletedAt: Date | null;
+
   @ManyToMany(() => Tag, (tag) => tag.notes, { cascade: true })
   @JoinTable({ name: 'note_tag' })
   tags: Tag[];

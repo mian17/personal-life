@@ -18,6 +18,17 @@ export class NotesController {
     return this.notes.findAll(query);
   }
 
+  @Get('trash')
+  findTrash(@Query() query: ListNotesQuery) {
+    return this.notes.findTrash(query);
+  }
+
+  @Delete('trash')
+  async emptyTrash() {
+    const { count } = await this.notes.emptyTrash();
+    return { ok: true, count };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.notes.findOne(id);
@@ -26,6 +37,17 @@ export class NotesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateNoteDto) {
     return this.notes.update(id, dto.body, dto.tags, dto.expectedVersion);
+  }
+
+  @Post(':id/restore')
+  restore(@Param('id') id: string) {
+    return this.notes.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  async removePermanent(@Param('id') id: string) {
+    await this.notes.removePermanent(id);
+    return { ok: true };
   }
 
   @Delete(':id')

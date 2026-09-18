@@ -1,19 +1,9 @@
 import Link from 'next/link';
+import { Trash2 } from 'lucide-react';
 import type { Note } from '@life/shared';
 import { deleteNoteAction } from './actions';
 import { LocalTime } from './local-time';
-
-function splitBody(body: string): { title: string; snippet: string } {
-  const normalized = body.replace(/\r\n/g, '\n').trim();
-  const newline = normalized.indexOf('\n');
-  if (newline === -1) {
-    return { title: normalized, snippet: '' };
-  }
-  return {
-    title: normalized.slice(0, newline).trim(),
-    snippet: normalized.slice(newline + 1).trim(),
-  };
-}
+import { splitBody } from './note-title';
 
 export function NoteList({ notes }: { notes: Note[] }) {
   if (notes.length === 0) {
@@ -46,7 +36,7 @@ export function NoteList({ notes }: { notes: Note[] }) {
             </Link>
             <form action={deleteNoteAction.bind(null, note.id)}>
               <button type="submit" className="note-delete" aria-label={`Delete ${title}`}>
-                ×
+                <Trash2 size={18} aria-hidden />
               </button>
             </form>
           </li>

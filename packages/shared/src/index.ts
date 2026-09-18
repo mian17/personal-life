@@ -9,6 +9,7 @@ export interface Note {
   tags: Tag[];
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
   version: number;
 }
 

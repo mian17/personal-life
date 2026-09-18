@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, X } from 'lucide-react';
 import type { Note } from '@life/shared';
 import { dedupeTags, parseInlineTags } from './tags';
 
@@ -343,13 +344,13 @@ export function NoteEditor({ note }: { note?: Note }) {
     <div className="editor-screen">
       <div className="editor-toolbar">
         <button type="button" className="editor-back" aria-label="Back" onClick={() => void leave()}>
-          {'\u2039'}
+          <ChevronLeft size={20} aria-hidden />
         </button>
         <span className="editor-status" role="status" aria-live="polite">
           {STATUS_TEXT[status]}
         </span>
-        <button type="button" className="editor-save" onClick={() => void leave()}>
-          Save
+        <button type="button" className="editor-save" aria-label="Save" onClick={() => void leave()}>
+          <Check size={20} aria-hidden />
         </button>
       </div>
       {conflictNote && (
@@ -389,7 +390,7 @@ export function NoteEditor({ note }: { note?: Note }) {
                 aria-label={`Remove tag ${name}`}
                 onClick={() => removeLegacyTag(name)}
               >
-                ×
+                <X size={14} aria-hidden />
               </button>
             </span>
           ))}

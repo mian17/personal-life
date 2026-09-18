@@ -60,24 +60,58 @@ h1 {
   margin: 0 0 1rem;
 }
 
-header {
+.nav-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin: 0 0 1rem;
 }
 
-header h1 {
-  margin: 0;
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
-.theme-toggle {
-  min-height: 0;
-  padding: 0.5rem 0.9rem;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
-  font-size: 0.85rem;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.header-icon:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .add-note {
@@ -97,25 +131,9 @@ header h1 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-.add-note::before,
-.add-note::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: currentColor;
-  border-radius: 2px;
-}
-
-.add-note::before {
-  width: 16px;
-  height: 2px;
-}
-
-.add-note::after {
-  width: 2px;
-  height: 16px;
+.add-note:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 textarea,
@@ -224,6 +242,46 @@ button {
   flex: 1;
 }
 
+.trash-restore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 0.9rem;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.trash-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--danger);
+}
+
+.trash-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.trash-empty {
+  min-height: 0;
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
 .note-title {
   font-weight: 600;
   white-space: nowrap;
@@ -286,20 +344,34 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0.5rem;
+  width: 40px;
+  height: 40px;
   min-height: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 1.75rem;
-  line-height: 1;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
 }
 
 .editor-save {
-  padding: 0.35rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   min-height: 0;
-  background: transparent;
-  color: var(--accent);
-  font-weight: 600;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.editor-back:focus-visible,
+.editor-save:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .editor-status {

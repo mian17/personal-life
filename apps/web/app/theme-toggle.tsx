@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 
 type Theme = 'system' | 'light' | 'dark';
 
 const ORDER: Theme[] = ['system', 'light', 'dark'];
 const LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
+const ICONS: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
 
 function readStored(): Theme {
   if (typeof window === 'undefined') {
@@ -31,6 +33,7 @@ export function ThemeToggle() {
   }, []);
 
   const nextTheme = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
+  const Icon = ICONS[theme];
 
   function cycle() {
     setTheme(nextTheme);
@@ -46,7 +49,7 @@ export function ThemeToggle() {
       aria-label={`Theme: ${LABELS[theme]}. Activate for ${LABELS[nextTheme]}.`}
       aria-pressed={theme !== 'system'}
     >
-      {LABELS[theme]}
+      <Icon size={18} aria-hidden />
     </button>
   );
 }
