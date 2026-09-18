@@ -6,4 +6,6 @@ data/
 *.log
 .env
 .env.local
+.env.development
+.env.development.local
 .playwright-cli/

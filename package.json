@@ -8,8 +8,7 @@
     "packages/shared"
   ],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm:dev -w apps/api\" \"npm:dev -w apps/web\"",
-    "start": "API_URL=http://127.0.0.1:3003 concurrently -n api,web -c blue,green \"npm:start -w apps/api\" \"npm:start -w apps/web\"",
+    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n api,web -c blue,green \"npm:dev -w apps/api\" \"npm:dev -w apps/web\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

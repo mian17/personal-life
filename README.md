@@ -15,17 +15,26 @@ A self-owned personal API that centralizes life data. Domain #1 is **notes/journ
 
 ```unknown
 npm install
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
 ```
 
-Generate a shared token and put the same value in both `.env` files:
+There are two env files at the repo root, one per environment. Both are gitignored; tracked
+`.example` files document their keys.
+
+- `.env.development` — local development, loaded by `npm run dev`.
+- `.env` — production, loaded by Docker Compose.
+
+```unknown
+cp .env.development.example .env.development
+cp .env.example .env
+```
+
+Generate a token and put the same value in the `API_TOKEN` of whichever file you're using:
 
 ```unknown
 openssl rand -hex 32
 ```
 
-Set `OWNER_LOGIN` in `apps/web/.env` to your tailnet login (e.g. `you@gmail.com`).
+Set `OWNER_LOGIN` to your tailnet login (e.g. `you@gmail.com`).
 
 ## Production (Docker Compose)
 
@@ -61,8 +70,6 @@ docker compose up -d --build # rebuild and restart
 
 ## Development
 
-Development is unchanged:
-
 ```unknown
 npm run dev        # api :3001 + web :3000
 npm run build      # compile both workspaces
@@ -70,9 +77,10 @@ npm run lint
 npm test
 ```
 
-Dev runs on the host with `NODE_ENV=development`, so auth is skipped locally. Ports differ
-by mode so a production preview never collides with dev. The API binds loopback on the host
-in dev; inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001`.
+`npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`) and
+runs with `NODE_ENV=development`, so auth is skipped locally. Ports differ by mode so a
+production preview never collides with dev. The API binds loopback on the host in dev;
+inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001`.
 
 ## Auth model
 
@@ -87,9 +95,9 @@ in dev; inside Docker it binds `0.0.0.0` so the web container can reach `http://
 4. API scripts run on the host and use `API_TOKEN` directly.
 
 For local browser development without Tailscale, no configuration is needed: when
-`NODE_ENV=development` (set by `npm run dev`) both gates above are skipped, so localhost
-works with no identity header or `API_TOKEN`. Production behavior is unchanged. The
-`DEV_AUTH_BYPASS` variable in `apps/web/.env.example` is unused and has no effect.
+`NODE_ENV=development` (set by `.env.development` for `npm run dev`) both gates above are
+skipped, so localhost works with no identity header or `API_TOKEN`. Production behavior is
+unchanged.
 
 Fallback if identity headers are ever unavailable: exchange `API_TOKEN` for a signed
 `HttpOnly` session cookie via a one-time login.
@@ -107,10 +115,10 @@ npm run lint
 Single SQLite file (default `apps/api/data/life.db`, override with `DB_PATH`). Copying the
 file is a complete backup.
 
-`npm run dev` sets `NODE_ENV=development` and `DB_PATH=data/scratch.db`, so development
-writes to a throwaway `apps/api/data/scratch.db` and never touches your personal notes.
-The Docker Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real
-`apps/api/data/life.db` on the host.
+`npm run dev` uses `DB_PATH=data/scratch.db` from `.env.development`, so development writes
+to a throwaway `apps/api/data/scratch.db` and never touches your personal notes. The Docker
+Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real `apps/api/data/life.db`
+on the host.
 
 ## Docs
 

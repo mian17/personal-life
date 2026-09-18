@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "NODE_ENV=development DB_PATH=data/scratch.db nest start --watch",
-    "start": "PORT=${PORT:-3003} node dist/main.js",
+    "dev": "nest start --watch",
+    "start": "PORT=${PORT:-3001} node dist/main.js",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

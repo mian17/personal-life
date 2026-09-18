@@ -28,7 +28,7 @@ note → create/delete → inline tags → search → keepalive durability → b
   Actions cannot outlive navigation.
 - Theme tokens live in `globals.css`; a pre-paint inline script in `layout.tsx` applies a
   persisted choice without a flash. Default = System (OS `prefers-color-scheme`).
-- Dev always targets `data/scratch.db` via the `apps/api` `dev` script; `start` uses `.env`.
+- Dev always targets `data/scratch.db` via `DB_PATH` in the root `.env.development`.
 
 ## Task List
 

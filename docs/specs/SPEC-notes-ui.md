@@ -43,17 +43,18 @@ No new dependencies. Existing stack only:
 
 ```
 Install:       npm install
-Dev:           npm run dev        # API uses DB_PATH=data/scratch.db (apps/api dev script); web :3000
-Dev real DB:   npm run start      # API loads apps/api/.env (real life.db); web :3000
+Dev:           npm run dev        # loads root .env.development (NODE_ENV=development, DB_PATH=data/scratch.db); api :3001, web :3000
+Prod preview:  docker compose up -d --build   # production path; api internal, web 127.0.0.1:3003
 Build:         npm run build
 Test:          npm test           # API e2e only
 Lint:          npm run lint       # tsc --noEmit per workspace
 Browser check: playwright-cli open http://127.0.0.1:3000
 ```
 
-`npm run dev` must never open the real `apps/api/data/life.db`. This is guaranteed by the
-`dev` script in `apps/api/package.json` (`DB_PATH=data/scratch.db`), which overrides `.env`
-because `process.loadEnvFile` does not replace an already-set env var.
+`npm run dev` must never open the real `apps/api/data/life.db`. `DB_PATH=data/scratch.db`
+lives in the root `.env.development`, loaded via Node's `--env-file-if-exists` in the root
+`dev` script. Note Node's env-file does not replace an ambient variable, so do not export
+`DB_PATH` in your shell when running dev.
 
 ## Project Structure
 

@@ -41,7 +41,7 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 - [x] Manual: start API, confirm `data/life.db` created with the three tables.
 
 **Dependencies:** Task 1
-**Files:** `apps/api/src/app.module.ts`, `apps/api/src/**/*.entity.ts`, `apps/api/.env.example`
+**Files:** `apps/api/src/app.module.ts`, `apps/api/src/**/*.entity.ts`, `.env.development.example`
 **Scope:** Medium
 
 ---
@@ -203,7 +203,7 @@ README/spec note (not implemented).
 - [x] Build passes.
 
 **Dependencies:** Task 8
-**Files:** `apps/web/middleware.ts`, `apps/web/.env.example`
+**Files:** `apps/web/middleware.ts`, `.env.development.example`
 **Scope:** Small
 
 ---

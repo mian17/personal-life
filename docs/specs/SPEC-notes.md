@@ -130,7 +130,8 @@ No authorization (single user owns everything). Authentication boundary:
 3. **Next.js → NestJS:** server-side `API_TOKEN`; NestJS binds loopback only.
 4. **Scripts:** run on the host, use `API_TOKEN` directly. No PAT table yet.
 
-`.env` gitignored and `chmod 600`; token never logged or sent to the browser.
+Env files are gitignored and `chmod 600`; token never logged or sent to the browser. Local
+development uses root `.env.development`; production uses root `.env` (Docker Compose).
 
 ## Testing Strategy
 
