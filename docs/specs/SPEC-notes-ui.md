@@ -44,7 +44,7 @@ No new dependencies. Existing stack only:
 ```
 Install:       npm install
 Dev:           npm run dev        # loads root .env.development (NODE_ENV=development, DB_PATH=data/scratch.db); api :3001, web :3000
-Prod preview:  docker compose up -d --build   # production path; api internal, web 127.0.0.1:3003
+Prod preview:  docker compose up -d --build   # production path; api internal, web 127.0.0.1:3002
 Build:         npm run build
 Test:          npm test           # API e2e only
 Lint:          npm run lint       # tsc --noEmit per workspace

@@ -6,7 +6,7 @@ Status: Confirmed by user
 ## Outcome
 
 A `docker compose`-based production deployment that fully replaces `npm run start`.
-The only externally reachable service is the web app, published on host loopback port 3003
+The only externally reachable service is the web app, published on host loopback port 3002
 for Tailscale Serve to target. The API runs internal-only on the compose network.
 
 ## User
@@ -21,9 +21,9 @@ Containers make production a single reproducible command.
 ## Success
 
 - `docker compose up -d --build` builds and runs web + api.
-- Web is published `127.0.0.1:3003` (loopback only), api is not published.
+- Web is published `127.0.0.1:3002` (loopback only), api is not published.
 - Web reaches the api over the compose network by service name.
-- Tailscale Serve targets `http://127.0.0.1:3003` and works from the phone.
+- Tailscale Serve targets `http://127.0.0.1:3002` and works from the phone.
 - Existing `apps/api/data/life.db` is bind-mounted, so all real notes survive untouched.
 
 ## Constraints
@@ -35,7 +35,7 @@ Containers make production a single reproducible command.
   the web container must NOT run with `NODE_ENV=development`.
 - Web must keep binding host loopback only (publish `127.0.0.1:3003`) so the middleware's
   "no `x-forwarded-host` means local host" assumption stays true and LAN devices cannot
-  bypass auth by hitting 3003 directly.
+  bypass auth by hitting 3002 directly.
 - Do not copy `apps/api/data/` or `.env*` into any image.
 
 ## Out of scope
@@ -47,7 +47,7 @@ Containers make production a single reproducible command.
 
 ## Decisions
 
-- 3003 (formerly the `npm run start` API port) becomes the web's published host port.
+- 3002 (the web's former `npm run start` port) becomes the web's published host port.
 - Internal API port is 3001; internal web port is 3002.
 - Bind-mount `apps/api/data/` from the host.
 - Env via a single root `.env` consumed with compose `env_file`.

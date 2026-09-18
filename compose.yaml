@@ -38,7 +38,7 @@ services:
       HOSTNAME: 0.0.0.0
       API_URL: http://api:3001
     ports:
-      - "127.0.0.1:3003:3002"
+      - "127.0.0.1:3002:3002"
     depends_on:
       api:
         condition: service_healthy

@@ -55,7 +55,7 @@ container at `/data/life.db`, so no data moves.
 Expose the web app on the tailnet (identity headers require Serve, **not** Funnel):
 
 ```unknown
-tailscale serve --bg --https 443 http://127.0.0.1:3003
+tailscale serve --bg --https 443 http://127.0.0.1:3002
 ```
 
 Open `https://<host>.<tailnet>.ts.net` on the phone and "Add to Home Screen".
@@ -87,7 +87,7 @@ inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001
 1. Tailscale ACL restricts port 443 to tailnet devices.
 2. Next.js middleware requires the Serve-injected `Tailscale-User-Login` header to match
    `OWNER_LOGIN`; otherwise 403. Funnel does not carry identity headers, so never use it.
-   The web container is published on host loopback (`127.0.0.1:3003`) only, so LAN devices
+   The web container is published on host loopback (`127.0.0.1:3002`) only, so LAN devices
    cannot bypass this by hitting the port directly.
 3. The Next.js BFF holds `API_TOKEN` server-side and calls the API over the compose network
    (`http://api:3001`); the API is never published to the host and the browser never sees
