@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.next
+**/data
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.gitignore
+**/*.log
+**/*.tsbuildinfo
+.playwright-cli
+docs
+tasks
+README.md

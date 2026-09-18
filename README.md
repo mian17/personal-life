@@ -27,33 +27,63 @@ openssl rand -hex 32
 
 Set `OWNER_LOGIN` in `apps/web/.env` to your tailnet login (e.g. `you@gmail.com`).
 
-## Run
+## Production (Docker Compose)
+
+Docker Compose is the production path; `npm run start` is no longer used. The web app is
+built and published on host loopback only, and the API runs internal to the compose
+network with no published port.
+
+```unknown
+cp .env.example .env
+# Edit .env: set API_TOKEN (openssl rand -hex 32) and OWNER_LOGIN to your tailnet login.
+docker compose up -d --build
+```
+
+The root `.env` is gitignored and is the single source of secrets for both services. The
+real database lives at `apps/api/data/life.db` on the host and is bind-mounted into the API
+container at `/data/life.db`, so no data moves.
+
+Expose the web app on the tailnet (identity headers require Serve, **not** Funnel):
+
+```unknown
+tailscale serve --bg --https 443 http://127.0.0.1:3003
+```
+
+Open `https://<host>.<tailnet>.ts.net` on the phone and "Add to Home Screen".
+
+Useful commands:
+
+```unknown
+docker compose logs -f       # tail both services
+docker compose down          # stop
+docker compose up -d --build # rebuild and restart
+```
+
+## Development
+
+Development is unchanged:
 
 ```unknown
 npm run dev        # api :3001 + web :3000
 npm run build      # compile both workspaces
-npm run start      # production: api :3003 + web :3002 (serves the real DB)
+npm run lint
+npm test
 ```
 
-Ports differ by mode so a production preview never collides with dev: dev is 3000/3001,
-`start` is 3002/3003. Each is overridable via `WEB_PORT` (web) and `PORT` (api).
-
-In another terminal, expose the web app on the tailnet (identity headers require Serve,
-**not** Funnel):
-
-```unknown
-tailscale serve --bg --https 443 http://127.0.0.1:3002
-```
-
-Open `https://<host>.<tailnet>.ts.net` on the phone and "Add to Home Screen".
+Dev runs on the host with `NODE_ENV=development`, so auth is skipped locally. Ports differ
+by mode so a production preview never collides with dev. The API binds loopback on the host
+in dev; inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001`.
 
 ## Auth model
 
 1. Tailscale ACL restricts port 443 to tailnet devices.
 2. Next.js middleware requires the Serve-injected `Tailscale-User-Login` header to match
    `OWNER_LOGIN`; otherwise 403. Funnel does not carry identity headers, so never use it.
-3. The Next.js BFF holds `API_TOKEN` server-side and calls the API on loopback; the browser
-   never sees the token.
+   The web container is published on host loopback (`127.0.0.1:3003`) only, so LAN devices
+   cannot bypass this by hitting the port directly.
+3. The Next.js BFF holds `API_TOKEN` server-side and calls the API over the compose network
+   (`http://api:3001`); the API is never published to the host and the browser never sees
+   the token.
 4. API scripts run on the host and use `API_TOKEN` directly.
 
 For local browser development without Tailscale, no configuration is needed: when
@@ -79,7 +109,8 @@ file is a complete backup.
 
 `npm run dev` sets `NODE_ENV=development` and `DB_PATH=data/scratch.db`, so development
 writes to a throwaway `apps/api/data/scratch.db` and never touches your personal notes.
-`npm run start` uses the real DB.
+The Docker Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real
+`apps/api/data/life.db` on the host.
 
 ## Docs
 

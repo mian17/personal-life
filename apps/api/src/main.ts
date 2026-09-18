@@ -8,6 +8,6 @@ try {
 
 async function bootstrap() {
   const app = await createApp();
-  await app.listen(Number(process.env.PORT ?? 3001), '127.0.0.1');
+  await app.listen(Number(process.env.PORT ?? 3001), process.env.HOST ?? '127.0.0.1');
 }
 bootstrap();
