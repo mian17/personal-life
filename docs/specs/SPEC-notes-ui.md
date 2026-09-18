@@ -126,23 +126,27 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 - Full-screen route, not an inline disclosure. The phone back gesture returns to the list.
 - No title field: the first line of the body is the title.
 - One textarea, full height, autofocused. Typing begins immediately on open.
-- **Autosave (existing notes only):** 400ms trailing debounce after typing stops → `PATCH`.
-  Status indicator: `Saving…` / `Saved` / `Couldn't save`. Also flush on blur and when the
-  tab becomes hidden. New notes (`/notes/new`) do **not** autosave — only an explicit Save
-  creates them.
+- **Autosave:** 400ms trailing debounce after typing stops → `PATCH`. Status indicator:
+  `Saving…` / `Saved` / `Couldn't save`. Also flush on blur. The debounce, blur, and the
+  explicit Save/Back controls coalesce through one in-flight drain, so they never fire
+  redundant overlapping requests.
 - **Transport:** the editor writes through the BFF route handlers
   (`POST /api/notes/flush`, `PATCH /api/notes/[id]/flush`) with plain `fetch`, not Server
   Actions. Server Actions refresh the current route, which remounts the editor on the
   create `new → id` param change and resets the caret; route-handler fetches do not.
-- **Keepalive flush:** a pending save for an existing note is flushed on `pagehide` /
-  `visibilitychange=hidden` via `fetch(url, { method: 'PATCH', keepalive: true })` to the
-  BFF route handler that injects `API_TOKEN`. It survives reload, back gesture, and route
-  change. Keepalive's 64KB body cap is safe against the 20KB note max. New notes never
-  keepalive-create; their draft is dropped on the way out.
+- **New-note autosave:** `/notes/new` autosaves like any other note. The first debounced
+  save `POST`s, then updates the URL to `/notes/[id]` via
+  `window.history.replaceState` (not `router.replace`, which would remount the editor).
+  Subsequent edits `PATCH`.
+- **Keepalive flush:** a pending save is flushed on `pagehide` /
+  `visibilitychange=hidden` via `fetch(url, { keepalive: true })` to the BFF route handler
+  that injects `API_TOKEN`. It survives reload, back gesture, and route change. Keepalive's
+  64KB body cap is safe against the 20KB note max. Only `pagehide` may keepalive-create a
+  new note (the page is leaving, so no duplicate is possible); a visibility-hidden new note
+  stays dirty for the normal debounced save instead.
 - **Navigation:** a Back control on the left of the toolbar and a Save control on the right
-  flank the status indicator. On an existing note both flush the pending save, then return
-  to `/`. On a new note, Save `POST`s once and replaces the URL with `/notes/[id]`; Back
-  discards the draft and returns to `/` without creating anything.
+  flank the status indicator. Both flush any pending save (creating a non-empty new note),
+  then return to `/`. An empty new note returns without creating anything.
 - **Delete:** deletion lives only on the home list rows; the editor has no delete control.
 - **Tags:** tags are edited inline as `#tag` tokens in the body. On save, tags are parsed
   from the body (`/#([^\s#]+)/g`, trimmed, deduped case-insensitively, max 50 chars each)
@@ -153,9 +157,9 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 
 ### New-note creation
 
-- `/notes/new` renders an empty editor with autosave disabled. Nothing is written while
-  typing; the first explicit Save `POST`s and then replaces the URL with `/notes/[id]` so
-  the back gesture and refresh behave correctly. Leaving without saving creates nothing.
+- `/notes/new` renders an empty editor with autosave enabled. The first debounced save
+  creates the note and updates the URL to `/notes/[id]`; leaving before typing creates
+  nothing.
 
 ### Theming (light + dark + manual override)
 
@@ -201,9 +205,8 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
    reload, and the text caret stays where it was across autosaves (no remount/reset).
 3. Pausing typing shows `Saving…` then `Saved` within ~1s on localhost; the list reflects
    the new title/snippet after returning.
-4. On an existing note, Back and Save both flush the pending edit and return to the list. On
-   a new note, Save creates it once and navigates to `/notes/[id]`, while Back discards the
-   draft without creating anything.
+4. Back and Save each flush the pending edit and return to the list; a non-empty new note is
+   created by that flush, while an empty new note returns without creating anything.
 5. Deleting from a home list row removes the note; the list no longer shows it.
 6. Typing in the search field filters the list to matching notes after a debounced server
    round trip; clearing it restores all notes.
