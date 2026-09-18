@@ -137,7 +137,7 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
   64KB body cap is safe against the 20KB note max. An optional `localStorage` draft mirror
   (recovered on mount) can cover the OS-kills-the-PWA case where no `pagehide` fires; not
   included in v1 unless requested.
-- **Explicit save:** a Save control on the left of the toolbar flushes any pending save, then
+- **Explicit save:** a Save control on the right of the toolbar flushes any pending save, then
   returns to `/`.
 - **Delete:** deletion lives only on the home list rows; the editor has no delete control.
 - **Tags:** tags are edited inline as `#tag` tokens in the body. On save, tags are parsed

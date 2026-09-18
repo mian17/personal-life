@@ -198,6 +198,9 @@ export function NoteEditor({ note }: { note?: Note }) {
   return (
     <div className="editor-screen">
       <div className="editor-toolbar">
+        <span className="editor-status" role="status" aria-live="polite">
+          {STATUS_TEXT[status]}
+        </span>
         <button
           type="button"
           className="editor-save"
@@ -208,9 +211,6 @@ export function NoteEditor({ note }: { note?: Note }) {
         >
           Save
         </button>
-        <span className="editor-status" role="status" aria-live="polite">
-          {STATUS_TEXT[status]}
-        </span>
       </div>
       <textarea
         ref={textareaRef}
