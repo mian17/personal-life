@@ -31,13 +31,18 @@ Set `OWNER_LOGIN` in `apps/web/.env` to your tailnet login (e.g. `you@gmail.com`
 
 ```unknown
 npm run dev        # api :3001 + web :3000
+npm run build      # compile both workspaces
+npm run start      # production: api :3003 + web :3002 (serves the real DB)
 ```
+
+Ports differ by mode so a production preview never collides with dev: dev is 3000/3001,
+`start` is 3002/3003. Each is overridable via `WEB_PORT` (web) and `PORT` (api).
 
 In another terminal, expose the web app on the tailnet (identity headers require Serve,
 **not** Funnel):
 
 ```unknown
-tailscale serve --bg --https 443 http://127.0.0.1:3000
+tailscale serve --bg --https 443 http://127.0.0.1:3002
 ```
 
 Open `https://<host>.<tailnet>.ts.net` on the phone and "Add to Home Screen".

@@ -5,7 +5,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "NODE_ENV=development DB_PATH=data/scratch.db nest start --watch",
-    "start": "node dist/main.js",
+    "start": "PORT=${PORT:-3003} node dist/main.js",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
