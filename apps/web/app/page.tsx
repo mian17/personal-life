@@ -26,12 +26,7 @@ export default async function Home({
     <main>
       <header>
         <h1>Notes</h1>
-        <div className="header-actions">
-          <ThemeToggle />
-          <Link href="/notes/new" className="add-note" aria-label="New note">
-            +
-          </Link>
-        </div>
+        <ThemeToggle />
       </header>
 
       <SearchBox q={q} tag={tag} />
@@ -52,6 +47,10 @@ export default async function Home({
       )}
 
       <NoteList notes={notes} />
+
+      <Link href="/notes/new" className="add-note" aria-label="New note">
+        +
+      </Link>
     </main>
   );
 }

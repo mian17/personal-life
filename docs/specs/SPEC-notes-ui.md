@@ -63,7 +63,7 @@ apps/web/app/
   notes/
     new/page.tsx      New-note editor route (no DB row until first save)
     [id]/page.tsx     Existing-note editor route
-  note-editor.tsx     Full-screen client editor (autosave, save, delete)
+  note-editor.tsx     Full-screen client editor (autosave, save)
   note-list.tsx       List rows (title/snippet/date), tap → editor
   search-box.tsx      Client search input; debounced ?q= update
   theme-toggle.tsx    Client System/Light/Dark control; persists to localStorage
@@ -83,7 +83,7 @@ Client editor component signature and save call, following existing conventions:
 export function NoteEditor({ note }: { note?: Note }) {
   const [body, setBody] = useState(note?.body ?? '');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  // debounce 400ms → saveNote(id, body); flush on blur, on Done, and on tab hide
+  // debounce 400ms → saveNote(id, body); flush on blur, on Save, and on tab hide
 }
 ```
 
@@ -115,10 +115,11 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
   param. No Search button.
 - Tag filter chips stay on the same pattern as today (`?tag=`), unchanged in behavior.
 - List rows: title = first line of body (bold, single line, ellipsis); snippet = remainder
-  (muted, up to 2 lines); date on the right. No "Edit" disclosure, no Delete button in the
-  row.
+  (muted, up to 2 lines); date on the right. No "Edit" disclosure; each row has its own
+  Delete control at the right.
 - Tapping a row navigates to `/notes/[id]`.
-- A "+" control navigates to `/notes/new`.
+- A "+" control navigates to `/notes/new`. It is a floating action button fixed to the
+  bottom-right of the viewport.
 
 ### Editor (`/notes/new`, `/notes/[id]`)
 
@@ -126,7 +127,7 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 - No title field: the first line of the body is the title.
 - One textarea, full height, autofocused. Typing begins immediately on open.
 - **Autosave:** 400ms trailing debounce after typing stops → `PATCH`. Status indicator:
-  `Saving…` / `Saved` / `Couldn't save`. Also flush on blur, on the Done control, and when
+  `Saving…` / `Saved` / `Couldn't save`. Also flush on blur, on the Save control, and when
   the tab becomes hidden.
 - **Keepalive flush:** Server Actions cannot outlive navigation, so a pending save is
   flushed on `pagehide` / `visibilitychange=hidden` via
@@ -136,8 +137,9 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
   64KB body cap is safe against the 20KB note max. An optional `localStorage` draft mirror
   (recovered on mount) can cover the OS-kills-the-PWA case where no `pagehide` fires; not
   included in v1 unless requested.
-- **Explicit save:** a Done control flushes any pending save, then returns to `/`.
-- **Delete:** a low-emphasis delete control in the editor removes the note and returns to `/`.
+- **Explicit save:** a Save control on the left of the toolbar flushes any pending save, then
+  returns to `/`.
+- **Delete:** deletion lives only on the home list rows; the editor has no delete control.
 - **Tags:** tags are edited inline as `#tag` tokens in the body. On save, tags are parsed
   from the body (`/#([^\s#]+)/g`, trimmed, deduped case-insensitively, max 50 chars each)
   and written through the existing `tags` array.
@@ -194,14 +196,14 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 2. Editing a note produces no explicit Save action and the change persists across a reload.
 3. Pausing typing shows `Saving…` then `Saved` within ~1s on localhost; the list reflects
    the new title/snippet after returning.
-4. The Done control flushes the pending edit and returns to the list.
-5. Deleting from the editor removes the note; the list no longer shows it.
+4. The Save control flushes the pending edit and returns to the list.
+5. Deleting from a home list row removes the note; the list no longer shows it.
 6. Typing in the search field filters the list to matching notes after a debounced server
    round trip; clearing it restores all notes.
 7. Tag filtering via `?tag=` still works and the existing tags are never silently dropped
    on edit.
-8. The list shows title (first line), snippet, and date per row; no Edit disclosure and no
-   per-row Delete button.
+8. The list shows title (first line), snippet, and date per row; no Edit disclosure, and each
+   row has a Delete control at the right.
 9. The app renders correctly in both light and dark schemes, and the theme control cycles
    System → Light → Dark; a forced choice persists across reload with no flash of the wrong
    theme, and System follows the OS.

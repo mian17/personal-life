@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Note } from '@life/shared';
+import { deleteNoteAction } from './actions';
 import { LocalTime } from './local-time';
 
 function splitBody(body: string): { title: string; snippet: string } {
@@ -36,6 +37,11 @@ export function NoteList({ notes }: { notes: Note[] }) {
               </span>
               <LocalTime iso={note.createdAt} />
             </Link>
+            <form action={deleteNoteAction.bind(null, note.id)}>
+              <button type="submit" className="note-delete" aria-label={`Delete ${title}`}>
+                ×
+              </button>
+            </form>
           </li>
         );
       })}

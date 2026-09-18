@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Note } from '@life/shared';
-import { createNoteAction, deleteNoteAction, saveNote } from './actions';
+import { createNoteAction, saveNote } from './actions';
 import { dedupeTags, parseInlineTags } from './tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error';
@@ -30,12 +30,10 @@ export function NoteEditor({ note }: { note?: Note }) {
   const [body, setBody] = useState(note?.body ?? '');
   const [retained, setRetained] = useState<string[]>(initialLegacy);
   const [status, setStatus] = useState<Status>('idle');
-  const [noteId, setNoteId] = useState<string | null>(note?.id ?? null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
-  const deletingRef = useRef(false);
   // Once a create PATCHes an id, all later saves must update it — never POST again.
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
@@ -44,7 +42,6 @@ export function NoteEditor({ note }: { note?: Note }) {
   const sentRef = useRef<{ body: string; tags: string[] } | null>(null);
 
   const save = useCallback(async () => {
-    if (deletingRef.current) return;
     if (inFlightRef.current) {
       dirtyRef.current = true;
       return;
@@ -65,7 +62,6 @@ export function NoteEditor({ note }: { note?: Note }) {
       if (id === null) {
         const created = await createNoteAction(nextBody, nextTags);
         idRef.current = created.id;
-        setNoteId(created.id);
         window.history.replaceState(null, '', `/notes/${created.id}`);
       } else if (!(await saveNote(id, nextBody, nextTags))) {
         // Empty body on an existing note is rejected, so it stays dirty and unsaved.
@@ -78,7 +74,6 @@ export function NoteEditor({ note }: { note?: Note }) {
       const sent = sentRef.current;
       sentRef.current = null;
       inFlightRef.current = false;
-      if (deletingRef.current) return;
       const latestTags = tagsFor(bodyRef.current, retainedRef.current);
       const changed =
         sent === null || bodyRef.current !== sent.body || !sameTags(latestTags, sent.tags);
@@ -107,7 +102,6 @@ export function NoteEditor({ note }: { note?: Note }) {
   // Server Actions do not survive navigation, so a pending edit is sent via a
   // keepalive fetch that the browser finishes after the page is gone.
   const flushKeepalive = useCallback((allowCreate: boolean) => {
-    if (deletingRef.current) return;
     // Hidden-but-alive (tab switch, app background): a new note must not be
     // created here, because idRef and the URL stay null/'/notes/new'. Returning
     // to type would then POST again and duplicate it. Leave it dirty for the
@@ -154,26 +148,6 @@ export function NoteEditor({ note }: { note?: Note }) {
     // newer body, save() re-issues the latest body once it resolves.
     send(`/api/notes/${idRef.current}/flush`, 'PATCH');
   }, []);
-
-  const remove = useCallback(async () => {
-    const id = idRef.current;
-    if (id === null) return;
-    deletingRef.current = true;
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    dirtyRef.current = false;
-    try {
-      await deleteNoteAction(id);
-    } catch {
-      deletingRef.current = false;
-      dirtyRef.current = true;
-      setStatus('error');
-      return;
-    }
-    router.push('/');
-  }, [router]);
 
   function schedule() {
     dirtyRef.current = true;
@@ -226,22 +200,17 @@ export function NoteEditor({ note }: { note?: Note }) {
       <div className="editor-toolbar">
         <button
           type="button"
-          className="editor-done"
+          className="editor-save"
           onClick={async () => {
             await flush();
             router.push('/');
           }}
         >
-          Done
+          Save
         </button>
         <span className="editor-status" role="status" aria-live="polite">
           {STATUS_TEXT[status]}
         </span>
-        {noteId !== null && (
-          <button type="button" className="editor-delete" onClick={() => void remove()}>
-            Delete
-          </button>
-        )}
       </div>
       <textarea
         ref={textareaRef}
