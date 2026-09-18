@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Note } from '@life/shared';
-import { createNoteAction, saveNote } from './actions';
 import { dedupeTags, parseInlineTags } from './tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error';
@@ -26,6 +25,9 @@ function sameTags(a: readonly string[], b: readonly string[]): boolean {
 
 export function NoteEditor({ note }: { note?: Note }) {
   const router = useRouter();
+  // A missing note means the create route: no autosave, only an explicit Save
+  // creates, and Back discards. Existing notes keep the debounced autosave.
+  const isNew = note === undefined;
   const initialLegacy = note?.tags.map((t) => t.name) ?? [];
   const [body, setBody] = useState(note?.body ?? '');
   const [retained, setRetained] = useState<string[]>(initialLegacy);
@@ -34,7 +36,7 @@ export function NoteEditor({ note }: { note?: Note }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
-  // Once a create PATCHes an id, all later saves must update it — never POST again.
+  const creatingRef = useRef(false);
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
   const retainedRef = useRef<string[]>(initialLegacy);
@@ -42,6 +44,9 @@ export function NoteEditor({ note }: { note?: Note }) {
   const sentRef = useRef<{ body: string; tags: string[] } | null>(null);
 
   const save = useCallback(async () => {
+    const id = idRef.current;
+    // Create mode never autosaves; only an explicit Save POSTs.
+    if (id === null) return;
     if (inFlightRef.current) {
       dirtyRef.current = true;
       return;
@@ -49,8 +54,11 @@ export function NoteEditor({ note }: { note?: Note }) {
     if (!dirtyRef.current) return;
     const nextBody = bodyRef.current;
     const nextTags = tagsFor(nextBody, retainedRef.current);
-    if (idRef.current === null && !nextBody.trim()) {
-      dirtyRef.current = false;
+    if (!nextBody.trim()) {
+      // Empty body on an existing note is rejected, so it stays dirty and unsaved.
+      sentRef.current = null;
+      dirtyRef.current = true;
+      setStatus('error');
       return;
     }
     inFlightRef.current = true;
@@ -58,13 +66,14 @@ export function NoteEditor({ note }: { note?: Note }) {
     sentRef.current = { body: nextBody, tags: nextTags };
     setStatus('saving');
     try {
-      const id = idRef.current;
-      if (id === null) {
-        const created = await createNoteAction(nextBody, nextTags);
-        idRef.current = created.id;
-        window.history.replaceState(null, '', `/notes/${created.id}`);
-      } else if (!(await saveNote(id, nextBody, nextTags))) {
-        // Empty body on an existing note is rejected, so it stays dirty and unsaved.
+      // A route-handler fetch, unlike a Server Action, does not refresh the RSC
+      // tree of the current route, so the editor is never remounted mid-edit.
+      const res = await fetch(`/api/notes/${id}/flush`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body: nextBody, tags: nextTags }),
+      });
+      if (!res.ok) {
         sentRef.current = null;
         inFlightRef.current = false;
         dirtyRef.current = true;
@@ -99,64 +108,89 @@ export function NoteEditor({ note }: { note?: Note }) {
     await save();
   }, [save]);
 
-  // Client-side navigation does not fire pagehide, so both toolbar actions
-  // flush the pending debounced save before leaving the editor.
+  // Client-side navigation does not fire pagehide, so leaving an existing note
+  // flushes the pending debounced save before navigating home.
   const leave = useCallback(async () => {
     await flush();
     router.push('/');
   }, [flush, router]);
 
-  // Server Actions do not survive navigation, so a pending edit is sent via a
-  // keepalive fetch that the browser finishes after the page is gone.
-  const flushKeepalive = useCallback((allowCreate: boolean) => {
-    // Hidden-but-alive (tab switch, app background): a new note must not be
-    // created here, because idRef and the URL stay null/'/notes/new'. Returning
-    // to type would then POST again and duplicate it. Leave it dirty for the
-    // normal debounced save. Only pagehide (allowCreate) may create.
-    if (idRef.current === null && !allowCreate) return;
+  const goBack = useCallback(() => {
+    // Back on a new note discards the draft without creating anything.
+    if (isNew) {
+      router.push('/');
+      return;
+    }
+    void leave();
+  }, [isNew, leave, router]);
+
+  const saveNow = useCallback(async () => {
+    if (!isNew) {
+      await leave();
+      return;
+    }
     const nextBody = bodyRef.current;
+    if (!nextBody.trim()) return;
+    if (creatingRef.current) return;
     const nextTags = tagsFor(nextBody, retainedRef.current);
+    creatingRef.current = true;
+    setStatus('saving');
+    try {
+      const res = await fetch('/api/notes/flush', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body: nextBody, tags: nextTags }),
+      });
+      if (!res.ok) {
+        creatingRef.current = false;
+        setStatus('error');
+        return;
+      }
+      const created = (await res.json()) as { id: string };
+      router.replace(`/notes/${created.id}`, { scroll: false });
+    } catch {
+      creatingRef.current = false;
+      setStatus('error');
+    }
+  }, [isNew, leave, router]);
+
+  // Keepalive is for existing notes only: a hidden or unloading new note must
+  // not create anything, so its draft is simply dropped on the way out.
+  const flushKeepalive = useCallback(() => {
+    const id = idRef.current;
+    if (id === null) return;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    if (!dirtyRef.current) return;
+    const nextBody = bodyRef.current;
+    const nextTags = tagsFor(nextBody, retainedRef.current);
     const fail = () => {
       dirtyRef.current = true;
       setStatus('error');
     };
-    // A rejected fetch or a non-2xx (e.g. the API rejecting an empty body) both
-    // leave the edit dirty so it can be retried.
-    const send = (url: string, method: 'POST' | 'PATCH') => {
-      dirtyRef.current = false;
-      void fetch(url, {
-        method,
-        keepalive: true,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ body: nextBody, tags: nextTags }),
-      })
-        .then((res) => {
-          if (!res.ok) fail();
-        })
-        .catch(fail);
-    };
-    if (idRef.current === null) {
-      // A create already in flight carries this note; a second POST would
-      // duplicate it. A non-dirty note was already flushed this lifecycle.
-      if (inFlightRef.current || !dirtyRef.current || !nextBody.trim()) return;
-      send('/api/notes/flush', 'POST');
-      return;
-    }
-    if (!dirtyRef.current) return;
     if (!nextBody.trim()) {
       fail();
       return;
     }
     // Send even while a save is in flight: if an older PATCH lands after this
     // newer body, save() re-issues the latest body once it resolves.
-    send(`/api/notes/${idRef.current}/flush`, 'PATCH');
+    dirtyRef.current = false;
+    void fetch(`/api/notes/${id}/flush`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ body: nextBody, tags: nextTags }),
+    })
+      .then((res) => {
+        if (!res.ok) fail();
+      })
+      .catch(fail);
   }, []);
 
   function schedule() {
+    if (isNew) return;
     dirtyRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -182,14 +216,10 @@ export function NoteEditor({ note }: { note?: Note }) {
 
   useEffect(() => {
     function onPageHide() {
-      // The page is actually leaving: a new note may be created here, and this
-      // is the final act — there is no live page left to duplicate from.
-      flushKeepalive(true);
+      flushKeepalive();
     }
     function onVisibility() {
-      // Hidden but alive: existing notes keepalive-PATCH, new notes stay dirty
-      // for the normal debounced save (see flushKeepalive).
-      if (document.visibilityState === 'hidden') flushKeepalive(false);
+      if (document.visibilityState === 'hidden') flushKeepalive();
     }
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
@@ -205,13 +235,13 @@ export function NoteEditor({ note }: { note?: Note }) {
   return (
     <div className="editor-screen">
       <div className="editor-toolbar">
-        <button type="button" className="editor-back" aria-label="Back" onClick={leave}>
+        <button type="button" className="editor-back" aria-label="Back" onClick={goBack}>
           {'\u2039'}
         </button>
         <span className="editor-status" role="status" aria-live="polite">
           {STATUS_TEXT[status]}
         </span>
-        <button type="button" className="editor-save" onClick={leave}>
+        <button type="button" className="editor-save" onClick={() => void saveNow()}>
           Save
         </button>
       </div>
