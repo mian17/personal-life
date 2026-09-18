@@ -99,6 +99,13 @@ export function NoteEditor({ note }: { note?: Note }) {
     await save();
   }, [save]);
 
+  // Client-side navigation does not fire pagehide, so both toolbar actions
+  // flush the pending debounced save before leaving the editor.
+  const leave = useCallback(async () => {
+    await flush();
+    router.push('/');
+  }, [flush, router]);
+
   // Server Actions do not survive navigation, so a pending edit is sent via a
   // keepalive fetch that the browser finishes after the page is gone.
   const flushKeepalive = useCallback((allowCreate: boolean) => {
@@ -198,17 +205,13 @@ export function NoteEditor({ note }: { note?: Note }) {
   return (
     <div className="editor-screen">
       <div className="editor-toolbar">
+        <button type="button" className="editor-back" aria-label="Back" onClick={leave}>
+          {'\u2039'}
+        </button>
         <span className="editor-status" role="status" aria-live="polite">
           {STATUS_TEXT[status]}
         </span>
-        <button
-          type="button"
-          className="editor-save"
-          onClick={async () => {
-            await flush();
-            router.push('/');
-          }}
-        >
+        <button type="button" className="editor-save" onClick={leave}>
           Save
         </button>
       </div>

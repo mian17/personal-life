@@ -137,8 +137,8 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
   64KB body cap is safe against the 20KB note max. An optional `localStorage` draft mirror
   (recovered on mount) can cover the OS-kills-the-PWA case where no `pagehide` fires; not
   included in v1 unless requested.
-- **Explicit save:** a Save control on the right of the toolbar flushes any pending save, then
-  returns to `/`.
+- **Navigation:** a Back control on the left of the toolbar and a Save control on the right
+  flank the status indicator. Both flush any pending save, then return to `/`.
 - **Delete:** deletion lives only on the home list rows; the editor has no delete control.
 - **Tags:** tags are edited inline as `#tag` tokens in the body. On save, tags are parsed
   from the body (`/#([^\s#]+)/g`, trimmed, deduped case-insensitively, max 50 chars each)
@@ -196,7 +196,7 @@ Existing endpoints reused as-is: `POST /api/notes`, `GET /api/notes?tag=&q=`,
 2. Editing a note produces no explicit Save action and the change persists across a reload.
 3. Pausing typing shows `Saving…` then `Saved` within ~1s on localhost; the list reflects
    the new title/snippet after returning.
-4. The Save control flushes the pending edit and returns to the list.
+4. The Back and Save controls each flush the pending edit and return to the list.
 5. Deleting from a home list row removes the note; the list no longer shows it.
 6. Typing in the search field filters the list to matching notes after a debounced server
    round trip; clearing it restores all notes.

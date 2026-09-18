@@ -253,6 +253,18 @@ button {
   margin-bottom: 0.5rem;
 }
 
+.editor-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  min-height: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
 .editor-save {
   padding: 0.35rem 0.5rem;
   min-height: 0;
@@ -264,7 +276,6 @@ button {
 .editor-status {
   color: var(--muted);
   font-size: 0.85rem;
-  margin-right: auto;
 }
 
 .editor-body {
