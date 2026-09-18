@@ -327,6 +327,7 @@ button {
   border-radius: 0;
   background: transparent;
   resize: none;
+  outline: none;
   font-size: 1.05rem;
 }
 
