@@ -48,9 +48,7 @@ export default async function Home({
 
       <NoteList notes={notes} />
 
-      <Link href="/notes/new" className="add-note" aria-label="New note">
-        +
-      </Link>
+      <Link href="/notes/new" className="add-note" aria-label="New note" />
     </main>
   );
 }
