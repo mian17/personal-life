@@ -6,6 +6,14 @@ import { OidcAdapterService } from './adapter/oidc-adapter.service';
 import { ACCESS_TOKEN_TTL_S, DEFAULT_RESOURCE, resourceServerPolicy } from './access-token.policy';
 import { staticClients } from './clients';
 import { interactionPolicyPrompts, loadExistingGrant } from './interaction-policy';
+import {
+  GRANT_TTL_S,
+  REFRESH_TOKEN_TTL_S,
+  ROTATE_REFRESH_TOKEN,
+  SESSION_TTL_S,
+  expiresWithSession,
+  issueRefreshToken,
+} from './refresh-token.policy';
 
 /** Issuer identifier; production must be browser-reachable (Tasks 7/8 design point). */
 export function resolveIssuer(): string {
@@ -85,7 +93,18 @@ export class OidcService {
         scopes: ['openid'],
         pkce: { required: () => true },
         // Access-token policy: JWT format, 10-minute TTL, audience-scoped via RFC 8707.
-        ttl: { AccessToken: ACCESS_TOKEN_TTL_S },
+        // Refresh tokens: 30 days, rotated on every use, with reuse detection.
+        // Session/Grant must outlive the refresh token, or grant validation would
+        // cut the refresh chain short before its own TTL.
+        ttl: {
+          AccessToken: ACCESS_TOKEN_TTL_S,
+          RefreshToken: REFRESH_TOKEN_TTL_S,
+          Session: SESSION_TTL_S,
+          Grant: GRANT_TTL_S,
+        },
+        rotateRefreshToken: ROTATE_REFRESH_TOKEN,
+        issueRefreshToken,
+        expiresWithSession,
         interactions: {
           policy: [...interactionPolicyPrompts()],
           url: (_ctx, interaction) => `/interaction/${interaction.uid}`,

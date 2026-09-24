@@ -71,4 +71,27 @@ export class Client {
       type: res.type,
     };
   }
+
+  /** Form POST with HTTP Basic client authentication (confidential clients). */
+  async postFormBasic(
+    path: string,
+    fields: Record<string, string>,
+    clientId: string,
+    clientSecret: string,
+  ): Promise<RpcResult> {
+    const res = await request(this.server() as never)
+      .post(path)
+      .type('form')
+      .set('Cookie', this.cookieHeader())
+      .auth(clientId, clientSecret)
+      .send(fields);
+    this.store(res.headers['set-cookie'] as unknown as string[] | undefined);
+    return {
+      status: res.status,
+      location: res.headers.location as string | undefined,
+      body: res.text,
+      json: parseJson(res.text, res.type),
+      type: res.type,
+    };
+  }
 }

@@ -28,7 +28,7 @@ function envList(name: string, fallback: readonly string[]): string[] {
 }
 
 const CODE_CLIENT = {
-  grant_types: ['authorization_code'] as const,
+  grant_types: ['authorization_code', 'refresh_token'] as const,
   response_types: ['code'] as const,
   scope: 'openid',
   id_token_signed_response_alg: 'EdDSA' as const,

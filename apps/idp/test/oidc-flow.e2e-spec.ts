@@ -173,8 +173,9 @@ describe('Authorization code + PKCE flow (e2e)', () => {
     expect(body.token_type).toBe('Bearer');
     expect(body.expires_in).toBe(600);
     expect(body.access_token).toBeDefined();
-    // No refresh tokens yet (Task 6).
-    expect(body.refresh_token).toBeUndefined();
+    // A refresh token is now issued (Task 6); rotation/reuse are covered by the
+    // refresh suite. Its lifetime is independent of the 10-minute access token.
+    expect(body.refresh_token).toBeDefined();
 
     const at = decodeJwt(body.access_token!);
     expect(at.aud).toBe('note-service');
@@ -192,56 +193,64 @@ describe('Authorization code + PKCE flow (e2e)', () => {
     expect(dance.state).toBe(state);
   });
 
-  it('verifies the minted access token offline against the fetched JWKS alone, and rejects a wrong audience', async () => {
-    const dance = await completeAuthorize(client, {
-      ...pkce(),
-      state: randomBytes(8).toString('hex'),
-      nonce: randomBytes(8).toString('hex'),
-      resource: 'https://note-service',
-    });
-    const tokens = await tokenRequest(client, dance.code!, dance.verifier);
-    const accessToken = (tokens.json as { access_token: string }).access_token;
+  it(
+    'verifies the minted access token offline against the fetched JWKS alone, and rejects a wrong audience',
+    async () => {
+      const dance = await completeAuthorize(client, {
+        ...pkce(),
+        state: randomBytes(8).toString('hex'),
+        nonce: randomBytes(8).toString('hex'),
+        resource: 'https://note-service',
+      });
+      const tokens = await tokenRequest(client, dance.code!, dance.verifier);
+      const accessToken = (tokens.json as { access_token: string }).access_token;
 
-    // Fetch the public JWKS document from the running IdP and hand it to a
-    // separate process; that process never calls the IdP.
-    const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
-    writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
+      // Fetch the public JWKS document from the running IdP and hand it to a
+      // separate process; that process never calls the IdP.
+      const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
+      writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
 
-    const good = await runVerifier([
-      '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'note-service',
-    ]);
-    expect(good.code).toBe(0);
-    expect(good.stdout).toContain('verified:');
+      const good = await runVerifier([
+        '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'note-service',
+      ]);
+      expect(good.code).toBe(0);
+      expect(good.stdout).toContain('verified:');
 
-    const wrongAud = await runVerifier([
-      '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'todo-service',
-    ]);
-    expect(wrongAud.code).not.toBe(0);
-    expect(wrongAud.stderr).toContain('aud');
-  });
+      const wrongAud = await runVerifier([
+        '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'todo-service',
+      ]);
+      expect(wrongAud.code).not.toBe(0);
+      expect(wrongAud.stderr).toContain('aud');
+    },
+    30000,
+  );
 
-  it('rejects a tampered and an expired minted token', async () => {
-    const dance = await completeAuthorize(client, {
-      ...pkce(),
-      state: randomBytes(8).toString('hex'),
-      nonce: randomBytes(8).toString('hex'),
-      resource: 'https://note-service',
-    });
-    const tokens = await tokenRequest(client, dance.code!, dance.verifier);
-    const accessToken = (tokens.json as { access_token: string }).access_token;
-    const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
-    writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
+  it(
+    'rejects a tampered and an expired minted token',
+    async () => {
+      const dance = await completeAuthorize(client, {
+        ...pkce(),
+        state: randomBytes(8).toString('hex'),
+        nonce: randomBytes(8).toString('hex'),
+        resource: 'https://note-service',
+      });
+      const tokens = await tokenRequest(client, dance.code!, dance.verifier);
+      const accessToken = (tokens.json as { access_token: string }).access_token;
+      const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
+      writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
 
-    const [h, p, s] = accessToken.split('.');
-    const tampered = `${h}.${p}.AAAA${s.slice(4)}`;
-    const tamperedResult = await runVerifier(['--token', tampered, '--jwks-file', PUBLIC_JWKS_FILE]);
-    expect(tamperedResult.code).not.toBe(0);
+      const [h, p, s] = accessToken.split('.');
+      const tampered = `${h}.${p}.AAAA${s.slice(4)}`;
+      const tamperedResult = await runVerifier(['--token', tampered, '--jwks-file', PUBLIC_JWKS_FILE]);
+      expect(tamperedResult.code).not.toBe(0);
 
-    // Expired: verify the same token without expiration tolerance would need a
-    // real clock; instead assert the claim policy directly (Task 4 covered expiry).
-    const claims = decodeJwt(accessToken);
-    expect(claims.exp! - claims.iat!).toBe(600);
-  });
+      // Expired: verify the same token without expiration tolerance would need a
+      // real clock; instead assert the claim policy directly (Task 4 covered expiry).
+      const claims = decodeJwt(accessToken);
+      expect(claims.exp! - claims.iat!).toBe(600);
+    },
+    30000,
+  );
 
   it('fails closed with 400 invalid_grant when the PKCE verifier does not match', async () => {
     const dance = await completeAuthorize(client, {
@@ -290,7 +299,8 @@ describe('Authorization code + PKCE flow (e2e)', () => {
     expect(client).toBeDefined();
     expect(client!.tokenEndpointAuthMethod).toBe('client_secret_basic');
     expect(client!.grantTypes).toContain('authorization_code');
-    expect(client!.grantTypes).not.toContain('refresh_token');
+    // Task 6 adds refresh_token; both clients get it and nothing else.
+    expect([...(client!.grantTypes ?? [])].sort()).toEqual(['authorization_code', 'refresh_token']);
     expect(client!.responseTypes).toEqual(['code']);
     expect(client!.idTokenSignedResponseAlg).toBe('EdDSA');
     expect(client!.redirectUris?.length ?? 0).toBeGreaterThan(0);

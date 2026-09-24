@@ -143,8 +143,44 @@ async function main(): Promise<void> {
       })
     : undefined;
   console.log(`6. access token -> aud=${JSON.stringify(atClaims.aud)} ttl=${(atClaims.exp ?? 0) - (atClaims.iat ?? 0)}s`);
-  console.log(`   id_token nonce ${idClaims?.nonce === nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent (expected)'}`);
-  console.log(`7. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${atClaims.aud}`);
+  console.log(`   id_token nonce ${idClaims?.nonce === nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent'}`);
+
+  // 7. Refresh: rotate, then replay the retired token to trigger family revocation.
+  if (!tokens.refresh_token) throw new Error('expected a refresh token from the token endpoint');
+  const refreshUse = (rt: string) =>
+    postJson(`${ISSUER}/token`, {
+      grant_type: 'refresh_token',
+      refresh_token: rt,
+      client_id: CLIENT_ID,
+    });
+  const rotated = await refreshUse(tokens.refresh_token);
+  console.log(`7. refresh -> ${rotated.status} newRT=${rotated.body.refresh_token !== tokens.refresh_token ? 'yes' : 'no'} at_ttl=${rotated.body.expires_in}s`);
+  if (!rotated.body.refresh_token) throw new Error('refresh did not return a new refresh token');
+
+  const reuse = await refreshUse(tokens.refresh_token);
+  console.log(`8. replay retired RT -> ${reuse.status} ${reuse.body.error ?? ''} (expect 400 invalid_grant)`);
+
+  const afterRevoke = await refreshUse(rotated.body.refresh_token);
+  console.log(`9. newest RT after replay -> ${afterRevoke.status} ${afterRevoke.body.error ?? ''} (expect 400: family revoked)`);
+
+  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${atClaims.aud}`);
+}
+
+interface RefreshBody {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  error?: string;
+  error_description?: string;
+}
+
+async function postJson(
+  url: string,
+  fields: Record<string, string>,
+): Promise<{ status: number; body: RefreshBody }> {
+  const res = await postForm(url, fields);
+  const body = (await res.json().catch(() => ({}))) as RefreshBody;
+  return { status: res.status, body };
 }
 
 main().catch((err: unknown) => {
