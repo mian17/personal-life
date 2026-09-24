@@ -212,8 +212,33 @@ app; no identity from the Tailscale header). Playwright e2e of the cold-browser 
 - [ ] `npm test -w apps/app` passes (Playwright login spec)
 - [ ] Manual check on the phone: full login on the tailnet URL
 
-**Dependencies:** Tasks 7, 0
-**Files likely touched:** `apps/app/middleware.ts`, `apps/app/lib/auth/**`, `apps/app/app/login/**`, `apps/app/playwright.config.*`
+**Dependencies:** Task 7
+**Files likely touched:** `apps/app/middleware.ts`, `apps/app/lib/auth/**`, `apps/app/app/auth/**`, `apps/app/playwright.config.*`, `apps/idp/src/login/**` (GET `/logout` landing only)
+**Estimated scope:** Medium
+
+## Task 8b: Production topology + env wiring (split from Task 8, 2026-09-25)
+
+**Description:** Make the IdP reachable in production: browser-reachable `IDP_ISSUER`
+behind Tailscale Serve (path routing on the single tailnet host is the leading option —
+it keeps app and IdP same-site, which keeps cookies and the logout chain simple),
+`OIDC_APP_CLIENT_SECRET` required in production (no placeholder fallback), redirect URI
+registration aligned byte-for-byte, the audience/resource mapping made env-driven (it is
+currently hardcoded to `note-service`), and the README auth-model section rewritten for
+the IdP world (Tailscale access-only, IdP identity).
+
+**Acceptance criteria:**
+- [ ] `IDP_ISSUER` is the browser-reachable production URL; discovery/authorize work through Serve with forwarded headers honored
+- [ ] `OIDC_APP_CLIENT_SECRET` is required in production (fails loudly without it)
+- [ ] `OIDC_APP_REDIRECT_URI` and the IdP's registration match exactly in production
+- [ ] Audience/resource mapping is env-driven, not hardcoded to `note-service`
+- [ ] README documents the new auth model
+
+**Verification:**
+- [ ] Full login on the phone via the tailnet URL after `docker compose up -d --build`
+- [ ] `npm test` green at root (all workspaces)
+
+**Dependencies:** Task 8
+**Files likely touched:** `compose.yaml`, `.env.example`, `.env.development.example`, `README.md`, `apps/idp/src/oidc/**`, `apps/app/lib/auth/env.ts`
 **Estimated scope:** Medium
 
 ## Task 9: `note-service-rs` verify guard (dual-accept)

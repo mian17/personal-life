@@ -69,8 +69,9 @@ note-service-rs:   (depends on idp's JWKS)          verify guard ──> API_TOK
 
 ### Phase 2: consumers (parallelizable)
 
-- [ ] Task 7: `app-rp` OIDC client (PKCE, state/nonce, callback, server-side session)
-- [ ] Task 8: `app-rp` login gate swap (redirect dance, logout, Tailscale gate access-only)
+- [ ] Task 7: `app-rp` OIDC client (PKCE, state/nonce, callback, server-side session) ✅ done 2026-09-25
+- [ ] Task 8: `app-rp` login gate swap (redirect dance, logout chain, Tailscale gate access-only)
+- [ ] Task 8b: Production topology + env wiring (split from Task 8; issuer reachability, secret required, README)
 - [ ] Task 9: `note-service-rs` verify guard (JWKS, `aud`, rotation) with dual-accept
 - [ ] Task 10: Retire `API_TOKEN` everywhere (one commit, `deprecation-and-migration`)
 
