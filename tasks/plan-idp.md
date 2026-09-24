@@ -20,9 +20,15 @@ module lands; the IdP ships dark.
   to `idp` per request. Audience-scoped tokens (`aud=note-service`) so services refuse
   each other's tokens. This is the actual microservice boundary we're here to learn.
 - **Authorization code + PKCE** for `app`; refresh tokens with rotation + reuse detection.
-- **Standard primitives only.** argon2id/bcrypt, standard JWT signing, constant-time
-  compares. Protocol surface: prefer a battle-tested library over hand-written OIDC
-  endpoints (Open Question 1 — must be decided before Task 4).
+- **Standard primitives only.** argon2id, EdDSA/Ed25519 JWT signing, constant-time
+  compares. **Protocol surface: library-backed `oidc-provider`** (decided 2026-09-24) —
+  we own users, sessions, clients, policies, and the SQLite adapter; the library owns spec
+  compliance. Enable only discovery, code+PKCE, token, refresh rotation, and JWKS.
+- **Single seeded user** (me) + seed script; no signup path. Lifetimes: access 10 min,
+  refresh 30 days rotating + reuse detection.
+- **Tailscale gate is access-only.** Kept solely so only my phone reaches the app (tailnet
+  ACL + Serve + header check as access control); identity and authentication come from the
+  IdP from now on.
 - **Dark-ship and dual-run.** `idp` merges unused first; `app-rp` can run before
   `note-service-rs` (BFF keeps `API_TOKEN` toward `note-service` in between); removal of
   `API_TOKEN` is one dedicated commit following `deprecation-and-migration`.
@@ -64,7 +70,7 @@ note-service-rs:   (depends on idp's JWKS)          verify guard ──> API_TOK
 ### Phase 2: consumers (parallelizable)
 
 - [ ] Task 7: `app-rp` OIDC client (PKCE, state/nonce, callback, server-side session)
-- [ ] Task 8: `app-rp` login gate swap (redirect dance, logout, Tailscale identity role off)
+- [ ] Task 8: `app-rp` login gate swap (redirect dance, logout, Tailscale gate access-only)
 - [ ] Task 9: `note-service-rs` verify guard (JWKS, `aud`, rotation) with dual-accept
 - [ ] Task 10: Retire `API_TOKEN` everywhere (one commit, `deprecation-and-migration`)
 
@@ -77,7 +83,7 @@ note-service-rs:   (depends on idp's JWKS)          verify guard ──> API_TOK
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Hand-rolled OIDC protocol has a vulnerability exposing real credentials | High | Prefer a vetted library (Open Q1); standard primitives only; e2e for every auth branch |
+| OIDC protocol surface has a vulnerability exposing real credentials | High | Library-backed `oidc-provider` (decided); only needed flows enabled; standard primitives only; e2e for every auth branch |
 | Breaking daily-use auth during migration | High | Dark-ship `idp`; dual-run windows; the existing 16 `note-service` e2e stay green in every task |
 | Key rotation lockout (old `kid` gone, sessions/token unverifiable) | Med | Rotation-tolerant JWKS cache (fetch on unknown `kid`), e2e with a rotated `kid` |
 | Session/CSRF attacks on login flows | Med | `state` + `nonce` + PKCE verified on callback; fail-closed e2e tests |
@@ -88,15 +94,15 @@ note-service-rs:   (depends on idp's JWKS)          verify guard ──> API_TOK
 Tasks 7–10 split into two independent streams (`app-rp` stream: 7→8; `note-service-rs`
 stream: 9→10) once Task 4 (JWKS) exists — even before the full OIDC surface lands.
 
-## Open Questions (blocking ones first)
+## Decisions (2026-09-24 plan review — all resolved)
 
-1. **Protocol surface: library (e.g. Node `oidc-provider`) vs hand-written endpoints.**
-   Blocks Task 4/5. Recommendation: library.
-2. Single seeded user vs user-creation path. Recommendation: seeded user + script.
-3. Token lifetimes (proposal: access 10 min, refresh 30 days rotating).
-4. Signing alg: EdDSA/Ed25519 vs RS256 (proposal: EdDSA).
-5. `idp` dev port / hostname (proposal: `idp:3003`).
-6. Keep the Tailscale header gate as defense-in-depth after `app-rp`? (Proposal: keep the
-   transport ACL, drop its identity role.)
-7. App session lifetime (proposal: 7 days sliding) and logout scope (proposal: local only).
-8. Dual-accept window length before Task 10 (proposal: short — same week).
+1. **Protocol surface: library-backed `oidc-provider`** (MIT, v9.x, OpenID-certified).
+2. **Seeded single user** + seed script; no signup path.
+3. **Token lifetimes:** access 10 min, refresh 30 days rotating + reuse detection.
+4. **Signing alg:** EdDSA/Ed25519 (RS256 only on consumer demand).
+5. **Hostname/port:** `idp:3003`.
+6. **Tailscale gate: access-only.** Kept solely so only my phone reaches the app (tailnet
+   ACL + Serve + header check as access control). Identity and authentication come from
+   the IdP from now on, for every service.
+7. **App session:** 7 days sliding; logout local-only, first cut.
+8. **Dual-accept window** before Task 10: short — same week.

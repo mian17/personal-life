@@ -1,13 +1,14 @@
 # Capability Map: IdP
 
 Traces to intent: `docs/intent/idp.md` (2026-09-24).
-Status: **proposed** — module boundaries, dependency direction, and build order are a
-gate; approve (or adjust) before treating the module specs as final.
+Status: **approved** 2026-09-24 — boundaries, dependency direction, and build order
+confirmed at plan review; decisions from that review are recorded in the module specs
+and `tasks/plan-idp.md`.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
 | `idp` | The IdP service: users + credentials, login UI + sessions, OIDC core (discovery, authorize, token, JWKS, client registry, refresh tokens) | — |
-| `app-rp` | `apps/app` becomes a relying party (authorization code + PKCE); its identity gate moves from the Tailscale header to an IdP login flow | `idp` |
+| `app-rp` | `apps/app` becomes a relying party (authorization code + PKCE); identity moves to the IdP while the Tailscale gate stays access-only (phone → app reachability) | `idp` |
 | `note-service-rs` | `apps/note-service` becomes a resource server: verifies JWTs locally via JWKS with an audience scoped to itself; retires `API_TOKEN` | `idp` |
 
 Build order: `idp` → `app-rp` ∥ `note-service-rs` (the last two are parallel and

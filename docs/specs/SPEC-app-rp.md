@@ -5,13 +5,16 @@ Traces to intent: `docs/intent/idp.md`.
 
 ## Objective
 
-Replace the app's identity gate (Tailscale `Tailscale-User-Login` header matched against
-`OWNER_LOGIN`) with a standard OIDC login: authorization code + PKCE against `idp`. The
-BFF keeps holding whatever secret authenticates it to `note-service` (still `API_TOKEN`
-until `note-service-rs` lands), so the browser never sees service credentials.
+Give the app a standard OIDC identity layer: authorization code + PKCE against `idp`.
+Identity and authentication come from the IdP — from now on, for the whole stack. The
+Tailscale gate is kept for one job only: **access** (only my phone can reach the app over
+the tailnet). It provides no identity. The BFF keeps holding whatever secret authenticates
+it to `note-service` (still `API_TOKEN` until `note-service-rs` lands), so the browser
+never sees service credentials.
 
-Tailscale remains transport/ACL (Serve for HTTPS, tailnet-only reachability) — this module
-only moves *identity* out of it.
+Tailscale keeps its transport/ACL role (Serve for HTTPS, tailnet-only reachability) and
+the header check as an access control — neither is identity. This module layers IdP
+identity inside that access gate.
 
 ## Tech Stack
 
@@ -74,15 +77,15 @@ no visual or interaction changes beyond the login entry.
 - [ ] Cold browser with no session → redirected to `idp` login → back in the app with a
       working notes UI (Playwright-verified).
 - [ ] Callback with mismatched `state` or PKCE verifier fails closed (4xx, no session).
-- [ ] Tailscale identity header is no longer the source of truth for identity (header gate
-      removed or reduced to a transport-level check — decide at implementation, keep one).
+- [ ] Identity comes from the IdP session; the Tailscale gate serves access only (only my
+      phone reaches the app) — no identity is derived from the Tailscale header.
 - [ ] `API_TOKEN` still works end-to-end during the dual-run window (unchanged
       `note-service` contract).
 
-## Open Questions
+## Decisions (2026-09-24, plan review)
 
-1. Do we keep the Tailscale header gate as defense-in-depth *in front of* the IdP login,
-   or remove it once `app-rp` lands? (Recommendation: keep transport ACL, remove the
-   identity role; revisit when the IdP is proven.)
-2. Session lifetime for the app cookie (proposal: 7 days, sliding).
-3. Logout: local only, or single-logout at the IdP too? (Proposal: local only, first cut.)
+1. **Tailscale gate kept, access-only.** Its sole job is that only my phone can reach the
+   app (tailnet ACL + Serve + header check as access control). Identity and authentication
+   come from the IdP — from now on, for every service.
+2. **App session cookie:** 7 days, sliding (accepted default).
+3. **Logout:** local only, first cut (accepted default).

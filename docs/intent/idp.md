@@ -11,7 +11,9 @@ The build artifacts live in `docs/specs/` — see the map at `docs/specs/MAP-idp
 - **Later:** a small, self-owned IdP (OpenID Connect provider) becomes the single source
   of identity for the stack. The app becomes a relying party (authorization code + PKCE);
   `note-service` and later `todo-service` become resource servers verifying tokens via
-  JWKS. We own the IdP; it stays small on purpose.
+  JWKS. We own the IdP; it stays small on purpose. The Tailscale gate is kept for access
+  only (only my phone reaches the app); identity and authentication come from the IdP
+  from now on.
 
 ## User
 

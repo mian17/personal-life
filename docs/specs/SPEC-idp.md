@@ -16,11 +16,16 @@ or email/reset infrastructure.
 ## Tech Stack
 
 - NestJS 11 + TypeORM + better-sqlite3, Node 22 — same shape as `note-service`.
+- Protocol surface: `oidc-provider` (MIT, v9.x, OpenID-certified) mounted in `apps/idp`,
+  configured to enable **only** discovery, authorization code + PKCE, token, refresh
+  rotation, and JWKS. We own users, argon2id credentials, login UI, sessions, the client
+  registry, policies, and the SQLite storage adapter; the library owns spec compliance.
 - Own database: `apps/idp/data/idp.db` (per-service data boundary; credentials never
   touch the notes database).
-- Passwords: argon2id (preferred) or bcrypt. JWT: asymmetric signing (EdDSA/Ed25519,
-  or RS256) with a JWKS endpoint — services verify offline, never call the IdP per request.
-- Compose: new `idp` service on the internal network (e.g. host port 3003 in dev).
+- Passwords: argon2id. JWT: EdDSA/Ed25519 asymmetric signing (RS256 only if a consumer
+  demands it) with a JWKS endpoint — services verify offline, never call the IdP per
+  request. Lifetimes: access 10 min, refresh 30 days with rotation + reuse detection.
+- Compose: new `idp` service on the internal network (hostname `idp`, dev port 3003).
 
 ## Commands
 
@@ -38,7 +43,7 @@ apps/idp/
   src/
     users/        accounts + credential hashes (the only place they exist)
     login/        login UI routes + session lifecycle
-    oidc/         discovery, authorize, token, JWKS, client registry, refresh tokens
+    oidc/         oidc-provider config + SQLite adapter, client registry
     crypto/       signing key management (generation, rotation hooks)
   test/           *.e2e-spec.ts
   data/           idp.db (gitignored, backed up like life.db)
@@ -87,14 +92,14 @@ rejected. No coverage percentage gate; every auth-relevant branch has a test.
       credentials exist only in the latter.
 - [ ] The running app's current auth flow is untouched (`idp` ships dark until `app-rp`).
 
-## Open Questions
+## Decisions (2026-09-24, plan review)
 
-1. **Protocol surface: hand-written endpoints vs a battle-tested library (e.g. Node's
-   `oidc-provider`).** Recommendation: library — we own the service, users, sessions,
-   clients, and policies; the library owns spec compliance. Hand-rolling is the one place
-   "learning" can become a real breach. Decide before Task 1 of `idp`.
-2. Single seeded user vs a user-creation path (CLI/seed)? Recommendation: seeded user,
-   create-more via a script.
-3. Token lifetimes. Proposal: access 10 min, refresh 30 days with rotation + reuse detection.
-4. Signing algorithm: EdDSA (Ed25519) vs RS256. Proposal: EdDSA unless a consumer needs RSA.
-5. Dev port and service hostname (`idp:3003`?).
+1. **Protocol surface: library-backed `oidc-provider`.** We own the service, users,
+   sessions, clients, policies, and storage adapter; the library owns spec compliance.
+2. **Seeded single user** (me) + a seed script; no signup path. More users later = data.
+3. **Token lifetimes:** access 10 min, refresh 30 days with rotation + reuse detection.
+4. **Signing:** EdDSA/Ed25519 (RS256 only if a consumer demands it).
+5. **Hostname/port:** `idp:3003` internal (dev).
+
+All open questions resolved. Implementation starts on the human's go (Task 1 of
+`tasks/todo-idp.md`).

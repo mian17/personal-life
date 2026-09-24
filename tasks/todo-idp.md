@@ -1,7 +1,8 @@
 # Todo: IdP chapter
 
 Traces to: `tasks/plan-idp.md`, `docs/specs/MAP-idp.md`.
-Status: **planning only** — no implementation until this list is approved.
+Status: approved at plan review (2026-09-24), decisions recorded in `tasks/plan-idp.md`.
+Implementation has **not** started — Task 1 begins on the human's go.
 
 ## Task 0: Rebuild/deploy the renamed stack (human-owned)
 
@@ -43,8 +44,9 @@ nothing calls it yet.
 
 ## Task 2: Users + credentials
 
-**Description:** Users table, argon2id (or bcrypt) hashing, a seed path for the first user,
-and the verification helper used by login. The only place in the stack where credentials exist.
+**Description:** Users table, argon2id hashing, a seed path for the first user (seeded
+single-user decision — no signup), and the verification helper used by login. The only
+place in the stack where credentials exist.
 
 **Acceptance criteria:**
 - [ ] Passwords stored only as salted hashes; e2e asserts no plaintext anywhere in `idp.db`
@@ -85,9 +87,9 @@ response shape identical whether or not the user exists.
 
 ## Task 4: Signing keys + JWKS + audience-scoped access tokens
 
-**Description:** Keypair generation and storage for `idp`, JWKS endpoint, and access-token
-issuance (EdDSA or RS256, `aud`-scoped, short-lived). Decides Open Question 1 (library vs
-hand-rolled) for the protocol surface in Task 5.
+**Description:** Keypair generation and storage for `idp` (EdDSA/Ed25519), the JWKS
+endpoint, and `aud`-scoped access-token issuance (10-min lifetime) via the decided
+`oidc-provider` keystore/JWKS surface.
 
 **Acceptance criteria:**
 - [ ] A minted token verifies offline against JWKS alone (separate process, no `idp` call)
@@ -104,8 +106,9 @@ hand-rolled) for the protocol surface in Task 5.
 
 ## Task 5: Authorization code + PKCE
 
-**Description:** Discovery document, `authorize` and `token` endpoints, and a client
-registry (first clients: `app`, dev client for tests). Full code+PKCE flow.
+**Description:** Wire the decided `oidc-provider` surface: discovery, `authorize` +
+`token` (code+PKCE) integrated with the Task 3 login, the client registry (first clients:
+`app`, dev client for tests), and the SQLite storage adapter.
 
 **Acceptance criteria:**
 - [ ] Code+PKCE happy path e2e green (authorize → code → token → verified access token)
@@ -122,8 +125,9 @@ registry (first clients: `app`, dev client for tests). Full code+PKCE flow.
 
 ## Task 6: Refresh tokens with rotation + reuse detection
 
-**Description:** Refresh tokens bound to client + subject, rotated on use; reuse of a
-retired token revokes the family.
+**Description:** Refresh tokens bound to client + subject, rotated on use with reuse
+detection (library-native in `oidc-provider`); prove rotation and family revocation with
+our own e2e.
 
 **Acceptance criteria:**
 - [ ] Refresh rotates (old token dead after use) and returns a new access token
@@ -163,13 +167,14 @@ retired token revokes the family.
 
 ## Task 8: `app-rp` login gate swap
 
-**Description:** Middleware redirects unauthenticated traffic to `idp` login (code+PKCE),
-logout is local-first. The Tailscale header loses its identity role (transport ACL stays).
+**Description:** Middleware redirects unauthenticated traffic to `idp` login (code+PKCE);
+logout is local-only (first cut). Identity comes from the IdP — the Tailscale gate stays
+**access-only** (only my phone reaches the app; no identity from the Tailscale header).
 Playwright e2e of the cold-browser flow.
 
 **Acceptance criteria:**
 - [ ] Cold browser → IdP login → callback → working notes UI (Playwright green)
-- [ ] Identity no longer derived from the Tailscale header; behavior on the tailnet URL unchanged for a logged-in user
+- [ ] Identity comes from the IdP session; the Tailscale gate remains, access-only (no identity derived from the Tailscale header)
 - [ ] `API_TOKEN` BFF behavior unchanged (dual-run intact)
 
 **Verification:**
@@ -214,7 +219,7 @@ old tests deleted in the same commit.
 - [ ] `grep -r API_TOKEN` returns only historical docs
 - [ ] Manual check on the phone after `docker compose up -d --build`
 
-**Dependencies:** Tasks 8, 9 (dual-run window elapsed — proposal: same week)
+**Dependencies:** Tasks 8, 9 (dual-run window elapsed — decided: short, same week)
 **Files likely touched:** `apps/note-service/src/auth/**`, `apps/app/lib/api.ts`, `.env*.example`, `compose.yaml`, `README.md`
 **Estimated scope:** Medium
 
