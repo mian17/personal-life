@@ -4,19 +4,22 @@ Traces to: `tasks/plan-idp.md`, `docs/specs/MAP-idp.md`.
 Status: approved at plan review (2026-09-24), decisions recorded in `tasks/plan-idp.md`.
 Implementation has **not** started — Task 1 begins on the human's go.
 
-## Task 0: Rebuild/deploy the renamed stack (human-owned)
+## Task 0: Rebuild/deploy the renamed stack (human-owned) — ✅ done 2026-09-24
+
+**Status:** Done — human-completed, owner-attested (the production rebuild ran under the
+new service names when the rename landed). Boxes ticked on attestation.
 
 **Description:** Bring the production stack back up under the new service names with the
 existing auth flow, unchanged.
 
 **Acceptance criteria:**
-- [ ] `docker compose up -d --build` healthy: `app` serving on 127.0.0.1:3002, `note-service` healthy on the internal network
-- [ ] Notes load and save through the UI on the tailnet URL
-- [ ] `apps/note-service/data/life.db` intact (checksum unchanged from `31767e4d…` baseline is a nice-to-have; "notes are all there" is the bar)
+- [x] `docker compose up -d --build` healthy: `app` serving on 127.0.0.1:3002, `note-service` healthy on the internal network (attested)
+- [x] Notes load and save through the UI on the tailnet URL (attested)
+- [x] `apps/note-service/data/life.db` intact (checksum `31767e4d…` verified unchanged through the rename and all Task 1–3 reviews)
 
 **Verification:**
-- [ ] `docker compose ps` shows both services up
-- [ ] Manual check on the phone: open the app, open a note
+- [x] `docker compose ps` shows both services up (attested)
+- [x] Manual check on the phone: open the app, open a note (attested)
 
 **Dependencies:** None
 **Files likely touched:** none (runtime only)
@@ -85,33 +88,40 @@ response shape identical whether or not the user exists.
 - [ ] `life.db` untouched; the running app's auth unchanged
 - [ ] Review with human before proceeding
 
-## Task 4: Signing keys + JWKS + audience-scoped access tokens
+## Task 4: Signing keys + JWKS + access-token policy foundation
 
-**Description:** Keypair generation and storage for `idp` (EdDSA/Ed25519), the JWKS
-endpoint, and `aud`-scoped access-token issuance (10-min lifetime) via the decided
-`oidc-provider` keystore/JWKS surface.
+**Description:** Keypair generation and persistence for `idp` (EdDSA/Ed25519, restart-safe
+`kid`), the JWKS/discovery surface via the decided `oidc-provider` keystore, and the
+access-token policy configuration (JWT-format access tokens, `aud`-scoped, 10-min TTL).
+Re-scoped at implementation start (tech lead): since `oidc-provider` owns issuance
+end-to-end, minting a token requires the authorize+token flow — so the minted-token
+acceptance lives in Task 5 where real tokens exist. Task 4 proves the key/JWKS/policy
+foundation.
 
 **Acceptance criteria:**
-- [ ] A minted token verifies offline against JWKS alone (separate process, no `idp` call)
-- [ ] Wrong `aud`, expired, and tampered tokens all fail verification
-- [ ] Signing keys never leave `idp`'s data dir; public JWKS exposes only public material
+- [ ] Ed25519 signing keypair generated once and persisted (file mode 0600, gitignored, never logged); same `kid` after an app restart
+- [ ] JWKS/discovery endpoints serve only public material with the correct `kid` (no private params in the response)
+- [ ] A JWT signed by the persisted private key verifies in a standalone process against the fetched JWKS alone; tampered and expired variants fail
+- [ ] Access-token policy (JWT format, `aud`, 10-min TTL) configured and unit-tested at the claims/config level
 
 **Verification:**
-- [ ] `npm test -w apps/idp` passes (token/JWKS e2e)
-- [ ] Manual check: verify a real token with a standalone JWKS verifier script
+- [ ] `npm test -w apps/idp` passes (keys/JWKS e2e)
+- [ ] Manual check: standalone JWKS verifier script proves offline verification
 
-**Dependencies:** Task 1 (needs only the skeleton; can follow Tasks 2–3 in order)
-**Files likely touched:** `apps/idp/src/crypto/**`, `apps/idp/src/oidc/jwks.*`, `apps/idp/test/token.e2e-spec.ts`
+**Dependencies:** Tasks 1–3
+**Files likely touched:** `apps/idp/src/crypto/**`, `apps/idp/src/oidc/**`, `apps/idp/scripts/**`, `apps/idp/test/keys-jwks.e2e-spec.ts`
 **Estimated scope:** Medium
 
 ## Task 5: Authorization code + PKCE
 
-**Description:** Wire the decided `oidc-provider` surface: discovery, `authorize` +
-`token` (code+PKCE) integrated with the Task 3 login, the client registry (first clients:
-`app`, dev client for tests), and the SQLite storage adapter.
+**Description:** Wire the decided `oidc-provider` flow surface: `authorize` + `token`
+(code+PKCE) integrated with the Task 3 login, the client registry (first clients: `app`,
+dev client for tests), and the SQLite storage adapter. Discovery/JWKS landed in Task 4.
 
 **Acceptance criteria:**
 - [ ] Code+PKCE happy path e2e green (authorize → code → token → verified access token)
+- [ ] A minted access token verifies offline against JWKS alone (separate process, no `idp` call), with `aud` enforced (wrong audience rejected) — the SPEC-idp success bar
+- [ ] Expired and tampered minted tokens fail verification
 - [ ] PKCE verifier mismatch and `state` mismatch fail closed
 - [ ] Unauthenticated authorize redirects to the Task 3 login, then resumes the flow
 
