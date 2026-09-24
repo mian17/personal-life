@@ -6,11 +6,13 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3003} node dist/main.js",
+    "seed": "ts-node scripts/seed-user.ts",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@life/shared": "*",
+    "argon2": "^0.45.1",
     "@nestjs/common": "^11.0.11",
     "@nestjs/core": "^11.0.11",
     "@nestjs/platform-express": "^11.0.11",
