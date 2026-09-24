@@ -75,11 +75,11 @@ in the same commit.
 - [ ] `API_TOKEN` fully retired: removed from code, `.env*` examples, compose, and README
       in one commit (follow `deprecation-and-migration` for that commit).
 
-## Open Questions
+## Decisions (2026-09-25, tech lead)
 
-1. Dual-run window length — accept both `API_TOKEN` and JWT for a while, or hard-switch
-   in one commit? (Recommendation: short dual-accept window, then one removal commit.)
-2. Clock-skew tolerance (proposal: 30s).
-3. Should `todo-service` later reuse this guard via `packages/shared`, or copy the module?
-   (Recommendation: decide at `todo-service` time — copying twice is cheaper than a wrong
-   abstraction.)
+1. **Dual-run:** short dual-accept window (Task 9 accepts both `API_TOKEN` and JWT), then
+   one removal commit (Task 10) — as recorded in `tasks/plan-idp.md` decision 8.
+2. **Clock-skew tolerance:** 30s.
+3. **Guard reuse for `todo-service`:** copy the module when the second consumer exists;
+   extract to `packages/shared` only after the second copy proves the abstraction
+   (two copies are cheaper than a wrong abstraction).
