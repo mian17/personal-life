@@ -1,0 +1,44 @@
+# Intent: small, self-owned IdP
+
+Confirmed 2026-09-24 via interview (continues `docs/intent/architecture.md`).
+The build artifacts live in `docs/specs/` — see the map at `docs/specs/MAP-idp.md`.
+
+## Outcome
+
+- **Now:** the renamed stack keeps running on its existing auth code flow — Tailscale
+  identity header at the edge, BFF-held `API_TOKEN`. Nothing about auth changes until
+  the IdP lands.
+- **Later:** a small, self-owned IdP (OpenID Connect provider) becomes the single source
+  of identity for the stack. The app becomes a relying party (authorization code + PKCE);
+  `note-service` and later `todo-service` become resource servers verifying tokens via
+  JWKS. We own the IdP; it stays small on purpose.
+
+## User
+
+Me — daily use, single user today. Shaped so admitting someone later is a data change,
+not a rewrite.
+
+## Why now
+
+Daily use cannot wait on an auth rewrite, so the running app stays untouched. The IdP is
+the next learning chapter and is built deliberately, after the rename chapter closed.
+
+## Success
+
+- Now: containers healthy, auth behavior unchanged.
+- Later: one source of identity in the stack; every service authenticates its own callers
+  with per-service, audience-scoped tokens; no secret shared across services; I can defend
+  OIDC flow design hands-on.
+
+## Constraint
+
+Small and boring wins. Standard primitives only (argon2id/bcrypt, standard JWT signing,
+constant-time compares) — **credential safety is as hard a line as data safety.** Single
+host, single-user scale. "Small IdP" means core OIDC only: login, users, sessions,
+clients, token issuance, JWKS.
+
+## Out of scope (first IdP cut)
+
+Roles/permissions, passkeys, social login, federation, multi-tenancy, email/reset
+infrastructure. Also out of scope right now: implementation itself — this branch is
+planning only until the plan is approved.
