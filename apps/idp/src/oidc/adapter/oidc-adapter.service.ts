@@ -4,6 +4,9 @@ import type { Adapter, AdapterPayload } from 'oidc-provider';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { OidcPayload } from './oidc-payload.entity';
 
+/** The Grant model name used as the `model` discriminator in `oidc_payload`. */
+const GRANT_MODEL = 'Grant';
+
 /** Unix seconds, the unit the provider uses for `expiresIn`. */
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -117,5 +120,41 @@ export class OidcAdapterService {
   /** Test/debug aid: how many rows exist for a model. */
   count(model?: string): Promise<number> {
     return this.repo.count(model ? { where: { model } } : undefined);
+  }
+
+  private accountIdOf(row: OidcPayload): string | undefined {
+    try {
+      const payload = JSON.parse(row.payload) as AdapterPayload & { accountId?: unknown };
+      return typeof payload.accountId === 'string' ? payload.accountId : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Revokes every grant belonging to one account, deleting the token rows
+   * (refresh/access/code) tied to each grant and the Grant rows themselves.
+   *
+   * Mechanism: read the Grant rows and match `accountId` from the stored JSON.
+   * We chose this over a dedicated indexed `accountId` column because it is the
+   * smaller honest change — no schema migration — and at single-user scale the
+   * Grant set is tiny (at most one per client). If grants ever grow, add an
+   * `accountId` column maintained in `upsert` and filter on it instead.
+   *
+   * The `delete({ grantId })` step has the same effect as the provider's
+   * `revokeByGrantId`: the Grant row itself has a null `grantId`, so it is
+   * removed separately by key.
+   */
+  async revokeGrantsForAccount(accountId: string): Promise<number> {
+    const grants = await this.repo.find({ where: { model: GRANT_MODEL } });
+    const grantIds = grants
+      .filter((row) => this.accountIdOf(row) === accountId)
+      .map((row) => row.id);
+
+    for (const grantId of grantIds) {
+      await this.repo.delete({ grantId });
+      await this.repo.delete({ key: keyFor(GRANT_MODEL, grantId) });
+    }
+    return grantIds.length;
   }
 }
