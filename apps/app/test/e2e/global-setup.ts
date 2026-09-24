@@ -69,7 +69,8 @@ export default async function globalSetup(): Promise<void> {
     }),
   );
 
-  // note-service: its own scratch DB so life.db is never touched.
+  // note-service: its own scratch DB so life.db is never touched. JWT-only
+  // (Task 10): it verifies against the test IdP's JWKS, no static token.
   await build('apps/note-service');
   services.push(
     await spawnService({
@@ -82,7 +83,8 @@ export default async function globalSetup(): Promise<void> {
         PORT: String(notePort),
         HOST: '127.0.0.1',
         DB_PATH: `${E2E_DIR}/note-service.db`,
-        API_TOKEN: 'e2e-api-token-not-a-secret',
+        IDP_ISSUER: `http://127.0.0.1:${idpPort}`,
+        NOTE_SERVICE_AUDIENCE: 'note-service',
       },
     }),
   );
@@ -110,7 +112,6 @@ export default async function globalSetup(): Promise<void> {
         PORT: String(appPort),
         HOSTNAME: '127.0.0.1',
         API_URL: `http://127.0.0.1:${notePort}`,
-        API_TOKEN: 'e2e-api-token-not-a-secret',
         IDP_ISSUER: `http://127.0.0.1:${idpPort}`,
         OIDC_APP_CLIENT_ID: 'app',
         OIDC_APP_CLIENT_SECRET: 'app-dev-client-secret-not-a-secret',

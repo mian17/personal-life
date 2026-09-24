@@ -1,5 +1,8 @@
 import 'server-only';
+import { cookies } from 'next/headers';
 import type { CreateNoteInput, Note, NotePage, Tag, UpdateNoteInput } from '@life/shared';
+import { SESSION_COOKIE } from './auth/cookies';
+import { getValidSession } from './auth/session';
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
 
@@ -13,16 +16,26 @@ export class ApiError extends Error {
   }
 }
 
-function authHeaders(): HeadersInit {
-  const token = process.env.API_TOKEN;
-  if (!token) throw new Error('API_TOKEN is not set');
-  return { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+/**
+ * The BFF authenticates to `note-service` with the caller's IdP access token
+ * (Task 10 — JWT-only). The token comes from the server-side session, refreshed
+ * when near expiry; a refresh failure means "re-login" (the session is destroyed
+ * and we surface 401, which the gate turns into a redirect on the next request).
+ * The token never reaches the browser.
+ */
+async function authHeaders(): Promise<HeadersInit> {
+  const jar = await cookies();
+  const session = await getValidSession(jar.get(SESSION_COOKIE)?.value);
+  if (!session) {
+    throw new ApiError(401, 'no valid session');
+  }
+  return { Authorization: `Bearer ${session.accessToken}`, 'content-type': 'application/json' };
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+    headers: { ...(await authHeaders()), ...(init?.headers ?? {}) },
     cache: 'no-store',
   });
   if (!res.ok) {

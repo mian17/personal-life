@@ -29,13 +29,8 @@ cp .env.development.example .env.development
 cp .env.example .env
 ```
 
-Generate a token and put the same value in the `API_TOKEN` of whichever file you're using:
-
-```unknown
-openssl rand -hex 32
-```
-
-Set `OWNER_LOGIN` to your tailnet login (e.g. `you@gmail.com`).
+Set `OWNER_LOGIN` to your tailnet login (e.g. `you@gmail.com`), and generate the OIDC
+client secret with `openssl rand -hex 32` (see the OIDC keys in `.env.example`).
 
 ## Production (Docker Compose)
 
@@ -46,7 +41,7 @@ on host loopback `127.0.0.1:3003` so Tailscale Serve can proxy to it), and `app`
 
 ```unknown
 cp .env.example .env
-# Edit .env: set API_TOKEN, OWNER_LOGIN, OIDC_APP_CLIENT_SECRET, IDP_ISSUER,
+# Edit .env: set OWNER_LOGIN, OIDC_APP_CLIENT_SECRET, IDP_ISSUER,
 # and OIDC_APP_REDIRECT_URI for your tailnet host (see "Auth model").
 docker compose up -d --build
 ```
@@ -140,10 +135,13 @@ decides whether a device can reach the app, never *who* the user is.
    *Known residual:* the oidc-provider's own SSO session cookie survives logout until a
    later "kill SSO session" / RP-initiated-logout decision lands, so a fresh
    authorization may auto-resolve without re-prompting.
-5. **BFF (dual-run, unchanged).** The Next.js BFF still holds `API_TOKEN` server-side and
-   calls `note-service` over the compose network (`http://note-service:3001`); the
-   browser never sees it. `API_TOKEN` is retired only in Task 10, after the IdP-based
-   resource-server guard (Task 9) proves out.
+5. **BFF → note-service (JWT-only).** The Next.js BFF calls `note-service` over the
+   compose network (`http://note-service:3001`) with the caller's **session access
+   token** as `Authorization: Bearer <jwt>`. The token is read from the server-side
+   session (refreshed when near expiry; a refresh failure means re-login) and never
+   reaches the browser. `note-service` verifies it offline against the IdP's JWKS —
+   no shared secret, no per-request call to the IdP. The former shared static token
+   was retired (see Rollback below).
 
 ### Redirect-URI byte-identity
 
@@ -161,10 +159,14 @@ is the `iss` claim and the base for discovery/authorize/token/JWKS URLs.
 
 For local browser development without Tailscale, no configuration is needed: when
 `NODE_ENV=development` (set by `.env.development`) the gates are skipped, so localhost
-works with no identity header or `API_TOKEN`.
+works with no identity header or session.
 
-Fallback if identity headers are ever unavailable: exchange `API_TOKEN` for a signed
-`HttpOnly` session cookie via a one-time login.
+### Rollback
+
+Service-to-service auth is JWT-only. If verification needs to be temporarily disabled,
+`git revert` the retirement commit restores the previous dual-accept guard (a static
+shared token **or** a JWT), and the shared-token env entries can be reintroduced from
+that commit's `.env` examples.
 
 ## Test / build / lint
 

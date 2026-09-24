@@ -2,17 +2,25 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
 
 const TEST_DB = join(__dirname, 'test-life.db');
 process.env.DB_PATH = TEST_DB;
-process.env.API_TOKEN = 'test-secret';
 
-const auth = (r: request.Test) => r.set('Authorization', 'Bearer test-secret');
+// Every request now carries a minted JWT (Task 10); the guard is JWT-only.
+// The token is minted once in beforeAll from an ephemeral local JWKS.
+let token = '';
+const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
 
 describe('Notes API (e2e)', () => {
   let app: INestApplication;
+  let harness: JwtTestHarness;
 
   beforeAll(async () => {
+    harness = await new JwtTestHarness().start();
+    configureVerifierEnv(harness);
+    token = await harness.sign({ expiresIn: 3600 });
+
     rmSync(TEST_DB, { force: true });
     const { createApp } = await import('../src/app.factory');
     app = await createApp();
@@ -22,6 +30,7 @@ describe('Notes API (e2e)', () => {
   afterAll(async () => {
     await app.close();
     rmSync(TEST_DB, { force: true });
+    await harness.stop();
   });
 
   it('rejects missing token', async () => {

@@ -9,6 +9,13 @@ services:
       PORT: "3001"
       HOST: 0.0.0.0
       DB_PATH: /data/life.db
+      # JWT-only auth (Task 10). note-service verifies tokens offline against the
+      # IdP's JWKS. `iss` must equal the issuer the IdP mints with (the
+      # browser-facing URL in .env), while the JWKS is fetched over the internal
+      # compose network (no tailnet round-trip) — hence the two vars.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      IDP_JWKS_URL: ${NOTE_SERVICE_IDP_JWKS_URL:-http://idp:3003/jwks}
+      NOTE_SERVICE_AUDIENCE: ${NOTE_SERVICE_AUDIENCE:-note-service}
     volumes:
       - ./apps/note-service/data:/data
     networks:
