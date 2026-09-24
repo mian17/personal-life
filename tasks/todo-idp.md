@@ -1,8 +1,10 @@
 # Todo: IdP chapter
 
 Traces to: `tasks/plan-idp.md`, `docs/specs/MAP-idp.md`.
-Status: approved at plan review (2026-09-24), decisions recorded in `tasks/plan-idp.md`.
-Implementation has **not** started — Task 1 begins on the human's go.
+Status: **implementation complete 2026-09-25** — Tasks 1–10 plus 6b and 8c landed on
+`feature/idp` (subagent-built, tech-lead reviewed); all suites green. Remaining before
+the chapter closes: the human deploy + phone check (checklist below), then the "Now"
+horizon note in `docs/intent/idp.md`.
 
 ## Task 0: Rebuild/deploy the renamed stack (human-owned) — ✅ done 2026-09-24
 
@@ -281,7 +283,24 @@ old tests deleted in the same commit.
 
 ## Checkpoint: complete
 
-- [ ] Full flow through the IdP on the phone
-- [ ] `API_TOKEN` gone from code/env/compose/README; all suites green
-- [ ] `life.db` and `apps/idp/data/idp.db` intact
+- [ ] Full flow through the IdP on the phone ← **human deploy step, below**
+- [x] `API_TOKEN` gone from code/env-examples/compose/README (grep gate: only dated docs and the human's real `.env*`); all suites green (`apps/idp` 64, `apps/app` 52 unit + 3 Playwright, `apps/note-service` 25)
+- [x] `life.db` and `apps/idp/data/idp.db` intact (life.db md5 `31767e4d…` verified after every task)
 - [ ] Review with human; update `docs/intent/idp.md` ("Now" horizon closed)
+
+### Human deploy checklist (the one remaining gate)
+
+1. Root `.env`: **delete the `API_TOKEN` line** (now dead — a subagent's verification grep
+   once surfaced its value in terminal output; deleting it closes that too). Add:
+   `IDP_ISSUER=https://<host>.<tailnet>.ts.net:8443`, `OIDC_APP_CLIENT_ID=app`,
+   `OIDC_APP_CLIENT_SECRET=<openssl rand -hex 32>`,
+   `OIDC_APP_REDIRECT_URI=https://<host>.<tailnet>.ts.net/auth/callback`,
+   `OIDC_DEFAULT_RESOURCE=https://note-service`,
+   `OIDC_AUDIENCE_MAP=https://note-service=note-service`.
+2. Tailscale Serve (tailnet-only, never Funnel):
+   `tailscale serve --bg --https 443 http://127.0.0.1:3002` and
+   `tailscale serve --bg --https 8443 http://127.0.0.1:3003` (verify `tailscale serve status`).
+3. `docker compose up -d --build` (the IdP and app fail loudly if the secret is missing).
+4. Seed the user once: `SEED_USERNAME=<you> SEED_PASSWORD=<pw> DB_PATH=apps/idp/data/idp.db npm run seed -w apps/idp`.
+5. Phone: cold-browser login → notes load/save → logout → back at login. If a JWT is
+   misconfigured you'll see 401 → login loop; `IDP_ISSUER` must byte-match the minted `iss`.
