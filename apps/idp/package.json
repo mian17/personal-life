@@ -20,6 +20,7 @@
     "better-sqlite3": "^11.8.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "oidc-provider": "^9.12.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "typeorm": "^0.3.20"
@@ -32,6 +33,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.9",
+    "@types/oidc-provider": "^9.12.1",
     "@types/supertest": "^6.0.2",
     "jest": "^29.7.0",
     "supertest": "^7.0.0",
@@ -51,6 +53,7 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": ["/node_modules/(?!(oidc-provider|jose)/)"],
     "testEnvironment": "node"
   }
 }

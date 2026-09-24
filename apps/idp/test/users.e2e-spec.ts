@@ -30,13 +30,16 @@ async function runSeed(
 
 describe('Users credentials (e2e)', () => {
   const TEST_DB = join(__dirname, 'test-idp-users.db');
+  const TEST_KEYS = join(__dirname, 'test-idp-users-keys.json');
   process.env.DB_PATH = TEST_DB;
+  process.env.KEYS_PATH = TEST_KEYS;
 
   let app: INestApplication;
   let users: UsersService;
 
   beforeAll(async () => {
     rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
     const { createApp } = await import('../src/app.factory');
     app = await createApp();
     await app.init();
@@ -46,6 +49,7 @@ describe('Users credentials (e2e)', () => {
   afterAll(async () => {
     await app.close();
     rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
   });
 
   it('hashes and verifies a correct password', async () => {

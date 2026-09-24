@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { HealthController } from './health/health.controller';
 import { LoginModule } from './login/login.module';
+import { OidcModule } from './oidc/oidc.module';
 import { Session } from './sessions/session.entity';
 import { User } from './users/user.entity';
 import { UsersModule } from './users/users.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
     }),
     UsersModule,
     LoginModule,
+    OidcModule,
   ],
   controllers: [HealthController],
 })

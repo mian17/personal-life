@@ -22,13 +22,16 @@ function rawToken(cookie: string): string {
 
 describe('Login and sessions (e2e)', () => {
   const TEST_DB = join(__dirname, 'test-idp-login.db');
+  const TEST_KEYS = join(__dirname, 'test-idp-login-keys.json');
   process.env.DB_PATH = TEST_DB;
+  process.env.KEYS_PATH = TEST_KEYS;
 
   let app: INestApplication;
   let users: UsersService;
 
   beforeAll(async () => {
     rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
     const { createApp } = await import('../src/app.factory');
     app = await createApp();
     await app.init();
@@ -39,6 +42,7 @@ describe('Login and sessions (e2e)', () => {
   afterAll(async () => {
     await app.close();
     rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
   });
 
   const login = (username: string, password: string) =>
