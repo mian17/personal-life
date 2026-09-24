@@ -38,3 +38,25 @@ export function homePage(username: string): string {
 </body>
 </html>`;
 }
+
+/**
+ * Side-effect-free logout landing. A GET renders this page, which auto-submits a
+ * same-origin POST to `/logout`. The POST (never the GET) performs revocation, so
+ * a cross-site navigation still arrives with the IdP session cookie attached —
+ * the browser treats the POST as same-origin because it originates here.
+ */
+export function logoutPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Signing out</title></head>
+<body>
+<main>
+<h1>Signing out…</h1>
+<form id="logout-form" method="post" action="/logout">
+<button type="submit">Sign out</button>
+</form>
+</main>
+<script>document.getElementById('logout-form').submit();</script>
+</body>
+</html>`;
+}

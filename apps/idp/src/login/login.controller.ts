@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
 import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
-import { homePage, loginPage } from './login.view';
+import { homePage, loginPage, logoutPage } from './login.view';
 import { OidcAdapterService } from '../oidc/adapter/oidc-adapter.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { UsersService } from '../users/users.service';
@@ -32,6 +32,18 @@ export class LoginController {
     const token = await this.sessions.create(user);
     res.cookie(SESSION_COOKIE, token, sessionCookieOptions());
     res.type('html').status(200).send(homePage(user.username));
+  }
+
+  /**
+   * Side-effect-free logout landing (GET). It renders a page that auto-POSTs to
+   * `/logout` on this origin, so the IdP session cookie always attaches even
+   * when the navigation started on another site. Revocation happens only on the
+   * POST — "mutations are POST-only" holds. This is the seed shape decision C
+   * (RP-initiated logout) will later formalize.
+   */
+  @Get('logout')
+  showLogoutLanding(@Res() res: Response) {
+    res.type('html').status(200).send(logoutPage());
   }
 
   @Post('logout')
