@@ -3,8 +3,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { Provider } from 'oidc-provider';
 import { SigningKeyService } from '../crypto/signing-key.service';
 import { OidcAdapterService } from './adapter/oidc-adapter.service';
-import { ACCESS_TOKEN_TTL_S, DEFAULT_RESOURCE, resourceServerPolicy } from './access-token.policy';
-import { staticClients } from './clients';
+import { ACCESS_TOKEN_TTL_S, defaultResource, resourceServerPolicy } from './access-token.policy';
+import { assertOidcConfig, staticClients } from './clients';
 import { interactionPolicyPrompts, loadExistingGrant } from './interaction-policy';
 import {
   GRANT_TTL_S,
@@ -79,7 +79,12 @@ export class OidcService {
   constructor(
     private readonly keys: SigningKeyService,
     private readonly adapter: OidcAdapterService,
-  ) {}
+  ) {
+    // Fail fast at boot on production-critical config (e.g. a missing app client
+    // secret). The provider itself stays lazily constructed so this does not
+    // create signing keys for a process that never serves OIDC.
+    assertOidcConfig();
+  }
 
   provider(): Provider {
     if (!this.instance) {
@@ -122,7 +127,7 @@ export class OidcService {
           resourceIndicators: {
             enabled: true,
             // Tokens are always JWT: when a client omits `resource`, resolve one.
-            defaultResource: (_ctx, _client, oneOf) => oneOf?.[0] ?? DEFAULT_RESOURCE,
+            defaultResource: (_ctx, _client, oneOf) => oneOf?.[0] ?? defaultResource(),
             useGrantedResource: () => true,
             getResourceServerInfo: (_ctx, resource) => resourceServerPolicy(resource),
           },

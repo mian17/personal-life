@@ -12,11 +12,27 @@ const DEV_REDIRECT_URIS = ['http://127.0.0.1:8080/cb', 'http://localhost:8080/cb
 const DEFAULT_APP_REDIRECT_URIS = ['http://127.0.0.1:3002/auth/callback'];
 
 /**
- * Obviously-fake placeholder used only when `OIDC_APP_CLIENT_SECRET` is unset.
- * The `app` client ships dark until Task 7, so a real secret is not needed yet;
- * production MUST supply `OIDC_APP_CLIENT_SECRET` before the RP is switched on.
+ * Obviously-fake placeholder used only outside production. Production MUST
+ * supply `OIDC_APP_CLIENT_SECRET` — `resolveAppClientSecret` throws otherwise,
+ * so a misconfigured production boot fails loudly rather than shipping a
+ * known-public secret.
  */
 const DEV_APP_CLIENT_SECRET = 'app-dev-client-secret-not-a-secret';
+
+/**
+ * The `app` client secret. Required in production (fails loudly); an
+ * obviously-fake default is allowed in development/test only.
+ */
+export function resolveAppClientSecret(env: NodeJS.ProcessEnv = process.env): string {
+  const secret = env.OIDC_APP_CLIENT_SECRET?.trim();
+  if (secret) return secret;
+  if (env.NODE_ENV === 'production') {
+    throw new Error(
+      'OIDC_APP_CLIENT_SECRET must be set in production (no placeholder fallback)',
+    );
+  }
+  return DEV_APP_CLIENT_SECRET;
+}
 
 function envList(name: string, fallback: readonly string[]): string[] {
   const raw = process.env[name]?.trim();
@@ -35,16 +51,16 @@ const CODE_CLIENT = {
 };
 
 /**
- * The `app` relying party (Task 7). Confidential, authenticates with
+ * The `app` relying party. Confidential, authenticates with
  * `client_secret_basic`; the secret comes from `OIDC_APP_CLIENT_SECRET` and is
- * never logged. Falls back to an obviously-fake placeholder while dark.
+ * never logged. Required in production (see `resolveAppClientSecret`).
  */
 export function appClient(): ClientMetadata {
   return {
     ...CODE_CLIENT,
     client_id: 'app',
     client_name: 'personal-life app',
-    client_secret: process.env.OIDC_APP_CLIENT_SECRET?.trim() || DEV_APP_CLIENT_SECRET,
+    client_secret: resolveAppClientSecret(),
     token_endpoint_auth_method: 'client_secret_basic',
     redirect_uris: envList('OIDC_APP_REDIRECT_URIS', DEFAULT_APP_REDIRECT_URIS),
   };
@@ -59,6 +75,16 @@ export function devClient(): ClientMetadata {
     token_endpoint_auth_method: 'none',
     redirect_uris: [...DEV_REDIRECT_URIS],
   };
+}
+
+/**
+ * Asserts production-critical OIDC config at boot. Kept separate from
+ * `staticClients()` so it runs even though the provider itself is built lazily:
+ * a production boot without the app client secret must fail immediately rather
+ * than on the first authorization request.
+ */
+export function assertOidcConfig(env: NodeJS.ProcessEnv = process.env): void {
+  resolveAppClientSecret(env);
 }
 
 export function staticClients(): ClientMetadata[] {

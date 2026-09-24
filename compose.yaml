@@ -37,6 +37,22 @@ services:
       PORT: "3003"
       HOST: 0.0.0.0
       DB_PATH: /data/idp.db
+      # Browser-reachable issuer (set in .env): the public Tailscale Serve URL.
+      # The app and IdP must be same-site for SameSite=Lax cookies/logout.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      OIDC_APP_CLIENT_ID: ${OIDC_APP_CLIENT_ID:-app}
+      # Required in production; the IdP validates at boot and fails loudly
+      # (no placeholder fallback) so a missing value is caught immediately.
+      OIDC_APP_CLIENT_SECRET: ${OIDC_APP_CLIENT_SECRET:-}
+      # Exact browser callback URL; must byte-match OIDC_APP_REDIRECT_URI on the app.
+      OIDC_APP_REDIRECT_URIS: ${OIDC_APP_REDIRECT_URI:-}
+      # Audience/resource mapping (defaults preserve note-service).
+      OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
+      OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=note-service}
+    ports:
+      # Published on host loopback only so `tailscale serve` can proxy to it
+      # (the IdP itself stays off the tailnet/LAN). See README "Auth model".
+      - "127.0.0.1:3003:3003"
     volumes:
       - ./apps/idp/data:/data
     networks:
@@ -65,10 +81,20 @@ services:
       PORT: "3002"
       HOSTNAME: 0.0.0.0
       API_URL: http://note-service:3001
+      # OIDC relying-party config (values from .env). The issuer must be the
+      # browser-reachable URL; the app validates at boot and fails loudly.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      OIDC_APP_CLIENT_ID: ${OIDC_APP_CLIENT_ID:-app}
+      OIDC_APP_CLIENT_SECRET: ${OIDC_APP_CLIENT_SECRET:-}
+      # Must byte-match OIDC_APP_REDIRECT_URIS registered on the IdP.
+      OIDC_APP_REDIRECT_URI: ${OIDC_APP_REDIRECT_URI:-}
+      OIDC_APP_RESOURCE: ${OIDC_APP_RESOURCE:-https://note-service}
     ports:
       - "127.0.0.1:3002:3002"
     depends_on:
       note-service:
+        condition: service_healthy
+      idp:
         condition: service_healthy
     networks:
       - life
