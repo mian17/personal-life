@@ -8,7 +8,7 @@ function escapeHtml(value: string): string {
 }
 
 /** Self-contained, no external assets — rendered straight from the controller. */
-export function loginPage(error?: string): string {
+export function loginPage(error?: string, action = '/login'): string {
   return `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in</title></head>
@@ -16,7 +16,7 @@ export function loginPage(error?: string): string {
 <main>
 <h1>Sign in</h1>
 ${error ? `<p role="alert">${escapeHtml(error)}</p>` : ''}
-<form method="post" action="/login">
+<form method="post" action="${escapeHtml(action)}">
 <label>Username <input name="username" type="text" autocomplete="username" required></label>
 <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
 <button type="submit">Sign in</button>

@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { Provider } from 'oidc-provider';
 import { SigningKeyService } from '../crypto/signing-key.service';
-import { ACCESS_TOKEN_TTL_S, resourceServerPolicy } from './access-token.policy';
+import { OidcAdapterService } from './adapter/oidc-adapter.service';
+import { ACCESS_TOKEN_TTL_S, DEFAULT_RESOURCE, resourceServerPolicy } from './access-token.policy';
+import { staticClients } from './clients';
+import { interactionPolicyPrompts, loadExistingGrant } from './interaction-policy';
 
 /** Issuer identifier; production must be browser-reachable (Tasks 7/8 design point). */
 export function resolveIssuer(): string {
@@ -33,8 +36,8 @@ export const OIDC_ROUTE_NAMES = [
 
 export type OidcRouteName = (typeof OIDC_ROUTE_NAMES)[number];
 
-/** Paths that the provider owns; requests here are routed into its callback. */
-export const OIDC_PATHS = [
+/** Fast-path route check that never builds the provider (and thus never the keystore). */
+const STATIC_OIDC_PATHS = [
   '/.well-known',
   '/auth',
   '/token',
@@ -51,12 +54,8 @@ export const OIDC_PATHS = [
   '/backchannel',
 ] as const;
 
-/**
- * True when the path belongs to the provider. Pure and static so it can run
- * before `app.init()` without building the provider (and thus the keystore).
- */
 export function isProviderPath(path: string): boolean {
-  return OIDC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+  return STATIC_OIDC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
 /**
@@ -66,27 +65,47 @@ export function isProviderPath(path: string): boolean {
 @Injectable()
 export class OidcService {
   private instance?: Provider;
+  private resolved?: string[];
   private gate?: (req: Request, res: Response, next: NextFunction) => void;
 
-  constructor(private readonly keys: SigningKeyService) {}
+  constructor(
+    private readonly keys: SigningKeyService,
+    private readonly adapter: OidcAdapterService,
+  ) {}
 
   provider(): Provider {
     if (!this.instance) {
       this.instance = new Provider(resolveIssuer(), {
         jwks: this.keys.jwks(),
-        clients: [],
-        // Access-token policy: JWT format, 10-minute TTL, audience-scoped through
-        // the RFC 8707 resource-indicator mechanism. Real clients/scope mapping
-        // arrive in Task 5; this hook is the configured foundation.
+        clients: staticClients(),
+        // Durable state (grants, codes, access tokens, interactions, sessions) in idp.db.
+        adapter: this.adapter.factory(),
+        // Code-only clients with PKCE S256 required (RFC 7636 / RFC 9700).
+        responseTypes: ['code'],
+        scopes: ['openid'],
+        pkce: { required: () => true },
+        // Access-token policy: JWT format, 10-minute TTL, audience-scoped via RFC 8707.
         ttl: { AccessToken: ACCESS_TOKEN_TTL_S },
+        interactions: {
+          policy: [...interactionPolicyPrompts()],
+          url: (_ctx, interaction) => `/interaction/${interaction.uid}`,
+        },
+        // Resolve the account id (our User.id) to claims for the id_token/userinfo.
+        findAccount: (_ctx, id) => ({
+          accountId: id,
+          claims: async () => ({ sub: id }),
+        }),
+        loadExistingGrant,
         features: {
-          // The library's dev views accept any credentials and MUST stay off;
-          // Task 5 wires the Task 3 login as the interaction handler.
+          // The library's dev views accept any credentials and MUST stay off; we
+          // wire the Task 3 login as the interaction handler instead.
           devInteractions: { enabled: false },
           resourceIndicators: {
             enabled: true,
-            getResourceServerInfo: (_ctx, resourceIndicator) =>
-              resourceServerPolicy(resourceIndicator),
+            // Tokens are always JWT: when a client omits `resource`, resolve one.
+            defaultResource: (_ctx, _client, oneOf) => oneOf?.[0] ?? DEFAULT_RESOURCE,
+            useGrantedResource: () => true,
+            getResourceServerInfo: (_ctx, resource) => resourceServerPolicy(resource),
           },
         },
       });
@@ -98,13 +117,16 @@ export class OidcService {
 
   /** Provider endpoint paths for enabled features (used to verify the static gate). */
   handledPaths(): string[] {
-    return OIDC_ROUTE_NAMES.flatMap((name) => {
-      try {
-        return [this.provider().pathFor(name)];
-      } catch {
-        return [];
-      }
-    });
+    if (!this.resolved) {
+      this.resolved = OIDC_ROUTE_NAMES.flatMap((name) => {
+        try {
+          return [this.provider().pathFor(name)];
+        } catch {
+          return [];
+        }
+      });
+    }
+    return this.resolved;
   }
 
   /**

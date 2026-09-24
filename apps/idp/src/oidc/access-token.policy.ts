@@ -3,6 +3,14 @@ import type { ResourceServer } from 'oidc-provider';
 /** Access-token lifetime: 10 minutes (recorded decision, aligned with the refresh policy). */
 export const ACCESS_TOKEN_TTL_S = 600;
 
+/**
+ * Resource indicator used when a client does not send `resource` explicitly.
+ * Resource indicators must be absolute URIs; the audience (`aud`) is the mapped
+ * service name (`note-service`). A Task 7/8 concern: make this env-driven once
+ * the app RP lands and there is more than one resource server.
+ */
+export const DEFAULT_RESOURCE = 'https://note-service';
+
 /** The claims our access tokens carry; `aud` scopes the token to one target service. */
 export interface AccessTokenClaims {
   sub: string;
