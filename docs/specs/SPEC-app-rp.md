@@ -88,4 +88,6 @@ no visual or interaction changes beyond the login entry.
    app (tailnet ACL + Serve + header check as access control). Identity and authentication
    come from the IdP — from now on, for every service.
 2. **App session cookie:** 7 days, sliding (accepted default).
-3. **Logout:** local only, first cut (accepted default).
+3. **Logout:** the app's logout ends the IdP session and **revokes the user's grants
+   server-side** (decision B, 2026-09-25) — refresh tokens die immediately. Full
+   RP-initiated logout (`end_session`) is deferred to the multi-RP chapter (decision C).

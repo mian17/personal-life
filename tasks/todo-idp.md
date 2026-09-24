@@ -151,6 +151,27 @@ our own e2e.
 **Files likely touched:** `apps/idp/src/oidc/refresh.*`, `apps/idp/test/refresh.e2e-spec.ts`
 **Estimated scope:** Small
 
+## Task 6b: Revoke grants on logout (decision B, 2026-09-25)
+
+**Description:** Logout revokes the account's grants at the IdP (`revokeByGrantId`), so
+every refresh token dies the moment the user logs out. This is decision B — full
+RP-initiated logout (decision C, `end_session` + back-channel logout) is deferred to the
+multi-RP chapter and will wrap exactly this action.
+
+**Acceptance criteria:**
+- [ ] Logout revokes all grants belonging to the account — a refresh token obtained before logout is rejected (`invalid_grant`) immediately after
+- [ ] Grants belonging to other accounts survive (revocation is per-account)
+- [ ] Task 6's rotation/family-revocation behavior unchanged (its tests stay green)
+- [ ] Documented residual: stateless 10-min access tokens live out their TTL after logout (by design)
+
+**Verification:**
+- [ ] `npm test -w apps/idp` passes (new logout-revocation e2e + all existing)
+- [ ] Manual check: dance → refresh token → logout → refresh attempt 400
+
+**Dependencies:** Task 6
+**Files likely touched:** `apps/idp/src/login/**`, `apps/idp/src/oidc/adapter/**`, `apps/idp/test/logout-revocation.e2e-spec.ts`
+**Estimated scope:** Small
+
 ## Checkpoint: `idp` complete
 
 - [ ] All `idp` e2e green; offline verification with `aud` enforced
@@ -177,10 +198,10 @@ our own e2e.
 
 ## Task 8: `app-rp` login gate swap
 
-**Description:** Middleware redirects unauthenticated traffic to `idp` login (code+PKCE);
-logout is local-only (first cut). Identity comes from the IdP — the Tailscale gate stays
-**access-only** (only my phone reaches the app; no identity from the Tailscale header).
-Playwright e2e of the cold-browser flow.
+**Description:** Middleware redirects unauthenticated traffic to `idp` login (code+PKCE).
+Logout ends the IdP session and — via Task 6b — revokes grants server-side. Identity
+comes from the IdP — the Tailscale gate stays **access-only** (only my phone reaches the
+app; no identity from the Tailscale header). Playwright e2e of the cold-browser flow.
 
 **Acceptance criteria:**
 - [ ] Cold browser → IdP login → callback → working notes UI (Playwright green)

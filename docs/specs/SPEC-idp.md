@@ -100,6 +100,9 @@ rejected. No coverage percentage gate; every auth-relevant branch has a test.
 3. **Token lifetimes:** access 10 min, refresh 30 days with rotation + reuse detection.
 4. **Signing:** EdDSA/Ed25519 (RS256 only if a consumer demands it).
 5. **Hostname/port:** `idp:3003` internal (dev).
+6. **Logout revokes grants** (2026-09-25, decision B): `revokeByGrantId` on logout kills
+   every refresh token immediately; stateless 10-min access tokens live out their TTL by
+   design. RP-initiated/back-channel logout (`end_session`) is deferred to the multi-RP
+   chapter (decision C).
 
-All open questions resolved. Implementation starts on the human's go (Task 1 of
-`tasks/todo-idp.md`).
+All open questions resolved. Implementation is underway per `tasks/todo-idp.md`.

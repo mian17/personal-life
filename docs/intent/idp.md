@@ -42,5 +42,11 @@ clients, token issuance, JWKS.
 ## Out of scope (first IdP cut)
 
 Roles/permissions, passkeys, social login, federation, multi-tenancy, email/reset
-infrastructure. Also out of scope right now: implementation itself — this branch is
-planning only until the plan is approved.
+infrastructure, and RP-initiated logout (`end_session` + back-channel logout).
+
+## Decisions log
+
+- 2026-09-25: **Logout revokes grants (decision B).** `revokeByGrantId` on logout, so every
+  refresh token dies immediately. Stateless 10-min access tokens live out their TTL by
+  design. **RP-initiated logout (decision C) is deferred** to the multi-RP chapter, where
+  its core action is exactly this revocation — B is the engine, C is the standard wrapper.
