@@ -24,7 +24,7 @@ an inline pre-paint script in `layout.tsx` that applies the persisted choice. Se
 - [x] `npm run lint` passes.
 
 **Dependencies:** None
-**Files:** `apps/web/app/globals.css`, `apps/web/app/theme-toggle.tsx`, `apps/web/app/layout.tsx`, `apps/web/app/page.tsx`
+**Files:** `apps/app/app/globals.css`, `apps/app/app/theme-toggle.tsx`, `apps/app/app/layout.tsx`, `apps/app/app/page.tsx`
 **Scope:** Medium
 
 ---
@@ -49,7 +49,7 @@ control that flushes then returns to `/`.
 - [x] `npm run build` succeeds.
 
 **Dependencies:** None (list navigation wired in Task 3)
-**Files:** `apps/web/app/notes/[id]/page.tsx`, `apps/web/app/note-editor.tsx`, `apps/web/lib/api.ts`, `apps/web/app/actions.ts`
+**Files:** `apps/app/app/notes/[id]/page.tsx`, `apps/app/app/note-editor.tsx`, `apps/app/lib/api.ts`, `apps/app/app/actions.ts`
 **Scope:** Medium
 
 ---
@@ -73,7 +73,7 @@ per-row Delete button; keep the existing tag filter chips.
 - [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
-**Files:** `apps/web/app/page.tsx`, `apps/web/app/note-list.tsx`, `apps/web/app/globals.css`
+**Files:** `apps/app/app/page.tsx`, `apps/app/app/note-list.tsx`, `apps/app/app/globals.css`
 **Scope:** Medium
 
 ---
@@ -95,7 +95,7 @@ row is created until the first meaningful input; the first save `POST`s via `cre
 - [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
-**Files:** `apps/web/app/notes/new/page.tsx`, `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`, `apps/web/lib/api.ts`
+**Files:** `apps/app/app/notes/new/page.tsx`, `apps/app/app/note-editor.tsx`, `apps/app/app/actions.ts`, `apps/app/lib/api.ts`
 **Scope:** Medium
 
 ---
@@ -116,7 +116,7 @@ list (already dropped in Task 3).
 - [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
-**Files:** `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`
+**Files:** `apps/app/app/note-editor.tsx`, `apps/app/app/actions.ts`
 **Scope:** Small
 
 ---
@@ -140,7 +140,7 @@ tags = inline hashtags ∪ retained chips. Parse on save only, never per keystro
 - [x] `npm run lint` passes.
 
 **Dependencies:** Task 2
-**Files:** `apps/web/app/note-editor.tsx`, `apps/web/app/actions.ts`
+**Files:** `apps/app/app/note-editor.tsx`, `apps/app/app/actions.ts`
 **Scope:** Medium
 
 ---
@@ -171,7 +171,7 @@ composing the URL.
 - [x] `npm run build` succeeds.
 
 **Dependencies:** Task 3
-**Files:** `apps/web/app/search-box.tsx`, `apps/web/app/page.tsx`
+**Files:** `apps/app/app/search-box.tsx`, `apps/app/app/page.tsx`
 **Scope:** Medium
 
 ---
@@ -194,7 +194,7 @@ change.
 - [x] `npm run build` succeeds.
 
 **Dependencies:** Task 2
-**Files:** `apps/web/app/api/notes/[id]/flush/route.ts`, `apps/web/app/note-editor.tsx`, `apps/web/lib/api.ts`
+**Files:** `apps/app/app/api/notes/[id]/flush/route.ts`, `apps/app/app/note-editor.tsx`, `apps/app/lib/api.ts`
 **Scope:** Medium
 
 ---
@@ -210,7 +210,7 @@ search, tag filter, create, theme states, and refresh persistence. Run `npm test
 - [x] All spec success criteria 1–11 confirmed with evidence.
 - [x] `npm test` passes (API e2e unchanged).
 - [x] `npm run lint` passes for all workspaces.
-- [x] `apps/api/data/life.db` mtime unchanged after the session.
+- [x] `apps/note-service/data/life.db` mtime unchanged after the session.
 
 **Verification:**
 - [x] `npm test`, `npm run lint`.

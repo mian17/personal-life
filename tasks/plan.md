@@ -12,7 +12,7 @@ notes API with tags → UI capture/list → edit/delete/filter → auth boundary
 
 ## Architecture Decisions
 
-- npm workspaces monorepo: `apps/api` (NestJS), `apps/web` (Next.js), `packages/shared`.
+- npm workspaces monorepo: `apps/note-service` (NestJS), `apps/app` (Next.js), `packages/shared`.
 - SQLite + TypeORM via `@nestjs/typeorm`, `better-sqlite3` driver (user choice).
 - Next.js server is the BFF: holds `API_TOKEN` server-side, calls NestJS on loopback
   3001. Browser only ever talks to `:3000`.

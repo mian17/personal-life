@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/api",
-    "apps/web",
+    "apps/note-service",
+    "apps/app",
     "packages/shared"
   ],
   "scripts": {
-    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n api,web -c blue,green \"npm:dev -w apps/api\" \"npm:dev -w apps/web\"",
+    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,app -c blue,green \"npm:dev -w apps/note-service\" \"npm:dev -w apps/app\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

@@ -36,7 +36,7 @@ No new dependencies. Existing stack only:
 
 - Next.js 15 App Router; React Server Components for reads, Server Actions for writes.
 - React 19 client components for the editor and search input.
-- Existing NestJS REST API via the server-side BFF (`apps/web/lib/api.ts`).
+- Existing NestJS REST API via the server-side BFF (`apps/app/lib/api.ts`).
 - TypeScript strict from `packages/shared`.
 
 ## Commands
@@ -51,7 +51,7 @@ Lint:          npm run lint       # tsc --noEmit per workspace
 Browser check: playwright-cli open http://127.0.0.1:3000
 ```
 
-`npm run dev` must never open the real `apps/api/data/life.db`. `DB_PATH=data/scratch.db`
+`npm run dev` must never open the real `apps/note-service/data/life.db`. `DB_PATH=data/scratch.db`
 lives in the root `.env.development`, loaded via Node's `--env-file-if-exists` in the root
 `dev` script. Note Node's env-file does not replace an ambient variable, so do not export
 `DB_PATH` in your shell when running dev.
@@ -59,7 +59,7 @@ lives in the root `.env.development`, loaded via Node's `--env-file-if-exists` i
 ## Project Structure
 
 ```
-apps/web/app/
+apps/app/app/
   page.tsx            Home: search + tag filter + list (Server Component)
   notes/
     new/page.tsx      New-note editor route (no DB row until first save)
@@ -73,8 +73,8 @@ apps/web/app/
   theme-toggle.tsx    Client System/Light/Dark control; persists to localStorage
   actions.ts          Server Actions: create, update, delete (reused)
   api/notes/[id]/flush/route.ts  BFF PATCH for keepalive flush on pagehide
-apps/web/lib/api.ts   Add getNote(id); existing listNotes(tag, q) reused
-apps/web/app/globals.css  Restyle for full-screen editor + list rows
+apps/app/lib/api.ts   Add getNote(id); existing listNotes(tag, q) reused
+apps/app/app/globals.css  Restyle for full-screen editor + list rows
 ```
 
 ## Code Style
@@ -229,7 +229,7 @@ All text/glyph icons are replaced with `lucide-react`:
 
 ## Testing Strategy
 
-- **API:** the Jest + supertest e2e (`apps/api/test/notes.e2e-spec.ts`) must stay green and
+- **API:** the Jest + supertest e2e (`apps/note-service/test/notes.e2e-spec.ts`) must stay green and
   now covers trash: soft-delete hides the note from the list, `GET /:id` 404s when trashed,
   restore preserves `createdAt`/tags/version, permanent delete 404s on a second call, and
   empty-trash returns the deleted count.

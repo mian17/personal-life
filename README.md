@@ -2,8 +2,8 @@
 
 A self-owned personal API that centralizes life data. Domain #1 is **notes/journaling**.
 
-- `apps/api` — NestJS + TypeORM/SQLite REST API (loopback only).
-- `apps/web` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
+- `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
+- `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
 - `packages/shared` — shared DTO/types.
 
 ## Requirements
@@ -49,7 +49,7 @@ docker compose up -d --build
 ```
 
 The root `.env` is gitignored and is the single source of secrets for both services. The
-real database lives at `apps/api/data/life.db` on the host and is bind-mounted into the API
+real database lives at `apps/note-service/data/life.db` on the host and is bind-mounted into the API
 container at `/data/life.db`, so no data moves.
 
 Expose the web app on the tailnet (identity headers require Serve, **not** Funnel):
@@ -71,7 +71,7 @@ docker compose up -d --build # rebuild and restart
 ## Development
 
 ```unknown
-npm run dev        # api :3001 + web :3000
+npm run dev        # note-service :3001 + app :3000
 npm run build      # compile both workspaces
 npm run lint
 npm test
@@ -80,7 +80,7 @@ npm test
 `npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`) and
 runs with `NODE_ENV=development`, so auth is skipped locally. Ports differ by mode so a
 production preview never collides with dev. The API binds loopback on the host in dev;
-inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001`.
+inside Docker it binds `0.0.0.0` so the web container can reach `http://note-service:3001`.
 
 ## Auth model
 
@@ -90,7 +90,7 @@ inside Docker it binds `0.0.0.0` so the web container can reach `http://api:3001
    The web container is published on host loopback (`127.0.0.1:3002`) only, so LAN devices
    cannot bypass this by hitting the port directly.
 3. The Next.js BFF holds `API_TOKEN` server-side and calls the API over the compose network
-   (`http://api:3001`); the API is never published to the host and the browser never sees
+   (`http://note-service:3001`); the API is never published to the host and the browser never sees
    the token.
 4. API scripts run on the host and use `API_TOKEN` directly.
 
@@ -112,12 +112,12 @@ npm run lint
 
 ## Data
 
-Single SQLite file (default `apps/api/data/life.db`, override with `DB_PATH`). Copying the
+Single SQLite file (default `apps/note-service/data/life.db`, override with `DB_PATH`). Copying the
 file is a complete backup.
 
 `npm run dev` uses `DB_PATH=data/scratch.db` from `.env.development`, so development writes
-to a throwaway `apps/api/data/scratch.db` and never touches your personal notes. The Docker
-Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real `apps/api/data/life.db`
+to a throwaway `apps/note-service/data/scratch.db` and never touches your personal notes. The Docker
+Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real `apps/note-service/data/life.db`
 on the host.
 
 ## Docs

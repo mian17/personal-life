@@ -1,8 +1,8 @@
 services:
-  api:
+  note-service:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/note-service/Dockerfile
     env_file: .env
     environment:
       NODE_ENV: production
@@ -10,7 +10,7 @@ services:
       HOST: 0.0.0.0
       DB_PATH: /data/life.db
     volumes:
-      - ./apps/api/data:/data
+      - ./apps/note-service/data:/data
     networks:
       - life
     healthcheck:
@@ -27,20 +27,20 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  web:
+  app:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: apps/app/Dockerfile
     env_file: .env
     environment:
       NODE_ENV: production
       PORT: "3002"
       HOSTNAME: 0.0.0.0
-      API_URL: http://api:3001
+      API_URL: http://note-service:3001
     ports:
       - "127.0.0.1:3002:3002"
     depends_on:
-      api:
+      note-service:
         condition: service_healthy
     networks:
       - life

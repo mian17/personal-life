@@ -19,7 +19,7 @@ from a phone in seconds.
 
 ## Tech Stack
 
-- Node.js latest, npm workspaces monorepo (`apps/web`, `apps/api`, `packages/shared`).
+- Node.js latest, npm workspaces monorepo (`apps/app`, `apps/note-service`, `packages/shared`).
 - API: NestJS, SQLite via TypeORM (`@nestjs/typeorm` + `better-sqlite3` driver).
   `ponytail:` three tables would need no ORM; TypeORM chosen per user preference. Chosen over
   Prisma because it is the canonical NestJS DI integration with no codegen step. Reversible —
@@ -42,8 +42,8 @@ Lint:      npm run lint
 ## Project Structure
 
 ```
-apps/api/        NestJS API (notes + tags modules, auth guard, SQLite access)
-apps/web/        Next.js UI + PWA; middleware gates on Tailscale identity header
+apps/note-service/        NestJS API (notes + tags modules, auth guard, SQLite access)
+apps/app/        Next.js UI + PWA; middleware gates on Tailscale identity header
 packages/shared/ DTO / model types shared by web and api
 docs/            Intent, design, specs
 tasks/           plan.md, todo.md (created during planning)

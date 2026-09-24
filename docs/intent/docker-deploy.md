@@ -24,7 +24,7 @@ Containers make production a single reproducible command.
 - Web is published `127.0.0.1:3002` (loopback only), api is not published.
 - Web reaches the api over the compose network by service name.
 - Tailscale Serve targets `http://127.0.0.1:3002` and works from the phone.
-- Existing `apps/api/data/life.db` is bind-mounted, so all real notes survive untouched.
+- Existing `apps/note-service/data/life.db` is bind-mounted, so all real notes survive untouched.
 
 ## Constraints
 
@@ -36,7 +36,7 @@ Containers make production a single reproducible command.
 - Web must keep binding host loopback only (publish `127.0.0.1:3003`) so the middleware's
   "no `x-forwarded-host` means local host" assumption stays true and LAN devices cannot
   bypass auth by hitting 3002 directly.
-- Do not copy `apps/api/data/` or `.env*` into any image.
+- Do not copy `apps/note-service/data/` or `.env*` into any image.
 
 ## Out of scope
 
@@ -49,5 +49,5 @@ Containers make production a single reproducible command.
 
 - 3002 (the web's former `npm run start` port) becomes the web's published host port.
 - Internal API port is 3001; internal web port is 3002.
-- Bind-mount `apps/api/data/` from the host.
+- Bind-mount `apps/note-service/data/` from the host.
 - Env via a single root `.env` consumed with compose `env_file`.

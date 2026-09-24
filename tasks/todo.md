@@ -6,12 +6,12 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 
 ## Task 1: Monorepo scaffold + shared types
 
-**Description:** Initialize the npm workspaces monorepo with `apps/api`, `apps/web`, and
+**Description:** Initialize the npm workspaces monorepo with `apps/note-service`, `apps/app`, and
 `packages/shared`; wire root scripts and TypeScript config.
 
 **Acceptance criteria:**
 - [x] Root `package.json` declares workspaces and `dev`/`build`/`test`/`lint` scripts.
-- [x] `apps/api`, `apps/web`, `packages/shared` exist with their own `package.json`.
+- [x] `apps/note-service`, `apps/app`, `packages/shared` exist with their own `package.json`.
 - [x] `packages/shared` exports `Note`, `Tag`, and DTO types.
 - [x] `npm install` succeeds from root.
 
@@ -41,7 +41,7 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/SPEC-notes.md`
 - [x] Manual: start API, confirm `data/life.db` created with the three tables.
 
 **Dependencies:** Task 1
-**Files:** `apps/api/src/app.module.ts`, `apps/api/src/**/*.entity.ts`, `.env.development.example`
+**Files:** `apps/note-service/src/app.module.ts`, `apps/note-service/src/**/*.entity.ts`, `.env.development.example`
 **Scope:** Medium
 
 ---
@@ -69,7 +69,7 @@ create.
 - [x] Manual curl check.
 
 **Dependencies:** Task 2
-**Files:** `apps/api/src/notes/*.ts`, `packages/shared/**`
+**Files:** `apps/note-service/src/notes/*.ts`, `packages/shared/**`
 **Scope:** Medium
 
 ---
@@ -89,7 +89,7 @@ create.
 - [x] Build passes.
 
 **Dependencies:** Task 3
-**Files:** `apps/api/src/notes/*.ts`, `apps/api/src/tags/*.ts`
+**Files:** `apps/note-service/src/notes/*.ts`, `apps/note-service/src/tags/*.ts`
 **Scope:** Medium
 
 ---
@@ -110,7 +110,7 @@ shared DTOs (non-empty bounded body; trimmed, deduped, bounded tag names).
 - [x] `npm test` passes.
 
 **Dependencies:** Task 4
-**Files:** `apps/api/src/auth/*.ts`, `apps/api/src/**/*.dto.ts`, `apps/api/test/*.e2e-spec.ts`
+**Files:** `apps/note-service/src/auth/*.ts`, `apps/note-service/src/**/*.dto.ts`, `apps/note-service/test/*.e2e-spec.ts`
 **Scope:** Medium
 
 ---
@@ -129,7 +129,7 @@ shared DTOs (non-empty bounded body; trimmed, deduped, bounded tag names).
 bearer `API_TOKEN` when calling NestJS on loopback `:3001`.
 
 **Acceptance criteria:**
-- [x] `apps/web` serves a page at `:3000`.
+- [x] `apps/app` serves a page at `:3000`.
 - [x] `/api/*` server-side calls reach NestJS with the token; browser never sees the token.
 - [x] Root `npm run dev` starts both.
 
@@ -138,7 +138,7 @@ bearer `API_TOKEN` when calling NestJS on loopback `:3001`.
 - [x] Build passes.
 
 **Dependencies:** Task 5
-**Files:** `apps/web/app/**`, `apps/web/lib/api.ts`, `apps/web/next.config.*`
+**Files:** `apps/app/app/**`, `apps/app/lib/api.ts`, `apps/app/next.config.*`
 **Scope:** Medium
 
 ---
@@ -157,7 +157,7 @@ Save via a Server Action.
 - [x] Build passes.
 
 **Dependencies:** Task 6
-**Files:** `apps/web/app/page.tsx`, `apps/web/app/actions.ts`
+**Files:** `apps/app/app/page.tsx`, `apps/app/app/actions.ts`
 **Scope:** Medium
 
 ---
@@ -176,7 +176,7 @@ chips to filter.
 - [x] Build passes.
 
 **Dependencies:** Task 7
-**Files:** `apps/web/app/page.tsx`, `apps/web/app/**/note-list.tsx`
+**Files:** `apps/app/app/page.tsx`, `apps/app/app/**/note-list.tsx`
 **Scope:** Medium
 
 ---
@@ -203,7 +203,7 @@ README/spec note (not implemented).
 - [x] Build passes.
 
 **Dependencies:** Task 8
-**Files:** `apps/web/middleware.ts`, `.env.development.example`
+**Files:** `apps/app/middleware.ts`, `.env.development.example`
 **Scope:** Small
 
 ---
@@ -222,7 +222,7 @@ add-to-home-screen.
 - [x] Build passes.
 
 **Dependencies:** Task 9
-**Files:** `apps/web/app/**`, `apps/web/public/manifest.json`
+**Files:** `apps/app/app/**`, `apps/app/public/manifest.json`
 **Scope:** Medium
 
 ---

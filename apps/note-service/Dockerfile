@@ -8,17 +8,17 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-COPY apps/api/package.json apps/api/
-COPY apps/web/package.json apps/web/
+COPY apps/note-service/package.json apps/note-service/
+COPY apps/app/package.json apps/app/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
-COPY apps/api ./apps/api
+COPY apps/note-service ./apps/note-service
 
 RUN npm run build -w @life/shared \
-  && npm run build -w @life/api \
+  && npm run build -w @life/note-service \
   && npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
@@ -31,8 +31,8 @@ WORKDIR /app
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /repo/packages/shared/dist ./packages/shared/dist
-COPY --from=build /repo/apps/api/package.json ./package.json
-COPY --from=build /repo/apps/api/dist ./dist
+COPY --from=build /repo/apps/note-service/package.json ./package.json
+COPY --from=build /repo/apps/note-service/dist ./dist
 
 EXPOSE 3001
 CMD ["node", "dist/main.js"]
