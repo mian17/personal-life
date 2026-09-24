@@ -22,7 +22,8 @@ function tokens(expiresIn = 600): Tokens {
 /** A store with a controllable clock, plus the clock's current value. */
 function fixedStore(now = 1_000_000) {
   let clock = now;
-  const store = new SessionStore(7 * 24 * HOUR, () => clock);
+  // Fresh backing map so tests never share the process-wide (globalThis) store.
+  const store = new SessionStore(7 * 24 * HOUR, () => clock, new Map());
   return { store, advance: (ms: number) => (clock += ms), clock: () => clock };
 }
 

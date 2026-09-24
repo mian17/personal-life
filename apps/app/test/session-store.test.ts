@@ -4,7 +4,8 @@ const DAY = 24 * 60 * 60 * 1000;
 
 function makeStore(now = 1_000_000) {
   let clock = now;
-  const store = new SessionStore(SESSION_TTL_MS, () => clock);
+  // Fresh backing map so tests never share the process-wide (globalThis) store.
+  const store = new SessionStore(SESSION_TTL_MS, () => clock, new Map());
   return { store, advance: (ms: number) => (clock += ms) };
 }
 

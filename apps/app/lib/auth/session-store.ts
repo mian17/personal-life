@@ -4,10 +4,10 @@ import 'server-only';
  * Server-side app session store. Holds OIDC tokens, so this module is
  * `server-only` — nothing here may ever reach a client component.
  *
- * Storage is an in-process Map. That is honest for this single-instance,
- * single-user app: an app restart drops all sessions and everyone re-logs-in.
- * If the app is ever scaled horizontally, replace this with a shared store
- * behind the same interface; no caller needs to change.
+ * Storage is an in-process Map anchored on `globalThis` (see below). That is
+ * honest for this single-instance, single-user app: an app restart drops all
+ * sessions and everyone re-logs-in. If the app is ever scaled horizontally,
+ * replace this with a shared store behind the same interface; no caller changes.
  */
 
 export interface AppSession {
@@ -32,13 +32,31 @@ export const REFRESH_SKEW_MS = 30 * 1000;
 
 type Clock = () => number;
 
+/**
+ * Next.js runs middleware and route handlers in separate module registries, so a
+ * plain module-level `new Map()` would give them different stores. They DO share
+ * one process (and `globalThis`), so the backing map is anchored there. This is
+ * also what makes the session created by the callback route visible to the
+ * middleware that gates the next request.
+ */
+const GLOBAL_STORAGE_KEY = '__lifeAppSessionStore';
+
+export function defaultSessionStorage(): Map<string, AppSession> {
+  const holder = globalThis as unknown as Record<string, Map<string, AppSession> | undefined>;
+  holder[GLOBAL_STORAGE_KEY] ??= new Map<string, AppSession>();
+  return holder[GLOBAL_STORAGE_KEY]!;
+}
+
 export class SessionStore {
-  private readonly sessions = new Map<string, AppSession>();
+  private readonly sessions: Map<string, AppSession>;
 
   constructor(
     private readonly ttlMs: number = SESSION_TTL_MS,
     private readonly now: Clock = Date.now,
-  ) {}
+    storage: Map<string, AppSession> = defaultSessionStorage(),
+  ) {
+    this.sessions = storage;
+  }
 
   /** The store's current time (the injected clock), used for consistent expiry math. */
   nowMs(): number {

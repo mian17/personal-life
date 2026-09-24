@@ -6,7 +6,9 @@
     "dev": "next dev -p 3000 -H 127.0.0.1",
     "build": "next build",
     "start": "next start -p ${WEB_PORT:-3002} -H 127.0.0.1",
-    "test": "jest --passWithNoTests",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "jest --passWithNoTests",
+    "test:e2e": "playwright test",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,6 +21,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
@@ -31,6 +34,7 @@
     "moduleFileExtensions": ["js", "json", "ts", "tsx"],
     "rootDir": ".",
     "testRegex": "\\.(test|spec)\\.tsx?$",
+    "testPathIgnorePatterns": ["/.next/", "/test/e2e/"],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^server-only$": "<rootDir>/test/stubs/server-only.ts"
@@ -39,7 +43,6 @@
       "^.+\\.(t|j)sx?$": ["ts-jest", { "tsconfig": "tsconfig.test.json" }]
     },
     "transformIgnorePatterns": ["/node_modules/(?!(openid-client|jose|oauth4webapi)/)"],
-    "testEnvironment": "node",
-    "testPathIgnorePatterns": ["/.next/"]
+    "testEnvironment": "node"
   }
 }

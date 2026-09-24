@@ -1,22 +1,45 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { SESSION_COOKIE } from '@/lib/auth/cookies';
+import { sessionStore } from '@/lib/auth/session-store';
+import { decideGate } from '@/lib/auth/gate';
+import { absoluteUrl } from '@/lib/auth/origin';
 
+/**
+ * Two independent gates run here:
+ *
+ *  1. ACCESS (Tailscale) — unchanged semantics: only the owner's device may
+ *     reach the app. It never establishes identity.
+ *  2. IDENTITY (IdP) — a valid app session (from the Task 7 code+PKCE flow) is
+ *     required; otherwise the user is sent to start the login dance. Identity
+ *     comes only from the IdP-backed session.
+ *
+ * Runs on the Node.js runtime so it reads the same in-process session store the
+ * callback route writes to (they share `globalThis`, not module scope).
+ */
 export function middleware(req: NextRequest) {
-  // Dev skips auth so localhost works without headers; production logic below is unchanged.
-  if (process.env.NODE_ENV === 'development') return NextResponse.next();
+  const hasValidSession = Boolean(sessionStore.get(req.cookies.get(SESSION_COOKIE)?.value));
 
-  // Serve-proxied traffic carries x-forwarded-host; direct local traffic does not.
-  // The web app binds to loopback, so header-less requests can only be the local host.
-  const viaServe = req.headers.has('x-forwarded-host');
-  if (!viaServe) return NextResponse.next();
+  const decision = decideGate({
+    isProduction: process.env.NODE_ENV === 'production',
+    pathname: req.nextUrl.pathname,
+    hasForwardedHost: req.headers.has('x-forwarded-host'),
+    tailscaleLogin: req.headers.get('tailscale-user-login'),
+    ownerLogin: process.env.OWNER_LOGIN,
+    hasValidSession,
+  });
 
-  const owner = process.env.OWNER_LOGIN;
-  const login = req.headers.get('tailscale-user-login');
-  if (!owner || !login || login.toLowerCase() !== owner.toLowerCase()) {
+  if (decision === 'forbidden') {
     return new NextResponse('Forbidden', { status: 403 });
+  }
+  if (decision === 'redirect-login') {
+    // Built on the request's external origin; Next normalizes loopback hosts
+    // (127.0.0.1 → localhost) in redirects, so the test client uses localhost too.
+    return NextResponse.redirect(absoluteUrl(req, '/auth/login'));
   }
   return NextResponse.next();
 }
 
 export const config = {
+  runtime: 'nodejs',
   matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json).*)'],
 };

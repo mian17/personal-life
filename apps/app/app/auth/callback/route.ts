@@ -5,6 +5,7 @@ import { LOGIN_ATTEMPT_COOKIE, loginAttemptCookieOptions } from '@/lib/auth/logi
 import { SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth/cookies';
 import { createSession } from '@/lib/auth/session';
 import { resolveCallback } from '@/lib/auth/callback';
+import { absoluteUrl } from '@/lib/auth/origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   );
 
   const res = outcome.ok
-    ? NextResponse.redirect(new URL('/', req.url), { status: 303 })
+    ? NextResponse.redirect(absoluteUrl(req, '/'), { status: 303 })
     : new NextResponse(outcome.message, { status: outcome.status });
 
   // The attempt is single-use regardless of outcome.

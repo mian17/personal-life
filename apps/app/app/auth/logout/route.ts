@@ -7,19 +7,16 @@ import { buildIdpLogoutUrl } from '@/lib/auth/logout';
 export const dynamic = 'force-dynamic';
 
 /**
- * `POST /auth/logout` — kills the app session first, then hands off to the
- * IdP's `POST /logout` so decision-B grant revocation fires server-side there
- * (every refresh token dies).
- *
- * The hand-off uses HTTP 307 (method-preserving): the browser re-POSTs to the
- * IdP logout with its own IdP session cookie, which is the only way the IdP can
- * identify the account to revoke — the app could not POST on the browser's
- * behalf without that cookie. A 303 would downgrade to GET and miss the route.
+ * `POST /auth/logout` — kills the app session first, then sends the browser on a
+ * plain top-level GET to the IdP's `/logout` landing. That landing auto-POSTs to
+ * the IdP's own `POST /logout` from the IdP origin, so the IdP session cookie is
+ * always attached and decision-B grant revocation fires — regardless of where
+ * the logout started (this is what makes the chain cross-site-safe).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   destroySession(req.cookies.get(SESSION_COOKIE)?.value);
 
-  const res = NextResponse.redirect(buildIdpLogoutUrl(getIdpIssuer()), { status: 307 });
+  const res = NextResponse.redirect(buildIdpLogoutUrl(getIdpIssuer()), { status: 303 });
   res.cookies.set(SESSION_COOKIE, '', clearedCookieOptions());
   return res;
 }
