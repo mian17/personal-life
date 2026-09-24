@@ -5,6 +5,7 @@
   "workspaces": [
     "apps/note-service",
     "apps/app",
+    "apps/idp",
     "packages/shared"
   ],
   "scripts": {

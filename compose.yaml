@@ -27,6 +27,34 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  idp:
+    build:
+      context: .
+      dockerfile: apps/idp/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3003"
+      HOST: 0.0.0.0
+      DB_PATH: /data/idp.db
+    volumes:
+      - ./apps/idp/data:/data
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('net').connect(3003,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   app:
     build:
       context: .

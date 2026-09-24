@@ -10,6 +10,7 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY apps/note-service/package.json apps/note-service/
 COPY apps/app/package.json apps/app/
+COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci
 
