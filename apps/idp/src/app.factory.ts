@@ -2,14 +2,13 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { Express } from 'express';
 import { mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import { AppModule } from './app.module';
+import { resolveDbPath } from './config/db-path';
 import { OidcService } from './oidc/oidc.service';
 
 export async function createApp(): Promise<INestApplication> {
-  mkdirSync(dirname(process.env.DB_PATH ?? join(process.cwd(), 'data', 'idp.db')), {
-    recursive: true,
-  });
+  mkdirSync(dirname(resolveDbPath()), { recursive: true });
   const app = await NestFactory.create(AppModule);
   // Mount the OIDC protocol routes before init() so they precede Nest's body
   // parsers: oidc-provider reads the raw request body itself.

@@ -52,6 +52,13 @@ bind-mounted into `note-service` at `/data/life.db`; the IdP keeps its own datab
 `apps/idp/data/idp.db` (bind-mounted at `/data/idp.db`). No data moves, and identity data
 never touches the notes database.
 
+Seed the single IdP account (production is gated on `NODE_ENV=production`, so the seed
+cannot touch the identity DB by accident):
+
+```unknown
+NODE_ENV=production SEED_USERNAME=you SEED_PASSWORD='…' npm run seed -w apps/idp
+```
+
 ### Tailscale Serve topology
 
 Expose both services on the **same tailnet host** so the browser sees them as same-site
@@ -106,6 +113,14 @@ runs with `NODE_ENV=development`, so the auth gates are skipped locally. Ports d
 mode so a production preview never collides with dev. The API binds loopback on the host
 in dev; inside Docker it binds `0.0.0.0` so the web container can reach
 `http://note-service:3001`.
+
+Outside production the IdP uses a throwaway database (`apps/idp/data/scratch.db`) — the
+dev server and the dev seed share it, and the production identity DB
+(`apps/idp/data/idp.db`) is only ever seeded with `NODE_ENV=production`:
+
+```unknown
+SEED_USERNAME=you SEED_PASSWORD='…' npm run seed -w apps/idp
+```
 
 ## Auth model
 

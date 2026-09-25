@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { dirname, join } from 'path';
+import { resolveDbPath } from '../config/db-path';
 import { JsonWebKeySet, loadOrCreateKeySet } from './signing-keys';
 
 /**
  * `KEYS_PATH` overrides the key file location; the default sits next to the
- * service database under `data/` (gitignored) so it follows `DB_PATH` in tests.
+ * service database under `data/` (gitignored) so it follows `DB_PATH` in tests
+ * and the scratch/production split outside them.
  */
-export function resolveKeysPath(): string {
-  if (process.env.KEYS_PATH) return process.env.KEYS_PATH;
-  const dbPath = process.env.DB_PATH ?? join(process.cwd(), 'data', 'idp.db');
-  return join(dirname(dbPath), 'keys.json');
+export function resolveKeysPath(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.KEYS_PATH) return env.KEYS_PATH;
+  return join(dirname(resolveDbPath(env)), 'keys.json');
 }
 
 /**
