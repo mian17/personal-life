@@ -2,8 +2,8 @@ import { createHash } from 'crypto';
 import { createClient } from 'redis';
 
 /**
- * Read-through cache for `NotesService` reads, invalidated by a *generation
- * counter* (`INCR note:gen`) rather than per-key deletes.
+ * Read-through cache for `NotesService` reads, invalidated by a *per-user
+ * generation counter* (`INCR note:gen:<sub>`) rather than per-key deletes.
  *
  * Why generation-bump over per-key invalidation: a single write can invalidate
  * an unbounded number of read keys (every `findAll` filter/cursor combination,
@@ -14,12 +14,20 @@ import { createClient } from 'redis';
  * One atomic op per write, cluster-safe, and impossible to leave partially
  * invalidated.
  *
+ * Every key embeds the owner `sub`, and each user has their own counter, so one
+ * user's keys are unreachable from another user's namespace and one user's
+ * writes neither invalidate nor populate another user's entries. The sub
+ * component is leak prevention at the cache layer, not access control — the
+ * service layer still enforces ownership on the DB query.
+ *
  * Fail-open is the contract: every Redis path is wrapped so an error degrades to
  * the DB. Cache loss is never a correctness problem — only a performance one.
  */
 
-/** The single counter every read key embeds; bumped once per write. */
-export const GENERATION_KEY = 'note:gen';
+/** The per-user counter every one of that user's read keys embeds; bumped once per write. */
+export function generationKey(sub: string): string {
+  return `note:gen:${sub}`;
+}
 
 /** TTL ceiling (spec: note bodies are 60s-fresh at most). */
 export const CACHE_TTL_SECONDS = 60;
@@ -64,20 +72,21 @@ export class NotesCache {
   constructor(private readonly client: CacheClient | null) {}
 
   /**
-   * Read-through with the stale-guard. The generation is captured *before* the
-   * loader runs and re-read *after* it: if a write bumped the counter while the
-   * DB query was in flight, the freshly-queried value is now stale, so it is
-   * never written under the new generation (which would mask that write for the
-   * TTL). The next read misses and observes the write.
+   * Read-through with the stale-guard, scoped to one owner. The generation is
+   * captured *before* the loader runs and re-read *after* it: if a write bumped
+   * this user's counter while the DB query was in flight, the freshly-queried
+   * value is now stale, so it is never written under the new generation (which
+   * would mask that write for the TTL). The next read misses and observes the
+   * write.
    */
-  async getThrough<T>(baseKey: string, loader: () => Promise<T>): Promise<T> {
+  async getThrough<T>(sub: string, baseKey: string, loader: () => Promise<T>): Promise<T> {
     const client = this.client;
     if (!client) return loader();
 
     let genBefore: number;
     try {
-      genBefore = await this.readGeneration(client);
-      const cached = await client.get(this.key(baseKey, genBefore));
+      genBefore = await this.readGeneration(client, sub);
+      const cached = await client.get(this.key(sub, baseKey, genBefore));
       if (cached !== null) return JSON.parse(cached) as T;
     } catch {
       return loader(); // any cache error: correct, degraded DB path
@@ -86,9 +95,9 @@ export class NotesCache {
     const value = await loader();
 
     try {
-      const genAfter = await this.readGeneration(client);
+      const genAfter = await this.readGeneration(client, sub);
       if (genAfter === genBefore) {
-        await client.set(this.key(baseKey, genBefore), JSON.stringify(value), {
+        await client.set(this.key(sub, baseKey, genBefore), JSON.stringify(value), {
           EX: CACHE_TTL_SECONDS,
         });
       }
@@ -100,42 +109,46 @@ export class NotesCache {
   }
 
   /**
-   * One `INCR` invalidates every read. Called *after* each write's DB mutation
-   * (review finding 2026-09-25). Bump-after closes a stale window that
-   * bump-before leaves open: a read landing between the bump and the mutation
-   * would see the new generation, query the DB mid-write (pre-mutation state),
-   * find the generation still new, and cache that stale value under the new
-   * generation for the TTL — the stale-guard only covers bumps that land *during*
-   * the query. Emitting the bump only once the new state is durable guarantees
-   * every entry that can hold pre-mutation state was born under the old
-   * generation and dies on this bump. It also means a mutation that throws
-   * (e.g. the optimistic-lock `ConflictException`) never bumps, so the cache
-   * keeps serving a consistent view of a write that did not happen.
+   * One `INCR note:gen:<sub>` invalidates every one of that user's reads. Called
+   * *after* each write's DB mutation (review finding 2026-09-25). Bump-after
+   * closes a stale window that bump-before leaves open: a read landing between
+   * the bump and the mutation would see the new generation, query the DB
+   * mid-write (pre-mutation state), find the generation still new, and cache that
+   * stale value under the new generation for the TTL — the stale-guard only
+   * covers bumps that land *during* the query. Emitting the bump only once the
+   * new state is durable guarantees every entry that can hold pre-mutation state
+   * was born under the old generation and dies on this bump. It also means a
+   * mutation that throws (e.g. the optimistic-lock `ConflictException`) never
+   * bumps, so the cache keeps serving a consistent view of a write that did not
+   * happen.
+   *
+   * Only the caller's own namespace is affected: another user's counter and
+   * entries are untouched.
    *
    * The DB is the source of truth, so even the tiny ordering gap is safe: a read
    * concurrent with the mutation either sees old state (which the bump then
    * retires) or new state. A Redis error here must never block the write — fail
    * open.
    */
-  async bumpGeneration(): Promise<void> {
+  async bumpGeneration(sub: string): Promise<void> {
     if (!this.client) return;
     try {
-      await this.client.incr(GENERATION_KEY);
+      await this.client.incr(generationKey(sub));
     } catch {
       /* fail open: the write still proceeds; reads stay DB-served while down */
     }
   }
 
-  private async readGeneration(client: CacheClient): Promise<number> {
-    const raw = await client.get(GENERATION_KEY);
+  private async readGeneration(client: CacheClient, sub: string): Promise<number> {
+    const raw = await client.get(generationKey(sub));
     if (raw === null) return 0; // fresh cache: generation 0 until the first write
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  private key(baseKey: string, generation: number): string {
+  private key(sub: string, baseKey: string, generation: number): string {
     const rest = baseKey.startsWith('note:') ? baseKey.slice('note:'.length) : baseKey;
-    return `note:v${generation}:${rest}`;
+    return `note:${sub}:v${generation}:${rest}`;
   }
 }
 

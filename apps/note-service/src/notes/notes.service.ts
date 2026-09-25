@@ -66,7 +66,7 @@ export class NotesService {
     const saved = await this.notes.save(note);
     // Bump AFTER the insert: pre-mutation reads were born under the old
     // generation and die here. A thrown save never bumps (cache stays honest).
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
     return toDto(saved);
   }
 
@@ -86,7 +86,7 @@ export class NotesService {
       limit: opts.limit,
       cursor: opts.cursor,
     })}`;
-    return this.cache.getThrough(cacheKey, async () => {
+    return this.cache.getThrough(sub, cacheKey, async () => {
       const qb = this.notes
         .createQueryBuilder('note')
         .leftJoinAndSelect('note.tags', 'tag')
@@ -128,7 +128,7 @@ export class NotesService {
   ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
     const cacheKey = `note:trash:${hashOptions({ limit: opts.limit, cursor: opts.cursor })}`;
-    return this.cache.getThrough(cacheKey, async () => {
+    return this.cache.getThrough(sub, cacheKey, async () => {
       const qb = this.notes
         .createQueryBuilder('note')
         .leftJoinAndSelect('note.tags', 'tag')
@@ -159,7 +159,7 @@ export class NotesService {
   }
 
   async findOne(sub: string, id: string): Promise<NoteDto> {
-    return this.cache.getThrough(`note:one:${id}`, async () => {
+    return this.cache.getThrough(sub, `note:one:${id}`, async () => {
       const note = await this.notes.findOne({
         where: { id, ownerSub: sub, deletedAt: IsNull() },
         relations: { tags: true },
@@ -189,7 +189,7 @@ export class NotesService {
     note.version += 1;
     const saved = await this.notes.save(note);
     // Bump AFTER the mutation — see bumpGeneration(); a 409 above never bumps.
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
     return toDto(saved);
   }
 
@@ -199,7 +199,7 @@ export class NotesService {
     note.deletedAt = new Date();
     await this.notes.save(note);
     // Bump AFTER the mutation: pre-mutation entries die here.
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
   }
 
   async restore(sub: string, id: string): Promise<NoteDto> {
@@ -210,7 +210,7 @@ export class NotesService {
     if (!note) throw new NotFoundException('Note not found');
     note.deletedAt = null;
     const saved = await this.notes.save(note);
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
     return toDto(saved);
   }
 
@@ -218,17 +218,17 @@ export class NotesService {
     const result = await this.notes.delete({ id, ownerSub: sub, deletedAt: Not(IsNull()) });
     if (!result.affected) throw new NotFoundException('Note not found');
     // Only a successful delete reaches the bump.
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
   }
 
   async emptyTrash(sub: string): Promise<{ count: number }> {
     const result = await this.notes.delete({ ownerSub: sub, deletedAt: Not(IsNull()) });
-    await this.cache.bumpGeneration();
+    await this.cache.bumpGeneration(sub);
     return { count: result.affected ?? 0 };
   }
 
   async listTags(sub: string): Promise<{ id: number; name: string }[]> {
-    return this.cache.getThrough('note:tags', async () => {
+    return this.cache.getThrough(sub, 'note:tags', async () => {
       const tags = await this.tags
         .createQueryBuilder('tag')
         .innerJoin('tag.notes', 'note')
