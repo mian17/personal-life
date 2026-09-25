@@ -1,0 +1,251 @@
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { rmSync } from 'fs';
+import { join } from 'path';
+import { Repository } from 'typeorm';
+import { AppModule } from '../src/app.module';
+import { User } from '../src/users/user.entity';
+import { UsersService } from '../src/users/users.service';
+import {
+  PassthroughCache,
+  USERS_CACHE,
+  USERS_CACHE_TTL_SECONDS,
+  USERS_NEGATIVE_TTL_SECONDS,
+  RedisUsersCache,
+  createUsersCache,
+  userCacheKey,
+} from '../src/users/users-cache';
+import { FakeCacheClient } from './fake-cache-client';
+
+const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
+
+describe('IdP users read-through cache (e2e)', () => {
+  const TEST_DB = join(__dirname, 'test-idp-users-cache.db');
+  const TEST_KEYS = join(__dirname, 'test-idp-users-cache-keys.json');
+  process.env.DB_PATH = TEST_DB;
+  process.env.KEYS_PATH = TEST_KEYS;
+
+  let app: INestApplication;
+  let users: UsersService;
+  let repo: Repository<User>;
+  let cache: FakeCacheClient;
+
+  beforeAll(async () => {
+    rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
+    // The default selection must stay the DB-only path; this spec injects the
+    // fake cache explicitly so no real Redis is ever required.
+    delete process.env.REDIS_URL;
+
+    cache = new FakeCacheClient();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(USERS_CACHE)
+      .useValue(new RedisUsersCache(cache))
+      .compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    users = app.get(UsersService);
+    repo = app.get(getRepositoryToken(User));
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
+  });
+
+  it('serves the second identical lookup from cache without touching the repository', async () => {
+    await users.createUser('cache-alice', FIXTURE_PASSWORD);
+    const findSpy = jest.spyOn(repo, 'findOne');
+
+    const first = await users.findByUsername('cache-alice');
+    const second = await users.findByUsername('cache-alice');
+
+    expect(findSpy).toHaveBeenCalledTimes(1);
+    expect(second?.id).toBe(first?.id);
+    expect(second?.passwordHash).toBe(first?.passwordHash);
+    // `createdAt` keeps its type across the JSON round-trip.
+    expect(second?.createdAt.getTime()).toBe(first?.createdAt.getTime());
+    expect(await users.verifyPassword(second!, FIXTURE_PASSWORD)).toBe(true);
+
+    findSpy.mockRestore();
+  });
+
+  it('caches a found row under the 300s positive TTL', async () => {
+    await users.createUser('cache-ttl', FIXTURE_PASSWORD);
+    await users.findByUsername('cache-ttl');
+    expect(cache.ttlSeconds.get(userCacheKey('cache-ttl'))).toBe(USERS_CACHE_TTL_SECONDS);
+  });
+
+  it('invalidates the cached key when createUser writes', async () => {
+    // Prime a negative sentinel for a username that does not exist yet.
+    expect(await users.findByUsername('cache-bob')).toBeNull();
+    expect(cache.store.has(userCacheKey('cache-bob'))).toBe(true);
+
+    // createUser must drop that sentinel; otherwise the next read would wrongly
+    // report "absent" for up to the negative TTL.
+    await users.createUser('cache-bob', FIXTURE_PASSWORD);
+    expect(cache.store.has(userCacheKey('cache-bob'))).toBe(false);
+
+    // A stale value can never survive: the next read must hit the repository.
+    const findSpy = jest.spyOn(repo, 'findOne');
+    const reread = await users.findByUsername('cache-bob');
+    expect(findSpy).toHaveBeenCalledTimes(1);
+    expect(reread?.username).toBe('cache-bob');
+    findSpy.mockRestore();
+  });
+
+  it('caches unknown usernames behind a short TTL sentinel', async () => {
+    const findSpy = jest.spyOn(repo, 'findOne');
+
+    const first = await users.findByUsername('cache-nobody');
+    const second = await users.findByUsername('cache-nobody');
+
+    expect(first).toBeNull();
+    expect(second).toBeNull();
+    expect(findSpy).toHaveBeenCalledTimes(1);
+    expect(cache.ttlSeconds.get(userCacheKey('cache-nobody'))).toBeLessThanOrEqual(
+      USERS_NEGATIVE_TTL_SECONDS,
+    );
+
+    findSpy.mockRestore();
+  });
+
+  it('returns null for an empty username without touching repository or cache', async () => {
+    const findSpy = jest.spyOn(repo, 'findOne');
+    const getCallsBefore = cache.getCalls;
+
+    expect(await users.findByUsername('   ')).toBeNull();
+
+    expect(findSpy).not.toHaveBeenCalled();
+    expect(cache.getCalls).toBe(getCallsBefore);
+    findSpy.mockRestore();
+  });
+
+  it('falls open to the DB when the cache cannot be read', async () => {
+    await users.createUser('cache-carol', FIXTURE_PASSWORD);
+    cache.failReads = true;
+    try {
+      const user = await users.findByUsername('cache-carol');
+      expect(user?.username).toBe('cache-carol');
+      expect(await users.verifyPassword(user!, FIXTURE_PASSWORD)).toBe(true);
+    } finally {
+      cache.failReads = false;
+    }
+  });
+
+  it('still returns the row when cache population fails', async () => {
+    await users.createUser('cache-dave', FIXTURE_PASSWORD);
+    cache.failWrites = true;
+    try {
+      const user = await users.findByUsername('cache-dave');
+      expect(user?.username).toBe('cache-dave');
+    } finally {
+      cache.failWrites = false;
+    }
+  });
+
+  it('does not let a failed invalidation break createUser', async () => {
+    cache.failDeletes = true;
+    try {
+      await expect(users.createUser('cache-erin', FIXTURE_PASSWORD)).resolves.toMatchObject({
+        username: 'cache-erin',
+      });
+    } finally {
+      cache.failDeletes = false;
+    }
+  });
+});
+
+describe('RedisUsersCache helper (unit)', () => {
+  const row = (overrides: Partial<User> = {}): User =>
+    ({
+      id: 'u1',
+      username: 'zoe',
+      passwordHash: '$argon2id$hash',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      ...overrides,
+    }) as User;
+
+  it('returns the fresh DB row on miss, then the cached row on hit', async () => {
+    const fake = new FakeCacheClient();
+    const cache = new RedisUsersCache(fake);
+    const loader = jest.fn(async () => row());
+
+    const first = await cache.getThrough(userCacheKey('zoe'), USERS_CACHE_TTL_SECONDS, loader);
+    const second = await cache.getThrough(userCacheKey('zoe'), USERS_CACHE_TTL_SECONDS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(first?.id).toBe('u1');
+    expect(second?.id).toBe('u1');
+    expect(second?.createdAt).toBeInstanceOf(Date);
+  });
+
+  it('caches a null result under the short negative TTL', async () => {
+    const fake = new FakeCacheClient();
+    const cache = new RedisUsersCache(fake);
+    const loader = jest.fn(async () => null);
+
+    // The positive TTL is requested, but a null result must be stored short.
+    await cache.getThrough(userCacheKey('ghost'), USERS_CACHE_TTL_SECONDS, loader);
+    await cache.getThrough(userCacheKey('ghost'), USERS_CACHE_TTL_SECONDS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(fake.ttlSeconds.get(userCacheKey('ghost'))).toBe(USERS_NEGATIVE_TTL_SECONDS);
+  });
+
+  it('fails open to the loader on read and write errors', async () => {
+    const fake = new FakeCacheClient();
+    const cache = new RedisUsersCache(fake);
+    const loader = jest.fn(async () => row({ id: 'u2', username: 'yan' }));
+
+    fake.failReads = true;
+    expect(
+      (await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id,
+    ).toBe('u2');
+    fake.failReads = false;
+
+    // Read-error path populated a value above; drop it so the write-error case
+    // is a genuine miss and must reach the loader again.
+    await fake.del(userCacheKey('yan'));
+    fake.failWrites = true;
+    expect(
+      (await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id,
+    ).toBe('u2');
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a corrupt cached value as a miss', async () => {
+    const fake = new FakeCacheClient();
+    const cache = new RedisUsersCache(fake);
+    await fake.set(userCacheKey('corrupt'), '{not-json', { EX: USERS_CACHE_TTL_SECONDS });
+    const loader = jest.fn(async () => null);
+
+    await expect(
+      cache.getThrough(userCacheKey('corrupt'), USERS_CACHE_TTL_SECONDS, loader),
+    ).resolves.toBeNull();
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows invalidate errors so callers never see a cache failure', async () => {
+    const fake = new FakeCacheClient();
+    const cache = new RedisUsersCache(fake);
+    fake.failDeletes = true;
+    await expect(cache.invalidate(userCacheKey('x'))).resolves.toBeUndefined();
+  });
+});
+
+describe('createUsersCache selection (unit)', () => {
+  it('selects the DB-only pass-through when REDIS_URL is unset', async () => {
+    const selected = createUsersCache(undefined);
+    expect(selected).toBeInstanceOf(PassthroughCache);
+
+    const loader = jest.fn(async () => null);
+    await selected.getThrough('k', USERS_CACHE_TTL_SECONDS, loader);
+    await selected.getThrough('k', USERS_CACHE_TTL_SECONDS, loader);
+    expect(loader).toHaveBeenCalledTimes(2);
+    await expect(selected.invalidate('k')).resolves.toBeUndefined();
+  });
+});
