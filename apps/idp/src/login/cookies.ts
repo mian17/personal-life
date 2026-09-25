@@ -13,7 +13,15 @@ export function readCookie(header: string | undefined, name: string): string | u
     if (eq === -1) continue;
     if (part.slice(0, eq).trim() !== name) continue;
     const value = part.slice(eq + 1).trim();
-    return value ? decodeURIComponent(value) : undefined;
+    if (!value) return undefined;
+    // A malformed percent-encoding (e.g. `idp_session=%`) must never throw:
+    // undecodable input is treated as "no cookie" so the caller fails closed to
+    // the login redirect instead of turning the request into a 500.
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }

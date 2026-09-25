@@ -76,6 +76,62 @@ describe('access-token refresh (re-login on failure)', () => {
     expect(readSession(session.id, store)?.accessToken).toBe('at-2');
   });
 
+  it('single-flights concurrent refreshes: two callers, one refresh, one shared result', async () => {
+    const { store, clock } = fixedStore();
+    const session = createSession(tokens(600), store);
+    // A deferred refresh so both callers are genuinely in flight at once.
+    let release!: (t: Tokens) => void;
+    const refresh = jest.fn(
+      (_rt: string) => new Promise<Tokens>((resolve) => (release = resolve)),
+    );
+    const at = clock() + 600_000 - REFRESH_SKEW_MS + 1;
+
+    const first = getValidSession(session.id, at, refresh, store);
+    const second = getValidSession(session.id, at, refresh, store);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    release({
+      accessToken: 'at-2',
+      refreshToken: 'rt-2',
+      idToken: null,
+      expiresIn: 600,
+      subject: 'user-1',
+    });
+    const [r1, r2] = await Promise.all([first, second]);
+
+    // Exactly one refresh for the pair, and both callers see the same session.
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith('rt');
+    expect(r1).toBe(r2);
+    expect(r1?.accessToken).toBe('at-2');
+    expect(readSession(session.id, store)?.accessToken).toBe('at-2');
+  });
+
+  it('clears the in-flight refresh on failure so a later call may attempt again', async () => {
+    const { store, clock } = fixedStore();
+    const session = createSession(tokens(600), store);
+    // Keep the session alive through the failed refresh (which normally destroys
+    // it) so the second call actually reaches the refresh path again.
+    jest.spyOn(store, 'destroy').mockImplementation(() => undefined);
+    const at = clock() + 600_000 + 1;
+
+    const first = jest.fn().mockRejectedValue(new Error('invalid_grant'));
+    expect(await getValidSession(session.id, at, first, store)).toBeUndefined();
+    expect(first).toHaveBeenCalledTimes(1);
+
+    const second = jest.fn().mockResolvedValue({
+      accessToken: 'at-2',
+      refreshToken: 'rt-2',
+      idToken: null,
+      expiresIn: 600,
+      subject: 'user-1',
+    });
+    // Not the settled failed promise: a fresh attempt is made.
+    const result = await getValidSession(session.id, at, second, store);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(result?.accessToken).toBe('at-2');
+  });
+
   it('destroys the session and returns undefined when refresh fails (no retry)', async () => {
     const { store, clock } = fixedStore();
     const session = createSession(tokens(600), store);

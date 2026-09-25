@@ -122,8 +122,18 @@ export class OidcService {
         }),
         loadExistingGrant,
         features: {
-          // The library's dev views accept any credentials and MUST stay off; we
-          // wire the Task 3 login as the interaction handler instead.
+          // The enable-only protocol surface (SPEC-idp "Tech Stack" + decision 6):
+          // discovery, authorization code + PKCE, token, refresh rotation, JWKS.
+          // Everything else is explicitly disabled so library defaults cannot
+          // advertise or serve endpoints outside that set. `resourceIndicators`
+          // stays on because the audience-scoped access tokens (RFC 8707) depend
+          // on it.
+          //
+          // The library's defaults leave `devInteractions`, `dPoP`,
+          // `rpInitiatedLogout`, `pushedAuthorizationRequests`, and `userinfo`
+          // enabled; RP-initiated logout (`end_session`) is a FORBIDDEN item and
+          // is deferred to the multi-RP chapter (decision 6). Every flag below is
+          // disabled explicitly, never left to the default.
           devInteractions: { enabled: false },
           resourceIndicators: {
             enabled: true,
@@ -132,6 +142,33 @@ export class OidcService {
             useGrantedResource: () => true,
             getResourceServerInfo: (_ctx, resource) => resourceServerPolicy(resource),
           },
+          dPoP: { enabled: false },
+          rpInitiatedLogout: { enabled: false },
+          pushedAuthorizationRequests: { enabled: false },
+          userinfo: { enabled: false },
+          introspection: { enabled: false },
+          revocation: { enabled: false },
+          backchannelLogout: { enabled: false },
+          deviceFlow: { enabled: false },
+          registration: { enabled: false },
+          registrationManagement: { enabled: false },
+          requestObjects: { enabled: false },
+          claimsParameter: { enabled: false },
+          clientCredentials: { enabled: false },
+          ciba: { enabled: false },
+          encryption: { enabled: false },
+          fapi: { enabled: false },
+          jwtIntrospection: { enabled: false },
+          jwtResponseModes: { enabled: false },
+          jwtUserinfo: { enabled: false },
+          mTLS: { enabled: false },
+          attestClientAuth: { enabled: false },
+          clientIdMetadataDocument: { enabled: false },
+          richAuthorizationRequests: { enabled: false },
+          rpMetadataChoices: { enabled: false },
+          webMessageResponseMode: { enabled: false },
+          externalSigningSupport: { enabled: false },
+          openid4vci: { enabled: false },
         },
       });
       // TLS terminates at Tailscale Serve in production; trust x-forwarded-*.

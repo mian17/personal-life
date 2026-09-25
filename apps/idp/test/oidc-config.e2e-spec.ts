@@ -1,3 +1,7 @@
+import { INestApplication } from '@nestjs/common';
+import { rmSync } from 'fs';
+import { join } from 'path';
+import request from 'supertest';
 import { appClient, assertOidcConfig, resolveAppClientSecret, staticClients } from '../src/oidc/clients';
 import { audienceFor, defaultResource } from '../src/oidc/access-token.policy';
 
@@ -119,5 +123,77 @@ describe('audience mapping (env-driven)', () => {
   it('treats a plain service name as its own audience', () => {
     process.env.OIDC_AUDIENCE_MAP = 'https://other=x';
     expect(audienceFor('note-service')).toBe('note-service');
+  });
+});
+
+/**
+ * The enable-only protocol surface (SPEC-idp + decision 6). Every feature
+ * outside discovery / code+PKCE / token / refresh rotation / JWKS must be off,
+ * so the library's defaults cannot advertise or serve them. The `end_session`
+ * (RP-initiated logout) endpoint is a FORBIDDEN item deferred to the multi-RP
+ * chapter; this pins its absence so it cannot silently come back.
+ */
+describe('enabled protocol surface (discovery + routes)', () => {
+  const TEST_DB = join(__dirname, 'test-idp-config-surface.db');
+  const TEST_KEYS = join(__dirname, 'test-idp-config-surface-keys.json');
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    process.env.DB_PATH = TEST_DB;
+    process.env.KEYS_PATH = TEST_KEYS;
+    rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
+    const { createApp } = await import('../src/app.factory');
+    app = await createApp();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(TEST_DB, { force: true });
+    rmSync(TEST_KEYS, { force: true });
+  });
+
+  const absentEndpoints = [
+    'end_session_endpoint',
+    'pushed_authorization_request_endpoint',
+    'userinfo_endpoint',
+    'introspection_endpoint',
+    'revocation_endpoint',
+    'registration_endpoint',
+    'device_authorization_endpoint',
+    'backchannel_authentication_endpoint',
+    'challenge_endpoint',
+  ] as const;
+
+  it('does not advertise any endpoint outside the enable-only set', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/.well-known/openid-configuration')
+      .expect(200);
+    for (const key of absentEndpoints) {
+      expect(res.body[key]).toBeUndefined();
+    }
+    // The endpoints that ARE part of the surface are advertised.
+    expect(res.body.authorization_endpoint).toBeDefined();
+    expect(res.body.token_endpoint).toBeDefined();
+    expect(res.body.jwks_uri).toBeDefined();
+    expect(res.body.issuer).toBeDefined();
+  });
+
+  it('404s every route outside the enabled surface', async () => {
+    for (const path of [
+      '/session/end',
+      '/request',
+      '/me',
+      '/token/introspection',
+      '/token/revocation',
+      '/reg',
+      '/device/auth',
+      '/challenge',
+      '/backchannel',
+    ]) {
+      const res = await request(app.getHttpServer()).get(path);
+      expect([404, 405]).toContain(res.status);
+    }
   });
 });

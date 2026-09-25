@@ -126,6 +126,20 @@ describe('Login and sessions (e2e)', () => {
       .expect(302)
       .expect('Location', '/login');
   });
+
+  it('treats a malformed session cookie as absent (login redirect, not a 500)', async () => {
+    // A stray `%` is invalid percent-encoding; decoding it throws URIError. The
+    // parser must fail closed to "no cookie" so GET / redirects to /login.
+    await request(app.getHttpServer())
+      .get('/')
+      .set('Cookie', `${COOKIE}=%`)
+      .expect(302)
+      .expect('Location', '/login');
+    await request(app.getHttpServer())
+      .post('/logout')
+      .set('Cookie', `${COOKIE}=%`)
+      .expect(303);
+  });
 });
 
 describe('Raw session storage (e2e)', () => {

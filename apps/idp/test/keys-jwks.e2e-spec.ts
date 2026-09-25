@@ -116,9 +116,25 @@ describe('Signing keys and JWKS (e2e)', () => {
     for (const p of providerPaths) {
       expect(isProviderPath(p)).toBe(true);
     }
-    // Paths the enabled features definitely expose.
-    for (const p of ['/auth', '/token', '/jwks', '/me']) {
+    // Paths the enabled features definitely expose: discovery (implicit), auth,
+    // token, jwks.
+    for (const p of ['/auth', '/token', '/jwks']) {
       expect(providerPaths).toContain(p);
+    }
+    // Endpoints outside the enable-only surface must NOT be handled (see
+    // oidc-config.e2e-spec.ts for the discovery/route absence assertions).
+    for (const p of [
+      '/me',
+      '/session/end',
+      '/token/introspection',
+      '/token/revocation',
+      '/request',
+      '/reg',
+      '/device/auth',
+      '/challenge',
+      '/backchannel',
+    ]) {
+      expect(providerPaths).not.toContain(p);
     }
     expect(isProviderPath('/health')).toBe(false);
     expect(isProviderPath('/login')).toBe(false);
