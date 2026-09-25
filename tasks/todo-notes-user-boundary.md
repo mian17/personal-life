@@ -125,10 +125,9 @@ script suite.
   `npx tsc -p apps/note-service/tsconfig.scripts.json --noEmit`, `npm run lint`.
 - Blast radius: `apps/note-service/scripts/backfill-owner.ts` (new),
   `apps/note-service/tsconfig.scripts.json` (new),
-  `apps/note-service/package.json` (the `backfill-owner` script entry **and** a
-  `ts-node` `^10.9.2` devDependency — same version `apps/idp` uses, so the human-run
-  CLI works honestly instead of leaning on a sibling workspace's hoisted bin; the
-  lockfile is synced by the tech lead after review),
+  `apps/note-service/package.json` (the `backfill-owner` script entry only —
+  `ts-node@^10.9.2` was already in note-service's devDependencies; no dependency
+  change, no lockfile touch),
   `apps/note-service/test/owner-backfill.e2e-spec.ts` (new).
 - Depends on: Task 2, Task 3. Scope: M.
 - Hard line: the suite uses its own temp DBs — never anything under `apps/*/data/`.

@@ -25,7 +25,8 @@ from a phone in seconds.
   Prisma because it is the canonical NestJS DI integration with no codegen step. Reversible —
   schema is three entities.
 - Web: Next.js App Router, React Server Components for reads, Server Actions for writes.
-- Auth: Tailscale identity headers gated in Next.js middleware; service token `API_TOKEN`
+- Auth: Tailscale identity headers gated in Next.js middleware; per-session IdP access tokens (the earlier `API_TOKEN` service token predates the IdP
+  chapter and is superseded)
   between Next.js and NestJS.
 - Tests: Jest + supertest (API e2e).
 

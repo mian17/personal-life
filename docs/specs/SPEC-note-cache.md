@@ -62,10 +62,14 @@ apps/note-service/test/notes-cache.e2e-spec.ts   → hit / invalidate / gen-stal
 ## Code Style
 
 ```ts
-async findOne(id: string): Promise<NoteDto> {
-  return this.cache.getThrough(`note:one:${id}`, () => this.notes.findOneByOrFail({ id }));
+async findOne(sub: string, id: string): Promise<NoteDto> {
+  return this.cache.getThrough(sub, `note:one:${id}`, async () => {
+    const note = await this.notes.findOneBy({ id, ownerSub: sub });
+    if (!note) throw new NotFoundException(); // foreign id and missing id: same 404
+    return toDto(note);
+  });
 }
-// Every write ENDS with await this.cache.bumpGeneration(); // one INCR invalidates all reads
+// Every write ENDS with await this.cache.bumpGeneration(sub); // one INCR invalidates all of that user's reads
 ```
 
 Controllers unchanged — the cache lives inside the service layer.
