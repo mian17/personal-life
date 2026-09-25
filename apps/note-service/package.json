@@ -6,6 +6,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3001} node dist/main.js",
+    "backfill-owner": "ts-node scripts/backfill-owner.ts",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
