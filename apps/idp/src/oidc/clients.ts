@@ -11,8 +11,16 @@ import type { ClientMetadata } from 'oidc-provider';
 const DEV_REDIRECT_URIS = ['http://127.0.0.1:8080/cb', 'http://localhost:8080/cb'];
 /** Default callback registered in production (behind Tailscale Serve on :3002). */
 const PROD_APP_REDIRECT_URI = 'http://127.0.0.1:3002/auth/callback';
-/** Default callback in dev — byte-identical to the app's dev default (apps/app/lib/auth/env.ts). */
-const DEV_APP_REDIRECT_URI = 'http://127.0.0.1:3000/auth/callback';
+/**
+ * Dev default. The app canonicalizes a loopback redirect to `localhost` (the
+ * host Next's middleware puts the browser on — see `apps/app/lib/auth/origin.ts`),
+ * and a hand-run setup may still send either spelling, so register both. The
+ * port matches the app's dev port (3000).
+ */
+const DEV_APP_REDIRECT_URIS = [
+  'http://localhost:3000/auth/callback',
+  'http://127.0.0.1:3000/auth/callback',
+];
 
 /**
  * Obviously-fake placeholder used only outside production. Production MUST
@@ -39,8 +47,9 @@ export function resolveAppClientSecret(env: NodeJS.ProcessEnv = process.env): st
 
 /**
  * Registered redirect URIs for the `app` client. Explicit `OIDC_APP_REDIRECT_URIS`
- * always wins. Otherwise the default follows the environment so byte-identity
- * with the app holds with zero config: dev → :3000 (the app's dev default),
+ * always wins. Otherwise the default follows the environment so the browser URL
+ * matches with zero config: dev registers both loopback spellings on :3000 (the
+ * app canonicalizes to `localhost`; a hand-run setup may use `127.0.0.1`),
  * production → :3002. The exact string must match the browser URL and the app's
  * `OIDC_APP_REDIRECT_URI`.
  */
@@ -52,7 +61,7 @@ function appRedirectUris(env: NodeJS.ProcessEnv): string[] {
       .map((value) => value.trim())
       .filter(Boolean);
   }
-  return [env.NODE_ENV === 'production' ? PROD_APP_REDIRECT_URI : DEV_APP_REDIRECT_URI];
+  return env.NODE_ENV === 'production' ? [PROD_APP_REDIRECT_URI] : [...DEV_APP_REDIRECT_URIS];
 }
 
 const CODE_CLIENT = {

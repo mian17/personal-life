@@ -2,8 +2,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 
 /**
  * Spawn a long-lived Node process and wait until it reports ready.
- * Used by the Playwright global setup to bring up idp, note-service, and the
- * production-built app exactly as Docker would (same commands, same env).
+ * Used by the Playwright global setup to bring up idp, note-service, and the app
+ * exactly as Docker (or `next dev`) would.
+ *
+ * The child is spawned in its own process group (`detached` on POSIX) so teardown
+ * can kill the whole tree: `next dev` forks a `next-server` child that would
+ * otherwise outlive a SIGTERM to the launcher.
  */
 export interface SpawnedService {
   name: string;
@@ -19,11 +23,29 @@ export interface SpawnOptions {
   env: NodeJS.ProcessEnv;
 }
 
+const SUPPORTS_GROUPS = process.platform !== 'win32';
+
+function signalTree(pid: number | undefined, signal: NodeJS.Signals): void {
+  if (!pid) return;
+  try {
+    // Negative pid targets the whole process group created by `detached`.
+    process.kill(SUPPORTS_GROUPS ? -pid : pid, signal);
+  } catch {
+    // Already gone, or no group (best-effort).
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // gone
+    }
+  }
+}
+
 export async function spawnService(options: SpawnOptions): Promise<SpawnedService> {
   const child = spawn(options.command, options.args, {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: SUPPORTS_GROUPS,
   });
 
   const logs: string[] = [];
@@ -43,19 +65,23 @@ export async function spawnService(options: SpawnOptions): Promise<SpawnedServic
   });
 
   const stop = async () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM');
-      await new Promise((resolve) => {
-        const t = setTimeout(() => {
-          child.kill('SIGKILL');
-          resolve(undefined);
-        }, 3000);
-        child.on('exit', () => {
-          clearTimeout(t);
-          resolve(undefined);
-        });
-      });
+    if (child.exitCode !== null || child.signalCode !== null) {
+      signalTree(child.pid, 'SIGKILL');
+      return;
     }
+    signalTree(child.pid, 'SIGTERM');
+    await new Promise((resolve) => {
+      const t = setTimeout(() => {
+        signalTree(child.pid, 'SIGKILL');
+        resolve(undefined);
+      }, 3000);
+      child.on('exit', () => {
+        clearTimeout(t);
+        resolve(undefined);
+      });
+    });
+    // Belt-and-braces: reap the group again in case a grandchild survived.
+    signalTree(child.pid, 'SIGKILL');
   };
 
   return { name: options.name, child, stop };

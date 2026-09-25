@@ -39,6 +39,10 @@ export async function resolveCallback(
 ): Promise<CallbackResult> {
   const attempt = decodeLoginAttempt(attemptCookie);
   if (!attempt) {
+    // The attempt cookie is scoped to `/auth` and bound to the browser origin.
+    // Loopback spellings (`127.0.0.1`, `[::1]`, `localhost`) are distinct hosts
+    // for cookies, and Next's middleware normalization can move the browser
+    // between the two, so this fails closed rather than guessing.
     return { ok: false, status: 400, message: 'missing or invalid auth attempt' };
   }
 

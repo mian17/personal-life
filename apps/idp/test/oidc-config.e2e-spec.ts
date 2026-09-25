@@ -59,13 +59,16 @@ describe('static clients', () => {
     expect(appClient(env).redirect_uris).toEqual(['https://host.example.ts.net/auth/callback']);
   });
 
-  it('defaults the app redirect to the dev callback outside production', () => {
-    // Byte-identical to the app's dev default (apps/app/lib/auth/env.ts) so the
-    // dance works with zero extra config.
-    expect(appClient({ NODE_ENV: 'development' }).redirect_uris).toEqual([
+  it('defaults the app redirect to both dev loopback spellings outside production', () => {
+    // The app canonicalizes a loopback redirect to `localhost` (the host Next's
+    // middleware puts the browser on), and a hand-run setup may still send
+    // `127.0.0.1`, so both are registered with zero config.
+    const expected = [
+      'http://localhost:3000/auth/callback',
       'http://127.0.0.1:3000/auth/callback',
-    ]);
-    expect(appClient({}).redirect_uris).toEqual(['http://127.0.0.1:3000/auth/callback']);
+    ];
+    expect(appClient({ NODE_ENV: 'development' }).redirect_uris).toEqual(expected);
+    expect(appClient({}).redirect_uris).toEqual(expected);
   });
 
   it('keeps the production redirect default (:3002) under NODE_ENV=production', () => {

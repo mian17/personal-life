@@ -18,6 +18,9 @@ import { E2E_OWNER } from './test/e2e/config';
 export default defineConfig({
   testDir: './test/e2e',
   testMatch: '**/*.spec.ts',
+  // The dev-mode harness (test/e2e/dev) runs `next dev`, separately, because it
+  // shares apps/app/.next with this production build. Exclude it here.
+  testIgnore: ['**/dev/**'],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -29,7 +32,9 @@ export default defineConfig({
   use: {
     // The app-under-test is reached as `localhost`: Next normalizes loopback
     // 127.0.0.1 → localhost in middleware redirects, so the browser origin must
-    // be `localhost` to keep login cookies + the callback on one origin.
+    // be `localhost` to keep login cookies + the callback on one origin. The
+    // `origins.spec.ts` file additionally drives the 127.0.0.1 origin (both are
+    // registered on the IdP).
     baseURL: process.env.APP_URL ?? 'http://localhost:3100',
     extraHTTPHeaders: { 'tailscale-user-login': E2E_OWNER },
     trace: 'retain-on-failure',

@@ -12,6 +12,8 @@
  *   production an obviously-fake default is used so dev/test boot without it.
  */
 
+import { canonicalizeLoopbackUrl } from './origin';
+
 export interface AuthEnv {
   issuer: string;
   clientId: string;
@@ -93,10 +95,29 @@ export function getAuthEnv(env: AuthEnvSource = process.env): AuthEnv {
     issuer: getIdpIssuer(env),
     clientId: env.OIDC_APP_CLIENT_ID ?? 'app',
     clientSecret: clientSecret || DEV_APP_CLIENT_SECRET,
-    redirectUri: env.OIDC_APP_REDIRECT_URI ?? 'http://127.0.0.1:3002/auth/callback',
+    redirectUri: canonicalizeRedirect(
+      env.OIDC_APP_REDIRECT_URI ?? 'http://127.0.0.1:3002/auth/callback',
+    ),
     resource: env.OIDC_APP_RESOURCE ?? 'https://note-service',
   };
   return validateAuthEnv(auth, env);
+}
+
+/**
+ * A loopback redirect URI is canonicalized to `localhost`, because that is the
+ * host the browser actually ends up on: Next's middleware normalizes any
+ * loopback spelling (`127.0.0.1`/`[::1]`/`localhost`) to `localhost` in its
+ * redirects. Keeping the configured value as `127.0.0.1` would send the IdP's
+ * callback to a different host than the one holding the attempt cookie, which
+ * fails closed. Non-loopback (production/Tailscale) redirects are untouched.
+ * A malformed value is returned as-is so `validateAuthEnv` can report it.
+ */
+function canonicalizeRedirect(redirectUri: string): string {
+  try {
+    return canonicalizeLoopbackUrl(redirectUri);
+  } catch {
+    return redirectUri;
+  }
 }
 
 /** True when the issuer is plain http (local dev); `openid-client` needs an opt-in then. */

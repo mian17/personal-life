@@ -1,0 +1,34 @@
+import { defineConfig, devices } from '@playwright/test';
+import { devPorts } from './test/e2e/config';
+
+/**
+ * Development-mode harness: `next dev` (the human's `npm run dev` runtime) on
+ * scratch DBs, reached on `127.0.0.1`.
+ *
+ * Run separately from the production harness because `next dev` and `next build`
+ * share `apps/app/.next`. `npm run test:e2e -w apps/app` runs both in sequence.
+ *
+ * The access gate is skipped in dev by contract, so no tailscale header is sent
+ * (dev has no Tailscale header anyway); the identity login wall is exercised for
+ * real, exactly as the human hits it.
+ */
+export default defineConfig({
+  testDir: './test/e2e/dev',
+  testMatch: '**/*.spec.ts',
+  timeout: 90_000,
+  expect: { timeout: 10_000 },
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  reporter: [['list']],
+  globalSetup: './test/e2e/global-setup.dev.ts',
+  globalTeardown: './test/e2e/global-teardown.dev.ts',
+  use: {
+    baseURL: process.env.APP_DEV_URL ?? `http://127.0.0.1:${devPorts().appPort}`,
+    // No tailscale header: the access gate is skipped in dev by contract, and
+    // the identity login wall is what this harness exercises for real.
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+});

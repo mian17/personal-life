@@ -18,6 +18,20 @@ describe('getAuthEnv', () => {
     expect(env.resource).toBe('https://note-service');
   });
 
+  it('canonicalizes a loopback redirect URI to localhost (the host Next normalizes to)', () => {
+    expect(getAuthEnv({ ...baseEnv, OIDC_APP_REDIRECT_URI: 'http://127.0.0.1:3000/auth/callback' }).redirectUri).toBe(
+      'http://localhost:3000/auth/callback',
+    );
+    expect(getAuthEnv({ ...baseEnv, OIDC_APP_REDIRECT_URI: 'http://[::1]:3000/auth/callback' }).redirectUri).toBe(
+      'http://localhost:3000/auth/callback',
+    );
+  });
+
+  it('leaves a non-loopback redirect URI byte-identical (production/Tailscale)', () => {
+    const prod = 'https://host.example.ts.net/auth/callback';
+    expect(getAuthEnv({ ...baseEnv, OIDC_APP_REDIRECT_URI: prod }).redirectUri).toBe(prod);
+  });
+
   it('requires OIDC_APP_CLIENT_SECRET in production (no fallback)', () => {
     expect(() => getAuthEnv({ NODE_ENV: 'production' })).toThrow(
       /OIDC_APP_CLIENT_SECRET must be set in production/,
