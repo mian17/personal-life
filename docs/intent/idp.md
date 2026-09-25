@@ -50,3 +50,6 @@ infrastructure, and RP-initiated logout (`end_session` + back-channel logout).
   refresh token dies immediately. Stateless 10-min access tokens live out their TTL by
   design. **RP-initiated logout (decision C) is deferred** to the multi-RP chapter, where
   its core action is exactly this revocation — B is the engine, C is the standard wrapper.
+- 2026-09-25: **Logout also ends the SSO session.** Beyond revoking grants, the IdP
+  destroys its own provider session and clears the `_session` cookie on logout — a fresh
+  login requires the password again (no silent SSO re-resolve).

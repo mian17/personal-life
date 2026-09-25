@@ -104,5 +104,7 @@ rejected. No coverage percentage gate; every auth-relevant branch has a test.
    every refresh token immediately; stateless 10-min access tokens live out their TTL by
    design. RP-initiated/back-channel logout (`end_session`) is deferred to the multi-RP
    chapter (decision C).
+7. **Logout ends the SSO session too** (2026-09-25): the provider session is destroyed
+   and the `_session` cookie cleared on logout — no silent re-login after logout.
 
 All open questions resolved. Implementation is underway per `tasks/todo-idp.md`.
