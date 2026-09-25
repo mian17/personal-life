@@ -9,7 +9,10 @@ import type { ClientMetadata } from 'oidc-provider';
  */
 
 const DEV_REDIRECT_URIS = ['http://127.0.0.1:8080/cb', 'http://localhost:8080/cb'];
-const DEFAULT_APP_REDIRECT_URIS = ['http://127.0.0.1:3002/auth/callback'];
+/** Default callback registered in production (behind Tailscale Serve on :3002). */
+const PROD_APP_REDIRECT_URI = 'http://127.0.0.1:3002/auth/callback';
+/** Default callback in dev — byte-identical to the app's dev default (apps/app/lib/auth/env.ts). */
+const DEV_APP_REDIRECT_URI = 'http://127.0.0.1:3000/auth/callback';
 
 /**
  * Obviously-fake placeholder used only outside production. Production MUST
@@ -34,13 +37,22 @@ export function resolveAppClientSecret(env: NodeJS.ProcessEnv = process.env): st
   return DEV_APP_CLIENT_SECRET;
 }
 
-function envList(name: string, fallback: readonly string[]): string[] {
-  const raw = process.env[name]?.trim();
-  if (!raw) return [...fallback];
-  return raw
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
+/**
+ * Registered redirect URIs for the `app` client. Explicit `OIDC_APP_REDIRECT_URIS`
+ * always wins. Otherwise the default follows the environment so byte-identity
+ * with the app holds with zero config: dev → :3000 (the app's dev default),
+ * production → :3002. The exact string must match the browser URL and the app's
+ * `OIDC_APP_REDIRECT_URI`.
+ */
+function appRedirectUris(env: NodeJS.ProcessEnv): string[] {
+  const raw = env.OIDC_APP_REDIRECT_URIS?.trim();
+  if (raw) {
+    return raw
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+  return [env.NODE_ENV === 'production' ? PROD_APP_REDIRECT_URI : DEV_APP_REDIRECT_URI];
 }
 
 const CODE_CLIENT = {
@@ -55,14 +67,14 @@ const CODE_CLIENT = {
  * `client_secret_basic`; the secret comes from `OIDC_APP_CLIENT_SECRET` and is
  * never logged. Required in production (see `resolveAppClientSecret`).
  */
-export function appClient(): ClientMetadata {
+export function appClient(env: NodeJS.ProcessEnv = process.env): ClientMetadata {
   return {
     ...CODE_CLIENT,
     client_id: 'app',
     client_name: 'personal-life app',
-    client_secret: resolveAppClientSecret(),
+    client_secret: resolveAppClientSecret(env),
     token_endpoint_auth_method: 'client_secret_basic',
-    redirect_uris: envList('OIDC_APP_REDIRECT_URIS', DEFAULT_APP_REDIRECT_URIS),
+    redirect_uris: appRedirectUris(env),
   };
 }
 

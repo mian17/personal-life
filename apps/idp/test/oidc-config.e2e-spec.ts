@@ -52,14 +52,36 @@ describe('static clients', () => {
   });
 
   it('uses OIDC_APP_REDIRECT_URIS for the app client when set', () => {
-    process.env.OIDC_APP_REDIRECT_URIS = 'https://host.example.ts.net/auth/callback';
-    process.env.OIDC_APP_CLIENT_SECRET = 's';
-    try {
-      expect(appClient().redirect_uris).toEqual(['https://host.example.ts.net/auth/callback']);
-    } finally {
-      delete process.env.OIDC_APP_REDIRECT_URIS;
-      delete process.env.OIDC_APP_CLIENT_SECRET;
-    }
+    const env: NodeJS.ProcessEnv = {
+      OIDC_APP_REDIRECT_URIS: 'https://host.example.ts.net/auth/callback',
+      OIDC_APP_CLIENT_SECRET: 's',
+    };
+    expect(appClient(env).redirect_uris).toEqual(['https://host.example.ts.net/auth/callback']);
+  });
+
+  it('defaults the app redirect to the dev callback outside production', () => {
+    // Byte-identical to the app's dev default (apps/app/lib/auth/env.ts) so the
+    // dance works with zero extra config.
+    expect(appClient({ NODE_ENV: 'development' }).redirect_uris).toEqual([
+      'http://127.0.0.1:3000/auth/callback',
+    ]);
+    expect(appClient({}).redirect_uris).toEqual(['http://127.0.0.1:3000/auth/callback']);
+  });
+
+  it('keeps the production redirect default (:3002) under NODE_ENV=production', () => {
+    expect(
+      appClient({ NODE_ENV: 'production', OIDC_APP_CLIENT_SECRET: 's' }).redirect_uris,
+    ).toEqual(['http://127.0.0.1:3002/auth/callback']);
+  });
+
+  it('lets an explicit OIDC_APP_REDIRECT_URIS win in both modes', () => {
+    const explicit = { OIDC_APP_REDIRECT_URIS: 'https://x.ts.net/auth/callback' };
+    expect(appClient({ NODE_ENV: 'development', ...explicit }).redirect_uris).toEqual([
+      'https://x.ts.net/auth/callback',
+    ]);
+    expect(
+      appClient({ NODE_ENV: 'production', OIDC_APP_CLIENT_SECRET: 's', ...explicit }).redirect_uris,
+    ).toEqual(['https://x.ts.net/auth/callback']);
   });
 });
 

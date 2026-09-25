@@ -12,8 +12,8 @@ const TEST_DB = join(__dirname, 'test-idp-refresh.db');
 const TEST_KEYS = join(__dirname, 'test-idp-refresh-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const DEV_REDIRECT = 'http://127.0.0.1:8080/cb';
-/** The `app` client's registered redirect (see src/oidc/clients.ts defaults). */
-const APP_REDIRECT = 'http://127.0.0.1:3002/auth/callback';
+/** The `app` client's registered redirect in dev (see src/oidc/clients.ts defaults). */
+const APP_REDIRECT = 'http://127.0.0.1:3000/auth/callback';
 const PASSWORD = 'fixture-password-not-a-secret';
 const APP_CLIENT_SECRET = 'app-dev-client-secret-not-a-secret';
 

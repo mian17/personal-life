@@ -101,19 +101,19 @@ tailscale serve status       # show the current Serve routes
 ## Development
 
 ```unknown
-npm run dev        # note-service :3001 + app :3000
-npm run dev -w apps/idp   # IdP :3003 (run separately; not in the root dev script)
+npm run dev        # note-service :3001 + app :3000 + idp :3003 (all three)
 npm run build      # compile all workspaces
 npm run lint
 npm test
 ```
 
-`npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`) and
-runs with `NODE_ENV=development`: the Tailscale **network access gate** is skipped locally
-(dev has no Tailscale header), so only this device reaches the app via loopback. The IdP
-**login/session gate is the app's real flow in every environment** — including localhost —
-so you log in locally against the IdP before the notes UI renders. Ports differ by mode so
-a production preview never collides with dev. The API binds loopback on the host in dev;
+`npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`), runs
+with `NODE_ENV=development`, and starts all three services in one command. It runs the
+Tailscale **network access gate** only in production (dev has no Tailscale header), so
+locally only this device reaches the app via loopback. The IdP **login/session gate is the
+app's real flow in every environment** — including localhost — so after seeding a dev user
+you log in locally against the IdP before the notes UI renders. Ports differ by mode so a
+production preview never collides with dev. The API binds loopback on the host in dev;
 inside Docker it binds `0.0.0.0` so the web container can reach `http://note-service:3001`.
 
 Outside production the IdP uses a throwaway database (`apps/idp/data/scratch.db`) — the
