@@ -28,7 +28,9 @@ Guard stops discarding claims: `request.principal = { sub }` after verification,
   bypass cannot leak into later specs in the same jest worker.
 - Verify: `npm run test -w apps/note-service -- auth.e2e-spec`, `npm run lint`.
 - Blast radius: `apps/note-service/src/auth/auth.guard.ts`,
-  `apps/note-service/src/auth/principal.ts` (new), `apps/note-service/test/auth.e2e-spec.ts`.
+  `apps/note-service/src/auth/principal.ts` (new), `apps/note-service/test/auth.e2e-spec.ts`,
+  `apps/note-service/test/jwt-harness.ts` (only to allow minting a sub-less token for
+  the 401 case).
 - Depends on: none. Scope: S.
 
 ## Task 2: notes ownership
