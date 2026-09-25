@@ -49,7 +49,11 @@ apps/note-service/test/notes-cache.e2e-spec.ts   → key-shape + isolation cases
 ## Code Style
 
 ```ts
-this.cache.getThrough(sub, `note:one:${id}`, () => this.notes.findOneByOrFail({ id, ownerSub: sub }));
+this.cache.getThrough(sub, `note:one:${id}`, async () => {
+  const note = await this.notes.findOneBy({ id, ownerSub: sub });
+  if (!note) throw new NotFoundException(); // foreign id and missing id: same 404
+  return note;
+});
 // every write ENDS with await this.cache.bumpGeneration(sub);
 ```
 

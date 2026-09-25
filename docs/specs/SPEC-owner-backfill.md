@@ -10,13 +10,19 @@ idempotent, human-run at deploy time. The backup is the rollback path.
 
 ## Contract (the seam)
 
-- CLI: `npm run backfill-owner -w apps/note-service` → `apps/note-service/scripts/backfill-owner.ts`.
-  Env: `NOTE_DB_PATH` (default `apps/note-service/data/life.db`),
-  `IDP_DB_PATH` (**required, no default** — explicit is safe).
-- **Step 0 — ensure schema (idempotent).** Add `ownerSub TEXT` to `note` and `tag` when
-  missing (`PRAGMA table_info` guard + `ALTER TABLE ADD COLUMN`), so the script runs on
-  the *old* schema. This is what makes the prescribed deploy order possible: stop
-  services → run script → boot new code — zero window in which legacy rows are invisible.
+- CLI: `npm run backfill-owner -w apps/note-service` →
+  `apps/note-service/scripts/backfill-owner.ts`. Env: `NOTE_DB_PATH` (default
+  `apps/note-service/data/life.db`), `IDP_DB_PATH` (**required, no default** — explicit
+  is safe). Both resolve against `process.env.INIT_CWD ?? process.cwd()`, so the
+  documented repo-root command works as written despite `npm -w` setting the script's
+  cwd to the workspace.
+- **Step 0 — ensure schema (idempotent, no rebuild).** Add `ownerSub TEXT` to `note`
+  and `tag` when missing (`PRAGMA table_info` guard + native `ALTER TABLE ADD COLUMN`),
+  so the script runs on the *old* schema. This is what makes the prescribed deploy
+  order possible: stop services → run script → boot new code — zero window in which
+  legacy rows are invisible. (The tag unique-constraint change is intentionally left to
+  TypeORM's first-boot reconcile — one data-preserving table rebuild, covered by the
+  backup Step 1 already took.)
 - **Step 1 — backup (before any write).** `VACUUM INTO '<life.db>.bak-<UTC
   timestamp>'` — a SQLite-consistent snapshot even with readers live. Verification
   before anything else: the copy exists, opens, `PRAGMA quick_check` passes, and its
@@ -35,26 +41,30 @@ idempotent, human-run at deploy time. The backup is the rollback path.
 
 ## Security posture
 
-This script is the **one sanctioned writer of `life.db` outside the service**. It is
-run by the human during the deploy window, never by tests, never by agents. It writes
-only `ownerSub` columns; it touches nothing else in either DB.
+This script is the **one sanctioned writer of `life.db` outside the service** (and the
+one sanctioned *reader* of `idp.db` — read-only). It is run by the human during the
+deploy window, never by tests, never by agents against real data. It writes only the
+two `ownerSub` columns and its own backup file.
 
 ## Tech Stack
 
 Node + better-sqlite3 (already the service's driver), plain script — no Nest context.
+Typechecked via `tsconfig.scripts.json` (the main tsconfig's `include` covers `src/`
+only, so `npm run lint` alone would not see the script).
 
 ## Commands
 
 ```
-Run (deploy):  IDP_DB_PATH=apps/idp/data/idp.db npm run backfill-owner -w apps/note-service
-Unit:          npm run test -w apps/note-service
-Typecheck:     npm run lint
+Run (deploy, from repo root):  IDP_DB_PATH=apps/idp/data/idp.db npm run backfill-owner -w apps/note-service
+Unit:                          npm run test -w apps/note-service -- owner-backfill.e2e-spec
+Typecheck:                     npx tsc -p apps/note-service/tsconfig.scripts.json --noEmit
 ```
 
 ## Project Structure
 
 ```
 apps/note-service/scripts/backfill-owner.ts        → the migration
+apps/note-service/tsconfig.scripts.json            → typecheck config for scripts/
 apps/note-service/test/owner-backfill.e2e-spec.ts  → script suite (temp fixtures only)
 ```
 
@@ -74,12 +84,15 @@ Script suite against **temp fixture DBs** (own temp `life.db` + own temp `idp.db
 never anything under `apps/*/data/`):
 
 - Backup created and verified **before** any write (ordering asserted), and the backup
-  is usable as a rollback (it restores the pre-run row state).
-- Zero users → abort, zero writes. Missing/unreadable IdP DB → abort.
+  is usable as a rollback (restores the pre-run row state).
+- Existing backups never overwritten (two runs → two distinct backup files).
+- Zero users → abort, zero writes. Missing/unreadable `IDP_DB_PATH` → abort.
 - Oldest-of-many: two users with different `createdAt` → oldest wins; equal timestamps
   → deterministic (`id` ASC).
 - Idempotent re-run: second run stamps 0 rows and performs no writes.
 - Owned rows untouched; `tag` backfilled too.
+- Path resolution works under `npm -w` (relative env values resolve against
+  `INIT_CWD`, verified in-suite).
 - Regression: note suite green.
 
 ## Boundaries
@@ -87,14 +100,15 @@ never anything under `apps/*/data/`):
 - **Always:** backup + verification first; read-only on the IdP DB; stamp only NULLs;
   deterministic owner selection; non-zero exit on any failure.
 - **Ask first:** running it anywhere outside the deploy window; changing the selection
-  rule; adding any write beyond the two `UPDATE`s.
-- **Never:** run against real data from tests/agents; write `apps/idp/data/**`; let the
-  script run automatically at startup; overwrite an existing backup.
+  rule; adding any write beyond the two `UPDATE`s and the backup file.
+- **Never:** run against real data from tests/agents; write or read `apps/idp/data/**`
+  outside the human-run deploy; let the script run automatically at startup; overwrite
+  an existing backup.
 
 ## Success Criteria
 
-1. On a copy of the real DB: backup created + verified, all NULL rows stamped to the
-   oldest user, re-run is a no-op.
+1. On a temp copy of the real DB (human/tech-lead rehearsal): backup created + verified,
+   all NULL rows stamped to the oldest user, re-run is a no-op.
 2. Script suite green (all cases above).
 3. Note suite green; `life.db` checksum outside the human-run script unchanged.
 

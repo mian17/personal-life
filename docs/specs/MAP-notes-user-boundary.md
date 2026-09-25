@@ -8,13 +8,14 @@ Traces to: `docs/intent/notes-user-boundary.md` (confirmed 2026-09-26, explicit 
 | `note-cache-scope` | Per-user cache keys + per-user generation counter | `note-ownership` |
 | `owner-backfill` | Timestamped verified `life.db` backup + idempotent oldest-user backfill (human-run script) | `note-ownership` |
 
-Build order: `note-ownership` → `note-cache-scope`, `owner-backfill` (the latter two are
-parallel-safe once the seam and columns exist).
+Build order: `note-ownership` → `note-cache-scope`, `owner-backfill`. (Module-level;
+at task level the tags and cache slices serialize because both thread `sub` through
+`notes.service.ts` — see the ledger's dependency edges.)
 
 Module specs: `docs/specs/SPEC-note-ownership.md`, `docs/specs/SPEC-note-cache-scope.md`,
 `docs/specs/SPEC-owner-backfill.md`.
 
-Chapter-close duty (plan/todo): close the drift this chapter creates in
+Chapter-close duty (Task 6): close the drift this chapter creates in
 `SPEC-notes.md` ("No authorization" paragraph) and `SPEC-note-cache.md` (key shapes).
 
 No API surface change (`packages/shared` DTOs byte-identical), no `apps/app` change, no
