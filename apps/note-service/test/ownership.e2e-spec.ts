@@ -65,6 +65,8 @@ describe('Notes ownership (e2e)', () => {
     auth(request(app.getHttpServer()).get('/api/notes'), token);
   const trash = (token: string) =>
     auth(request(app.getHttpServer()).get('/api/notes/trash'), token);
+  const tags = (token: string) =>
+    auth(request(app.getHttpServer()).get('/api/tags'), token);
 
   it('scopes list and trash to the caller (B sees nothing of A)', async () => {
     const active = await post({ body: 'a-active' }, tokenA).expect(201);
@@ -267,5 +269,70 @@ describe('Notes ownership (e2e)', () => {
     expect(restored.body.body).toBe('lifecycle edited');
     expect(restored.body.deletedAt).toBeNull();
     expect(restored.body.tags.map((t: { name: string }) => t.name)).toEqual(['life']);
+  });
+
+  it("scopes the tag list to the caller (A's tag names never appear to B)", async () => {
+    await post({ body: 'iso-a', tags: ['iso-a-only'] }, tokenA).expect(201);
+    await post({ body: 'iso-b', tags: ['iso-b-only'] }, tokenB).expect(201);
+
+    const aTags = await tags(tokenA).expect(200);
+    const aNames = aTags.body.map((t: { name: string }) => t.name);
+    expect(aNames).toContain('iso-a-only');
+    expect(aNames).not.toContain('iso-b-only');
+
+    const bTags = await tags(tokenB).expect(200);
+    const bNames = bTags.body.map((t: { name: string }) => t.name);
+    expect(bNames).toContain('iso-b-only');
+    expect(bNames).not.toContain('iso-a-only');
+  });
+
+  it('gives each owner a distinct tag row for the same name', async () => {
+    const a = await post({ body: 'shared-a', tags: ['shared-name'] }, tokenA).expect(201);
+    const b = await post({ body: 'shared-b', tags: ['shared-name'] }, tokenB).expect(201);
+
+    // Per-owner uniqueness: the same name is created for both owners.
+    expect(a.body.tags.map((t: { name: string }) => t.name)).toEqual(['shared-name']);
+    expect(b.body.tags.map((t: { name: string }) => t.name)).toEqual(['shared-name']);
+
+    const aListed = (await tags(tokenA).expect(200)).body.find(
+      (t: { name: string }) => t.name === 'shared-name',
+    );
+    const bListed = (await tags(tokenB).expect(200)).body.find(
+      (t: { name: string }) => t.name === 'shared-name',
+    );
+    expect(aListed).toBeDefined();
+    expect(bListed).toBeDefined();
+    // Distinct rows, each owner's note carrying its own row.
+    expect(aListed.id).not.toBe(bListed.id);
+    expect(a.body.tags[0].id).toBe(aListed.id);
+    expect(b.body.tags[0].id).toBe(bListed.id);
+  });
+
+  it('resolves a repeated name within one owner to a single shared tag row', async () => {
+    const first = await post({ body: 'dup-1', tags: ['one-owner-dup'] }, tokenA).expect(201);
+    const second = await post({ body: 'dup-2', tags: ['one-owner-dup'] }, tokenA).expect(201);
+
+    expect(first.body.tags[0].id).toBe(second.body.tags[0].id);
+
+    const listed = (await tags(tokenA).expect(200)).body.filter(
+      (t: { name: string }) => t.name === 'one-owner-dup',
+    );
+    expect(listed).toHaveLength(1);
+  });
+
+  it("does not attach A's tag rows to B's note under the same names", async () => {
+    const a = await post({ body: 'cross-a', tags: ['cross-owned'] }, tokenA).expect(201);
+    const aTagId = a.body.tags[0].id;
+
+    const b = await post({ body: 'cross-b', tags: ['cross-owned'] }, tokenB).expect(201);
+    expect(b.body.tags[0].name).toBe('cross-owned');
+    expect(b.body.tags[0].id).not.toBe(aTagId);
+
+    // A's tag row is untouched: still exactly one A-owned row for the name.
+    const aListed = (await tags(tokenA).expect(200)).body.filter(
+      (t: { name: string }) => t.name === 'cross-owned',
+    );
+    expect(aListed).toHaveLength(1);
+    expect(aListed[0].id).toBe(aTagId);
   });
 });

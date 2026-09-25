@@ -38,14 +38,18 @@ export class NotesService {
     @Inject(NOTES_CACHE) private readonly cache: NotesCache,
   ) {}
 
-  private async resolveTags(names: string[]): Promise<Tag[]> {
+  private async resolveTags(sub: string, names: string[]): Promise<Tag[]> {
     const result: Tag[] = [];
     for (const name of names) {
+      // Per-owner get-or-create: the lookup is scoped to the caller, so two
+      // owners may hold the same name as two distinct rows, and a legacy
+      // `ownerSub = NULL` tag (never equal to `:sub`) matches nothing.
       let tag = await this.tags
         .createQueryBuilder('tag')
         .where('LOWER(tag.name) = LOWER(:name)', { name })
+        .andWhere('tag.ownerSub = :sub', { sub })
         .getOne();
-      if (!tag) tag = await this.tags.save(this.tags.create({ name }));
+      if (!tag) tag = await this.tags.save(this.tags.create({ name, ownerSub: sub }));
       result.push(tag);
     }
     return result;
@@ -57,7 +61,7 @@ export class NotesService {
       ownerSub: sub,
       version: 0,
       deletedAt: null,
-      tags: await this.resolveTags(normalizeTags(tagNames)),
+      tags: await this.resolveTags(sub, normalizeTags(tagNames)),
     });
     const saved = await this.notes.save(note);
     // Bump AFTER the insert: pre-mutation reads were born under the old
@@ -181,7 +185,7 @@ export class NotesService {
       throw new ConflictException('Note was modified');
     }
     if (body !== undefined) note.body = body;
-    if (tagNames !== undefined) note.tags = await this.resolveTags(normalizeTags(tagNames));
+    if (tagNames !== undefined) note.tags = await this.resolveTags(sub, normalizeTags(tagNames));
     note.version += 1;
     const saved = await this.notes.save(note);
     // Bump AFTER the mutation — see bumpGeneration(); a 409 above never bumps.
@@ -223,12 +227,13 @@ export class NotesService {
     return { count: result.affected ?? 0 };
   }
 
-  async listTags(): Promise<{ id: number; name: string }[]> {
+  async listTags(sub: string): Promise<{ id: number; name: string }[]> {
     return this.cache.getThrough('note:tags', async () => {
       const tags = await this.tags
         .createQueryBuilder('tag')
         .innerJoin('tag.notes', 'note')
         .where('note.deletedAt IS NULL')
+        .andWhere('tag.ownerSub = :sub', { sub })
         .orderBy('tag.name', 'ASC')
         .getMany();
       return tags.map((t) => ({ id: t.id, name: t.name }));
