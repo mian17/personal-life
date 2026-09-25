@@ -51,9 +51,10 @@ export class NotesService {
     return result;
   }
 
-  async create(body: string, tagNames: string[] | undefined): Promise<NoteDto> {
+  async create(sub: string, body: string, tagNames: string[] | undefined): Promise<NoteDto> {
     const note = this.notes.create({
       body,
+      ownerSub: sub,
       version: 0,
       deletedAt: null,
       tags: await this.resolveTags(normalizeTags(tagNames)),
@@ -65,12 +66,15 @@ export class NotesService {
     return toDto(saved);
   }
 
-  async findAll(opts: {
-    tag?: string;
-    q?: string;
-    limit?: number;
-    cursor?: string;
-  }): Promise<NotePage> {
+  async findAll(
+    sub: string,
+    opts: {
+      tag?: string;
+      q?: string;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
     const cacheKey = `note:list:${hashOptions({
       tag: opts.tag,
@@ -85,6 +89,7 @@ export class NotesService {
         .orderBy('note.createdAt', 'DESC')
         .addOrderBy('note.id', 'DESC')
         .where('note.deletedAt IS NULL')
+        .andWhere('note.ownerSub = :sub', { sub })
         .take(limit + 1);
 
       if (opts.tag) {
@@ -113,7 +118,10 @@ export class NotesService {
     });
   }
 
-  async findTrash(opts: { limit?: number; cursor?: string }): Promise<NotePage> {
+  async findTrash(
+    sub: string,
+    opts: { limit?: number; cursor?: string },
+  ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
     const cacheKey = `note:trash:${hashOptions({ limit: opts.limit, cursor: opts.cursor })}`;
     return this.cache.getThrough(cacheKey, async () => {
@@ -121,6 +129,7 @@ export class NotesService {
         .createQueryBuilder('note')
         .leftJoinAndSelect('note.tags', 'tag')
         .where('note.deletedAt IS NOT NULL')
+        .andWhere('note.ownerSub = :sub', { sub })
         .orderBy('note.deletedAt', 'DESC')
         .addOrderBy('note.id', 'DESC')
         .take(limit + 1);
@@ -145,10 +154,10 @@ export class NotesService {
     });
   }
 
-  async findOne(id: string): Promise<NoteDto> {
+  async findOne(sub: string, id: string): Promise<NoteDto> {
     return this.cache.getThrough(`note:one:${id}`, async () => {
       const note = await this.notes.findOne({
-        where: { id, deletedAt: IsNull() },
+        where: { id, ownerSub: sub, deletedAt: IsNull() },
         relations: { tags: true },
       });
       if (!note) throw new NotFoundException('Note not found');
@@ -157,13 +166,14 @@ export class NotesService {
   }
 
   async update(
+    sub: string,
     id: string,
     body?: string,
     tagNames?: string[],
     expectedVersion?: number,
   ): Promise<NoteDto> {
     const note = await this.notes.findOne({
-      where: { id, deletedAt: IsNull() },
+      where: { id, ownerSub: sub, deletedAt: IsNull() },
       relations: { tags: true },
     });
     if (!note) throw new NotFoundException('Note not found');
@@ -179,8 +189,8 @@ export class NotesService {
     return toDto(saved);
   }
 
-  async remove(id: string): Promise<void> {
-    const note = await this.notes.findOne({ where: { id, deletedAt: IsNull() } });
+  async remove(sub: string, id: string): Promise<void> {
+    const note = await this.notes.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!note) throw new NotFoundException('Note not found');
     note.deletedAt = new Date();
     await this.notes.save(note);
@@ -188,9 +198,9 @@ export class NotesService {
     await this.cache.bumpGeneration();
   }
 
-  async restore(id: string): Promise<NoteDto> {
+  async restore(sub: string, id: string): Promise<NoteDto> {
     const note = await this.notes.findOne({
-      where: { id, deletedAt: Not(IsNull()) },
+      where: { id, ownerSub: sub, deletedAt: Not(IsNull()) },
       relations: { tags: true },
     });
     if (!note) throw new NotFoundException('Note not found');
@@ -200,15 +210,15 @@ export class NotesService {
     return toDto(saved);
   }
 
-  async removePermanent(id: string): Promise<void> {
-    const result = await this.notes.delete({ id, deletedAt: Not(IsNull()) });
+  async removePermanent(sub: string, id: string): Promise<void> {
+    const result = await this.notes.delete({ id, ownerSub: sub, deletedAt: Not(IsNull()) });
     if (!result.affected) throw new NotFoundException('Note not found');
     // Only a successful delete reaches the bump.
     await this.cache.bumpGeneration();
   }
 
-  async emptyTrash(): Promise<{ count: number }> {
-    const result = await this.notes.delete({ deletedAt: Not(IsNull()) });
+  async emptyTrash(sub: string): Promise<{ count: number }> {
+    const result = await this.notes.delete({ ownerSub: sub, deletedAt: Not(IsNull()) });
     await this.cache.bumpGeneration();
     return { count: result.affected ?? 0 };
   }
