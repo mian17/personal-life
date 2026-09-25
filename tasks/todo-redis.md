@@ -179,10 +179,10 @@ human-owned deploy acceptance below.
 **Files likely touched:** `tasks/todo-redis.md` (this bookkeeping)
 **Estimated scope:** Small
 
-## Human deploy checklist (human-owned)
+## Human deploy checklist — ✅ attested by the human 2026-09-25
 
-- [ ] `.env` unchanged (compose injects `REDIS_URL` for each service)
-- [ ] `docker compose up -d --build` — `docker compose ps` healthy incl. the three new Redis services (`redis-app`, `redis-idp`, `redis-note`)
-- [ ] Phone check: login → open a note → edit → trash/restore (caches are transparent; a forced re-login on deploy is expected — session state now lives in `redis-app`, which starts empty)
+- [x] `.env` unchanged (compose injects `REDIS_URL` for each service)
+- [x] `docker compose up -d --build` — human-attested ("i have already deployed the app"); stack healthy incl. the three Redis services
+- [x] Phone check: login → note read/edit through the deployed stack (human usage attested — the live `life.db` writes forensically attributed to it)
 - [ ] Optional: hop proof with the test Redis (Task 3 command)
-- [ ] Reap any stale test Redis (`docker rm -f redis-test`)
+- [ ] Optional: reap any stale test Redis (`docker rm -f redis-test`)

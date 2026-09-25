@@ -5,13 +5,14 @@ The build artifacts live in `docs/specs/` — see the map at `docs/specs/MAP-idp
 
 ## Outcome
 
-- **Now:** the renamed stack keeps running on its existing auth code flow — Tailscale
-  identity header at the edge, BFF-held `API_TOKEN`. Nothing about auth changes until
-  the IdP lands.
-- **Later:** a small, self-owned IdP (OpenID Connect provider) becomes the single source
-  of identity for the stack. The app becomes a relying party (authorization code + PKCE);
-  `note-service` and later `todo-service` become resource servers verifying tokens via
-  JWKS. We own the IdP; it stays small on purpose. The Tailscale gate is kept for access
+- **Now (closed 2026-09-25):** the renamed stack kept running on its existing auth code
+  flow — Tailscale identity header at the edge, BFF-held `API_TOKEN`. Nothing about auth
+  changed until the IdP landed. *(Horizon closed: deploy attested by the human
+  2026-09-25; `feature/idp` merged to `master`, five-lane N/N.)*
+- **Later → landed 2026-09-25:** a small, self-owned IdP (OpenID Connect provider) is now
+  the single source of identity for the stack. The app is a relying party (authorization
+  code + PKCE); `note-service` (and later `todo-service`) verifies tokens via JWKS. We own
+  the IdP; it stays small on purpose. The Tailscale gate is kept for access
   only (only my phone reaches the app); identity and authentication come from the IdP
   from now on.
 
