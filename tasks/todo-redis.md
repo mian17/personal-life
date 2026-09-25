@@ -3,8 +3,9 @@
 Traces to: `tasks/plan-redis.md`, `docs/specs/MAP-redis.md`.
 Status: **implementation complete 2026-09-25** — Tasks 1–7 done (subagent-built under the
 tech-lead protocol, tech-lead reviewed, slices committed on `feature/redis`).
-Close-out verification (sequential): app unit **115/115**, idp **95/95**, note **43/43**,
-lint clean (4 workspaces), hop e2e **2/2** (single run), `docker compose config -q` clean.
+Close-out verification: hop e2e **2/2** (single run), `docker compose config -q` clean.
+Five-lane gate (`tasks/five-lane-redis.md`): **N/N MERGEABLE** after 2 fix passes — final
+suites app **129/129**, idp **98/98**, note **43/43**, lint clean.
 Hard lines held: `life.db` never written by the chapter's work (re-attested
 `7d96a6a9bfba66e533f70e225cad7634` at close-out — the live DB changes only through the
 human's app usage; `31767e4d…` was an earlier point-in-time attestation); no Redis port

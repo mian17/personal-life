@@ -1,7 +1,7 @@
 # Five-Lane Verification — Redis chapter (`feature/redis`)
 
 **Gate run:** 2026-09-25. **Scope:** `git diff e425cbd..afc2fc9` (11 commits) + one uncommitted fix pass + tech-lead doc corrections.
-**Final verdict: STOP — NOT MERGEABLE.** 3/5 after the single permitted fix pass. Merge requires N/N.
+**Final verdict: N/N — MERGEABLE.** Trail: round 1 = 5/5 FAIL → one fix pass → round 2 = 3/5 (STOP per protocol) → user-authorized cycle 2 (R1+R2) → lanes 1–2 re-run → **5/5 PASS**.
 
 ## Stage 0 — suite gate (not a lane)
 
@@ -62,14 +62,38 @@ Static `import { AppModule }` is evaluated before the describe-body `process.env
 - `connectBounded`'s hard timeout can wall a slow-but-healthy boot for one shot (lane 1); `get`'s `KEEPTTL`+`EXPIRE` is 2 round-trips (lane 2); `redis-app` keeps RDB on (deliberate state store, lane 3); `todo-redis.md` suite counts (115/95) stale vs 128/98 (lane 2); `SPEC-app-state` "ioredis" leftover — closed in this commit (lane 5).
 - lane 3: `SessionStoreUnavailable.cause` must never be serialized by future error handlers (nothing does today). `npm audit` unavailable (registry mirror returns NOT_IMPLEMENTED) — advisory data unverified, stated as a limitation.
 
+## Cycle 2 (user-authorized — "continue until mergeable")
+
+Suite gate green (app 129/129, idp 98/98 `--runInBand`, note 43/43, lint clean). The parallel `keys-jwks` red was root-caused: pre-existing load sensitivity — `execFile` child-process verification overflowing jest's default 5s timeout under parallel workers on a loaded box; passes isolated (5.8s) and serial; spec untouched by the diff. `life.db` re-attested `eb35fa12…` (human usage 20:25:42 — agents/tests never wrote it).
+
+Cycle-2 fix (R1+R2): `unboundedReconnectStrategy` (capped backoff + jitter, never returns `false` — node-redis can no longer latch closed; fail-closed preserved via `disableOfflineQueue` + `connectBounded` race; same-instance recovery proven), deferred-import house pattern in the idp spec (own per-run DB, two consecutive green runs, scratch.db cleaned, `idp.db` never opened).
+
+Re-run of the failed lanes (3/4/5 stood on their round-2 PASS verdicts):
+
+| # | Lane | Verdict | Blockers |
+|---|------|---------|----------|
+| 1 | correctness-domain | **PASS** | 0 |
+| 2 | code-quality | **PASS_WITH_NITS** | 0 |
+| 3 | security | PASS_WITH_NITS (standing) | 0 |
+| 4 | qa-e2e | PASS_WITH_NITS (standing) | 0 |
+| 5 | plan-conformance | PASS_WITH_NITS (standing) | 0 |
+
+## Merge condition met
+
+Per repo rule the merge to `master` stays gated on the human deploy + phone check (`tasks/todo-redis.md` checklist). Code is committed on `feature/redis` at the exact lane-verified state. ⚠️ Live-state warning: the containers the human started earlier run the pre-fix app images and the pre-fix cache command (no `--save ""`) — `docker compose up -d --build` must recreate them before the no-persistence guarantee holds in production.
+
+## Residual nits (recorded, non-blocking)
+
+- `apps/idp/test/keys-jwks.e2e-spec.ts` child-process test overflows jest's 5s default timeout under parallel workers (pre-existing; raise the timeout or force serial in a housekeeping pass).
+- Comment-only: `redis-store.ts` jitter note misattributes the jitter to node-redis; `redis-store.test.ts` still says "bounded reconnect" (stale since R1). Left untouched post-verification so the committed tree equals the verified tree.
+- The recovery-lifecycle test drives a fake lifecycle flag; never-give-up is pinned separately by the strategy unit test + factory identity assertions (lane 2: adequate).
+- `unboundedReconnectStrategy` retries on socket timeouts too (deliberate). `SessionStoreUnavailable.cause` must never be serialized by future error handlers. `npm audit` unavailable (registry mirror) — advisories unverified.
+
 ## Machine-readable verdicts
 
 ```json
 {"round":1,"lanes":{"correctness-domain":"FAIL","code-quality":"FAIL","security":"FAIL","qa-e2e":"FAIL","plan-conformance":"FAIL"},"unique_blockers":4,"fix_pass":{"tests_pass":true,"used":1}}
-{"round":2,"lanes":{"correctness-domain":"FAIL","code-quality":"FAIL","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"},"remaining_blockers":["R1","R2"]}
-{"gate":"STOP_NO_MERGE","score":"3/5","merge_condition":"N/N","fix_pass_budget":"spent"}
+{"round":2,"lanes":{"correctness-domain":"FAIL","code-quality":"FAIL","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"},"remaining_blockers":["R1","R2"],"gate":"STOP"}
+{"round":3,"cycle":2,"re_run":["correctness-domain","code-quality"],"lanes":{"correctness-domain":"PASS","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"}}
+{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","fix_passes":2}
 ```
-
-## Next
-
-Per the gate, the fix budget for this run is spent — the gate stops here. The next cycle ("fix and re-run") has exactly two items (R1, R2); after them only lanes 1 and 2 need re-running — lanes 3/4/5 stand on their PASS verdicts. Code changes from the fix pass remain **uncommitted** until a gate reaches N/N.
