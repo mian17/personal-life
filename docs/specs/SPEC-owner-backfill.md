@@ -23,18 +23,26 @@ before any write of any kind.
   `PRAGMA quick_check` passes, and its `note` row count equals the source's. Any
   backup/verification failure → exit ≠ 0 and **zero writes**. Existing backup files are
   never overwritten (unique timestamps).
-- **Step 2 — schema surgery (idempotent).**
+- **Step 2 — schema surgery (idempotent; every DDL byte-equivalent to what TypeORM's
+  `synchronize` expects, so the first boot performs zero schema-mutating statements).**
   a. `note`: add `ownerSub TEXT` when missing (`PRAGMA table_info` guard + native
-     `ALTER TABLE ADD COLUMN` — no rebuild).
-  b. `tag`: **rebuild the table** — create `tag` with `(id, name, ownerSub)` and
-     `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)`, copy rows, drop the old table,
-     rename. This is the only way to remove the legacy inline `UNIQUE(name)` (an
-     un-droppable `sqlite_autoindex`; `synchronize` never removes it and clones it
-     forward — verified on typeorm 0.3.31). Idempotence guard: skip when `tag` already
-     has `ownerSub` and no single-column unique on `name`.
+     `ALTER TABLE ADD COLUMN` — no rebuild), and create
+     `INDEX "IDX_note_owner_sub" ON "note"(ownerSub)` when missing — the entity's
+     explicit index name, created here so the boot has nothing left to do.
+  b. `tag`: **rebuild the table** — with `PRAGMA foreign_keys = OFF` around the
+     drop-and-rename (`note_tag` references `tag`; better-sqlite3 defaults FK
+     enforcement ON and the real DB has referencing rows — `DROP TABLE "tag"` aborts
+     with `SQLITE_CONSTRAINT_FOREIGNKEY` otherwise). Create `tag` with the exact DDL
+     TypeORM expects for the entity — including `"id" integer PRIMARY KEY
+     AUTOINCREMENT NOT NULL` with ids preserved — plus
+     `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)`; copy rows; drop the old table
+     (the legacy inline `UNIQUE(name)` dies with it); rename. Then
+     `PRAGMA foreign_key_check` must report **zero violations** before FK enforcement
+     is re-enabled. Idempotence guard: skip when `tag` already has `ownerSub` and no
+     single-column unique on `name`.
   The entity declares the composite unique with the **same explicit index name**
   (`@Index('UQ_tag_name_owner', …)`), so first-boot `synchronize` finds exactly its
-  expectation and does nothing.
+  expectation and mutates nothing.
 - **Step 3 — resolve owner.** Open `IDP_DB_PATH` **read-only**;
   `SELECT id FROM user ORDER BY createdAt ASC, id ASC LIMIT 1`. Missing table, zero
   users, or unreadable DB → abort loudly with the remediation (seed the user first).
@@ -50,7 +58,8 @@ before any write of any kind.
 This script is the **one sanctioned writer of `life.db` outside the service** (and the
 one sanctioned *reader* of `idp.db` — read-only). It is run by the human during the
 deploy window, never by tests, never by agents against real data. It writes only the
-two `ownerSub` columns, the `tag` table rebuild, and its own backup file.
+two `ownerSub` columns, the `tag` table rebuild, the two indexes, and its own backup
+file.
 
 ## Tech Stack
 
@@ -80,7 +89,7 @@ Plain sequential async steps with explicit aborts — no framework, no clevernes
 
 ```ts
 const backup = await snapshotAndVerify(dbPath);      // Step 1 — aborts on any failure
-await applySchema(dbPath);                           // Step 2 — note ALTER + tag rebuild
+await applySchema(dbPath);                           // Step 2 — note ALTER + indexes + tag rebuild
 const sub = await resolveOldestUser(idpDbPath);      // Step 3 — aborts when none
 const stamped = await backfillNullOwners(dbPath, sub); // Step 4 — UPDATE ... WHERE ownerSub IS NULL
 ```
@@ -94,10 +103,12 @@ never anything under `apps/*/data/`):
   before the Step 2 DDL), and the backup restores the pre-run row state (rollback
   proof).
 - Existing backups never overwritten (two runs → two distinct backup files).
-- **Legacy `tag` conversion:** a fixture with the old `UNIQUE(name)` + real rows → after
-  the script: rows intact, the old global unique is gone (same name insertable for a
-  second owner), `UQ_tag_name_owner` present, and a subsequent app boot's
-  `synchronize` performs **no schema change** (convergence proof).
+- **Legacy `tag` conversion + convergence:** a fixture with the old `UNIQUE(name)`,
+  real rows **and `note_tag` referencing rows** → after the script: rows intact (ids
+  preserved), the rebuild completes with zero FK violations (FK-off + `foreign_key_check`
+  exercised), the old global unique is gone (same name insertable for a second owner),
+  `UQ_tag_name_owner` and `IDX_note_owner_sub` present, and a subsequent app boot's
+  `synchronize` performs **zero schema-mutating statements**.
 - Zero users → abort, zero writes. Missing/unreadable `IDP_DB_PATH` → abort.
 - Oldest-of-many: two users with different `createdAt` → oldest wins; equal timestamps
   → deterministic (`id` ASC).
@@ -111,19 +122,21 @@ never anything under `apps/*/data/`):
 ## Boundaries
 
 - **Always:** backup + verification before any write; read-only on the IdP DB; stamp
-  only NULLs; deterministic owner selection; non-zero exit on any failure.
+  only NULLs; deterministic owner selection; non-zero exit on any failure; FK
+  enforcement restored and `foreign_key_check` clean after the rebuild.
 - **Ask first:** running it anywhere outside the deploy window; changing the selection
   rule; adding any write beyond Step 2's surgery, the two `UPDATE`s, and the backup.
 - **Never:** run against real data from tests/agents; write `apps/idp/data/**` or read
   it outside the human-run deploy; let the script run automatically at startup;
-  overwrite an existing backup.
+  overwrite an existing backup; leave FK enforcement disabled.
 
 ## Success Criteria
 
 1. The human-run deploy against the real DBs prints: backup path + verification OK,
    all NULL rows stamped to the oldest user; a re-run is a no-op. (The real-DB pass is
    human-owned — agents and tests only ever touch fixture DBs.)
-2. Script suite green (all cases above, including legacy `tag` conversion + convergence).
+2. Script suite green (all cases above, including legacy `tag` conversion + the
+   zero-schema-mutation convergence proof).
 3. Note suite green; `life.db` checksum outside the human-run script unchanged.
 
 ## Open Questions

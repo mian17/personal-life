@@ -23,12 +23,17 @@ user notices nothing; a second identity would see an empty world.
   against typeorm 0.3.31: `synchronize` will not drop a single-column inline UNIQUE —
   `sqlite_autoindex` is un-droppable — and `recreateTable` clones it forward, so a
   legacy `tag` table **never converges** and per-owner tag names stay blocked). The
-  script therefore: adds `note.ownerSub` via native `ALTER TABLE ADD COLUMN`, and
-  rebuilds `tag` once (new table `(id, name, ownerSub)` → copy rows → drop old →
-  rename) which removes the old `UNIQUE(name)` with the table, then creates
-  `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)` — the **explicit name** the entity
-  declares (`@Index('UQ_tag_name_owner', ['name','ownerSub'], { unique: true })`), so
-  first-boot `synchronize` sees exactly what it expects and does nothing. Booting the
+  script therefore: adds `note.ownerSub` via native `ALTER TABLE ADD COLUMN` and
+  creates `IDX_note_owner_sub`; and rebuilds `tag` once (new table → copy rows with
+  ids preserved → drop old → rename) which removes the old `UNIQUE(name)` with the
+  table, then creates `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)` — the
+  **explicit name** the entity declares (`@Index('UQ_tag_name_owner', ['name','ownerSub'], { unique: true })`).
+  The rebuild runs under `PRAGMA foreign_keys = OFF` (`note_tag` references `tag`;
+  better-sqlite3 defaults FK enforcement ON and `DROP TABLE "tag"` aborts with
+  `SQLITE_CONSTRAINT_FOREIGNKEY` on referencing rows) followed by a zero-result
+  `PRAGMA foreign_key_check`, and its DDL is byte-equivalent to TypeORM's expectation
+  (`"id" integer PRIMARY KEY AUTOINCREMENT NOT NULL`, ids preserved) — so first-boot
+  `synchronize` provably performs **zero schema-mutating statements**. Booting the
   new code **without** running the script leaves the old global tag unique in place —
   the deploy order is mandatory.
 - **Backup first, everything else after.** The script's first step is the verified
@@ -76,7 +81,7 @@ user notices nothing; a second identity would see an empty world.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Legacy `tag` schema cannot be migrated by `synchronize` (old UNIQUE never dropped; rebuild repeats every boot) | High | The script's own `tag` rebuild (backup-covered, before boot); Task 5's suite proves rows survive and the old unique is gone on a legacy fixture; explicit index name keeps first-boot sync a no-op |
+| Legacy `tag` schema cannot be migrated by `synchronize` (old UNIQUE never dropped; rebuild repeats every boot) | High | The script's own `tag` rebuild (backup-covered, before boot; FK-off + `foreign_key_check`, AUTOINCREMENT-equivalent DDL); Task 5's suite proves rows survive, the old unique is gone, and the boot performs zero schema-mutating statements |
 | New code booted without running the script first | High | Deploy checklist mandates stop → script → boot; the script suite documents the divergence symptom; stamped rows invisible otherwise (empty window) |
 | Backfill mis-selection of owner | High | Deterministic `ORDER BY createdAt, id LIMIT 1`; abort on zero users; tie-break tested; never re-stamps owned rows |
 | Verified token without `sub` could match NULL-owner rows | High | Guard rejects (401) any verified token lacking a non-empty string `sub`; suite case in Task 1 |

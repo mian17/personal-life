@@ -27,7 +27,7 @@ doesn't need a data-tier change to be worth having now.
 
 - A token with a different `sub` sees zero notes and cannot read, modify, or delete yours.
 - My own usage is byte-for-byte identical — same lists, same behavior, no UI change.
-- The backfill is idempotent (stamps only `owner_sub IS NULL` rows), deterministic
+- The backfill is idempotent (stamps only `ownerSub IS NULL` rows), deterministic
   (oldest user in the identity database), and safe (verified backup first).
 
 ## Constraint
@@ -54,6 +54,6 @@ human-owned e2e suite.
   pre-built. A future second user sees an empty list; sharing would be its own chapter.
 - 2026-09-26: **Backfill = oldest user in the identity database.** Deterministic rule;
   on production that's the only user, and everything there is theirs. Idempotent:
-  `owner_sub IS NULL` rows only — never re-stamps owned rows.
+  `ownerSub IS NULL` rows only — never re-stamps owned rows.
 - 2026-09-26: **The migration script owns its backup.** Timestamped `life.db` copy,
   verified complete before any write; backup is the rollback, not a checklist item.

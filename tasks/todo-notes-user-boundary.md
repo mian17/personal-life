@@ -108,9 +108,13 @@ script suite.
   runnable as written; backup verified before any write including Step 2 DDL
   (ordering asserted) and a backup restores pre-run row state (rollback proof);
   existing backups never overwritten (unique timestamps); **legacy `tag` conversion
-  proven** — rows survive the rebuild, the old global unique is gone (same name
-  insertable for a second owner), `UQ_tag_name_owner` present, and a following app
-  boot's `synchronize` performs no schema change (convergence); zero users → abort
+  proven** — rows survive the rebuild (ids preserved, incl. `note_tag`-referencing
+  rows; zero FK violations under `PRAGMA foreign_keys = OFF` + clean
+  `foreign_key_check` before re-enabling), the old global unique is gone (same name
+  insertable for a second owner), `UQ_tag_name_owner` + `IDX_note_owner_sub` present,
+  and a following app boot's `synchronize` performs **zero schema-mutating statements**
+  (the rebuilt DDL is byte-equivalent to TypeORM's expectation — `AUTOINCREMENT`
+  included); zero users → abort
   with zero writes; missing or unreadable `IDP_DB_PATH` → abort; oldest-of-many with
   `createdAt, id` tie-break deterministic; re-run stamps 0 rows / no writes (schema
   step skipped by its guard); owned rows untouched; `tag` backfilled; non-zero exit on
