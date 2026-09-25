@@ -2,7 +2,30 @@ import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnService, waitForHttp, type SpawnedService } from './services';
-import { E2E_APP_SECRET, E2E_OWNER, E2E_PASSWORD, E2E_USER, repoRoot } from './config';
+import {
+  E2E_APP_SECRET,
+  E2E_OWNER,
+  E2E_PASSWORD,
+  E2E_USER,
+  hopPorts,
+  repoRoot,
+} from './config';
+
+/**
+ * The hop replicas' callbacks, registered on the shared harness IdP so the
+ * two-instance proof (Task 3 / `hop.spec.ts`) can drive a real login dance from
+ * replica A. Additive only: extra loopback redirect URIs are inert for every
+ * other spec, and the IdP still rejects any unregistered callback.
+ */
+function hopRedirectUris(): string[] {
+  const { appAPort, appBPort } = hopPorts();
+  return [
+    `http://localhost:${appAPort}/auth/callback`,
+    `http://127.0.0.1:${appAPort}/auth/callback`,
+    `http://localhost:${appBPort}/auth/callback`,
+    `http://127.0.0.1:${appBPort}/auth/callback`,
+  ];
+}
 
 /**
  * Shared launcher for the two e2e stacks.
@@ -55,7 +78,13 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
     // Both loopback spellings are registered so the dance works whether the
     // browser origin is `localhost` or `127.0.0.1` (exactly the bug class).
-    OIDC_APP_REDIRECT_URIS: `http://localhost:${cfg.appPort}/auth/callback,http://127.0.0.1:${cfg.appPort}/auth/callback`,
+    // The hop replicas' callbacks are included so the two-instance proof can
+    // reuse this IdP without a third service (see `hopRedirectUris`).
+    OIDC_APP_REDIRECT_URIS: [
+      `http://localhost:${cfg.appPort}/auth/callback`,
+      `http://127.0.0.1:${cfg.appPort}/auth/callback`,
+      ...hopRedirectUris(),
+    ].join(','),
     SEED_USERNAME: E2E_USER,
     SEED_PASSWORD: E2E_PASSWORD,
   };

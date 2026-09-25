@@ -26,6 +26,29 @@ export function devPorts() {
   };
 }
 
+/**
+ * The two replicas for the Redis hop proof (Task 3). Kept clear of the 31xx
+ * shared-stack and 32xx dev-stack ports, and of 3199 (the degraded-app
+ * instance), so no two harnesses can collide on a port. Both replicas share the
+ * single harness IdP (`testPorts().idpPort`, itself overridable via
+ * `E2E_IDP_PORT`) and the one test Redis (`TEST_REDIS_URL`).
+ */
+export function hopPorts() {
+  return {
+    appAPort: Number(process.env.E2E_HOP_A_PORT ?? 3310),
+    appBPort: Number(process.env.E2E_HOP_B_PORT ?? 3311),
+  };
+}
+
+/**
+ * The shared Redis the hop proof runs against. This is the spec's gate: unset →
+ * the hop spec skips entirely (default e2e stays zero-Redis); set to a test-owned
+ * endpoint (e.g. `redis://127.0.0.1:6399`) → the two replicas are booted with it.
+ */
+export function testRedisUrl(): string | undefined {
+  return process.env.TEST_REDIS_URL?.trim() || undefined;
+}
+
 /** Where global-setup records the spawned PIDs for global-teardown. */
 export const prodPidsFile = 'service-pids-prod.json';
 export const devPidsFile = 'service-pids-dev.json';
