@@ -82,7 +82,10 @@ matching the confirmed intent's "trash never purges on its own".
 
 ## API Surface
 
-All under `/api`, guarded by a single bearer-token guard (`API_TOKEN`); no users/sessions.
+All under `/api`, guarded by the JWT auth guard (IdP-issued access token verified via
+JWKS — `SPEC-note-service-rs.md`). Since the per-user boundary (2026-09-26) every route
+operates strictly on the caller's own rows — `SPEC-note-ownership.md`; the earlier
+`API_TOKEN` guard and "no users/sessions" note are superseded.
 
 ```
 POST   /api/notes               { body, tags[] }
@@ -113,7 +116,11 @@ GET    /api/tags
 
 ## Authentication & Authorization
 
-No authorization (single user owns everything). Authentication boundary:
+Authorization = strict per-user ownership (2026-09-26): every note and tag carries the
+IdP `sub`; every query is scoped by it; a foreign id is a byte-identical 404
+(`SPEC-note-ownership.md`). Authentication boundary (layer stack — the `API_TOKEN`
+references in items 3–4 predate the IdP chapter and are superseded by per-session
+access tokens):
 
 1. **Network:** Tailscale ACL — only tailnet devices reach port 3000 (primary boundary).
 2. **Browser → Next.js:** `tailscale serve` identity header `Tailscale-User-Login`;

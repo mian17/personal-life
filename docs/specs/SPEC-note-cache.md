@@ -10,12 +10,13 @@ DB stays the source of truth; cache loss degrades to DB reads and is never wrong
 
 ## Contract (the seam)
 
-- Cached reads (all in `NotesService`): `findAll(opts)`, `findTrash(opts)`,
-  `findOne(id)`, `listTags()`. Keys embed the request shape:
-  `note:v<gen>:list:<hash(opts)>`, `note:v<gen>:trash:<hash(opts)>`,
-  `note:v<gen>:one:<id>`, `note:v<gen>:tags`. TTL 60s.
+- Cached reads (all in `NotesService`): `findAll(sub, opts)`, `findTrash(sub, opts)`,
+  `findOne(sub, id)`, `listTags(sub)`. Keys embed the owner and the request shape
+  (per-user scoping since 2026-09-26 — `SPEC-note-cache-scope.md`):
+  `note:<sub>:v<gen>:list:<hash(opts)>`, `note:<sub>:v<gen>:trash:<hash(opts)>`,
+  `note:<sub>:v<gen>:one:<id>`, `note:<sub>:v<gen>:tags`. TTL 60s.
 - **Invalidation = generation bump.** Every write (`create`, `update`, `remove`,
-  `restore`, `removePermanent`, `emptyTrash`) runs `INCR note:gen` **after** its DB
+  `restore`, `removePermanent`, `emptyTrash`) runs `INCR note:gen:<sub>` **after** its DB
   mutation; stale keys are unreachable (they hold the old generation in the key) and age
   out via TTL. One atomic op per write; no `KEYS`/`SCAN`, no per-query invalidation
   bookkeeping. **Why after, not before (review finding 2026-09-25):** a bump-first

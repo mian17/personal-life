@@ -1,12 +1,12 @@
 # Todo: note-service per-user boundary chapter
 
 Traces to: `tasks/plan-notes-user-boundary.md`, `docs/specs/MAP-notes-user-boundary.md`.
-Status: **planning complete 2026-09-26** — plan validated by the pre-IMPLEMENT gate;
-round-2 findings (12) patched 2026-09-26, round-3 findings (6: synchronize never drops
-the legacy `UNIQUE(name)` — script-owned `tag` rebuild adopted; backup-first ordering;
-Task 6 placeholder/hard-line conflicts removed; NODE_ENV suite hygiene; rehearsal scope
-corrected) patched 2026-09-26. Next: gate re-validation, then subagent-built tasks on
-`feature/user-boundary`.
+Status: **implementation complete 2026-09-26** — Tasks 1–6 done (subagent-built under
+the tech-lead protocol, tech-lead reviewed, slices committed on `feature/user-boundary`;
+the plan was validated 3/3 by the pre-IMPLEMENT gate after two patched rounds — 12 + 6
+findings, several empirically proven library behaviors). Final suites: note-service
+**5 suites / 74 tests** green, lint clean (4 workspaces), script typecheck clean.
+Remaining: five-lane gate, then the human deploy checklist below.
 
 Standing rules (AGENTS.md): implementation goes to subagents with the mandatory task
 template; verification ladder lint → targeted jest (note-service suite runs
@@ -54,7 +54,7 @@ methods filter `ownerSub = :sub`; foreign id = missing id = 404 via explicit
 - Depends on: Task 1. Scope: M.
 
 ### Checkpoint: Foundation
-- [ ] Note suite green (existing + ownership); lint clean
+- [x] Note suite green (existing + ownership); lint clean
 
 ## Task 3: tags ownership
 
@@ -93,7 +93,7 @@ other cache semantics unchanged.
 - Scope: S.
 
 ### Checkpoint: Periphery
-- [ ] Full note-service suite green incl. cache cases
+- [x] Full note-service suite green incl. cache cases
 
 ## Task 5: owner-backfill script
 
@@ -148,7 +148,8 @@ rollback-covered); agents and tests only ever touch fixture DBs.
 - Depends on: Tasks 1–5. Scope: S.
 
 ### Checkpoint: Complete
-- [ ] All acceptance criteria met; five-lane gate run; human deploy checklist below ready
+- [x] All acceptance criteria met (Tasks 1–6; suites 74/74, lint clean, prod-env check clean)
+- [ ] Five-lane gate run; human deploy checklist below ready
 
 ## Human deploy checklist (human-owned)
 
