@@ -143,8 +143,22 @@ services:
 
   redis-idp:
     image: redis:8-alpine
-    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-    # Cache only: no volume, no AOF — nothing durable is written.
+    # Cache only. `--save ""` disables the image's default RDB snapshot points
+    # (without it the cached argon2 hash would still land in /data/dump.rdb, a
+    # second disk) and `--appendonly no` forces AOF off: nothing durable is
+    # written. List form keeps the empty `--save` argument unambiguous.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     networks:
       - life
     healthcheck:
@@ -157,8 +171,21 @@ services:
 
   redis-note:
     image: redis:8-alpine
-    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-    # Cache only: note content must not hit a second disk.
+    # Cache only. `--save ""` + `--appendonly no` turn off both RDB and AOF: note
+    # content must not hit a second disk, and the image's default snapshot points
+    # would otherwise write it to /data/dump.rdb. See compose decision 6.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     networks:
       - life
     healthcheck:
