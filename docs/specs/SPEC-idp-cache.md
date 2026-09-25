@@ -40,7 +40,7 @@ these cannot hold, the cache is removed rather than weakened.
 ```
 Unit/e2e:   npm run test -w apps/idp
 Typecheck:  npm run lint
-Integration: TEST_REDIS_URL=... npm run test -w apps/idp -- redis-cache   (gated describe)
+Integration: none built (optional future TEST_REDIS_URL-gated describe) — coverage is the fake-client suite + module-boundary tests (OIDC payloads never cached); the TEST_REDIS_URL seam lives in apps/app's hop proof.
 ```
 
 ## Project Structure

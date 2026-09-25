@@ -50,7 +50,7 @@ today's in-memory store; zero Redis in the dev workflow.
 
 ```
 Unit:        npm run test:unit -w apps/app
-Integration: TEST_REDIS_URL=redis://127.0.0.1:6379 npx vitest run test/redis-store test/redis-lock   (from apps/app)
+Integration: TEST_REDIS_URL=redis://127.0.0.1:6399 npx playwright test test/e2e/hop.spec.ts   (from apps/app — the two-instance hop proof; unit suites run against fake clients)
 Typecheck:   npm run lint
 ```
 
@@ -96,7 +96,7 @@ Same conventions as the surrounding auth layer: `server-only`, dependency-inject
 
 - **Always:** fail closed on auth paths; `REDIS_URL`-unset behavior byte-identical to
   today; tests per slice; tokens stay `server-only`.
-- **Ask first:** any new dependency beyond `ioredis`; changes to `getValidSession`'s
+- **Ask first:** any new dependency beyond `redis` (node-redis — already adopted); changes to `getValidSession`'s
   public signature; anything that touches `apps/note-service/`.
 - **Never:** fall back to per-instance memory when `REDIS_URL` is set; publish the Redis
   port to the host; cache or log token values; run e2e from this module's tasks.
@@ -113,4 +113,4 @@ Same conventions as the surrounding auth layer: `server-only`, dependency-inject
 ## Open Questions
 
 None blocking. The hop proof's redis provisioning (`docker compose up redis-app` vs
-embedded test container) is decided in `tasks/plan-redis.md` — compose-provided.
+embedded test container) is decided in `tasks/plan-redis.md` — test-owned ephemeral container (`docker run --rm -p 127.0.0.1:6399:6379 redis:8-alpine`, reaped after the run).

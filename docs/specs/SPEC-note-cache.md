@@ -47,7 +47,7 @@ still holds: `apps/note-service/data/life.db` is never modified by this module.
 ```
 Unit:      npm run test -w apps/note-service
 Typecheck: npm run lint
-Integration: TEST_REDIS_URL=... npm run test -w apps/note-service -- redis-cache   (gated describe)
+Integration: none built (optional future TEST_REDIS_URL-gated describe) — coverage is the fake-client suite (hit / invalidation ordering / stale-guard / fail-open); the TEST_REDIS_URL seam lives in apps/app's hop proof.
 ```
 
 ## Project Structure
