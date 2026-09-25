@@ -13,7 +13,11 @@ idempotent, human-run at deploy time. The backup is the rollback path.
 - CLI: `npm run backfill-owner -w apps/note-service` → `apps/note-service/scripts/backfill-owner.ts`.
   Env: `NOTE_DB_PATH` (default `apps/note-service/data/life.db`),
   `IDP_DB_PATH` (**required, no default** — explicit is safe).
-- **Step 1 — backup (the script's own first step).** `VACUUM INTO '<life.db>.bak-<UTC
+- **Step 0 — ensure schema (idempotent).** Add `ownerSub TEXT` to `note` and `tag` when
+  missing (`PRAGMA table_info` guard + `ALTER TABLE ADD COLUMN`), so the script runs on
+  the *old* schema. This is what makes the prescribed deploy order possible: stop
+  services → run script → boot new code — zero window in which legacy rows are invisible.
+- **Step 1 — backup (before any write).** `VACUUM INTO '<life.db>.bak-<UTC
   timestamp>'` — a SQLite-consistent snapshot even with readers live. Verification
   before anything else: the copy exists, opens, `PRAGMA quick_check` passes, and its
   `note` row count equals the source's. Any backup/verification failure → abort with
