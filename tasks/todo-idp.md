@@ -301,6 +301,8 @@ old tests deleted in the same commit.
    `tailscale serve --bg --https 443 http://127.0.0.1:3002` and
    `tailscale serve --bg --https 8443 http://127.0.0.1:3003` (verify `tailscale serve status`).
 3. `docker compose up -d --build` (the IdP and app fail loudly if the secret is missing).
-4. Seed the user once: `SEED_USERNAME=<you> SEED_PASSWORD=<pw> DB_PATH=apps/idp/data/idp.db npm run seed -w apps/idp`.
+4. Seed the user once (`npm -w` runs inside `apps/idp`, so the default `data/idp.db` is
+   already the right file — the same one dev and production share via the compose
+   bind-mount): `SEED_USERNAME=<you> SEED_PASSWORD=<pw> npm run seed -w apps/idp`.
 5. Phone: cold-browser login → notes load/save → logout → back at login. If a JWT is
    misconfigured you'll see 401 → login loop; `IDP_ISSUER` must byte-match the minted `iss`.
