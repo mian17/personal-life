@@ -1,14 +1,24 @@
 import 'server-only';
+import { createClient } from 'redis';
+import { RedisSessionStore } from './redis-store';
 
 /**
  * Server-side app session store. Holds OIDC tokens, so this module is
  * `server-only` — nothing here may ever reach a client component.
  *
- * Storage is an in-process Map anchored on `globalThis` (see below). That is
- * honest for this single-instance, single-user app: an app restart drops all
- * sessions and everyone re-logs-in. If the app is ever scaled horizontally,
- * replace this with a shared store behind the same interface; no caller changes.
+ * Storage is an in-process Map by default (anchored on `globalThis`, see below).
+ * That is honest for a single-instance app: an app restart drops all sessions and
+ * everyone re-logs-in. When `REDIS_URL` is set the shared `RedisSessionStore`
+ * replaces it behind the same interface (see `createSessionStore`), so replicas
+ * behave as one service.
  */
+
+/**
+ * A store method may be synchronous (in-process Map) or asynchronous (Redis).
+ * The seam is written this way so both implementations share one interface
+ * without the in-process fast path paying for a promise it never uses.
+ */
+export type MaybePromise<T> = T | Promise<T>;
 
 export interface AppSession {
   /** Opaque session id (the cookie value); never derived from tokens. */
@@ -47,7 +57,33 @@ export function defaultSessionStorage(): Map<string, AppSession> {
   return holder[GLOBAL_STORAGE_KEY]!;
 }
 
-export class SessionStore {
+/**
+ * The store seam: the exact surface callers depend on, satisfied by both the
+ * in-memory store (dev/e2e) and `RedisSessionStore` (shared, `REDIS_URL` set).
+ *
+ * `size`/`clear` are test/debug aids and therefore optional — Redis cannot
+ * enumerate its keys with the command surface this module uses (no `SCAN` by
+ * design; the app only ever addresses sessions by id).
+ */
+export interface SessionStoreApi {
+  /** The store's current time (the injected clock), used for consistent expiry math. */
+  nowMs(): MaybePromise<number>;
+  /** Stores a session, setting its sliding window from now. */
+  create(
+    session: Omit<AppSession, 'expiresAt'> & { expiresAt?: number },
+  ): MaybePromise<AppSession>;
+  /** Looks up a live session, expiring it and applying sliding renewal. */
+  get(id: string | undefined): MaybePromise<AppSession | undefined>;
+  /** Replaces the stored tokens/metadata for an existing session. */
+  update(id: string, patch: Partial<Omit<AppSession, 'id'>>): MaybePromise<AppSession | undefined>;
+  destroy(id: string | undefined): MaybePromise<void>;
+  /** Test/debug aid. */
+  size?(): MaybePromise<number>;
+  /** Test/debug aid: drop every session. */
+  clear?(): MaybePromise<void>;
+}
+
+export class SessionStore implements SessionStoreApi {
   private readonly sessions: Map<string, AppSession>;
 
   constructor(
@@ -110,4 +146,27 @@ export class SessionStore {
 }
 
 /** Process-wide store. A restart clears it (documented above). */
-export const sessionStore = new SessionStore();
+export const sessionStore: SessionStore = new SessionStore();
+
+/**
+ * Selects the store implementation once at module init: `REDIS_URL` set → the
+ * shared `RedisSessionStore` (replicas behave as one service); unset → the
+ * in-process store, so dev/e2e stay Redis-free and behavior is unchanged.
+ *
+ * node-redis opens no socket until `connect()`, so we kick that off here and hold
+ * the one in-flight promise: every store command awaits it. An `error` listener
+ * is mandatory — Node treats an unhandled client `'error'` as a crash.
+ *
+ * Callers are retyped to `SessionStoreApi` (and made to await) in Task 2, which
+ * owns `session.ts`; wiring the process-wide `sessionStore` to this factory
+ * before then would leave the synchronous callers (`middleware.ts` in
+ * particular) treating a pending promise as a live session.
+ */
+export function createSessionStore(): SessionStoreApi {
+  const url = process.env.REDIS_URL;
+  if (!url) return new SessionStore();
+  const client = createClient({ url });
+  client.on('error', () => {});
+  const ready = client.connect();
+  return new RedisSessionStore(client, { ttlMs: SESSION_TTL_MS, ready });
+}
