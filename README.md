@@ -158,6 +158,17 @@ decides whether a device can reach the app, never *who* the user is.
    reaches the browser. `note-service` verifies it offline against the IdP's JWKS —
    no shared secret, no per-request call to the IdP. The former shared static token
    was retired (see Rollback below).
+6. **Per-service Redis (internal only).** Each service owns its own Redis instance on
+   the compose network, selected by `REDIS_URL` (injected by compose — never in `.env`).
+   The app cluster (`redis-app`, AOF + named volume) is the shared **session store** and
+   cross-replica **refresh lock**; it **fails closed** (a Redis error means no session →
+   login wall, never a per-instance fallback that would split state). `redis-idp` and
+   `redis-note` are **read-through caches** over their databases (LRU, unpersisted); they
+   **fail open** (a Redis error just falls back to the DB — degraded, never wrong). None
+   of the three publishes a host port, so Redis is reachable only between containers.
+   Clients are cluster-ready (`createClient`/`createCluster` share one surface), so a
+   later move to real Redis Cluster is a deploy-time swap. Dev and e2e need no Redis:
+   with `REDIS_URL` unset the services keep their in-memory behavior.
 
 ### Redirect-URI byte-identity
 

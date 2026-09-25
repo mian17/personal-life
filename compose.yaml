@@ -16,8 +16,13 @@ services:
       IDP_ISSUER: ${IDP_ISSUER:-}
       IDP_JWKS_URL: ${NOTE_SERVICE_IDP_JWKS_URL:-http://idp:3003/jwks}
       NOTE_SERVICE_AUDIENCE: ${NOTE_SERVICE_AUDIENCE:-note-service}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-note:6379
     volumes:
       - ./apps/note-service/data:/data
+    depends_on:
+      redis-note:
+        condition: service_healthy
     networks:
       - life
     healthcheck:
@@ -56,12 +61,17 @@ services:
       # Audience/resource mapping (defaults preserve note-service).
       OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
       OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=note-service}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-idp:6379
     ports:
       # Published on host loopback only so `tailscale serve` can proxy to it
       # (the IdP itself stays off the tailnet/LAN). See README "Auth model".
       - "127.0.0.1:3003:3003"
     volumes:
       - ./apps/idp/data:/data
+    depends_on:
+      redis-idp:
+        condition: service_healthy
     networks:
       - life
     healthcheck:
@@ -96,6 +106,9 @@ services:
       # Must byte-match OIDC_APP_REDIRECT_URIS registered on the IdP.
       OIDC_APP_REDIRECT_URI: ${OIDC_APP_REDIRECT_URI:-}
       OIDC_APP_RESOURCE: ${OIDC_APP_RESOURCE:-https://note-service}
+      # Session store + cross-replica refresh lock (fail-closed). Injected here;
+      # .env unchanged. AOF + named volume so sessions survive restarts.
+      REDIS_URL: redis://redis-app:6379
     ports:
       - "127.0.0.1:3002:3002"
     depends_on:
@@ -103,10 +116,63 @@ services:
         condition: service_healthy
       idp:
         condition: service_healthy
+      redis-app:
+        condition: service_healthy
     networks:
       - life
+    restart: unless-stopped
+
+  # --- Redis (Task 6) ---------------------------------------------------------
+  # One instance per service: app (session store, persisted) and idp/note
+  # (read-through caches, unpersisted). Internal network only — NO published
+  # host ports. See README "Auth model" and tasks/plan-redis.md decisions 2/6.
+  redis-app:
+    image: redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-app-data:/data
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-idp:
+    image: redis:8-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    # Cache only: no volume, no AOF — nothing durable is written.
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-note:
+    image: redis:8-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    # Cache only: note content must not hit a second disk.
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 networks:
   life:
     driver: bridge
+
+volumes:
+  # Sessions are state: AOF + named volume so they survive restarts/rebuilds.
+  redis-app-data:
