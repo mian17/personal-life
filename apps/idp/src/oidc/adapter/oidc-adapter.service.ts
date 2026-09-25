@@ -7,6 +7,9 @@ import { OidcPayload } from './oidc-payload.entity';
 /** The Grant model name used as the `model` discriminator in `oidc_payload`. */
 const GRANT_MODEL = 'Grant';
 
+/** The provider's own SSO session model. */
+const SESSION_MODEL = 'Session';
+
 /** Unix seconds, the unit the provider uses for `expiresIn`. */
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -156,5 +159,24 @@ export class OidcAdapterService {
       await this.repo.delete({ key: keyFor(GRANT_MODEL, grantId) });
     }
     return grantIds.length;
+  }
+
+  /**
+   * Destroys the provider's own SSO session rows for one account (2026-09-25
+   * decision: logout ends the SSO session, so a fresh authorize cannot silently
+   * re-resolve it). Mirrors `revokeGrantsForAccount`: the Session payload carries
+   * `accountId`, so we match on it and delete per-account — other accounts'
+   * sessions survive. Session rows have no `grantId`, so they are removed by key.
+   */
+  async destroySessionsForAccount(accountId: string): Promise<number> {
+    const sessions = await this.repo.find({ where: { model: SESSION_MODEL } });
+    const sessionIds = sessions
+      .filter((row) => this.accountIdOf(row) === accountId)
+      .map((row) => row.id);
+
+    for (const sessionId of sessionIds) {
+      await this.repo.delete({ key: keyFor(SESSION_MODEL, sessionId) });
+    }
+    return sessionIds.length;
   }
 }

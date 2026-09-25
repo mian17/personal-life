@@ -6,6 +6,8 @@ export interface RpcResult {
   body: string;
   json: unknown;
   type?: string;
+  /** Raw Set-Cookie headers, so tests can assert cookie clearing/flags. */
+  setCookie?: string[];
 }
 
 function parseJson(text: string, type: string | undefined): unknown {
@@ -53,6 +55,7 @@ export class Client {
       body: res.text,
       json: parseJson(res.text, res.type),
       type: res.type,
+      setCookie: res.headers['set-cookie'] as unknown as string[] | undefined,
     };
   }
 
@@ -69,6 +72,7 @@ export class Client {
       body: res.text,
       json: parseJson(res.text, res.type),
       type: res.type,
+      setCookie: res.headers['set-cookie'] as unknown as string[] | undefined,
     };
   }
 
@@ -92,6 +96,7 @@ export class Client {
       body: res.text,
       json: parseJson(res.text, res.type),
       type: res.type,
+      setCookie: res.headers['set-cookie'] as unknown as string[] | undefined,
     };
   }
 }

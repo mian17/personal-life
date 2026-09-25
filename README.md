@@ -130,11 +130,10 @@ decides whether a device can reach the app, never *who* the user is.
    revokes the whole grant family.
 4. **Logout.** Posts to `/auth/logout`, which destroys the app session and hands off (a
    top-level GET) to the IdP's `/logout` landing; that landing auto-POSTs the IdP's own
-   `POST /logout` from the IdP origin, so the IdP session cookie always attaches and the
-   user's grants are revoked server-side (every refresh token dies immediately).
-   *Known residual:* the oidc-provider's own SSO session cookie survives logout until a
-   later "kill SSO session" / RP-initiated-logout decision lands, so a fresh
-   authorization may auto-resolve without re-prompting.
+   `POST /logout` from the IdP origin, so the IdP session cookie always attaches. The IdP
+   then revokes the user's grants (every refresh token dies immediately) **and** destroys
+   its own SSO session (`_session` cleared), so a fresh login requires the password again
+   — no silent re-login. RP-initiated/back-channel logout (`end_session`) remains deferred.
 5. **BFF → note-service (JWT-only).** The Next.js BFF calls `note-service` over the
    compose network (`http://note-service:3001`) with the caller's **session access
    token** as `Authorization: Bearer <jwt>`. The token is read from the server-side

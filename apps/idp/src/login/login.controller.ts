@@ -5,6 +5,7 @@ import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
 import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
 import { homePage, loginPage, logoutPage } from './login.view';
 import { OidcAdapterService } from '../oidc/adapter/oidc-adapter.service';
+import { OidcService } from '../oidc/oidc.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { UsersService } from '../users/users.service';
 
@@ -14,6 +15,7 @@ export class LoginController {
     private readonly users: UsersService,
     private readonly sessions: SessionsService,
     private readonly grants: OidcAdapterService,
+    private readonly oidc: OidcService,
   ) {}
 
   @Get('login')
@@ -48,14 +50,23 @@ export class LoginController {
 
   @Post('logout')
   async logout(@Req() req: Request, @Res() res: Response) {
-    // Decision B (2026-09-25): logout revokes the account's grants server-side,
-    // so every refresh token dies immediately. Resolve the account before
-    // destroying the session, then revoke grants for that account only.
+    // Resolve the account before destroying anything, so both revocations are
+    // scoped to it. Then, in order:
+    //   1. decision B (2026-09-25): revoke the account's grants — every refresh
+    //      token dies immediately;
+    //   2. decision (2026-09-25): destroy the account's provider SSO sessions and
+    //      clear the `_session` cookie — a fresh authorize cannot silently
+    //      re-resolve the session and will require the password again;
+    //   3. destroy our own login session row + cookie.
     const user = await this.sessions.findValid(readSessionToken(req.headers.cookie));
     if (user) {
       await this.grants.revokeGrantsForAccount(user.id);
+      await this.grants.destroySessionsForAccount(user.id);
     }
     await this.sessions.destroy(readSessionToken(req.headers.cookie));
+
+    // Cookie name comes from the provider API, never hardcoded.
+    res.clearCookie(this.oidc.sessionCookieName(), { path: '/' });
     res.clearCookie(SESSION_COOKIE, sessionCookieOptions());
     res.redirect(303, '/login');
   }

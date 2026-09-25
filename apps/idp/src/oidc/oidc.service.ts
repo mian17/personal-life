@@ -153,6 +153,11 @@ export class OidcService {
     return this.resolved;
   }
 
+  /** The provider's own session cookie name (`_session`), from the provider API — never hardcoded. */
+  sessionCookieName(): string {
+    return this.provider().cookieName('session');
+  }
+
   /**
    * Express middleware forwarding only provider-owned routes into
    * `provider.callback()`; everything else falls through to Nest. Mounted before
