@@ -28,6 +28,8 @@ export interface SignOptions {
   expiresIn?: number;
   kid?: string;
   subject?: string;
+  /** Mint a token with no `sub` claim at all (principal-seam 401 case). */
+  omitSubject?: boolean;
 }
 
 export class JwtTestHarness {
@@ -70,7 +72,10 @@ export class JwtTestHarness {
       ? this.keys.find((k) => k.kid === options.kid) ?? this.keys[0]
       : this.keys[0];
     const now = Math.floor(Date.now() / 1000);
-    return new SignJWT({ sub: options.subject ?? 'test-user' })
+    const claims: Record<string, unknown> = options.omitSubject
+      ? {}
+      : { sub: options.subject ?? 'test-user' };
+    return new SignJWT(claims)
       .setProtectedHeader({ alg: 'EdDSA', kid: key.kid })
       .setIssuer(options.issuer ?? TEST_ISSUER)
       .setAudience(options.audience ?? TEST_AUDIENCE)

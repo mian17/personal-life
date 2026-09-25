@@ -1,7 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+import { Controller, Get, INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
+import { AuthGuard } from '../src/auth/auth.guard';
+import { Principal } from '../src/auth/principal';
 import {
   configureVerifierEnv,
   JwtTestHarness,
@@ -88,5 +91,80 @@ describe('JWT auth (e2e)', () => {
   it('uses the configured issuer constant in tests', () => {
     expect(TEST_ISSUER).toBe('https://idp.test');
     expect(TEST_AUDIENCE).toBe('note-service');
+  });
+});
+
+/**
+ * Principal-seam suite (Task 1). A standalone test module — just the probe
+ * controller and the real guard — so a tiny in-test route can observe
+ * `@Principal()` without touching production code or a database. `NODE_ENV` is
+ * saved/restored around every case because jest workers share `process.env` and
+ * the guard's dev bypass reads it at request time.
+ */
+describe('JWT auth principal seam (e2e)', () => {
+  @Controller('api/__principal')
+  class PrincipalProbeController {
+    @Get()
+    probe(@Principal() principal: { sub: string }) {
+      return principal;
+    }
+  }
+
+  let app: INestApplication;
+  let harness: JwtTestHarness;
+  let originalEnv: NodeJS.ProcessEnv;
+
+  beforeAll(async () => {
+    originalEnv = { ...process.env };
+    harness = await new JwtTestHarness().start();
+    configureVerifierEnv(harness);
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PrincipalProbeController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    app.useGlobalGuards(new AuthGuard());
+    await app.init();
+  });
+
+  afterEach(() => {
+    // The dev bypass must never leak into a later spec sharing this worker.
+    process.env.NODE_ENV = originalEnv.NODE_ENV;
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await harness.stop();
+    process.env = originalEnv;
+  });
+
+  const probe = (token?: string) => {
+    const r = request(app.getHttpServer()).get('/api/__principal');
+    return token ? r.set('Authorization', `Bearer ${token}`) : r;
+  };
+
+  it('propagates the verified token sub as the principal', async () => {
+    const res = await probe(await harness.sign({ subject: 'alice' })).expect(200);
+    expect(res.body).toEqual({ sub: 'alice' });
+  });
+
+  it('rejects a verified token with no sub claim', async () => {
+    await probe(await harness.sign({ omitSubject: true })).expect(401);
+  });
+
+  it('rejects a verified token with an empty-string sub', async () => {
+    await probe(await harness.sign({ subject: '' })).expect(401);
+  });
+
+  it('sets the dev-user principal under NODE_ENV=development', async () => {
+    process.env.NODE_ENV = 'development';
+    const res = await probe().expect(200);
+    expect(res.body).toEqual({ sub: 'dev-user' });
+  });
+
+  it('still rejects a missing or garbage token', async () => {
+    await probe().expect(401);
+    await probe('not-a-jwt').expect(401);
+    await probe('aaa.bbb.ccc').expect(401);
   });
 });
