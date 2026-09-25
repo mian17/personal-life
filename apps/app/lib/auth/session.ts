@@ -8,6 +8,7 @@ import {
   type SessionStoreApi,
 } from './session-store';
 import { refreshTokens, type Tokens } from './oidc-client';
+import { getRefreshLock, type RefreshLock } from './refresh-lock';
 
 /**
  * Session lifecycle: create from a token response, read (with near-expiry
@@ -80,8 +81,63 @@ function inFlightRefreshes(): Map<string, Promise<RefreshResult>> {
   return holder[GLOBAL_REFRESH_KEY]!;
 }
 
-/** Performs one token refresh and applies it to the store (or destroys on failure). */
+/**
+ * Test aid: drop the in-flight map. A cross-replica lock test needs to simulate
+ * a *second process* — clearing the map makes the next caller skip the
+ * single-flight fast path and actually contend for the Redis lock.
+ */
+export function clearInFlightRefreshes(): void {
+  inFlightRefreshes().clear();
+}
+
+/**
+ * Performs one token refresh and applies it to the store (or destroys on failure).
+ *
+ * The store's `now` clock is used for the *expiry math* of the rotated tokens
+ * (deterministic in tests), while the cross-replica lock wait is bounded by real
+ * wall-clock time — a test's injected clock advances instantly and must not be
+ * able to make a loser wait forever.
+ */
 async function performRefresh(
+  session: AppSession,
+  at: number,
+  refresh: typeof refreshTokens,
+  store: SessionStoreApi,
+  lock: RefreshLock,
+): Promise<RefreshResult> {
+  // No shared Redis: there is no cross-replica race to guard, so keep today's
+  // exact path — no lock round-trip, no re-read, no extra await — and let the
+  // in-process single-flight above carry the whole guarantee.
+  if (!lock.distributed) return refreshDirectly(session, at, refresh, store);
+
+  const acquired = await lock.acquire(session.id);
+  if (acquired.status === 'busy') {
+    return await waitForWinner(session, store, lock);
+  }
+
+  // Re-read under the lock before spending the refresh token. The `session` we
+  // hold was read *before* the lock, so a winner may have rotated it in the gap
+  // (or in the gap between our own in-process single-flight and acquiring).
+  // Presenting that stale refresh token would be a second use of a rotated
+  // token — the reuse-detection defect. If the record is already newer, adopt it
+  // and never touch the token.
+  const current = await store.get(session.id);
+  if (!current) return undefined;
+  if (current.accessToken !== session.accessToken || current.refreshToken !== session.refreshToken) {
+    return current;
+  }
+
+  try {
+    return await refreshDirectly(current, at, refresh, store);
+  } finally {
+    // Best-effort release; the TTL reaps a crashed holder, and a failed release
+    // (degraded Redis) must not mask the refresh result.
+    if (acquired.status === 'acquired') void acquired.release();
+  }
+}
+
+/** The actual refresh: present the token, store the rotation, or destroy. */
+async function refreshDirectly(
   session: AppSession,
   at: number,
   refresh: typeof refreshTokens,
@@ -102,6 +158,44 @@ async function performRefresh(
     await store.destroy(session.id);
     return undefined;
   }
+}
+
+/**
+ * The lock-loser path: we did NOT take the lock, so we must never present a
+ * refresh token. Instead we poll the session record for the winner's rotated
+ * tokens — success is detected by the tokens differing from the snapshot we
+ * read before the lock (the winner's `update` mutates access AND refresh token
+ * together; rotation guarantees both change). We give up when:
+ * - the session vanished (the winner's refresh failed and destroyed it), or
+ * - the wait exceeds the lock TTL.
+ * Both mean "re-login" (`undefined`). A crashed winner's lock simply expires and
+ * a later request retries; a *live* winner that wrote nothing is also bounded by
+ * the same TTL (we never wait on the session's 7-day window).
+ */
+async function waitForWinner(
+  session: AppSession,
+  store: SessionStoreApi,
+  lock: RefreshLock,
+): Promise<RefreshResult> {
+  const deadline = Date.now() + lock.ttlMs;
+  for (;;) {
+    await sleep(lock.pollIntervalMs);
+    const current = await store.get(session.id);
+    if (!current) return undefined;
+    if (
+      current.accessToken !== session.accessToken ||
+      current.refreshToken !== session.refreshToken
+    ) {
+      // The winner rotated the tokens: hand the winner's session back. This is
+      // the whole point of the lock — the loser presents no token itself.
+      return current;
+    }
+    if (Date.now() >= deadline) return undefined;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -140,11 +234,13 @@ export async function getValidSession(
   const existing = inFlight.get(session.id);
   if (existing) return existing;
 
-  const refreshPromise = performRefresh(session, at, refresh, store).finally(() => {
-    // Clear on settle — success AND failure. A stale entry would make a later
-    // request reuse a settled (possibly destroyed-session) result.
-    inFlight.delete(session.id);
-  });
+  const refreshPromise = performRefresh(session, at, refresh, store, getRefreshLock()).finally(
+    () => {
+      // Clear on settle — success AND failure. A stale entry would make a later
+      // request reuse a settled (possibly destroyed-session) result.
+      inFlight.delete(session.id);
+    },
+  );
   inFlight.set(session.id, refreshPromise);
   return refreshPromise;
 }
