@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { unstable_rethrow } from 'next/navigation';
 import { getNote, updateNote } from '@/lib/api';
 import { apiErrorStatus, readFlushPayload } from '@/lib/flush-payload';
 
@@ -18,6 +19,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     return NextResponse.json({ ok: true, version: note.version, updatedAt: note.updatedAt });
   } catch (error) {
+    // Let Next's control-flow errors (e.g. the login redirect from requireSession)
+    // pass through instead of being turned into an upstream 502.
+    unstable_rethrow(error);
     const status = apiErrorStatus(error);
     if (status === 409) {
       // Hand the client the current server note so it can offer "Load latest"

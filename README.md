@@ -109,10 +109,12 @@ npm test
 ```
 
 `npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`) and
-runs with `NODE_ENV=development`, so the auth gates are skipped locally. Ports differ by
-mode so a production preview never collides with dev. The API binds loopback on the host
-in dev; inside Docker it binds `0.0.0.0` so the web container can reach
-`http://note-service:3001`.
+runs with `NODE_ENV=development`: the Tailscale **network access gate** is skipped locally
+(dev has no Tailscale header), so only this device reaches the app via loopback. The IdP
+**login/session gate is the app's real flow in every environment** — including localhost —
+so you log in locally against the IdP before the notes UI renders. Ports differ by mode so
+a production preview never collides with dev. The API binds loopback on the host in dev;
+inside Docker it binds `0.0.0.0` so the web container can reach `http://note-service:3001`.
 
 Outside production the IdP uses a throwaway database (`apps/idp/data/scratch.db`) — the
 dev server and the dev seed share it, and the production identity DB
@@ -171,9 +173,10 @@ closed at the callback:
 `IDP_ISSUER` must likewise be the browser-reachable URL (not the compose hostname); it
 is the `iss` claim and the base for discovery/authorize/token/JWKS URLs.
 
-For local browser development without Tailscale, no configuration is needed: when
-`NODE_ENV=development` (set by `.env.development`) the gates are skipped, so localhost
-works with no identity header or session.
+For local browser development without Tailscale, no Tailscale configuration is needed: when
+`NODE_ENV=development` (set by `.env.development`) the Tailscale network access gate is
+skipped, but the **IdP login flow still runs** — you log in locally against the IdP before
+the notes UI renders.
 
 ### Rollback
 

@@ -95,16 +95,50 @@ describe('public paths', () => {
   });
 });
 
-describe('dev skip', () => {
-  it('skips the whole gate in development', () => {
-    expect(decideGate({ ...base, isProduction: false, hasValidSession: false })).toBe('next');
+describe('dev (non-production) gate', () => {
+  it('still enforces the identity gate: no session → redirect-login', () => {
+    // The dev-skip covers the ACCESS gate only. The identity gate runs everywhere,
+    // so a cold dev request is sent to login instead of hitting the data layer.
+    expect(
+      decideGate({ ...base, isProduction: false, pathname: '/', hasValidSession: false }),
+    ).toBe('redirect-login');
+  });
+
+  it('passes with a valid session in dev', () => {
+    expect(
+      decideGate({ ...base, isProduction: false, pathname: '/', hasValidSession: true }),
+    ).toBe('next');
+  });
+
+  it('exempts public paths in dev', () => {
+    expect(
+      decideGate({ ...base, isProduction: false, pathname: '/auth/login', hasValidSession: false }),
+    ).toBe('next');
+  });
+
+  it('retains the access-gate skip: dev traffic is never forbidden', () => {
+    // Dev has no Tailscale header and Next always injects x-forwarded-host; the
+    // skip is load-bearing, so even a forwarded host with a mismatched owner is
+    // allowed through to the identity gate.
     expect(
       decideGate({
         ...base,
         isProduction: false,
         hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
         tailscaleLogin: null,
+        hasValidSession: true,
       }),
     ).toBe('next');
+    expect(
+      decideGate({
+        ...base,
+        isProduction: false,
+        hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
+        tailscaleLogin: 'intruder@example.com',
+        hasValidSession: false,
+      }),
+    ).toBe('redirect-login');
   });
 });

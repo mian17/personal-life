@@ -1,8 +1,6 @@
 import 'server-only';
-import { cookies } from 'next/headers';
 import type { CreateNoteInput, Note, NotePage, Tag, UpdateNoteInput } from '@life/shared';
-import { SESSION_COOKIE } from './auth/cookies';
-import { getValidSession } from './auth/session';
+import { requireSession } from './auth/require-session';
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
 
@@ -20,15 +18,14 @@ export class ApiError extends Error {
  * The BFF authenticates to `note-service` with the caller's IdP access token
  * (Task 10 — JWT-only). The token comes from the server-side session, refreshed
  * when near expiry; a refresh failure means "re-login" (the session is destroyed
- * and we surface 401, which the gate turns into a redirect on the next request).
- * The token never reaches the browser.
+ * and `requireSession` redirects to `/auth/login`). The browser never sees it.
+ *
+ * `requireSession` is the single choke point: every data call from a page, action,
+ * or route handler degrades to a login redirect when there is no session, rather
+ * than throwing an error page.
  */
 async function authHeaders(): Promise<HeadersInit> {
-  const jar = await cookies();
-  const session = await getValidSession(jar.get(SESSION_COOKIE)?.value);
-  if (!session) {
-    throw new ApiError(401, 'no valid session');
-  }
+  const session = await requireSession();
   return { Authorization: `Bearer ${session.accessToken}`, 'content-type': 'application/json' };
 }
 

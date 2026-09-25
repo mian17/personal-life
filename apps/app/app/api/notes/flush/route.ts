@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { unstable_rethrow } from 'next/navigation';
 import { createNote } from '@/lib/api';
 import { apiErrorStatus, readFlushPayload } from '@/lib/flush-payload';
 
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
+    // Let Next's control-flow errors (e.g. the login redirect from requireSession)
+    // pass through instead of being turned into an upstream 502.
+    unstable_rethrow(error);
     const status = apiErrorStatus(error);
     if (status === 400) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
     return NextResponse.json({ error: 'upstream error' }, { status: 502 });
