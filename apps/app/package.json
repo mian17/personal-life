@@ -20,6 +20,7 @@
     "openid-client": "^6.8.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "redis": "^5.12.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
@@ -33,18 +34,33 @@
     "typescript": "^5.7.3"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts", "tsx"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts",
+      "tsx"
+    ],
     "rootDir": ".",
     "testRegex": "\\.(test|spec)\\.tsx?$",
-    "testPathIgnorePatterns": ["/.next/", "/test/e2e/"],
+    "testPathIgnorePatterns": [
+      "/.next/",
+      "/test/e2e/"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^server-only$": "<rootDir>/test/stubs/server-only.ts"
     },
     "transform": {
-      "^.+\\.(t|j)sx?$": ["ts-jest", { "tsconfig": "tsconfig.test.json" }]
+      "^.+\\.(t|j)sx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
     },
-    "transformIgnorePatterns": ["/node_modules/(?!(openid-client|jose|oauth4webapi)/)"],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(openid-client|jose|oauth4webapi)/)"
+    ],
     "testEnvironment": "node"
   }
 }
