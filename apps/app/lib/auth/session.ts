@@ -115,19 +115,28 @@ async function performRefresh(
     return await waitForWinner(session, store, lock);
   }
 
-  // Re-read under the lock before spending the refresh token. The `session` we
-  // hold was read *before* the lock, so a winner may have rotated it in the gap
-  // (or in the gap between our own in-process single-flight and acquiring).
-  // Presenting that stale refresh token would be a second use of a rotated
-  // token — the reuse-detection defect. If the record is already newer, adopt it
-  // and never touch the token.
-  const current = await store.get(session.id);
-  if (!current) return undefined;
-  if (current.accessToken !== session.accessToken || current.refreshToken !== session.refreshToken) {
-    return current;
-  }
-
+  // EVERY path after a successful acquire must release the lock. The two early
+  // returns below used to sit before the try/finally, leaking
+  // `app:lock:refresh:<id>` for its whole TTL: other replicas would then see
+  // `busy` and either wait out the TTL or spuriously re-login. Wrapping the
+  // whole post-acquire body keeps the vanished / tokens-adopted / refresh-failure
+  // paths covered too.
   try {
+    // Re-read under the lock before spending the refresh token. The `session` we
+    // hold was read *before* the lock, so a winner may have rotated it in the gap
+    // (or in the gap between our own in-process single-flight and acquiring).
+    // Presenting that stale refresh token would be a second use of a rotated
+    // token — the reuse-detection defect. If the record is already newer, adopt
+    // it and never touch the token.
+    const current = await store.get(session.id);
+    if (!current) return undefined;
+    if (
+      current.accessToken !== session.accessToken ||
+      current.refreshToken !== session.refreshToken
+    ) {
+      return current;
+    }
+
     return await refreshDirectly(current, at, refresh, store);
   } finally {
     // Best-effort release; the TTL reaps a crashed holder, and a failed release

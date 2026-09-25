@@ -1,6 +1,5 @@
 import 'server-only';
-import { createClient } from 'redis';
-import { RedisSessionStore } from './redis-store';
+import { RedisSessionStore, createBoundedRedisClient } from './redis-store';
 
 /**
  * Server-side app session store. Holds OIDC tokens, so this module is
@@ -150,16 +149,19 @@ export class SessionStore implements SessionStoreApi {
  * shared `RedisSessionStore` (replicas behave as one service); unset → the
  * in-process store, so dev/e2e stay Redis-free and behavior is unchanged.
  *
- * node-redis opens no socket until `connect()`, so we kick that off here and hold
- * the one in-flight promise: every store command awaits it. An `error` listener
- * is mandatory — Node treats an unhandled client `'error'` as a crash.
+ * The client is built with `createBoundedRedisClient`: node-redis's default
+ * offline queue would make every command issued during an outage await a
+ * `connect()` that never settles, so requests HANG instead of failing closed.
+ * The client disables the offline queue (commands reject fast) and races the cold
+ * connect against a hard timeout, while its reconnect strategy retries forever so
+ * the replica heals on its own once Redis returns. `ready` always settles, so
+ * commands reject fast into the store's fail-closed mapping (`get` → undefined,
+ * `create` → throw) and recovery needs no process restart.
  */
 export function createSessionStore(): SessionStoreApi {
   const url = process.env.REDIS_URL;
   if (!url) return new SessionStore();
-  const client = createClient({ url });
-  client.on('error', () => {});
-  const ready = client.connect();
+  const { client, ready } = createBoundedRedisClient(url);
   return new RedisSessionStore(client, { ttlMs: SESSION_TTL_MS, ready });
 }
 

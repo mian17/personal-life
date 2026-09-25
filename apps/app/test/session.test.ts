@@ -1,10 +1,16 @@
 import {
+  clearInFlightRefreshes,
   createSession,
   destroySession,
   getValidSession,
   readSession,
 } from '@/lib/auth/session';
-import { SessionStore, REFRESH_SKEW_MS } from '@/lib/auth/session-store';
+import { SessionStore, REFRESH_SKEW_MS, type AppSession } from '@/lib/auth/session-store';
+import {
+  REFRESH_LOCK_TTL_MS,
+  setRefreshLockForTests,
+  type RefreshLock,
+} from '@/lib/auth/refresh-lock';
 import type { Tokens } from '@/lib/auth/oidc-client';
 
 const HOUR = 60 * 60 * 1000;
@@ -163,5 +169,105 @@ describe('access-token refresh (re-login on failure)', () => {
     advance(8 * 24 * HOUR);
     const result = await getValidSession(session.id, undefined, jest.fn(), store);
     expect(result).toBeUndefined();
+  });
+});
+
+/**
+ * Regression for the leaked `app:lock:refresh:<id>` (five-lane blocker B2): the
+ * acquired lock's `release` originally sat in a `finally` that the two early
+ * returns (session vanished / tokens already rotated) returned *before*, so the
+ * lock was held for its full TTL and other replicas saw `busy`. Every
+ * post-acquire path must release exactly once.
+ */
+describe('refresh lock release on every post-acquire path', () => {
+  afterEach(() => {
+    setRefreshLockForTests(undefined);
+    clearInFlightRefreshes();
+  });
+
+  /**
+   * A distributed lock whose `acquire` records a spy `release`. The store is
+   * real (in-memory) so the test drives the vanished / adopted / refreshed paths
+   * by controlling what `store.get`/`store.update`/`refresh` return.
+   */
+  function spyLock() {
+    const release = jest.fn(async () => {});
+    const acquire = jest.fn(async () => ({ status: 'acquired' as const, release }));
+    const lock: RefreshLock = {
+      ttlMs: REFRESH_LOCK_TTL_MS,
+      pollIntervalMs: 250,
+      distributed: true,
+      acquire,
+    };
+    return { lock, release, acquire };
+  }
+
+  it('releases exactly once when the session vanished before the re-read', async () => {
+    const { store, clock } = fixedStore();
+    const session = await createSession(tokens(600), store);
+    // First read (before the lock) sees the session; the winner destroyed it in
+    // the gap, so the re-read under the lock sees nothing.
+    jest.spyOn(store, 'get').mockReturnValueOnce(session).mockReturnValue(undefined);
+    const { lock, release, acquire } = spyLock();
+    setRefreshLockForTests(lock);
+
+    const refresh = jest.fn();
+    const result = await getValidSession(session.id, clock() + 600_000 + 1, refresh, store);
+
+    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(result).toBeUndefined();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases exactly once when the tokens were already rotated (adopted)', async () => {
+    const { store, clock } = fixedStore();
+    const session = await createSession(tokens(600), store);
+    // The re-read under the lock returns newer tokens → adopt, do not refresh.
+    const rotated: AppSession = { ...session, accessToken: 'at-2', refreshToken: 'rt-2' };
+    jest.spyOn(store, 'get').mockReturnValueOnce(session).mockReturnValueOnce(rotated);
+    const { lock, release } = spyLock();
+    setRefreshLockForTests(lock);
+
+    const refresh = jest.fn();
+    const result = await getValidSession(session.id, clock() + 600_000 + 1, refresh, store);
+
+    expect(result?.accessToken).toBe('at-2');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases exactly once on a successful refresh', async () => {
+    const { store, clock } = fixedStore();
+    const session = await createSession(tokens(600), store);
+    const { lock, release } = spyLock();
+    setRefreshLockForTests(lock);
+
+    const refresh = jest.fn().mockResolvedValue({
+      accessToken: 'at-2',
+      refreshToken: 'rt-2',
+      idToken: null,
+      expiresIn: 600,
+      subject: 'user-1',
+    });
+    const result = await getValidSession(session.id, clock() + 600_000 + 1, refresh, store);
+
+    expect(result?.accessToken).toBe('at-2');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases exactly once when the refresh itself throws (finally still runs)', async () => {
+    const { store, clock } = fixedStore();
+    const session = await createSession(tokens(600), store);
+    const { lock, release } = spyLock();
+    setRefreshLockForTests(lock);
+
+    const refresh = jest.fn().mockRejectedValue(
+      Object.assign(new Error('invalid_grant'), { error: 'invalid_grant' }),
+    );
+    const result = await getValidSession(session.id, clock() + 600_000 + 1, refresh, store);
+
+    expect(result).toBeUndefined();
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });

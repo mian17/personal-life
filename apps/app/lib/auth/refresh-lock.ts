@@ -1,7 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'crypto';
-import { createClient } from 'redis';
-import type { RedisSetOptions } from './redis-store';
+import { createBoundedRedisClient, type RedisSetOptions } from './redis-store';
 
 /**
  * The cross-replica refresh lock — the distributed half of the "one refresh per
@@ -67,9 +66,12 @@ export interface RefreshLockOptions {
   /** Override the loser poll interval. */
   pollIntervalMs?: number;
   /**
-   * Resolves once the client is connected. node-redis opens no socket until
-   * `connect()`, so the factory holds that one in-flight promise and every
-   * command awaits it; a rejected promise degrades the lock (see below).
+   * Resolves once the client is connected OR the cold-connect watchdog has
+   * elapsed (see `connectBounded`) — whichever comes first. node-redis opens no
+   * socket until `connect()`, so the factory holds that one in-flight promise and
+   * every command awaits it; because it always settles, an unreachable Redis
+   * degrades the lock (see below) instead of hanging the refresh path. The bound
+   * is only on our wait: node-redis keeps retrying in the background.
    */
   ready?: Promise<unknown>;
 }
@@ -186,10 +188,9 @@ export class RedisRefreshLock implements RefreshLock {
 export function createRefreshLock(): RefreshLock {
   const url = process.env.REDIS_URL;
   if (!url) return new NullRefreshLock();
-  const client = createClient({ url });
-  // An unhandled client `'error'` event would crash the process.
-  client.on('error', () => {});
-  const ready = client.connect();
+  // Same bounded, fail-closed client as the session store: an unreachable Redis
+  // must degrade the lock (acquire → `degraded`), never hang the refresh path.
+  const { client, ready } = createBoundedRedisClient(url);
   return new RedisRefreshLock(client, { ready });
 }
 

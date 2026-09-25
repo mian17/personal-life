@@ -1,4 +1,5 @@
 import 'server-only';
+import { createClient } from 'redis';
 import type { AppSession, SessionStoreApi } from './session-store';
 
 /**
@@ -45,6 +46,94 @@ export class SessionStoreUnavailable extends Error {
   }
 }
 
+/** Hard ceiling on how long the cold-connect attempt may run before we stop awaiting it. */
+export const REDIS_CONNECT_TIMEOUT_MS = 3_000;
+
+/**
+ * Hard ceiling on the reconnect backoff — the same 2 s cap node-redis's own
+ * `defaultReconnectStrategy` uses, so a long outage never stretches the retry
+ * interval without bound.
+ */
+export const REDIS_RECONNECT_MAX_DELAY_MS = 2_000;
+
+/**
+ * The reconnect strategy the auth clients install: exponential backoff (capped at
+ * `REDIS_RECONNECT_MAX_DELAY_MS`, plus the 0–200 ms jitter node-redis adds) that
+ * **never** returns `false`.
+ *
+ * Never giving up is the fix for the permanent-outage regression. A strategy that
+ * returns `false` makes node-redis latch `#isOpen = false` and stop reconnecting
+ * for the life of the process; because the stores are built once at module init
+ * and nothing re-calls `connect()`, a transient Redis blip would brick the
+ * replica forever (permanent login wall, the refresh lock silently degraded with
+ * no signal). Retrying forever keeps background recovery alive. The fail-closed,
+ * non-hanging behavior *during* an outage comes from `disableOfflineQueue` +
+ * `connectBounded`, not from giving up: while the socket is not ready every
+ * command rejects fast instead of hanging.
+ */
+export function unboundedReconnectStrategy(retries: number): number {
+  const jitter = Math.floor(Math.random() * 200);
+  return Math.min(2 ** retries * 50, REDIS_RECONNECT_MAX_DELAY_MS) + jitter;
+}
+
+/**
+ * The fail-closed client construction shared by the session store and the refresh
+ * lock. Both need the same shape so an unreachable Redis can never make
+ * `get`/`update`/`create`/`acquire` hang:
+ * - `disableOfflineQueue` makes commands issued before ready reject immediately
+ *   (`ClientOfflineError`) — the in-repo precedent is the idp/note caches;
+ * - `unboundedReconnectStrategy` keeps node-redis's default retry-forever
+ *   background recovery (so a replica heals when Redis returns) while capping the
+ *   backoff; commands still fail fast while offline because of the offline-queue
+ *   setting above;
+ * - `connectBounded` races the *cold* `connect()` against a hard timeout and
+ *   swallows the outcome into a promise that ALWAYS settles — it can never become
+ *   an unhandled rejection, and an injected `connect()` whose promise never
+ *   settles (a hung socket) still resolves to `undefined` within the bound. The
+ *   race only bounds our *initial wait*: node-redis keeps reconnecting in the
+ *   background regardless, so recovery is not tied to this promise.
+ *
+ * The returned `ready` never rejects: callers `await this.ready` and then issue
+ * the command, which either succeeds or fails fast into their own mapping.
+ */
+export function connectBounded(client: {
+  connect(): Promise<unknown>;
+}): { ready: Promise<void> } {
+  const connecting = client.connect().then(
+    () => undefined,
+    () => undefined,
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, REDIS_CONNECT_TIMEOUT_MS);
+    // Do not hold the event loop open just for the connect watchdog.
+    (timer as unknown as { unref?: () => void }).unref?.();
+  });
+  const ready = Promise.race([connecting, timeout]).finally(() => clearTimeout(timer));
+  return { ready };
+}
+
+/**
+ * Builds the one fail-closed client both auth factories use. `error` events are
+ * sunk (an unhandled `'error'` would crash the process, and the URL may carry
+ * credentials so we never log it). `socket.reconnectStrategy` is pinned to
+ * `unboundedReconnectStrategy` — never a give-up strategy — so a transient outage
+ * is always recoverable without a process restart.
+ */
+export function createBoundedRedisClient(url: string): {
+  client: ReturnType<typeof createClient>;
+  ready: Promise<void>;
+} {
+  const client = createClient({
+    url,
+    disableOfflineQueue: true,
+    socket: { reconnectStrategy: unboundedReconnectStrategy },
+  });
+  client.on('error', () => {});
+  const { ready } = connectBounded(client);
+  return { client, ready };
+}
+
 /** Record key prefix: JSON of an `AppSession` at `app:sess:<id>`. */
 export const SESSION_KEY_PREFIX = 'app:sess:';
 
@@ -54,9 +143,12 @@ export interface RedisSessionStoreOptions {
   /** Injected clock, matching the in-memory store, for deterministic expiry math. */
   now?: () => number;
   /**
-   * Resolves once the client is connected. node-redis opens no socket until
-   * `connect()`, so the factory holds that one in-flight promise and every
-   * command awaits it; a rejected promise makes commands fail closed.
+   * Resolves once the client is connected OR the cold-connect watchdog has
+   * elapsed (see `connectBounded`) — whichever comes first. node-redis opens no
+   * socket until `connect()`, so the factory holds that one in-flight promise and
+   * every command awaits it; because it always settles, a command either succeeds
+   * or fails fast into the fail-closed mapping rather than hanging. The bound is
+   * only on our wait: node-redis keeps reconnecting in the background.
    */
   ready?: Promise<unknown>;
 }

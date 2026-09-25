@@ -230,7 +230,11 @@ describe('createSessionStore (REDIS_URL selection)', () => {
     try {
       const store = createSessionStore();
       expect(store).toBeInstanceOf(RedisSessionStore);
-      expect(mockCreateClient).toHaveBeenCalledWith({ url: 'redis://127.0.0.1:6379' });
+      // The bounded client shape (offline queue off, bounded reconnect) is asserted
+      // in `bounded-connect.test.ts`; here prove the selected store still works.
+      expect(mockCreateClient).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'redis://127.0.0.1:6379' }),
+      );
       // The factory held the connect() promise; commands flow end-to-end.
       await store.create(session());
       expect((await store.get('sess-1'))?.subject).toBe('me');
