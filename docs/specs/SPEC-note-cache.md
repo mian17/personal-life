@@ -15,9 +15,15 @@ DB stays the source of truth; cache loss degrades to DB reads and is never wrong
   `note:v<gen>:list:<hash(opts)>`, `note:v<gen>:trash:<hash(opts)>`,
   `note:v<gen>:one:<id>`, `note:v<gen>:tags`. TTL 60s.
 - **Invalidation = generation bump.** Every write (`create`, `update`, `remove`,
-  `restore`, `removePermanent`, `emptyTrash`) runs `INCR note:gen` first; stale keys are
-  unreachable (they hold the old generation in the key) and age out via TTL. One atomic
-  op per write; no `KEYS`/`SCAN`, no per-query invalidation bookkeeping.
+  `restore`, `removePermanent`, `emptyTrash`) runs `INCR note:gen` **after** its DB
+  mutation; stale keys are unreachable (they hold the old generation in the key) and age
+  out via TTL. One atomic op per write; no `KEYS`/`SCAN`, no per-query invalidation
+  bookkeeping. **Why after, not before (review finding 2026-09-25):** a bump-first
+  ordering leaves a stale window — a read landing between the bump and the mutation
+  would cache pre-mutation state under the NEW generation and hold it for the TTL (the
+  stale-guard only covers bumps that land during the query). Bump-after closes it: any
+  entry that can hold pre-mutation state is born under the old generation and dies on
+  the bump.
 - Read-through: miss → DB → populate under the *current* generation (re-read `gen`
   after the query and only populate if unchanged — a write during the query must not be
   masked by a freshly-populated stale value).
@@ -58,7 +64,7 @@ apps/note-service/test/notes-cache.e2e-spec.ts   → hit / invalidate / gen-stal
 async findOne(id: string): Promise<NoteDto> {
   return this.cache.getThrough(`note:one:${id}`, () => this.notes.findOneByOrFail({ id }));
 }
-// Every write starts with await this.cache.bumpGeneration(); // one INCR invalidates all reads
+// Every write ENDS with await this.cache.bumpGeneration(); // one INCR invalidates all reads
 ```
 
 Controllers unchanged — the cache lives inside the service layer.
@@ -73,7 +79,7 @@ Controllers unchanged — the cache lives inside the service layer.
 
 ## Boundaries
 
-- **Always:** fail open; 60s TTL ceiling; gen-bump before any write's DB mutation.
+- **Always:** fail open; 60s TTL ceiling; gen-bump after any write's DB mutation.
 - **Ask first:** caching anything beyond the four read methods; changing `NoteDto` shape.
 - **Never:** enable persistence on the cache Redis; publish the Redis port; touch
   `apps/note-service/data/**` (life.db md5 `31767e4d…` is a hard line); cache auth/JWT

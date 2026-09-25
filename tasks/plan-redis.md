@@ -17,7 +17,11 @@ human's `.env`; compose injects the three Redis URLs.
    2026-09-25 against redis.io + npm guidance). `createClient`/`createCluster` share one
    command surface, so real Redis Cluster is a deploy-time swap. Installed in each
    service separately (no shared package — ~40 lines of wrapper duplicated beats a
-   coupling point between independently evolving services). Built-in TS types.
+   coupling point between independently evolving services). Built-in TS types. **Version
+   unified at `^5.12.1`** (2026-09-25): the only line satisfying every consumer's peer
+   range (typeorm declares `redis@^3||^4||^5` peerOptional) with one hoisted install
+   across all three workspaces; v5/v6 are API-identical for our command surface
+   (verified against installed types).
 2. **One Redis instance per service** (`redis-app`, `redis-idp`, `redis-note`), internal
    network only, **no published host ports**; image pinned to `redis:8-alpine` (current
    stable major). Not logical-DB-separated: Redis Cluster has
@@ -29,9 +33,11 @@ human's `.env`; compose injects the three Redis URLs.
    `app:lock:refresh:<id>`. The in-process single-flight map stays as the fast path above
    it. Losers of the lock never present a refresh token — they wait for the winner's
    rotated tokens or return `undefined`.
-5. **note-cache invalidation = generation bump** (`INCR note:gen` before each write's DB
-   mutation; all keys embed the generation). One atomic op per write, no `KEYS`/`SCAN`,
-   and a write landing mid-query cannot be masked (populate only if generation unchanged).
+5. **note-cache invalidation = generation bump** (`INCR note:gen` **after** each write's
+   DB mutation — bump-first leaves a stale window where a read can cache pre-mutation
+   state under the NEW generation; see SPEC-note-cache review finding. All keys embed
+   the generation). One atomic op per write, no `KEYS`/`SCAN`, and a write landing
+   mid-query cannot be masked (populate only if generation unchanged).
 6. **Persistence split:** `redis-app` runs AOF + named volume (sessions survive restarts);
    `redis-idp`/`redis-note` run LRU + **no persistence** (caches — note content must not
    hit a second disk).

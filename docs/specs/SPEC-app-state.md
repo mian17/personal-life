@@ -18,8 +18,13 @@ today's in-memory store; zero Redis in the dev workflow.
   window, `update` patches tokens in place, expired sessions are gone.
 - Two implementations: the existing in-memory `SessionStore` (default when `REDIS_URL`
   is unset) and a new `RedisSessionStore`. Selection happens **once at module init**
-  (`createSessionStore()` reading `REDIS_URL`). No caller changes behavior:
-  `requireSession`, routes, and `getValidSession`'s signature stay as they are.
+  (`createSessionStore()` reading `REDIS_URL`). Seam methods return `MaybePromise<T>`;
+  callers in the auth layer thread `await` (Next middleware is async-capable) —
+  **behavior** unchanged, signatures async where the seam is reached.
+  ⚠️ **Auth-bypass trap (review finding 2026-09-25):** `middleware.ts`'s
+  `Boolean(sessionStore.get(...))` must become `Boolean(await …)` — a bare Promise is
+  always truthy and would let every request through. The gate tests must prove
+  "no session → login redirect" after the retype.
 - Redis record: JSON of `AppSession` at `app:sess:<id>`; key TTL tracks the sliding
   window and is re-extended on `get`. A record that fails JSON parsing is treated as
   absent (fail closed).

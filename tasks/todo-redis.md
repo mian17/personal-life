@@ -1,9 +1,9 @@
 # Todo: Redis chapter (per-service shared state + cache)
 
 Traces to: `tasks/plan-redis.md`, `docs/specs/MAP-redis.md`.
-Status: **planned 2026-09-25** — awaiting plan review, then subagent-built under the
-tech-lead protocol. Hard lines: `apps/note-service/data/life.db` (md5 `31767e4d…`) never
-changes; no Redis port ever published; `REDIS_URL`-unset behavior byte-identical to today.
+Status: **in implementation 2026-09-25** — Tasks 1, 4, 5 implemented and tech-lead
+reviewed (app unit 97/97, idp 95/95, note 43/43 after the bump-order fix; suites green,
+slices committed). In flight: 2a (async seam wiring) ∥ 6 (compose wiring) → 2b → 3 → 7.
 
 ## Task 1: `app-state` store seam + `RedisSessionStore`
 
@@ -25,7 +25,31 @@ store.
 **Files likely touched:** `apps/app/lib/auth/session-store.ts`, `apps/app/lib/auth/redis-store.ts` (new), `apps/app/test/redis-store.test.ts` (new), `apps/app/package.json`, `package-lock.json`
 **Estimated scope:** Medium
 
-## Task 2: `app-state` cross-replica refresh lock
+## Task 2a: `app-state` async seam wiring (factory goes live)
+
+**Description:** (Grew out of Task 1's discovered blocker.) Thread `await` through the
+auth layer so the `SessionStoreApi` seam (MaybePromise) is actually live: wire
+`createSessionStore()` into `sessionStore`, retype `readSession`/`createSession`/
+`destroySession` async, update middleware/gate/callback call sites and their tests.
+⚠️ **Auth-bypass trap:** `middleware.ts`'s `Boolean(sessionStore.get(...))` must become
+`Boolean(await …)` — a bare Promise is always truthy. Also: `resolveCallback`'s
+`createSession` call sits outside try/catch — map `SessionStoreUnavailable` to a clean
+failure (no 500, no stack trace).
+
+**Acceptance criteria:**
+- [ ] `REDIS_URL` unset → full behavior unchanged (all app unit tests green); set → Redis store actually serves reads/writes
+- [ ] Gate tests prove "no session → login redirect" AND "live session → pass" AFTER the retype (the bypass trap is covered)
+- [ ] `SessionStoreUnavailable` surfaces as a clean user-facing failure in the callback path
+
+**Verification:**
+- [ ] `npm run test:unit -w apps/app` green (all existing + new)
+- [ ] `npm run lint` clean
+
+**Dependencies:** Task 1
+**Files likely touched:** `apps/app/lib/auth/{session,session-store,gate,require-session,callback}.ts`, `apps/app/middleware.ts`, `apps/app/app/auth/**` (error mapping), `apps/app/test/{session,gate,require-session,callback}*.test.ts`
+**Estimated scope:** Large (mechanical retype + one trap)
+
+## Task 2b: `app-state` cross-replica refresh lock
 
 **Description:** `refresh-lock.ts` (`SET NX EX` on `app:lock:refresh:<id>`, TTL > 30s),
 composed inside `getValidSession` beneath the in-process single-flight fast path. Lock
@@ -42,7 +66,7 @@ or return `undefined`.
 - [ ] `npm run test:unit -w apps/app` green (incl. `redis-lock.test.ts`)
 - [ ] `npm run lint` clean
 
-**Dependencies:** Task 1
+**Dependencies:** Task 2a
 **Files likely touched:** `apps/app/lib/auth/refresh-lock.ts` (new), `apps/app/lib/auth/session.ts`, `apps/app/test/redis-lock.test.ts` (new), `apps/app/test/session.test.ts`
 **Estimated scope:** Medium
 
@@ -93,8 +117,9 @@ Rotating OIDC payloads stay uncached (hard rule). Fail-open to DB.
 
 **Description:** Cache helper with generation-bump invalidation (`note:v<gen>:…`) over the
 four read methods (`findAll`, `findTrash`, `findOne`, `listTags`), TTL 60s; every write
-bumps the generation before its DB mutation; populate only if the generation is unchanged
-after the query. Fail-open to DB. Cache Redis runs unpersisted.
+bumps the generation **after** its DB mutation (bump-first leaves a stale window — see
+SPEC-note-cache); populate only if the generation is unchanged after the query. Fail-open
+to DB. Cache Redis runs unpersisted.
 
 **Acceptance criteria:**
 - [ ] Second identical read is a repository-level cache hit (repo spy)
