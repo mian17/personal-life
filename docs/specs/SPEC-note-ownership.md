@@ -20,15 +20,17 @@ same UI, byte-identical DTOs.
   cannot reach a handler (guard rejects first). Handlers read the sub through a
   `@Principal()` param decorator and pass it explicitly into `NotesService` — no
   ambient/global identity.
-- **Persistence.** `note.ownerSub: text` and `tag.ownerSub: text`, both nullable. The
-  columns are added by the backfill script with native `ALTER TABLE ADD COLUMN` (no
-  rebuild); TypeORM's SQLite driver rebuilds a table for any column or unique-index
-  change (`addColumns` → `recreateTable`, verified on 0.3.31), so the tag unique change
-  (`name` unique → `UNIQUE(name, ownerSub)`) is a single data-preserving table rebuild
-  at first boot of the new code — after the verified backup exists and data is stamped
-  (proven against a legacy-schema fixture by Task 3's schema-compat suite). Every
-  `create` stamps `ownerSub = sub`. `NULL` = legacy pre-boundary row: matched by no
-  query, visible to nobody, written only by `owner-backfill`.
+- **Persistence.** `note.ownerSub: text` and `tag.ownerSub: text`, both nullable. All
+  legacy schema surgery is the backfill script's job (validated on typeorm 0.3.31:
+  `synchronize` never drops a legacy single-column inline `UNIQUE(name)` — it is an
+  un-droppable `sqlite_autoindex` and gets cloned forward by every rebuild, so a legacy
+  `tag` table never converges): the script adds `note.ownerSub` via native
+  `ALTER TABLE ADD COLUMN`, and rebuilds `tag` once (backup-covered, before boot) with
+  `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)` — the explicit name the entity
+  declares (`@Index('UQ_tag_name_owner', ['name','ownerSub'], { unique: true })`), so
+  first-boot `synchronize` finds its expectation and does nothing. Every `create`
+  stamps `ownerSub = sub`. `NULL` = legacy pre-boundary row: matched by no query,
+  visible to nobody, written only by `owner-backfill`.
 - **Scoping.** Every `NotesService` method takes `sub` and filters `ownerSub = :sub`:
   `findAll`, `findTrash`, `findOne`, `update`, `remove`, `restore`, `removePermanent`,
   `emptyTrash` (empties only the caller's trash), `listTags` (only the caller's tags —

@@ -18,48 +18,56 @@ user notices nothing; a second identity would see an empty world.
   whose `sub` is missing or not a non-empty string is **rejected 401** — claims without
   identity are unauthenticated here.
 - **`ownerSub` nullable, service-enforced.** `NULL` = legacy row (matched by no query,
-  visible to nobody); every `create` stamps the sub. Column adds are done by the
-  backfill script with native `ALTER TABLE ADD COLUMN` (no rebuild); TypeORM's SQLite
-  driver rebuilds a table for *any* column or unique-index change (verified against
-  0.3.31 — `addColumns` → `recreateTable`), so the one remaining schema reconcile (the
-  tag unique change) is a single data-preserving table rebuild at first boot of the new
-  code, happening **after** the script's verified backup exists and the data is stamped.
+  visible to nobody); every `create` stamps the sub.
+- **The script owns ALL legacy schema surgery; synchronize never fights it** (validated
+  against typeorm 0.3.31: `synchronize` will not drop a single-column inline UNIQUE —
+  `sqlite_autoindex` is un-droppable — and `recreateTable` clones it forward, so a
+  legacy `tag` table **never converges** and per-owner tag names stay blocked). The
+  script therefore: adds `note.ownerSub` via native `ALTER TABLE ADD COLUMN`, and
+  rebuilds `tag` once (new table `(id, name, ownerSub)` → copy rows → drop old →
+  rename) which removes the old `UNIQUE(name)` with the table, then creates
+  `UNIQUE INDEX "UQ_tag_name_owner"(name, ownerSub)` — the **explicit name** the entity
+  declares (`@Index('UQ_tag_name_owner', ['name','ownerSub'], { unique: true })`), so
+  first-boot `synchronize` sees exactly what it expects and does nothing. Booting the
+  new code **without** running the script leaves the old global tag unique in place —
+  the deploy order is mandatory.
+- **Backup first, everything else after.** The script's first step is the verified
+  `VACUUM INTO` backup (the intent's hard line: no write of any kind — DDL included —
+  before the verified copy exists). Then schema surgery, then the owner lookup, then
+  the NULL-only stamps.
 - **404s are explicit.** The service throws `NotFoundException` itself. TypeORM's
-  `EntityNotFoundError` is not mapped to 404 by default Nest and would surface as a 500;
-  foreign id and missing id must be byte-identical 404s. No 403 anywhere.
+  `EntityNotFoundError` is not mapped to 404 by default Nest and would surface as a
+  500; foreign id and missing id must be byte-identical 404s. No 403 anywhere.
 - **Tags are per-user too.** Tag names are user content; a global tag list would leak
-  one user's vocabulary to the next. `UNIQUE(name, ownerSub)`.
+  one user's vocabulary to the next. Uniqueness is per `(name, ownerSub)`.
 - **Dev principal is the constant `dev-user`**, produced only by the
   `NODE_ENV=development` guard bypass (real tokens carry uuid subs — no collision). The
-  bypass must be unreachable in the deployed container (`NODE_ENV=production`).
+  bypass must be unreachable in the deployed container (`NODE_ENV=production`), and the
+  dev-mode suite case must save/restore `NODE_ENV` (jest workers share `process.env`).
 - **Cache: per-user keys and per-user generation** (`note:gen:<sub>`); all ordering
   semantics of `SPEC-note-cache.md` unchanged.
-- **The migration runs before the new code boots** (stop → script → boot): the script
-  does the idempotent column `ALTER`s itself, so legacy rows are never invisible to the
-  new scoped queries. The script owns its backup (`VACUUM INTO` + verification) and is
-  the one sanctioned writer of `life.db` outside the service. Script paths resolve
-  against `process.env.INIT_CWD ?? process.cwd()` so the repo-root `npm run -w` command
-  works as written.
+- **Script paths resolve against `process.env.INIT_CWD ?? process.cwd()`** so the
+  repo-root `npm run -w` command works as written.
 
 ## Task List
 
 ### Phase 1: Foundation
-- [ ] Task 1: principal seam (guard → `request.principal` → `@Principal()`, dev subject, sub-less-token 401)
+- [ ] Task 1: principal seam (guard → `request.principal` → `@Principal()`, dev subject, sub-less-token 401, NODE_ENV hygiene)
 - [ ] Task 2: notes ownership (column, stamping, scoped queries, explicit 404, isolation suite)
 
 ### Checkpoint: Foundation
 - [ ] Note suite green (existing + ownership suite); lint clean; two-subject isolation proven
 
 ### Phase 2: Periphery
-- [ ] Task 3: tags ownership (column, per-owner uniqueness, scoped resolution/list, schema-compat suite)
+- [ ] Task 3: tags ownership (entity declares the composite unique index; scoped resolution/list) — fresh-schema behavior
 - [ ] Task 4: cache scoping (per-user keys + generation) — **after Task 3** (both thread `sub` through `notes.service.ts`)
 
 ### Checkpoint: Periphery
 - [ ] Full note-service suite green incl. cache key-shape + isolation cases
 
 ### Phase 3: Migration + close-out
-- [ ] Task 5: `owner-backfill` script + script suite + script typecheck
-- [ ] Task 6: close-out (spec drift closure, ledger, rehearsal on a DB copy, prod-env check, final sweep)
+- [ ] Task 5: `owner-backfill` script (backup first → note ALTER → tag rebuild → resolve → stamp) + script suite incl. legacy-tag conversion + script typecheck
+- [ ] Task 6: close-out (spec drift closure, ledger, prod-env check, final sweep)
 
 ### Checkpoint: Complete
 - [ ] All acceptance criteria met; human deploy checklist ready
@@ -68,10 +76,11 @@ user notices nothing; a second identity would see an empty world.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| First-boot schema reconcile rebuilds the `tag` table (TypeORM `recreateTable` on the unique-constraint change) | Med | Data is stamped before boot under a verified backup; Task 3's `schema-compat` suite proves rows survive the rebuild on a legacy-schema fixture with real rows; Task 6 rehearses on a temp copy of the real DB |
-| Deploy-order empty window (NULL rows invisible to new queries) | Med | Script does the column `ALTER`s and runs before boot; deploy checklist mandates stop → script → boot |
+| Legacy `tag` schema cannot be migrated by `synchronize` (old UNIQUE never dropped; rebuild repeats every boot) | High | The script's own `tag` rebuild (backup-covered, before boot); Task 5's suite proves rows survive and the old unique is gone on a legacy fixture; explicit index name keeps first-boot sync a no-op |
+| New code booted without running the script first | High | Deploy checklist mandates stop → script → boot; the script suite documents the divergence symptom; stamped rows invisible otherwise (empty window) |
 | Backfill mis-selection of owner | High | Deterministic `ORDER BY createdAt, id LIMIT 1`; abort on zero users; tie-break tested; never re-stamps owned rows |
 | Verified token without `sub` could match NULL-owner rows | High | Guard rejects (401) any verified token lacking a non-empty string `sub`; suite case in Task 1 |
+| Dev-mode suite case leaks `NODE_ENV=development` into later specs (shared jest env) | Med | The case saves/restores `NODE_ENV` in `afterEach`/`finally`; Task 1 acceptance requires it |
 | Dev bypass reachable if the container runs `NODE_ENV≠production` | Med | Compose sets `NODE_ENV=production`; Task 6 verifies as a read-only check; `dev-user` only ever exists locally |
 | e2e regression (human-owned suite) | Low | No UI/DTO change; e2e subject is single-user; rows get stamped with that subject |
 | Sub in cache keys lengthens keys | Low | uuid ≤ 36 chars; key shape tests updated |
