@@ -173,6 +173,13 @@ closed at the callback:
 `IDP_ISSUER` must likewise be the browser-reachable URL (not the compose hostname); it
 is the `iss` claim and the base for discovery/authorize/token/JWKS URLs.
 
+**Loopback in dev.** Next's middleware normalizes any loopback spelling
+(`127.0.0.1`/`[::1]`/`localhost`) to `localhost` in its redirects, so the browser always
+ends up on `localhost`. The app canonicalizes a loopback redirect URI to `localhost` to
+match, and the IdP's dev default registers **both** spellings — so the dance completes
+whichever loopback host you type, with no extra config. Non-loopback (production)
+redirects are untouched.
+
 For local browser development without Tailscale, no Tailscale configuration is needed: when
 `NODE_ENV=development` (set by `.env.development`) the Tailscale network access gate is
 skipped, but the **IdP login flow still runs** — you log in locally against the IdP before

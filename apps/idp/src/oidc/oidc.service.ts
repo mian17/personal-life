@@ -5,7 +5,7 @@ import { SigningKeyService } from '../crypto/signing-key.service';
 import { OidcAdapterService } from './adapter/oidc-adapter.service';
 import { ACCESS_TOKEN_TTL_S, defaultResource, resourceServerPolicy } from './access-token.policy';
 import { assertOidcConfig, staticClients } from './clients';
-import { interactionPolicyPrompts, loadExistingGrant } from './interaction-policy';
+import { interactionPolicyPrompts, INTERACTION_TTL_S, loadExistingGrant } from './interaction-policy';
 import {
   GRANT_TTL_S,
   REFRESH_TOKEN_TTL_S,
@@ -106,6 +106,7 @@ export class OidcService {
           RefreshToken: REFRESH_TOKEN_TTL_S,
           Session: SESSION_TTL_S,
           Grant: GRANT_TTL_S,
+          Interaction: INTERACTION_TTL_S,
         },
         rotateRefreshToken: ROTATE_REFRESH_TOKEN,
         issueRefreshToken,
