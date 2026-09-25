@@ -40,7 +40,8 @@ boring wins; credential safety and data safety stay hard lines.
 ## Out of scope
 
 Kubernetes manifests, real Redis Cluster mode, the SQLite→Postgres data-tier chapter
-(`note-service` per-user boundary included), and **caching rotating grant/session/
+(the `note-service` per-user boundary was carved out of it into its own chapter
+2026-09-26 — `docs/intent/notes-user-boundary.md`), and **caching rotating grant/session/
 interaction payloads anywhere** (they rotate or revoke on every use — stale = security
 bug; hit rate ≈ 0).
 
