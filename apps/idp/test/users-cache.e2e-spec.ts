@@ -1,10 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { rmSync } from 'fs';
+import { readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { Repository } from 'typeorm';
-import { AppModule } from '../src/app.module';
 import { User } from '../src/users/user.entity';
 import { UsersService } from '../src/users/users.service';
 import {
@@ -39,6 +38,11 @@ describe('IdP users read-through cache (e2e)', () => {
     delete process.env.REDIS_URL;
 
     cache = new FakeCacheClient();
+    // Deferred import AFTER DB_PATH is set: `AppModule`'s TypeORM config calls
+    // `resolveDbPath()` at decorator evaluation, so importing it up front would
+    // capture the default `data/scratch.db` and leak fixtures there (the house
+    // pattern every other idp spec uses).
+    const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(USERS_CACHE)
       .useValue(new RedisUsersCache(cache))
@@ -77,6 +81,20 @@ describe('IdP users read-through cache (e2e)', () => {
     await users.createUser('cache-ttl', FIXTURE_PASSWORD);
     await users.findByUsername('cache-ttl');
     expect(cache.ttlSeconds.get(userCacheKey('cache-ttl'))).toBe(USERS_CACHE_TTL_SECONDS);
+  });
+
+  it('never writes a key outside the idp:user: namespace', async () => {
+    // Exercise both write paths — createUser's invalidate (a delete, not a set)
+    // and findByUsername's populate — so "every key ever written" is meaningful.
+    await users.createUser('cache-keyspace', FIXTURE_PASSWORD);
+    await users.findByUsername('cache-keyspace');
+    await users.findByUsername('cache-keyspace-missing');
+
+    const written = [...cache.writtenKeys];
+    expect(written.length).toBeGreaterThan(0); // non-vacuous: something was written
+    for (const key of written) {
+      expect(key.startsWith('idp:user:')).toBe(true);
+    }
   });
 
   it('invalidates the cached key when createUser writes', async () => {
@@ -247,5 +265,49 @@ describe('createUsersCache selection (unit)', () => {
     await selected.getThrough('k', USERS_CACHE_TTL_SECONDS, loader);
     expect(loader).toHaveBeenCalledTimes(2);
     await expect(selected.invalidate('k')).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * The SPEC-idp-cache hard rule has two halves and neither is allowed to rely on
+ * convention: (1) the users cache must never see OIDC payloads, and (2) no OIDC
+ * module may reach into the users cache. Both are enforced by reading the real
+ * source files — a mock here would prove nothing.
+ */
+describe('OIDC payloads are never cached (module boundary, real source)', () => {
+  const srcDir = join(__dirname, '..', 'src');
+  const oidcDir = join(srcDir, 'oidc');
+  const usersCachePath = join(srcDir, 'users', 'users-cache.ts');
+
+  /** Every `.ts` file under a directory, recursively. */
+  function tsFilesUnder(dir: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) found.push(...tsFilesUnder(full));
+      else if (entry.name.endsWith('.ts')) found.push(full);
+    }
+    return found;
+  }
+
+  it('no file under src/oidc imports the users cache', () => {
+    const oidcFiles = tsFilesUnder(oidcDir);
+    expect(oidcFiles.length).toBeGreaterThan(0);
+
+    const offenders = oidcFiles.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return source.includes('users-cache') || source.includes('USERS_CACHE');
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('users-cache.ts imports nothing from src/oidc', () => {
+    const source = readFileSync(usersCachePath, 'utf8');
+    const offendingImports = source
+      .split('\n')
+      .filter((line) => /^\s*import\b/.test(line) && line.includes('oidc'));
+
+    expect(offendingImports).toEqual([]);
   });
 });

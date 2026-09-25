@@ -14,6 +14,12 @@ export class FakeCacheClient implements CacheClient {
   readonly expiresAt = new Map<string, number>();
   /** key → the TTL (seconds) last requested, for assertions. */
   readonly ttlSeconds = new Map<string, number>();
+  /**
+   * Every key ever passed to `set`, including ones later deleted by an
+   * invalidation. Lets a test assert the cache's whole keyspace (nothing outside
+   * `idp:user:` may ever be written).
+   */
+  readonly writtenKeys = new Set<string>();
 
   getCalls = 0;
   setCalls = 0;
@@ -39,6 +45,7 @@ export class FakeCacheClient implements CacheClient {
   async set(key: string, value: string, options: { EX: number }): Promise<unknown> {
     this.setCalls++;
     if (this.failWrites) throw new Error('fake redis: set failed');
+    this.writtenKeys.add(key);
     this.store.set(key, value);
     this.ttlSeconds.set(key, options.EX);
     this.expiresAt.set(key, Date.now() + options.EX * 1000);
