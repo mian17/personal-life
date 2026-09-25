@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * the logout started (this is what makes the chain cross-site-safe).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  destroySession(req.cookies.get(SESSION_COOKIE)?.value);
+  await destroySession(req.cookies.get(SESSION_COOKIE)?.value);
 
   const res = NextResponse.redirect(buildIdpLogoutUrl(getIdpIssuer()), { status: 303 });
   res.cookies.set(SESSION_COOKIE, '', clearedCookieOptions());

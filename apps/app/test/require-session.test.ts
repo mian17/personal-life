@@ -53,7 +53,7 @@ function seedValidSession(): void {
 describe('requireSession (data path)', () => {
   beforeEach(() => {
     mockCookieValue = undefined;
-    sessionStore.clear();
+    sessionStore.clear?.();
   });
 
   it('redirects to /auth/login when there is no session', async () => {
@@ -81,7 +81,7 @@ describe('requireSession (data path)', () => {
 describe('BFF flush routes (data path)', () => {
   beforeEach(() => {
     mockCookieValue = undefined;
-    sessionStore.clear();
+    sessionStore.clear?.();
   });
 
   const jsonRequest = () =>

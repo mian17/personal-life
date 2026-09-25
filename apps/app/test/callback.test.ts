@@ -1,5 +1,6 @@
 import { resolveCallback, buildExchangeUrl, type CallbackDeps } from '@/lib/auth/callback';
 import { encodeLoginAttempt, type LoginAttempt } from '@/lib/auth/login-attempt';
+import { SessionStoreUnavailable } from '@/lib/auth/redis-store';
 import type { Tokens } from '@/lib/auth/oidc-client';
 
 const ATTEMPT: LoginAttempt = { state: 'state-abc', nonce: 'nonce-xyz', codeVerifier: 'verifier-123' };
@@ -19,7 +20,7 @@ function tokens(): Tokens {
 function deps(overrides: Partial<CallbackDeps> = {}): CallbackDeps {
   return {
     completeAuthorization: jest.fn().mockResolvedValue(tokens()),
-    createSession: jest.fn().mockReturnValue({ id: 'session-1' }),
+    createSession: jest.fn().mockResolvedValue({ id: 'session-1' }),
     ...overrides,
   } as unknown as CallbackDeps;
 }
@@ -36,7 +37,7 @@ describe('buildExchangeUrl', () => {
 describe('GET /auth/callback decision logic (seam-mocked)', () => {
   it('happy path: exchanges, creates a session, and reports success', async () => {
     const completeAuthorization = jest.fn().mockResolvedValue(tokens());
-    const createSessionMock = jest.fn().mockReturnValue({ id: 'session-1' });
+    const createSessionMock = jest.fn().mockResolvedValue({ id: 'session-1' });
     const d = {
       completeAuthorization: completeAuthorization as unknown as CallbackDeps['completeAuthorization'],
       createSession: createSessionMock as unknown as CallbackDeps['createSession'],
@@ -66,6 +67,23 @@ describe('GET /auth/callback decision logic (seam-mocked)', () => {
     const outcome = await resolveCallback(CALLBACK, REDIRECT_URI, 'not-base64-json', d);
     expect(outcome.ok).toBe(false);
     expect(d.createSession).not.toHaveBeenCalled();
+  });
+
+  it('maps a session-store outage on createSession to a clean failure (no 500)', async () => {
+    const d = deps({
+      createSession: jest
+        .fn()
+        .mockRejectedValue(new SessionStoreUnavailable(new Error('redis unavailable'))),
+    });
+    const outcome = await resolveCallback(CALLBACK, REDIRECT_URI, encodeLoginAttempt(ATTEMPT), d);
+
+    // `createSession` threw rather than returning a half-issued session; the
+    // callback reports the same clean retryable failure as a denied login.
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.status).toBe(400);
+      expect(outcome.message).not.toContain('SessionStoreUnavailable');
+    }
   });
 
   it('fails closed with no session when the exchange throws (state/nonce/verifier mismatch)', async () => {

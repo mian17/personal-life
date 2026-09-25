@@ -239,3 +239,48 @@ describe('createSessionStore (REDIS_URL selection)', () => {
     }
   });
 });
+
+describe('process-wide sessionStore wiring (the factory is live)', () => {
+  // Re-importing under `jest.isolateModules` yields a fresh class identity, so
+  // these assert the selected store's *behavior* (sync map vs. the fake Redis
+  // command surface) rather than `instanceof`. `sessionStore` is the module-level
+  // `createSessionStore()` result, evaluated once at import time.
+  function importFresh(): typeof import('@/lib/auth/session-store') {
+    let mod!: typeof import('@/lib/auth/session-store');
+    jest.isolateModules(() => {
+      mod = require('@/lib/auth/session-store') as typeof import('@/lib/auth/session-store');
+    });
+    return mod;
+  }
+
+  it('is the in-memory store when REDIS_URL is unset', () => {
+    mockCreateClient.mockClear();
+    delete process.env.REDIS_URL;
+
+    const { sessionStore } = importFresh();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    // In-memory `create` is synchronous: it returns the record, not a Promise.
+    expect(sessionStore.create(session())).not.toBeInstanceOf(Promise);
+  });
+
+  it('is the Redis store and serves reads/writes when REDIS_URL is set', async () => {
+    const fake = new FakeRedis();
+    mockCreateClient.mockReturnValue(fake);
+    process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+    try {
+      const { sessionStore } = importFresh();
+
+      const created = await sessionStore.create(session());
+      // The write landed in Redis (not a private map): the record is addressable
+      // by its `app:sess:` key, and reads round-trip through the same client.
+      expect(fake.has(`${SESSION_KEY_PREFIX}${created.id}`)).toBe(true);
+      expect((await sessionStore.get(created.id))?.subject).toBe('me');
+
+      await sessionStore.destroy(created.id);
+      expect(fake.has(`${SESSION_KEY_PREFIX}${created.id}`)).toBe(false);
+      expect(await sessionStore.get(created.id)).toBeUndefined();
+    } finally {
+      delete process.env.REDIS_URL;
+    }
+  });
+});

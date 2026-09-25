@@ -4,8 +4,8 @@ import {
   REFRESH_SKEW_MS,
   SESSION_TTL_MS,
   sessionStore,
-  SessionStore,
   type AppSession,
+  type SessionStoreApi,
 } from './session-store';
 import { refreshTokens, type Tokens } from './oidc-client';
 
@@ -25,26 +25,32 @@ function expiryFrom(tokens: Tokens, now: number): number {
 }
 
 /** Creates a session for a freshly-completed login and returns it. */
-export function createSession(
+export async function createSession(
   tokens: Tokens,
-  store: SessionStore = sessionStore,
-): AppSession {
+  store: SessionStoreApi = sessionStore,
+): Promise<AppSession> {
   return store.create({
     id: newSessionId(),
     subject: tokens.subject ?? 'unknown',
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
     idToken: tokens.idToken,
-    accessTokenExpiresAt: expiryFrom(tokens, store.nowMs()),
+    accessTokenExpiresAt: expiryFrom(tokens, await store.nowMs()),
   });
 }
 
-export function readSession(id: string | undefined, store: SessionStore = sessionStore): AppSession | undefined {
+export async function readSession(
+  id: string | undefined,
+  store: SessionStoreApi = sessionStore,
+): Promise<AppSession | undefined> {
   return store.get(id);
 }
 
-export function destroySession(id: string | undefined, store: SessionStore = sessionStore): void {
-  store.destroy(id);
+export async function destroySession(
+  id: string | undefined,
+  store: SessionStoreApi = sessionStore,
+): Promise<void> {
+  await store.destroy(id);
 }
 
 /**
@@ -79,11 +85,11 @@ async function performRefresh(
   session: AppSession,
   at: number,
   refresh: typeof refreshTokens,
-  store: SessionStore,
+  store: SessionStoreApi,
 ): Promise<RefreshResult> {
   try {
     const tokens = await refresh(session.refreshToken);
-    return store.update(session.id, {
+    return await store.update(session.id, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       idToken: tokens.idToken,
@@ -91,7 +97,9 @@ async function performRefresh(
     });
   } catch {
     // Refresh failed (invalid_grant, family revoked, IdP down): re-login.
-    store.destroy(session.id);
+    // `await` before the delete: a Redis update can reject after its write (or
+    // race) and the delete must not be lost behind a detached promise.
+    await store.destroy(session.id);
     return undefined;
   }
 }
@@ -113,10 +121,10 @@ export async function getValidSession(
   id: string | undefined,
   now: number | undefined = undefined,
   refresh: typeof refreshTokens = refreshTokens,
-  store: SessionStore = sessionStore,
+  store: SessionStoreApi = sessionStore,
 ): Promise<AppSession | undefined> {
-  const at = now ?? store.nowMs();
-  const session = store.get(id);
+  const at = now ?? (await store.nowMs());
+  const session = await store.get(id);
   if (!session) return undefined;
 
   if (session.accessTokenExpiresAt - at > REFRESH_SKEW_MS) {
@@ -124,7 +132,7 @@ export async function getValidSession(
   }
 
   if (!session.refreshToken) {
-    store.destroy(session.id);
+    await store.destroy(session.id);
     return undefined;
   }
 

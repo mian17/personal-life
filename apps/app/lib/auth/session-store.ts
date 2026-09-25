@@ -145,9 +145,6 @@ export class SessionStore implements SessionStoreApi {
   }
 }
 
-/** Process-wide store. A restart clears it (documented above). */
-export const sessionStore: SessionStore = new SessionStore();
-
 /**
  * Selects the store implementation once at module init: `REDIS_URL` set → the
  * shared `RedisSessionStore` (replicas behave as one service); unset → the
@@ -156,11 +153,6 @@ export const sessionStore: SessionStore = new SessionStore();
  * node-redis opens no socket until `connect()`, so we kick that off here and hold
  * the one in-flight promise: every store command awaits it. An `error` listener
  * is mandatory — Node treats an unhandled client `'error'` as a crash.
- *
- * Callers are retyped to `SessionStoreApi` (and made to await) in Task 2, which
- * owns `session.ts`; wiring the process-wide `sessionStore` to this factory
- * before then would leave the synchronous callers (`middleware.ts` in
- * particular) treating a pending promise as a live session.
  */
 export function createSessionStore(): SessionStoreApi {
   const url = process.env.REDIS_URL;
@@ -170,3 +162,15 @@ export function createSessionStore(): SessionStoreApi {
   const ready = client.connect();
   return new RedisSessionStore(client, { ttlMs: SESSION_TTL_MS, ready });
 }
+
+/**
+ * Process-wide store, selected once at module init by `createSessionStore()`. An
+ * app restart clears the in-memory variant (documented above); with `REDIS_URL`
+ * set the session lives in Redis, shared across replicas and surviving restarts.
+ *
+ * ⚠️ The seam is `MaybePromise`: with a Redis store every `get` is a Promise.
+ * Callers MUST `await` it — `Boolean(sessionStore.get(...))` on a pending Promise
+ * is always true and would let every unauthenticated request through the
+ * middleware identity gate. `middleware.test.ts` pins both directions.
+ */
+export const sessionStore: SessionStoreApi = createSessionStore();

@@ -7,6 +7,11 @@ import { decodeLoginAttempt } from './login-attempt';
  * Pure-ish callback decision logic, with the two network/side-effecting seams
  * (`completeAuthorization`, `createSession`) injected so the route can be tested
  * without a live IdP. Fails closed on every error path.
+ *
+ * ⚠️ With `REDIS_URL` set, `createSession` reaches `RedisSessionStore.create`,
+ * which throws `SessionStoreUnavailable` when the store is unreachable (it never
+ * persists a half-issued session). That call is wrapped below and mapped to a
+ * clean, retryable failure — an unhandled rejection here would 500 the callback.
  */
 
 export type CallbackResult =
@@ -73,6 +78,14 @@ export async function resolveCallback(
     return { ok: false, status: 400, message: 'authorization failed' };
   }
 
-  const session = deps.createSession(tokens);
-  return { ok: true, sessionId: session.id };
+  try {
+    const session = await deps.createSession(tokens);
+    return { ok: true, sessionId: session.id };
+  } catch {
+    // Store unavailable (Redis down/connecting) — the IdP dance succeeded but we
+    // cannot persist the session. Fail closed with the same clean failure shape
+    // as a denied login (no stack trace, no half-issued cookie) so the user can
+    // simply retry; never fall back to per-instance memory.
+    return { ok: false, status: 400, message: 'authorization failed' };
+  }
 }
