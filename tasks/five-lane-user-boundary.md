@@ -1,13 +1,15 @@
 # Five-Lane Verification: note-service per-user boundary
 
 Branch: `feature/user-boundary`. Diff under review: `git diff master...HEAD` (chapter,
-15 commits at run time). Run date: 2026-09-26.
+17 commits at final run). Run date: 2026-09-26.
 
-## Final verdict: **INCONCLUSIVE — 4/5 lanes returned, lane 1 UNVERIFIED (session cancelled)**
+## Final verdict: **N/N — MERGEABLE** (merge blocked by the user's explicit-request rule)
 
-Fail-closed scoring: a missing verdict is a failure, never a pass — so this run does
-**not** reach N/N. Independent standing rule from the user (2026-09-26): **no merge
-without the user's explicit request**, regardless of gate outcome.
+Trail: suite gate green → lanes 1–5 fired in parallel → lane 1's session was cancelled
+mid-run (UNVERIFIED → fail-closed) → user authorized a lane-1 re-run → **5/5 PASS**.
+
+Standing rule from the user (2026-09-26): **no merge without the user's explicit
+request**, regardless of gate outcome. The branch is merge-ready and unmerged.
 
 ## Suite gate (step 0) — GREEN
 
@@ -17,12 +19,12 @@ untouched specs (`oidc-config` better-sqlite3 driver-load race; `keys-jwks` 5s
 child-process timeout — both characterized in `tasks/five-lane-redis.md`); zero idp
 files in this diff; the documented `--runInBand` mitigation produced 98/98.
 
-## Lane verdicts (round 1)
+## Lane verdicts
 
 | # | Lane | Verdict | Blockers | Notes |
 |---|------|---------|----------|-------|
-| 1 | correctness-domain | **UNVERIFIED** | — | session cancelled before returning a verdict; not re-run without user authorization |
-| 2 | code-quality | PASS_WITH_NITS | 1 MEDIUM (stale `SPEC-note-cache.md` Code Style block) — **resolved post-verdict**, docs-only |
+| 1 | correctness-domain | **PASS_WITH_NITS** (re-run) | 0 | adversarial read of the migration (backup-first, no row/id/FK loss, crash windows converge, re-stamp impossible); all 15 repository call sites scoped; legacy NULL rows unreachable; cache isolation sound |
+| 2 | code-quality | PASS_WITH_NITS | 1 MEDIUM (stale `SPEC-note-cache.md` Code Style block) — **resolved post-verdict**, docs-only (`e089aa4`) |
 | 3 | security | PASS_WITH_NITS | 0 | auth seam, authorization, script injection/traversal, leaks, DTO freeze all verified clean |
 | 4 | qa-e2e | PASS_WITH_NITS | 0 | every acceptance behavior mapped to a named passing test; human-owned e2e suite confirmed untouched |
 | 5 | plan-conformance | PASS_WITH_NITS | 0 | all REQUIRED items evidenced; all FORBIDDEN items absent; blast radii match the diff |
@@ -38,33 +40,37 @@ files in this diff; the documented `--runInBand` mitigation produced 98/98.
 
 ## Recorded nits (non-blocking)
 
+- A zero-user abort happens *after* Step 2 schema surgery (spec-accepted: "zero
+  backfill writes"; the backup is the rollback) but the abort message does not point
+  the operator at the backup; likewise `main()` prints the backup path only on success.
+- `snapshotAndVerify` verifies the `note` count only (not `tag`/`note_tag`);
+  `PRAGMA quick_check` covers integrity.
+- `applySchema` re-inlines the tag DDL literal instead of reusing `TAG_TABLE_DDL`;
+  `foreign_key_check` runs after `COMMIT` (backup is the rollback).
+- `@Principal()` trusts the global guard without a runtime assertion.
+- `resolveTags` check-then-insert can 500 one request on a concurrent same-name race
+  (pre-existing pattern).
 - `auth.guard.ts` comment "Dev skips the token check for localhost" predates this
-  chapter (the bypass keys on `NODE_ENV`, not localhost).
-- `SPEC-owner-backfill.md` says "zero writes" on zero-users abort where the suite
-  asserts "zero backfill writes" (Step 2 DDL legitimately precedes Step 3).
-- `backfill-owner.ts` re-inlines the tag DDL string instead of reusing `TAG_TABLE_DDL`
-  (drift risk between the two literals).
+  chapter (the bypass keys on `NODE_ENV`).
 - Dead `table === 'note' ? 'id' : 'id'` ternary in `owner-backfill.e2e-spec.ts`;
   `countWhereNull` called twice per table.
-- `foreign_key_check` runs after `COMMIT` in the tag rebuild (practically unreachable;
-  the Step 1 backup is the documented rollback).
-- `@Principal()` trusts the global guard without a runtime assertion.
+- Backup file has umask permissions (same exposure as `life.db`); `main()` prints the
+  owner sub to the operator console only.
 - `docs/intent/redis-shared-state.md` received a one-line carve-out cross-reference in
   the intent commit — chapter-level bookkeeping outside any task's blast radius.
-- Lane 2 nits: `resolveTags` check-then-insert race (pre-existing pattern); backup file
-  has umask permissions (same exposure as `life.db`); `main()` prints the owner sub to
-  the operator console only.
 
 ## Machine-readable verdicts
 
 ```json
 {"suite_gate":"GREEN","app":"pass","idp":"98/98(runInBand)","note":"74/74","lint":"clean","contention":"adjudicated"}
-{"round":1,"lanes":{"correctness-domain":"UNVERIFIED","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"},"blockers_open":0}
-{"gate":"INCONCLUSIVE","score":"4/5","merge_condition":"N/N","merge_blocked_by":"user explicit-request rule","next":"re-run lane 1 on user authorization"}
+{"round":1,"lanes":{"correctness-domain":"UNVERIFIED","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"},"note":"lane 1 session cancelled; fail-closed = failure"}
+{"round":2,"re_run":["correctness-domain"],"lanes":{"correctness-domain":"PASS_WITH_NITS","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"}}
+{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"BLOCKED_BY_USER_EXPLICIT_REQUEST"}
 ```
 
 ## Next
 
-Lane 1 (correctness/domain) must run for the gate to reach N/N. Per the user's
-standing instruction the merge is blocked until they explicitly request it; lane 1's
-re-run is likewise awaiting their word.
+The gate is complete and the chapter is merge-ready. Per the user's standing
+instruction, the merge to `master` happens only on their explicit request. The human
+deploy checklist (backfill script **before** booting the new code) is in
+`tasks/todo-notes-user-boundary.md`.
