@@ -32,5 +32,23 @@ export type { ThemeToggleProps } from './components/theme-toggle';
 export { IconLink } from './components/icon-link';
 export type { IconLinkProps } from './components/icon-link';
 
+export { PageShell } from './components/page-shell';
+export type { PageShellProps } from './components/page-shell';
+
+export { NavBar } from './components/nav-bar';
+export type { NavBarProps } from './components/nav-bar';
+
+export { PageTitle } from './components/page-title';
+export type { PageTitleProps } from './components/page-title';
+
+export { FabLink } from './components/fab-link';
+export type { FabLinkProps } from './components/fab-link';
+
+export { EditorToolbar } from './components/editor-toolbar';
+export type { EditorToolbarProps, EditorToolbarBack } from './components/editor-toolbar';
+
+export { EditorScreen } from './components/editor-screen';
+export type { EditorScreenProps } from './components/editor-screen';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';

@@ -1,0 +1,100 @@
+/*
+ * Block -> legacy class mapping (derived from apps/app/app/globals.css).
+ *
+ * Every rule below reproduces the computed styles of exactly one legacy rule
+ * (element rule or class group). The legacy class names never appear in this
+ * file — the notes port re-supplies them via `className` as frozen e2e hooks.
+ *
+ * | block          | legacy rule(s)                    |
+ * |----------------|-----------------------------------|
+ * | PageShell      | bare `main`                       |
+ * | NavBar         | `.nav-bar` + `.header-actions`    |
+ * | PageTitle      | bare `h1` + `.page-title`         |
+ * | FabLink        | `.add-note` (+ its `:focus-visible`) |
+ * | EditorToolbar  | `.editor-toolbar` (back control visuals are IconButton's) |
+ * | EditorScreen   | `.editor-screen`                  |
+ *
+ * Token policy: all lengths/colors come from tokens.css custom properties,
+ * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
+ * atoms.css does (`--space-2` = 2rem, `--space-1` = 1rem). Non-tokenizable
+ * keywords/units are kept verbatim: `auto`, `flex`, `fixed`, `100dvh`, `10`,
+ * `700`, `-0.02em` (no letter-spacing token exists in the frozen token layer),
+ * and the `env(safe-area-inset-*)` values.
+ */
+
+/* --------------------------------------------------------- PageShell */
+
+.ui-page {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-1) var(--space-1) calc(var(--space-5) + env(safe-area-inset-bottom));
+}
+
+/* ----------------------------------------------------------- NavBar */
+
+.ui-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin: 0 0 var(--space-0-25);
+}
+
+.ui-nav-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin-left: auto;
+}
+
+/* -------------------------------------------------------- PageTitle */
+
+.ui-page-title {
+  font-size: var(--space-2);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-1);
+}
+
+/* ---------------------------------------------------------- FabLink */
+
+.ui-fab-link {
+  position: fixed;
+  right: calc(var(--space-1) + env(safe-area-inset-right));
+  bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+  box-shadow: var(--shadow-fab);
+}
+
+.ui-fab-link:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+/* ---------------------------------------------------- EditorToolbar */
+
+.ui-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0-5);
+  margin-bottom: var(--space-0-5);
+}
+
+/* ----------------------------------------------------- EditorScreen */
+
+.ui-editor-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: max(var(--space-0-75), env(safe-area-inset-top)) var(--space-1)
+    calc(var(--space-1) + env(safe-area-inset-bottom));
+}
