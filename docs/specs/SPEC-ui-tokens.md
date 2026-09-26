@@ -56,8 +56,12 @@ Token naming: `--<category>-<qualifier>`, values preserved verbatim from today:
 }
 ```
 
-Spacing tokens cover only the literals that exist (`0.25/0.4/0.5/0.75/0.9/1/1.25rem`,
-`3rem`, `5rem`) — no invented scale values.
+Spacing/dimension tokens cover **exactly** the rem lengths present in `globals.css` —
+the full inventory is `0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8,
+0.85, 0.9, 0.95, 1, 1.05, 1.25, 2, 3, 5` rem (20 distinct values; `1.05rem` is the
+`.editor-body` font-size → a type token) plus the px literals `1px` borders, `40px`
+icon square, `16px/1.5` body type. No invented scale values: the inventory is derived
+mechanically from `globals.css` and every value is locked in the token-value test.
 
 ## Testing Strategy
 

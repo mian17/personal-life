@@ -7,8 +7,8 @@ One deliverable, four independently testable capabilities with one-way dependenc
 | Module id | Responsibility | Depends on |
 |---|---|---|
 | `ui-tokens` | `@life/ui` package skeleton + the visual language: design tokens (CSS custom properties), theme contract (data-theme + prefers-color-scheme + pre-hydration snippet) | — |
-| `ui-atoms` | Fixed-API visual primitives: Button, IconButton, Input, Textarea, Pill, Card, StatusText, LocalTime, ConfirmButton, ThemeToggle | `ui-tokens` |
-| `ui-blocks` | App-level composition blocks: PageShell, NavBar, PageTitle, EmptyState, List/ListItem, TagFilterNav, FabLink, EditorToolbar, AlertBanner, SearchField | `ui-atoms` |
+| `ui-atoms` | Fixed-API visual primitives: Button, IconButton, IconLink, Input, Textarea, Pill, Card, StatusText, LocalTime, ConfirmButton, ThemeToggle | `ui-tokens` |
+| `ui-blocks` | App-level composition blocks: PageShell, NavBar, PageTitle, EmptyState, List/ListItem, TagFilterNav, FabLink, EditorToolbar, EditorScreen, AlertBanner, SearchField, PillGroup, PageActions | `ui-atoms` |
 | `notes-port` | `apps/app` rewritten onto `@life/ui`, pixel-identical, frozen e2e selector surface, `globals.css` absorbed into the package | `ui-blocks` |
 
 Build order: `ui-tokens` → `ui-atoms` → `ui-blocks` → `notes-port`.

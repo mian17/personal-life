@@ -25,7 +25,7 @@ for these without any visible change.
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
 <Pill size="chip" | "filter" active? as="span" | "a" href? />
 <Card>children</Card>                // the .note surface: panel bg, radius-lg, overflow hidden
-<StatusText aria-live="polite">children</StatusText>
+<StatusText role="status" aria-live="polite">children</StatusText> // owns .editor-status
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
 <ConfirmButton message: string>children</ConfirmButton>
    // window.confirm gate on submit; className passthrough carries frozen hooks
@@ -34,15 +34,18 @@ for these without any visible change.
 <ThemeToggle />                      // system→light→dark cycle, aria-pressed, localStorage('theme')
 ```
 
-Mapping from today: `Button` absorbs the global `button` rule + button overrides
-(`.note-delete`, `.trash-restore`, `.trash-empty`, `.editor-back`, `.editor-save`,
-`.tag-chip-remove`, `.editor-conflict-actions button`); `IconButton` absorbs the
-button-side 40×40 bordered square (`.theme-toggle`, `.editor-back`, `.editor-save`);
+Mapping from today (each class has exactly one owner): `Button` absorbs the global
+`button` rule + button overrides (`.note-delete`, `.trash-restore`, `.trash-empty`,
+`.tag-chip-remove`, `.editor-conflict-actions button`); `IconButton` is the **sole**
+owner of the 40×40 bordered square classes `.theme-toggle`, `.editor-back`,
+`.editor-save` — all three render as `<button>` today (note-editor.tsx:346, :352);
 `IconLink` absorbs `.header-icon` — which in the app is used **only on `next/link`
-anchors** (page.tsx:30, trash/page.tsx:17), so it must render a link; `Pill` absorbs
-`.tag-chip`/`.tag-chip-remove`/`.filters a` pills; `Textarea` variant `editor` absorbs
-`.editor-body`; `LocalTime` / `ConfirmButton` / `ThemeToggle` are direct
-generalizations of `app/local-time.tsx`, `app/confirm-submit.tsx`,
+anchors** (page.tsx:30, trash/page.tsx:17), so it must render a link; `StatusText`
+owns `.editor-status` (span `role="status"`, note-editor.tsx:349); `ConfirmButton`
+owns the frozen `trash-delete` hook (on `ConfirmSubmit`, trash/page.tsx:59-64);
+`Pill` absorbs `.tag-chip`/`.tag-chip-remove`/`.filters a` pills; `Textarea` variant
+`editor` absorbs `.editor-body`; `LocalTime` / `ConfirmButton` / `ThemeToggle` are
+direct generalizations of `app/local-time.tsx`, `app/confirm-submit.tsx`,
 `app/theme-toggle.tsx`.
 
 ## Tech Stack

@@ -33,6 +33,8 @@ and the notes app's current pages map onto these one-to-one.
            actions?: ReactNode>children</PillGroup> // pill container (with optional
                                                     //   label + per-pill remove slots) —
                                                     //   owns .editor-legacy-tags
+<PageActions>children</PageActions>                // page-level action container —
+                                                   //   owns .trash-actions
 ```
 
 ## Tech Stack

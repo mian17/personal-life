@@ -63,7 +63,8 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 direct generalization of an existing app component.
 
 **Acceptance:**
-- [ ] Card (`.note` surface values), StatusText (`aria-live`), LocalTime (empty-first
+- [ ] Card (`.note` surface values), StatusText (`role="status" aria-live="polite"`,
+      owns `.editor-status`), LocalTime (empty-first
       render, `<time dateTime>`), ConfirmButton (cancel path never submits;
       `className` passthrough carries frozen hooks such as `trash-delete`),
       ThemeToggle (system→light→dark cycle, `aria-pressed`, `localStorage('theme')`),
@@ -95,7 +96,7 @@ direct generalization of an existing app component.
 
 **Depends on:** Task 3. **Scope:** M.
 
-## Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField, PillGroup
+## Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField, PillGroup, PageActions
 
 **Acceptance:**
 - [ ] EmptyState copy is passed in; List/ListItem typed item props + render-prop
@@ -103,12 +104,13 @@ direct generalization of an existing app component.
       state (accessible names are the item names — frozen); AlertBanner tone/actions;
       SearchField visual + 300ms debounce emitting `onQueryChange` only (no routing
       knowledge); PillGroup pill container (optional label + per-pill remove slots)
-      owning `.editor-legacy-tags` values.
+      owning `.editor-legacy-tags` values; PageActions page-level action container
+      owning `.trash-actions` values.
 - [ ] Unit tests: structure, slots, debounce with fake timers.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
-**Blast radius — allowed:** `packages/ui/src/components/{empty-state,list,tag-filter-nav,alert-banner,search-field,pill-group}.tsx`,
+**Blast radius — allowed:** `packages/ui/src/components/{empty-state,list,tag-filter-nav,alert-banner,search-field,pill-group,page-actions}.tsx`,
 `packages/ui/src/styles/blocks.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
@@ -137,6 +139,8 @@ direct generalization of an existing app component.
       IconLink, never IconButton).
 - [ ] `splitBody`/delete actions/routing/debounce wiring stay in app code; JSX only
       from `@life/ui`.
+- [ ] PWA constants in `layout.tsx` unchanged (`viewport.themeColor` values stay
+      app-owned and byte-identical).
 - [ ] lint + unit + build green.
 
 **Verify:** `npm run lint -w apps/app` · `npm run test:unit -w apps/app` ·
@@ -175,6 +179,8 @@ byte-identical (drain/keepalive/expectedVersion/409/history.replaceState).
 **Acceptance:**
 - [ ] `apps/app/app/globals.css` deleted; `@life/ui/styles.css` imported in
       `layout.tsx`; any surviving app CSS is a documented frozen-hook rule only.
+- [ ] PWA constants untouched: `viewport.themeColor` (`layout.tsx`) and
+      `public/manifest.json` colors byte-identical (SC4 of `SPEC-ui-tokens`).
 - [ ] All suites green both workspaces; specs updated for any drift discovered
       during the port (specs first).
 - [ ] Chapter diff self-review against the plan's blast radii.

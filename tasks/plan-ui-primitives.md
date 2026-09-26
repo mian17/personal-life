@@ -49,9 +49,9 @@ lead reviews, commits, and runs the gates.
 - [ ] `packages/ui` lints/tests green; token-value table enforced; atoms render
 
 ### Phase 2: Component library
-- [ ] Task 3: `ui-atoms` batch B — Card, StatusText, LocalTime, ConfirmButton, ThemeToggle
-- [ ] Task 4: `ui-blocks` batch A — PageShell, NavBar, PageTitle, FabLink, EditorToolbar
-- [ ] Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField
+- [ ] Task 3: `ui-atoms` batch B — Card, StatusText, LocalTime, ConfirmButton, ThemeToggle, IconLink
+- [ ] Task 4: `ui-blocks` batch A — PageShell, NavBar, PageTitle, FabLink, EditorToolbar, EditorScreen
+- [ ] Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField, PillGroup, PageActions
 
 ### Checkpoint: after Tasks 3–5 (library complete)
 - [ ] All atoms/blocks tested; grep proves zero notes-domain identifiers in `packages/ui`
