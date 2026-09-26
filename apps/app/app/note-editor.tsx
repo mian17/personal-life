@@ -2,8 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ChevronLeft, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { Note } from '@life/shared';
+import {
+  AlertBanner,
+  Button,
+  EditorScreen,
+  EditorToolbar,
+  IconButton,
+  Pill,
+  PillGroup,
+  StatusText,
+  Textarea,
+} from '@life/ui';
 import { dedupeTags, parseInlineTags } from './tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
@@ -341,34 +352,46 @@ export function NoteEditor({ note }: { note?: Note }) {
   const legacyChips = retained.filter((name) => !inlineNames.has(name.toLowerCase()));
 
   return (
-    <div className="editor-screen">
-      <div className="editor-toolbar">
-        <button type="button" className="editor-back" aria-label="Back" onClick={() => void leave()}>
-          <ChevronLeft size={20} aria-hidden />
-        </button>
-        <span className="editor-status" role="status" aria-live="polite">
-          {STATUS_TEXT[status]}
-        </span>
-        <button type="button" className="editor-save" aria-label="Save" onClick={() => void leave()}>
-          <Check size={20} aria-hidden />
-        </button>
-      </div>
+    <EditorScreen>
+      <EditorToolbar
+        back={{ label: 'Back', onBack: () => void leave() }}
+        status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
+        actions={
+          <IconButton label="Save" onClick={() => void leave()}>
+            <Check size={20} aria-hidden />
+          </IconButton>
+        }
+      />
       {conflictNote && (
-        <div className="editor-conflict" role="alert">
-          <p className="editor-conflict-text">This note changed on another device.</p>
-          <div className="editor-conflict-actions">
-            <button type="button" className="editor-conflict-load" onClick={loadLatest}>
-              Load latest
-            </button>
-            <button type="button" className="editor-conflict-overwrite" onClick={keepMine}>
-              Keep mine (overwrite)
-            </button>
-          </div>
-        </div>
+        <AlertBanner
+          role="alert"
+          actions={
+            <>
+              <Button
+                variant="primary"
+                size="bare"
+                className="editor-conflict-load"
+                onClick={loadLatest}
+              >
+                Load latest
+              </Button>
+              <Button
+                variant="ghost"
+                size="bare"
+                className="editor-conflict-overwrite"
+                onClick={keepMine}
+              >
+                Keep mine (overwrite)
+              </Button>
+            </>
+          }
+        >
+          This note changed on another device.
+        </AlertBanner>
       )}
-      <textarea
+      <Textarea
         ref={textareaRef}
-        className="editor-body"
+        variant="editor"
         aria-label="Note body"
         placeholder="Write a note… use #tags inline"
         value={body}
@@ -380,22 +403,19 @@ export function NoteEditor({ note }: { note?: Note }) {
         onBlur={() => void flush()}
       />
       {legacyChips.length > 0 && (
-        <div className="editor-legacy-tags" role="group" aria-label="Saved tags">
+        <PillGroup role="group" aria-label="Saved tags">
           {legacyChips.map((name) => (
-            <span key={name} className="tag-chip">
+            <Pill
+              key={name}
+              size="chip"
+              onRemove={() => removeLegacyTag(name)}
+              removeLabel={`Remove tag ${name}`}
+            >
               {name}
-              <button
-                type="button"
-                className="tag-chip-remove"
-                aria-label={`Remove tag ${name}`}
-                onClick={() => removeLegacyTag(name)}
-              >
-                <X size={14} aria-hidden />
-              </button>
-            </span>
+            </Pill>
           ))}
-        </div>
+        </PillGroup>
       )}
-    </div>
+    </EditorScreen>
   );
 }
