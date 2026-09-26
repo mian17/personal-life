@@ -32,11 +32,21 @@ packages/ui/
   package.json          # @life/ui, workspace-registered (root workspaces += "packages/ui")
   tsconfig.json         # extends tsconfig.base.json, jsx react-jsx, noEmit
   src/index.ts          # barrel (components exported from later modules)
-  src/styles.css        # the single consumer entry: @import './styles/tokens.css';
-                        #   later modules append @import './styles/atoms.css' / 'blocks.css'
+  src/styles.css        # the single consumer entry, fixed import order:
+                        #   @import './styles/tokens.css'; './styles/base.css';
+                        #   './styles/atoms.css'; './styles/blocks.css';
+                        #   (atoms/blocks appended by later modules)
   src/styles/tokens.css # the token layer (only token file in this module)
+  src/styles/base.css   # base element layer: `* { box-sizing: border-box }` and
+                        #   `html, body` margin/padding/background/color/font — values
+                        #   from tokens only (owns globals.css:39-50)
   test/                 # unit tests
 ```
+
+Ownership note: the base element rules (`*`, `html, body`) are owned by `base.css`
+(this module); the bare `h1` and `main` element rules are owned by `PageTitle` /
+`PageShell` respectively (see `SPEC-ui-blocks.md`). Every rule that leaves
+`globals.css` has exactly one relocation target.
 
 ## Code Style
 

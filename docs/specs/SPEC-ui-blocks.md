@@ -44,7 +44,8 @@ and the notes app's current pages map onto these one-to-one.
 `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`. `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
 `.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
-by `Button`, see `SPEC-ui-atoms`). The remaining legacy classes are owned per
+by `Button`, see `SPEC-ui-atoms`). Element defaults: bare `h1` → `PageTitle`,
+`main` → `PageShell`. The remaining legacy classes are owned per
 `SPEC-ui-atoms` and the block contracts above (`.empty` → EmptyState, `.filters` →
 TagFilterNav, `.nav-bar`/`.header-actions` → NavBar, `.page-title` → PageTitle,
 `.add-note` → FabLink, `.search-box` → SearchField, `.editor-toolbar` →

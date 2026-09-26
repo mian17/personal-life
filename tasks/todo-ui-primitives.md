@@ -18,8 +18,12 @@ value table + theme contract, and a working test harness.
 - [ ] `tokens.css`: all colors (dark + light + media-query block) byte-identical to
       `apps/app/app/globals.css`; spacing/radius/type/shadow/layout literals promoted
       to tokens at identical values; theme selectors unchanged.
-- [ ] `src/styles.css` entry exists and `@import`s `./styles/tokens.css` (the entry the
-      consumer imports; later tasks append `atoms.css`/`blocks.css` imports).
+- [ ] `src/styles.css` entry exists and `@import`s `./styles/tokens.css` and
+      `./styles/base.css` in that order (the entry the consumer imports; later tasks
+      append `atoms.css`/`blocks.css` imports).
+- [ ] `base.css` owns the base element rules: `* { box-sizing: border-box }` and
+      `html, body` margin/padding/background/color/font (values from tokens only —
+      globals.css:39-50 relocated verbatim).
 - [ ] A test asserts the token-value table and theme-selector shapes (fails on drift).
 - [ ] `apps/app/next.config.mjs` transpilePackages gains `@life/ui`; apps/app jest
       `moduleNameMapper` gains `^@life/ui$` → `packages/ui/src`.
@@ -45,7 +49,8 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
       primary/ghost/danger/quiet; sizes default/bare), IconButton (40×40 bordered;
       default/ghost), Input/Textarea (global input rules;
       Textarea `variant="editor"` reproduces `.editor-body` values),
-      Pill (chip/filter, active state).
+      Pill (chip/filter, active state; `onRemove`/`removeLabel` remove affordance
+      owning `.tag-chip-remove`).
 - [ ] Unit tests: rendered classes/roles/labels/element types, variant mapping, passthrough.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
@@ -122,8 +127,9 @@ direct generalization of an existing app component.
 ## Checkpoint: library complete (tech lead, after Task 5)
 
 - [ ] `npm run lint -w packages/ui` + `npm run test -w packages/ui` green.
-- [ ] `grep -ri "note\|trash\|tag-chip\|editor" packages/ui/src` → zero domain names
-      (component files named for their primitive only).
+- [ ] `grep -ri "note\|trash\|tag-chip" packages/ui/src` → zero domain names (words
+      like `editor`, `status`, `pill` are generic UI vocabulary and allowed; component
+      files named for their primitive only).
 - [ ] Spec drift check: specs match what shipped (update specs first if not).
 
 ## Task 6: `notes-port` — layout + home + trash + note pages

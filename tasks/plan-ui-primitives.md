@@ -17,10 +17,10 @@ lead reviews, commits, and runs the gates.
    `@life/shared` pattern). Avoids a dist rebuild loop in dev and a second build in CI.
 2. **One stylesheet entry, composed of partials.** `@life/ui/styles.css` is the single
    file consumers import; it `@import`s the partials `src/styles/tokens.css`,
-   `src/styles/atoms.css`, `src/styles/blocks.css` in that fixed order (added as each
-   module lands). Mirrors today's single `globals.css`, so cascade behavior is
-   preserved. Per-component CSS files are rejected: import-order specificity is a
-   pixel-drift risk.
+   `src/styles/base.css`, `src/styles/atoms.css`, `src/styles/blocks.css` in that
+   fixed order (added as each module lands). Mirrors today's single `globals.css`, so
+   cascade behavior is preserved. Per-component CSS files are rejected: import-order
+   specificity is a pixel-drift risk.
 3. **Generic `ui-*` class names; frozen e2e hooks ride on `className` passthrough.**
    `button.trash-delete` keeps matching because the app passes `className="trash-delete"`
    (the class needs no CSS to exist). Package code contains zero notes-domain names.

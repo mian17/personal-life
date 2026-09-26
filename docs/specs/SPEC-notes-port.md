@@ -18,11 +18,12 @@ must survive byte-identically — the enumerated list below was verified against
 suite's actual selector surface (`journey.ts`, `journey.suite.ts`, `access-gate.spec.ts`):
 
 - Headings/labels: `Notes` heading; labels `New note`, `Note body`, `Save`,
-  `Search notes`, `Delete …`, `Trash`, `Back`; the per-row restore label pattern
-  `` `Restore ${title}` `` (journey.ts:96); the empty-trash confirmation copy
-  `Trash is empty.` (journey.suite.ts:105); tag-filter link accessible names (the tag
-  name itself, e.g. `errand`, journey.suite.ts:74) — every `aria-label`/visible string
-  in the current markup, verbatim.
+  `Search notes`, `Delete …`, `Trash`, `Back`; the `Saved tags` group label and the
+  per-chip `` `Remove tag ${name}` `` pattern (note-editor.tsx:383, :390); the
+  per-row restore label pattern `` `Restore ${title}` `` (journey.ts:96); the
+  empty-trash confirmation copy `Trash is empty.` (journey.suite.ts:105); tag-filter
+  link accessible names (the tag name itself, e.g. `errand`, journey.suite.ts:74) —
+  every `aria-label`/visible string in the current markup, verbatim.
 - Class hook: `button.trash-delete` must keep matching (passed via `className` on the
   ConfirmButton — that hook lives on `ConfirmSubmit` today, trash/page.tsx:59-64).
 - Element semantics: anchors stay anchors (`IconLink`), buttons stay buttons, and the

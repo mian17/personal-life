@@ -23,7 +23,10 @@ for these without any visible change.
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
-<Pill size="chip" | "filter" active? as="span" | "a" href? />
+<Pill size="chip" | "filter" active? as="span" | "a" href?
+     onRemove?: () => void removeLabel?: string />
+   // remove affordance lives inside the chip (owns .tag-chip-remove);
+   //   removeLabel renders verbatim as the remove button's aria-label (frozen)
 <Card>children</Card>                // the .note surface: panel bg, radius-lg, overflow hidden
 <StatusText role="status" aria-live="polite">children</StatusText> // owns .editor-status
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
