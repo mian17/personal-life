@@ -12,9 +12,14 @@ reviews diffs, commits, runs checkpoints. Test runs: targeted, sequential, ≤3 
 value table + theme contract, and a working test harness.
 
 **Acceptance:**
-- [ ] Root `package.json` `workspaces` gains `packages/ui`; `@life/ui` package.json
-      (private, peerDeps react/react-dom 19, devDeps jest/ts-jest/jsdom/@testing-library/react
-      + react/react-dom for tests), `tsconfig.json` extends `tsconfig.base.json`.
+- [ ] Root `package.json` `workspaces` gains `packages/ui`; `@life/ui` package.json:
+      private; `main`/`types` → `src/index.ts`; `exports` map `{".": "./src/index.ts",
+      "./styles.css": "./src/styles.css"}` (so bare `@life/ui` and `@life/ui/styles.css`
+      both resolve); `scripts` `{lint: "tsc --noEmit", test: "jest"}`; peerDeps
+      react/react-dom 19; devDeps jest/ts-jest/jsdom/@testing-library/react +
+      react/react-dom for tests; `tsconfig.json` extends `tsconfig.base.json` with
+      `jsx: react-jsx`, `noEmit: true`, and `lib` extended with DOM (base has
+      `lib: ["ES2022"]` only).
 - [ ] `tokens.css`: all colors (dark + light + media-query block) byte-identical to
       `apps/app/app/globals.css`; spacing/radius/type/shadow/layout literals promoted
       to tokens at identical values; theme selectors unchanged.
@@ -25,14 +30,16 @@ value table + theme contract, and a working test harness.
       `html, body` margin/padding/background/color/font (values from tokens only —
       globals.css:39-50 relocated verbatim).
 - [ ] A test asserts the token-value table and theme-selector shapes (fails on drift).
-- [ ] `apps/app/next.config.mjs` transpilePackages gains `@life/ui`; apps/app jest
-      `moduleNameMapper` gains `^@life/ui$` → `packages/ui/src`.
+- [ ] `apps/app/package.json` gains `"@life/ui": "*"` dependency; jest
+      `moduleNameMapper` gains `^@life/ui$` → `<rootDir>/../../packages/ui/src/index.ts`;
+      `apps/app/next.config.mjs` transpilePackages gains `@life/ui`.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui` ·
 `npm run test:unit -w apps/app` (existing tests untouched/green).
 
 **Blast radius — allowed:** `packages/ui/**`, root `package.json`,
-`apps/app/next.config.mjs`, `apps/app/package.json` (jest block only).
+`apps/app/next.config.mjs`, `apps/app/package.json` (jest block + `@life/ui`
+dependency entry only).
 **Prohibited:** `apps/app/test/e2e/**`, `apps/app/app/**`, `apps/*/data/**`, lockfile
 hand-edits (`npm install` for workspace registration is allowed and expected).
 
@@ -56,8 +63,8 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
 **Blast radius — allowed:** `packages/ui/src/components/{button,icon-button,input,textarea,pill}.tsx`,
-`packages/ui/src/styles/atoms.css`, `packages/ui/src/index.ts`, `packages/ui/src/lib/cx.ts`,
-`packages/ui/test/*` (5 suites).
+`packages/ui/src/styles/atoms.css`, `packages/ui/src/styles.css` (import append),
+`packages/ui/src/index.ts`, `packages/ui/src/lib/cx.ts`, `packages/ui/test/*` (5 suites).
 **Prohibited:** everything else — no app files, no spec files, no e2e.
 
 **Depends on:** Task 1. **Scope:** M.
@@ -80,7 +87,8 @@ direct generalization of an existing app component.
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
 **Blast radius — allowed:** `packages/ui/src/components/{card,status-text,local-time,confirm-button,theme-toggle,icon-link}.tsx`,
-`packages/ui/src/styles/atoms.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
+`packages/ui/src/styles/atoms.css`, `packages/ui/src/styles.css` (import append),
+`packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
 **Depends on:** Task 2. **Scope:** M.
@@ -98,7 +106,8 @@ direct generalization of an existing app component.
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
 **Blast radius — allowed:** `packages/ui/src/components/{page-shell,nav-bar,page-title,fab-link,editor-toolbar,editor-screen}.tsx`,
-`packages/ui/src/styles/blocks.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
+`packages/ui/src/styles/blocks.css`, `packages/ui/src/styles.css` (import append),
+`packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
 **Depends on:** Task 3. **Scope:** M.
@@ -119,7 +128,8 @@ direct generalization of an existing app component.
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
 **Blast radius — allowed:** `packages/ui/src/components/{empty-state,list,tag-filter-nav,alert-banner,search-field,pill-group,page-actions}.tsx`,
-`packages/ui/src/styles/blocks.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
+`packages/ui/src/styles/blocks.css`, `packages/ui/src/styles.css` (import append),
+`packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
 **Depends on:** Task 4. **Scope:** M.

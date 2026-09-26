@@ -16,6 +16,9 @@ visual language instead of copy-pasted literals.
 - Package: `packages/ui`, name `@life/ui` (sibling of `@life/shared`). **Ships TSX/CSS
   source, no build step** — consumers add `@life/ui` to Next `transpilePackages`
   (pattern already used for `@life/shared`) and map it in jest `moduleNameMapper`.
+  Entry points: `main`/`types` → `src/index.ts`; `exports` map `{".": "./src/index.ts",
+  "./styles.css": "./src/styles.css"}` so bare `@life/ui` and `@life/ui/styles.css`
+  both resolve.
 - Styling: plain CSS with custom properties (no Tailwind/CSS-in-JS — matches the app).
 - React 19 / Next 15 types as **peerDependencies** (consumer provides).
 

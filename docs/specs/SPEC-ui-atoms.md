@@ -37,10 +37,11 @@ for these without any visible change.
 <ThemeToggle />                      // system→light→dark cycle, aria-pressed, localStorage('theme')
 ```
 
-Mapping from today (each class has exactly one owner): `Button` absorbs the global
-`button` rule + button overrides (`.note-delete`, `.trash-restore`, `.trash-empty`,
-`.editor-conflict-actions button`, `.editor-conflict-load`,
-`.editor-conflict-overwrite`); `IconButton` is the **sole** owner of the 40×40
+Mapping from today (each rule has exactly one owner): `Button` absorbs the global
+`button` element rule + button overrides (`.note-delete`, `.trash-restore`,
+`.trash-empty`, `.editor-conflict-actions button`, `.editor-conflict-load`,
+`.editor-conflict-overwrite`); `Input`/`Textarea` absorb the global `textarea, input`
+rule and the bare `textarea` rule (globals.css:139-152); `IconButton` is the **sole** owner of the 40×40
 bordered square classes `.theme-toggle`, `.editor-back`, `.editor-save` — all three
 render as `<button>` today (note-editor.tsx:346, :352); `IconLink` absorbs
 `.header-icon` — which in the app is used **only on `next/link` anchors**
