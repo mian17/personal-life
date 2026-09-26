@@ -1,0 +1,269 @@
+/*
+ * Variant -> legacy class mapping (derived from apps/app/app/globals.css).
+ *
+ * Every rule below reproduces the computed styles of exactly one legacy class
+ * (or legacy class group). The legacy class names never appear in this file —
+ * the notes port re-supplies them via `className` as frozen e2e hooks.
+ *
+ * Button (owns the global `button` rule + button overrides)
+ * | variant   | size    | legacy class(es)                                   |
+ * |-----------|---------|----------------------------------------------------|
+ * | primary   | default | global `button`                                     |
+ * | primary   | bare    | `.editor-conflict-actions button` + `.editor-conflict-load` |
+ * | ghost     | default | (new) outline button, no legacy counterpart         |
+ * | ghost     | bare    | `.editor-conflict-actions button` + `.editor-conflict-overwrite` |
+ * | danger    | default | `.note-delete`                                      |
+ * | danger    | bare    | `.trash-empty`                                      |
+ * | quiet     | default | `.trash-restore`                                    |
+ * | quiet     | bare    | (new) compact quiet button, no legacy counterpart   |
+ *
+ * IconButton (sole owner of the 40x40 bordered square controls)
+ * | variant | legacy class(es)                    |
+ * |---------|-------------------------------------|
+ * | default | `.theme-toggle`, `.editor-back`, `.editor-save` |
+ * | ghost   | (new) chromeless 40x40 control      |
+ *
+ * Input / Textarea (own the global form-control rules)
+ * | component | variant  | legacy class(es)            |
+ * |-----------|----------|-----------------------------|
+ * | Input     | —        | global `textarea, input`    |
+ * | Textarea  | default  | global `textarea, input` + bare `textarea` |
+ * | Textarea  | editor   | those two + `.editor-body`  |
+ *
+ * Pill (owns the chip and filter pill families)
+ * | size   | active | legacy class(es)                     |
+ * |--------|--------|--------------------------------------|
+ * | chip   | no     | `.tag-chip`                          |
+ * | chip   | yes    | `.tag-chip` + `.ui-pill--active` values |
+ * | filter | no     | `.filters a`                         |
+ * | filter | yes    | `.filters a` + `.filters a.active`   |
+ * remove affordance: `.tag-chip-remove` (+ its `:hover`).
+ *
+ * Token policy: all lengths/colors come from tokens.css custom properties.
+ * Every value resolves to tokens.css (including `--on-accent: white`).
+ * Non-tokenizable keywords (`inherit`, `transparent`, `none`, `vertical`,
+ * `pointer`, `100%`, `1`, `600`, `0`) are kept verbatim.
+ */
+
+/* ------------------------------------------------------------------ Button */
+
+.ui-btn {
+  padding: var(--space-0-85) var(--space-1-25);
+  border-radius: var(--radius-md);
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--tap-height);
+}
+
+/* default size — the 48px tap target (global button geometry) */
+.ui-btn--default {
+  min-height: var(--tap-height);
+  padding: var(--space-0-85) var(--space-1-25);
+  border-radius: var(--radius-md);
+}
+
+/* bare size — compact (removes the 48px floor; per-variant geometry below).
+   Border-radius is left to the variant: .note-delete/.trash-restore reset it
+   to 0 while .trash-empty/.editor-conflict-* keep the 10px from the base. */
+.ui-btn--bare {
+  min-height: 0;
+}
+
+.ui-btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  border: var(--border-width) solid var(--border);
+  color: var(--text);
+}
+
+.ui-btn--danger {
+  background: transparent;
+  color: var(--danger);
+}
+
+.ui-btn--quiet {
+  background: transparent;
+  color: var(--accent);
+}
+
+/* ghost/default -> (new) outline button; no legacy counterpart */
+.ui-btn--ghost.ui-btn--default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-height);
+  padding: var(--space-0-85) var(--space-1-25);
+  background: transparent;
+  border: var(--border-width) solid var(--border);
+  color: var(--text);
+}
+
+/* danger/default -> .note-delete */
+.ui-btn--danger.ui-btn--default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-height);
+  min-height: var(--tap-height);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--space-1-25);
+  line-height: 1;
+}
+
+/* danger/bare -> .trash-empty */
+.ui-btn--danger.ui-btn--bare {
+  min-height: 0;
+  padding: var(--space-0-5) var(--space-0-9);
+  background: transparent;
+  border: var(--border-width) solid var(--danger);
+  color: var(--danger);
+  font-size: var(--space-0-9);
+}
+
+/* quiet/default -> .trash-restore */
+.ui-btn--quiet.ui-btn--default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-height);
+  padding: 0 var(--space-0-9);
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--space-0-9);
+  font-weight: 600;
+}
+
+/* primary/bare -> .editor-conflict-actions button + .editor-conflict-load */
+.ui-btn--primary.ui-btn--bare {
+  min-height: 0;
+  padding: var(--space-0-4) var(--space-0-7);
+  font-size: var(--space-0-85);
+  background: var(--accent);
+}
+
+/* ghost/bare -> .editor-conflict-actions button + .editor-conflict-overwrite */
+.ui-btn--ghost.ui-btn--bare {
+  min-height: 0;
+  padding: var(--space-0-4) var(--space-0-7);
+  font-size: var(--space-0-85);
+  background: transparent;
+  border: var(--border-width) solid var(--border);
+  color: var(--text);
+}
+
+/* --------------------------------------------------------- IconButton */
+
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  border: var(--border-width) solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ui-icon-btn:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-icon-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* ------------------------------------------------ Input / Textarea */
+
+.ui-input,
+.ui-textarea {
+  width: 100%;
+  padding: var(--space-0-75);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.ui-textarea {
+  resize: vertical;
+}
+
+.ui-textarea--editor {
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  font-size: var(--fs-editor);
+}
+
+/* ------------------------------------------------------------- Pill */
+
+.ui-pill {
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.ui-pill--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-3);
+  padding: var(--space-0-2) var(--space-0-3) var(--space-0-2) var(--space-0-6);
+  border: var(--border-width) solid var(--border);
+  font-size: var(--space-0-8);
+}
+
+.ui-pill--filter {
+  padding: var(--space-0-35) var(--space-0-7);
+  text-decoration: none;
+  font-size: var(--space-0-85);
+}
+
+.ui-pill--active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ui-pill__remove {
+  min-height: 0;
+  padding: 0 var(--space-0-35);
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--space-0-95);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-pill__remove:hover {
+  color: var(--danger);
+}

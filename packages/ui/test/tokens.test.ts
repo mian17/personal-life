@@ -57,6 +57,7 @@ const DARK_COLORS = {
   '--accent': '#5b8cff',
   '--danger': '#ff6b6b',
   '--border': '#2a2f3a',
+  '--on-accent': 'white',
 } as const;
 
 const LIGHT_COLORS = {
