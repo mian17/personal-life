@@ -85,7 +85,9 @@ direct generalization of an existing app component.
 **Acceptance:**
 - [ ] Semantic markup preserved (`main`, `nav`, `h1`, `a`/`button`); slots compose
       (leading/trailing/actions/back/status); safe-area + content-width from tokens;
-      EditorScreen is the full-screen fixed editor container owning `.editor-screen`.
+      EditorScreen is the full-screen fixed editor container owning `.editor-screen`;
+      EditorToolbar's back control is a **button** with an `onBack` handler (today's
+      `leave()` flushes autosave), never an href.
 - [ ] Unit tests for structure + slot composition.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
@@ -102,8 +104,9 @@ direct generalization of an existing app component.
 - [ ] EmptyState copy is passed in; List/ListItem typed item props + render-prop
       trailing/delete slots (zero notes types); TagFilterNav pill nav with active
       state (accessible names are the item names — frozen); AlertBanner tone/actions;
-      SearchField visual + 300ms debounce emitting `onQueryChange` only (no routing
-      knowledge); PillGroup pill container (optional label + per-pill remove slots)
+      SearchField visual + controlled `value` prop + 300ms debounce emitting
+      `onQueryChange` only (no routing knowledge); PillGroup pill container (optional
+      label + per-pill remove slots)
       owning `.editor-legacy-tags` values; PageActions page-level action container
       owning `.trash-actions` values.
 - [ ] Unit tests: structure, slots, debounce with fake timers.

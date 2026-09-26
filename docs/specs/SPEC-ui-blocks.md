@@ -20,11 +20,12 @@ and the notes app's current pages map onto these one-to-one.
                                                    //   snippet, trailing, deleteAction? (render prop)
 <TagFilterNav items: {name, href, active}[] />     // .filters pill nav
 <FabLink href label>children</FabLink>             // .add-note fixed action
-<EditorToolbar back={{href,label}} status?: ReactNode
-               actions?: ReactNode />              // .editor-toolbar
+<EditorToolbar back={{label, onBack: () => void}}  // back is a BUTTON (frozen:
+               status?: ReactNode                  //   onBack is leave(), which
+               actions?: ReactNode />              //   flushes autosave) — never an href
 <AlertBanner tone="warning" actions?: ReactNode>   // .editor-conflict generalized
    children</AlertBanner>
-<SearchField label placeholder
+<SearchField label placeholder value?: string      // controlled current query
              onQueryChange: (q: string) => void /> // visual + 300ms debounce ONLY;
                                                    //   routing stays in the app
 <EditorScreen>children</EditorScreen>            // full-screen fixed editor container
@@ -36,6 +37,20 @@ and the notes app's current pages map onto these one-to-one.
 <PageActions>children</PageActions>                // page-level action container —
                                                    //   owns .trash-actions
 ```
+
+## CSS ownership (legacy `globals.css` classes owned by blocks)
+
+`List`/`ListItem` own the row internals: `.notes`, `.note-link`, `.note form`,
+`.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
+`.note-snippet`. `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
+`.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
+by `Button`, see `SPEC-ui-atoms`). The remaining legacy classes are owned per
+`SPEC-ui-atoms` and the block contracts above (`.empty` → EmptyState, `.filters` →
+TagFilterNav, `.nav-bar`/`.header-actions` → NavBar, `.page-title` → PageTitle,
+`.add-note` → FabLink, `.search-box` → SearchField, `.editor-toolbar` →
+EditorToolbar, `.editor-screen` → EditorScreen, `.editor-legacy-tags` → PillGroup).
+Invariant: every class in `globals.css` has **exactly one** owner — zero classes
+unowned or double-owned.
 
 ## Tech Stack
 
