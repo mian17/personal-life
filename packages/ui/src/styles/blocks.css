@@ -15,7 +15,7 @@
  * | EditorScreen   | `.editor-screen`                  |
  * | EmptyState     | `.empty` + `.empty p`             |
  * | List           | `.notes`                          |
- * | ListItem       | `.note` row part + `.note-link` + `.note form` + `.note-text` + `.note-title` + `.note-sub` + `.note-sub time` + `.note-sep` + `.note-snippet` (the `.note` surface part is Card's) |
+ * | ListItem       | `.note` surface + row + `.note-link` + `.note form` + `.note-text` + `.note-title` + `.note-sub` + `.note-sub time` + `.note-sep` + `.note-snippet` (the class rode the row `li`) |
  * | TagFilterNav   | `.filters` container only (the pills are Pill's) |
  * | AlertBanner    | `.editor-conflict` + `.editor-conflict-text` + `.editor-conflict-actions` (its buttons are Button's) |
  * | SearchField    | `.search-box` container only (the input visuals are Input's) |
@@ -131,11 +131,14 @@
 
 /* ---------------------------------------------------------- ListItem */
 
-/* The `.note` row part: Card owns the surface (panel bg, --radius-lg,
-   overflow); ListItem owns the row layout. */
+/* The `.note` rule in full: surface (panel bg, --radius-lg, overflow) followed
+   by row layout. Both halves ride the row `li`, so ListItem owns both. */
 .ui-list-item {
   display: flex;
   align-items: stretch;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .ui-list-item__link {

@@ -42,7 +42,8 @@
  * Card / StatusText / IconLink (batch B)
  * | component  | legacy class(es)                                          |
  * |------------|-----------------------------------------------------------|
- * | Card       | `.note` surface part (panel bg, `--radius-lg`, overflow)  |
+ * | Card       | (none — generic surface atom; the legacy `.note` surface  |
+ * |            |  and row both rode the row `li`, owned by ListItem)        |
  * | StatusText | `.editor-status`                                          |
  * | IconLink   | `.header-icon` (+ its `:focus-visible`)                   |
  * LocalTime / ConfirmButton / ThemeToggle add no CSS: they compose
@@ -279,8 +280,10 @@
 
 /* ------------------------------------------------------------- Card */
 
-/* The legacy `.note` surface part only: panel background, radius, clipping.
-   The `.note` flex row is owned by ListItem (see SPEC-ui-blocks). */
+/* The legacy `.note` surface declarations (panel background, `--radius-lg`,
+   clipping) are owned by ListItem: the `.note` class rode the row `li`, so the
+   shipped row carries both surface and row layout. Card stays as a generic panel
+   atom for future apps and has no legacy counterpart. */
 .ui-card {
   background: var(--panel);
   border-radius: var(--radius-lg);

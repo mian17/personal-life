@@ -1,4 +1,4 @@
-import './globals.css';
+import '@life/ui/styles.css';
 
 export const metadata = {
   title: 'Personal Life',

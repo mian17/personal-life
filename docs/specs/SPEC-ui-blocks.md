@@ -42,7 +42,7 @@ and the notes app's current pages map onto these one-to-one.
 ## CSS ownership (legacy `globals.css` classes owned by blocks)
 
 `List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
-layout — the class is borne by the `ListItem` `li`, note-list.tsx:22), `.note-link`,
+layout — the legacy class rode the row `li`, now carried by `ListItem`), `.note-link`,
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`. `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
 `.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
@@ -52,6 +52,9 @@ by `Button`, see `SPEC-ui-atoms`). Element defaults: bare `h1` → `PageTitle`,
 TagFilterNav, `.nav-bar`/`.header-actions` → NavBar, `.page-title` → PageTitle,
 `.add-note` → FabLink, `.search-box` → SearchField, `.editor-toolbar` →
 EditorToolbar, `.editor-screen` → EditorScreen, `.editor-legacy-tags` → PillGroup).
+`Card` is a generic surface atom with **no** legacy class counterpart: the legacy
+`.note` surface *and* row both rode the row `li`, so `ListItem` owns the surface
+declarations (panel bg, `--radius-lg`, overflow) as well as the row layout.
 Invariant: every class in `globals.css` has **exactly one** owner — zero classes
 unowned or double-owned.
 

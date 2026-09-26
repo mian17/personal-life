@@ -29,9 +29,11 @@ for these without any visible change.
      onRemove?: () => void removeLabel?: string />
    // remove affordance lives inside the chip (owns .tag-chip-remove);
    //   removeLabel renders verbatim as the remove button's aria-label (frozen)
-<Card>children</Card>                // generic panel surface (same token values as the
-                                   //   legacy .note surface; the legacy .note ROW
-                                   //   element is owned by ListItem — see SPEC-ui-blocks)
+<Card>children</Card>                // generic panel surface atom (token values match the
+                                   //   legacy .note surface); no legacy class
+                                   //   counterpart in the shipped app — the `.note`
+                                   //   surface+row are owned by ListItem, whose `li`
+                                   //   bore the class (see SPEC-ui-blocks)
 <StatusText role="status" aria-live="polite">children</StatusText> // owns .editor-status
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
 <ConfirmButton message: string>children</ConfirmButton>
