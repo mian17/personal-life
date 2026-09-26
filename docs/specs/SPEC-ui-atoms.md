@@ -13,33 +13,43 @@ for these without any visible change.
 
 ```tsx
 // All atoms: className passthrough (frozen e2e hooks ride on it), no style props.
-<Button variant="primary" | "ghost" | "danger" size="default" | "bare"
+// Element semantics are frozen: today's anchors render as links, today's buttons
+// as buttons — an atom never swaps the element type.
+<Button variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare"
         type="submit" | "button" onClick? formAction? aria-label? title?>
-<IconButton label: string            // renders aria-label={label} — text is part of the frozen contract
+<IconButton label: string            // <button>; renders aria-label={label} — frozen text
             variant="default" | "ghost">
+<IconLink href label>children</IconLink>  // <a>/<Link> with the 40×40 bordered visual
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
-<Textarea aria-label? placeholder? rows? name? defaultValue? onChange? />
+<Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
+          variant="default" | "editor" />   // "editor" reproduces .editor-body values
 <Pill size="chip" | "filter" active? as="span" | "a" href? />
 <Card>children</Card>                // the .note surface: panel bg, radius-lg, overflow hidden
 <StatusText aria-live="polite">children</StatusText>
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
-<ConfirmButton message: string>children</ConfirmButton>  // window.confirm gate on submit
+<ConfirmButton message: string>children</ConfirmButton>
+   // window.confirm gate on submit; className passthrough carries frozen hooks
+   // (e.g. the port passes className="trash-delete" here — that hook lives on
+   //  ConfirmSubmit in the app today, trash/page.tsx)
 <ThemeToggle />                      // system→light→dark cycle, aria-pressed, localStorage('theme')
 ```
 
-Mapping from today: `Button` absorbs the global `button` rule + all overrides
-(`.note-delete`, `.trash-restore`, `.trash-delete`, `.trash-empty`, `.editor-back`,
-`.editor-save`, `.tag-chip-remove`, conflict buttons); `IconButton` absorbs the 40×40
-bordered square (`.header-icon`, `.theme-toggle`, `.editor-back`, `.editor-save`);
-`Pill` absorbs `.tag-chip`/`.tag-chip-remove`/`.filters a` pills; `LocalTime` /
-`ConfirmButton` / `ThemeToggle` are direct generalizations of `app/local-time.tsx`,
-`app/confirm-submit.tsx`, `app/theme-toggle.tsx`.
+Mapping from today: `Button` absorbs the global `button` rule + button overrides
+(`.note-delete`, `.trash-restore`, `.trash-empty`, `.editor-back`, `.editor-save`,
+`.tag-chip-remove`, `.editor-conflict-actions button`); `IconButton` absorbs the
+button-side 40×40 bordered square (`.theme-toggle`, `.editor-back`, `.editor-save`);
+`IconLink` absorbs `.header-icon` — which in the app is used **only on `next/link`
+anchors** (page.tsx:30, trash/page.tsx:17), so it must render a link; `Pill` absorbs
+`.tag-chip`/`.tag-chip-remove`/`.filters a` pills; `Textarea` variant `editor` absorbs
+`.editor-body`; `LocalTime` / `ConfirmButton` / `ThemeToggle` are direct
+generalizations of `app/local-time.tsx`, `app/confirm-submit.tsx`,
+`app/theme-toggle.tsx`.
 
 ## Tech Stack
 
-React 19 function components (TSX source). CSS in `@life/ui/styles.css`, class names
-`ui-<component>[--<variant>]` — generic, never notes-shaped. Styling values come only
-from `ui-tokens` tokens.
+React 19 function components (TSX source). CSS in the `atoms.css` partial (composed by
+`@life/ui/styles.css`, see `SPEC-ui-tokens.md`), class names `ui-<component>[--<variant>]`
+— generic, never notes-shaped. Styling values come only from `ui-tokens` tokens.
 
 ## Commands
 
@@ -49,9 +59,9 @@ from `ui-tokens` tokens.
 ## Project Structure
 
 ```
-packages/ui/src/components/button.tsx        # one file per atom
+packages/ui/src/components/button.tsx        # one file per atom (incl. icon-link.tsx)
 packages/ui/src/index.ts                     # barrel
-packages/ui/src/styles/atoms.css             # imported by styles.css
+packages/ui/src/styles/atoms.css             # partial, composed by styles.css
 packages/ui/test/*.test.tsx                  # one suite per atom
 ```
 
@@ -79,13 +89,14 @@ Rendering + behavior unit tests per atom. Harness: jest + `jsdom` +
 `@testing-library/react` (devDependencies of `packages/ui` only — the map's single
 dependency addition; fallback if disallowed: `renderToStaticMarkup` markup assertions
 in the node environment, behavior checks via stubbed globals). Cover: rendered DOM
-classes/roles/labels, `ConfirmButton` cancel path does not submit, `ThemeToggle`
-cycling + `aria-pressed`, `LocalTime` empty-first render, keyboard focusability.
+classes/roles/labels/element types, `ConfirmButton` cancel path does not submit,
+`ThemeToggle` cycling + `aria-pressed`, `LocalTime` empty-first render, `IconLink`
+renders an anchor, keyboard focusability.
 
 ## Boundaries
 
 - Always: preserve every ARIA label the e2e suite can see; `className` merges, never
-  replaces; forward refs/HTML attrs.
+  replaces; forward refs/HTML attrs; keep today's element types.
 - Ask first: new dependencies; new atoms not in the list above; any prop that takes a
   style value.
 - Never: import app code (types may come from `@life/shared` only); encode notes
@@ -93,7 +104,7 @@ cycling + `aria-pressed`, `LocalTime` empty-first render, keyboard focusability.
 
 ## Success Criteria
 
-1. All 10 atoms render with computed styles identical to today's equivalents.
+1. All 11 atoms render with computed styles identical to today's equivalents.
 2. Frozen e2e surface preserved through `className` passthrough (labels verbatim).
 3. Unit tests green for every atom; `npm run lint -w packages/ui` clean.
 4. Zero notes-specific names in `packages/ui` (grep-enforced in review).

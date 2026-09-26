@@ -14,13 +14,19 @@ locally.
 
 The Playwright suite (`apps/app/test/e2e/**`, human-owned — never run, never edit)
 queries **visible text, ARIA labels, roles, headings, and one CSS class hook**. These
-must survive byte-identically:
+must survive byte-identically — the enumerated list below was verified against the
+suite's actual selector surface (`journey.ts`, `journey.suite.ts`, `access-gate.spec.ts`):
 
 - Headings/labels: `Notes` heading; labels `New note`, `Note body`, `Save`,
-  `Search notes`, `Delete …`, `Trash`, `Back` — every `aria-label` string in the
-  current markup, verbatim.
-- Class hook: `button.trash-delete` must keep matching (passed via `className`, may
-  carry no CSS).
+  `Search notes`, `Delete …`, `Trash`, `Back`; the per-row restore label pattern
+  `` `Restore ${title}` `` (journey.ts:96); the empty-trash confirmation copy
+  `Trash is empty.` (journey.suite.ts:105); tag-filter link accessible names (the tag
+  name itself, e.g. `errand`, journey.suite.ts:74) — every `aria-label`/visible string
+  in the current markup, verbatim.
+- Class hook: `button.trash-delete` must keep matching (passed via `className` on the
+  ConfirmButton — that hook lives on `ConfirmSubmit` today, trash/page.tsx:59-64).
+- Element semantics: anchors stay anchors (`IconLink`), buttons stay buttons, and the
+  `<ul>/<li>/<nav>/<main>/<h1>/<form>/<time>` structure is preserved.
 - Theme contract: `document.documentElement.dataset.theme`, pre-hydration inline
   script in `layout.tsx`, `suppressHydrationWarning` — unchanged.
 - Hydration behavior: `LocalTime` renders empty pre-hydration; no new
@@ -31,7 +37,7 @@ must survive byte-identically:
 | Moves to `@life/ui` | Stays in `apps/app` |
 |---|---|
 | `note-list.tsx` markup → `List/ListItem/EmptyState` | `lib/api`, `lib/auth/**`, route handlers, middleware |
-| `note-editor.tsx` markup → `EditorToolbar/AlertBanner/Textarea/Pill` | the autosave engine (~300 lines: drain, expectedVersion/409, keepalive) |
+| `note-editor.tsx` markup → `EditorScreen` (`.editor-screen`), `EditorToolbar`, `AlertBanner`, `Textarea variant="editor"` (`.editor-body`), `PillGroup` (`.editor-legacy-tags`) | the autosave engine (~300 lines: drain, expectedVersion/409, keepalive) |
 | `search-box.tsx` visuals → `SearchField` | debounce→`router.replace` wiring |
 | `theme-toggle.tsx`, `local-time.tsx`, `confirm-submit.tsx` → atoms | server actions (`app/actions.ts`), `tags.ts`, `note-title.ts` |
 | `globals.css` → `@life/ui/styles.css` (tokens+atoms+blocks) | a minimal app stylesheet only if a frozen hook needs a rule |
@@ -67,7 +73,7 @@ export default async function Home({ searchParams }: Props) {
     <PageShell>
       <NavBar trailing={<ThemeToggle />} />
       <PageTitle>Notes</PageTitle>
-      <SearchField label="Search notes" placeholder="Search notes…" onQueryChange={runSearch} />
+      <SearchField label="Search notes" placeholder="Search notes" onQueryChange={runSearch} />
       <TagFilterNav items={tags.map((t) => ({ name: t.name, href: hrefFor(t), active: t.name === tag }))} />
       <List>{notes.map((n) => <ListItem … deleteAction={<ConfirmButton …/>} />)}</List>
       <FabLink href="/notes/new" label="New note">+</FabLink>

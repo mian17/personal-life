@@ -27,6 +27,12 @@ and the notes app's current pages map onto these one-to-one.
 <SearchField label placeholder
              onQueryChange: (q: string) => void /> // visual + 300ms debounce ONLY;
                                                    //   routing stays in the app
+<EditorScreen>children</EditorScreen>            // full-screen fixed editor container
+                                                 //   (safe-area aware) — owns .editor-screen
+<PillGroup label?: ReactNode
+           actions?: ReactNode>children</PillGroup> // pill container (with optional
+                                                    //   label + per-pill remove slots) —
+                                                    //   owns .editor-legacy-tags
 ```
 
 ## Tech Stack

@@ -18,6 +18,8 @@ value table + theme contract, and a working test harness.
 - [ ] `tokens.css`: all colors (dark + light + media-query block) byte-identical to
       `apps/app/app/globals.css`; spacing/radius/type/shadow/layout literals promoted
       to tokens at identical values; theme selectors unchanged.
+- [ ] `src/styles.css` entry exists and `@import`s `./styles/tokens.css` (the entry the
+      consumer imports; later tasks append `atoms.css`/`blocks.css` imports).
 - [ ] A test asserts the token-value table and theme-selector shapes (fails on drift).
 - [ ] `apps/app/next.config.mjs` transpilePackages gains `@life/ui`; apps/app jest
       `moduleNameMapper` gains `^@life/ui$` → `packages/ui/src`.
@@ -39,10 +41,12 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 **Acceptance:**
 - [ ] Components per `SPEC-ui-atoms.md` prop contracts; `cx` util; `className`
       passthrough merges; HTML attrs/refs forwarded.
-- [ ] Variants reproduce today's rules exactly: Button (primary/ghost/danger/bare),
-      IconButton (40×40 bordered; default/ghost), Input/Textarea (global input rules),
+- [ ] Variants reproduce today's rules exactly: Button (variants
+      primary/ghost/danger/quiet; sizes default/bare), IconButton (40×40 bordered;
+      default/ghost), Input/Textarea (global input rules;
+      Textarea `variant="editor"` reproduces `.editor-body` values),
       Pill (chip/filter, active state).
-- [ ] Unit tests: rendered classes/roles/labels, variant mapping, passthrough.
+- [ ] Unit tests: rendered classes/roles/labels/element types, variant mapping, passthrough.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
@@ -53,49 +57,58 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 
 **Depends on:** Task 1. **Scope:** M.
 
-## Task 3: `ui-atoms` batch B — Card, StatusText, LocalTime, ConfirmButton, ThemeToggle
+## Task 3: `ui-atoms` batch B — Card, StatusText, LocalTime, ConfirmButton, ThemeToggle, IconLink
+
+**Objective:** The behavior-bearing atoms and the link-shaped icon control, each a
+direct generalization of an existing app component.
 
 **Acceptance:**
 - [ ] Card (`.note` surface values), StatusText (`aria-live`), LocalTime (empty-first
-      render, `<time dateTime>`), ConfirmButton (cancel path never submits),
-      ThemeToggle (system→light→dark cycle, `aria-pressed`, `localStorage('theme')`).
+      render, `<time dateTime>`), ConfirmButton (cancel path never submits;
+      `className` passthrough carries frozen hooks such as `trash-delete`),
+      ThemeToggle (system→light→dark cycle, `aria-pressed`, `localStorage('theme')`),
+      IconLink (renders an anchor/Link — `.header-icon` is used on `next/link`
+      anchors today, never a button).
 - [ ] Behavior unit tests incl. fake timers/user events for confirm + toggle.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
-**Blast radius — allowed:** `packages/ui/src/components/{card,status-text,local-time,confirm-button,theme-toggle}.tsx`,
+**Blast radius — allowed:** `packages/ui/src/components/{card,status-text,local-time,confirm-button,theme-toggle,icon-link}.tsx`,
 `packages/ui/src/styles/atoms.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
 **Depends on:** Task 2. **Scope:** M.
 
-## Task 4: `ui-blocks` batch A — PageShell, NavBar, PageTitle, FabLink, EditorToolbar
+## Task 4: `ui-blocks` batch A — PageShell, NavBar, PageTitle, FabLink, EditorToolbar, EditorScreen
 
 **Acceptance:**
 - [ ] Semantic markup preserved (`main`, `nav`, `h1`, `a`/`button`); slots compose
-      (leading/trailing/actions/back/status); safe-area + content-width from tokens.
+      (leading/trailing/actions/back/status); safe-area + content-width from tokens;
+      EditorScreen is the full-screen fixed editor container owning `.editor-screen`.
 - [ ] Unit tests for structure + slot composition.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
-**Blast radius — allowed:** `packages/ui/src/components/{page-shell,nav-bar,page-title,fab-link,editor-toolbar}.tsx`,
+**Blast radius — allowed:** `packages/ui/src/components/{page-shell,nav-bar,page-title,fab-link,editor-toolbar,editor-screen}.tsx`,
 `packages/ui/src/styles/blocks.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
 **Depends on:** Task 3. **Scope:** M.
 
-## Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField
+## Task 5: `ui-blocks` batch B — EmptyState, List/ListItem, TagFilterNav, AlertBanner, SearchField, PillGroup
 
 **Acceptance:**
 - [ ] EmptyState copy is passed in; List/ListItem typed item props + render-prop
       trailing/delete slots (zero notes types); TagFilterNav pill nav with active
-      state; AlertBanner tone/actions; SearchField visual + 300ms debounce emitting
-      `onQueryChange` only (no routing knowledge).
+      state (accessible names are the item names — frozen); AlertBanner tone/actions;
+      SearchField visual + 300ms debounce emitting `onQueryChange` only (no routing
+      knowledge); PillGroup pill container (optional label + per-pill remove slots)
+      owning `.editor-legacy-tags` values.
 - [ ] Unit tests: structure, slots, debounce with fake timers.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
-**Blast radius — allowed:** `packages/ui/src/components/{empty-state,list,tag-filter-nav,alert-banner,search-field}.tsx`,
+**Blast radius — allowed:** `packages/ui/src/components/{empty-state,list,tag-filter-nav,alert-banner,search-field,pill-group}.tsx`,
 `packages/ui/src/styles/blocks.css`, `packages/ui/src/index.ts`, `packages/ui/test/*`.
 **Prohibited:** everything else.
 
@@ -116,9 +129,12 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 `confirm-submit` local components in favor of the atoms.
 
 **Acceptance:**
-- [ ] Frozen contract byte-identical: every `aria-label`/heading/visible text verbatim;
-      `button.trash-delete` hook present; theme script + `suppressHydrationWarning`
-      preserved; LocalTime empty-first preserved.
+- [ ] Frozen contract byte-identical: every `aria-label`/heading/visible text verbatim
+      — including the `` `Restore ${title}` `` label pattern, the `Trash is empty.`
+      copy, and tag-filter link accessible names; `button.trash-delete` hook present
+      (on the ConfirmButton); theme script + `suppressHydrationWarning` preserved;
+      LocalTime empty-first preserved; anchors stay anchors (Trash/Back nav uses
+      IconLink, never IconButton).
 - [ ] `splitBody`/delete actions/routing/debounce wiring stay in app code; JSX only
       from `@life/ui`.
 - [ ] lint + unit + build green.
@@ -135,8 +151,9 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 
 ## Task 7: `notes-port` — note editor markup
 
-**Objective:** Split `app/note-editor.tsx` (401 lines): JSX →
-`EditorToolbar`/`AlertBanner`/`Textarea`/`Pill`; the autosave engine stays
+**Objective:** Split `app/note-editor.tsx` (401 lines): JSX → `EditorScreen`
+(`.editor-screen`), `EditorToolbar`, `AlertBanner`, `Textarea variant="editor"`
+(`.editor-body`), `PillGroup` (`.editor-legacy-tags`); the autosave engine stays
 byte-identical (drain/keepalive/expectedVersion/409/history.replaceState).
 
 **Acceptance:**

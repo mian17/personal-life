@@ -32,7 +32,9 @@ packages/ui/
   package.json          # @life/ui, workspace-registered (root workspaces += "packages/ui")
   tsconfig.json         # extends tsconfig.base.json, jsx react-jsx, noEmit
   src/index.ts          # barrel (components exported from later modules)
-  src/styles/tokens.css # the token layer (only file in this module)
+  src/styles.css        # the single consumer entry: @import './styles/tokens.css';
+                        #   later modules append @import './styles/atoms.css' / 'blocks.css'
+  src/styles/tokens.css # the token layer (only token file in this module)
   test/                 # unit tests
 ```
 

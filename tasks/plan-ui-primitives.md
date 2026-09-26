@@ -15,10 +15,12 @@ lead reviews, commits, and runs the gates.
 1. **Source-shipped package, no build step.** `packages/ui` exports TSX + CSS source;
    consumers use Next `transpilePackages` + jest `moduleNameMapper` (the proven
    `@life/shared` pattern). Avoids a dist rebuild loop in dev and a second build in CI.
-2. **One stylesheet entry.** `@life/ui/styles.css` = tokens + atoms + blocks sections,
-   imported exactly once by the consumer's root layout — mirrors today's single
-   `globals.css`, so cascade behavior is preserved. Per-component CSS files are
-   rejected: import-order specificity is a pixel-drift risk.
+2. **One stylesheet entry, composed of partials.** `@life/ui/styles.css` is the single
+   file consumers import; it `@import`s the partials `src/styles/tokens.css`,
+   `src/styles/atoms.css`, `src/styles/blocks.css` in that fixed order (added as each
+   module lands). Mirrors today's single `globals.css`, so cascade behavior is
+   preserved. Per-component CSS files are rejected: import-order specificity is a
+   pixel-drift risk.
 3. **Generic `ui-*` class names; frozen e2e hooks ride on `className` passthrough.**
    `button.trash-delete` keeps matching because the app passes `className="trash-delete"`
    (the class needs no CSS to exist). Package code contains zero notes-domain names.
@@ -31,6 +33,9 @@ lead reviews, commits, and runs the gates.
 6. **Test harness decision (the one dependency ask):** `packages/ui` devDeps gain
    `jsdom` + `@testing-library/react` (workspace-local, dev-only, zero runtime impact).
    Fallback if disallowed: `renderToStaticMarkup` markup assertions + stubbed globals.
+   Note: the `transpilePackages` half of the `@life/shared` consumption pattern is the
+   proven one; the jest `moduleNameMapper` entry for `@life/ui` is new to `apps/app`
+   (only idp/note-service map `@life/shared` today).
 7. **Agents never run Playwright.** The frozen-contract table is the mechanical
    defense; the human's e2e run + phone check are the acceptance (repo hard line).
 
@@ -70,7 +75,7 @@ lead reviews, commits, and runs the gates.
 | Source-consumed package breaks Next build | Med | proven `@life/shared` pattern (`transpilePackages`); `next build` is Task 6/8 verification |
 | `note-editor.tsx` engine disturbed during JSX move | High | strict markup/logic split (decision 5); engine file bytes reviewed at the diff gate |
 | New devDeps (jsdom/RTL) rejected late | Low | flagged as the single Ask-first item now; documented fallback |
-| jest config edits break existing app tests | Med | `moduleNameMapper` additions only; existing 15 test files untouched; `test:unit` green at every checkpoint |
+| jest config edits break existing app tests | Med | `moduleNameMapper` additions only; the 14 existing unit test files untouched; `test:unit` green at every checkpoint |
 
 ## Open Questions
 
