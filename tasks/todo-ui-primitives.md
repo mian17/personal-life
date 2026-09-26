@@ -2,7 +2,9 @@
 
 Plan: `tasks/plan-ui-primitives.md`. Specs: `docs/specs/MAP-ui-primitives.md` +
 `SPEC-ui-{tokens,atoms,blocks}.md`, `SPEC-notes-port.md`. Branch: `feature/ui-primitives`.
-Status: not started. Each task = one subagent (mandatory task template). Tech lead
+Status: **pre-IMPLEMENT gate VALIDATED 3/3** (8 fresh-context validator rounds; 33
+empirically-proven findings closed in `db26b25..3190d8d`) — implementation ready.
+Each task = one subagent (mandatory task template). Tech lead
 reviews diffs, commits, runs checkpoints. Test runs: targeted, sequential, ≤3 per task.
 
 ## Task 1: `ui-tokens` — package skeleton + token layer + harness
