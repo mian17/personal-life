@@ -16,7 +16,8 @@ value table + theme contract, and a working test harness.
       private; `main`/`types` → `src/index.ts`; `exports` map `{".": "./src/index.ts",
       "./styles.css": "./src/styles.css"}` (so bare `@life/ui` and `@life/ui/styles.css`
       both resolve); `scripts` `{lint: "tsc --noEmit", test: "jest"}`; peerDeps
-      react/react-dom 19; devDeps jest/ts-jest/jest-environment-jsdom/
+      react/react-dom 19, next, lucide-react (all already provided by `apps/app`);
+      devDeps jest/ts-jest/jest-environment-jsdom/
       @testing-library/react + react/react-dom for tests; `tsconfig.json` extends
       `tsconfig.base.json` with `jsx: react-jsx`, `noEmit: true`, and `lib` extended
       with DOM (base has `lib: ["ES2022"]` only).
@@ -63,7 +64,10 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
       Textarea `variant="editor"` reproduces `.editor-body` values),
       Pill (chip/filter, active state; `onRemove`/`removeLabel` remove affordance
       owning `.tag-chip-remove`).
-- [ ] Unit tests: rendered classes/roles/labels/element types, variant mapping, passthrough.
+- [ ] Children/labels: Button accepts text `children` and forwards `aria-label`;
+      IconButton renders icon `children` under its frozen `label` (never self-closing).
+- [ ] Unit tests: rendered classes/roles/labels/element types, variant mapping,
+      passthrough.
 
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
@@ -84,7 +88,8 @@ direct generalization of an existing app component.
       owns `.editor-status`), LocalTime (empty-first
       render, `<time dateTime>`), ConfirmButton (cancel path never submits;
       `className` passthrough carries frozen hooks such as `trash-delete`),
-      ThemeToggle (system→light→dark cycle, `aria-pressed`, `localStorage('theme')`),
+      ThemeToggle (system→light→dark cycle, `aria-pressed`, `localStorage('theme')`;
+      Monitor/Sun/Moon icons from the `lucide-react` peerDep),
       IconLink (renders an anchor/Link — `.header-icon` is used on `next/link`
       anchors today, never a button).
 - [ ] Behavior unit tests incl. fake timers/user events for confirm + toggle.
@@ -186,7 +191,9 @@ byte-identical (drain/keepalive/expectedVersion/409/history.replaceState).
 
 **Acceptance:**
 - [ ] Engine logic bytes unchanged (diff-reviewed); only markup moves.
-- [ ] Conflict banner labels/actions verbatim; `Note body` label preserved.
+- [ ] Conflict banner labels/actions verbatim; `Note body` label preserved; the
+      `Saved tags` group label and per-chip `` `Remove tag ${name}` `` aria-labels
+      verbatim (PillGroup/Pill `removeLabel` wiring).
 - [ ] lint + unit + build green.
 
 **Verify:** `npm run lint -w apps/app` · `npm run test:unit -w apps/app` ·

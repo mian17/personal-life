@@ -45,9 +45,11 @@ suite's actual selector surface (`journey.ts`, `journey.suite.ts`, `access-gate.
 
 ## Tech Stack
 
-No new runtime deps. `next.config.mjs` gains `transpilePackages: ['@life/shared',
-'@life/ui']`; root `workspaces` gains `packages/ui`; `apps/app` depends on
-`"@life/ui": "*"`; jest `moduleNameMapper` gains `^@life/ui$` → source path.
+No new runtime deps: `apps/app` adds none — `next`, `react`, `lucide-react` are
+already its dependencies and satisfy `@life/ui`'s peerDependencies.
+`next.config.mjs` gains `transpilePackages: ['@life/shared', '@life/ui']`; root
+`workspaces` gains `packages/ui`; `apps/app` depends on `"@life/ui": "*"`; jest
+`moduleNameMapper` gains `^@life/ui$` → source path.
 
 ## Commands
 

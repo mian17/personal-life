@@ -20,7 +20,9 @@ visual language instead of copy-pasted literals.
   "./styles.css": "./src/styles.css"}` so bare `@life/ui` and `@life/ui/styles.css`
   both resolve.
 - Styling: plain CSS with custom properties (no Tailwind/CSS-in-JS — matches the app).
-- React 19 / Next 15 types as **peerDependencies** (consumer provides).
+- React 19, Next 15, `lucide-react` as **peerDependencies** (consumer provides —
+  `apps/app` already depends on all three; `next` is required by the Link-bearing
+  atoms/blocks, `lucide-react` by ThemeToggle's icons).
 
 ## Commands
 

@@ -15,9 +15,11 @@ for these without any visible change.
 // All atoms: className passthrough (frozen e2e hooks ride on it), no style props.
 // Element semantics are frozen: today's anchors render as links, today's buttons
 // as buttons — an atom never swaps the element type.
-<Button variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare"
+<Button children: ReactNode
+        variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare"
         type="submit" | "button" onClick? formAction? aria-label? title?>
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
+            children: ReactNode      // the icon
             variant="default" | "ghost">
 <IconLink href label>children</IconLink>  // <a>/<Link> with the 40×40 bordered visual
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
@@ -36,7 +38,9 @@ for these without any visible change.
    // window.confirm gate on submit; className passthrough carries frozen hooks
    // (e.g. the port passes className="trash-delete" here — that hook lives on
    //  ConfirmSubmit in the app today, trash/page.tsx)
-<ThemeToggle />                      // system→light→dark cycle, aria-pressed, localStorage('theme')
+<ThemeToggle />                      // system→light→dark cycle, aria-pressed,
+                                     //   localStorage('theme'); Monitor/Sun/Moon icons
+                                     //   from lucide-react (peerDep — consumer provides)
 ```
 
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
@@ -79,14 +83,16 @@ packages/ui/test/*.test.tsx                  # one suite per atom
 ## Code Style
 
 ```tsx
-export function IconButton({ label, variant = 'default', className, ...rest }: IconButtonProps) {
+export function IconButton({ label, variant = 'default', className, children, ...rest }: IconButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
       className={cx('ui-icon-btn', variant !== 'default' && `ui-icon-btn--${variant}`, className)}
       {...rest}
-    />
+    >
+      {children}
+    </button>
   );
 }
 ```
