@@ -2,9 +2,11 @@
 
 Plan: `tasks/plan-ui-primitives.md`. Specs: `docs/specs/MAP-ui-primitives.md` +
 `SPEC-ui-{tokens,atoms,blocks}.md`, `SPEC-notes-port.md`. Branch: `feature/ui-primitives`.
-Status: **pre-IMPLEMENT gate VALIDATED 3/3** (8 fresh-context validator rounds; 33
-empirically-proven findings closed in `db26b25..3190d8d`) — implementation ready.
-Each task = one subagent (mandatory task template). Tech lead
+Status: **implementation complete; five-lane gate N/N** (`tasks/five-lane-ui-primitives.md`,
+fix pass `38c1247`) — merge-ready, awaiting the user's explicit merge request + the
+human acceptance (phone check + human e2e run). Pre-IMPLEMENT gate: VALIDATED 3/3
+(8 fresh-context validator rounds; 33 empirically-proven findings closed in
+`db26b25..3190d8d`). Each task = one subagent (mandatory task template). Tech lead
 reviews diffs, commits, runs checkpoints. Test runs: targeted, sequential, ≤3 per task.
 
 ## Task 1: `ui-tokens` — package skeleton + token layer + harness
@@ -94,7 +96,9 @@ to include `packages/ui/src/styles/tokens.css` +
 direct generalization of an existing app component.
 
 **Acceptance:**
-- [ ] Card (`.note` surface values), StatusText (`role="status" aria-live="polite"`,
+- [ ] Card (generic panel surface at the legacy `.note` surface *values*; since
+      Task 8 the `.note` row incl. surface is owned by ListItem — Card has no legacy
+      counterpart), StatusText (`role="status" aria-live="polite"`,
       owns `.editor-status`), LocalTime (empty-first
       render, `<time dateTime>`), ConfirmButton (cancel path never submits;
       `className` passthrough carries frozen hooks such as `trash-delete`),
