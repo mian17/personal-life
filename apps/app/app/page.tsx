@@ -1,8 +1,7 @@
 import { listNotes, listTags } from '@/lib/api';
 import { NoteList } from './note-list';
 import { SearchBox } from './search-box';
-import { ThemeToggle } from './theme-toggle';
-import Link from 'next/link';
+import { FabLink, IconLink, NavBar, PageShell, PageTitle, TagFilterNav, ThemeToggle } from '@life/ui';
 import { Plus, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -23,41 +22,35 @@ export default async function Home({
   const { tag, q } = await searchParams;
   const [{ notes }, tags] = await Promise.all([listNotes(tag, q), listTags()]);
 
-  return (
-    <main>
-      <div className="nav-bar">
-        <div className="header-actions">
-          <Link href="/trash" className="header-icon" aria-label="Trash">
-            <Trash2 size={20} aria-hidden />
-          </Link>
-          <ThemeToggle />
-        </div>
-      </div>
+  const filterItems = [
+    ...(tag ? [{ name: 'All', href: filterHref(q), active: false }] : []),
+    ...tags.map((t) => ({ name: t.name, href: filterHref(q, t.name), active: tag === t.name })),
+  ];
 
-      <h1 className="page-title">Notes</h1>
+  return (
+    <PageShell>
+      <NavBar
+        trailing={
+          <>
+            <IconLink href="/trash" label="Trash">
+              <Trash2 size={20} aria-hidden />
+            </IconLink>
+            <ThemeToggle />
+          </>
+        }
+      />
+
+      <PageTitle>Notes</PageTitle>
 
       <SearchBox q={q} tag={tag} />
 
-      {tags.length > 0 && (
-        <nav className="filters">
-          {tag && <Link href={filterHref(q)}>All</Link>}
-          {tags.map((t) => (
-            <Link
-              key={t.id}
-              href={filterHref(q, t.name)}
-              className={tag === t.name ? 'active' : ''}
-            >
-              {t.name}
-            </Link>
-          ))}
-        </nav>
-      )}
+      {tags.length > 0 && <TagFilterNav items={filterItems} />}
 
       <NoteList notes={notes} />
 
-      <Link href="/notes/new" className="add-note" aria-label="New note">
+      <FabLink href="/notes/new" label="New note">
         <Plus size={28} strokeWidth={2.5} aria-hidden />
-      </Link>
-    </main>
+      </FabLink>
+    </PageShell>
   );
 }

@@ -36,8 +36,8 @@ for these without any visible change.
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
 <ConfirmButton message: string>children</ConfirmButton>
    // window.confirm gate on submit; className passthrough carries frozen hooks
-   // (e.g. the port passes className="trash-delete" here — that hook lives on
-   //  ConfirmSubmit in the app today, trash/page.tsx)
+   // (e.g. the port passes className="trash-delete" + variant="danger" here —
+   //  that hook lives on ConfirmSubmit in the app today, trash/page.tsx)
 <ThemeToggle />                      // system→light→dark cycle, aria-pressed,
                                      //   localStorage('theme'); Monitor/Sun/Moon icons
                                      //   from lucide-react (peerDep — consumer provides)
