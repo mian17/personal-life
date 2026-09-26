@@ -100,7 +100,8 @@ direct generalization of an existing app component.
 
 **Blast radius — allowed:** `packages/ui/src/components/{card,status-text,local-time,confirm-button,theme-toggle,icon-link}.tsx`,
 `packages/ui/src/styles/atoms.css`, `packages/ui/src/styles.css` (import append),
-`packages/ui/src/index.ts`, `packages/ui/test/*`.
+`packages/ui/src/index.ts`, `packages/ui/package.json` (jest `moduleNameMapper` stub
+entry for `next/link` only), `packages/ui/test/*` (incl. `test/stubs/`).
 **Prohibited:** everything else.
 
 **Depends on:** Task 2. **Scope:** M.

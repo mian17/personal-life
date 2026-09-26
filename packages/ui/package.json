@@ -49,6 +49,9 @@
         }
       ]
     },
+    "moduleNameMapper": {
+      "^next/link$": "<rootDir>/test/stubs/next-link.tsx"
+    },
     "testEnvironment": "jsdom"
   }
 }

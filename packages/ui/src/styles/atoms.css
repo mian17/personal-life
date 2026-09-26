@@ -39,6 +39,15 @@
  * | filter | yes    | `.filters a` + `.filters a.active`   |
  * remove affordance: `.tag-chip-remove` (+ its `:hover`).
  *
+ * Card / StatusText / IconLink (batch B)
+ * | component  | legacy class(es)                                          |
+ * |------------|-----------------------------------------------------------|
+ * | Card       | `.note` surface part (panel bg, `--radius-lg`, overflow)  |
+ * | StatusText | `.editor-status`                                          |
+ * | IconLink   | `.header-icon` (+ its `:focus-visible`)                   |
+ * LocalTime / ConfirmButton / ThemeToggle add no CSS: they compose
+ * `time`/Button/IconButton.
+ *
  * Token policy: all lengths/colors come from tokens.css custom properties.
  * Every value resolves to tokens.css (including `--on-accent: white`).
  * Non-tokenizable keywords (`inherit`, `transparent`, `none`, `vertical`,
@@ -266,4 +275,42 @@
 
 .ui-pill__remove:hover {
   color: var(--danger);
+}
+
+/* ------------------------------------------------------------- Card */
+
+/* The legacy `.note` surface part only: panel background, radius, clipping.
+   The `.note` flex row is owned by ListItem (see SPEC-ui-blocks). */
+.ui-card {
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------- StatusText */
+
+.ui-status-text {
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+/* --------------------------------------------------------- IconLink */
+
+.ui-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-icon-link:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
 }
