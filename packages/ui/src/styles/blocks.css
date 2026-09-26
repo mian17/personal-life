@@ -13,6 +13,14 @@
  * | FabLink        | `.add-note` (+ its `:focus-visible`) |
  * | EditorToolbar  | `.editor-toolbar` (back control visuals are IconButton's) |
  * | EditorScreen   | `.editor-screen`                  |
+ * | EmptyState     | `.empty` + `.empty p`             |
+ * | List           | `.notes`                          |
+ * | ListItem       | `.note` row part + `.note-link` + `.note form` + `.note-text` + `.note-title` + `.note-sub` + `.note-sub time` + `.note-sep` + `.note-snippet` (the `.note` surface part is Card's) |
+ * | TagFilterNav   | `.filters` container only (the pills are Pill's) |
+ * | AlertBanner    | `.editor-conflict` + `.editor-conflict-text` + `.editor-conflict-actions` (its buttons are Button's) |
+ * | SearchField    | `.search-box` container only (the input visuals are Input's) |
+ * | PillGroup      | `.editor-legacy-tags` (the chips are Pill's) |
+ * | PageActions    | `.trash-actions`                  |
  *
  * Token policy: all lengths/colors come from tokens.css custom properties,
  * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
@@ -97,4 +105,154 @@
   min-height: 100dvh;
   padding: max(var(--space-0-75), env(safe-area-inset-top)) var(--space-1)
     calc(var(--space-1) + env(safe-area-inset-bottom));
+}
+
+/* -------------------------------------------------------- EmptyState */
+
+.ui-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: var(--space-3) var(--space-1);
+}
+
+.ui-empty p {
+  margin: var(--space-0-25) 0;
+}
+
+/* -------------------------------------------------------------- List */
+
+.ui-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+/* ---------------------------------------------------------- ListItem */
+
+/* The `.note` row part: Card owns the surface (panel bg, --radius-lg,
+   overflow); ListItem owns the row layout. */
+.ui-list-item {
+  display: flex;
+  align-items: stretch;
+}
+
+.ui-list-item__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-75);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-0-9);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* `.note form` — the delete-action slot wraps a form in the app. */
+.ui-list-item form {
+  display: flex;
+}
+
+.ui-list-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-15);
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-list-item__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-list-item__sub {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-0-4);
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+.ui-list-item__sub time {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ui-list-item__sep {
+  flex-shrink: 0;
+  color: var(--border);
+}
+
+.ui-list-item__snippet {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------ TagFilterNav */
+
+.ui-tag-filter-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+  margin: var(--space-1-25) 0;
+}
+
+/* ------------------------------------------------------- AlertBanner */
+
+.ui-alert-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0-5);
+  margin-bottom: var(--space-0-5);
+  padding: var(--space-0-6) var(--space-0-75);
+  border: var(--border-width) solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.ui-alert-banner__text {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--space-0-9);
+}
+
+.ui-alert-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+}
+
+/* -------------------------------------------------------- SearchField */
+
+.ui-search-box {
+  margin: 0 0 var(--space-1);
+}
+
+/* ---------------------------------------------------------- PillGroup */
+
+.ui-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-4);
+  margin-top: var(--space-0-5);
+  padding-top: var(--space-0-6);
+  border-top: var(--border-width) solid var(--border);
+}
+
+/* -------------------------------------------------------- PageActions */
+
+.ui-page-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-1-25);
 }

@@ -16,8 +16,9 @@ and the notes app's current pages map onto these one-to-one.
 <NavBar leading? trailing? />                      // .nav-bar + .header-actions slot
 <PageTitle>children</PageTitle>                    // <h1>
 <EmptyState heading? body: ReactNode />            // .empty block (used twice today)
-<List> <ListItem …> </List>                        // ul/li; ListItem: href, title, meta,
-                                                   //   snippet, trailing, deleteAction? (render prop)
+<List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
+                                                   //   snippet, trailing, deleteAction?,
+                                                   //   children? (render slots; no domain types)
 <TagFilterNav items: {name, href, active}[] />     // .filters pill nav
 <FabLink href label>children</FabLink>             // .add-note fixed action
 <EditorToolbar back={{label, onBack: () => void}}  // back is a BUTTON (frozen:
