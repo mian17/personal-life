@@ -61,7 +61,9 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 - [ ] Components per `SPEC-ui-atoms.md` prop contracts; `cx` util; `className`
       passthrough merges; HTML attrs/refs forwarded.
 - [ ] Variants reproduce today's rules exactly: Button (variants
-      primary/ghost/danger/quiet; sizes default/bare), IconButton (40×40 bordered;
+      primary/ghost/danger/quiet; sizes default/bare/icon — `icon` splits the
+      legacy `.note-delete` 1.25rem/1 shape from `.trash-delete`'s inherited
+      body 16px/1.5), IconButton (40×40 bordered;
       default/ghost), Input/Textarea (global input rules;
       Textarea `variant="editor"` reproduces `.editor-body` values),
       Pill (chip/filter, active state; `onRemove`/`removeLabel` remove affordance
@@ -74,8 +76,14 @@ hand-edits (`npm install` for workspace registration is allowed and expected).
 **Verify:** `npm run lint -w packages/ui` · `npm run test -w packages/ui`.
 
 **Blast radius — allowed:** `packages/ui/src/components/{button,icon-button,input,textarea,pill}.tsx`,
-`packages/ui/src/styles/atoms.css`, `packages/ui/src/styles.css` (import append),
-`packages/ui/src/index.ts`, `packages/ui/src/lib/cx.ts`, `packages/ui/test/*` (5 suites).
+`packages/ui/src/styles/atoms.css`, `packages/ui/src/styles/tokens.css`,
+`packages/ui/src/styles.css` (import append),
+`packages/ui/src/index.ts`, `packages/ui/src/lib/cx.ts`,
+`packages/ui/test/*` (5 atom suites + `tokens.test.ts`).
+**Radius note (recorded at the Task 2 review):** the radius was extended post-review
+to include `packages/ui/src/styles/tokens.css` +
+`packages/ui/test/tokens.test.ts` for the `--on-accent` tokenization required by
+`SPEC-ui-tokens.md` SC1.
 **Prohibited:** everything else — no app files, no spec files, no e2e.
 
 **Depends on:** Task 1. **Scope:** M.

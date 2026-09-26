@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cx } from '../lib/cx';
@@ -45,13 +46,15 @@ export function Pill({
   );
 
   if (as === 'a') {
-    // The atom renders either a span or an anchor; a single prop bag cannot be
-    // statically narrowed, so the anchor branch re-types it at the boundary.
-    const anchorProps = rest as unknown as ComponentPropsWithRef<'a'>;
+    // The atom renders either a span or a link; a single prop bag cannot be
+    // statically narrowed, so the link branch re-types it at the boundary. The
+    // legacy `.filters a` pills used next/link, so client-side navigation is
+    // preserved (not a raw <a> full document load).
+    const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
     return (
-      <a href={href} className={classes} {...anchorProps}>
+      <Link href={href ?? ''} className={classes} {...linkProps}>
         {content}
-      </a>
+      </Link>
     );
   }
 

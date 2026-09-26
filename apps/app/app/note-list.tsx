@@ -24,6 +24,7 @@ export function NoteList({ notes }: { notes: Note[] }) {
                 <Button
                   type="submit"
                   variant="danger"
+                  size="icon"
                   className="note-delete"
                   aria-label={`Delete ${title}`}
                 >

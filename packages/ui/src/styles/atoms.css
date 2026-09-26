@@ -12,7 +12,8 @@
  * | primary   | bare    | `.editor-conflict-actions button` + `.editor-conflict-load` |
  * | ghost     | default | (new) outline button, no legacy counterpart         |
  * | ghost     | bare    | `.editor-conflict-actions button` + `.editor-conflict-overwrite` |
- * | danger    | default | `.note-delete`                                      |
+ * | danger    | icon    | `.note-delete` (48px square, 1.25rem/1 glyph)       |
+ * | danger    | default | `.trash-delete` (48px square, inherited body type)  |
  * | danger    | bare    | `.trash-empty`                                      |
  * | quiet     | default | `.trash-restore`                                    |
  * | quiet     | bare    | (new) compact quiet button, no legacy counterpart   |
@@ -83,6 +84,17 @@
   min-height: 0;
 }
 
+/* icon size — the 48px square glyph control (.note-delete). The size modifier
+   sets the box; the danger pair below adds the type overrides. */
+.ui-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-height);
+  min-height: var(--tap-height);
+  padding: 0;
+}
+
 .ui-btn--primary {
   background: var(--accent);
   color: var(--on-accent);
@@ -116,7 +128,16 @@
   color: var(--text);
 }
 
-/* danger/default -> .note-delete */
+/* danger/icon -> .note-delete */
+.ui-btn--danger.ui-btn--icon {
+  border-radius: 0;
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--space-1-25);
+  line-height: 1;
+}
+
+/* danger/default -> .trash-delete (no type override: inherits body 16px/1.5) */
 .ui-btn--danger.ui-btn--default {
   display: inline-flex;
   align-items: center;
@@ -127,8 +148,6 @@
   border-radius: 0;
   background: transparent;
   color: var(--danger);
-  font-size: var(--space-1-25);
-  line-height: 1;
 }
 
 /* danger/bare -> .trash-empty */

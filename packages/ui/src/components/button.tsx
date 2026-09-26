@@ -2,7 +2,7 @@ import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'quiet';
-export type ButtonSize = 'default' | 'bare';
+export type ButtonSize = 'default' | 'bare' | 'icon';
 
 export interface ButtonProps extends ComponentPropsWithRef<'button'> {
   variant?: ButtonVariant;

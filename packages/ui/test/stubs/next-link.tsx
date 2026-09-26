@@ -9,11 +9,13 @@ export interface NextLinkStubProps extends AnchorHTMLAttributes<HTMLAnchorElemen
  * Test stub for `next/link` (mapped in package.json jest.moduleNameMapper).
  *
  * Production components import the real `next/link`; this renders the anchor
- * Next.js would render on the client so element semantics stay observable.
+ * Next.js would render on the client so element semantics stay observable. The
+ * `data-next-link` marker lets suites assert a component actually routed through
+ * `next/link` (a raw `<a>` would otherwise be indistinguishable).
  */
 export default function NextLinkStub({ href, children, ...rest }: NextLinkStubProps) {
   return (
-    <a href={href} {...rest}>
+    <a data-next-link="" href={href} {...rest}>
       {children}
     </a>
   );

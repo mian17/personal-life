@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { Button, type ButtonVariant } from '../src/components/button';
+import { Button, type ButtonSize, type ButtonVariant } from '../src/components/button';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
@@ -32,6 +34,40 @@ describe('Button', () => {
     const button = screen.getByRole('button');
     expect(button.classList.contains('ui-btn--bare')).toBe(true);
     expect(button.classList.contains('ui-btn--default')).toBe(false);
+  });
+
+  it.each<ButtonSize>(['default', 'bare', 'icon'])(
+    'maps size="%s" to its modifier class',
+    (size) => {
+      render(
+        <Button size={size} variant="danger">
+          x
+        </Button>,
+      );
+      const button = screen.getByRole('button');
+      expect(button.classList.contains(`ui-btn--${size}`)).toBe(true);
+      const others: ButtonSize[] = (['default', 'bare', 'icon'] as ButtonSize[]).filter(
+        (s) => s !== size,
+      );
+      for (const other of others) {
+        expect(button.classList.contains(`ui-btn--${other}`)).toBe(false);
+      }
+    },
+  );
+
+  it('splits the danger type metrics: icon = 1.25rem/1, default = inherited body type', () => {
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    const icon = block('.ui-btn--danger.ui-btn--icon');
+    expect(icon).toMatch(/font-size:\s*var\(--space-1-25\)/);
+    expect(icon).toMatch(/line-height:\s*1\b/);
+
+    const fallback = block('.ui-btn--danger.ui-btn--default');
+    expect(fallback).not.toMatch(/font-size/);
+    expect(fallback).not.toMatch(/line-height/);
   });
 
   it('merges className instead of replacing it', () => {

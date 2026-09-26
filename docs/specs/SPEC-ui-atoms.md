@@ -14,9 +14,10 @@ for these without any visible change.
 ```tsx
 // All atoms: className passthrough (frozen e2e hooks ride on it), no style props.
 // Element semantics are frozen: today's anchors render as links, today's buttons
-// as buttons — an atom never swaps the element type.
+// as buttons — an atom never swaps the element type. Link-shaped atoms render
+// `next/link`'s Link (client-side navigation, matching legacy markup).
 <Button children: ReactNode
-        variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare"
+        variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare" | "icon"
         type="submit" | "button" onClick? formAction? aria-label? title?>
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
             children: ReactNode      // the icon
@@ -29,6 +30,8 @@ for these without any visible change.
      onRemove?: () => void removeLabel?: string />
    // remove affordance lives inside the chip (owns .tag-chip-remove);
    //   removeLabel renders verbatim as the remove button's aria-label (frozen)
+   // as="a" renders next/link's Link (matching legacy `.filters a` usage),
+   //   so filter-pill clicks keep client-side navigation;
 <Card>children</Card>                // generic panel surface atom (token values match the
                                    //   legacy .note surface); no legacy class
                                    //   counterpart in the shipped app — the `.note`
@@ -46,9 +49,12 @@ for these without any visible change.
 ```
 
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
-`button` element rule + button overrides (`.note-delete`, `.trash-restore`,
-`.trash-empty`, `.editor-conflict-actions button`, `.editor-conflict-load`,
-`.editor-conflict-overwrite`); `Input`/`Textarea` absorb the global `textarea, input`
+`button` element rule + button overrides — its three sizes split the legacy shapes
+exactly: `size="icon"` `→` `.note-delete` (1.25rem/1 icon control), `size="default"`
+`→` `.trash-delete` (no type override; inherits the body 16px/1.5), `size="bare"`
+`→` `.trash-empty` / `.editor-conflict-actions button` (`.editor-conflict-load`,
+`.editor-conflict-overwrite`), with `quiet/default` `→` `.trash-restore`;
+`Input`/`Textarea` absorb the global `textarea, input`
 rule and the bare `textarea` rule (globals.css:139-152); `IconButton` is the **sole** owner of the 40×40
 bordered square classes `.theme-toggle`, `.editor-back`, `.editor-save` — all three
 render as `<button>` today (note-editor.tsx:346, :352); `IconLink` absorbs

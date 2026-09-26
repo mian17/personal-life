@@ -61,13 +61,13 @@ Token naming: `--<category>-<qualifier>`, values preserved verbatim from today:
 :root {
   /* colors — byte-identical to apps/app/app/globals.css */
   --bg: #0f1115; --panel: #181b22; --text: #e8eaf0; --muted: #8b93a7;
-  --accent: #5b8cff; --danger: #ff6b6b; --border: #2a2f3a;
+  --accent: #5b8cff; --danger: #ff6b6b; --border: #2a2f3a; --on-accent: white;
   /* literals promoted to tokens — values unchanged */
   --radius-md: 10px; --radius-lg: 12px; --radius-pill: 999px;
   --tap-height: 48px; --content-width: 640px;
   --border-width: 1px; --focus-ring: 2px;
   --icon-btn-size: 40px; --fab-size: 56px;
-  --font-size: 16px; --leading: 1.5;
+  --font-size: 16px; --leading: 1.5; --fs-editor: 1.05rem;
   --shadow-fab: 0 4px 12px rgba(0, 0, 0, 0.25);
   --font-stack: system-ui, -apple-system, sans-serif;
   color-scheme: light dark;
@@ -78,7 +78,7 @@ Spacing/dimension tokens cover **exactly** the length literals present in
 `globals.css` (both inventories grep-derived and locked in the token-value test):
 rem values `0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9,
 0.95, 1, 1.05, 1.25, 2, 3, 5` (20 distinct; `1.05rem` is the `.editor-body`
-font-size → type token) and px values `1, 2, 4, 10, 12, 16, 40, 48, 56, 640, 999`
+font-size → the `--fs-editor` type token) and px values `1, 2, 4, 10, 12, 16, 40, 48, 56, 640, 999`
 (11 distinct: `1px` borders, `2px` focus outline/offset, `4px`/`12px` shadow
 offset/blur inside `--shadow-fab`, `10px`/`12px`/`999px` radii, `16px` body font,
 `40px` icon square, `48px` tap height, `56px` FAB, `640px` content width). No

@@ -29,6 +29,18 @@ describe('Pill', () => {
     expect(link.getAttribute('href')).toBe('/?tag=errand');
   });
 
+  it('routes the as="a" branch through next/link (client-side navigation)', () => {
+    render(
+      <Pill as="a" href="/?tag=errand" size="filter">
+        errand
+      </Pill>,
+    );
+    const link = screen.getByRole('link', { name: 'errand' });
+    // The jest moduleNameMapper resolves `next/link` to the stub, which stamps
+    // `data-next-link`; a raw <a> would carry no such marker.
+    expect(link.hasAttribute('data-next-link')).toBe(true);
+  });
+
   it('adds the active modifier only when active', () => {
     const { rerender } = render(
       <Pill as="a" href="/x" size="filter">
