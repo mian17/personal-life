@@ -3,13 +3,19 @@
 Branch: `feature/user-boundary`. Diff under review: `git diff master...HEAD` (chapter,
 17 commits at final run). Run date: 2026-09-26.
 
-## Final verdict: **N/N — MERGEABLE** (merge blocked by the user's explicit-request rule)
+## Final verdict: **N/N — MERGED** (`7462c63 → 62fdfad`, fast-forward)
 
 Trail: suite gate green → lanes 1–5 fired in parallel → lane 1's session was cancelled
 mid-run (UNVERIFIED → fail-closed) → user authorized a lane-1 re-run → **5/5 PASS**.
 
 Standing rule from the user (2026-09-26): **no merge without the user's explicit
-request**, regardless of gate outcome. The branch is merge-ready and unmerged.
+request**, regardless of gate outcome. Honored: the chapter stayed unmerged until the
+user's explicit merge request (2026-09-27), after their own deploy + verification.
+
+Human deploy attestation (2026-09-27): the user ran the migration on the real DBs
+themselves and verified the live app ("i verified, it was ok") — live `life.db` is
+migrated and the boundary is in production. Merge explicitly requested same day;
+fast-forward, no merge commit.
 
 ## Suite gate (step 0) — GREEN
 
@@ -65,12 +71,10 @@ files in this diff; the documented `--runInBand` mitigation produced 98/98.
 {"suite_gate":"GREEN","app":"pass","idp":"98/98(runInBand)","note":"74/74","lint":"clean","contention":"adjudicated"}
 {"round":1,"lanes":{"correctness-domain":"UNVERIFIED","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"},"note":"lane 1 session cancelled; fail-closed = failure"}
 {"round":2,"re_run":["correctness-domain"],"lanes":{"correctness-domain":"PASS_WITH_NITS","code-quality":"PASS_WITH_NITS","security":"PASS_WITH_NITS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"}}
-{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"BLOCKED_BY_USER_EXPLICIT_REQUEST"}
+{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"MERGED","merged":"2026-09-27 fast-forward 7462c63..62fdfad","deploy":"human-attested 2026-09-27 (migration + live verification)"}
 ```
 
 ## Next
 
-The gate is complete and the chapter is merge-ready. Per the user's standing
-instruction, the merge to `master` happens only on their explicit request. The human
-deploy checklist (backfill script **before** booting the new code) is in
-`tasks/todo-notes-user-boundary.md`.
+Chapter closed. The boundary is on `master` and in production (human-deployed and
+verified 2026-09-27). The user's ruling on the next chapter is still open.
