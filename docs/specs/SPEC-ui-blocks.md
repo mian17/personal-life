@@ -40,8 +40,9 @@ and the notes app's current pages map onto these one-to-one.
 
 ## CSS ownership (legacy `globals.css` classes owned by blocks)
 
-`List`/`ListItem` own the row internals: `.notes`, `.note-link`, `.note form`,
-`.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
+`List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
+layout — the class is borne by the `ListItem` `li`, note-list.tsx:22), `.note-link`,
+`.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`. `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
 `.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
 by `Button`, see `SPEC-ui-atoms`). Element defaults: bare `h1` → `PageTitle`,

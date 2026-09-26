@@ -113,5 +113,6 @@ each token's value); the theme selectors are exactly
 
 ## Open Questions
 
-- Test harness dependencies (jsdom + `@testing-library/react`) are proposed **once**
+- Test harness dependencies (`jest-environment-jsdom` +
+  `@testing-library/react`) are proposed **once**
   at the map level (see `SPEC-ui-atoms.md`); this module alone needs none.

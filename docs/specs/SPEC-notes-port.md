@@ -41,7 +41,7 @@ suite's actual selector surface (`journey.ts`, `journey.suite.ts`, `access-gate.
 | `note-editor.tsx` markup → `EditorScreen` (`.editor-screen`), `EditorToolbar`, `AlertBanner`, `Textarea variant="editor"` (`.editor-body`), `PillGroup` (`.editor-legacy-tags`) | the autosave engine (~300 lines: drain, expectedVersion/409, keepalive) |
 | `search-box.tsx` visuals → `SearchField` | debounce→`router.replace` wiring |
 | `theme-toggle.tsx`, `local-time.tsx`, `confirm-submit.tsx` → atoms | server actions (`app/actions.ts`), `tags.ts`, `note-title.ts` |
-| `globals.css` → `@life/ui/styles.css` (tokens+atoms+blocks) | a minimal app stylesheet only if a frozen hook needs a rule |
+| `globals.css` → `@life/ui/styles.css` (tokens+base+atoms+blocks) | a minimal app stylesheet only if a frozen hook needs a rule |
 
 ## Tech Stack
 

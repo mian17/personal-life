@@ -16,10 +16,15 @@ value table + theme contract, and a working test harness.
       private; `main`/`types` → `src/index.ts`; `exports` map `{".": "./src/index.ts",
       "./styles.css": "./src/styles.css"}` (so bare `@life/ui` and `@life/ui/styles.css`
       both resolve); `scripts` `{lint: "tsc --noEmit", test: "jest"}`; peerDeps
-      react/react-dom 19; devDeps jest/ts-jest/jsdom/@testing-library/react +
-      react/react-dom for tests; `tsconfig.json` extends `tsconfig.base.json` with
-      `jsx: react-jsx`, `noEmit: true`, and `lib` extended with DOM (base has
-      `lib: ["ES2022"]` only).
+      react/react-dom 19; devDeps jest/ts-jest/jest-environment-jsdom/
+      @testing-library/react + react/react-dom for tests; `tsconfig.json` extends
+      `tsconfig.base.json` with `jsx: react-jsx`, `noEmit: true`, and `lib` extended
+      with DOM (base has `lib: ["ES2022"]` only).
+- [ ] Test harness wired like `apps/app`: inline `jest` key in `package.json`
+      (`testEnvironment: "jsdom"`, `transform` via ts-jest against a
+      `tsconfig.test.json` variant, `moduleFileExtensions: ["ts","tsx","js"]`,
+      `testRegex` for `*.test.tsx?`), plus the `tsconfig.test.json` itself —
+      `npm run test -w packages/ui` must run, not just exist.
 - [ ] `tokens.css`: all colors (dark + light + media-query block) byte-identical to
       `apps/app/app/globals.css`; spacing/radius/type/shadow/layout literals promoted
       to tokens at identical values; theme selectors unchanged.

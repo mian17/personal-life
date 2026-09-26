@@ -27,7 +27,9 @@ for these without any visible change.
      onRemove?: () => void removeLabel?: string />
    // remove affordance lives inside the chip (owns .tag-chip-remove);
    //   removeLabel renders verbatim as the remove button's aria-label (frozen)
-<Card>children</Card>                // the .note surface: panel bg, radius-lg, overflow hidden
+<Card>children</Card>                // generic panel surface (same token values as the
+                                   //   legacy .note surface; the legacy .note ROW
+                                   //   element is owned by ListItem — see SPEC-ui-blocks)
 <StatusText role="status" aria-live="polite">children</StatusText> // owns .editor-status
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
 <ConfirmButton message: string>children</ConfirmButton>
@@ -94,7 +96,7 @@ except the two `Pill` render tags.
 
 ## Testing Strategy
 
-Rendering + behavior unit tests per atom. Harness: jest + `jsdom` +
+Rendering + behavior unit tests per atom. Harness: jest + `jest-environment-jsdom` +
 `@testing-library/react` (devDependencies of `packages/ui` only — the map's single
 dependency addition; fallback if disallowed: `renderToStaticMarkup` markup assertions
 in the node environment, behavior checks via stubbed globals). Cover: rendered DOM
@@ -120,5 +122,5 @@ renders an anchor, keyboard focusability.
 
 ## Open Questions
 
-- `jsdom` + `@testing-library/react` as `packages/ui` devDependencies: recommended
+- `jest-environment-jsdom` + `@testing-library/react` as `packages/ui` devDependencies: recommended
   (needs a test harness for behavior contracts). Fallback documented in Testing.

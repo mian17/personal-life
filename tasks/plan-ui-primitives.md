@@ -31,7 +31,7 @@ lead reviews, commits, and runs the gates.
    drain, expectedVersion/409, keepalive) is app logic and stays byte-identical in
    `apps/app`; only the JSX moves. The port must not "clean up" the engine.
 6. **Test harness decision (the one dependency ask):** `packages/ui` devDeps gain
-   `jsdom` + `@testing-library/react` (workspace-local, dev-only, zero runtime impact).
+   `jest-environment-jsdom` + `@testing-library/react` (workspace-local, dev-only, zero runtime impact).
    Fallback if disallowed: `renderToStaticMarkup` markup assertions + stubbed globals.
    Note: the `transpilePackages` half of the `@life/shared` consumption pattern is the
    proven one; the jest `moduleNameMapper` entry for `@life/ui` is new to `apps/app`
@@ -74,10 +74,10 @@ lead reviews, commits, and runs the gates.
 | Hydration regressions (LocalTime, theme script) | Med | behavior contracts unit-tested; `suppressHydrationWarning` + pre-hydration script preserved verbatim |
 | Source-consumed package breaks Next build | Med | proven `@life/shared` pattern (`transpilePackages`); `next build` is Task 6/8 verification |
 | `note-editor.tsx` engine disturbed during JSX move | High | strict markup/logic split (decision 5); engine file bytes reviewed at the diff gate |
-| New devDeps (jsdom/RTL) rejected late | Low | flagged as the single Ask-first item now; documented fallback |
+| New devDeps (jest-environment-jsdom/RTL) rejected late | Low | flagged as the single Ask-first item now; documented fallback |
 | jest config edits break existing app tests | Med | `moduleNameMapper` additions only; the 14 existing unit test files untouched; `test:unit` green at every checkpoint |
 
 ## Open Questions
 
-- **The single human decision:** approve `jsdom` + `@testing-library/react` as
+- **The single human decision:** approve `jest-environment-jsdom` + `@testing-library/react` as
   `packages/ui` devDependencies (dev-only). Say no → zero-new-dep fallback.
