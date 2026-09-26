@@ -1,0 +1,82 @@
+:root {
+  /* colors — byte-identical to apps/app/app/globals.css */
+  --bg: #0f1115;
+  --panel: #181b22;
+  --text: #e8eaf0;
+  --muted: #8b93a7;
+  --accent: #5b8cff;
+  --danger: #ff6b6b;
+  --border: #2a2f3a;
+
+  /* radii — literals promoted to tokens, values unchanged */
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* layout — literals promoted to tokens, values unchanged */
+  --tap-height: 48px;
+  --content-width: 640px;
+  --border-width: 1px;
+  --focus-ring: 2px;
+  --icon-btn-size: 40px;
+  --fab-size: 56px;
+
+  /* type — literals promoted to tokens, values unchanged */
+  --font-size: 16px;
+  --leading: 1.5;
+  --font-stack: system-ui, -apple-system, sans-serif;
+  --fs-editor: 1.05rem; /* .editor-body font-size */
+
+  /* shadow — literal promoted to a token, value unchanged */
+  --shadow-fab: 0 4px 12px rgba(0, 0, 0, 0.25);
+
+  /* spacing — exactly the length literals present in globals.css */
+  --space-0-15: 0.15rem;
+  --space-0-2: 0.2rem;
+  --space-0-25: 0.25rem;
+  --space-0-3: 0.3rem;
+  --space-0-35: 0.35rem;
+  --space-0-4: 0.4rem;
+  --space-0-5: 0.5rem;
+  --space-0-6: 0.6rem;
+  --space-0-7: 0.7rem;
+  --space-0-75: 0.75rem;
+  --space-0-8: 0.8rem;
+  --space-0-85: 0.85rem;
+  --space-0-9: 0.9rem;
+  --space-0-95: 0.95rem;
+  --space-1: 1rem;
+  --space-1-25: 1.25rem;
+  --space-2: 2rem;
+  --space-3: 3rem;
+  --space-5: 5rem;
+
+  color-scheme: light dark;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --text: #1a1d24;
+  --muted: #5c6577;
+  --accent: #2f6bff;
+  --danger: #d64545;
+  --border: #dfe3ea;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1a1d24;
+    --muted: #5c6577;
+    --accent: #2f6bff;
+    --danger: #d64545;
+    --border: #dfe3ea;
+  }
+}
