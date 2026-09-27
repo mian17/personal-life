@@ -2,12 +2,13 @@
 
 Plan: `tasks/plan-ui-primitives.md`. Specs: `docs/specs/MAP-ui-primitives.md` +
 `SPEC-ui-{tokens,atoms,blocks}.md`, `SPEC-notes-port.md`. Branch: `feature/ui-primitives`.
-Status: **implementation complete; five-lane gate N/N** (`tasks/five-lane-ui-primitives.md`,
-fix pass `38c1247`) — merge-ready, awaiting the user's explicit merge request + the
-human acceptance (phone check + human e2e run). Pre-IMPLEMENT gate: VALIDATED 3/3
-(8 fresh-context validator rounds; 33 empirically-proven findings closed in
-`db26b25..3190d8d`). Each task = one subagent (mandatory task template). Tech lead
-reviews diffs, commits, runs checkpoints. Test runs: targeted, sequential, ≤3 per task.
+Status: **CLOSED — merged to master** (`2873976 → 12ace81`, fast-forward, 2026-09-27).
+Human-deployed and verified 2026-09-27 (deploy-time Dockerfile fix `12ace81`).
+Five-lane gate N/N (`tasks/five-lane-ui-primitives.md`, fix pass `38c1247`).
+Pre-IMPLEMENT gate: VALIDATED 3/3 (8 fresh-context validator rounds; 33
+empirically-proven findings closed in `db26b25..3190d8d`). Each task = one subagent
+(mandatory task template). Tech lead reviews diffs, commits, runs checkpoints.
+Test runs: targeted, sequential, ≤3 per task.
 
 ## Task 1: `ui-tokens` — package skeleton + token layer + harness
 

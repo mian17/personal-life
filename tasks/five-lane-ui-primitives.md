@@ -3,15 +3,21 @@
 Branch: `feature/ui-primitives`. Diff under review: `git diff master...HEAD` (chapter,
 15 commits at final run). Run date: 2026-09-27.
 
-## Final verdict: **N/N — MERGEABLE** (merge blocked by the user's standing explicit-request rule)
+## Final verdict: **N/N — MERGED** (`2873976 → 12ace81`, fast-forward)
 
 Trail: suite gate green → lanes 1–5 fired in parallel → lanes 1 & 5 FAIL (4 MEDIUM
 blockers) → one fix pass (`38c1247`, `tests_pass=true`) → failed lanes re-run only →
 **5/5 PASS**.
 
-Standing rule from the user (2026-09-26, carried forward): **no merge without the
-user's explicit request**, regardless of gate outcome. The branch is merge-ready and
-unmerged.
+Standing rule honored: the chapter stayed unmerged until the user's explicit merge
+request (2026-09-27), after their own deploy + verification.
+
+Human deploy + acceptance attestation (2026-09-27): the user deployed the stack
+(`docker compose up -d --build`) and verified the live app ("i verified it", no
+discrepancies). Deploy prerequisites discovered and fixed at deploy time (post-gate):
+the three Dockerfiles lacked the `packages/ui` workspace (`12ace81`) — an honest gap
+in the chapter plan (specs never covered deployment packaging); caught by the
+pre-deploy verification build, human-verified after rollout.
 
 ## Suite gate (step 0) — GREEN
 
@@ -76,12 +82,12 @@ diff-attributable and were not run (cost discipline).
 {"round":1,"lanes":{"correctness-domain":"FAIL","code-quality":"PASS_WITH_NITS","security":"PASS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"FAIL"},"blockers":4}
 {"fix_pass":"38c1247","tests_pass":true,"fixed":["note-delete/trash-delete type metrics","Pill anchor next/link","Task 2 radius record","SPEC-ui-tokens drift"]}
 {"round":2,"re_run":["correctness-domain","plan-conformance"],"lanes":{"correctness-domain":"PASS_WITH_NITS","code-quality":"PASS_WITH_NITS","security":"PASS","qa-e2e":"PASS_WITH_NITS","plan-conformance":"PASS_WITH_NITS"}}
-{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"BLOCKED_BY_USER_EXPLICIT_REQUEST","human_acceptance":"phone check + human e2e run pending"}
+{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"MERGED","merged":"2026-09-27 fast-forward 2873976..12ace81","deploy":"human-deployed + verified 2026-09-27 (docker compose; Dockerfile workspace fix 12ace81 at deploy time)"}
 ```
 
 ## Next
 
-The gate is complete and the chapter is merge-ready. Human acceptance remains (the
-plan delegates pixel confirmation to the phone check and the human-owned e2e run).
-Per the standing instruction, the merge to `master` happens only on the user's
-explicit request.
+Chapter closed. `@life/ui` is on `master` and in production (human-deployed and
+verified 2026-09-27). The AGENTS.md Shared UI Contract governs all future frontend
+work — next chapter candidates: `todo-service` (its UI assembles from `@life/ui`) or
+the user's ruling.
