@@ -18,6 +18,10 @@ Security contract (this is the whole point of the module):
   typed `CryptoError`. **Never** return partially-decrypted or silently-empty output.
 - Zero third-party dependencies — `node:crypto` only (supply-chain hygiene).
 - Key material never logged, never stringified into errors, never persisted here.
+- Nonce budget: random 96-bit nonces (NIST SP 800-38D §8.2.2 random-nonce mode) are
+  safe to ~2^32 field encryptions per DEK; at this app's write volume the bound is
+  unreachable in practice, and crossing it means rekeying that user (fresh DEK +
+  re-encrypt), which the envelope hierarchy supports without touching the master key.
 
 ## API (type contract — exact signatures)
 
@@ -84,7 +88,7 @@ export function encryptField(dek: Buffer, plaintext: string, aad: string): strin
 
 ```
 Typecheck: npm run typecheck
-Test:      npm run test:unit -- packages/crypto
+Test:      npm run test:unit -w @life/crypto
 Build:     npm run build -w @life/crypto
 ```
 

@@ -13,8 +13,13 @@ but executed by the human).
 
 ## Behavior
 
-Script: `apps/note-service/scripts/encrypt-backfill.ts` (run convention mirrors
-`apps/idp/scripts/seed-user.ts`).
+Script: `apps/note-service/scripts/encrypt-backfill.ts`, run through the workspace's
+existing convention (`ts-node scripts/*.ts`, cf. `backfill-owner`):
+
+```
+npm run backfill-encrypt -w @life/note-service -- --dry-run
+npm run backfill-encrypt -w @life/note-service
+```
 
 - **Idempotence by prefix detection:** rows already starting `enc.v1.` are skipped.
   Re-running is always safe; the report is stable.
@@ -32,12 +37,24 @@ Script: `apps/note-service/scripts/encrypt-backfill.ts` (run convention mirrors
 - **Failure:** a row that cannot be encrypted aborts the batch transaction and exits
   non-zero with the row id in the error — never a half-reported success.
 
+## Sibling script: master-key rotation (`rotate-master-key`)
+
+Proves the intent's success criterion "key rotation never touches note data":
+
+- `apps/note-service/scripts/rotate-master-key.ts` → `npm run rotate-master-key -w @life/note-service`,
+  reading `NOTE_MASTER_KEY` (old) and `NOTE_MASTER_KEY_NEW` (new) from env.
+- For every `user_keys` row: `rewrapDek(wrappedDek, oldMaster, newMaster)`, bump
+  `kekVersion`, write back. **Zero content rows are read or written.**
+- Idempotent-ish and safe to re-run: rows already wrapped under the new key fail the
+  old-key unwrap and are reported as `skipped`, never corrupted. Non-zero exit if any
+  row fails for a reason other than already-rotated.
+
 ## Deploy Checklist (human-run)
 
 1. Stop the stack (`docker compose down`).
 2. Backup: copy the note-service DB file to `<db>.pre-encrypt-<date>` (rollback path).
-3. `NOTE_MASTER_KEY=<key> <run command> scripts/encrypt-backfill.ts --dry-run` → review counts.
-4. Same command without `--dry-run`.
+3. `NOTE_MASTER_KEY=<key> npm run backfill-encrypt -w @life/note-service -- --dry-run` → review counts.
+4. `NOTE_MASTER_KEY=<key> npm run backfill-encrypt -w @life/note-service` (apply).
 5. Boot (`docker compose up -d`), verify counts endpoint/UX (phone check).
 6. Rollback if needed: stop, restore the backup file, boot.
 
@@ -47,17 +64,20 @@ never enters the repo (hard line: no secrets).
 ## Project Structure
 
 ```
-apps/note-service/scripts/encrypt-backfill.ts   → the script (thin; logic in src/ so tests can reach it)
+apps/note-service/scripts/encrypt-backfill.ts   → backfill entry (thin; logic in src/ so tests can reach it)
+apps/note-service/scripts/rotate-master-key.ts  → rotation entry (same shape)
 apps/note-service/src/keys/backfill.ts          → tested core: plan + apply
-apps/note-service/test/backfill.test.ts         → temp sqlite fixtures only
+apps/note-service/src/keys/rotation.ts          → tested core: rewrap-all + report
+apps/note-service/test/backfill.test.ts         → temp sqlite fixtures only (incl. rotation cases)
 ```
 
 ## Commands
 
 ```
 Typecheck: npm run typecheck
-Test:      npm run test:unit -- apps/note-service/test/backfill.test.ts
-Dry run:   NOTE_MASTER_KEY=... <run command> scripts/encrypt-backfill.ts --dry-run
+Test:      npm run test:unit -w @life/note-service -- test/backfill.test.ts
+Dry run:   NOTE_MASTER_KEY=<key> npm run backfill-encrypt -w @life/note-service -- --dry-run
+Rotate:    NOTE_MASTER_KEY=<old> NOTE_MASTER_KEY_NEW=<new> npm run rotate-master-key -w @life/note-service
 ```
 
 ## Testing Strategy (temp DB fixtures only — `data/**` is a hard line)
@@ -74,6 +94,10 @@ Dry run:   NOTE_MASTER_KEY=... <run command> scripts/encrypt-backfill.ts --dry-r
 6. Index relocation: post-run, the unique index is gone and service-level dedupe
    still prevents duplicate tag names (covered by `notes-at-rest` suite; asserted here
    for the migration half).
+7. Rotation (`rotate-master-key`): rewrap-all updates `wrappedDek` + `kekVersion`
+   under the new master, the underlying DEK is byte-identical before/after, zero
+   content rows are read or written, and a re-run reports already-rotated rows as
+   `skipped` without corrupting them.
 
 ## Boundaries
 

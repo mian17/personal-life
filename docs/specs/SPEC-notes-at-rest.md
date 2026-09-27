@@ -20,7 +20,7 @@ New table `user_keys` (the only schema addition):
 user_keys(
   sub         TEXT PRIMARY KEY,      -- owner sub (sentinel '_legacy_' for NULL-owner rows)
   wrappedDek  TEXT NOT NULL,         -- kw.v1 envelope under the master key
-  kekVersion  INTEGER NOT NULL DEFAULT 1,
+  kekVersion  INTEGER NOT NULL DEFAULT 1,  -- bumped by the rotate-master-key script
   createdAt   DATETIME NOT NULL
 )
 ```
@@ -54,8 +54,9 @@ Entity changes:
 
 `LIKE` is retired for content. The read path becomes uniform:
 
-1. SQL fetch of the owner's rows scoped by **metadata only** (`ownerSub`, `deletedAt`,
-   stable order by `updatedAt`/`id`) — no `q`/`tag` in SQL.
+1. SQL fetch of the owner's rows scoped by **metadata only** (`ownerSub`, `deletedAt`),
+   ordered exactly as today's code (list: `createdAt DESC`; trash: `deletedAt DESC`;
+   `id` tie-break) — no `q`/`tag` in SQL, no reordering.
 2. Decrypt fields in memory.
 3. Filter: `q` → case-insensitive substring over `body`; `tag` → case-insensitive
    match on tag names (same behavior as today).
@@ -67,12 +68,19 @@ Unicode more broadly — the broader fold is the accepted, documented deviation)
 
 ## Cache Rules
 
-- Cached artifacts = **serialized ciphertext rows** keyed `note:rows:<sub>:<gen>:<scope>`
-  (scope = all | trash). `q`/`tag` leave the key space (they no longer affect SQL) —
-  one entry serves every search/filter variant; the generation-counter invalidation
-  and fail-open/60s-TTL contracts in `notes-cache.ts` are unchanged.
+- **Every cached value is ciphertext** — this covers all three cached shapes the
+  service has today, not just the list:
+  - `note:list:<opts>` / `note:trash:<opts>` → serialized ciphertext rows for the
+    scope (scope = all | trash);
+  - `note:one:<id>` → the single note's serialized ciphertext row (was: decrypted DTO);
+  - `note:tags` → serialized ciphertext tag rows (was: decrypted tag names).
+- Key composition follows the existing `notes-cache.ts` `key()` scheme
+  (`note:<sub>:v<gen>:<rest>`); `q`/`tag` leave the key space (they no longer affect
+  SQL) — one entry serves every search/filter variant. The generation-counter
+  invalidation and fail-open/60s-TTL contracts are unchanged.
 - Decryption and filtering happen after every cache hit. No plaintext is ever written
-  to Redis (AOF persists it — that is the whole point).
+  to Redis (AOF persists it — that is the whole point). Tests assert every serialized
+  cached value contains `enc.v1.` and no plaintext.
 
 ## Project Structure
 
@@ -86,8 +94,8 @@ apps/note-service/test/            → service + parity + cache tests (temp sqli
 
 ```
 Typecheck: npm run typecheck
-Test:      npm run test:unit -- apps/note-service
-Build:     npm run build -w @life/note-service   (or the workspace's existing build script)
+Test:      npm run test:unit -w @life/note-service
+Build:     npm run build -w @life/note-service
 ```
 
 ## Testing Strategy

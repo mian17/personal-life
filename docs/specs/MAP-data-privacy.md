@@ -6,7 +6,7 @@ Status: APPROVED (user gate 2026-09-27; continued autonomously per AGENTS.md §8
 |---|---|---|
 | `crypto` | Shared envelope-encryption package `@life/crypto`: DEK generation, AES-256-GCM field crypt, KEK wrap/unwrap/rewrap, envelope formats v1. Consumer-agnostic | — |
 | `notes-at-rest` | note-service integration: encrypted persistence of `note.body` + `tag.name`, `user_keys` table, ciphertext-only cache, decrypt-then-match search/tag filtering | `crypto` |
-| `notes-backfill` | Idempotent plaintext→envelope migration script, tag unique-index relocation, deploy-window checklist | `notes-at-rest` |
+| `notes-backfill` | Idempotent plaintext→envelope migration script, tag unique-index relocation, master-key rotation (rewrap) script, deploy-window checklist | `notes-at-rest` |
 
 Build order: `crypto` → `notes-at-rest` → `notes-backfill`.
 
