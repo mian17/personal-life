@@ -110,7 +110,7 @@ Owned here (migration cases):
    a failed check aborts.
 
 Owned by T5 (`test/tag-refs.test.ts`, note-service behaviors): attach/detach by id,
-unknown-id pruning, tag filter by id, `[{tagId, count}]` shape, note round-trip with
+dangling-id replacement (a write replaces the set; no registry call), tag filter by id, `[{tagId, count}]` shape, note round-trip with
 `tagIds`.
 
 ## Boundaries

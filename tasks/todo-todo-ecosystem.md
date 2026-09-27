@@ -65,7 +65,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     under every NODE_ENV (explicit `@Public()` exemption test — no 401)**; leak-free
     bodies; compose healthchecks hit `/health/ready`.
   - Verify: `npm run test:unit -w @life/note-service -- test/health.e2e-spec.ts` &&
-    `npm run test:unit -w @life/idp` && `npm run typecheck`.
+    `npm run test:unit -w @life/idp -- test/health.e2e-spec.ts` && `npm run typecheck`.
   - Dependencies: none. Size: S.
 - [ ] T3: `apps/tags-service` registry — module `tags-service`
   - Description: New service — `GET/POST /api/tags`, `PATCH/DELETE /api/tags/:id`,
@@ -126,7 +126,8 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `test/ownership.e2e-spec.ts`, `test/notes-cache.e2e-spec.ts`,
     `test/crypto-roundtrip.test.ts`, `test/content-match.test.ts`, `test/backfill.test.ts`.
   - Acceptance: note-service holds zero tag names; TagRef attach/detach/filter/
-    `[{tagId,count}]` + unknown-id prune + note round-trip with `tagIds`
+    `[{tagId,count}]` + dangling-id replacement (a write replaces the set; no registry
+    call) + note round-trip with `tagIds`
     (SPEC-tags-extraction "Owned by T5" list — incl. dangling-id replacement, a write
     replacing the set); all six pinned suites updated and
     green against the TagRef contract; the two ops scripts still compile and their
@@ -176,7 +177,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `apps/app/test/**` (incl. `apps/app/test/e2e/**` — navigation URLs only, I5-approved),
     `apps/app/package.json` (`typecheck` alias if missing).
   - Acceptance: `/notes` + `/todos` live, `/` redirects; tags one vocabulary across both
-    apps; Contract 1 mechanical checks green; frozen e2e diff = I5 URLs and nothing else.
+    apps — the BFF omits unresolvable ids at render AND excludes them from subsequent
+    writes (kernel detach semantics); Contract 1 mechanical checks green; frozen e2e
+    diff = I5 URLs and nothing else.
   - Verify: `npm run test:unit -w @life/app` && `npm run build -w @life/app` && `npm run typecheck`.
   - Dependencies: T5 (note-service TagRef), T6 (todo-service), T7 (primitives). Size: L.
 - [ ] T9: wiring + integration pass — module `todo-ui` (close)
@@ -262,4 +265,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
   tests renamed to dangling-id replacement), T5 Verify builds `@life/shared` before
   typecheck (dist-resolved types), T1 gives shared/cache `typecheck` scripts, and
   idp's readiness custody check is pinned side-effect-free (never triggers lazy
-  `keys.json` creation). Round 7: PENDING.
+  `keys.json` creation).
+- 2026-09-28: conformance round 7: FAIL, 6 findings (1 CRITICAL, 5 MINOR) — all
+  folded in: the last two "unknown-id prune" holdouts rewritten to dangling-id
+  replacement; DTO `version` scope fixed to todo/list; the `/health` alias stated in
+  both new services' health sections; `todo:all` rows documented as carrying their
+  `tagIds`; T2's idp verify targeted to the single spec; BFF write-side exclusion of
+  unresolvable ids added to SPEC-todo-ui + T8. Round 8: PENDING.

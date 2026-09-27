@@ -32,7 +32,8 @@ both apps — so tags feel identical everywhere (I3).
   `life-api` audience — no per-service audience names appear in the client. Env
   wiring is T9's, client config is T8's.
 - **`/notes` tag rework:** tag filter nav renders `[{tagId, count}]` resolved to
-  names via the registry batch call.
+  names via the registry batch call. The BFF omits unresolvable ids when rendering
+  **and excludes them from subsequent writes** (kernel detach semantics).
 
 ## UI contract (AGENTS.md Contract 1)
 

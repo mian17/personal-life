@@ -50,8 +50,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 
 ## Behavior / API (kernel contracts apply)
 
-DTO shapes: every mutable entity's DTO carries `version` (todo, list, and tag) so
-clients can send `expectedVersion` (kernel concurrency contract).
+DTO shapes: every mutable entity's DTO carries `version` (todo and list — tags are
+registry-owned `TagRef`s, their `version` comes from the registry DTO) so clients
+can send `expectedVersion` (kernel concurrency contract).
 
 - `POST /api/todos {title, note?, dueDate?, listId?, tagIds?}` → 201 (version 0).
 - `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page.
@@ -76,7 +77,8 @@ clients can send `expectedVersion` (kernel concurrency contract).
 ## Cache Rules (AGENTS.md Contract 2)
 
 - Cached shapes: serialized **ciphertext** todo rows (`todo:all` — the owner's full
-  row set), list rows (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
+  row set; **each row carries its `tagIds`** so the tag filter and counts serve from
+  the hit), list rows (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
   ids + counts, no ciphertext by design).
 - Key composition `todo:<sub>:v<gen>:<rest>`. `q`/`tagId`/`listId`/`done`/`due*`/
   cursor/limit never enter the key — `listId` and every other filter are applied in
@@ -87,7 +89,8 @@ clients can send `expectedVersion` (kernel concurrency contract).
 
 ## Health
 
-Per `SPEC-service-kernel`: `/health/live`, `/health/ready` (DB + key custody).
+Per `SPEC-service-kernel`: `/health/live`, `/health/ready` (DB + key custody), and
+the `/health` deprecated alias (readiness semantics).
 
 ## Commands
 

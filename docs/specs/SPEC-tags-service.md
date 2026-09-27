@@ -69,7 +69,7 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 ## Health
 
 Per `SPEC-service-kernel`: `/health/live` (no dependency checks), `/health/ready`
-(DB + key custody only).
+(DB + key custody only), and the `/health` deprecated alias (readiness semantics).
 
 ## Commands
 
