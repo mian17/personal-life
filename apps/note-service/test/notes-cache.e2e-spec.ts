@@ -2,10 +2,11 @@ import {
   CACHE_TTL_SECONDS,
   createNotesCache,
   generationKey,
-  hashOptions,
   NotesCache,
 } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
+import { KeysService } from '../src/keys/keys.service';
+import { ENC_PREFIX, encryptField, generateDek, wrapDek } from '@life/crypto';
 import { FakeRedisClient, FailingRedisClient } from './fake-redis';
 
 /**
@@ -13,6 +14,12 @@ import { FakeRedisClient, FailingRedisClient } from './fake-redis';
  * spy — these tests prove *when* the repository is consulted and *what* is
  * written to Redis, without a database or a live Redis. The behavioural gates
  * for CRUD stay in notes.e2e-spec.ts.
+ *
+ * `notes-at-rest` T5: every cached value is a serialized **ciphertext row**
+ * (`enc.v1.` envelopes), never a decrypted DTO. These tests build fixtures with
+ * the real `@life/crypto` package and a spy `KeysService`, so the cache-hit path
+ * genuinely decrypts and the no-plaintext assertions inspect the raw strings
+ * written to Redis.
  *
  * Every key embeds the owner sub and the generation counter is per-user, so one
  * user's writes neither invalidate nor populate another user's entries.
@@ -23,17 +30,72 @@ const ISO = '2024-01-01T00:00:00.000Z';
 /** The single sub the ordering / stale-guard / fail-open cases run under. */
 const SUB = 'sub-1';
 
+const MASTER_KEY = Buffer.alloc(32, 0x2a);
+const DEK = generateDek();
+
+/** AAD shapes copied from `SPEC-notes-at-rest` (the cross-module contract). */
+const noteAad = (sub: string, id: string): string => `life.v1|${sub}|note|body|${id}`;
+const tagAad = (sub: string): string => `life.v1|${sub}|tag|name`;
+
+/** A stored tag row: the name is an `enc.v1.` envelope, as at rest. */
+function tagEntity(tag: { id: number; name: string }, sub: string = SUB): any {
+  return { id: tag.id, name: encryptField(DEK, tag.name, tagAad(sub)) };
+}
+
+/**
+ * A stored note row. `body` is a **plaintext** override that the factory
+ * encrypts for the fixture; every returned `body`/`tags[].name` is ciphertext.
+ */
 function noteEntity(overrides: Record<string, unknown> = {}): any {
+  const { body = 'hello', tags = [], ...rest } = overrides as any;
+  const id = (rest.id as string) ?? 'n1';
+  const ownerSub = (rest.ownerSub as string | null | undefined) ?? SUB;
   return {
-    id: 'n1',
-    body: 'hello',
+    id,
+    ownerSub,
+    body: encryptField(DEK, String(body), noteAad(ownerSub ?? SUB, id)),
     version: 0,
     deletedAt: null,
-    tags: [],
+    tags: (tags as Array<{ id: number; name: string }>).map((t) => tagEntity(t, ownerSub ?? SUB)),
     createdAt: new Date(ISO),
     updatedAt: new Date(ISO),
-    ...overrides,
+    ...rest,
   };
+}
+
+/**
+ * A real `KeysService` over a spy `user_keys` repo that always resolves the same
+ * DEK. Memoization is per-instance, so each harness gets its own — but the DEK is
+ * identical, which is all the fixtures need.
+ */
+function makeKeysService(): KeysService {
+  const userKeys: any = {
+    findOne: jest.fn(async ({ where }: any) => ({
+      sub: where.sub,
+      wrappedDek: wrapDek(DEK, MASTER_KEY),
+      kekVersion: 1,
+      createdAt: new Date(),
+    })),
+    insert: jest.fn(),
+  };
+  return new KeysService(userKeys, MASTER_KEY);
+}
+
+/**
+ * A `FakeRedisClient` that also records every raw value written, so a test can
+ * assert the serialized payload contains `enc.v1.` and no known plaintext.
+ */
+class CapturingRedisClient extends FakeRedisClient {
+  readonly values: Array<{ key: string; value: string }> = [];
+
+  override async set(
+    key: string,
+    value: string,
+    options?: { EX?: number },
+  ): Promise<'OK'> {
+    this.values.push({ key, value });
+    return super.set(key, value, options);
+  }
 }
 
 function chainable(opts: {
@@ -73,6 +135,7 @@ interface Harness {
     findOneResult: any;
     getManyImpl: (() => Promise<any[]>) | null;
     tagRows: any[];
+    tagFindResult: any[];
     deleteAffected: number;
     /** Awaited by every DB mutation; lets a test hold a write open. */
     mutationGate: (() => Promise<void>) | null;
@@ -88,6 +151,7 @@ function makeHarness(cache: NotesCache, events: string[] = []): Harness {
     findOneResult: null,
     getManyImpl: null,
     tagRows: [],
+    tagFindResult: [],
     deleteAffected: 1,
     mutationGate: null,
   };
@@ -130,11 +194,15 @@ function makeHarness(cache: NotesCache, events: string[] = []): Harness {
         getOne: () => Promise.resolve(null),
       }),
     ),
+    find: jest.fn(async () => state.tagFindResult),
+    // Mirror TypeORM: `create` only merges fields; the caller supplies the
+    // already-encrypted name. (Never encrypt here or the double-encrypted name
+    // would fail the AAD check on read.)
     create: jest.fn((data: any) => ({ id: 1, ...data })),
     save: jest.fn(async (tag: any) => tag),
   };
 
-  const service = new NotesService(notes, tags, cache);
+  const service = new NotesService(notes, tags, cache, makeKeysService());
   return { service, cache, state, notes, tags, events };
 }
 
@@ -143,69 +211,205 @@ async function flush(): Promise<void> {
 }
 
 describe('NotesCache (read-through + generation invalidation)', () => {
-  describe('hit: identical reads are served from cache', () => {
-    it('findAll twice consults the repository once and writes one v0 key with a 60s TTL', async () => {
-      const client = new FakeRedisClient();
+  describe('hit: identical reads are served from cache (decrypted after the hit)', () => {
+    it('findAll twice consults the repository once and writes one v0 ciphertext-row key with a 60s TTL', async () => {
+      const client = new CapturingRedisClient();
       const h = makeHarness(new NotesCache(client));
 
       const first = await h.service.findAll(SUB, {});
       const second = await h.service.findAll(SUB, {});
 
-      expect(first).toEqual(second);
+      // The API output is byte-identical across a miss and a hit.
+      expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+      expect(first.notes[0].body).toBe('hello');
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
       expect(client.sets).toHaveLength(1);
-      expect(client.sets[0].key).toMatch(new RegExp(`^note:${SUB}:v0:list:[0-9a-f]{16}$`));
+      expect(client.sets[0].key).toBe(`note:${SUB}:v0:list`);
       expect(client.sets[0].options).toEqual({ EX: CACHE_TTL_SECONDS });
+      // The stored value is ciphertext rows, not decrypted DTOs.
+      expect(client.values[0].value).toContain(ENC_PREFIX);
+      expect(client.values[0].value).not.toContain('hello');
     });
 
     it('findTrash twice consults the repository once', async () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
-      h.state.noteRows = [noteEntity({ deletedAt: new Date(ISO) })];
+      h.state.noteRows = [noteEntity({ id: 't1', deletedAt: new Date(ISO) })];
 
       await h.service.findTrash(SUB, {});
       await h.service.findTrash(SUB, {});
 
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
-      expect(client.sets[0].key).toMatch(new RegExp(`^note:${SUB}:v0:trash:[0-9a-f]{16}$`));
+      expect(client.sets[0].key).toBe(`note:${SUB}:v0:trash`);
     });
 
-    it('findOne twice consults the repository once', async () => {
-      const client = new FakeRedisClient();
+    it('findOne twice consults the repository once and returns decrypted content on the hit', async () => {
+      const client = new CapturingRedisClient();
       const h = makeHarness(new NotesCache(client));
-      h.state.findOneResult = noteEntity();
+      h.state.findOneResult = noteEntity({ body: 'secret body', tags: [{ id: 7, name: 'work' }] });
 
       const first = await h.service.findOne(SUB, 'n1');
       const second = await h.service.findOne(SUB, 'n1');
 
-      expect(first).toEqual(second);
+      expect(first.body).toBe('secret body');
+      expect(first.tags).toEqual([{ id: 7, name: 'work' }]);
+      expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(h.notes.findOne).toHaveBeenCalledTimes(1);
       expect(client.sets[0].key).toBe(`note:${SUB}:v0:one:n1`);
+      // The cached value is the ciphertext row, never the decrypted DTO.
+      expect(client.values[0].value).toContain(ENC_PREFIX);
+      expect(client.values[0].value).not.toContain('secret body');
+      expect(client.values[0].value).not.toContain('work');
     });
 
-    it('listTags twice consults the repository once', async () => {
-      const client = new FakeRedisClient();
+    it('listTags twice consults the repository once and returns decrypted, name-sorted names', async () => {
+      const client = new CapturingRedisClient();
       const h = makeHarness(new NotesCache(client));
-      h.state.tagRows = [{ id: 1, name: 'work' }];
+      h.state.tagRows = [tagEntity({ id: 2, name: 'zeta' }), tagEntity({ id: 1, name: 'alpha' })];
 
       const first = await h.service.listTags(SUB);
       const second = await h.service.listTags(SUB);
 
-      expect(first).toEqual(second);
+      expect(first).toEqual([
+        { id: 1, name: 'alpha' },
+        { id: 2, name: 'zeta' },
+      ]);
+      expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(h.tags.createQueryBuilder).toHaveBeenCalledTimes(1);
       expect(client.sets[0].key).toBe(`note:${SUB}:v0:tags`);
+      expect(client.values[0].value).toContain(ENC_PREFIX);
+      expect(client.values[0].value).not.toContain('alpha');
+      expect(client.values[0].value).not.toContain('zeta');
     });
 
-    it('distinct read shapes occupy distinct keys (no filter bleed)', async () => {
+    it('applies q and tag filtering to a cache hit (post-decrypt, one loader call)', async () => {
+      const client = new FakeRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      h.state.noteRows = [
+        noteEntity({ id: 'n1', body: 'alpha note', tags: [{ id: 1, name: 'work' }] }),
+        noteEntity({ id: 'n2', body: 'beta note', tags: [{ id: 2, name: 'idea' }] }),
+      ];
+
+      const all = await h.service.findAll(SUB, {});
+      const byQ = await h.service.findAll(SUB, { q: 'alpha' });
+      const byTag = await h.service.findAll(SUB, { tag: 'IDEA' });
+
+      expect(all.notes.map((n) => n.body)).toEqual(['alpha note', 'beta note']);
+      expect(byQ.notes.map((n) => n.body)).toEqual(['alpha note']);
+      expect(byTag.notes.map((n) => n.body)).toEqual(['beta note']);
+      // The filter variants were served from the single cached row set.
+      expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
+    });
+
+    it('q / tag / limit / cursor do not enter the key space (one entry serves every variant)', async () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
 
+      await h.service.findAll(SUB, { q: 'a' });
       await h.service.findAll(SUB, { tag: 'work' });
-      await h.service.findAll(SUB, { tag: 'idea' });
-      await h.service.findAll(SUB, { tag: 'work' });
+      await h.service.findAll(SUB, { limit: 1, cursor: 'x' });
+
+      expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(client.setCalls).toEqual([`note:${SUB}:v0:list`]);
+    });
+
+    it('generation bump makes the stale ciphertext entry unreachable; a fresh read repopulates', async () => {
+      const client = new FakeRedisClient();
+      const h = makeHarness(new NotesCache(client));
+
+      await h.service.findAll(SUB, {});
+      expect(client.setCalls).toEqual([`note:${SUB}:v0:list`]);
+
+      // A write bumps to v1; the v0 entry can no longer be addressed.
+      await h.service.create(SUB, 'x', []);
+      h.state.noteRows = [noteEntity({ id: 'n9', body: 'after bump' })];
+      const after = await h.service.findAll(SUB, {});
 
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(2);
-      expect(new Set(client.setCalls).size).toBe(2);
+      expect(after.notes[0].body).toBe('after bump');
+      expect(client.setCalls).toContain(`note:${SUB}:v1:list`);
+    });
+  });
+
+  describe('ciphertext-only: no plaintext is ever written to Redis', () => {
+    /**
+     * Populate all four cache shapes through the service and assert on the raw
+     * serialized strings. The known plaintext tokens (bodies + tag names) must
+     * not appear in any captured value; every value must carry `enc.v1.`.
+     */
+    it('list / trash / one / tags all serialize ciphertext only', async () => {
+      const BODY = 'TOPSECRET-NOTE-BODY';
+      const TAG = 'TOPSECRET-TAG-NAME';
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      const row = noteEntity({ id: 'n1', body: BODY, tags: [{ id: 5, name: TAG }] });
+      h.state.noteRows = [row];
+      h.state.findOneResult = row;
+      h.state.tagRows = [tagEntity({ id: 5, name: TAG })];
+
+      await h.service.findAll(SUB, {});
+      await h.service.findTrash(SUB, {});
+      await h.service.findOne(SUB, 'n1');
+      await h.service.listTags(SUB);
+
+      const keys = client.values.map((v) => v.key);
+      expect(keys).toEqual([
+        `note:${SUB}:v0:list`,
+        `note:${SUB}:v0:trash`,
+        `note:${SUB}:v0:one:n1`,
+        `note:${SUB}:v0:tags`,
+      ]);
+      expect(client.values).toHaveLength(4);
+      for (const { key, value } of client.values) {
+        expect(value).toContain(ENC_PREFIX);
+        expect(value).not.toContain(BODY);
+        expect(value).not.toContain(TAG);
+      }
+    });
+
+    it('serves a legacy plaintext row directly but refuses to cache it', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      // A pre-backfill row: body/name are not envelopes (dual-read, D8).
+      h.state.noteRows = [
+        {
+          id: 'legacy',
+          ownerSub: SUB,
+          body: 'legacy plaintext body',
+          version: 0,
+          deletedAt: null,
+          tags: [],
+          createdAt: new Date(ISO),
+          updatedAt: new Date(ISO),
+        },
+      ];
+
+      const page = await h.service.findAll(SUB, {});
+
+      expect(page.notes[0].body).toBe('legacy plaintext body');
+      // The loader's result is returned, but nothing was written to Redis.
+      expect(client.values).toHaveLength(0);
+      expect(client.setCalls).toHaveLength(0);
+    });
+
+    it('discards a legacy/plaintext entry already in Redis and rewrites ciphertext', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      h.state.noteRows = [noteEntity({ id: 'n1', body: 'fresh ciphertext' })];
+      const key = `note:${SUB}:v0:list`;
+
+      // A leftover plaintext entry from a pre-fix deploy.
+      client.store.set(key, JSON.stringify([{ id: 'n1', body: 'old plaintext', tags: [] }]));
+
+      const page = await h.service.findAll(SUB, {});
+
+      expect(page.notes[0].body).toBe('fresh ciphertext');
+      expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
+      // The unusable entry was overwritten with ciphertext rows.
+      const written = client.values.filter((v) => v.key === key);
+      expect(written).toHaveLength(1);
+      expect(written[0].value).toContain(ENC_PREFIX);
+      expect(written[0].value).not.toContain('old plaintext');
     });
   });
 
@@ -366,8 +570,8 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       await firstRead;
 
       // The stale value must not be cached under the new generation.
-      expect(client.setCalls.filter((k) => k.startsWith(`note:${SUB}:v0:list:`))).toHaveLength(0);
-      expect(client.setCalls).not.toContain(`note:${SUB}:v1:list:` + hashOptions({})); // never the new gen either
+      expect(client.setCalls).not.toContain(`note:${SUB}:v0:list`);
+      expect(client.setCalls).not.toContain(`note:${SUB}:v1:list`); // never the new gen either
 
       // The next read misses and observes the freshly-stored state.
       h.state.getManyImpl = null;
@@ -403,8 +607,8 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       // unreachable as soon as the write bumps.
       const during = await h.service.findAll(SUB, {});
       expect(during.notes[0].body).toBe('old');
-      expect(client.setCalls).toEqual([`note:${SUB}:v0:list:${hashOptions({})}`]);
-      expect(client.setCalls.some((k) => k.startsWith(`note:${SUB}:v1:list:`))).toBe(false);
+      expect(client.setCalls).toEqual([`note:${SUB}:v0:list`]);
+      expect(client.setCalls.some((k) => k.startsWith(`note:${SUB}:v1:list`))).toBe(false);
 
       releaseGate();
       await writePromise;
@@ -415,7 +619,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       h.state.noteRows = [noteEntity({ body: 'raced' })];
       const after = await h.service.findAll(SUB, {});
       expect(after.notes[0].body).toBe('raced');
-      expect(client.setCalls).toContain(`note:${SUB}:v1:list:${hashOptions({})}`);
+      expect(client.setCalls).toContain(`note:${SUB}:v1:list`);
     });
   });
 
@@ -425,14 +629,16 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       const h = makeHarness(new NotesCache(client));
       const A = 'user-a';
       const B = 'user-b';
+      // An empty row set: this case is about key namespaces, not decryption.
+      h.state.noteRows = [];
 
       // Both users populate their own list entry.
       await h.service.findAll(A, {});
       await h.service.findAll(B, {});
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(2);
       expect(client.setCalls).toEqual([
-        `note:${A}:v0:list:${hashOptions({})}`,
-        `note:${B}:v0:list:${hashOptions({})}`,
+        `note:${A}:v0:list`,
+        `note:${B}:v0:list`,
       ]);
 
       // A writes: exactly A's counter bumps and nothing else.
@@ -448,7 +654,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       // re-queries, and repopulates under the new generation.
       await h.service.findAll(A, {});
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(3);
-      expect(client.setCalls).toContain(`note:${A}:v1:list:${hashOptions({})}`);
+      expect(client.setCalls).toContain(`note:${A}:v1:list`);
     });
 
     it("a read by one user never populates a key reachable from the other's namespace", async () => {
@@ -456,6 +662,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       const h = makeHarness(new NotesCache(client));
       const A = 'user-a';
       const B = 'user-b';
+      h.state.noteRows = [];
 
       await h.service.findAll(A, {});
       expect(client.setCalls.length).toBeGreaterThan(0);
@@ -464,21 +671,24 @@ describe('NotesCache (read-through + generation invalidation)', () => {
 
       await h.service.findAll(B, {});
       const bKeys = client.setCalls.filter((k) => k.startsWith(`note:${B}:`));
-      expect(bKeys).toEqual([`note:${B}:v0:list:${hashOptions({})}`]);
+      expect(bKeys).toEqual([`note:${B}:v0:list`]);
     });
   });
 
   describe('fail-open: Redis errors degrade to the DB path', () => {
     it('reads still return DB data and never throw', async () => {
       const h = makeHarness(new NotesCache(new FailingRedisClient()));
-      h.state.findOneResult = noteEntity();
+      h.state.noteRows = [noteEntity({ body: 'hello', tags: [{ id: 3, name: 'work' }] })];
+      h.state.findOneResult = noteEntity({ body: 'one', tags: [{ id: 3, name: 'work' }] });
+      h.state.tagRows = [tagEntity({ id: 3, name: 'work' })];
 
       const page = await h.service.findAll(SUB, {});
       expect(page.notes[0].body).toBe('hello');
       const one = await h.service.findOne(SUB, 'n1');
-      expect(one.id).toBe('n1');
+      expect(one.body).toBe('one');
+      expect(one.tags).toEqual([{ id: 3, name: 'work' }]);
       const tags = await h.service.listTags(SUB);
-      expect(tags).toEqual([]);
+      expect(tags).toEqual([{ id: 3, name: 'work' }]);
     });
 
     it('writes still mutate the DB when the bump cannot reach Redis', async () => {

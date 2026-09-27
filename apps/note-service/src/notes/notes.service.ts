@@ -6,7 +6,7 @@ import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypt
 import { Note } from './note.entity';
 import { Tag } from './tag.entity';
 import { KeysService } from '../keys/keys.service';
-import { hashOptions, NOTES_CACHE, NotesCache } from './notes-cache';
+import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
 import type { Note as NoteDto, NotePage } from '@life/shared';
 
@@ -36,6 +36,132 @@ function noteBodyAad(ownerSub: string, noteId: string): string {
 function tagNameAad(ownerSub: string): string {
   return `life.v1|${ownerSub}|tag|name`;
 }
+
+/**
+ * Ciphertext-row shapes stored in Redis (`SPEC-notes-at-rest` Cache Rules). The
+ * cache holds **rows as stored** — `body`/`name` are `enc.v1.` envelopes — never
+ * a decrypted DTO. Metadata is copied verbatim because keyset pagination and the
+ * DTO need it; only content is (and stays) ciphertext.
+ */
+interface CachedNoteRow {
+  id: string;
+  ownerSub: string | null;
+  body: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  tags: CachedTagRow[];
+}
+
+interface CachedTagRow {
+  id: number;
+  name: string;
+}
+
+/** Serialize a note entity into its ciphertext-row form (dates → ISO). */
+function toCachedNoteRow(note: Note): CachedNoteRow {
+  return {
+    id: note.id,
+    ownerSub: note.ownerSub,
+    body: note.body,
+    version: note.version,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
+    deletedAt: note.deletedAt ? note.deletedAt.toISOString() : null,
+    tags: (note.tags ?? []).map((t) => ({ id: t.id, name: t.name })),
+  };
+}
+
+/**
+ * True when every content field of a serialized row is an `enc.v1.` envelope, so
+ * the populate may touch Redis. A pre-backfill legacy row is plaintext (D8
+ * dual-read); caching it would persist plaintext in an AOF store, so it refuses
+ * (`cacheable` on `getThrough`) and is served straight from the DB instead.
+ * A row with no encrypted content (e.g. a note with no tags or no encrypted
+ * names) is not "cacheable proof" either — absence of a prefix is exactly the
+ * legacy signal.
+ */
+function isCiphertextNoteRow(row: CachedNoteRow): boolean {
+  return (
+    typeof row?.body === 'string' &&
+    row.body.startsWith(ENC_PREFIX) &&
+    Array.isArray(row.tags) &&
+    row.tags.every((t) => typeof t?.name === 'string' && t.name.startsWith(ENC_PREFIX))
+  );
+}
+
+function isCiphertextTagRow(row: CachedTagRow): boolean {
+  return typeof row?.name === 'string' && row.name.startsWith(ENC_PREFIX);
+}
+
+function isCiphertextTagList(rows: CachedTagRow[]): boolean {
+  return rows.every(isCiphertextTagRow);
+}
+
+/** Reject a hit whose serialized rows are not all `enc.v1.` ciphertext. */
+function decodeCiphertextNoteRow(raw: unknown): CachedNoteRow {
+  const row = raw as CachedNoteRow;
+  if (!isCiphertextNoteRow(row)) throw new Error('cache entry is not ciphertext');
+  return row;
+}
+
+function decodeCiphertextNoteList(raw: unknown): CachedNoteRow[] {
+  if (!Array.isArray(raw) || !raw.every(isCiphertextNoteRow)) {
+    throw new Error('cache entry is not ciphertext');
+  }
+  return raw;
+}
+
+function decodeCiphertextTagList(raw: unknown): CachedTagRow[] {
+  if (!Array.isArray(raw) || !raw.every(isCiphertextTagRow)) {
+    throw new Error('cache entry is not ciphertext');
+  }
+  return raw;
+}
+
+/**
+ * Rehydrate a validated ciphertext row. Content is run through the same AAD
+ * shapes as a fresh DB read, so a hit cannot skip authentication. Callers pass
+ * rows that already passed `isCiphertextNoteRow` (loader output or a decoded hit).
+ */
+function decodeCachedNoteRow(
+  row: CachedNoteRow,
+  sub: string,
+  dek: Buffer | null,
+  open: OpenField,
+): NoteDto {
+  return {
+    id: row.id,
+    body: open(row.body, dek, noteBodyAad(sub, row.id), 'note', row.id),
+    tags: row.tags.map((t) => ({
+      id: t.id,
+      name: open(t.name, dek, tagNameAad(sub), 'tag', String(t.id)),
+    })),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    deletedAt: row.deletedAt,
+    version: row.version,
+  };
+}
+
+function decodeCachedTagRow(
+  row: CachedTagRow,
+  sub: string,
+  dek: Buffer | null,
+  open: OpenField,
+): { id: number; name: string } {
+  return { id: row.id, name: open(row.name, dek, tagNameAad(sub), 'tag', String(row.id)) };
+}
+
+/** Binds `openField` for decode helpers (keeps the private method off the free functions). */
+type OpenField = (
+  stored: string,
+  dek: Buffer | null,
+  aad: string,
+  entity: 'note' | 'tag',
+  id: string,
+) => string;
 
 /**
  * Decode today's keyset cursor, `base64(<isoTimestamp>|<id>)`. The wire format is
@@ -136,12 +262,17 @@ export class NotesService {
     }
   }
 
-  /** True when any content field of `note` is an envelope needing the owner DEK. */
-  private needsDek(note: Note): boolean {
-    return (
-      note.body.startsWith(ENC_PREFIX) ||
-      (note.tags ?? []).some((t) => t.name.startsWith(ENC_PREFIX))
+  /**
+   * Resolve the owner DEK for a set of ciphertext rows, at most once per read.
+   * A set with no `enc.v1.` field is all-legacy (or empty), so no key is needed
+   * and the rows pass through `openField` untouched (dual-read).
+   */
+  private async readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
+    const needs = rows.some(
+      (r) => r.body.startsWith(ENC_PREFIX) || r.tags.some((t) => t.name.startsWith(ENC_PREFIX)),
     );
+    if (!needs) return null;
+    return this.requireKeys().getDekForRead(sub);
   }
 
   private toDto(note: Note, sub: string, dek: Buffer | null): NoteDto {
@@ -159,18 +290,15 @@ export class NotesService {
     };
   }
 
-  /** Decrypt a single loaded note, provisioning nothing (read path, fail-closed). */
+  /**
+   * Decrypt a single loaded note, provisioning nothing (read path, fail-closed).
+   * Runs the stored row through the same ciphertext-row pipeline a cache hit
+   * uses, so there is exactly one decrypt/assemble path.
+   */
   private async decryptOne(note: Note, sub: string): Promise<NoteDto> {
-    const dek = this.needsDek(note) ? await this.requireKeys().getDekForRead(sub) : null;
-    return this.toDto(note, sub, dek);
-  }
-
-  /** Decrypt a page of loaded notes, resolving the owner DEK at most once. */
-  private async decryptMany(rows: Note[], sub: string): Promise<NoteDto[]> {
-    const dek = rows.some((n) => this.needsDek(n))
-      ? await this.requireKeys().getDekForRead(sub)
-      : null;
-    return rows.map((n) => this.toDto(n, sub, dek));
+    const row = toCachedNoteRow(note);
+    const dek = await this.readDek(sub, [row]);
+    return decodeCachedNoteRow(row, sub, dek, this.openField);
   }
 
   /**
@@ -232,41 +360,43 @@ export class NotesService {
     },
   ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
-    const cacheKey = `note:list:${hashOptions({
-      tag: opts.tag,
-      q: opts.q,
-      limit: opts.limit,
-      cursor: opts.cursor,
-    })}`;
-    return this.cache.getThrough(sub, cacheKey, async () => {
-      // Metadata-only SQL: content (`q`) and tag names are envelopes, so neither
-      // can be matched in the DB. Fetch the owner's non-trashed rows in today's
-      // exact order (`createdAt DESC`, `id` DESC tie-break) and do all matching
-      // and pagination in memory after decryption. No `LIMIT` can be pushed into
-      // SQL because the row set is only known once the filter has run.
-      const rows = await this.notes
-        .createQueryBuilder('note')
-        .leftJoinAndSelect('note.tags', 'tag')
-        .orderBy('note.createdAt', 'DESC')
-        .addOrderBy('note.id', 'DESC')
-        .where('note.deletedAt IS NULL')
-        .andWhere('note.ownerSub = :sub', { sub })
-        .getMany();
+    // Key: `note:<sub>:v<gen>:list` — no q/tag/limit/cursor. The cached value is
+    // the whole non-trashed ciphertext row set; every filter variant shares it.
+    const rows = await this.cache.getThrough(
+      sub,
+      'note:list',
+      async () => {
+        // Metadata-only SQL: content (`q`) and tag names are envelopes, so neither
+        // can be matched in the DB. Fetch the owner's non-trashed rows in today's
+        // exact order (`createdAt DESC`, `id` DESC tie-break) and do all matching
+        // and pagination in memory after decryption. No `LIMIT` is pushed into SQL
+        // because the row set is only known once the filter has run.
+        const found = await this.notes
+          .createQueryBuilder('note')
+          .leftJoinAndSelect('note.tags', 'tag')
+          .orderBy('note.createdAt', 'DESC')
+          .addOrderBy('note.id', 'DESC')
+          .where('note.deletedAt IS NULL')
+          .andWhere('note.ownerSub = :sub', { sub })
+          .getMany();
+        return found.map(toCachedNoteRow);
+      },
+      // A legacy plaintext row must never be cached (AOF persists it).
+      { decode: decodeCiphertextNoteList, cacheable: (rows) => rows.every(isCiphertextNoteRow) },
+    );
 
-      // Decrypt once for the whole candidate set; matching sees effective
-      // plaintext (envelope rows: decrypted; legacy rows: the raw value).
-      const decoded = await this.decryptMany(rows, sub);
+    const dek = await this.readDek(sub, rows);
+    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openField));
 
-      const tagKey = opts.tag?.toLowerCase();
-      const filtered = decoded.filter((note) => {
-        if (tagKey && !note.tags.some((t) => t.name.toLowerCase() === tagKey)) return false;
-        if (opts.q && !likeMatch(note.body, `%${opts.q}%`)) return false;
-        return true;
-      });
-
-      const { page, nextCursor } = paginate(filtered, limit, opts.cursor, (n) => n.createdAt);
-      return { notes: page, nextCursor };
+    const tagKey = opts.tag?.toLowerCase();
+    const filtered = decoded.filter((note) => {
+      if (tagKey && !note.tags.some((t) => t.name.toLowerCase() === tagKey)) return false;
+      if (opts.q && !likeMatch(note.body, `%${opts.q}%`)) return false;
+      return true;
     });
+
+    const { page, nextCursor } = paginate(filtered, limit, opts.cursor, (n) => n.createdAt);
+    return { notes: page, nextCursor };
   }
 
   async findTrash(
@@ -274,35 +404,51 @@ export class NotesService {
     opts: { limit?: number; cursor?: string },
   ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
-    const cacheKey = `note:trash:${hashOptions({ limit: opts.limit, cursor: opts.cursor })}`;
-    return this.cache.getThrough(sub, cacheKey, async () => {
-      // Metadata-only SQL mirroring `findAll`: trashed rows only, in today's
-      // `deletedAt DESC` / `id` DESC order, then keyset-paginated in memory so a
-      // same-timestamp tie can never repeat or skip the boundary row.
-      const rows = await this.notes
-        .createQueryBuilder('note')
-        .leftJoinAndSelect('note.tags', 'tag')
-        .where('note.deletedAt IS NOT NULL')
-        .andWhere('note.ownerSub = :sub', { sub })
-        .orderBy('note.deletedAt', 'DESC')
-        .addOrderBy('note.id', 'DESC')
-        .getMany();
+    // Key: `note:<sub>:v<gen>:trash` — pagination is in memory, so limit/cursor
+    // are not part of the key and one entry serves every trash page request.
+    const rows = await this.cache.getThrough(
+      sub,
+      'note:trash',
+      async () => {
+        // Metadata-only SQL mirroring `findAll`: trashed rows only, in today's
+        // `deletedAt DESC` / `id` DESC order, then keyset-paginated in memory so a
+        // same-timestamp tie can never repeat or skip the boundary row.
+        const found = await this.notes
+          .createQueryBuilder('note')
+          .leftJoinAndSelect('note.tags', 'tag')
+          .where('note.deletedAt IS NOT NULL')
+          .andWhere('note.ownerSub = :sub', { sub })
+          .orderBy('note.deletedAt', 'DESC')
+          .addOrderBy('note.id', 'DESC')
+          .getMany();
+        return found.map(toCachedNoteRow);
+      },
+      { decode: decodeCiphertextNoteList, cacheable: (rows) => rows.every(isCiphertextNoteRow) },
+    );
 
-      const decoded = await this.decryptMany(rows, sub);
-      const { page, nextCursor } = paginate(decoded, limit, opts.cursor, (n) => n.deletedAt!);
-      return { notes: page, nextCursor };
-    });
+    const dek = await this.readDek(sub, rows);
+    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openField));
+    const { page, nextCursor } = paginate(decoded, limit, opts.cursor, (n) => n.deletedAt!);
+    return { notes: page, nextCursor };
   }
 
   async findOne(sub: string, id: string): Promise<NoteDto> {
-    return this.cache.getThrough(sub, `note:one:${id}`, async () => {
-      const note = await this.notes.findOne({
-        where: { id, ownerSub: sub, deletedAt: IsNull() },
-        relations: { tags: true },
-      });
-      if (!note) throw new NotFoundException('Note not found');
-      return this.decryptOne(note, sub);
-    });
+    // Key: `note:<sub>:v<gen>:one:<id>` — a single ciphertext row, not a DTO.
+    const row = await this.cache.getThrough(
+      sub,
+      `note:one:${id}`,
+      async () => {
+        const note = await this.notes.findOne({
+          where: { id, ownerSub: sub, deletedAt: IsNull() },
+          relations: { tags: true },
+        });
+        if (!note) throw new NotFoundException('Note not found');
+        return toCachedNoteRow(note);
+      },
+      { decode: decodeCiphertextNoteRow, cacheable: isCiphertextNoteRow },
+    );
+    const dek = await this.readDek(sub, [row]);
+    return decodeCachedNoteRow(row, sub, dek, this.openField);
   }
 
   async update(
@@ -369,24 +515,30 @@ export class NotesService {
   }
 
   async listTags(sub: string): Promise<{ id: number; name: string }[]> {
-    return this.cache.getThrough(sub, 'note:tags', async () => {
-      const tags = await this.tags
-        .createQueryBuilder('tag')
-        .innerJoin('tag.notes', 'note')
-        .where('note.deletedAt IS NULL')
-        .andWhere('tag.ownerSub = :sub', { sub })
-        .getMany();
-      const dek = tags.some((t) => t.name.startsWith(ENC_PREFIX))
-        ? await this.requireKeys().getDekForRead(sub)
-        : null;
-      const names = tags.map((t) => ({
-        id: t.id,
-        name: this.openField(t.name, dek, tagNameAad(sub), 'tag', String(t.id)),
-      }));
-      // The former SQL `ORDER BY tag.name` cannot order ciphertext; sort on the
-      // decrypted names so the API order stays deterministic and name-ascending.
-      names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-      return names;
-    });
+    // Key: `note:<sub>:v<gen>:tags` — the owner's ciphertext tag rows, decrypted
+    // after the hit; the name-ascending order is (re)applied post-decrypt.
+    const rows = await this.cache.getThrough(
+      sub,
+      'note:tags',
+      async () => {
+        const tags = await this.tags
+          .createQueryBuilder('tag')
+          .innerJoin('tag.notes', 'note')
+          .where('note.deletedAt IS NULL')
+          .andWhere('tag.ownerSub = :sub', { sub })
+          .getMany();
+        return tags.map((t) => ({ id: t.id, name: t.name }));
+      },
+      { decode: decodeCiphertextTagList, cacheable: isCiphertextTagList },
+    );
+
+    const dek = rows.some((t) => t.name.startsWith(ENC_PREFIX))
+      ? await this.requireKeys().getDekForRead(sub)
+      : null;
+    const names = rows.map((row) => decodeCachedTagRow(row, sub, dek, this.openField));
+    // The former SQL `ORDER BY tag.name` cannot order ciphertext; sort on the
+    // decrypted names so the API order stays deterministic and name-ascending.
+    names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    return names;
   }
 }

@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { createClient } from 'redis';
 
 /**
@@ -6,13 +5,27 @@ import { createClient } from 'redis';
  * generation counter* (`INCR note:gen:<sub>`) rather than per-key deletes.
  *
  * Why generation-bump over per-key invalidation: a single write can invalidate
- * an unbounded number of read keys (every `findAll` filter/cursor combination,
- * the trash page, the tag list, one note). Tracking which keys exist would need
- * `KEYS`/`SCAN` (O(N) and cluster-hostile) or a parallel bookkeeping structure
- * that can drift. Bumping one integer moves every subsequent read onto a new key
- * namespace; the old keys are simply unreachable and age out via the 60s TTL.
- * One atomic op per write, cluster-safe, and impossible to leave partially
- * invalidated.
+ * an unbounded number of read keys (the list scope, the trash scope, the tag
+ * list, one note). Tracking which keys exist would need `KEYS`/`SCAN` (O(N) and
+ * cluster-hostile) or a parallel bookkeeping structure that can drift. Bumping
+ * one integer moves every subsequent read onto a new key namespace; the old keys
+ * are simply unreachable and age out via the 60s TTL. One atomic op per write,
+ * cluster-safe, and impossible to leave partially invalidated.
+ *
+ * Final key shape (`<rest>` after the `note:<sub>:v<gen>:` prefix):
+ *   - `list`        → the owner's non-trashed ciphertext rows (scope = all)
+ *   - `trash`       → the owner's trashed ciphertext rows (scope = trash)
+ *   - `one:<id>`    → one note's ciphertext row
+ *   - `tags`        → the owner's ciphertext tag rows
+ * `q`/`tag`/`limit`/`cursor` are deliberately **not** in the key: the cached
+ * value is the whole metadata-scoped row set, and filtering/pagination run in
+ * memory after every hit, so one entry serves every search/filter variant.
+ *
+ * Every cached value is serialized **ciphertext** rows (`SPEC-notes-at-rest`
+ * Cache Rules): the service decrypts only after a hit/miss, never before the
+ * populate. Redis here is AOF-persistent, so plaintext at this layer would
+ * defeat the chapter. `cacheable` on `getThrough` is the tripwire that refuses
+ * to persist a legacy plaintext (dual-read) value.
  *
  * Every key embeds the owner `sub`, and each user has their own counter, so one
  * user's keys are unreachable from another user's namespace and one user's
@@ -53,18 +66,21 @@ export interface CacheClient {
   connect(): Promise<unknown>;
 }
 
-/** Stable, collision-resistant hash of a request's option shape. */
-export function hashOptions(opts: Record<string, unknown>): string {
-  return createHash('sha1').update(stableStringify(opts)).digest('hex').slice(0, 16);
-}
-
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+/**
+ * Hit-handling hooks for `getThrough`.
+ *
+ * - `decode` turns the raw parsed cache value into `T`, and must **throw** when
+ *   the entry is unusable (a legacy/plaintext entry written before this contract,
+ *   or corruption). A throw is treated exactly like a miss: the DB loader runs
+ *   and its fresh value is written back under the same generation.
+ * - `cacheable` decides whether the loader's value may be persisted at all. The
+ *   transparent dual-read path can surface a legacy plaintext row (no `enc.v1.`
+ *   envelope); returning false leaves Redis untouched so no plaintext ever lands
+ *   in an AOF-persistent store.
+ */
+export interface CacheHitOptions<T> {
+  decode?: (raw: unknown) => T;
+  cacheable?: (value: T) => boolean;
 }
 
 export class NotesCache {
@@ -78,25 +94,38 @@ export class NotesCache {
    * value is now stale, so it is never written under the new generation (which
    * would mask that write for the TTL). The next read misses and observes the
    * write.
+   *
+   * `loader` must return the **ciphertext row** form (never a decrypted DTO):
+   * the same value is both returned to the caller (who decrypts it) and, when
+   * `cacheable` allows, stored under `baseKey`.
    */
-  async getThrough<T>(sub: string, baseKey: string, loader: () => Promise<T>): Promise<T> {
+  async getThrough<T>(
+    sub: string,
+    baseKey: string,
+    loader: () => Promise<T>,
+    options: CacheHitOptions<T> = {},
+  ): Promise<T> {
     const client = this.client;
     if (!client) return loader();
 
-    let genBefore: number;
+    let genBefore: number | null = null;
     try {
       genBefore = await this.readGeneration(client, sub);
       const cached = await client.get(this.key(sub, baseKey, genBefore));
-      if (cached !== null) return JSON.parse(cached) as T;
+      if (cached !== null) {
+        const raw = JSON.parse(cached) as unknown;
+        return options.decode ? options.decode(raw) : (raw as T);
+      }
     } catch {
-      return loader(); // any cache error: correct, degraded DB path
+      /* cache read error or unusable entry: fall through to the DB loader */
     }
 
     const value = await loader();
 
     try {
+      if (genBefore === null) return value; // generation unknown: populate nothing
       const genAfter = await this.readGeneration(client, sub);
-      if (genAfter === genBefore) {
+      if (genAfter === genBefore && (options.cacheable?.(value) ?? true)) {
         await client.set(this.key(sub, baseKey, genBefore), JSON.stringify(value), {
           EX: CACHE_TTL_SECONDS,
         });
