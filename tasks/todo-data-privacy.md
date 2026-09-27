@@ -2,7 +2,8 @@
 
 Plan: `tasks/plan-data-privacy.md` · Specs: `docs/specs/MAP-data-privacy.md` + `SPEC-*.md` · Intent: `docs/intent/data-privacy.md`
 
-Status: **GATE COMPLETE — 5/5 N/N, MERGEABLE** (merge parked: user's explicit request only). Process: AGENTS.md §8 (autonomous after the intent gate) + §6
+Status: **CLOSED — merged to master** (`dc81543 → 4b17cea`, fast-forward, 2026-09-28).
+Human-built, deployed and verified (2026-09-28). Five-lane gate N/N (`tasks/five-lane-data-privacy.md`, fix pass `f3dc4aa`). Process: AGENTS.md §8 (autonomous after the intent gate) + §6
 review lifecycle per task. Superpowers skills explicitly not used (user instruction
 2026-09-27). Each task = one subagent (mandatory AGENTS.md task template), TDD,
 tech-lead diff review + commit. Test runs: targeted, sequential, ≤2 per task.

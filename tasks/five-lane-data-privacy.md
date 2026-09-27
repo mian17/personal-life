@@ -3,7 +3,11 @@
 Branch: `feature/data-privacy` · Range: `master..HEAD` (52f6a9c..f3dc4aa)
 Plan: `tasks/plan-data-privacy.md` · Ledger: `tasks/todo-data-privacy.md`
 
-## Final verdict: **N/N — MERGEABLE** (merge parked: user's explicit request only)
+## Final verdict: **N/N — MERGED** (`dc81543 → 4b17cea`, fast-forward, 2026-09-28)
+
+Standing rule honored: the branch stayed unmerged until the user's explicit merge
+request (2026-09-28), after their own build + deployment + verification
+("it is actually fine to use now").
 
 Trail: suite gate green (crypto 35/35 + note-service 110/110; typecheck clean) →
 lanes 1–5 fired in parallel over one shared context block → lanes 2 & 5 FAIL
@@ -56,13 +60,14 @@ with ids-only logs; zero third-party crypto.
 ## Machine record
 
 ```json
-{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"PARKED_AWAITING_USER_EXPLICIT_REQUEST","suite":"crypto 35/35 + note-service 110/110 + typecheck clean","fix_pass":"f3dc4aa (tests_pass=true)","human_run_required":"production backfill + deploy (see SPEC-notes-backfill.md checklist)"}
+{"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"MERGED","merged":"2026-09-28 fast-forward dc81543..4b17cea","suite":"crypto 35/35 + note-service 110/110 + typecheck clean","fix_pass":"f3dc4aa (tests_pass=true)","human_run_required":"production backfill + deploy (see SPEC-notes-backfill.md checklist)"}
 ```
 
 ## Next
 
-Merge to `master` happens only on the user's explicit request. Deployment is
-human-run (AGENTS.md §8: production data migrations and deploys): generate the
-production `NOTE_MASTER_KEY`, stop the stack, backup the DB file, dry-run, apply,
-boot, phone check — checklist verbatim in `apps/note-service/scripts/encrypt-backfill.ts`
-header and `docs/specs/SPEC-notes-backfill.md`.
+Chapter closed — `@life/crypto` + note-content encryption at rest are on `master`
+and human-deployed/verified (2026-09-28). Outstanding human item if not yet done:
+the production `backfill-encrypt` run for pre-existing rows (dual-read keeps
+everything working until then; checklist in `docs/specs/SPEC-notes-backfill.md`).
+Next chapter candidates: `todo-service` (consumes `@life/crypto`) or the user's
+ruling.
