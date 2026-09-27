@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { Note } from './notes/note.entity';
 import { Tag } from './notes/tag.entity';
+import { KeysModule } from './keys/keys.module';
+import { UserKeys } from './keys/user-keys.entity';
 import { NotesModule } from './notes/notes.module';
 
 @Module({
@@ -10,10 +12,11 @@ import { NotesModule } from './notes/notes.module';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db'),
-      entities: [Note, Tag],
+      entities: [Note, Tag, UserKeys],
       synchronize: true,
     }),
     NotesModule,
+    KeysModule,
   ],
 })
 export class AppModule {}

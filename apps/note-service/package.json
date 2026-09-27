@@ -8,9 +8,12 @@
     "start": "PORT=${PORT:-3001} node dist/main.js",
     "backfill-owner": "ts-node scripts/backfill-owner.ts",
     "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "jest"
   },
   "dependencies": {
+    "@life/crypto": "*",
     "@life/shared": "*",
     "@nestjs/common": "^11.0.11",
     "@nestjs/core": "^11.0.11",
@@ -49,8 +52,9 @@
       "ts"
     ],
     "rootDir": ".",
-    "testRegex": ".e2e-spec.ts$",
+    "testRegex": "(\\.e2e-spec|\\.test)\\.ts$",
     "moduleNameMapper": {
+      "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
       "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts"
     },
     "transform": {
