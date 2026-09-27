@@ -50,15 +50,19 @@ ids, and the app composes names from the registry (MAP M4).
 (the receiving side owns import; opening both DBs directly is the `backfill-owner`
 precedent).
 
-- Inputs: `NOTE_DB_PATH` (read; default `apps/note-service/data/life.db`),
+- Inputs: `NOTE_DB_PATH` (read+write — the case-variant merge repoint and the
+  schema surgery write the note DB; default `apps/note-service/data/life.db`),
   `TAGS_DB_PATH` (write; default `apps/tags-service/data/tags.db`) — resolved via
   `apps/tags-service/src/keys/db.ts` (T3, mirroring note-service's resolver:
   cwd-independent default, env override wins; a third copy would trigger extraction
   to `@life/shared`, rule of three) — plus `NOTE_MASTER_KEY` (decrypt with
   note-service DEKs) and `TAGS_MASTER_KEY` (encrypt under registry DEKs).
-- First action, before any write: a self-verified backup of BOTH DBs (`VACUUM INTO`
-  + `PRAGMA quick_check`, the `backfill-owner` precedent). No destructive step runs
-  without it; a failed check aborts the script.
+- First action, before any write: a self-verified backup of every DB that EXISTS
+  (`VACUUM INTO` + `PRAGMA quick_check`, the `backfill-owner` precedent) — the note
+  DB always, `tags.db` only when present: on the first run the registry has not
+  booted and `tags.db` does not exist yet (the import bootstraps it), which is not
+  data loss and must NOT abort. No destructive step runs without the verified
+  backups; a failed check on an existing DB aborts the script.
 - Registry schema bootstrap: the import creates `tag`/`user_keys` in `tags.db` if
   absent (DDL byte-equivalent to SPEC-tags-service's entities) before copying — the
   registry service has not booted at that point.
@@ -91,7 +95,8 @@ precedent).
 ## Deploy Checklist (human-run)
 
 1. Stop the stack (`docker compose down`).
-2. Backup both DB files (note `life.db` + new `tags.db`).
+2. Backup the DB files that exist (note `life.db`; `tags.db` only after a first
+   import). The script also takes its own verified backups before writing.
 3. `NOTE_MASTER_KEY=<key> TAGS_MASTER_KEY=<key> NOTE_DB_PATH=<life.db> TAGS_DB_PATH=<tags.db> npm run import-tags -w @life/tags-service -- --dry-run` → review counts. (DB-path vars optional — defaults resolve correctly from the repo root.)
 4. Same without `--dry-run` (apply; ends with the schema surgery).
 5. Boot (`docker compose up -d`) → verify tags render in `/notes`.
@@ -120,8 +125,9 @@ Owned here (migration cases):
    and inserts into `note_tag` succeed.
 7. Legacy plaintext name input (pre-`notes-backfill` rows): imported and stored as
    registry envelopes.
-8. Verified backup: `VACUUM INTO` + `quick_check` snapshots exist before any write;
-   a failed check aborts.
+8. Verified backup: `VACUUM INTO` + `quick_check` snapshots of every existing DB
+   before any write (first run: the absent `tags.db` is skipped, not an error); a
+   failed check aborts.
 9. Case-variant duplicates for one owner (`Work` + `work`): merged onto the lowest
    id, `note_tag` repointed, merges counted in the report.
 10. Schema-surgery shape: rebuilt `note_tag` has columns (noteId, tagId), PK

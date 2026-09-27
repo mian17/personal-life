@@ -52,6 +52,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `apps/note-service/src/auth/auth.guard.ts` +
     `apps/note-service/src/auth/public.decorator.ts` (new — `@Public()` Reflector
     exemption so the health trio is unauthenticated behind the global `AuthGuard`),
+    `apps/note-service/test/auth.e2e-spec.ts` (**modified only if needed** — it pins
+    a zero-arg `new AuthGuard()` construction; the exemption must keep that working,
+    e.g. an optional `Reflector` with a default),
     `apps/note-service/test/health.e2e-spec.ts` (new), `apps/idp/src/health/health.controller.ts`
     (**modified** — idp's ready-check is a **side-effect-free config presence** check;
     it must NOT call `SigningKeyService.jwks()`, which lazily writes `keys.json`),
@@ -97,12 +100,13 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Files: `apps/tags-service/scripts/import-tags.ts`, `apps/tags-service/src/tags/import.ts`,
     `apps/tags-service/test/import-tags.test.ts` (new), `apps/tags-service/package.json`
     (script `import-tags` → `ts-node scripts/import-tags.ts`).
-  - Acceptance: every case in SPEC-tags-extraction's migration list (cases 1-10:
-    import + ids preserved, idempotence, dry-run purity + count parity, `_legacy_`
+  - Acceptance: every case in SPEC-tags-extraction's **migration case list** (import
+    + ids preserved, idempotence, dry-run purity + count parity, `_legacy_`
     round-trip, poisoned-row abort, schema-surgery shape, legacy plaintext input,
-    verified backup, case-variant merge incl. a note linked to both variants).
-    Case 10's zero-schema-mutation boot assertion is T5's (needs T5's `NoteTag`
-    entity), as are the TagRef/round-trip behaviors.
+    verified backup incl. the first-run absent-`tags.db` behavior, case-variant merge
+    incl. a note linked to both variants). The zero-schema-mutation boot assertion
+    lives in the spec's T5-owned list (needs T5's `NoteTag` entity), as do the
+    TagRef/round-trip behaviors.
   - Verify: `npm run test:unit -w @life/tags-service -- test/import-tags.test.ts` && `npm run typecheck`.
   - Dependencies: T3. Size: M.
 - [ ] T5: note-service TagRef conversion — module `tags-extraction`
@@ -153,7 +157,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `apps/todo-service/data/todo.db`). Registers itself in the root workspace.
   - Files: `apps/todo-service/**` (new: package.json with `build`/`typecheck`/
     `test:unit` scripts, entities, todo/list modules+controllers+services, `keys/*`
-    incl. `db.ts`, `health/*`, tests), root `package.json` (workspaces +=
+    incl. `db.ts`, `health/*`, tests), `packages/shared/src/index.ts` (the todo/list
+    DTO wire types — `Todo`, `TodoPage`, `CreateTodoInput`, `UpdateTodoInput`, `List`
+    — exported here per the `Note`/`CreateNoteInput` precedent; T8 consumes, never
+    re-declares), root `package.json` (workspaces +=
     `apps/todo-service`), `package-lock.json` (via `npm install` only). NOT included:
     `apps/todo-service/Dockerfile` (T9's), `compose.yaml` (T9's).
   - Acceptance: every group in SPEC-todo-service's Testing Strategy (envelope
@@ -297,4 +304,11 @@ Case counts are referenced by spec section, never by number (kills count drift).
   carries `merges=`, repoint dedupes same-note duplicate associations first (PK
   collision), MAP M2 records the merge exception, the import bootstraps the registry
   schema, idp's health spec joins T2's blast radius, T4's acceptance enumerates the
-  full case list. Round 10: PENDING.
+  full case list.
+- 2026-09-28: conformance round 10: FAIL, 5 findings (0 CRITICAL, 1 MAJOR,
+  4 MINOR) — all folded in: the backup contract now backs up only DBs that EXIST
+  (first-run `tags.db` absence is not data loss and must not abort), `NOTE_DB_PATH`
+  labelled read+write (merge repoint + surgery write it), T4's acceptance drops
+  numeric ranges per the ledger's own rule, `auth.e2e-spec`'s pinned zero-arg
+  `new AuthGuard()` joins T2's radius, and the todo/list DTO wire types are owned by
+  T6 in `@life/shared` (T8 consumes). Round 11: PENDING.

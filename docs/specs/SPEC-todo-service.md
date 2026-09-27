@@ -52,7 +52,10 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 
 DTO shapes: every mutable entity's DTO carries `version` (todo and list — tags are
 registry-owned `TagRef`s, their `version` comes from the registry DTO) so clients
-can send `expectedVersion` (kernel concurrency contract).
+can send `expectedVersion` (kernel concurrency contract). The wire types (`Todo`,
+`TodoPage`, `CreateTodoInput`, `UpdateTodoInput`, `List`) are exported from
+`@life/shared` (the `Note`/`CreateNoteInput` precedent) — this module owns them;
+the app consumes, never re-declares (the orchestrator seam is the wire contract).
 
 - `POST /api/todos {title, note?, dueDate?, listId?, tagIds?}` → 201 (version 0).
 - `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page.
