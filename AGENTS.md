@@ -129,6 +129,11 @@ State the specific, atomic goal in 1-2 direct sentences.
   by element. Any gap goes upstream per section 3 — never patched around in the app,
   never solved with raw HTML.
 
+- Cache plan (backend tasks): the cached shapes, key composition, invalidation, and
+  failure mode this task implements — or the spec's `## Cache Rules` section it
+  fulfils. Any gap goes upstream per section 9 — never a per-service fork of the
+  read-through cache.
+
 - Specific edge cases or error states to handle.
 
 [VERIFICATION & TESTING RULES]
@@ -158,6 +163,7 @@ Before marking a task as complete or delegating the next dependent step:
 Blast Radius Check: Inspect the diff. If the subagent modified files outside its declared scope (e.g., edited global configs, mocks, or unrelated files), revert those changes immediately.
 Contract Validation: Confirm that newly created types, interfaces, and exports match the architectural plan.
 UI Contract Check (any UI diff): Run section 3's mechanical checks — raw-HTML grep, next/link grep, raw-value grep, domain-name grep. Verify no primitive was forked and every new visual concept landed in packages/ui with a spec update first.
+Backend Data-Layer Check (any backend service diff): Run section 9's mechanical checks — read-through usage, cache-value shape (ciphertext rows), spec `## Cache Rules` presence, no SQL content matching over encrypted columns.
 Execution Audit: Check if the subagent ran unauthorized broad test suites or E2E runs. If so, correct the agent and ensure unauthorized changes are stripped.
 Final Tech Lead Verification: Once all subagents have completed their isolated steps, run a targeted verification check across the integrated boundary.
 7. Skill Chaining Protocol
@@ -202,6 +208,73 @@ Prompt the user for exactly these and nothing else:
   document the checklist, but the human runs them.
 
 Everything else: decide, execute, verify, and report outcomes in the final summary.
+
+## 9. Backend Data-Layer Contract (BE → cache → DB)
+
+Every backend service that serves domain data is built in exactly three layers, in
+this order — `note-service` is the reference implementation
+(`apps/note-service/src/notes/notes-cache.ts` + `notes.service.ts`):
+
+```
+request → BE (service: authz, domain logic, encrypt/decrypt)
+        → cache (read-through, Redis)
+        → DB (reached only through the cache's loader)
+```
+
+The cache is part of the architecture, not an optimization bolted on later. When
+planning a backend service, this layering is decided in the spec phase, not
+improvised at implementation time.
+
+### Rule 1 — the DB sits behind the cache, not beside it
+
+- Read flows go through the cache's read-through loader; repository/query-manager
+  access lives inside the loader, nowhere else.
+- Write flows go BE → DB, then invalidate (bump the owner's generation counter).
+  The cache is never the source of truth and never absorbs writes silently.
+
+### Rule 2 — cached values are rows as persisted, never presentation
+
+- The cache stores serialized DB rows exactly as stored. For content-bearing
+  services that means **ciphertext** (`enc.v1.` envelopes via `@life/crypto`) — the
+  cache is inside the at-rest boundary (Redis is AOF-persistent; a decrypted DTO in
+  Redis is a data-privacy breach).
+- Decrypt, assemble DTOs, filter, and paginate **after** every cache hit. Plaintext
+  exists only in the request path.
+
+### Rule 3 — the cache key reflects the fetch, not the request
+
+- Key shape: `<svc>:<sub>:v<gen>:<rest>`, with per-owner isolation.
+- Content filters (`q`, tag filters) and pagination (`cursor`, `limit`) never enter
+  the key — one entry serves every filter/page variant.
+- Invalidation contract: per-owner generation counter bumped on successful writes,
+  TTL as backstop, fail-open on any cache error (degrade to the direct loader —
+  the cache may never cause unavailability, and the fallback path must not write
+  plaintext).
+
+### Rule 4 — planning and reuse
+
+- Every backend service spec MUST contain a `## Cache Rules` section stating the
+  cached shapes, key composition, invalidation, and failure mode. A plan or task
+  list without a cache-layer task is incomplete. A service that deliberately ships
+  without a cache records the deviation and its rationale in the spec (rare).
+- The second service must NOT fork `notes-cache.ts` — extract the generic
+  read-through cache into a shared workspace package first (same no-fork rule as
+  `@life/ui`).
+- Content-bearing services additionally follow `docs/specs/SPEC-notes-at-rest.md`
+  (envelope at rest, `@life/crypto` consumption): this cache contract is one half
+  of that at-rest contract.
+
+### Mechanical checks (tech lead runs at every review touching a backend service)
+
+- `grep -rln "getThrough" apps/*/src` → read flows go through the read-through
+  cache (or the spec documents the deviation).
+- Every cache-write site passes the ciphertext test: the service's cache suite
+  asserts serialized values contain `enc.v1.` and no known plaintext (pattern:
+  `apps/note-service/test/notes-cache.e2e-spec.ts`).
+- `grep -rn "## Cache Rules" docs/specs/SPEC-*.md` → every backend service spec
+  has one.
+- No content matching in SQL over encrypted columns — filters run in memory
+  post-decrypt (`content-match.ts` pattern).
 
 ## Thinking discipline
 
