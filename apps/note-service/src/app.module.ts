@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { Note } from './notes/note.entity';
 import { Tag } from './notes/tag.entity';
+import { HealthModule } from './health/health.module';
 import { KeysModule } from './keys/keys.module';
 import { UserKeys } from './keys/user-keys.entity';
 import { NotesModule } from './notes/notes.module';
@@ -17,6 +18,7 @@ import { NotesModule } from './notes/notes.module';
     }),
     NotesModule,
     KeysModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

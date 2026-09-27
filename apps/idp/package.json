@@ -8,7 +8,9 @@
     "start": "PORT=${PORT:-3003} node dist/main.js",
     "seed": "ts-node scripts/seed-user.ts",
     "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "test:unit": "jest --passWithNoTests",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@life/shared": "*",

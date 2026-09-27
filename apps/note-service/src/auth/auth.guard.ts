@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { JWTPayload } from 'jose';
 import {
   createJwksResolver,
@@ -8,12 +14,18 @@ import {
   type VerifierConfig,
 } from './jwt-verifier';
 import type { AuthenticatedRequest, Principal } from './principal';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 /**
  * JWT-only auth guard (Task 10; principal seam Task 1). Every request must carry
  * a valid IdP-issued access token, verified offline via JWKS — signature, `iss`,
  * `aud`, `exp` — with a 30s clock skew. Any doubt fails closed; the token is
  * never logged.
+ *
+ * A route marked `@Public()` (health probes; `IS_PUBLIC_KEY` metadata) skips the
+ * check entirely — probes cannot log in. `Reflector` is resolved with a default
+ * so the bare `new AuthGuard()` construction keeps working in tests and modules
+ * that do not provide it.
  *
  * On success the verified `sub` is propagated as `request.principal`, and a
  * verified token without a usable `sub` is rejected with 401: claims without
@@ -27,7 +39,18 @@ export class AuthGuard implements CanActivate {
   private resolver?: JwksResolver;
   private config?: VerifierConfig;
 
+  constructor(private readonly reflector: Reflector = new Reflector()) {}
+
   canActivate(context: ExecutionContext): Promise<boolean> | boolean {
+    // Explicit `@Public()` exemption before any credential parsing: a public
+    // route answers regardless of `NODE_ENV` and never inspects a token.
+    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])) {
+      return true;
+    }
+
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     // Dev skips the token check for localhost; production behavior below is unchanged.
