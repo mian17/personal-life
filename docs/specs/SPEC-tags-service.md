@@ -23,6 +23,10 @@ tag(
 user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 ```
 
+- DB wiring: `DB_PATH` env (default `apps/tags-service/data/tags.db` via
+  `src/keys/db.ts`, mirroring note-service's resolver); compose bind-mounts
+  `./apps/tags-service/data:/data` with `DB_PATH=/data/tags.db`.
+
 - Name encryption: `@life/crypto` envelope with AAD `life.v1|<sub>|tag|name` — the
   byte-identical shape note-service used, so migration re-encrypts cleanly.
 - No association tables. Uniqueness is case-insensitive per owner, enforced at
@@ -51,7 +55,7 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 - No dual-read (M5) — the store starts encrypted. Master key `TAGS_MASTER_KEY`
   (32-byte base64), fail-closed bootstrap.
 
-## Cache Rules (AGENTS.md §9)
+## Cache Rules (AGENTS.md Contract 2)
 
 - Cached shape: the owner's serialized **ciphertext** tag rows — one entry serves
   both the list and `resolve` (slice by id in memory after the hit).

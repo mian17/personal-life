@@ -1,7 +1,7 @@
 # Spec: todo-ui (route move, /todos UI, shared tag UX)
 
 Module id: `todo-ui` (see `MAP-todo-ecosystem.md`). All work in `apps/app` +
-upstream `packages/ui` per AGENTS.md §3 (Shared UI Contract). No new visual
+upstream `packages/ui` per AGENTS.md Contract 1 (Shared UI Contract). No new visual
 language; every visual concept comes from `@life/ui`.
 
 ## Objective
@@ -31,7 +31,7 @@ both apps — so tags feel identical everywhere (I3).
 - **`/notes` tag rework:** tag filter nav renders `[{tagId, count}]` resolved to
   names via the registry batch call.
 
-## UI contract (AGENTS.md §3)
+## UI contract (AGENTS.md Contract 1)
 
 - Composed from `@life/ui` atoms/blocks. The named upstream additions required by
   this module (T7, spec-first in `packages/ui` + `SPEC-ui-*`): **`TagPicker`**
@@ -71,6 +71,6 @@ Build:     npm run build -w @life/app
 ## Success Criteria
 
 1. `/notes` and `/todos` both live; `/` redirects.
-2. Mechanical checks (§3) green; zero raw-HTML/next/link/raw-value hits.
+2. Mechanical checks (Contract 1) green; zero raw-HTML/next/link/raw-value hits.
 3. Tags behave as one vocabulary across both apps (create/rename/delete from either).
 4. The frozen e2e surface diff contains the I5 URLs and nothing else.

@@ -16,7 +16,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
 - MAP M1–M5 and intent I1–I6 are the binding decisions (esp. M1 = Approach 2,
   per-service key custody M3, BFF composition M4).
 - P1: Extract `@life/cache` + `likeMatch` into shared packages **first** and refactor
-  note-service onto them (AGENTS.md §9 no-fork rule) — note-service's green suites
+  note-service onto them (AGENTS.md Contract 2 no-fork rule) — note-service's green suites
   are the regression baseline for everything after.
 - P2: Health retrofit lands early (T2) so both new services copy a working pattern
   instead of inventing one.
@@ -44,7 +44,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
 - [ ] T4: `import-tags` migration script + tests (human-run later)
 
 ### Checkpoint: Registry
-- [ ] Registry suites green incl. the six migration cases
+- [ ] Registry suites green incl. the migration case list (SPEC-tags-extraction)
 
 ### Phase 3 — Consumers
 - [ ] T5: note-service TagRef conversion (association-only, prune, `{tagId,count}`)
@@ -58,7 +58,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
 - [ ] T8: `apps/app` — `/notes` move + redirect, `/todos`, shared tag UX
 
 ### Checkpoint: UI
-- [ ] §3 mechanical checks green; frozen e2e diff = I5 URLs only
+- [ ] Contract 1 mechanical checks green; frozen e2e diff = I5 URLs only
 
 ### Phase 5 — Wiring & close
 - [ ] T9: compose/env/Docker wiring + integration pass

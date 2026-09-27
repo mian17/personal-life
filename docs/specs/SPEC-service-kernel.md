@@ -9,7 +9,7 @@ aligned) and note-service (retrofit).
 One service dialect for the whole ecosystem: every service (note, idp, tags, todo)
 speaks the same health, error, pagination, and vocabulary contracts — so a later
 orchestrator or Kubernetes rollout is pure addition, not rework. Also owns the two
-shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
+shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork rule).
 
 ## Contracts
 
@@ -19,7 +19,7 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
   dependency checks (a DB blip must not restart containers).
 - `GET /health/ready` → `200 {"status":"ok"}` | `503 {"status":"degraded"}` — checks
   what genuinely breaks serving: DB reachable (`SELECT 1`) + key custody loaded.
-  **Deliberately not the Redis cache**: the §9 cache is fail-open, so a cache outage
+  **Deliberately not the Redis cache**: the Contract 2 cache is fail-open, so a cache outage
   must never take a service out of rotation. Readiness mirrors real failure semantics.
 - `GET /health` — kept on **every** service as a deprecated alias of `/health/ready`
   (readiness semantics). Existing consumers depend on it (e.g. the Playwright harness
@@ -72,28 +72,33 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 
 - Base URLs (app-side env): `API_URL` (note-service, existing), `TAGS_API_URL`,
   `TODO_API_URL`.
-- **Token model (single multi-audience access token):** the app session holds one
-  access token whose `aud` is the array `["note-service", "tags-service",
-  "todo-service"]`; the IdP mints that array for the app client at login (its
-  `OIDC_AUDIENCE_MAP` registers all three resources for the app). Each service
-  verifies **presence of its own audience** in `aud` (not exclusivity). The session
-  shape therefore stays exactly as today (one `accessToken`). Documented upgrade
-  path if isolation must tighten: RFC 8707 resource indicators → per-resource
-  tokens; the contracts below do not change when that happens. IdP minting + config
-  is owned by T9.
+- **Token model — one shared ecosystem audience `life-api`** (decided after the
+  conformance validator proved multi-audience tokens infeasible on the pinned
+  `oidc-provider` 9.x: one audience per token, and `OIDC_AUDIENCE_MAP` is a
+  resource→audience map that cannot emit an array): the app session keeps ONE
+  access token (the `AppSession` shape is unchanged), minted with `aud: "life-api"`
+  for whichever registered resource the app requests. All three services verify
+  that single audience — each through its own `*_SERVICE_AUDIENCE` env knob (set to
+  `life-api`), so a future split to isolated audiences is config, not code.
+  Recorded trade-off: within this single-user security domain the token no longer
+  distinguishes which service it addresses — accepted deliberately. Upgrade path:
+  RFC 8707 per-resource tokens (three audiences, resource indicators — stock
+  provider), contracts below unchanged.
 - Per-service verification env (mirroring the note-service naming):
   `TAGS_IDP_JWKS_URL` / `TAGS_SERVICE_AUDIENCE`, `TODO_IDP_JWKS_URL` /
   `TODO_SERVICE_AUDIENCE` (existing: `NOTE_SERVICE_IDP_JWKS_URL` /
-  `NOTE_SERVICE_AUDIENCE`). Internal JWKS over the compose network by default
-  (`http://idp:3003/jwks`), issuer = browser-facing URL (the established two-var
-  pattern).
+  `NOTE_SERVICE_AUDIENCE`) — all three audience values = `life-api`. Internal JWKS
+  over the compose network by default (`http://idp:3003/jwks`), issuer =
+  browser-facing URL (the established two-var pattern).
 - Cache wiring: `REDIS_URL` per service (compose-injected, same pattern as
   note-service). All three services share the one `redis-note` instance —
   service-prefixed keys (`note:`/`tags:`/`todo:`) keep the namespaces disjoint.
+- DB wiring: `DB_PATH` per service (tags/todo bind-mount `./apps/<svc>/data:/data`
+  with `DB_PATH=/data/<name>.db`, note-service's pattern).
 - Ownership: T8 implements the app-side client config; T9 wires env/compose/IdP
-  (incl. the multi-audience minting).
+  (audience map → `life-api`, `apps/idp/test/**` fixture updates included).
 
-## Shared primitives (no-fork, AGENTS.md §9)
+## Shared primitives (no-fork, AGENTS.md Contract 2)
 
 - `@life/cache` (`packages/cache`, new): the generic read-through cache extracted
   from `apps/note-service/src/notes/notes-cache.ts`. Generic signature:

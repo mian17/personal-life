@@ -40,6 +40,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   `done`, timestamps are metadata and stay queryable in SQL (decision: dueDate is
   operational data, not content; documented here deliberately).
 - No dual-read (M5). Master key `TODO_MASTER_KEY` (32-byte base64), fail-closed.
+- DB wiring: `DB_PATH` env (default `apps/todo-service/data/todo.db` via
+  `src/keys/db.ts`, mirroring note-service's resolver); compose bind-mounts
+  `./apps/todo-service/data:/data` with `DB_PATH=/data/todo.db`.
 - No trash (decision): `DELETE` is permanent; trash is a v2 candidate alongside
   recurrence/subtasks/priorities.
 
@@ -50,7 +53,7 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   Order: dated by `dueDate ASC` (overdue first), undated last, `createdAt DESC`
   tiebreak. `q` matches decrypted `title`+`note` via `likeMatch` (parity contract
   per kernel); `tagId` filters over `todo_tag`; all content filtering happens after
-  cache hits (AGENTS.md §9).
+  cache hits (AGENTS.md Contract 2).
 - `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?,
   listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins) ·
   `DELETE /api/todos/:id` (permanent).
@@ -58,10 +61,11 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   (case-insensitive collision within owner → 409) · `DELETE /api/lists/:id` —
   detach semantics: its todos survive with `listId` cleared.
 - `GET /api/todos/tags` → `[{tagId, count}]` (kernel usage surface; names resolved
-  by the app via the registry).
+  by the app via the registry). **Declare this route before `GET /api/todos/:id`** —
+  Nest matches in declaration order and the literal path must not be shadowed.
 - Unknown/foreign `tagIds` are omitted and lazily pruned (kernel `TagRef` semantics).
 
-## Cache Rules (AGENTS.md §9)
+## Cache Rules (AGENTS.md Contract 2)
 
 - Cached shapes: serialized **ciphertext** todo rows (`todo:all` — the owner's full
   row set), list rows (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:

@@ -34,7 +34,7 @@ ids, and the app composes names from the registry (MAP M4).
   tag rows" cache bullet is superseded here — the cached shape becomes the
   used-`tagId`+count rows.
 
-## Cache Rules (AGENTS.md §9)
+## Cache Rules (AGENTS.md Contract 2)
 
 - Cached shape: the used-`tagId`+count rows for the owner (`note:tags` key) —
   **metadata-only by design** (ids and counts carry no plaintext, so the
@@ -50,13 +50,19 @@ ids, and the app composes names from the registry (MAP M4).
 precedent).
 
 - Inputs: `NOTE_DB_PATH` (read; default `apps/note-service/data/life.db`),
-  `TAGS_DB_PATH` (write; default `apps/tags-service/data/tags.db`) — both resolved
-  via the shared `resolveDbPath` convention (cwd-independent defaults, env override
-  wins) — plus `NOTE_MASTER_KEY` (decrypt with note-service DEKs) and
-  `TAGS_MASTER_KEY` (encrypt under registry DEKs).
-- Id-preserving: rows copied with their existing integer ids; re-encrypted under the
-  registry's per-owner DEKs (`_legacy_` sentinel filing for NULL-owner rows, per
-  `SPEC-notes-backfill`). Plaintext exists only in flight — never at rest.
+  `TAGS_DB_PATH` (write; default `apps/tags-service/data/tags.db`) — resolved via
+  `apps/tags-service/src/keys/db.ts` (T3, mirroring note-service's resolver:
+  cwd-independent default, env override wins; a third copy would trigger extraction
+  to `@life/shared`, rule of three) — plus `NOTE_MASTER_KEY` (decrypt with
+  note-service DEKs) and `TAGS_MASTER_KEY` (encrypt under registry DEKs).
+- First action, before any write: a self-verified backup of BOTH DBs (`VACUUM INTO`
+  + `PRAGMA quick_check`, the `backfill-owner` precedent). No destructive step runs
+  without it; a failed check aborts the script.
+- Id-preserving: rows copied with their existing integer ids. Input is dual-read —
+  values starting `enc.v1.` are decrypted with note-service DEKs, legacy plaintext
+  names (pre-`notes-backfill` rows) pass through as-is — and **every** imported name
+  is re-encrypted under the registry's per-owner DEKs (`_legacy_` sentinel filing for
+  NULL-owner rows, per `SPEC-notes-backfill`). Plaintext exists only in flight.
 - Idempotent: an id already present is skipped (byte-identical re-runs); batches are
   transactional; a poisoned row aborts with its id and a non-zero exit; `--dry-run`
   reports counts and writes nothing.
@@ -97,6 +103,10 @@ Owned here (migration cases):
 5. Poisoned row → batch abort, row id surfaced, non-zero exit.
 6. Schema surgery: post-apply there is no `tag` table, `note_tag` has no FK to it,
    and inserts into `note_tag` succeed.
+7. Legacy plaintext name input (pre-`notes-backfill` rows): imported and stored as
+   registry envelopes.
+8. Verified backup: `VACUUM INTO` + `quick_check` snapshots exist before any write;
+   a failed check aborts.
 
 Owned by T5 (`test/tag-refs.test.ts`, note-service behaviors): attach/detach by id,
 unknown-id pruning, tag filter by id, `[{tagId, count}]` shape, note round-trip with
@@ -113,6 +123,6 @@ unknown-id pruning, tag filter by id, `[{tagId, count}]` shape, note round-trip 
 ## Success Criteria
 
 1. note-service holds zero tag names; its suites prove TagRef behavior.
-2. The migration passes all six cases and runs verbatim from the checklist.
+2. The migration passes every case in the list above and runs verbatim from the checklist.
 3. The `/notes` app shows the same tags as before the cut-over (verified by the human
    at deploy, per the checklist).
