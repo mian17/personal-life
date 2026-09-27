@@ -7,6 +7,7 @@ import { Note } from './note.entity';
 import { Tag } from './tag.entity';
 import { KeysService } from '../keys/keys.service';
 import { hashOptions, NOTES_CACHE, NotesCache } from './notes-cache';
+import { likeMatch } from './content-match';
 import type { Note as NoteDto, NotePage } from '@life/shared';
 
 function normalizeTags(tags: string[] | undefined): string[] {
@@ -34,6 +35,53 @@ function noteBodyAad(ownerSub: string, noteId: string): string {
 /** AAD for a tag name. Tag ids are DB-assigned post-insert, so they cannot bind. */
 function tagNameAad(ownerSub: string): string {
   return `life.v1|${ownerSub}|tag|name`;
+}
+
+/**
+ * Decode today's keyset cursor, `base64(<isoTimestamp>|<id>)`. The wire format is
+ * unchanged; only the comparison moved in memory (see `paginate`).
+ */
+function decodeCursor(cursor: string): { ts: string; id: string } {
+  const [ts, id] = Buffer.from(cursor, 'base64').toString().split('|');
+  return { ts, id };
+}
+
+/**
+ * In-memory keyset pagination over a candidate list already ordered by
+ * (`timestamp DESC`, `id DESC`) — today's exact order. Rows are kept only when
+ * they fall strictly after the cursor
+ * (`timestamp < cursor.ts OR (timestamp = cursor.ts AND id < cursor.id)`), so a
+ * page boundary can neither repeat nor skip a row.
+ *
+ * The comparison runs on the hydrated ISO timestamp, not raw sqlite text: sqlite
+ * stores `YYYY-MM-DD HH:MM:SS.mmm` while the cursor is ISO `...T...Z`, and the
+ * old SQL predicate compared the two directly — at a tie it re-emitted the
+ * cursor row. Moving pagination in memory (the filter now runs post-decrypt)
+ * fixes that, which the no-duplicates/no-skips contract requires.
+ *
+ * Cursor wire format (`base64(<isoTimestamp>|<id>)`) and the page shape are
+ * unchanged from the SQL path.
+ */
+function paginate<T extends { id: string }>(
+  ordered: T[],
+  limit: number,
+  cursor: string | undefined,
+  timestampOf: (item: T) => string,
+): { page: T[]; nextCursor: string | null } {
+  let items = ordered;
+  if (cursor) {
+    const { ts, id } = decodeCursor(cursor);
+    items = ordered.filter((item) => {
+      const itemTs = timestampOf(item);
+      return itemTs < ts || (itemTs === ts && item.id < id);
+    });
+  }
+  const hasMore = items.length > limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+  const last = page[page.length - 1];
+  const nextCursor =
+    hasMore && last ? Buffer.from(`${timestampOf(last)}|${last.id}`).toString('base64') : null;
+  return { page, nextCursor };
 }
 
 @Injectable()
@@ -191,38 +239,33 @@ export class NotesService {
       cursor: opts.cursor,
     })}`;
     return this.cache.getThrough(sub, cacheKey, async () => {
-      const qb = this.notes
+      // Metadata-only SQL: content (`q`) and tag names are envelopes, so neither
+      // can be matched in the DB. Fetch the owner's non-trashed rows in today's
+      // exact order (`createdAt DESC`, `id` DESC tie-break) and do all matching
+      // and pagination in memory after decryption. No `LIMIT` can be pushed into
+      // SQL because the row set is only known once the filter has run.
+      const rows = await this.notes
         .createQueryBuilder('note')
         .leftJoinAndSelect('note.tags', 'tag')
         .orderBy('note.createdAt', 'DESC')
         .addOrderBy('note.id', 'DESC')
         .where('note.deletedAt IS NULL')
         .andWhere('note.ownerSub = :sub', { sub })
-        .take(limit + 1);
+        .getMany();
 
-      if (opts.tag) {
-        qb.andWhere('LOWER(tag.name) = LOWER(:tag)', { tag: opts.tag });
-      }
-      if (opts.q) {
-        qb.andWhere('note.body LIKE :q', { q: `%${opts.q}%` });
-      }
-      if (opts.cursor) {
-        const [createdAt, id] = Buffer.from(opts.cursor, 'base64').toString().split('|');
-        qb.andWhere(
-          '(note.createdAt < :createdAt OR (note.createdAt = :createdAt AND note.id < :id))',
-          { createdAt, id },
-        );
-      }
+      // Decrypt once for the whole candidate set; matching sees effective
+      // plaintext (envelope rows: decrypted; legacy rows: the raw value).
+      const decoded = await this.decryptMany(rows, sub);
 
-      const rows = await qb.getMany();
-      const hasMore = rows.length > limit;
-      const page = hasMore ? rows.slice(0, limit) : rows;
-      const last = page[page.length - 1];
-      const nextCursor =
-        hasMore && last
-          ? Buffer.from(`${last.createdAt.toISOString()}|${last.id}`).toString('base64')
-          : null;
-      return { notes: await this.decryptMany(page, sub), nextCursor };
+      const tagKey = opts.tag?.toLowerCase();
+      const filtered = decoded.filter((note) => {
+        if (tagKey && !note.tags.some((t) => t.name.toLowerCase() === tagKey)) return false;
+        if (opts.q && !likeMatch(note.body, `%${opts.q}%`)) return false;
+        return true;
+      });
+
+      const { page, nextCursor } = paginate(filtered, limit, opts.cursor, (n) => n.createdAt);
+      return { notes: page, nextCursor };
     });
   }
 
@@ -233,32 +276,21 @@ export class NotesService {
     const limit = opts.limit ?? 50;
     const cacheKey = `note:trash:${hashOptions({ limit: opts.limit, cursor: opts.cursor })}`;
     return this.cache.getThrough(sub, cacheKey, async () => {
-      const qb = this.notes
+      // Metadata-only SQL mirroring `findAll`: trashed rows only, in today's
+      // `deletedAt DESC` / `id` DESC order, then keyset-paginated in memory so a
+      // same-timestamp tie can never repeat or skip the boundary row.
+      const rows = await this.notes
         .createQueryBuilder('note')
         .leftJoinAndSelect('note.tags', 'tag')
         .where('note.deletedAt IS NOT NULL')
         .andWhere('note.ownerSub = :sub', { sub })
         .orderBy('note.deletedAt', 'DESC')
         .addOrderBy('note.id', 'DESC')
-        .take(limit + 1);
+        .getMany();
 
-      if (opts.cursor) {
-        const [deletedAt, id] = Buffer.from(opts.cursor, 'base64').toString().split('|');
-        qb.andWhere(
-          '(note.deletedAt < :deletedAt OR (note.deletedAt = :deletedAt AND note.id < :id))',
-          { deletedAt, id },
-        );
-      }
-
-      const rows = await qb.getMany();
-      const hasMore = rows.length > limit;
-      const page = hasMore ? rows.slice(0, limit) : rows;
-      const last = page[page.length - 1];
-      const nextCursor =
-        hasMore && last
-          ? Buffer.from(`${last.deletedAt!.toISOString()}|${last.id}`).toString('base64')
-          : null;
-      return { notes: await this.decryptMany(page, sub), nextCursor };
+      const decoded = await this.decryptMany(rows, sub);
+      const { page, nextCursor } = paginate(decoded, limit, opts.cursor, (n) => n.deletedAt!);
+      return { notes: page, nextCursor };
     });
   }
 
