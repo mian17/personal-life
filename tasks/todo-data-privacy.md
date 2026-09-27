@@ -2,7 +2,7 @@
 
 Plan: `tasks/plan-data-privacy.md` · Specs: `docs/specs/MAP-data-privacy.md` + `SPEC-*.md` · Intent: `docs/intent/data-privacy.md`
 
-Status: **IMPLEMENTING**. Process: AGENTS.md §8 (autonomous after the intent gate) + §6
+Status: **IMPLEMENTATION COMPLETE** (T1–T7 done, integration green). Process: AGENTS.md §8 (autonomous after the intent gate) + §6
 review lifecycle per task. Superpowers skills explicitly not used (user instruction
 2026-09-27). Each task = one subagent (mandatory AGENTS.md task template), TDD,
 tech-lead diff review + commit. Test runs: targeted, sequential, ≤2 per task.
@@ -10,7 +10,7 @@ Merge to `master`: user's explicit request only.
 
 ## Tasks
 
-- [ ] T1: `@life/crypto` package (module `crypto`)
+- [x] T1: `@life/crypto` package (module `crypto`)
   - Files: `packages/crypto/**` (new: package.json with `typecheck`/`test:unit`/`build`
     scripts, tsconfig, src/, test/), root `package.json` (add `packages/crypto` to
     workspaces + add `"typecheck": "npm run typecheck --workspaces --if-present"`),
@@ -20,7 +20,7 @@ Merge to `master`: user's explicit request only.
     cases (one published AES-256-GCM KAT, HKDF pin, tamper/format/rotation cases);
     `npm run build -w @life/crypto` produces `dist/`.
   - Verify: `npm run test:unit -w @life/crypto` && `npm run typecheck`.
-- [ ] T2: key management in note-service (module `notes-at-rest`)
+- [x] T2: key management in note-service (module `notes-at-rest`)
   - Files: `apps/note-service/src/keys/{user-keys.entity.ts,keys.module.ts,keys.service.ts}`
     (new), `apps/note-service/src/app.module.ts` (register), `apps/note-service/package.json`
     (add `@life/crypto` dep + jest `moduleNameMapper` entry mirroring `@life/shared`,
@@ -30,7 +30,7 @@ Merge to `master`: user's explicit request only.
     memoized unwrap; master key loaded once via `loadMasterKeyFromEnv('NOTE_MASTER_KEY')`,
     fail closed; no key material in errors/logs.
   - Verify: `npm run test:unit -w @life/note-service -- test/keys.service.test.ts` && `npm run typecheck`.
-- [ ] T3: encrypted writes/reads + tag handling (module `notes-at-rest`)
+- [x] T3: encrypted writes/reads + tag handling (module `notes-at-rest`)
   - Files: `apps/note-service/src/notes/notes.service.ts`, `apps/note-service/src/notes/tag.entity.ts`
     (stop declaring `UQ_tag_name_owner`), `apps/note-service/test/crypto-roundtrip.test.ts` (new).
   - Acceptance: writes always emit `enc.v1` envelopes (note AAD binds service-generated
@@ -40,7 +40,7 @@ Merge to `master`: user's explicit request only.
     corrupt body in the DB → request fails closed (typed `CryptoError` → 500) with an
     ids-only log line.
   - Verify: `npm run test:unit -w @life/note-service -- test/crypto-roundtrip.test.ts` && `npm run typecheck`.
-- [ ] T4: decrypt-then-match search + parity + pagination (module `notes-at-rest`)
+- [x] T4: decrypt-then-match search + parity + pagination (module `notes-at-rest`)
   - Files: `apps/note-service/src/notes/notes.service.ts` (query path),
     `apps/note-service/src/notes/content-match.ts` (new), `apps/note-service/test/content-match.test.ts` (new).
   - Acceptance: `q`/`tag` removed from SQL content matching; metadata-only SQL with
@@ -48,7 +48,7 @@ Merge to `master`: user's explicit request only.
     tie-break); in-memory filter/paginate; same API page shape; LIKE-parity comparator
     test (ASCII corpus; documented Unicode-folding deviation).
   - Verify: `npm run test:unit -w @life/note-service -- test/content-match.test.ts` && `npm run typecheck`.
-- [ ] T5: ciphertext-only cache (module `notes-at-rest`)
+- [x] T5: ciphertext-only cache (module `notes-at-rest`)
   - Files: `apps/note-service/src/notes/notes-cache.ts` (value shape where needed),
     `apps/note-service/src/notes/notes.service.ts` (integration), `apps/note-service/test/notes-cache.e2e-spec.ts`
     (existing suite → extend).
@@ -59,7 +59,7 @@ Merge to `master`: user's explicit request only.
     generation-counter + fail-open + 60s TTL contracts unchanged; decrypt happens on
     every hit path (incl. `findOne` and `listTags`).
   - Verify: `npm run test:unit -w @life/note-service -- test/notes-cache.e2e-spec.ts` && `npm run typecheck`.
-- [ ] T6: ops scripts — backfill + rotation (module `notes-backfill`)
+- [x] T6: ops scripts — backfill + rotation (module `notes-backfill`)
   - Files: `apps/note-service/scripts/encrypt-backfill.ts`, `apps/note-service/scripts/rotate-master-key.ts`
     (new), `apps/note-service/src/keys/backfill.ts`, `apps/note-service/src/keys/rotation.ts` (new),
     `apps/note-service/test/backfill.test.ts` (new), `apps/note-service/package.json`
@@ -71,7 +71,7 @@ Merge to `master`: user's explicit request only.
     (`npm run backfill-encrypt -w @life/note-service -- --dry-run` etc.); checklist
     rendered in the script header.
   - Verify: `npm run test:unit -w @life/note-service -- test/backfill.test.ts` && `npm run typecheck`.
-- [ ] T7: env wiring + integration pass
+- [x] T7: env wiring + integration pass
   - Files: `compose.yaml` (note-service `NOTE_MASTER_KEY` passthrough),
     `.env.development.example` (documented placeholder, no value), untracked
     `.env.development` (dev key — never staged).
@@ -91,4 +91,15 @@ Merge to `master`: user's explicit request only.
 - `validating-plans`/superpowers process: **dropped per user instruction** (its
   10-step in-plan workflow and successor chain). The gate log above stands as the
   tech-lead conformance record (§6); per-task review + five-lane gate at close remain.
-- Five-lane chapter gate: PENDING (tasks complete).
+- Integration boundary run (T7): 9/9 suites, 110/110 tests, typecheck + builds clean,
+  zero `apps/app` diff, no secrets in tracked files. Found and fixed 3 real defects:
+  I1 (T5 regression) unbound `this.openField` decrypt callback masked `CryptoError`
+  with `TypeError` on tamper paths → bound (`openFieldCb`); I2 e2e suites booting
+  `AppModule` need the master key → jest `setupFiles` test key (public by design);
+  I3 D7 schema truth propagated to the old `backfill-owner` DDL (no `UQ_tag_name_owner`,
+  creates `user_keys`) keeping the boot-mutates-nothing contract. Also measured: one
+  earlier full-run flake (37 failures) traced to stale state from a boot-crashed run;
+  3 consecutive full runs since are 100% stable.
+- Dev boot with the real dev key (bounded, port 3101): `Nest application successfully
+  started`, HTTP 200 on `/api/tags` — keys + notes modules initialized.
+- Five-lane chapter gate: IN PROGRESS.
