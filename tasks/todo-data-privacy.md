@@ -2,7 +2,7 @@
 
 Plan: `tasks/plan-data-privacy.md` · Specs: `docs/specs/MAP-data-privacy.md` + `SPEC-*.md` · Intent: `docs/intent/data-privacy.md`
 
-Status: **IMPLEMENTATION COMPLETE** (T1–T7 done, integration green). Process: AGENTS.md §8 (autonomous after the intent gate) + §6
+Status: **GATE COMPLETE — 5/5 N/N, MERGEABLE** (merge parked: user's explicit request only). Process: AGENTS.md §8 (autonomous after the intent gate) + §6
 review lifecycle per task. Superpowers skills explicitly not used (user instruction
 2026-09-27). Each task = one subagent (mandatory AGENTS.md task template), TDD,
 tech-lead diff review + commit. Test runs: targeted, sequential, ≤2 per task.
@@ -135,4 +135,8 @@ Merge to `master`: user's explicit request only.
   package-anchored default + `test/backfill-db-path.test.ts` (3 cases), truthful script
   comments, ledger ownership for the seven integration-repair files, corrected
   zero-UI-diff wording. Re-run: lane 2 PASS_WITH_NITS (blocker verified fixed).
-- Five-lane chapter gate: FIX PASS COMMITTED — lane 5 re-verdict pending.
+- Five-lane re-run after fix pass `f3dc4aa`: lane 2 PASS_WITH_NITS (blocker verified
+  fixed at HEAD), lane 5 PASS_WITH_NITS (all 4 blockers verified closed; full
+  conformance walk clean — 46 diff files all owned, D1–D11 traceable). Final:
+  **5/5 N/N — MERGEABLE** (`tasks/five-lane-data-privacy.md`). Merge + production
+  migration remain human-gated (explicit request / human-run per AGENTS.md §8).
