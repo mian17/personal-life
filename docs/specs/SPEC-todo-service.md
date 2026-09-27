@@ -31,6 +31,7 @@ list(
   id        TEXT PRIMARY KEY,        -- service-generated UUID v4
   name      TEXT NOT NULL,           -- enc.v1, AAD life.v1|<sub>|list|name|<id>
   ownerSub  TEXT NOT NULL,
+  version   INTEGER NOT NULL DEFAULT 0,   -- kernel concurrency contract
   createdAt DATETIME NOT NULL
 )
 user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
@@ -57,8 +58,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 - `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?,
   listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins) ·
   `DELETE /api/todos/:id` (permanent).
-- Lists: `POST /api/lists {name}` · `GET /api/lists` · `PATCH /api/lists/:id {name}`
-  (case-insensitive collision within owner → 409) · `DELETE /api/lists/:id` —
+- Lists: `POST /api/lists {name}` · `GET /api/lists` · `PATCH /api/lists/:id
+  {name, expectedVersion?}` (case-insensitive collision within owner → 409; stale
+  `expectedVersion` → 409, omit = last-write-wins) · `DELETE /api/lists/:id` —
   detach semantics: its todos survive with `listId` cleared.
 - `GET /api/todos/tags` → `[{tagId, count}]` (kernel usage surface; names resolved
   by the app via the registry). **Declare this route before `GET /api/todos/:id`** —

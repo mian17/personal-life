@@ -26,8 +26,9 @@ both apps — so tags feel identical everywhere (I3).
   source). The note composer's inline tag-name handling becomes picker-driven
   (`tagIds`) — same experience, new contract (`SPEC-tags-extraction`).
 - **Transport config (per kernel contract):** the app's API client gains
-  `TAGS_API_URL`/`TODO_API_URL` base URLs and per-service audiences
-  (`tags-service`, `todo-service`); env wiring is T9's, client config is T8's.
+  `TAGS_API_URL`/`TODO_API_URL` base URLs; auth uses the kernel's single shared
+  `life-api` audience — no per-service audience names appear in the client. Env
+  wiring is T9's, client config is T8's.
 - **`/notes` tag rework:** tag filter nav renders `[{tagId, count}]` resolved to
   names via the registry batch call.
 
@@ -55,7 +56,8 @@ Build:     npm run build -w @life/app
    todo create with `tagIds`; name resolution batching).
 2. `@life/ui` primitive tests for any upstream additions (spec-first).
 3. Playwright: human-owned, frozen — only the I5 navigation URL updates land in
-   this chapter; agents write no new e2e specs and run no e2e (AGENTS.md §2).
+   this chapter; agents write no new e2e specs and run no e2e (AGENTS.md testing policy —
+  global protocol §3).
 4. Manual verification checklist (human, at deploy): `/` redirects; `/notes` shows
    pre-migration tags; `/todos` flows work; tag rename from one app shows in the
    other.

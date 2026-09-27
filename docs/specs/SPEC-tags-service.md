@@ -18,6 +18,7 @@ tag(
   id        INTEGER PRIMARY KEY AUTOINCREMENT,  -- preserved ids, sole writer (M2)
   name      TEXT NOT NULL,                      -- enc.v1 envelope
   ownerSub  TEXT NOT NULL,
+  version   INTEGER NOT NULL DEFAULT 0,         -- kernel concurrency contract
   createdAt DATETIME NOT NULL
 )
 user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
@@ -39,9 +40,10 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   (case-insensitive). Names exist only here.
 - `POST /api/tags {name}` → create-or-get case-insensitively (201 created / 200
   existing). This is the only way tags come into existence.
-- `PATCH /api/tags/:id {name}` → rename. Ecosystem-wide by construction (single
-  name source). Rejects a case-insensitive collision with a *different* tag of the
-  same owner (409).
+- `PATCH /api/tags/:id {name, expectedVersion?}` → rename. Ecosystem-wide by
+  construction (single name source). Rejects a case-insensitive collision with a
+  *different* tag of the same owner (409) and a stale `expectedVersion` (409;
+  omit = last-write-wins — kernel concurrency contract).
 - `DELETE /api/tags/:id` → delete the vocabulary row. Consumers detach (kernel
   `TagRef` semantics). Never touches domain content.
 - `POST /api/tags/resolve {ids}` → `[{id, name}]` for the caller's own tags;

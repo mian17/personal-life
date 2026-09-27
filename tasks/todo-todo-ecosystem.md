@@ -223,4 +223,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
   migration self-verified `VACUUM INTO` backup, legacy plaintext input handling +
   case, idp `typecheck` alias, T9 build verify, todo route-order constraint
   (`/api/todos/tags` before `:id`), and case counts de-numbered (referenced by spec
-  section — kills count drift). Round 4: PENDING.
+  section — kills count drift).
+- 2026-09-28: conformance round 4: FAIL, 4 findings (1 CRITICAL, 3 MINOR) — all
+  folded in: SPEC-todo-ui's stale per-service audience wording rewritten to the
+  shared `life-api` model (kernel is the single source), AGENTS.md restructure
+  committed + stray `.bak` removed, stale §-references repointed to Contract 2 /
+  global §3, and `version`/`expectedVersion` added to the mutable tag/list rows
+  per the kernel concurrency contract. Round 5: PENDING.

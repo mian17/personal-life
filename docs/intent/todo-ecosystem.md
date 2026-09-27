@@ -24,7 +24,7 @@ after two refinements: tags extraction, health routes).
   or Kubernetes rollout is pure addition.
 - Constraint: contract consistency first (the orchestrator seam); `tags-service`
   is the sole registry (domains reference tags by id, never store names);
-  `@life/crypto` at rest in every new/moved service + AGENTS.md §9 cache layer;
+  `@life/crypto` at rest in every new/moved service + AGENTS.md Contract 2 cache layer;
   readiness mirrors real failure semantics (fail-open cache never gates it);
   frozen Playwright selectors except the URL navigation the route request covers;
   the tag data migration and deploys are human-run at the cut-over.
