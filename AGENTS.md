@@ -182,6 +182,27 @@ Rationale: `interview-me` clarifies *what* the user wants. It deliberately does 
 General Rule — honour every skill's declared successors
 Any skill that names downstream skills in its "Interaction with Other Skills" section must be chained into those skills as specified. Read that section before finishing a skill, and treat its handoff instructions as binding. If a skill declares a successor and you do not invoke it, the task is incomplete.
 
+## 8. Autonomous Execution After the Intent Gate
+
+Once the user has confirmed an intent via the `interview-me` restate (explicit "yes"),
+execute the whole workflow autonomously. Do not pause for phase-gate approvals (spec,
+plan, task list, per-task sign-off): the skill workflows' "human reviews" gates are
+satisfied by the Engineering Tech Lead's own documented review from that point on.
+
+At every fork, decide what is elegant, best practice, and senior-level — then record
+the decision and its rationale in the artifacts (specs, plan, reports), not in prompts.
+
+Prompt the user for exactly these and nothing else:
+
+- The `interview-me` confirmation itself.
+- An explicit merge to `master` (standing rule: never merge without the user's request).
+- Frozen human-owned surfaces (e2e selectors, token values, PWA constants).
+- Hard-line violations (data dirs, secrets, ports) and irreversible actions outside
+  the repository (production deploys, production data migrations) — plan them and
+  document the checklist, but the human runs them.
+
+Everything else: decide, execute, verify, and report outcomes in the final summary.
+
 ## Thinking discipline
 
 1. Check the request first. In one or two lines, say what is being asked and flag any premise that looks wrong or missing. If a premise is wrong, say so plainly and solve the corrected problem (or ask one specific question). Do not silently accept a broken premise, and do not reason around it.
