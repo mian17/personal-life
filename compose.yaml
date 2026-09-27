@@ -18,6 +18,10 @@ services:
       NOTE_SERVICE_AUDIENCE: ${NOTE_SERVICE_AUDIENCE:-note-service}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-note:6379
+      # Content-encryption master key (data-privacy chapter). 32 bytes base64:
+      # generate with `openssl rand -base64 32` into the server's .env. Fail-fast
+      # here; note-service also refuses to boot without it.
+      NOTE_MASTER_KEY: ${NOTE_MASTER_KEY:?NOTE_MASTER_KEY is required (openssl rand -base64 32)}
     volumes:
       - ./apps/note-service/data:/data
     depends_on:

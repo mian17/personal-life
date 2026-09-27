@@ -55,6 +55,9 @@
     ],
     "rootDir": ".",
     "testRegex": "(\\.e2e-spec|\\.test)\\.ts$",
+    "setupFiles": [
+      "<rootDir>/test/setup-env.ts"
+    ],
     "moduleNameMapper": {
       "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
       "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts"

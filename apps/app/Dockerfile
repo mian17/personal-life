@@ -13,6 +13,7 @@ COPY apps/app/package.json apps/app/
 COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
+COPY packages/crypto/package.json packages/crypto/
 RUN npm ci
 
 COPY tsconfig.base.json ./

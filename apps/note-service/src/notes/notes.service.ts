@@ -214,6 +214,13 @@ function paginate<T extends { id: string }>(
 export class NotesService {
   private readonly logger = new Logger(NotesService.name);
 
+  /**
+   * `openField` passed as a decrypt callback must stay `this`-bound: its catch
+   * path logs through `this.logger`, and an unbound reference turns that into a
+   * TypeError that would mask the real `CryptoError` on tampered rows.
+   */
+  private readonly openFieldCb = this.openField.bind(this);
+
   constructor(
     @InjectRepository(Note) private readonly notes: Repository<Note>,
     @InjectRepository(Tag) private readonly tags: Repository<Tag>,
@@ -298,7 +305,7 @@ export class NotesService {
   private async decryptOne(note: Note, sub: string): Promise<NoteDto> {
     const row = toCachedNoteRow(note);
     const dek = await this.readDek(sub, [row]);
-    return decodeCachedNoteRow(row, sub, dek, this.openField);
+    return decodeCachedNoteRow(row, sub, dek, this.openFieldCb);
   }
 
   /**
@@ -386,7 +393,7 @@ export class NotesService {
     );
 
     const dek = await this.readDek(sub, rows);
-    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openField));
+    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openFieldCb));
 
     const tagKey = opts.tag?.toLowerCase();
     const filtered = decoded.filter((note) => {
@@ -427,7 +434,7 @@ export class NotesService {
     );
 
     const dek = await this.readDek(sub, rows);
-    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openField));
+    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openFieldCb));
     const { page, nextCursor } = paginate(decoded, limit, opts.cursor, (n) => n.deletedAt!);
     return { notes: page, nextCursor };
   }
@@ -448,7 +455,7 @@ export class NotesService {
       { decode: decodeCiphertextNoteRow, cacheable: isCiphertextNoteRow },
     );
     const dek = await this.readDek(sub, [row]);
-    return decodeCachedNoteRow(row, sub, dek, this.openField);
+    return decodeCachedNoteRow(row, sub, dek, this.openFieldCb);
   }
 
   async update(
@@ -535,7 +542,7 @@ export class NotesService {
     const dek = rows.some((t) => t.name.startsWith(ENC_PREFIX))
       ? await this.requireKeys().getDekForRead(sub)
       : null;
-    const names = rows.map((row) => decodeCachedTagRow(row, sub, dek, this.openField));
+    const names = rows.map((row) => decodeCachedTagRow(row, sub, dek, this.openFieldCb));
     // The former SQL `ORDER BY tag.name` cannot order ciphertext; sort on the
     // decrypted names so the API order stays deterministic and name-ascending.
     names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

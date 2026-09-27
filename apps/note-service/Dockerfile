@@ -13,13 +13,16 @@ COPY apps/app/package.json apps/app/
 COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
+COPY packages/crypto/package.json packages/crypto/
 RUN npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
+COPY packages/crypto ./packages/crypto
 COPY apps/note-service ./apps/note-service
 
 RUN npm run build -w @life/shared \
+  && npm run build -w @life/crypto \
   && npm run build -w @life/note-service \
   && npm prune --omit=dev
 
@@ -33,6 +36,8 @@ WORKDIR /app
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /repo/packages/shared/dist ./packages/shared/dist
+COPY --from=build /repo/packages/crypto/package.json ./packages/crypto/package.json
+COPY --from=build /repo/packages/crypto/dist ./packages/crypto/dist
 COPY --from=build /repo/apps/note-service/package.json ./package.json
 COPY --from=build /repo/apps/note-service/dist ./dist
 

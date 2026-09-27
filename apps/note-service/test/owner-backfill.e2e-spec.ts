@@ -307,19 +307,22 @@ describe('owner-backfill (e2e)', () => {
 
       // The legacy global unique is gone...
       expect(hasSingleColumnUniqueOnName(db, 'tag')).toBe(false);
-      // ...and the composite unique + note index are exactly what the entity declares.
-      expect(hasIndex(db, 'tag', 'UQ_tag_name_owner')).toBe(true);
-      expect(indexColumns(db, 'UQ_tag_name_owner')).toEqual(['name', 'ownerSub']);
+      // ...and so is the composite unique: `UQ_tag_name_owner` moved to
+      // service-level enforcement (plan D7 — ciphertext names cannot satisfy a
+      // DB unique index). The note index is exactly what the entity declares.
+      expect(hasIndex(db, 'tag', 'UQ_tag_name_owner')).toBe(false);
       expect(hasIndex(db, 'note', 'IDX_note_owner_sub')).toBe(true);
       expect(indexColumns(db, 'IDX_note_owner_sub')).toEqual(['ownerSub']);
 
       // Same name is now insertable for two different owners...
       db.prepare('INSERT INTO "tag" ("name","ownerSub") VALUES (?,?)').run('work', 'owner-a');
       db.prepare('INSERT INTO "tag" ("name","ownerSub") VALUES (?,?)').run('work', 'owner-b');
-      // ...but still unique within one owner.
+      // ...and the DB no longer guards per-owner uniqueness at all: the service
+      // dedupes case-insensitively on create/link (plan D7; covered by the
+      // crypto-roundtrip suite's tag-dedupe case).
       expect(() =>
         db.prepare('INSERT INTO "tag" ("name","ownerSub") VALUES (?,?)').run('work', 'owner-a'),
-      ).toThrow();
+      ).not.toThrow();
 
       // Every legacy row was stamped to the oldest user.
       expect(

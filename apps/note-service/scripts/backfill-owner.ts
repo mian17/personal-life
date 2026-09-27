@@ -14,8 +14,11 @@ import { resolve } from 'path';
  * Ordering is the contract:
  *   1. `VACUUM INTO` a verified backup — the first action; no write precedes it.
  *   2. Schema surgery: `note.ownerSub` + `IDX_note_owner_sub`; `tag` rebuild that
- *      drops the legacy inline `UNIQUE(name)` and emits `UQ_tag_name_owner` with
- *      DDL byte-equivalent to TypeORM's expectation (so first boot mutates nothing).
+ *      (see below); `user_keys` creation — all DDL byte-equivalent to the entities.
+ *      drops the legacy inline `UNIQUE(name)`; per-owner name uniqueness is
+ *      service-enforced now (SPEC-notes-at-rest, plan D7 — encrypted names cannot
+ *      satisfy a DB unique index), and the DDL stays byte-equivalent to TypeORM's
+ *      expectation (so first boot mutates nothing).
  *   3. Resolve the oldest user from `idp.db`, opened read-only.
  *   4. `UPDATE ... WHERE ownerSub IS NULL` for `note` and `tag`. Owned rows are
  *      never re-stamped; a re-run stamps 0 and performs no writes.
@@ -199,7 +202,8 @@ const TAG_TABLE_DDL =
  *  b. `tag`: when it still lacks `ownerSub` or still carries the legacy
  *     single-column UNIQUE(name), rebuild it under `PRAGMA foreign_keys = OFF`,
  *     copy rows with ids preserved, drop the old table (taking the old unique
- *     with it), rename, and create `UQ_tag_name_owner(name, ownerSub)`. Then
+ *     with it), and rename. No composite unique index is created: tag-name
+ *     uniqueness is service-enforced (plan D7). Then
  *     require a clean `PRAGMA foreign_key_check` before re-enabling FK
  *     enforcement. Otherwise skip.
  */
@@ -223,8 +227,7 @@ export function applySchema(noteDbPath: string): SchemaResult {
     // (b) tag.
     if (!tableExists(db, 'tag')) {
       db.exec(TAG_TABLE_DDL);
-      db.exec('CREATE UNIQUE INDEX "UQ_tag_name_owner" ON "tag" ("name", "ownerSub")');
-      actions.push('created tag table with UQ_tag_name_owner');
+      actions.push('created tag table');
       mutated = true;
     } else if (!hasColumn(db, 'tag', 'ownerSub') || hasSingleColumnUniqueOnName(db, 'tag')) {
       const hadOwnerSub = hasColumn(db, 'tag', 'ownerSub');
@@ -244,7 +247,6 @@ export function applySchema(noteDbPath: string): SchemaResult {
           );
           db.exec('DROP TABLE "tag"');
           db.exec('ALTER TABLE "temporary_tag" RENAME TO "tag"');
-          db.exec('CREATE UNIQUE INDEX "UQ_tag_name_owner" ON "tag" ("name", "ownerSub")');
           db.exec('COMMIT');
         } catch (err) {
           db.exec('ROLLBACK');
@@ -260,10 +262,20 @@ export function applySchema(noteDbPath: string): SchemaResult {
         // Enforcement is restored on every path, success or failure.
         db.exec('PRAGMA foreign_keys = ON');
       }
-      actions.push('rebuilt tag (removed legacy UNIQUE(name), created UQ_tag_name_owner)');
+      actions.push('rebuilt tag (removed legacy UNIQUE(name))');
       mutated = true;
     } else {
       actions.push('skipped tag rebuild (already migrated)');
+    }
+
+    // (c) user_keys: DEK custody (data-privacy chapter). DDL byte-equivalent to
+    // the entity so the boot-mutates-nothing contract holds.
+    if (!tableExists(db, 'user_keys')) {
+      db.exec(
+        'CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT NULL, "kekVersion" integer NOT NULL DEFAULT (1), "createdAt" datetime NOT NULL)',
+      );
+      actions.push('created user_keys');
+      mutated = true;
     }
 
     return { mutated, actions };
