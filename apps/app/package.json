@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000 -H 127.0.0.1",
+    "dev": "next dev -p ${WEB_PORT:-3100} -H 127.0.0.1",
     "build": "next build",
     "start": "next start -p ${WEB_PORT:-3002} -H 127.0.0.1",
     "test": "npm run test:unit && npm run test:e2e",

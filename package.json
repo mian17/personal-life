@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "scripts": {
-    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,app,idp -c blue,green,magenta \"npm:dev -w apps/note-service\" \"npm:dev -w apps/app\" \"PORT=3003 npm run dev -w apps/idp\"",
+    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,app,idp -c blue,green,magenta \"npm:dev -w apps/note-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"
