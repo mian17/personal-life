@@ -26,7 +26,8 @@ todo(
   createdAt DATETIME NOT NULL,
   updatedAt DATETIME NOT NULL
 )
-todo_tag(todoId TEXT, tagId INTEGER, PRIMARY KEY(todoId, tagId))   -- TagRefs, no names
+todo_tag(todoId TEXT, tagId INTEGER, PRIMARY KEY(todoId, tagId),
+         FOREIGN KEY(todoId) REFERENCES todo(id) ON DELETE CASCADE)  -- TagRefs, no names
 list(
   id        TEXT PRIMARY KEY,        -- service-generated UUID v4
   name      TEXT NOT NULL,           -- enc.v1, AAD life.v1|<sub>|list|name|<id>
@@ -49,6 +50,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 
 ## Behavior / API (kernel contracts apply)
 
+DTO shapes: every mutable entity's DTO carries `version` (todo, list, and tag) so
+clients can send `expectedVersion` (kernel concurrency contract).
+
 - `POST /api/todos {title, note?, dueDate?, listId?, tagIds?}` → 201 (version 0).
 - `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page.
   Order: dated by `dueDate ASC` (overdue first), undated last, `createdAt DESC`
@@ -65,7 +69,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 - `GET /api/todos/tags` → `[{tagId, count}]` (kernel usage surface; names resolved
   by the app via the registry). **Declare this route before `GET /api/todos/:id`** —
   Nest matches in declaration order and the literal path must not be shadowed.
-- Unknown/foreign `tagIds` are omitted and lazily pruned (kernel `TagRef` semantics).
+- Detach handling (kernel `TagRef` semantics, no S2S): todo-service stores exactly
+  the `tagIds` each write carries — updates replace the set (and `todo_tag` rows
+  cascade on todo delete); the BFF omits unresolvable ids when rendering.
 
 ## Cache Rules (AGENTS.md Contract 2)
 

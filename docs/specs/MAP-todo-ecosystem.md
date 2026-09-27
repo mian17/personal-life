@@ -14,7 +14,7 @@ its own spec (`SPEC-<module-id>.md`) in this directory. Plan/tasks live in
 
 Build order: `service-kernel` → `tags-service` → (`tags-extraction` ∥ `todo-service`) → `todo-ui`.
 
-## Cross-cutting design decisions (recorded per AGENTS.md §8)
+## Cross-cutting design decisions (recorded per global protocol §8)
 
 | # | Decision | Rationale |
 |---|---|---|

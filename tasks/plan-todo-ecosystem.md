@@ -22,7 +22,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
   instead of inventing one.
 - P3: Build order follows the map: kernel → registry → consumers → UI. The map's
   `tags-extraction ∥ todo-service` is a dependency fact; execution stays sequential
-  under tech-lead review/commit discipline (AGENTS.md §1).
+  under tech-lead review/commit discipline (global protocol §1).
 - P4: The tag migration ships with tests but is **human-run** at deploy (hard line);
   its checklist lives in SPEC-tags-extraction + the script header.
 - P5: UI is spec-first upstream: any new `@life/ui` primitive (TagPicker/TagManager,

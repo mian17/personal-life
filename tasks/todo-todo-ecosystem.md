@@ -48,6 +48,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     (`apps/app/test/e2e/stack.ts`) polls it and treats `<500` as ready.
   - Files: `apps/note-service/src/health/**` (new), `apps/note-service/src/app.module.ts`
     (+ `apps/note-service/src/app.factory.ts` if registration requires it),
+    `apps/note-service/src/auth/auth.guard.ts` +
+    `apps/note-service/src/auth/public.decorator.ts` (new — `@Public()` Reflector
+    exemption so the health trio is unauthenticated behind the global `AuthGuard`;
     `apps/note-service/test/health.e2e-spec.ts` (new), `apps/idp/src/health/health.controller.ts`
     (**modified** — `apps/idp/test/health.e2e-spec.ts` already exists and pins the
     current body), `apps/idp/package.json` (add `test:unit` alias → `test` **and**
@@ -55,8 +58,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     typecheck currently skips it), `compose.yaml` (healthcheck commands only).
   - Acceptance: live = 200 with DB down (no dependency checks); ready = 503 on DB down
     or missing key custody (DB + key only, never cache); `/health` answers identically
-    to `/health/ready` on both services; leak-free bodies; compose healthchecks hit
-    `/health/ready`.
+    to `/health/ready` on both services; **the health trio answers unauthenticated
+    under every NODE_ENV (explicit `@Public()` exemption test — no 401)**; leak-free
+    bodies; compose healthchecks hit `/health/ready`.
   - Verify: `npm run test:unit -w @life/note-service -- test/health.e2e-spec.ts` &&
     `npm run test:unit -w @life/idp` && `npm run typecheck`.
   - Dependencies: none. Size: S.
@@ -148,7 +152,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     apps consume them (AGENTS.md Contract 1 Rule 3): `TagPicker` (attach/detach by id),
     `TagManager` (create/rename/delete), `DueDatePill` (due-date display/grouping).
   - Files: `packages/ui/src/**`, `packages/ui/test/**`, `packages/ui/package.json`
-    (add `test:unit` alias → `test`), `docs/specs/SPEC-ui-*.md`,
+    (add `test:unit` + `typecheck` aliases), `docs/specs/SPEC-ui-*.md`,
     `docs/specs/MAP-ui-primitives.md`, `packages/ui/src/styles/tokens.css` (only if new token).
   - Acceptance: the three primitives covered by `@life/ui` tests; spec + map updated in
     the same change; no raw-HTML/raw-value/token leaks (Contract 1 mechanical checks).
@@ -162,7 +166,8 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `TODO_API_URL`; the shared-audience token model per the kernel contract means the
     session shape is unchanged), update Playwright navigation to the I5 URLs.
   - Files: `apps/app/app/**` (route move + new `/todos`), `apps/app/lib/**`, `actions.ts`,
-    `apps/app/test/**` (incl. `apps/app/test/e2e/**` — navigation URLs only, I5-approved).
+    `apps/app/test/**` (incl. `apps/app/test/e2e/**` — navigation URLs only, I5-approved),
+    `apps/app/package.json` (`typecheck` alias if missing).
   - Acceptance: `/notes` + `/todos` live, `/` redirects; tags one vocabulary across both
     apps; Contract 1 mechanical checks green; frozen e2e diff = I5 URLs and nothing else.
   - Verify: `npm run test:unit -w @life/app` && `npm run build -w @life/app` && `npm run typecheck`.
@@ -181,10 +186,16 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Files: `compose.yaml`, `.env.development.example`, untracked `.env.development`,
     `apps/app/Dockerfile`, `apps/idp/Dockerfile`, `apps/note-service/Dockerfile`,
     `apps/tags-service/Dockerfile` (new), `apps/todo-service/Dockerfile` (new),
-    `apps/idp/src/**` + `apps/idp/test/**` (audience map + fixtures only).
-    T3/T6 must NOT create Dockerfiles or touch compose.
-  - Acceptance: dev stack boots with dev keys; all three services authenticate the
-    app's single `life-api` token; `npm run typecheck` + workspace builds green; all
+    `apps/idp/src/**` + `apps/idp/test/**` (audience map + fixtures only),
+    `apps/app/test/e2e/**` harness infra (`stack.ts`/`config.ts`/service wiring —
+    bring tags/todo up in the Playwright stack; frozen *assertions* untouched, T8
+    owns only the I5 navigation URLs), root `package.json` (dev script gains
+    tags/todo), `.env.example` (its `OIDC_AUDIENCE_MAP` line → `life-api`),
+    `README.md` (auth section). T3/T6 must NOT create Dockerfiles or touch compose.
+  - Acceptance: dev stack (`npm run dev`) and the Playwright harness both bring up
+    tags/todo so `/notes` and `/todos` render names; `.env.example` + README agree
+    with the `life-api` model; all three services authenticate the app's single
+    `life-api` token; `npm run typecheck` + workspace builds green; all
     targeted suites green in one pass (incl. idp); no secrets in tracked files;
     frozen-surface diff stays I5-only.
   - Verify: `npm run typecheck` && `npm run build --workspaces --if-present` &&
@@ -194,7 +205,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `npm run test:unit -w @life/ui` && `npm run test:unit -w @life/app`.
   - Dependencies: T1-T8. Size: M.
 
-## Checkpoints (planning-skill gates, §8 self-reviewed and logged)
+## Checkpoints (planning-skill gates, global protocol §8 self-reviewed and logged)
 
 - After T2 (Foundation): note-service suites unchanged-green, health tests green, typecheck clean.
 - After T4 (Registry): registry suites green incl. the migration case list.
@@ -229,4 +240,12 @@ Case counts are referenced by spec section, never by number (kills count drift).
   shared `life-api` model (kernel is the single source), AGENTS.md restructure
   committed + stray `.bak` removed, stale §-references repointed to Contract 2 /
   global §3, and `version`/`expectedVersion` added to the mutable tag/list rows
-  per the kernel concurrency contract. Round 5: PENDING.
+  per the kernel concurrency contract.
+- 2026-09-28: conformance round 5: FAIL, 9 findings (1 CRITICAL, 3 MAJOR, 5 MINOR) —
+  all folded in: `@Public()` health exemption + unauthenticated case (T2 owns the
+  guard now), dev-script + Playwright harness wiring for tags/todo (T9, split from
+  T8's frozen-URL scope), `.env.example` + README audience lines (T9), inline `#tag`
+  parsing explicitly retained (frozen e2e behavior), detach semantics rewritten to
+  no-S2S (BFF omits unresolvable ids; writes replace the set), `todo_tag` ON DELETE
+  CASCADE, profile/typecheck coverage for ui/app, `version` in tag/list DTOs,
+  residual section refs repointed to the global protocol. Round 6: PENDING.

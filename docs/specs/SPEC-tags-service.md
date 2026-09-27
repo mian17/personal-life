@@ -36,7 +36,7 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 
 ## Behavior / API (kernel contracts apply)
 
-- `GET /api/tags` → `[{id, name, createdAt}]`, decrypted, name-sorted
+- `GET /api/tags` → `[{id, name, version, createdAt}]`, decrypted, name-sorted
   (case-insensitive). Names exist only here.
 - `POST /api/tags {name}` → create-or-get case-insensitively (201 created / 200
   existing). This is the only way tags come into existence.

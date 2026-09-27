@@ -23,8 +23,10 @@ both apps — so tags feel identical everywhere (I3).
 - **Shared tag UX:** tag picker (attach/detach by `tagId`) and tag manager (create,
   rename, delete) usable from both `/notes` and `/todos`, backed by `tags-service`
   exclusively. Rename/delete in either app reflect everywhere immediately (single
-  source). The note composer's inline tag-name handling becomes picker-driven
-  (`tagIds`) — same experience, new contract (`SPEC-tags-extraction`).
+  source). The note composer **keeps inline `#tag` parsing** (frozen e2e behavior: typing
+  `#errand` still creates the filter link) — the parsed name goes through the
+  registry's create-or-get and the note write carries `tagIds`. The picker is an
+  addition to this flow, not a replacement (`SPEC-tags-extraction`).
 - **Transport config (per kernel contract):** the app's API client gains
   `TAGS_API_URL`/`TODO_API_URL` base URLs; auth uses the kernel's single shared
   `life-api` audience — no per-service audience names appear in the client. Env

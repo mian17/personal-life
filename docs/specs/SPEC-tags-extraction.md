@@ -27,8 +27,9 @@ ids, and the app composes names from the registry (MAP M4).
 - Tag filtering in listings filters over `note_tag` by `tagId` — still metadata-only
   SQL per `SPEC-notes-at-rest` search rules; decrypt-then-match content filtering is
   unchanged.
-- Lazy prune (kernel `TagRef` semantics): ids unknown to the registry are omitted
-  from DTOs and their association rows pruned opportunistically on writes. Note
+- Detach handling (kernel `TagRef` semantics, no S2S): note-service stores exactly
+  the `tagIds` each write carries — updates replace the set, so dangling ids fall
+  away on the next edit; the BFF omits unresolvable ids when rendering. Note
   content is never deleted.
 - Supersession note: `SPEC-notes-at-rest.md`'s "`note:tags` = serialized ciphertext
   tag rows" cache bullet is superseded here — the cached shape becomes the

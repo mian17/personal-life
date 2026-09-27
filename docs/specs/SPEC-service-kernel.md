@@ -40,9 +40,11 @@ shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork r
   `POST /api/tags/resolve {ids} → [{id, name}]` (owner-scoped), called by the app
   (BFF composition — no service-to-service calls in request paths, MAP M4).
 - Semantics: rename is invisible to consumers (names resolve fresh); delete =
-  **detach** — consumers treat unknown/foreign ids as detached: omit from DTOs and
-  opportunistically prune association rows on writes. Domain content is never
-  deleted as a side effect.
+  **detach**, handled **without any service-to-service call**: a domain service
+  stores exactly the `tagIds` a write carries (updates replace the set, so dangling
+  ids fall away on the next edit — no registry validation, no prune pass); the BFF
+  omits ids that `resolve` does not return when rendering and excludes them from
+  subsequent writes. Domain content is never deleted as a side effect.
 - A domain's tag usage surface is `GET …/tags → [{tagId, count}]` (ids + counts only).
 
 ### `origin` links — the orchestrator seam

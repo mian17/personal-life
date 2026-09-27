@@ -4,7 +4,7 @@
 | Knob | Value |
 |---|---|
 | `typecheck` | `npm run typecheck` (workspace-aware; run in the touched workspace) |
-| `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest: `apps/app`, `apps/note-service`, `packages/crypto`) |
+| `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
 | `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
 | `max-test-runs` | 2 |
 | `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md` value table); PWA constants (`public/manifest.json`, `viewport.themeColor`) |
