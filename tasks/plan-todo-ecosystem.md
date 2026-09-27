@@ -44,7 +44,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
 - [ ] T4: `import-tags` migration script + tests (human-run later)
 
 ### Checkpoint: Registry
-- [ ] Registry suites green incl. the seven migration cases
+- [ ] Registry suites green incl. the six migration cases
 
 ### Phase 3 — Consumers
 - [ ] T5: note-service TagRef conversion (association-only, prune, `{tagId,count}`)

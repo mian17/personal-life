@@ -47,10 +47,11 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 
 ### `origin` links — the orchestrator seam
 
-- Shape: `{ service: 'note' | 'todo' | 'tags' | …, id: string }`, nullable JSON on
-  domain rows. Documented and reserved now; the future suggestion layer attaches it
-  (e.g. a todo created from a note). Nothing populates it in this chapter except
-  where naturally available.
+- Shape: `{ service: 'note' | 'todo' | 'tags', id: string }` — the union is closed
+  to the three current services and extended by adding the new service's own name
+  (one place: this section). Nullable JSON on domain rows.
+- Status in this chapter: **reserved, nothing populates it** (the future suggestion
+  layer attaches it, e.g. a todo created from a note).
 
 ### API surface rules (mirror note-service conventions)
 
@@ -71,16 +72,26 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 
 - Base URLs (app-side env): `API_URL` (note-service, existing), `TAGS_API_URL`,
   `TODO_API_URL`.
-- Per-service token audiences (isolation; the IdP mints per-audience access tokens
-  through its existing flow): `note-service`, `tags-service`, `todo-service`.
+- **Token model (single multi-audience access token):** the app session holds one
+  access token whose `aud` is the array `["note-service", "tags-service",
+  "todo-service"]`; the IdP mints that array for the app client at login (its
+  `OIDC_AUDIENCE_MAP` registers all three resources for the app). Each service
+  verifies **presence of its own audience** in `aud` (not exclusivity). The session
+  shape therefore stays exactly as today (one `accessToken`). Documented upgrade
+  path if isolation must tighten: RFC 8707 resource indicators → per-resource
+  tokens; the contracts below do not change when that happens. IdP minting + config
+  is owned by T9.
 - Per-service verification env (mirroring the note-service naming):
   `TAGS_IDP_JWKS_URL` / `TAGS_SERVICE_AUDIENCE`, `TODO_IDP_JWKS_URL` /
   `TODO_SERVICE_AUDIENCE` (existing: `NOTE_SERVICE_IDP_JWKS_URL` /
   `NOTE_SERVICE_AUDIENCE`). Internal JWKS over the compose network by default
   (`http://idp:3003/jwks`), issuer = browser-facing URL (the established two-var
   pattern).
-- IdP registration: `OIDC_AUDIENCE_MAP` gains `tags-service` and `todo-service`.
-- Ownership: T8 implements the app-side client config; T9 wires env/compose/IdP.
+- Cache wiring: `REDIS_URL` per service (compose-injected, same pattern as
+  note-service). All three services share the one `redis-note` instance —
+  service-prefixed keys (`note:`/`tags:`/`todo:`) keep the namespaces disjoint.
+- Ownership: T8 implements the app-side client config; T9 wires env/compose/IdP
+  (incl. the multi-audience minting).
 
 ## Shared primitives (no-fork, AGENTS.md §9)
 
