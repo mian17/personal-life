@@ -9,7 +9,8 @@
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "jest"
+    "test:unit": "jest",
+    "import-tags": "ts-node scripts/import-tags.ts"
   },
   "dependencies": {
     "@life/cache": "*",
