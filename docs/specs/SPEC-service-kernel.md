@@ -65,8 +65,10 @@ shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork r
   byte-identical** (binding precedent `SPEC-note-ownership.md` — never `403`, it
   leaks existence); `409` on stale `expectedVersion`. Body shape identical to
   note-service's.
-- Pagination: cursor `base64(iso|id)`, per-domain stable order (defined in each
-  domain spec).
+- Pagination: the cursor payload is per-domain over the domain's stable order —
+  default `base64(<iso>|<id>)`; domains with richer orderings extend it (todo:
+  `base64(<dueDate-or-~>|<createdAt>|<id>)`, `~` = undated sentinel). Stable order
+  defined in each domain spec.
 - Concurrency: `version` int on mutable rows; PATCH accepts `expectedVersion`
   (omit = legacy last-write-wins, as notes).
 - Ids: service-generated UUID v4 for new domain rows (notes precedent). Tag ids

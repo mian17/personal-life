@@ -42,8 +42,9 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   `done`, timestamps are metadata and stay queryable in SQL (decision: dueDate is
   operational data, not content; documented here deliberately).
 - No dual-read (M5). Master key `TODO_MASTER_KEY` (32-byte base64), fail-closed.
-- DB wiring: `DB_PATH` env (default `apps/todo-service/data/todo.db` via
-  `src/keys/db.ts`, mirroring note-service's resolver); compose bind-mounts
+- DB wiring: `DB_PATH` env (default `apps/todo-service/data/todo.db` via `@life/shared`'s `resolveDbPath`
+  (note-service's split: the service reads `DB_PATH` inline, scripts resolve their
+  own vars); compose bind-mounts
   `./apps/todo-service/data:/data` with `DB_PATH=/data/todo.db`.
 - No trash (decision): `DELETE` is permanent; trash is a v2 candidate alongside
   recurrence/subtasks/priorities.
@@ -58,7 +59,8 @@ can send `expectedVersion` (kernel concurrency contract). The wire types (`Todo`
 the app consumes, never re-declares (the orchestrator seam is the wire contract).
 
 - `POST /api/todos {title, note?, dueDate?, listId?, tagIds?}` → 201 (version 0).
-- `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page.
+- `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page. Cursor payload:
+  `base64(<dueDate-or-~>|<createdAt>|<id>)` (`~` = undated sentinel).
   Order: dated by `dueDate ASC` (overdue first), undated last, `createdAt DESC`
   tiebreak. `q` matches decrypted `title`+`note` via `likeMatch` (parity contract
   per kernel); `tagId` filters over `todo_tag`; all content filtering happens after

@@ -52,10 +52,9 @@ precedent).
 
 - Inputs: `NOTE_DB_PATH` (read+write — the case-variant merge repoint and the
   schema surgery write the note DB; default `apps/note-service/data/life.db`),
-  `TAGS_DB_PATH` (write; default `apps/tags-service/data/tags.db`) — resolved via
-  `apps/tags-service/src/keys/db.ts` (T3, mirroring note-service's resolver:
-  cwd-independent default, env override wins; a third copy would trigger extraction
-  to `@life/shared`, rule of three) — plus `NOTE_MASTER_KEY` (decrypt with
+  `TAGS_DB_PATH` (write; default `apps/tags-service/data/tags.db`) — resolved via `@life/shared`'s `resolveDbPath(envName, defaultRelPath)`
+  (extracted in T1 — rule of three met: note, tags, todo all resolve DB paths
+  through it) — plus `NOTE_MASTER_KEY` (decrypt with
   note-service DEKs) and `TAGS_MASTER_KEY` (encrypt under registry DEKs).
 - First action, before any write: a self-verified backup of every DB that EXISTS
   (`VACUUM INTO` + `PRAGMA quick_check`, the `backfill-owner` precedent) — the note

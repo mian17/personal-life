@@ -21,7 +21,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
     and the LIKE-parity matcher from `content-match.ts` into `@life/shared`; refactor
     note-service onto both with zero behavior change. (AGENTS.md Contract 2 no-fork rule, MAP P1.)
   - Files: `packages/cache/**` (new), `packages/shared/src/like-match.ts` (new),
-    `packages/shared/src/index.ts` (barrel re-export of `likeMatch`),
+    `packages/shared/src/db-path.ts` (new — `resolveDbPath(envName, defaultRelPath)`,
+    extracted from note-service's `src/keys/db.ts`; rule of three met: note, tags,
+    todo), `apps/note-service/src/keys/db.ts` (thin re-export shim),
+    `packages/shared/src/index.ts` (barrel re-export of `likeMatch` + `resolveDbPath`),
     `packages/shared/test/like-match.test.ts` (new), `packages/shared/package.json`
     (add jest config + `test:unit` + `typecheck` scripts — shared has neither today),
     `apps/note-service/package.json` (add `@life/cache` dep + jest `moduleNameMapper`
@@ -74,11 +77,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
 - [ ] T3: `apps/tags-service` registry — module `tags-service`
   - Description: New service — `GET/POST /api/tags`, `PATCH/DELETE /api/tags/:id`,
     `POST /api/tags/resolve`; own key custody (`TAGS_MASTER_KEY`), `@life/crypto`
-    at rest, `@life/cache`, health routes, `src/keys/db.ts` resolver (default
+    at rest, `@life/cache`, health routes, DB paths resolved via `@life/shared`'s `resolveDbPath` (default
     `apps/tags-service/data/tags.db`). Registers itself in the root workspace.
   - Files: `apps/tags-service/**` (new: package.json with `build`/`typecheck`/
-    `test:unit` scripts, entities, `tags.module/controller/service`, `keys/*`
-    incl. `db.ts`, `health/*`, tests), root `package.json` (workspaces +=
+    `test:unit` scripts, entities, `tags.module/controller/service`, `keys/*`, `health/*`, tests), root `package.json` (workspaces +=
     `apps/tags-service`), `package-lock.json` (via `npm install` only). NOT included:
     `apps/tags-service/Dockerfile` (T9's), `compose.yaml` (T9's).
   - Acceptance: every case in SPEC-tags-service's Testing Strategy (create-or-get
@@ -153,11 +155,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `origin` links; own key custody (`TODO_MASTER_KEY`), `@life/crypto` at rest,
     `@life/cache`, health routes; the SPEC-todo-service endpoints (5 todo + 4 list +
     1 usage — **declare `GET /api/todos/tags` before `GET /api/todos/:id`** so the
-    literal path is not shadowed); `src/keys/db.ts` resolver (default
+    literal path is not shadowed); DB paths via `@life/shared`'s `resolveDbPath` (default
     `apps/todo-service/data/todo.db`). Registers itself in the root workspace.
   - Files: `apps/todo-service/**` (new: package.json with `build`/`typecheck`/
-    `test:unit` scripts, entities, todo/list modules+controllers+services, `keys/*`
-    incl. `db.ts`, `health/*`, tests), `packages/shared/src/index.ts` (the todo/list
+    `test:unit` scripts, entities, todo/list modules+controllers+services, `keys/*`, `health/*`, tests), `packages/shared/src/index.ts` (the todo/list
     DTO wire types — `Todo`, `TodoPage`, `CreateTodoInput`, `UpdateTodoInput`, `List`
     — exported here per the `Note`/`CreateNoteInput` precedent; T8 consumes, never
     re-declares), root `package.json` (workspaces +=
@@ -312,3 +313,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
   numeric ranges per the ledger's own rule, `auth.e2e-spec`'s pinned zero-arg
   `new AuthGuard()` joins T2's radius, and the todo/list DTO wire types are owned by
   T6 in `@life/shared` (T8 consumes). Round 11: PENDING.
+- 2026-09-28: conformance round 11: **PASS** (0 CRITICAL, 0 MAJOR, 2 MINOR). Both
+  minors folded before implementation: `resolveDbPath(envName, defaultRelPath)`
+  extracted to `@life/shared` in T1 (rule of three met — note, tags, todo; per-service
+  `db.ts` copies deleted from T3/T6), and the todo cursor payload pinned as
+  `base64(<dueDate-or-~>|<createdAt>|<id>)` (kernel's per-domain cursor clause).
+  **PRE-IMPLEMENT GATE: GREEN** — implementation starts at T1.

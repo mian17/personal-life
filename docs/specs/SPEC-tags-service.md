@@ -24,8 +24,9 @@ tag(
 user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 ```
 
-- DB wiring: `DB_PATH` env (default `apps/tags-service/data/tags.db` via
-  `src/keys/db.ts`, mirroring note-service's resolver); compose bind-mounts
+- DB wiring: `DB_PATH` env (default `apps/tags-service/data/tags.db` via `@life/shared`'s `resolveDbPath`
+  (note-service's split: the service reads `DB_PATH` inline, scripts resolve their
+  own vars); compose bind-mounts
   `./apps/tags-service/data:/data` with `DB_PATH=/data/tags.db`.
 
 - Name encryption: `@life/crypto` envelope with AAD `life.v1|<sub>|tag|name` — the
