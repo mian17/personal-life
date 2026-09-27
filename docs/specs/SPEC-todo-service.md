@@ -63,10 +63,12 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 
 ## Cache Rules (AGENTS.md §9)
 
-- Cached shapes: serialized **ciphertext** todo rows per scope (`todo:list:<id>`,
-  `todo:all`), list rows (`todo:lists`), and tag-usage rows (`todo:tags`).
-- Key composition `todo:<sub>:v<gen>:<rest>`. `q`/`tagId`/`listId`/`done`/cursor/
-  limit never enter the key — one entry serves every filter/page variant.
+- Cached shapes: serialized **ciphertext** todo rows (`todo:all` — the owner's full
+  row set), list rows (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
+  ids + counts, no ciphertext by design).
+- Key composition `todo:<sub>:v<gen>:<rest>`. `q`/`tagId`/`listId`/`done`/`due*`/
+  cursor/limit never enter the key — `listId` and every other filter are applied in
+  memory off `todo:all` after the hit; one entry serves every filter/page variant.
 - Per-owner generation counter bumped on every successful write; 60s TTL backstop;
   fail-open on cache errors (direct loader; never plaintext on the fallback path).
 - Decrypt, filter, and paginate after every hit. No plaintext in Redis.
@@ -95,8 +97,9 @@ Build:     npm run build -w @life/todo-service
    filters, cursor continuity (no dup/skip).
 5. Lists: rename collision 409; delete detaches todos (they survive).
 6. TagRefs: attach/detach by id, unknown-id prune, `[{tagId, count}]`.
-7. Cache: every shape asserts `enc.v1.`-only serialized values; gen-counter
-   invalidation; fail-open.
+7. Cache: content-bearing shapes (`todo:all`, `todo:lists`) assert `enc.v1.`-only
+   serialized values — the `todo:tags` shape is ids+counts metadata by design and
+   asserts no plaintext content (no names); gen-counter invalidation; fail-open.
 8. Health routes; version/`expectedVersion` 409 semantics.
 
 ## Boundaries

@@ -74,6 +74,9 @@ Unicode more broadly — the broader fold is the accepted, documented deviation)
     scope (scope = all | trash);
   - `note:one:<id>` → the single note's serialized ciphertext row (was: decrypted DTO);
   - `note:tags` → serialized ciphertext tag rows (was: decrypted tag names).
+    **(Superseded by `SPEC-tags-extraction.md` in the todo-ecosystem chapter: once
+    tags move to `tags-service`, this shape becomes the used-`tagId`+count metadata
+    rows — no name data lives in note-service at all.)**
 - Key composition follows the existing `notes-cache.ts` `key()` scheme
   (`note:<sub>:v<gen>:<rest>`); `q`/`tag` leave the key space (they no longer affect
   SQL) — one entry serves every search/filter variant. The generation-counter

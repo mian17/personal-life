@@ -25,16 +25,19 @@ both apps — so tags feel identical everywhere (I3).
   exclusively. Rename/delete in either app reflect everywhere immediately (single
   source). The note composer's inline tag-name handling becomes picker-driven
   (`tagIds`) — same experience, new contract (`SPEC-tags-extraction`).
+- **Transport config (per kernel contract):** the app's API client gains
+  `TAGS_API_URL`/`TODO_API_URL` base URLs and per-service audiences
+  (`tags-service`, `todo-service`); env wiring is T9's, client config is T8's.
 - **`/notes` tag rework:** tag filter nav renders `[{tagId, count}]` resolved to
   names via the registry batch call.
 
 ## UI contract (AGENTS.md §3)
 
-- Composed from `@life/ui` atoms/blocks. Any missing visual concept (e.g. a
-  `TagPicker`/`TagManager` block, a due-date pill) is added **upstream** first:
-  `packages/ui` implementation + `docs/specs/SPEC-ui-*.md` update (+ `MAP-ui-primitives.md`
-  for a new component), then consumed here. Never raw HTML for interactive
-  elements, never app-side CSS recreating primitives, tokens only.
+- Composed from `@life/ui` atoms/blocks. The named upstream additions required by
+  this module (T7, spec-first in `packages/ui` + `SPEC-ui-*`): **`TagPicker`**
+  (attach/detach by id), **`TagManager`** (create/rename/delete against the
+  registry), **`DueDatePill`** (due-date display/grouping). Never raw HTML for
+  interactive elements, never app-side CSS recreating primitives, tokens only.
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
 
 ## Commands

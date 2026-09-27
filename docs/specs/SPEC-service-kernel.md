@@ -21,13 +21,16 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
   what genuinely breaks serving: DB reachable (`SELECT 1`) + key custody loaded.
   **Deliberately not the Redis cache**: the §9 cache is fail-open, so a cache outage
   must never take a service out of rotation. Readiness mirrors real failure semantics.
-- Both unauthenticated (probes cannot log in) but leak-free: no versions, config, or
-  stack traces in bodies; cheap and side-effect-free.
+- `GET /health` — kept on **every** service as a deprecated alias of `/health/ready`
+  (readiness semantics). Existing consumers depend on it (e.g. the Playwright harness
+  `apps/app/test/e2e/stack.ts` polls `/health`), and it must keep answering.
+- All three unauthenticated (probes cannot log in) but leak-free: no versions,
+  config, or stack traces in bodies; cheap and side-effect-free.
 - Wiring: compose `healthcheck` = `GET /health/ready` ("healthy" = can serve).
   Kubernetes later: `/health/live` → `livenessProbe`, `/health/ready` →
   `readinessProbe`. Optional `/health/startup` only if boot grows slow.
-- Retrofit: note-service gains the pair; idp's existing `@Controller('health')` is
-  aligned to the dialect and kept as a `/health` alias of `/health/ready`.
+- Retrofit: note-service gains the trio; idp's existing `@Controller('health')` is
+  aligned to the dialect (its current body becomes the `/health` alias behavior).
 
 ### `TagRef` — the shared tag vocabulary
 
@@ -53,8 +56,10 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 
 - Auth: Bearer JWT verified offline against the IdP JWKS; every query owner-scoped
   by `sub`.
-- Errors: `401` unauthenticated, `403` foreign owner, `404` missing, `409` stale
-  `expectedVersion`. Body shape identical to note-service's.
+- Errors: `401` unauthenticated; **`404` for foreign and missing ids alike,
+  byte-identical** (binding precedent `SPEC-note-ownership.md` — never `403`, it
+  leaks existence); `409` on stale `expectedVersion`. Body shape identical to
+  note-service's.
 - Pagination: cursor `base64(iso|id)`, per-domain stable order (defined in each
   domain spec).
 - Concurrency: `version` int on mutable rows; PATCH accepts `expectedVersion`
@@ -62,15 +67,32 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 - Ids: service-generated UUID v4 for new domain rows (notes precedent). Tag ids
   remain integers (M2).
 
+### App → service transport contract
+
+- Base URLs (app-side env): `API_URL` (note-service, existing), `TAGS_API_URL`,
+  `TODO_API_URL`.
+- Per-service token audiences (isolation; the IdP mints per-audience access tokens
+  through its existing flow): `note-service`, `tags-service`, `todo-service`.
+- Per-service verification env (mirroring the note-service naming):
+  `TAGS_IDP_JWKS_URL` / `TAGS_SERVICE_AUDIENCE`, `TODO_IDP_JWKS_URL` /
+  `TODO_SERVICE_AUDIENCE` (existing: `NOTE_SERVICE_IDP_JWKS_URL` /
+  `NOTE_SERVICE_AUDIENCE`). Internal JWKS over the compose network by default
+  (`http://idp:3003/jwks`), issuer = browser-facing URL (the established two-var
+  pattern).
+- IdP registration: `OIDC_AUDIENCE_MAP` gains `tags-service` and `todo-service`.
+- Ownership: T8 implements the app-side client config; T9 wires env/compose/IdP.
+
 ## Shared primitives (no-fork, AGENTS.md §9)
 
 - `@life/cache` (`packages/cache`, new): the generic read-through cache extracted
-  from `apps/note-service/src/notes/notes-cache.ts` — `getThrough(key, loader,
-  {decode, cacheable})`, per-owner generation counter, 60s TTL, fail-open, per-sub
-  key isolation, key composition `<svc>:<sub>:v<gen>:<rest>`. Values are always
-  serialized rows as persisted (ciphertext for content). note-service refactors onto
-  it; `tags-service`/`todo-service` consume it. The existing notes-cache contract
-  suite is ported and becomes the shared suite.
+  from `apps/note-service/src/notes/notes-cache.ts`. Generic signature:
+  `createCache({ service, client, ttlSeconds = 60 })` → `cache.getThrough(sub, rest,
+  loader, { decode, cacheable })`; keys compose as `<service>:<sub>:v<gen>:<rest>`
+  (`service` comes from the constructor, `sub` per call). Per-owner generation
+  counter, TTL backstop, fail-open, per-sub isolation. Values are always serialized
+  rows as persisted (ciphertext for content). note-service refactors onto it;
+  `tags-service`/`todo-service` consume it. The existing notes-cache contract suite
+  is ported and becomes the shared suite.
 - `likeMatch` (extracted into `@life/shared`): the LIKE-parity matcher from
   `apps/note-service/src/notes/content-match.ts` (`%`/`_` wildcards, ASCII-fold
   parity with SQLite `LIKE`, documented Unicode-fold deviation). Consumers run it
@@ -82,9 +104,12 @@ shared primitives that would otherwise be forked (AGENTS.md §9 no-fork rule).
 Typecheck: npm run typecheck
 Test:      npm run test:unit -w @life/cache
            npm run test:unit -w @life/shared
-           npm run test:unit -w @life/note-service -- test/health.test.ts
+           npm run test:unit -w @life/note-service -- test/health.e2e-spec.ts
 Build:     npm run build -w @life/cache
 ```
+
+(`test:unit` is added to `@life/shared`/`@life/ui`/`@life/idp` where missing — owned
+by T1/T7/T2 respectively.)
 
 ## Testing Strategy
 
@@ -93,7 +118,8 @@ Build:     npm run build -w @life/cache
 - Matcher: the ported empirical parity suite (expectations generated by real SQLite
   `LIKE` bindings, not hand-coded).
 - Health: per-service tests — `/health/live` stays 200 with the DB down;
-  `/health/ready` flips 503 on DB down or missing key custody; bodies leak nothing.
+  `/health/ready` flips 503 on DB down or missing key custody; `/health` alias
+  answers identically to `/health/ready`; bodies leak nothing.
 
 ## Boundaries
 
@@ -107,6 +133,6 @@ Build:     npm run build -w @life/cache
 
 1. `@life/cache` + `likeMatch` exist in shared packages; note-service consumes both
    with zero behavior change (its suites stay green).
-2. All four services answer the same health dialect; compose healthchecks use
-   `/health/ready`.
+2. All four services answer the same health dialect (including the `/health` alias);
+   compose healthchecks use `/health/ready`.
 3. Every contract above is referenced (not re-invented) by the downstream specs.
