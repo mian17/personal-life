@@ -51,11 +51,12 @@ Case counts are referenced by spec section, never by number (kills count drift).
     (+ `apps/note-service/src/app.factory.ts` if registration requires it),
     `apps/note-service/src/auth/auth.guard.ts` +
     `apps/note-service/src/auth/public.decorator.ts` (new — `@Public()` Reflector
-    exemption so the health trio is unauthenticated behind the global `AuthGuard`;
+    exemption so the health trio is unauthenticated behind the global `AuthGuard`),
     `apps/note-service/test/health.e2e-spec.ts` (new), `apps/idp/src/health/health.controller.ts`
-    (**modified** — `apps/idp/test/health.e2e-spec.ts` already exists and pins the
-    current body; idp's ready-check is a **side-effect-free config presence** check —
-    it must NOT call `SigningKeyService.jwks()`, which lazily writes `keys.json`), `apps/idp/package.json` (add `test:unit` alias → `test` **and**
+    (**modified** — idp's ready-check is a **side-effect-free config presence** check;
+    it must NOT call `SigningKeyService.jwks()`, which lazily writes `keys.json`),
+    `apps/idp/test/health.e2e-spec.ts` (**modified** — exists and pins the current
+    body), `apps/idp/package.json` (add `test:unit` alias → `test` **and**
     `typecheck` alias → `tsc -p tsconfig.json --noEmit` — idp has neither, so root
     typecheck currently skips it), `compose.yaml` (healthcheck commands only).
   - Acceptance: live = 200 with DB down (no dependency checks); ready = 503 on DB down
@@ -96,10 +97,12 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Files: `apps/tags-service/scripts/import-tags.ts`, `apps/tags-service/src/tags/import.ts`,
     `apps/tags-service/test/import-tags.test.ts` (new), `apps/tags-service/package.json`
     (script `import-tags` → `ts-node scripts/import-tags.ts`).
-  - Acceptance: every case in SPEC-tags-extraction's migration-owned Testing Strategy
-    (import + ids preserved, idempotence, dry-run purity + count parity, `_legacy_`
-    round-trip, poisoned-row abort, schema surgery, legacy plaintext input, verified
-    backup). The TagRef/round-trip behaviors belong to T5's suite.
+  - Acceptance: every case in SPEC-tags-extraction's migration list (cases 1-10:
+    import + ids preserved, idempotence, dry-run purity + count parity, `_legacy_`
+    round-trip, poisoned-row abort, schema-surgery shape, legacy plaintext input,
+    verified backup, case-variant merge incl. a note linked to both variants).
+    Case 10's zero-schema-mutation boot assertion is T5's (needs T5's `NoteTag`
+    entity), as are the TagRef/round-trip behaviors.
   - Verify: `npm run test:unit -w @life/tags-service -- test/import-tags.test.ts` && `npm run typecheck`.
   - Dependencies: T3. Size: M.
 - [ ] T5: note-service TagRef conversion — module `tags-extraction`
@@ -130,8 +133,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Acceptance: note-service holds zero tag names; TagRef attach/detach/filter/
     `[{tagId,count}]` + dangling-id replacement (a write replaces the set; no registry
     call) + note round-trip with `tagIds`
-    (SPEC-tags-extraction "Owned by T5" list — incl. dangling-id replacement, a write
-    replacing the set); all six pinned suites updated and
+    (SPEC-tags-extraction "Owned by T5" list — incl. dangling-id replacement and
+    synchronize stability: boot post-T5 note-service on a migrated fixture, assert
+    zero schema-mutating statements and `note_tag` DDL == the `NoteTag` entity);
+    all six pinned suites updated and
     green against the TagRef contract; the two ops scripts still compile and their
     raw-SQL flows are untouched; the backfill core skips tag scanning when the table
     is absent; content filtering unchanged (decrypt-then-match).
@@ -212,7 +217,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     with the `life-api` model; all three services authenticate the app's single
     `life-api` token; `npm run typecheck` + workspace builds green; all
     targeted suites green in one pass (incl. idp); no secrets in tracked files;
-    frozen-surface diff stays I5-only.
+    frozen-surface diff stays I5-only; the T5 synchronize-stability case is
+    re-verified on the integrated stack (post-migration boot: zero schema-mutating
+    statements).
   - Verify: `npm run typecheck` && `npm run build --workspaces --if-present` &&
     `npm run test:unit -w @life/cache` && `npm run test:unit -w @life/shared` &&
     `npm run test:unit -w @life/tags-service` && `npm run test:unit -w @life/todo-service` &&
@@ -284,4 +291,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
   T8 wiring (list CRUD was unowned), generation-counter key stated as
   `<service>:gen:<sub>` (shared Redis, no cross-invalidation), `origin` scoped to
   todo rows in this chapter, and the backfill core tolerates the absent `tag` table.
-  Round 9: PENDING.
+- 2026-09-28: conformance round 9: FAIL, 7 findings (1 CRITICAL, 2 MAJOR, 4 MINOR) —
+  all folded in: the case-10 handshake fixed (schema-surgery shape asserted in T4,
+  zero-schema-mutation boot assertion moved to T5, re-verified in T9), report format
+  carries `merges=`, repoint dedupes same-note duplicate associations first (PK
+  collision), MAP M2 records the merge exception, the import bootstraps the registry
+  schema, idp's health spec joins T2's blast radius, T4's acceptance enumerates the
+  full case list. Round 10: PENDING.

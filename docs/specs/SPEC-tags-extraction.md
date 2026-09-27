@@ -59,6 +59,9 @@ precedent).
 - First action, before any write: a self-verified backup of BOTH DBs (`VACUUM INTO`
   + `PRAGMA quick_check`, the `backfill-owner` precedent). No destructive step runs
   without it; a failed check aborts the script.
+- Registry schema bootstrap: the import creates `tag`/`user_keys` in `tags.db` if
+  absent (DDL byte-equivalent to SPEC-tags-service's entities) before copying — the
+  registry service has not booted at that point.
 - Id-preserving: rows copied with their existing integer ids. Input is dual-read —
   values starting `enc.v1.` are decrypted with note-service DEKs, legacy plaintext
   names (pre-`notes-backfill` rows) pass through as-is — and **every** imported name
@@ -67,7 +70,10 @@ precedent).
 - Case-insensitive collision policy (registry invariant: one case-insensitive name
   per owner): legacy rows may hold case-variant duplicates for one owner (e.g.
   `Work` + `work`). The import **merges** them onto the lowest id and repoints
-  `note_tag` rows to the surviving id; the report counts merges. A collision with an
+  `note_tag` rows to the surviving id; the report counts merges. When one note
+  links BOTH variants, duplicate `note_tag` rows are deduped first (one association
+  survives) so the repoint cannot violate the `(noteId, tagId)` primary key. A
+  collision with an
   already-imported id follows the same merge.
 - Idempotent: an id already present is skipped (byte-identical re-runs); batches are
   transactional; a poisoned row aborts with its id and a non-zero exit; `--dry-run`
@@ -79,7 +85,8 @@ precedent).
   next note-service boot's `synchronize` performs zero schema-mutating statements
   (the `SPEC-owner-backfill` precedent). Idempotent: absent `tag` table /
   already-rebuilt `note_tag` → skipped.
-- Report format mirrors the backfill scripts: `import-tags [plan|apply]: imported=N skipped=M keysCreated=K errors=0`.
+- Report format mirrors the backfill scripts:
+  `import-tags [plan|apply]: imported=N skipped=M merges=V keysCreated=K errors=0`.
 
 ## Deploy Checklist (human-run)
 
@@ -117,12 +124,17 @@ Owned here (migration cases):
    a failed check aborts.
 9. Case-variant duplicates for one owner (`Work` + `work`): merged onto the lowest
    id, `note_tag` repointed, merges counted in the report.
-10. Synchronize stability: booting note-service against the migrated DB performs
-   zero schema-mutating statements (rebuilt `note_tag` DDL == T5's entity DDL).
+10. Schema-surgery shape: rebuilt `note_tag` has columns (noteId, tagId), PK
+   (noteId, tagId), an `ON DELETE CASCADE` FK from `noteId` to `note`, and **no** FK
+   to `tag`. (The zero-schema-mutation boot assertion needs T5's `NoteTag` entity —
+   owned by T5 below, re-verified in T9.)
 
 Owned by T5 (`test/tag-refs.test.ts`, note-service behaviors): attach/detach by id,
-dangling-id replacement (a write replaces the set; no registry call), tag filter by id, `[{tagId, count}]` shape, note round-trip with
-`tagIds`.
+dangling-id replacement (a write replaces the set; no registry call), tag filter by
+id, `[{tagId, count}]` shape, note round-trip with `tagIds`; and synchronize
+stability — boot the post-T5 note-service against a migrated fixture and assert
+zero schema-mutating statements (rebuilt `note_tag` DDL == the `NoteTag` entity;
+`SPEC-owner-backfill` precedent).
 
 ## Boundaries
 
