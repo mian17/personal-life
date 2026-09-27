@@ -62,7 +62,10 @@ Merge to `master`: user's explicit request only.
 - [x] T6: ops scripts — backfill + rotation (module `notes-backfill`)
   - Files: `apps/note-service/scripts/encrypt-backfill.ts`, `apps/note-service/scripts/rotate-master-key.ts`
     (new), `apps/note-service/src/keys/backfill.ts`, `apps/note-service/src/keys/rotation.ts` (new),
-    `apps/note-service/test/backfill.test.ts` (new), `apps/note-service/package.json`
+    `apps/note-service/src/keys/db.ts` (new — shared cwd-independent DB-path helper,
+    added by the five-lane fix pass), `apps/note-service/test/backfill.test.ts` (new),
+    `apps/note-service/test/backfill-db-path.test.ts` (new — path-resolution regression
+    suite, fix pass), `apps/note-service/package.json`
     (add `backfill-encrypt`, `rotate-master-key` scripts — `ts-node scripts/*.ts` convention).
   - Acceptance: all 7 required cases per `SPEC-notes-backfill.md` (idempotence,
     dry-run byte-identical, round-trip decrypt incl. `_legacy_` sentinel owners,
@@ -75,8 +78,26 @@ Merge to `master`: user's explicit request only.
   - Files: `compose.yaml` (note-service `NOTE_MASTER_KEY` passthrough),
     `.env.development.example` (documented placeholder, no value), untracked
     `.env.development` (dev key — never staged).
+  - Integration repairs (tech lead) — ownership: the seven files below were
+    edited during the integration pass (I1–I3 + deploy wiring) and are owned
+    here; no other task's Files list covers them.
+    - `apps/app/Dockerfile`, `apps/idp/Dockerfile`, `apps/note-service/Dockerfile`
+      — deploy wiring: `COPY packages/crypto/package.json` (note-service also
+      copies `packages/crypto` and builds `@life/crypto`) so `npm ci` and the
+      image build resolve the new workspace package.
+    - `apps/note-service/test/setup-env.ts` — jest `setupFiles` supplying the
+      obviously-fake test master key so e2e suites that boot `AppModule` start
+      (I2).
+    - `apps/note-service/src/notes/notes.module.ts` — import `KeysModule` so
+      `NotesService` can resolve `KeysService` (I1 dependency wiring).
+    - `apps/note-service/scripts/backfill-owner.ts`,
+      `apps/note-service/test/owner-backfill.e2e-spec.ts` — I3: propagate the D7
+      schema truth (drop `UQ_tag_name_owner`, create `user_keys`) to the legacy
+      owner-backfill DDL and its suite, keeping the boot-mutates-nothing
+      contract.
   - Acceptance: dev stack boots with a dev key; `npm run typecheck` + `npm run build -w @life/crypto`
-    + `npm run build -w @life/note-service` green; zero app/UI diff (`git diff master...HEAD -- apps/app` empty);
+    + `npm run build -w @life/note-service` green; zero UI diff — the `apps/app`
+    diff is limited to the Dockerfile workspace-manifest line (build plumbing);
     all three targeted suites green in one pass; no secrets in tracked files.
   - Verify: `npm run typecheck` + `npm run test:unit -w @life/crypto` + `npm run test:unit -w @life/note-service`.
 
@@ -92,7 +113,9 @@ Merge to `master`: user's explicit request only.
   10-step in-plan workflow and successor chain). The gate log above stands as the
   tech-lead conformance record (§6); per-task review + five-lane gate at close remain.
 - Integration boundary run (T7): 9/9 suites, 110/110 tests, typecheck + builds clean,
-  zero `apps/app` diff, no secrets in tracked files. Found and fixed 3 real defects:
+  zero UI diff (the `apps/app` diff is limited to the Dockerfile workspace-manifest
+  line — build plumbing, no UI change), no secrets in tracked files. Found and fixed
+  3 real defects:
   I1 (T5 regression) unbound `this.openField` decrypt callback masked `CryptoError`
   with `TypeError` on tamper paths → bound (`openFieldCb`); I2 e2e suites booting
   `AppModule` need the master key → jest `setupFiles` test key (public by design);
@@ -102,4 +125,14 @@ Merge to `master`: user's explicit request only.
   3 consecutive full runs since are 100% stable.
 - Dev boot with the real dev key (bounded, port 3101): `Nest application successfully
   started`, HTTP 200 on `/api/tags` — keys + notes modules initialized.
-- Five-lane chapter gate: IN PROGRESS.
+- Five-lane chapter gate, round 1 (5 parallel lanes over master..HEAD): lanes 1
+  (correctness) PASS_WITH_NITS, 3 (security) PASS, 4 (qa) PASS_WITH_NITS, 2
+  (code-quality) FAIL + 5 (plan-conformance) FAIL — one shared HIGH defect: the ops
+  scripts' DB-path default resolved against INIT_CWD, so the documented repo-root
+  deploy command targeted <repo>/data/life.db instead of apps/note-service/data/life.db
+  (a migration that would never touch the production data), plus ledger-ownership
+  accuracy items. One fix pass (tests_pass=true): shared `src/keys/db.ts` helper with a
+  package-anchored default + `test/backfill-db-path.test.ts` (3 cases), truthful script
+  comments, ledger ownership for the seven integration-repair files, corrected
+  zero-UI-diff wording. Re-run: lane 2 PASS_WITH_NITS (blocker verified fixed).
+- Five-lane chapter gate: FIX PASS COMMITTED — lane 5 re-verdict pending.

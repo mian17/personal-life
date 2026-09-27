@@ -1,12 +1,14 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { join, resolve } from 'path';
 import { loadMasterKeyFromEnv } from '@life/crypto';
 import { Note } from '../src/notes/note.entity';
 import { Tag } from '../src/notes/tag.entity';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import { MASTER_KEY_ENV } from '../src/keys/keys.service';
+import { resolveDbPath } from '../src/keys/db';
 import { formatRotationReport, rotateMasterKeys } from '../src/keys/rotation';
+
+export { resolveDbPath };
 
 /**
  * `rotate-master-key` entry (`SPEC-notes-backfill` Sibling script + `D10`). Thin
@@ -29,20 +31,18 @@ import { formatRotationReport, rotateMasterKeys } from '../src/keys/rotation';
  * 4. Update `NOTE_MASTER_KEY` in the environment to `<new>`, boot (`docker compose up -d`), verify.
  * 5. Rollback if needed: stop, restore the backup file, boot with the old key.
  *
+ * The DB path resolves through the shared `src/keys/db.ts` helper (identical to
+ * `backfill-encrypt`): an explicit `NOTE_DB_PATH` override (resolved against
+ * `INIT_CWD ?? cwd` like backfill-owner) wins; otherwise the default is anchored
+ * at this package's own directory (`apps/note-service/data/life.db`), so the
+ * documented repo-root command opens the right file regardless of cwd.
+ *
  * Idempotent-ish and safe to re-run: rows already under the new key are reported
  * `skipped`, never corrupted. Any other failure exits non-zero.
  */
 
-const DEFAULT_NOTE_DB_PATH = join('data', 'life.db');
-
 /** Env var holding the NEW master key. */
 export const NEW_MASTER_KEY_ENV = 'NOTE_MASTER_KEY_NEW';
-
-/** Anchor env-relative paths where npm was invoked from (`INIT_CWD`), like backfill-owner. */
-export function resolveDbPath(env: NodeJS.ProcessEnv = process.env): string {
-  const root = env.INIT_CWD ?? process.cwd();
-  return resolve(root, env.NOTE_DB_PATH || DEFAULT_NOTE_DB_PATH);
-}
 
 /** Mirror of `app.module.ts`'s better-sqlite3 DataSource, with `synchronize` off. */
 export function createDataSource(dbPath: string): DataSource {

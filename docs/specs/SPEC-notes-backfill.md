@@ -68,7 +68,9 @@ apps/note-service/scripts/encrypt-backfill.ts   → backfill entry (thin; logic 
 apps/note-service/scripts/rotate-master-key.ts  → rotation entry (same shape)
 apps/note-service/src/keys/backfill.ts          → tested core: plan + apply
 apps/note-service/src/keys/rotation.ts          → tested core: rewrap-all + report
+apps/note-service/src/keys/db.ts                → shared DB-path resolution (cwd-independent default, NOTE_DB_PATH override)
 apps/note-service/test/backfill.test.ts         → temp sqlite fixtures only (incl. rotation cases)
+apps/note-service/test/backfill-db-path.test.ts → path-resolution regression cases
 ```
 
 ## Commands
