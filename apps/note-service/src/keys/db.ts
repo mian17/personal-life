@@ -1,8 +1,15 @@
-import { join, resolve } from 'path';
+import { join } from 'path';
+import { resolveDbPath as resolveSharedDbPath } from '@life/shared';
 
 /**
  * Single source of truth for the note-service DB path, shared by the
  * `backfill-encrypt` and `rotate-master-key` CLIs (`scripts/*.ts`).
+ *
+ * The resolution rule now lives in `@life/shared`'s generic
+ * `resolveDbPath(envName, defaultPath, env?)` (AGENTS.md Contract 2 no-fork
+ * rule; rule of three met by note, tags, todo). This module keeps its existing
+ * public signature (`resolveDbPath(env)` + `DEFAULT_NOTE_DB_PATH`) as a thin
+ * shim so the two CLIs and `test/backfill-db-path.test.ts` stay unchanged.
  *
  * The default is anchored at this package's own directory — `__dirname` is
  * `apps/note-service/src/keys` both under `ts-node scripts/*.ts` and under
@@ -25,10 +32,5 @@ export const DEFAULT_NOTE_DB_PATH = join(__dirname, '..', '..', 'data', 'life.db
  *      cwd.
  */
 export function resolveDbPath(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env.NOTE_DB_PATH;
-  if (override) {
-    const root = env.INIT_CWD ?? process.cwd();
-    return resolve(root, override);
-  }
-  return DEFAULT_NOTE_DB_PATH;
+  return resolveSharedDbPath('NOTE_DB_PATH', DEFAULT_NOTE_DB_PATH, env);
 }

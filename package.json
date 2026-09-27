@@ -8,7 +8,8 @@
     "apps/idp",
     "packages/shared",
     "packages/ui",
-    "packages/crypto"
+    "packages/crypto",
+    "packages/cache"
   ],
   "scripts": {
     "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,app,idp -c blue,green,magenta \"npm:dev -w apps/note-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",

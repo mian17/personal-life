@@ -1,3 +1,6 @@
+export { likeMatch } from './like-match';
+export { resolveDbPath } from './db-path';
+
 export interface Tag {
   id: number;
   name: string;
