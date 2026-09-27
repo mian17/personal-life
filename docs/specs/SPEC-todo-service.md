@@ -108,7 +108,8 @@ Build:     npm run build -w @life/todo-service
 4. Ordering + filters + pagination: due-dated ASC/undated-last, done/`dueBefore`
    filters, cursor continuity (no dup/skip).
 5. Lists: rename collision 409; delete detaches todos (they survive).
-6. TagRefs: attach/detach by id, unknown-id prune, `[{tagId, count}]`.
+6. TagRefs: attach/detach by id, dangling-id replacement (a write replaces the
+   set; no registry call), `[{tagId, count}]`.
 7. Cache: content-bearing shapes (`todo:all`, `todo:lists`) assert `enc.v1.`-only
    serialized values — the `todo:tags` shape is ids+counts metadata by design and
    asserts no plaintext content (no names); gen-counter invalidation; fail-open.

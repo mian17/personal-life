@@ -16,13 +16,14 @@ Case counts are referenced by spec section, never by number (kills count drift).
 - [ ] T1: shared kernel primitives (`@life/cache` + `likeMatch`) — module `service-kernel`
   - Description: Extract the generic read-through cache from `apps/note-service/src/notes/notes-cache.ts`
     into `packages/cache` (`@life/cache`, per SPEC-service-kernel's generic signature:
-    `createCache({service, client, ttlSeconds})` → `getThrough(sub, rest, loader, opts)`)
+    `createCache({service, client, ttlSeconds})` → `getThrough(sub, rest, loader, opts)`;
+    its package.json carries `build`/`typecheck`/`test:unit`)
     and the LIKE-parity matcher from `content-match.ts` into `@life/shared`; refactor
     note-service onto both with zero behavior change. (AGENTS.md Contract 2 no-fork rule, MAP P1.)
   - Files: `packages/cache/**` (new), `packages/shared/src/like-match.ts` (new),
     `packages/shared/src/index.ts` (barrel re-export of `likeMatch`),
     `packages/shared/test/like-match.test.ts` (new), `packages/shared/package.json`
-    (add jest config + `test:unit` script — shared has neither today),
+    (add jest config + `test:unit` + `typecheck` scripts — shared has neither today),
     `apps/note-service/package.json` (add `@life/cache` dep + jest `moduleNameMapper`
     `"^@life/cache$": "<rootDir>/../../packages/cache/src/index.ts"` — mirrors the
     `@life/crypto`/`@life/shared` source-resolution pattern; `@life/cache`'s `main`
@@ -53,11 +54,13 @@ Case counts are referenced by spec section, never by number (kills count drift).
     exemption so the health trio is unauthenticated behind the global `AuthGuard`;
     `apps/note-service/test/health.e2e-spec.ts` (new), `apps/idp/src/health/health.controller.ts`
     (**modified** — `apps/idp/test/health.e2e-spec.ts` already exists and pins the
-    current body), `apps/idp/package.json` (add `test:unit` alias → `test` **and**
+    current body; idp's ready-check is a **side-effect-free config presence** check —
+    it must NOT call `SigningKeyService.jwks()`, which lazily writes `keys.json`), `apps/idp/package.json` (add `test:unit` alias → `test` **and**
     `typecheck` alias → `tsc -p tsconfig.json --noEmit` — idp has neither, so root
     typecheck currently skips it), `compose.yaml` (healthcheck commands only).
   - Acceptance: live = 200 with DB down (no dependency checks); ready = 503 on DB down
-    or missing key custody (DB + key only, never cache); `/health` answers identically
+    or missing key custody (DB + key-custody-config only, never cache — side-effect-free: no lazy key
+    generation from a probe); `/health` answers identically
     to `/health/ready` on both services; **the health trio answers unauthenticated
     under every NODE_ENV (explicit `@Public()` exemption test — no 401)**; leak-free
     bodies; compose healthchecks hit `/health/ready`.
@@ -104,8 +107,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `note_tag` association only via an explicit `NoteTag` join entity mapped to the
     existing `note_tag` table (no `Tag` entity remains; `tagId` plain integer, no FK —
     registry is external per Approach 2); `GET /api/tags` (existing route) changes
-    shape in place to `[{tagId, count}]`; tag filter by id (metadata-only SQL); lazy
-    prune of dangling ids; `note:tags` cache shape becomes id+count rows. Everything
+    shape in place to `[{tagId, count}]`; tag filter by id (metadata-only SQL); dangling ids
+    detach per the kernel (writes replace the `tagIds` set; BFF omits unresolvable ids
+    — no prune pass, no registry call); `note:tags` cache shape becomes id+count rows. Everything
     that references the `Tag` entity or old tag shapes is updated here — including
     the ops scripts (whose DataSource registers `Tag`; they run against historical
     schemas via raw SQL and must keep doing so) and every pinned suite.
@@ -123,10 +127,13 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `test/crypto-roundtrip.test.ts`, `test/content-match.test.ts`, `test/backfill.test.ts`.
   - Acceptance: note-service holds zero tag names; TagRef attach/detach/filter/
     `[{tagId,count}]` + unknown-id prune + note round-trip with `tagIds`
-    (SPEC-tags-extraction "Owned by T5" list); all six pinned suites updated and
+    (SPEC-tags-extraction "Owned by T5" list — incl. dangling-id replacement, a write
+    replacing the set); all six pinned suites updated and
     green against the TagRef contract; the two ops scripts still compile and their
     raw-SQL flows are untouched; content filtering unchanged (decrypt-then-match).
-  - Verify: `npm run test:unit -w @life/note-service` && `npm run typecheck`.
+  - Verify: `npm run test:unit -w @life/note-service` && `npm run build -w @life/shared`
+    && `npm run typecheck`. (T5 edits shared's public types — its `dist` must be
+    rebuilt before tsc typechecks note-service against it; same trap as T1.)
   - Dependencies: T3. Size: L (single concern: the whole note-service tag surface).
 - [ ] T6: `apps/todo-service` — module `todo-service`
   - Description: New service — todos (title, note, done, dueDate) + lists + TagRefs +
@@ -142,7 +149,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `apps/todo-service/Dockerfile` (T9's), `compose.yaml` (T9's).
   - Acceptance: every group in SPEC-todo-service's Testing Strategy (envelope
     round-trip, AAD swap fail-closed, LIKE parity empirical, ordering+filters+pagination,
-    list detach, TagRef prune + count, cache ciphertext-only for content shapes +
+    list detach, TagRef dangling-id replacement + count, cache ciphertext-only for content shapes +
     metadata-only tag usage, health + version/409); build produces dist.
   - Verify: `npm run test:unit -w @life/todo-service` &&
     `npm run build -w @life/todo-service` && `npm run typecheck`.
@@ -248,4 +255,11 @@ Case counts are referenced by spec section, never by number (kills count drift).
   parsing explicitly retained (frozen e2e behavior), detach semantics rewritten to
   no-S2S (BFF omits unresolvable ids; writes replace the set), `todo_tag` ON DELETE
   CASCADE, profile/typecheck coverage for ui/app, `version` in tag/list DTOs,
-  residual section refs repointed to the global protocol. Round 6: PENDING.
+  residual section refs repointed to the global protocol.
+- 2026-09-28: conformance round 6: FAIL, 4 findings (1 CRITICAL, 1 MAJOR, 2 MINOR) —
+  all folded in: residual "prune" wording across MAP/plan/ledger/SPEC-todo-service
+  rewritten to the kernel's set-replacement detach (no prune pass, no registry call;
+  tests renamed to dangling-id replacement), T5 Verify builds `@life/shared` before
+  typecheck (dist-resolved types), T1 gives shared/cache `typecheck` scripts, and
+  idp's readiness custody check is pinned side-effect-free (never triggers lazy
+  `keys.json` creation). Round 7: PENDING.

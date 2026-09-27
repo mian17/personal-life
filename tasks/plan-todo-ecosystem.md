@@ -47,7 +47,7 @@ and give every service one health dialect. Contracts first (the orchestrator sea
 - [ ] Registry suites green incl. the migration case list (SPEC-tags-extraction)
 
 ### Phase 3 — Consumers
-- [ ] T5: note-service TagRef conversion (association-only, prune, `{tagId,count}`)
+- [ ] T5: note-service TagRef conversion (association-only, set-replacement detach, `{tagId,count}`)
 - [ ] T6: `apps/todo-service` — todo/list domain + cache + health
 
 ### Checkpoint: Consumers
