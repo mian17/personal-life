@@ -1,8 +1,11 @@
-import { Column, Entity, Index, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Note } from './note.entity';
 
+// `tag.name` is now an `@life/crypto` envelope (non-deterministic), so the former
+// `UQ_tag_name_owner` unique index can no longer guard the `(name, ownerSub)`
+// invariant. `SPEC-notes-at-rest` relocates it to case-insensitive service-level
+// dedupe (`NotesService.resolveTags`); `notes-backfill` drops the physical index.
 @Entity('tag')
-@Index('UQ_tag_name_owner', ['name', 'ownerSub'], { unique: true })
 export class Tag {
   @PrimaryGeneratedColumn()
   id: number;
