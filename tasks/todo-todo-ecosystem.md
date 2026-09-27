@@ -119,7 +119,9 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `apps/note-service/src/notes/notes.module.ts` + `apps/note-service/src/app.module.ts`
     (entity registration), `packages/shared/src/index.ts` (shared input types:
     `CreateNoteInput.tags` → `tagIds`, `UpdateNoteInput`, `Tag` → `TagRef`),
-    `notes-cache.ts` integration, `apps/note-service/scripts/encrypt-backfill.ts` +
+    `notes-cache.ts` integration, `apps/note-service/src/keys/backfill.ts`
+    (`collectTasks` scans the `tag` table — must tolerate its absence post-extraction),
+    `apps/note-service/scripts/encrypt-backfill.ts` +
     `scripts/rotate-master-key.ts` (DataSource entity list — drop `Tag`, add `NoteTag`;
     raw-SQL behavior against historical schemas unchanged), `apps/note-service/test/tag-refs.test.ts`
     (new), and the pinned suites updated to the TagRef contract: `test/notes.e2e-spec.ts`,
@@ -131,7 +133,8 @@ Case counts are referenced by spec section, never by number (kills count drift).
     (SPEC-tags-extraction "Owned by T5" list — incl. dangling-id replacement, a write
     replacing the set); all six pinned suites updated and
     green against the TagRef contract; the two ops scripts still compile and their
-    raw-SQL flows are untouched; content filtering unchanged (decrypt-then-match).
+    raw-SQL flows are untouched; the backfill core skips tag scanning when the table
+    is absent; content filtering unchanged (decrypt-then-match).
   - Verify: `npm run test:unit -w @life/note-service` && `npm run build -w @life/shared`
     && `npm run typecheck`. (T5 edits shared's public types — its `dist` must be
     rebuilt before tsc typechecks note-service against it; same trap as T1.)
@@ -158,18 +161,20 @@ Case counts are referenced by spec section, never by number (kills count drift).
 - [ ] T7: `@life/ui` upstream additions — module `todo-ui`
   - Description: The named primitives, added **upstream** with spec updates before
     apps consume them (AGENTS.md Contract 1 Rule 3): `TagPicker` (attach/detach by id),
-    `TagManager` (create/rename/delete), `DueDatePill` (due-date display/grouping).
+    `TagManager` (create/rename/delete), `DueDatePill` (due-date display/grouping),
+    `ListManager` (create/rename/delete todo lists).
   - Files: `packages/ui/src/**`, `packages/ui/test/**`, `packages/ui/package.json`
     (add `test:unit` + `typecheck` aliases), `docs/specs/SPEC-ui-*.md`,
     `docs/specs/MAP-ui-primitives.md`, `packages/ui/src/styles/tokens.css` (only if new token).
-  - Acceptance: the three primitives covered by `@life/ui` tests; spec + map updated in
+  - Acceptance: the four primitives covered by `@life/ui` tests; spec + map updated in
     the same change; no raw-HTML/raw-value/token leaks (Contract 1 mechanical checks).
   - Verify: `npm run test:unit -w @life/ui` && `npm run typecheck`.
   - Dependencies: none (can precede T8). Size: M.
 - [ ] T8: `apps/app` UI — module `todo-ui`
   - Description: Move `/` → `/notes` (+ redirect), build `/todos` (grouped
     Overdue/Today/Later/No date, done toggle, composer, inline edit, filters), wire the
-    shared `TagPicker`/`TagManager` to `tags-service` from both apps, rework the note
+    shared `TagPicker`/`TagManager` to `tags-service` from both apps and the
+    `ListManager` to todo-service lists, rework the note
     composer to `tagIds`, add the app-side transport config (`TAGS_API_URL`,
     `TODO_API_URL`; the shared-audience token model per the kernel contract means the
     session shape is unchanged), update Playwright navigation to the I5 URLs.
@@ -271,4 +276,12 @@ Case counts are referenced by spec section, never by number (kills count drift).
   replacement; DTO `version` scope fixed to todo/list; the `/health` alias stated in
   both new services' health sections; `todo:all` rows documented as carrying their
   `tagIds`; T2's idp verify targeted to the single spec; BFF write-side exclusion of
-  unresolvable ids added to SPEC-todo-ui + T8. Round 8: PENDING.
+  unresolvable ids added to SPEC-todo-ui + T8.
+- 2026-09-28: conformance round 8: FAIL, 6 findings (0 CRITICAL, 3 MAJOR, 3 MINOR) —
+  all folded in: migration case-collision merge policy (merge case-variants onto the
+  lowest id + repoint `note_tag`, tested), synchronize-stability pinning (rebuilt
+  `note_tag` DDL == T5's entity; zero-mutation boot case), `ListManager` primitive +
+  T8 wiring (list CRUD was unowned), generation-counter key stated as
+  `<service>:gen:<sub>` (shared Redis, no cross-invalidation), `origin` scoped to
+  todo rows in this chapter, and the backfill core tolerates the absent `tag` table.
+  Round 9: PENDING.

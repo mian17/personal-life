@@ -40,7 +40,8 @@ both apps — so tags feel identical everywhere (I3).
 - Composed from `@life/ui` atoms/blocks. The named upstream additions required by
   this module (T7, spec-first in `packages/ui` + `SPEC-ui-*`): **`TagPicker`**
   (attach/detach by id), **`TagManager`** (create/rename/delete against the
-  registry), **`DueDatePill`** (due-date display/grouping). Never raw HTML for
+  registry), **`DueDatePill`** (due-date display/grouping), **`ListManager`** (create/rename/delete todo lists).
+  Never raw HTML for
   interactive elements, never app-side CSS recreating primitives, tokens only.
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
 

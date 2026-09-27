@@ -64,14 +64,21 @@ precedent).
   names (pre-`notes-backfill` rows) pass through as-is — and **every** imported name
   is re-encrypted under the registry's per-owner DEKs (`_legacy_` sentinel filing for
   NULL-owner rows, per `SPEC-notes-backfill`). Plaintext exists only in flight.
+- Case-insensitive collision policy (registry invariant: one case-insensitive name
+  per owner): legacy rows may hold case-variant duplicates for one owner (e.g.
+  `Work` + `work`). The import **merges** them onto the lowest id and repoints
+  `note_tag` rows to the surviving id; the report counts merges. A collision with an
+  already-imported id follows the same merge.
 - Idempotent: an id already present is skipped (byte-identical re-runs); batches are
   transactional; a poisoned row aborts with its id and a non-zero exit; `--dry-run`
   reports counts and writes nothing.
 - Schema surgery (final step, after a fully successful import; `PRAGMA
   foreign_keys = OFF` window + table rebuild, the `backfill-owner` precedent):
   `note_tag` is rebuilt without the FK to `tag` (keep `noteId` FK + PK), then the
-  note DB's `tag` table is dropped. Idempotent: absent `tag` table / already-rebuilt
-  `note_tag` → skipped.
+  note DB's `tag` table is dropped. The rebuilt `note_tag` DDL is byte-equivalent to T5's `NoteTag` entity, so the
+  next note-service boot's `synchronize` performs zero schema-mutating statements
+  (the `SPEC-owner-backfill` precedent). Idempotent: absent `tag` table /
+  already-rebuilt `note_tag` → skipped.
 - Report format mirrors the backfill scripts: `import-tags [plan|apply]: imported=N skipped=M keysCreated=K errors=0`.
 
 ## Deploy Checklist (human-run)
@@ -108,6 +115,10 @@ Owned here (migration cases):
    registry envelopes.
 8. Verified backup: `VACUUM INTO` + `quick_check` snapshots exist before any write;
    a failed check aborts.
+9. Case-variant duplicates for one owner (`Work` + `work`): merged onto the lowest
+   id, `note_tag` repointed, merges counted in the report.
+10. Synchronize stability: booting note-service against the migrated DB performs
+   zero schema-mutating statements (rebuilt `note_tag` DDL == T5's entity DDL).
 
 Owned by T5 (`test/tag-refs.test.ts`, note-service behaviors): attach/detach by id,
 dangling-id replacement (a write replaces the set; no registry call), tag filter by id, `[{tagId, count}]` shape, note round-trip with

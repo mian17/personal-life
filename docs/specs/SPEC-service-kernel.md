@@ -51,7 +51,9 @@ shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork r
 
 - Shape: `{ service: 'note' | 'todo' | 'tags', id: string }` — the union is closed
   to the three current services and extended by adding the new service's own name
-  (one place: this section). Nullable JSON on domain rows.
+  (one place: this section). Nullable JSON — declared on **todo rows** in this
+  chapter (the seam's first consumer); other domains add the column when they
+  actually attach origins.
 - Status in this chapter: **reserved, nothing populates it** (the future suggestion
   layer attaches it, e.g. a todo created from a note).
 
@@ -105,7 +107,9 @@ shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork r
 - `@life/cache` (`packages/cache`, new): the generic read-through cache extracted
   from `apps/note-service/src/notes/notes-cache.ts`. Generic signature:
   `createCache({ service, client, ttlSeconds = 60 })` → `cache.getThrough(sub, rest,
-  loader, { decode, cacheable })`; keys compose as `<service>:<sub>:v<gen>:<rest>`
+  loader, { decode, cacheable })`; keys compose as `<service>:<sub>:v<gen>:<rest>`;
+  the generation-counter key is service-prefixed too — `<service>:gen:<sub>` — since
+  all three services share one Redis and must never cross-invalidate
   (`service` comes from the constructor, `sub` per call). Per-owner generation
   counter, TTL backstop, fail-open, per-sub isolation. Values are always serialized
   rows as persisted (ciphertext for content). note-service refactors onto it;
