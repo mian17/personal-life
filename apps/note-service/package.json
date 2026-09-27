@@ -7,6 +7,8 @@
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3001} node dist/main.js",
     "backfill-owner": "ts-node scripts/backfill-owner.ts",
+    "backfill-encrypt": "ts-node scripts/encrypt-backfill.ts",
+    "rotate-master-key": "ts-node scripts/rotate-master-key.ts",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
