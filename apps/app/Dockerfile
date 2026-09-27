@@ -12,10 +12,12 @@ COPY apps/note-service/package.json apps/note-service/
 COPY apps/app/package.json apps/app/
 COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ui/package.json packages/ui/
 RUN npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
+COPY packages/ui ./packages/ui
 COPY apps/app ./apps/app
 
 RUN npm run build -w @life/shared \
@@ -37,6 +39,9 @@ COPY --from=build /repo/apps/app/public ./apps/app/public
 # into the bundle, so the standalone server can always require it.
 COPY --from=build /repo/packages/shared/package.json ./node_modules/@life/shared/package.json
 COPY --from=build /repo/packages/shared/dist ./node_modules/@life/shared/dist
+# Same safety net for @life/ui (source-shipped and transpiled into the bundle).
+COPY --from=build /repo/packages/ui/package.json ./node_modules/@life/ui/package.json
+COPY --from=build /repo/packages/ui/src ./node_modules/@life/ui/src
 
 EXPOSE 3002
 CMD ["node", "apps/app/server.js"]

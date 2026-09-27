@@ -12,6 +12,7 @@ COPY apps/note-service/package.json apps/note-service/
 COPY apps/app/package.json apps/app/
 COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ui/package.json packages/ui/
 RUN npm ci
 
 COPY tsconfig.base.json ./
