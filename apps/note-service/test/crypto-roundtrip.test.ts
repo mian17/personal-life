@@ -8,7 +8,7 @@ import { CryptoError } from '@life/crypto';
 import { KeysService } from '../src/keys/keys.service';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import { Note } from '../src/notes/note.entity';
-import { Tag } from '../src/notes/tag.entity';
+import { NoteTag } from '../src/notes/note-tag.entity';
 import { NotesCache } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
 
@@ -38,14 +38,14 @@ async function makeHarness(): Promise<Harness> {
   const dataSource = new DataSource({
     type: 'better-sqlite3',
     database: join(dir, 'notes.db'),
-    entities: [Note, Tag, UserKeys],
+    entities: [Note, NoteTag, UserKeys],
     synchronize: true,
   });
   await dataSource.initialize();
   const keys = new KeysService(dataSource.getRepository(UserKeys), MASTER_KEY);
   const service = new NotesService(
     dataSource.getRepository(Note),
-    dataSource.getRepository(Tag),
+    dataSource.getRepository(NoteTag),
     new NotesCache(null),
     keys,
   );
@@ -58,9 +58,12 @@ async function rawBody(dataSource: DataSource, id: string): Promise<string> {
   return rows[0].body as string;
 }
 
-async function rawTagNames(dataSource: DataSource): Promise<string[]> {
-  const rows = await dataSource.query('SELECT name FROM tag ORDER BY id');
-  return rows.map((r: { name: string }) => r.name);
+async function rawTagIds(dataSource: DataSource, noteId: string): Promise<number[]> {
+  const rows = (await dataSource.query(
+    'SELECT tagId FROM note_tag WHERE noteId = ? ORDER BY tagId',
+    [noteId],
+  )) as Array<{ tagId: number }>;
+  return rows.map((r) => Number(r.tagId));
 }
 
 /** Flip one ciphertext byte while keeping the envelope base64url-canonical. */
@@ -110,35 +113,29 @@ describe('notes-at-rest T3: encrypted fields + transparent dual-read', () => {
     expect(readBack.body).toBe('second version');
   });
 
-  it('tags: raw name column is an envelope; listTags and the note DTO return original names', async () => {
-    const dto = await h.service.create(SUB, 'tagged', ['Work']);
+  it('tags: tagIds round-trip through the association table; no tag names are stored here', async () => {
+    const dto = await h.service.create(SUB, 'tagged', [7, 3]);
 
-    expect(dto.tags.map((t) => t.name)).toEqual(['Work']);
-    const stored = await rawTagNames(h.dataSource);
-    expect(stored).toHaveLength(1);
-    expect(stored[0].startsWith(ENC_PREFIX)).toBe(true);
-    expect(stored[0]).not.toContain('Work');
+    // The wire DTO carries the registry ids (order-normalized).
+    expect(dto.tagIds).toEqual([3, 7]);
+    // Only association rows exist; note-service owns no tag vocabulary.
+    expect(await rawTagIds(h.dataSource, dto.id)).toEqual([3, 7]);
+    const tagTables = (await h.dataSource.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='tag'",
+    )) as unknown[];
+    expect(tagTables).toHaveLength(0);
 
-    const listed = await h.service.listTags(SUB);
-    expect(listed.map((t) => t.name)).toEqual(['Work']);
+    const reread = await h.service.findOne(SUB, dto.id);
+    expect(reread.tagIds).toEqual([3, 7]);
   });
 
-  it('tag dedupe: Work / work / WORK collapse into exactly one owner row', async () => {
-    const a = await h.service.create(SUB, 'a', ['Work']);
-    const b = await h.service.create(SUB, 'b', ['work']);
-    const c = await h.service.create(SUB, 'c', ['WORK']);
+  it('tag dedupe: repeated ids in one write collapse into a single association each', async () => {
+    const a = await h.service.create(SUB, 'a', [5, 5, 5]);
+    const b = await h.service.create(SUB, 'b', [5, 6]);
 
-    const count = await h.dataSource.query(
-      'SELECT COUNT(*) AS c FROM tag WHERE ownerSub = ?',
-      [SUB],
-    );
-    expect(Number(count[0].c)).toBe(1);
-
-    // Every link reused the same tag identity, and the original spelling of the
-    // first-seen name is preserved.
-    expect(b.tags[0].id).toBe(a.tags[0].id);
-    expect(c.tags[0].id).toBe(a.tags[0].id);
-    expect(a.tags[0].name).toBe('Work');
+    // Exactly one row per distinct id, per note.
+    expect(await rawTagIds(h.dataSource, a.id)).toEqual([5]);
+    expect(await rawTagIds(h.dataSource, b.id)).toEqual([5, 6]);
   });
 
   it('dual-read: a legacy plaintext row is readable unchanged, then a write converts it', async () => {

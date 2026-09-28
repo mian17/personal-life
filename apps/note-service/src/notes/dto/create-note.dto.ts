@@ -1,5 +1,5 @@
-import { IsArray, IsOptional, IsString, MaxLength, MinLength, IsNotEmpty } from 'class-validator';
-import { NOTE_BODY_MAX, TAG_NAME_MAX } from '@life/shared';
+import { IsArray, IsInt, IsOptional, IsString, MaxLength, MinLength, IsNotEmpty } from 'class-validator';
+import { NOTE_BODY_MAX } from '@life/shared';
 
 export class CreateNoteDto {
   @IsString()
@@ -7,9 +7,10 @@ export class CreateNoteDto {
   @MaxLength(NOTE_BODY_MAX)
   body: string;
 
+  // TagRef ids (registry-owned). note-service stores exactly these ids; the app
+  // resolves names through `tags-service` before writing (MAP M4).
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  @MaxLength(TAG_NAME_MAX, { each: true })
-  tags: string[] = [];
+  @IsInt({ each: true })
+  tagIds: number[] = [];
 }

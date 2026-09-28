@@ -11,7 +11,7 @@ export class NotesController {
 
   @Post()
   create(@Principal() principal: Principal, @Body() dto: CreateNoteDto) {
-    return this.notes.create(principal.sub, dto.body, dto.tags);
+    return this.notes.create(principal.sub, dto.body, dto.tagIds);
   }
 
   @Get()
@@ -37,7 +37,7 @@ export class NotesController {
 
   @Patch(':id')
   update(@Principal() principal: Principal, @Param('id') id: string, @Body() dto: UpdateNoteDto) {
-    return this.notes.update(principal.sub, id, dto.body, dto.tags, dto.expectedVersion);
+    return this.notes.update(principal.sub, id, dto.body, dto.tagIds, dto.expectedVersion);
   }
 
   @Post(':id/restore')

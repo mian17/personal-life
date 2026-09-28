@@ -217,10 +217,17 @@ describe('Notes ownership (e2e)', () => {
   });
 
   it('serializes no owner field in the NoteDto (list and get)', async () => {
-    const noteKeys = ['body', 'createdAt', 'deletedAt', 'id', 'tags', 'updatedAt', 'version'].sort();
-    const tagKeys = ['id', 'name'].sort();
+    const noteKeys = [
+      'body',
+      'createdAt',
+      'deletedAt',
+      'id',
+      'tagIds',
+      'updatedAt',
+      'version',
+    ].sort();
 
-    const created = await post({ body: 'shape-check', tags: ['shape'] }, tokenA).expect(201);
+    const created = await post({ body: 'shape-check', tagIds: [5] }, tokenA).expect(201);
     const fetched = await auth(
       request(app.getHttpServer()).get(`/api/notes/${created.body.id}`),
       tokenA,
@@ -229,7 +236,7 @@ describe('Notes ownership (e2e)', () => {
     expect(fetched.body).not.toHaveProperty('owner');
     expect(fetched.body).not.toHaveProperty('ownerSub');
     expect(Object.keys(fetched.body).sort()).toEqual(noteKeys);
-    expect(Object.keys(fetched.body.tags[0]).sort()).toEqual(tagKeys);
+    expect(fetched.body.tagIds).toEqual([5]);
 
     const listed = await list(tokenA).expect(200);
     const item = listed.body.notes.find((n: { id: string }) => n.id === created.body.id);
@@ -240,7 +247,7 @@ describe('Notes ownership (e2e)', () => {
   });
 
   it('preserves the full owner lifecycle (create/list/update/trash/restore)', async () => {
-    const created = await post({ body: 'lifecycle', tags: ['life'] }, tokenA).expect(201);
+    const created = await post({ body: 'lifecycle', tagIds: [11] }, tokenA).expect(201);
     const id = created.body.id;
     expect(created.body.version).toBe(0);
 
@@ -268,71 +275,57 @@ describe('Notes ownership (e2e)', () => {
     ).expect(201);
     expect(restored.body.body).toBe('lifecycle edited');
     expect(restored.body.deletedAt).toBeNull();
-    expect(restored.body.tags.map((t: { name: string }) => t.name)).toEqual(['life']);
+    expect(restored.body.tagIds).toEqual([11]);
   });
 
-  it("scopes the tag list to the caller (A's tag names never appear to B)", async () => {
-    await post({ body: 'iso-a', tags: ['iso-a-only'] }, tokenA).expect(201);
-    await post({ body: 'iso-b', tags: ['iso-b-only'] }, tokenB).expect(201);
+  it("scopes the tag usage surface to the caller (A's registry ids never appear to B)", async () => {
+    await post({ body: 'iso-a', tagIds: [101] }, tokenA).expect(201);
+    await post({ body: 'iso-b', tagIds: [202] }, tokenB).expect(201);
 
     const aTags = await tags(tokenA).expect(200);
-    const aNames = aTags.body.map((t: { name: string }) => t.name);
-    expect(aNames).toContain('iso-a-only');
-    expect(aNames).not.toContain('iso-b-only');
+    const aIds = aTags.body.map((t: { tagId: number }) => t.tagId);
+    expect(aIds).toContain(101);
+    expect(aIds).not.toContain(202);
 
     const bTags = await tags(tokenB).expect(200);
-    const bNames = bTags.body.map((t: { name: string }) => t.name);
-    expect(bNames).toContain('iso-b-only');
-    expect(bNames).not.toContain('iso-a-only');
+    const bIds = bTags.body.map((t: { tagId: number }) => t.tagId);
+    expect(bIds).toContain(202);
+    expect(bIds).not.toContain(101);
   });
 
-  it('gives each owner a distinct tag row for the same name', async () => {
-    const a = await post({ body: 'shared-a', tags: ['shared-name'] }, tokenA).expect(201);
-    const b = await post({ body: 'shared-b', tags: ['shared-name'] }, tokenB).expect(201);
+  it('counts usage per registry id within one owner (a repeated id is a single association)', async () => {
+    const first = await post({ body: 'dup-1', tagIds: [303] }, tokenA).expect(201);
+    const second = await post({ body: 'dup-2', tagIds: [303] }, tokenA).expect(201);
 
-    // Per-owner uniqueness: the same name is created for both owners.
-    expect(a.body.tags.map((t: { name: string }) => t.name)).toEqual(['shared-name']);
-    expect(b.body.tags.map((t: { name: string }) => t.name)).toEqual(['shared-name']);
+    // Both notes carry the same registry id.
+    expect(first.body.tagIds).toEqual([303]);
+    expect(second.body.tagIds).toEqual([303]);
+
+    const listed = (await tags(tokenA).expect(200)).body.find(
+      (t: { tagId: number }) => t.tagId === 303,
+    );
+    expect(listed).toBeDefined();
+    expect(listed.count).toBe(2);
+  });
+
+  it("does not leak B's association rows into A's usage surface for the same registry id", async () => {
+    const a = await post({ body: 'cross-a', tagIds: [404] }, tokenA).expect(201);
+    const b = await post({ body: 'cross-b', tagIds: [404] }, tokenB).expect(201);
+
+    // The same external registry id is stored per owner; each usage surface sees
+    // only its own associations.
+    expect(a.body.tagIds).toEqual([404]);
+    expect(b.body.tagIds).toEqual([404]);
 
     const aListed = (await tags(tokenA).expect(200)).body.find(
-      (t: { name: string }) => t.name === 'shared-name',
+      (t: { tagId: number }) => t.tagId === 404,
     );
     const bListed = (await tags(tokenB).expect(200)).body.find(
-      (t: { name: string }) => t.name === 'shared-name',
+      (t: { tagId: number }) => t.tagId === 404,
     );
     expect(aListed).toBeDefined();
     expect(bListed).toBeDefined();
-    // Distinct rows, each owner's note carrying its own row.
-    expect(aListed.id).not.toBe(bListed.id);
-    expect(a.body.tags[0].id).toBe(aListed.id);
-    expect(b.body.tags[0].id).toBe(bListed.id);
-  });
-
-  it('resolves a repeated name within one owner to a single shared tag row', async () => {
-    const first = await post({ body: 'dup-1', tags: ['one-owner-dup'] }, tokenA).expect(201);
-    const second = await post({ body: 'dup-2', tags: ['one-owner-dup'] }, tokenA).expect(201);
-
-    expect(first.body.tags[0].id).toBe(second.body.tags[0].id);
-
-    const listed = (await tags(tokenA).expect(200)).body.filter(
-      (t: { name: string }) => t.name === 'one-owner-dup',
-    );
-    expect(listed).toHaveLength(1);
-  });
-
-  it("does not attach A's tag rows to B's note under the same names", async () => {
-    const a = await post({ body: 'cross-a', tags: ['cross-owned'] }, tokenA).expect(201);
-    const aTagId = a.body.tags[0].id;
-
-    const b = await post({ body: 'cross-b', tags: ['cross-owned'] }, tokenB).expect(201);
-    expect(b.body.tags[0].name).toBe('cross-owned');
-    expect(b.body.tags[0].id).not.toBe(aTagId);
-
-    // A's tag row is untouched: still exactly one A-owned row for the name.
-    const aListed = (await tags(tokenA).expect(200)).body.filter(
-      (t: { name: string }) => t.name === 'cross-owned',
-    );
-    expect(aListed).toHaveLength(1);
-    expect(aListed[0].id).toBe(aTagId);
+    expect(aListed.count).toBe(1);
+    expect(bListed.count).toBe(1);
   });
 });

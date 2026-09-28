@@ -13,7 +13,8 @@ import { resolve } from 'path';
  *
  * Ordering is the contract:
  *   1. `VACUUM INTO` a verified backup — the first action; no write precedes it.
- *   2. Schema surgery: `note.ownerSub` + `IDX_note_owner_sub`; `tag` rebuild that
+ *   2. Schema surgery: `note.ownerSub` + `IDX_note_owner_sub`; `note_tag`
+ *      reconciliation to the association-only entity; `tag` rebuild that
  *      (see below); `user_keys` creation — all DDL byte-equivalent to the entities.
  *      drops the legacy inline `UNIQUE(name)`; per-owner name uniqueness is
  *      service-enforced now (SPEC-notes-at-rest, plan D7 — encrypted names cannot
@@ -193,6 +194,19 @@ function hasSingleColumnUniqueOnName(db: Database.Database, table: string): bool
 const TAG_TABLE_DDL =
   'CREATE TABLE "tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)';
 
+// Association-only `note_tag`, byte-equivalent to the T5 `NoteTag` join entity and
+// to `import.ts`'s rebuild (PK (noteId, tagId); noteId FK ON DELETE CASCADE ON
+// UPDATE NO ACTION; NO FK to `tag`). Keeping this DDL in lockstep is what preserves
+// the boot-mutates-nothing contract below.
+const NOTE_TAG_DDL =
+  'CREATE TABLE "note_tag" ("noteId" varchar NOT NULL, "tagId" integer NOT NULL, ' +
+  'CONSTRAINT "FK_ddfc0b18dcc060cb8899a249910" FOREIGN KEY ("noteId") REFERENCES "note" ("id") ' +
+  'ON DELETE CASCADE ON UPDATE NO ACTION, PRIMARY KEY ("noteId", "tagId"))';
+const NOTE_TAG_TEMP_DDL = NOTE_TAG_DDL.replace(
+  'CREATE TABLE "note_tag"',
+  'CREATE TABLE "temporary_note_tag"',
+);
+
 /**
  * Step 2. Idempotent schema surgery, every DDL byte-equivalent to TypeORM's
  * expectation so the first boot's `synchronize` finds nothing to change.
@@ -275,6 +289,51 @@ export function applySchema(noteDbPath: string): SchemaResult {
         'CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT NULL, "kekVersion" integer NOT NULL DEFAULT (1), "createdAt" datetime NOT NULL)',
       );
       actions.push('created user_keys');
+      mutated = true;
+    }
+
+    // (d) note_tag: reconciled to the association-only `NoteTag` entity (the tag
+    // vocabulary is external after the tags-extraction migration). Rebuilt when it
+    // still references `tag` or carries the legacy join-table indexes; created
+    // fresh when absent. Same FK-off rebuild pattern as the tag table above.
+    const noteTagSql = db
+      .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='note_tag'`)
+      .get() as { sql: string } | undefined;
+    const legacyNoteTag =
+      !!noteTagSql &&
+      (noteTagSql.sql.includes('REFERENCES "tag"') ||
+        hasIndexNamed(db, 'note_tag', 'IDX_ddfc0b18dcc060cb8899a24991'));
+    if (!noteTagSql) {
+      db.exec(NOTE_TAG_DDL);
+      actions.push('created note_tag');
+      mutated = true;
+    } else if (legacyNoteTag) {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('BEGIN');
+        try {
+          db.exec(NOTE_TAG_TEMP_DDL);
+          db.exec(
+            'INSERT INTO "temporary_note_tag" ("noteId","tagId") ' +
+              'SELECT "noteId","tagId" FROM "note_tag"',
+          );
+          db.exec('DROP TABLE "note_tag"');
+          db.exec('ALTER TABLE "temporary_note_tag" RENAME TO "note_tag"');
+          db.exec('COMMIT');
+        } catch (err) {
+          db.exec('ROLLBACK');
+          throw err;
+        }
+        const violations = db.prepare('PRAGMA foreign_key_check').all() as unknown[];
+        if (violations.length > 0) {
+          throw new Error(
+            `note_tag rebuild left ${violations.length} foreign-key violation(s); aborting`,
+          );
+        }
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+      actions.push('rebuilt note_tag (association-only, dropped FK to tag)');
       mutated = true;
     }
 

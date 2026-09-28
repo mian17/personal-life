@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { loadMasterKeyFromEnv } from '@life/crypto';
 import { Note } from '../src/notes/note.entity';
-import { Tag } from '../src/notes/tag.entity';
+import { NoteTag } from '../src/notes/note-tag.entity';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import { MASTER_KEY_ENV } from '../src/keys/keys.service';
 import { resolveDbPath } from '../src/keys/db';
@@ -49,7 +49,7 @@ export function createDataSource(dbPath: string): DataSource {
   return new DataSource({
     type: 'better-sqlite3',
     database: dbPath,
-    entities: [Note, Tag, UserKeys],
+    entities: [Note, NoteTag, UserKeys],
     synchronize: false,
   });
 }

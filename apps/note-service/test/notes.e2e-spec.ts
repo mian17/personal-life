@@ -62,42 +62,42 @@ describe('Notes API (e2e)', () => {
     expect(reread.body.createdAt).toBe(iso);
   });
 
-  it('hides tags that no longer have notes', async () => {
+  it('hides registry ids that no longer have notes', async () => {
     const created = await auth(
-      request(app.getHttpServer()).post('/api/notes').send({ body: 'x', tags: ['orphan'] }),
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'x', tagIds: [77] }),
     ).expect(201);
 
     const withNote = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
-    expect(withNote.body.map((t: { name: string }) => t.name)).toContain('orphan');
+    expect(withNote.body.map((t: { tagId: number }) => t.tagId)).toContain(77);
 
     await auth(request(app.getHttpServer()).delete(`/api/notes/${created.body.id}`)).expect(200);
 
     const afterDelete = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
-    expect(afterDelete.body.map((t: { name: string }) => t.name)).not.toContain('orphan');
+    expect(afterDelete.body.map((t: { tagId: number }) => t.tagId)).not.toContain(77);
   });
 
-  it('supports the full note lifecycle with tag filtering', async () => {
+  it('supports the full note lifecycle with tagId filtering', async () => {
     const created = await auth(
-      request(app.getHttpServer()).post('/api/notes').send({ body: 'hello', tags: ['Work'] }),
+      request(app.getHttpServer()).post('/api/notes').send({ body: 'hello', tagIds: [1] }),
     ).expect(201);
     const id = created.body.id;
-    expect(created.body.tags).toHaveLength(1);
+    expect(created.body.tagIds).toHaveLength(1);
 
     const listed = await auth(request(app.getHttpServer()).get('/api/notes')).expect(200);
     expect(listed.body.notes.map((n: { body: string }) => n.body)).toContain('hello');
 
     const filtered = await auth(
-      request(app.getHttpServer()).get('/api/notes?tag=work'),
+      request(app.getHttpServer()).get('/api/notes?tagId=1'),
     ).expect(200);
     expect(filtered.body.notes.map((n: { id: string }) => n.id)).toContain(id);
 
     const updated = await auth(
       request(app.getHttpServer())
         .patch(`/api/notes/${id}`)
-        .send({ body: 'hello edited', tags: ['idea'] }),
+        .send({ body: 'hello edited', tagIds: [2] }),
     ).expect(200);
     expect(updated.body.body).toBe('hello edited');
-    expect(updated.body.tags.map((t: { name: string }) => t.name)).toEqual(['idea']);
+    expect(updated.body.tagIds).toEqual([2]);
 
     await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
     await auth(request(app.getHttpServer()).get(`/api/notes/${id}`)).expect(404);
@@ -179,7 +179,7 @@ describe('Notes API (e2e)', () => {
     const created = await auth(
       request(app.getHttpServer())
         .post('/api/notes')
-        .send({ body: 'trash me', tags: ['trashy'] }),
+        .send({ body: 'trash me', tagIds: [88] }),
     ).expect(201);
     const id = created.body.id;
 
@@ -207,11 +207,11 @@ describe('Notes API (e2e)', () => {
     ).expect(404);
   });
 
-  it('restores a trashed note with the same createdAt, tags, and version', async () => {
+  it('restores a trashed note with the same createdAt, tagIds, and version', async () => {
     const created = await auth(
       request(app.getHttpServer())
         .post('/api/notes')
-        .send({ body: 'restore me', tags: ['keep'] }),
+        .send({ body: 'restore me', tagIds: [55] }),
     ).expect(201);
     const id = created.body.id;
     const createdAt = created.body.createdAt;
@@ -229,7 +229,7 @@ describe('Notes API (e2e)', () => {
       request(app.getHttpServer()).post(`/api/notes/${id}/restore`),
     ).expect(201);
     expect(restored.body.createdAt).toBe(createdAt);
-    expect(restored.body.tags.map((t: { name: string }) => t.name)).toEqual(['keep']);
+    expect(restored.body.tagIds).toEqual([55]);
     expect(restored.body.version).toBe(1);
     expect(restored.body.deletedAt).toBeNull();
 

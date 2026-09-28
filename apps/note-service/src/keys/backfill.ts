@@ -143,9 +143,15 @@ async function collectTasks(ds: DataSource): Promise<{ todo: ContentTask[]; skip
   const noteRows = (await ds.query(
     'SELECT "id", "body", "ownerSub" FROM "note" ORDER BY "createdAt" ASC, "id" ASC',
   )) as Array<{ id: string; body: string; ownerSub: string | null }>;
-  const tagRows = (await ds.query(
-    'SELECT "id", "name", "ownerSub" FROM "tag" ORDER BY "id" ASC',
-  )) as Array<{ id: number; name: string; ownerSub: string | null }>;
+  // Tag names moved to `tags-service` (`SPEC-tags-extraction`); a migrated note
+  // DB has no `tag` table at all. The historical `backfill-encrypt` must keep
+  // working post-extraction, so scanning tags degrades to zero rows when the
+  // table is absent (the pre-extraction dual-read/encrypt path is unchanged).
+  const tagRows = (await tableExists(ds, 'tag'))
+    ? ((await ds.query(
+        'SELECT "id", "name", "ownerSub" FROM "tag" ORDER BY "id" ASC',
+      )) as Array<{ id: number; name: string; ownerSub: string | null }>)
+    : [];
 
   const todo: ContentTask[] = [];
   let skipped = 0;

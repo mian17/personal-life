@@ -1,15 +1,29 @@
 export { likeMatch } from './like-match';
 export { resolveDbPath } from './db-path';
 
-export interface Tag {
-  id: number;
-  name: string;
+/**
+ * `TagRef` — the ecosystem tag vocabulary reference (`SPEC-service-kernel`).
+ * note-service no longer owns tag names; it stores exactly the integer ids a
+ * write carries (association-only `note_tag` rows). Names live solely in
+ * `tags-service` and are resolved by the app (BFF composition, MAP M4).
+ */
+export interface TagRef {
+  tagId: number;
+}
+
+/**
+ * A domain's tag usage surface (`GET …/tags → [{tagId, count}]`): the used ids
+ * plus how many of the owner's rows carry each. Ids and counts only — no names.
+ */
+export interface TagUsage {
+  tagId: number;
+  count: number;
 }
 
 export interface Note {
   id: string;
   body: string;
-  tags: Tag[];
+  tagIds: number[];
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -18,12 +32,12 @@ export interface Note {
 
 export interface CreateNoteInput {
   body: string;
-  tags?: string[];
+  tagIds?: number[];
 }
 
 export interface UpdateNoteInput {
   body?: string;
-  tags?: string[];
+  tagIds?: number[];
   expectedVersion?: number;
 }
 

@@ -1,14 +1,14 @@
 import { Transform } from 'class-transformer';
 import {
   IsArray,
+  IsInt,
   IsOptional,
   IsString,
   MaxLength,
   IsNotEmpty,
-  IsInt,
   Min,
 } from 'class-validator';
-import { NOTE_BODY_MAX, TAG_NAME_MAX } from '@life/shared';
+import { NOTE_BODY_MAX } from '@life/shared';
 
 export class UpdateNoteDto {
   @IsOptional()
@@ -17,11 +17,12 @@ export class UpdateNoteDto {
   @MaxLength(NOTE_BODY_MAX)
   body?: string;
 
+  // TagRef ids (registry-owned). Omitting the field leaves associations
+  // untouched; sending an array REPLACES the set (kernel detach semantics).
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  @MaxLength(TAG_NAME_MAX, { each: true })
-  tags?: string[];
+  @IsInt({ each: true })
+  tagIds?: number[];
 
   @IsOptional()
   @Transform(({ value }) => Number(value))

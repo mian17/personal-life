@@ -3,12 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  JoinTable,
-  ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Tag } from './tag.entity';
+import { NoteTag } from './note-tag.entity';
 
 @Entity('note')
 @Index('IDX_note_owner_sub', ['ownerSub'])
@@ -31,9 +30,11 @@ export class Note {
   @Column({ type: 'datetime', nullable: true })
   deletedAt: Date | null;
 
-  @ManyToMany(() => Tag, (tag) => tag.notes, { cascade: true })
-  @JoinTable({ name: 'note_tag' })
-  tags: Tag[];
+  // Association-only (TagRefs by id). note-service owns no tag vocabulary;
+  // tag names live in `tags-service` (SPEC-tags-extraction). The join rows are
+  // managed explicitly by `NotesService` (replace-the-set on writes).
+  @OneToMany(() => NoteTag, (noteTag) => noteTag.note)
+  noteTags: NoteTag[];
 
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;

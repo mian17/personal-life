@@ -6,7 +6,7 @@ import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { decryptField, encryptField, unwrapDek, wrapDek } from '@life/crypto';
 import { Note } from '../src/notes/note.entity';
-import { Tag } from '../src/notes/tag.entity';
+import { NoteTag } from '../src/notes/note-tag.entity';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import {
   BackfillRowError,
@@ -34,7 +34,7 @@ interface Harness {
 
 interface Fixture {
   notes: Array<{ id: string; body: string; ownerSub: string | null; deletedAt?: Date | null }>;
-  tags: Array<{ name: string; ownerSub: string | null }>;
+  tags: Array<{ id: number; name: string; ownerSub: string | null }>;
 }
 
 async function makeHarness(): Promise<Harness> {
@@ -43,12 +43,17 @@ async function makeHarness(): Promise<Harness> {
   const ds = new DataSource({
     type: 'better-sqlite3',
     database: dbPath,
-    entities: [Note, Tag, UserKeys],
+    entities: [Note, NoteTag, UserKeys],
     synchronize: true,
   });
   await ds.initialize();
-  // The entity no longer declares the index; the pre-backfill schema still has
-  // it. Recreate it so the migration has something to drop/relocate.
+  // The backfill script runs against historical (pre-extraction) note DBs, whose
+  // `tag` table still holds encrypted names; the current entities no longer
+  // declare `Tag`, so the fixture recreates that schema directly. The pre-backfill
+  // schema also still has the legacy unique index the migration drops.
+  await ds.query(
+    'CREATE TABLE "tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)',
+  );
   await ds.query('CREATE UNIQUE INDEX "UQ_tag_name_owner" ON "tag" ("name", "ownerSub")');
   return { ds, dbPath, dir };
 }
@@ -64,7 +69,11 @@ async function seed(h: Harness, fixture: Fixture): Promise<void> {
     });
   }
   for (const t of fixture.tags) {
-    await h.ds.getRepository(Tag).insert({ name: t.name, ownerSub: t.ownerSub });
+    await h.ds.query('INSERT INTO "tag" ("id","name","ownerSub") VALUES (?,?,?)', [
+      t.id,
+      t.name,
+      t.ownerSub,
+    ]);
   }
 }
 
@@ -91,9 +100,9 @@ function standardFixture(): { ids: Record<string, string>; fixture: Fixture } {
         },
       ],
       tags: [
-        { name: 'Work', ownerSub: 'user-a' },
-        { name: 'work', ownerSub: 'user-a' },
-        { name: 'Legacy', ownerSub: null },
+        { id: 1, name: 'Work', ownerSub: 'user-a' },
+        { id: 2, name: 'work', ownerSub: 'user-a' },
+        { id: 3, name: 'Legacy', ownerSub: null },
       ],
     },
   };
@@ -186,6 +195,25 @@ describe('notes-backfill T6: idempotent plaintext → envelope migration', () =>
     expect(formatted).toContain('encrypted=7');
     expect(formatted).toContain('keysCreated=3');
     expect(formatted).toContain('errors=0');
+  });
+
+  it('tolerates an absent `tag` table (post-`tags-extraction` note DB): notes only, no error', async () => {
+    const { fixture } = standardFixture();
+    await seed(h, fixture);
+    // The migration drops the note DB's `tag` table; tag names now live in
+    // `tags-service`. The historical backfill must still run without error.
+    await h.ds.query('DROP TABLE "tag"');
+
+    const report = await applyBackfill(h.ds, MASTER_KEY);
+
+    // 4 note rows (the 3 tag rows are gone); owners user-a, user-b, _legacy_.
+    expect(report.encrypted).toBe(4);
+    expect(report.skipped).toBe(0);
+    expect(report.keysCreated).toBe(3);
+    expect(report.errors).toBe(0);
+    for (const n of fixture.notes) {
+      expect(await rawBody(h.ds, n.id)).toMatch(/^enc\.v1\./);
+    }
   });
 
   it('is idempotent: a second apply skips everything and leaves ciphertext byte-identical', async () => {

@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { KeysService } from '../src/keys/keys.service';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import { Note } from '../src/notes/note.entity';
-import { Tag } from '../src/notes/tag.entity';
+import { NoteTag } from '../src/notes/note-tag.entity';
 import { NotesCache } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
 import { likeMatch } from '../src/notes/content-match';
@@ -53,7 +53,7 @@ async function makeHarness(): Promise<Harness> {
   const dataSource = new DataSource({
     type: 'better-sqlite3',
     database: join(dir, 'notes.db'),
-    entities: [Note, Tag, UserKeys],
+    entities: [Note, NoteTag, UserKeys],
     synchronize: true,
     logging: true,
     logger: makeLogger(log) as never,
@@ -62,7 +62,7 @@ async function makeHarness(): Promise<Harness> {
   const keys = new KeysService(dataSource.getRepository(UserKeys), MASTER_KEY);
   const service = new NotesService(
     dataSource.getRepository(Note),
-    dataSource.getRepository(Tag),
+    dataSource.getRepository(NoteTag),
     new NotesCache(null),
     keys,
   );
@@ -79,10 +79,10 @@ async function sqliteLike(ds: DataSource, text: string, pattern: string): Promis
 async function seedNote(
   h: Harness,
   body: string,
-  tags: string[] = [],
+  tagIds: number[] = [],
   createdAt?: Date,
 ): Promise<{ id: string }> {
-  const dto = await h.service.create(SUB, body, tags);
+  const dto = await h.service.create(SUB, body, tagIds);
   if (createdAt) {
     await h.dataSource.getRepository(Note).update(dto.id, { createdAt });
   }
@@ -215,16 +215,17 @@ describe('notes-at-rest T4: decrypt-then-match service', () => {
     expect(wildcard.notes.map((n) => n.id)).toEqual([alpha.id]);
   });
 
-  it('3. filters `tag` case-insensitively and combines `q` + `tag`', async () => {
-    const work = await seedNote(h, 'hello world', ['Work']);
-    const idea = await seedNote(h, 'hello world', ['idea']);
-    const workOther = await seedNote(h, 'other text', ['WORK']);
+  it('3. filters by `tagId` and combines `q` + `tagId`', async () => {
+    const work = await seedNote(h, 'hello world', [1]);
+    const idea = await seedNote(h, 'hello world', [2]);
+    // A second note sharing the same registry id (the filter is id-based).
+    const workOther = await seedNote(h, 'other text', [1]);
 
-    const byTag = await h.service.findAll(SUB, { tag: 'work' });
+    const byTag = await h.service.findAll(SUB, { tagId: 1 });
     expect(byTag.notes.map((n) => n.id).sort()).toEqual([work.id, workOther.id].sort());
     expect(byTag.notes.map((n) => n.id)).not.toContain(idea.id);
 
-    const combined = await h.service.findAll(SUB, { q: 'hello', tag: 'work' });
+    const combined = await h.service.findAll(SUB, { q: 'hello', tagId: 1 });
     expect(combined.notes.map((n) => n.id)).toEqual([work.id]);
   });
 
@@ -269,7 +270,7 @@ describe('notes-at-rest T4: decrypt-then-match service', () => {
           'createdAt',
           'deletedAt',
           'id',
-          'tags',
+          'tagIds',
           'updatedAt',
           'version',
         ]);
@@ -309,10 +310,10 @@ describe('notes-at-rest T4: decrypt-then-match service', () => {
   });
 
   it('keeps SQL metadata-only: no `LIKE` and no `LOWER(...)` in the read query', async () => {
-    await seedNote(h, 'hello there', ['work']);
+    await seedNote(h, 'hello there', [1]);
 
     h.log.length = 0;
-    await h.service.findAll(SUB, { q: 'hello', tag: 'work' });
+    await h.service.findAll(SUB, { q: 'hello', tagId: 1 });
 
     const contentMatching = h.log.filter((sql) => /\bLIKE\b/i.test(sql) || /\bLOWER\s*\(/i.test(sql));
     expect(contentMatching).toEqual([]);

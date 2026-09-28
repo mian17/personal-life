@@ -130,7 +130,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `CreateNoteInput.tags` → `tagIds`, `UpdateNoteInput`, `Tag` → `TagRef`),
     `notes-cache.ts` integration, `apps/note-service/src/keys/backfill.ts`
     (`collectTasks` scans the `tag` table — must tolerate its absence post-extraction),
-    `apps/note-service/scripts/encrypt-backfill.ts` +
+    `apps/note-service/scripts/backfill-owner.ts` (tech-lead integration repair
+    I-T5-1: its DDL reconciles `note_tag` to the `NoteTag` entity — byte-equivalent
+    to `import.ts`'s rebuild — preserving the boot-mutates-nothing tripwire; the
+    owner-backfill suite passes UNCHANGED), `apps/note-service/scripts/encrypt-backfill.ts` +
     `scripts/rotate-master-key.ts` (DataSource entity list — drop `Tag`, add `NoteTag`;
     raw-SQL behavior against historical schemas unchanged), `apps/note-service/test/tag-refs.test.ts`
     (new), and the pinned suites updated to the TagRef contract: `test/notes.e2e-spec.ts`,
@@ -319,3 +322,12 @@ Case counts are referenced by spec section, never by number (kills count drift).
   `db.ts` copies deleted from T3/T6), and the todo cursor payload pinned as
   `base64(<dueDate-or-~>|<createdAt>|<id>)` (kernel's per-domain cursor clause).
   **PRE-IMPLEMENT GATE: GREEN** — implementation starts at T1.
+- 2026-09-28: T1 (`2e6b9f6`), T2 (`394ccd1`, Foundation checkpoint green), T3
+  (`c4063b3`, 46 tests), T4 (`7b23bf8`, 16 tests, Registry checkpoint green) done.
+  T5 landed across three server restarts (subagent sessions killed twice; work
+  resumed from the tree, finished + verified by the tech lead). Integration repair
+  I-T5-1: `backfill-owner`'s DDL now reconciles `note_tag` to the association-only
+  `NoteTag` entity (the data-privacy D7 class — the boot-mutates-nothing tripwire
+  fired on the schema change; script-side fix, its suite passes unchanged). Notes
+  cache harness spy gained the `find` the set-replacement path needs. Final: 12/12
+  suites, 128/128 tests, typecheck clean. Consumers checkpoint pending T6.

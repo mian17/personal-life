@@ -4,22 +4,27 @@ import { randomUUID } from 'crypto';
 import { IsNull, Not, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { Note } from './note.entity';
-import { Tag } from './tag.entity';
+import { NoteTag } from './note-tag.entity';
 import { KeysService } from '../keys/keys.service';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
-import type { Note as NoteDto, NotePage } from '@life/shared';
+import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
 
-function normalizeTags(tags: string[] | undefined): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of tags ?? []) {
-    const name = raw.trim();
-    if (!name || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    out.push(name);
+/**
+ * Deduplicate the `tagIds` a write carries, preserving first-seen order. The
+ * result is the association set stored for the note (TagRef semantics,
+ * `SPEC-service-kernel`): note-service stores exactly the ids it is given —
+ * no registry validation, no name resolution (names live in `tags-service`).
+ */
+function normalizeTagIds(tagIds: number[] | undefined): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const id of tagIds ?? []) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
   }
-  return out;
+  return out.sort((a, b) => a - b);
 }
 
 /**
@@ -32,16 +37,11 @@ function noteBodyAad(ownerSub: string, noteId: string): string {
   return `life.v1|${ownerSub}|note|body|${noteId}`;
 }
 
-/** AAD for a tag name. Tag ids are DB-assigned post-insert, so they cannot bind. */
-function tagNameAad(ownerSub: string): string {
-  return `life.v1|${ownerSub}|tag|name`;
-}
-
 /**
  * Ciphertext-row shapes stored in Redis (`SPEC-notes-at-rest` Cache Rules). The
- * cache holds **rows as stored** — `body`/`name` are `enc.v1.` envelopes — never
- * a decrypted DTO. Metadata is copied verbatim because keyset pagination and the
- * DTO need it; only content is (and stays) ciphertext.
+ * cache holds **rows as stored** — `body` is an `enc.v1.` envelope — never a
+ * decrypted DTO. `tagIds` are association ids (metadata) copied verbatim so the
+ * DTO and the in-memory tag filter can run after a hit.
  */
 interface CachedNoteRow {
   id: string;
@@ -51,12 +51,7 @@ interface CachedNoteRow {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
-  tags: CachedTagRow[];
-}
-
-interface CachedTagRow {
-  id: number;
-  name: string;
+  tagIds: number[];
 }
 
 /** Serialize a note entity into its ciphertext-row form (dates → ISO). */
@@ -69,37 +64,22 @@ function toCachedNoteRow(note: Note): CachedNoteRow {
     createdAt: note.createdAt.toISOString(),
     updatedAt: note.updatedAt.toISOString(),
     deletedAt: note.deletedAt ? note.deletedAt.toISOString() : null,
-    tags: (note.tags ?? []).map((t) => ({ id: t.id, name: t.name })),
+    tagIds: (note.noteTags ?? []).map((nt) => nt.tagId).sort((a, b) => a - b),
   };
 }
 
 /**
- * True when every content field of a serialized row is an `enc.v1.` envelope, so
- * the populate may touch Redis. A pre-backfill legacy row is plaintext (D8
+ * True when the serialized row's content field is an `enc.v1.` envelope, so the
+ * populate may touch Redis. A pre-backfill legacy row is plaintext (D8
  * dual-read); caching it would persist plaintext in an AOF store, so it refuses
  * (`cacheable` on `getThrough`) and is served straight from the DB instead.
- * A row with no encrypted content (e.g. a note with no tags or no encrypted
- * names) is not "cacheable proof" either — absence of a prefix is exactly the
- * legacy signal.
+ * `tagIds` are plain integers (association metadata) and carry no content.
  */
 function isCiphertextNoteRow(row: CachedNoteRow): boolean {
-  return (
-    typeof row?.body === 'string' &&
-    row.body.startsWith(ENC_PREFIX) &&
-    Array.isArray(row.tags) &&
-    row.tags.every((t) => typeof t?.name === 'string' && t.name.startsWith(ENC_PREFIX))
-  );
+  return typeof row?.body === 'string' && row.body.startsWith(ENC_PREFIX);
 }
 
-function isCiphertextTagRow(row: CachedTagRow): boolean {
-  return typeof row?.name === 'string' && row.name.startsWith(ENC_PREFIX);
-}
-
-function isCiphertextTagList(rows: CachedTagRow[]): boolean {
-  return rows.every(isCiphertextTagRow);
-}
-
-/** Reject a hit whose serialized rows are not all `enc.v1.` ciphertext. */
+/** Reject a hit whose serialized row is not `enc.v1.` ciphertext content. */
 function decodeCiphertextNoteRow(raw: unknown): CachedNoteRow {
   const row = raw as CachedNoteRow;
   if (!isCiphertextNoteRow(row)) throw new Error('cache entry is not ciphertext');
@@ -113,16 +93,31 @@ function decodeCiphertextNoteList(raw: unknown): CachedNoteRow[] {
   return raw;
 }
 
-function decodeCiphertextTagList(raw: unknown): CachedTagRow[] {
-  if (!Array.isArray(raw) || !raw.every(isCiphertextTagRow)) {
-    throw new Error('cache entry is not ciphertext');
+/**
+ * The `note:tags` cache holds **metadata only** (`SPEC-tags-extraction` Cache
+ * Rules): the used-`tagId`+count rows, which carry no plaintext. A hit is valid
+ * when every row has numeric `tagId`/`count` fields.
+ */
+function isTagUsageRow(row: TagUsage): boolean {
+  return (
+    typeof row?.tagId === 'number' &&
+    Number.isInteger(row.tagId) &&
+    typeof row?.count === 'number' &&
+    Number.isInteger(row.count) &&
+    row.count >= 0
+  );
+}
+
+function decodeTagUsage(raw: unknown): TagUsage[] {
+  if (!Array.isArray(raw) || !raw.every(isTagUsageRow)) {
+    throw new Error('cache entry is not tag usage');
   }
-  return raw;
+  return raw.map((row) => ({ tagId: row.tagId, count: row.count }));
 }
 
 /**
  * Rehydrate a validated ciphertext row. Content is run through the same AAD
- * shapes as a fresh DB read, so a hit cannot skip authentication. Callers pass
+ * shape as a fresh DB read, so a hit cannot skip authentication. Callers pass
  * rows that already passed `isCiphertextNoteRow` (loader output or a decoded hit).
  */
 function decodeCachedNoteRow(
@@ -133,11 +128,8 @@ function decodeCachedNoteRow(
 ): NoteDto {
   return {
     id: row.id,
-    body: open(row.body, dek, noteBodyAad(sub, row.id), 'note', row.id),
-    tags: row.tags.map((t) => ({
-      id: t.id,
-      name: open(t.name, dek, tagNameAad(sub), 'tag', String(t.id)),
-    })),
+    body: open(row.body, dek, noteBodyAad(sub, row.id), row.id),
+    tagIds: [...row.tagIds],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
@@ -145,23 +137,8 @@ function decodeCachedNoteRow(
   };
 }
 
-function decodeCachedTagRow(
-  row: CachedTagRow,
-  sub: string,
-  dek: Buffer | null,
-  open: OpenField,
-): { id: number; name: string } {
-  return { id: row.id, name: open(row.name, dek, tagNameAad(sub), 'tag', String(row.id)) };
-}
-
 /** Binds `openField` for decode helpers (keeps the private method off the free functions). */
-type OpenField = (
-  stored: string,
-  dek: Buffer | null,
-  aad: string,
-  entity: 'note' | 'tag',
-  id: string,
-) => string;
+type OpenField = (stored: string, dek: Buffer | null, aad: string, id: string) => string;
 
 /**
  * Decode today's keyset cursor, `base64(<isoTimestamp>|<id>)`. The wire format is
@@ -223,12 +200,11 @@ export class NotesService {
 
   constructor(
     @InjectRepository(Note) private readonly notes: Repository<Note>,
-    @InjectRepository(Tag) private readonly tags: Repository<Tag>,
+    @InjectRepository(NoteTag) private readonly noteTags: Repository<NoteTag>,
     @Inject(NOTES_CACHE) private readonly cache: NotesCache,
-    // Nest injects this by type once `NotesModule` imports `KeysModule` (T7
-    // integration). Optional-typed only so the legacy 3-arg construction in the
-    // T5-owned cache spec keeps compiling; Nest still requires the provider at
-    // runtime, so production can never silently boot without DEK custody.
+    // Nest injects this by type once `NotesModule` imports `KeysModule`. Optional
+    // only so a legacy 3-arg construction stays compiling; Nest still requires
+    // the provider at runtime, so production can never boot without DEK custody.
     private readonly keys?: KeysService,
   ) {}
 
@@ -241,19 +217,13 @@ export class NotesService {
   }
 
   /**
-   * Decrypt-or-passthrough for a single stored content field. A stored value
-   * carrying the `enc.v1.` prefix is decrypted (and authenticated) against its
-   * AAD; anything else is a legacy plaintext row and passes through unchanged
+   * Decrypt-or-passthrough for a stored content field. A stored value carrying
+   * the `enc.v1.` prefix is decrypted (and authenticated) against its AAD;
+   * anything else is a legacy plaintext row and passes through unchanged
    * (dual-read, rollback-safe). A decrypt failure is fail-closed: one ids-only
    * log line, then the typed `CryptoError` is rethrown — never empty/garbage.
    */
-  private openField(
-    stored: string,
-    dek: Buffer | null,
-    aad: string,
-    entity: 'note' | 'tag',
-    id: string,
-  ): string {
+  private openField(stored: string, dek: Buffer | null, aad: string, id: string): string {
     if (!stored.startsWith(ENC_PREFIX)) return stored;
     if (!dek) {
       // Callers only reach here after proving a key was required; failing closed
@@ -263,33 +233,29 @@ export class NotesService {
     try {
       return decryptField(dek, stored, aad);
     } catch (err) {
-      // Ids only — never content, tag names, keys, or AAD.
-      this.logger.error(`decrypt failed for ${entity} ${id}`);
+      // Ids only — never content, keys, or AAD.
+      this.logger.error(`decrypt failed for note ${id}`);
       throw err;
     }
   }
 
   /**
    * Resolve the owner DEK for a set of ciphertext rows, at most once per read.
-   * A set with no `enc.v1.` field is all-legacy (or empty), so no key is needed
+   * A set with no `enc.v1.` body is all-legacy (or empty), so no key is needed
    * and the rows pass through `openField` untouched (dual-read).
    */
   private async readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
-    const needs = rows.some(
-      (r) => r.body.startsWith(ENC_PREFIX) || r.tags.some((t) => t.name.startsWith(ENC_PREFIX)),
-    );
+    const needs = rows.some((r) => r.body.startsWith(ENC_PREFIX));
     if (!needs) return null;
     return this.requireKeys().getDekForRead(sub);
   }
 
-  private toDto(note: Note, sub: string, dek: Buffer | null): NoteDto {
+  /** Assemble the wire DTO from a stored note plus its association ids. */
+  private noteDto(note: Note, tagIds: number[], sub: string, dek: Buffer | null): NoteDto {
     return {
       id: note.id,
-      body: this.openField(note.body, dek, noteBodyAad(sub, note.id), 'note', note.id),
-      tags: (note.tags ?? []).map((t) => ({
-        id: t.id,
-        name: this.openField(t.name, dek, tagNameAad(sub), 'tag', String(t.id)),
-      })),
+      body: this.openField(note.body, dek, noteBodyAad(sub, note.id), note.id),
+      tagIds: [...tagIds],
       createdAt: note.createdAt.toISOString(),
       updatedAt: note.updatedAt.toISOString(),
       deletedAt: note.deletedAt ? note.deletedAt.toISOString() : null,
@@ -308,39 +274,10 @@ export class NotesService {
     return decodeCachedNoteRow(row, sub, dek, this.openFieldCb);
   }
 
-  /**
-   * Resolve tag names to rows for one owner. Names are encrypted at rest, so the
-   * caller's rows are loaded and their names decrypted in memory; matching is
-   * case-insensitive and a match **reuses** the existing row (the dropped
-   * `UQ_tag_name_owner` invariant, relocated to service enforcement). A brand-new
-   * name is encrypted with the tag AAD before insert.
-   */
-  private async resolveTags(sub: string, names: string[], dek: Buffer): Promise<Tag[]> {
-    if (names.length === 0) return [];
-    const existing = await this.tags.find({ where: { ownerSub: sub } });
-    const byKey = new Map<string, Tag>();
-    for (const tag of existing) {
-      const name = this.openField(tag.name, dek, tagNameAad(sub), 'tag', String(tag.id));
-      byKey.set(name.toLowerCase(), tag);
-    }
-    const result: Tag[] = [];
-    for (const name of names) {
-      const key = name.toLowerCase();
-      let tag = byKey.get(key);
-      if (!tag) {
-        tag = await this.tags.save(
-          this.tags.create({ name: encryptField(dek, name, tagNameAad(sub)), ownerSub: sub }),
-        );
-        byKey.set(key, tag);
-      }
-      result.push(tag);
-    }
-    return result;
-  }
-
-  async create(sub: string, body: string, tagNames: string[] | undefined): Promise<NoteDto> {
+  async create(sub: string, body: string, tagIds: number[] | undefined): Promise<NoteDto> {
     // Service-generated id: AAD binds it, so it must exist before the ciphertext.
     const id = randomUUID();
+    const ids = normalizeTagIds(tagIds);
     const dek = await this.requireKeys().getOrCreateDek(sub);
     const note = this.notes.create({
       id,
@@ -348,39 +285,43 @@ export class NotesService {
       ownerSub: sub,
       version: 0,
       deletedAt: null,
-      tags: await this.resolveTags(sub, normalizeTags(tagNames), dek),
     });
     const saved = await this.notes.save(note);
+    // Association rows are managed explicitly (TagRef joins, not a cascade
+    // relation) so a write stores exactly the ids it carries.
+    if (ids.length > 0) {
+      await this.noteTags.insert(ids.map((tagId) => ({ noteId: id, tagId })));
+    }
     // Bump AFTER the insert: pre-mutation reads were born under the old
     // generation and die here. A thrown save never bumps (cache stays honest).
     await this.cache.bumpGeneration(sub);
-    return this.toDto(saved, sub, dek);
+    return this.noteDto(saved, ids, sub, dek);
   }
 
   async findAll(
     sub: string,
     opts: {
-      tag?: string;
+      tagId?: number;
       q?: string;
       limit?: number;
       cursor?: string;
     },
   ): Promise<NotePage> {
     const limit = opts.limit ?? 50;
-    // Key: `note:<sub>:v<gen>:list` — no q/tag/limit/cursor. The cached value is
-    // the whole non-trashed ciphertext row set; every filter variant shares it.
+    // Key: `note:<sub>:v<gen>:list` — no q/tagId/limit/cursor. The cached value
+    // is the whole non-trashed ciphertext row set; every filter variant shares it.
     const rows = await this.cache.getThrough(
       sub,
       'note:list',
       async () => {
-        // Metadata-only SQL: content (`q`) and tag names are envelopes, so neither
-        // can be matched in the DB. Fetch the owner's non-trashed rows in today's
-        // exact order (`createdAt DESC`, `id` DESC tie-break) and do all matching
-        // and pagination in memory after decryption. No `LIMIT` is pushed into SQL
-        // because the row set is only known once the filter has run.
+        // Metadata-only SQL: content (`q`) is an envelope, so it cannot be
+        // matched in the DB, and the tag filter is applied in memory so one
+        // cached row set serves every variant. Fetch the owner's non-trashed
+        // rows in today's exact order (`createdAt DESC`, `id` DESC tie-break)
+        // and do all matching and pagination in memory after decryption.
         const found = await this.notes
           .createQueryBuilder('note')
-          .leftJoinAndSelect('note.tags', 'tag')
+          .leftJoinAndSelect('note.noteTags', 'noteTag')
           .orderBy('note.createdAt', 'DESC')
           .addOrderBy('note.id', 'DESC')
           .where('note.deletedAt IS NULL')
@@ -395,9 +336,8 @@ export class NotesService {
     const dek = await this.readDek(sub, rows);
     const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openFieldCb));
 
-    const tagKey = opts.tag?.toLowerCase();
     const filtered = decoded.filter((note) => {
-      if (tagKey && !note.tags.some((t) => t.name.toLowerCase() === tagKey)) return false;
+      if (opts.tagId !== undefined && !note.tagIds.includes(opts.tagId)) return false;
       if (opts.q && !likeMatch(note.body, `%${opts.q}%`)) return false;
       return true;
     });
@@ -422,7 +362,7 @@ export class NotesService {
         // same-timestamp tie can never repeat or skip the boundary row.
         const found = await this.notes
           .createQueryBuilder('note')
-          .leftJoinAndSelect('note.tags', 'tag')
+          .leftJoinAndSelect('note.noteTags', 'noteTag')
           .where('note.deletedAt IS NOT NULL')
           .andWhere('note.ownerSub = :sub', { sub })
           .orderBy('note.deletedAt', 'DESC')
@@ -447,7 +387,7 @@ export class NotesService {
       async () => {
         const note = await this.notes.findOne({
           where: { id, ownerSub: sub, deletedAt: IsNull() },
-          relations: { tags: true },
+          relations: { noteTags: true },
         });
         if (!note) throw new NotFoundException('Note not found');
         return toCachedNoteRow(note);
@@ -462,12 +402,14 @@ export class NotesService {
     sub: string,
     id: string,
     body?: string,
-    tagNames?: string[],
+    tagIds?: number[],
     expectedVersion?: number,
   ): Promise<NoteDto> {
+    // Load WITHOUT the relation: associations are managed explicitly below, and
+    // leaving `noteTags` undefined keeps `save` from touching any join row (the
+    // owning side would otherwise try to write a stale join column).
     const note = await this.notes.findOne({
       where: { id, ownerSub: sub, deletedAt: IsNull() },
-      relations: { tags: true },
     });
     if (!note) throw new NotFoundException('Note not found');
     if (expectedVersion !== undefined && note.version !== expectedVersion) {
@@ -477,14 +419,29 @@ export class NotesService {
     // even when the plaintext is unchanged.
     const dek = await this.requireKeys().getOrCreateDek(sub);
     if (body !== undefined) note.body = encryptField(dek, body, noteBodyAad(sub, note.id));
-    if (tagNames !== undefined) {
-      note.tags = await this.resolveTags(sub, normalizeTags(tagNames), dek);
+
+    let currentIds: number[];
+    if (tagIds !== undefined) {
+      // Updates REPLACE the association set: the ids the write carries are what
+      // remains, so dangling ids fall away (kernel detach semantics; no registry
+      // validation, no prune pass).
+      const ids = normalizeTagIds(tagIds);
+      await this.noteTags.delete({ noteId: note.id });
+      if (ids.length > 0) {
+        await this.noteTags.insert(ids.map((tagId) => ({ noteId: note.id, tagId })));
+      }
+      currentIds = ids;
+    } else {
+      currentIds = (await this.noteTags.find({ where: { noteId: note.id } }))
+        .map((nt) => nt.tagId)
+        .sort((a, b) => a - b);
     }
+
     note.version += 1;
     const saved = await this.notes.save(note);
     // Bump AFTER the mutation — see bumpGeneration(); a 409 above never bumps.
     await this.cache.bumpGeneration(sub);
-    return this.toDto(saved, sub, dek);
+    return this.noteDto(saved, currentIds, sub, dek);
   }
 
   async remove(sub: string, id: string): Promise<void> {
@@ -499,7 +456,7 @@ export class NotesService {
   async restore(sub: string, id: string): Promise<NoteDto> {
     const note = await this.notes.findOne({
       where: { id, ownerSub: sub, deletedAt: Not(IsNull()) },
-      relations: { tags: true },
+      relations: { noteTags: true },
     });
     if (!note) throw new NotFoundException('Note not found');
     note.deletedAt = null;
@@ -509,6 +466,7 @@ export class NotesService {
   }
 
   async removePermanent(sub: string, id: string): Promise<void> {
+    // The `noteId` FK (`ON DELETE CASCADE`) removes the note's association rows.
     const result = await this.notes.delete({ id, ownerSub: sub, deletedAt: Not(IsNull()) });
     if (!result.affected) throw new NotFoundException('Note not found');
     // Only a successful delete reaches the bump.
@@ -521,31 +479,34 @@ export class NotesService {
     return { count: result.affected ?? 0 };
   }
 
-  async listTags(sub: string): Promise<{ id: number; name: string }[]> {
-    // Key: `note:<sub>:v<gen>:tags` — the owner's ciphertext tag rows, decrypted
-    // after the hit; the name-ascending order is (re)applied post-decrypt.
+  /**
+   * The owner's tag usage surface (kernel `GET …/tags → [{tagId, count}]`):
+   * association ids + how many non-trashed notes carry each. Ids and counts only
+   * — names live in `tags-service` (resolved by the BFF), so nothing here is
+   * content and the `note:tags` cache is metadata-only by design.
+   */
+  async listTagUsage(sub: string): Promise<TagUsage[]> {
+    // Key: `note:<sub>:v<gen>:tags` — the owner's used-id+count rows.
     const rows = await this.cache.getThrough(
       sub,
       'note:tags',
       async () => {
-        const tags = await this.tags
-          .createQueryBuilder('tag')
-          .innerJoin('tag.notes', 'note')
+        // Metadata-only SQL: count non-trashed notes per association id for this
+        // owner (trashed-only tags stay hidden, as before).
+        const raw = (await this.noteTags
+          .createQueryBuilder('noteTag')
+          .innerJoin('noteTag.note', 'note')
+          .select('noteTag.tagId', 'tagId')
+          .addSelect('COUNT(*)', 'count')
           .where('note.deletedAt IS NULL')
-          .andWhere('tag.ownerSub = :sub', { sub })
-          .getMany();
-        return tags.map((t) => ({ id: t.id, name: t.name }));
+          .andWhere('note.ownerSub = :sub', { sub })
+          .groupBy('noteTag.tagId')
+          .orderBy('noteTag.tagId', 'ASC')
+          .getRawMany()) as Array<{ tagId: number | string; count: number | string }>;
+        return raw.map((row) => ({ tagId: Number(row.tagId), count: Number(row.count) }));
       },
-      { decode: decodeCiphertextTagList, cacheable: isCiphertextTagList },
+      { decode: decodeTagUsage },
     );
-
-    const dek = rows.some((t) => t.name.startsWith(ENC_PREFIX))
-      ? await this.requireKeys().getDekForRead(sub)
-      : null;
-    const names = rows.map((row) => decodeCachedTagRow(row, sub, dek, this.openFieldCb));
-    // The former SQL `ORDER BY tag.name` cannot order ciphertext; sort on the
-    // decrypted names so the API order stays deterministic and name-ascending.
-    names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    return names;
+    return rows;
   }
 }
