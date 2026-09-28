@@ -366,3 +366,10 @@ Case counts are referenced by spec section, never by number (kills count drift).
   PASS_WITH_NITS, zero blockers. **FIVE-LANE GATE: 5/5 N/N — MERGEABLE**
   (`tasks/five-lane-todo-ecosystem.md`). Merge + production migration + the human's
   Playwright pass remain human-gated.
+- 2026-09-28 (post-gate, user-requested route restructure): trash moves under the
+  notes app — `/trash` → `/notes/trash` with a permanent redirect (it is a notes
+  concern, not an ecosystem route). Files: `app/notes/trash/page.tsx` (moved),
+  `app/trash/page.tsx` (redirect), notes page link, `revalidatePath`, gate.test path
+  list, and the two journey `waitForURL` navigation lines (the user's request is the
+  explicit frozen-surface approval — URLs only). App suite 173/173, typecheck +
+  build clean.

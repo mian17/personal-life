@@ -89,7 +89,7 @@ describe('public paths', () => {
   });
 
   it('does not exempt app content or the BFF', () => {
-    for (const p of ['/', '/trash', '/notes/new', '/api/notes/flush', '/notes/abc']) {
+    for (const p of ['/', '/notes/trash', '/notes/new', '/api/notes/flush', '/notes/abc']) {
       expect(isPublicPath(p)).toBe(false);
     }
   });

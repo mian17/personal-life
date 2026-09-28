@@ -13,9 +13,12 @@ both apps — so tags feel identical everywhere (I3).
 ## Behavior
 
 - **Route move (I5):** the existing notes UI moves from `/` to `/notes`; `/`
-  permanently redirects to `/notes` (old links keep working). Playwright navigation
-  URLs update to `/notes` — the explicitly approved change; no selector/text/role in
-  the frozen e2e surface changes.
+  permanently redirects to `/notes` (old links keep working). Trash belongs to the
+  notes app and moves under it too — `/notes/trash`, with `/trash` permanently
+  redirecting (user-approved 2026-09-28; the same URL-only frozen-surface exception
+  covers its `waitForURL` updates). Playwright navigation URLs update to the new
+  paths — the explicitly approved changes; no selector/text/role in the frozen e2e
+  surface changes.
 - **`/todos`:** grouped `Overdue` / `Today` / `Later` / `No date`; done toggle;
   create (composer/FAB); inline edit title, note, due date, list; permanent delete;
   filters by list, tag, and done state. Data via the todo-service API (server

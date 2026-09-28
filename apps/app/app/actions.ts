@@ -6,7 +6,7 @@ import { createOrGetTag, deleteTag, renameTag } from '@/lib/tags-api';
 
 function revalidateNotes() {
   revalidatePath('/notes');
-  revalidatePath('/trash');
+  revalidatePath('/notes/trash');
 }
 
 export async function deleteNoteAction(id: string) {

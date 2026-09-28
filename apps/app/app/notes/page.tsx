@@ -48,7 +48,7 @@ export default async function NotesPage({
             <IconLink href="/todos" label="Todos">
               <ListTodo size={20} aria-hidden />
             </IconLink>
-            <IconLink href="/trash" label="Trash">
+            <IconLink href="/notes/trash" label="Trash">
               <Trash2 size={20} aria-hidden />
             </IconLink>
             <ThemeToggle />
