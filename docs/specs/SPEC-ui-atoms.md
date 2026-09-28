@@ -26,12 +26,16 @@ for these without any visible change.
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
-<Pill size="chip" | "filter" active? as="span" | "a" href?
-     onRemove?: () => void removeLabel?: string />
+<Pill size="chip" | "filter" active? as="span" | "a" | "button" href?
+     disabled? buttonType? onRemove?: () => void removeLabel?: string />
    // remove affordance lives inside the chip (owns .tag-chip-remove);
    //   removeLabel renders verbatim as the remove button's aria-label (frozen)
    // as="a" renders next/link's Link (matching legacy `.filters a` usage),
    //   so filter-pill clicks keep client-side navigation;
+   // as="button" (new, T7) renders a real <button> for a selectable chip — a
+   //   control, not a label (TagPicker's tag toggles). `disabled`/`buttonType`
+   //   apply only there; the interactive chip never renders onRemove (nesting a
+   //   button inside a button is invalid HTML).
 <Card>children</Card>                // generic panel surface atom (token values match the
                                    //   legacy .note surface); no legacy class
                                    //   counterpart in the shipped app — the `.note`
@@ -46,6 +50,13 @@ for these without any visible change.
 <ThemeToggle />                      // system→light→dark cycle, aria-pressed,
                                      //   localStorage('theme'); Monitor/Sun/Moon icons
                                      //   from lucide-react (peerDep — consumer provides)
+<DueDatePill dueDate: string | null  // due-date read-out; state derived from today
+             today?: string          //   (injected, defaults to the real local date)
+             emptyLabel?: string />  //   overdue | today | later | none. Pure display —
+                                     //   the derivation is the exported pure helpers
+                                     //   `dueDateState(dueDate, today)` / `todayIso()`.
+                                     //   Renders <time dateTime> for dated states; the
+                                     //   empty state renders `emptyLabel` with no <time>.
 ```
 
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
@@ -66,7 +77,10 @@ owns the frozen `trash-delete` hook (on `ConfirmSubmit`, trash/page.tsx:59-64);
 chip), the `.filters a` pill, and the `.active` active-state values; `Textarea`
 variant `editor` absorbs `.editor-body`; `LocalTime` / `ConfirmButton` /
 `ThemeToggle` are direct generalizations of `app/local-time.tsx`,
-`app/confirm-submit.tsx`, `app/theme-toggle.tsx`.
+`app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `DueDatePill` (T7, `todo-ui`) is a
+new atom with **no** legacy counterpart: it owns `.ui-due-pill` and its state
+modifiers (`.ui-due-pill--overdue|today`, colours from `--danger`/`--accent`); the
+`none`/`later` states need no extra declaration.
 
 ## Tech Stack
 

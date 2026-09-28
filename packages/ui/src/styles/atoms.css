@@ -39,6 +39,11 @@
  * | filter | no     | `.filters a`                         |
  * | filter | yes    | `.filters a` + `.filters a.active`   |
  * remove affordance: `.tag-chip-remove` (+ its `:hover`).
+ * `as="button"` renders the interactive chip (new — no legacy counterpart;
+ * a selectable chip is a control, so it is a real button).
+ *
+ * DueDatePill (new — no legacy counterpart): a due-date read-out with the
+ * /todos grouping semantics; overdue/today borrow the danger/accent colours.
  *
  * Card / StatusText / IconLink (batch B)
  * | component  | legacy class(es)                                          |
@@ -279,6 +284,23 @@
   color: var(--on-accent);
 }
 
+/* Interactive chip (Pill as="button"): same shell, reset the button chrome so
+   only the pill geometry/active pair above carries the visual. */
+.ui-pill--button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-pill--button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ui-pill--button:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
 .ui-pill__remove {
   min-height: 0;
   padding: 0 var(--space-0-35);
@@ -335,4 +357,20 @@
 .ui-icon-link:focus-visible {
   outline: var(--focus-ring) solid var(--accent);
   outline-offset: var(--focus-ring);
+}
+
+/* ------------------------------------------------- DueDatePill */
+
+.ui-due-pill {
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+/* overdue is the only state that earns the danger colour; today is accented. */
+.ui-due-pill--overdue {
+  color: var(--danger);
+}
+
+.ui-due-pill--today {
+  color: var(--accent);
 }

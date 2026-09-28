@@ -4,13 +4,16 @@ import { X } from 'lucide-react';
 import { cx } from '../lib/cx';
 
 export type PillSize = 'chip' | 'filter';
-export type PillTag = 'span' | 'a';
+export type PillTag = 'span' | 'a' | 'button';
+export type PillButtonType = 'button' | 'submit' | 'reset';
 
 export interface PillProps extends ComponentPropsWithRef<'span'> {
   size?: PillSize;
   active?: boolean;
   as?: PillTag;
   href?: string;
+  disabled?: boolean;
+  buttonType?: PillButtonType;
   onRemove?: () => void;
   removeLabel?: string;
   children?: ReactNode;
@@ -21,13 +24,33 @@ export function Pill({
   active = false,
   as = 'span',
   href,
+  disabled,
+  buttonType = 'button',
   onRemove,
   removeLabel,
   className,
   children,
   ...rest
 }: PillProps) {
-  const classes = cx('ui-pill', `ui-pill--${size}`, active && 'ui-pill--active', className);
+  const classes = cx(
+    'ui-pill',
+    `ui-pill--${size}`,
+    as === 'button' && 'ui-pill--button',
+    active && 'ui-pill--active',
+    className,
+  );
+
+  if (as === 'button') {
+    // A chip that toggles state is a control, not a label: render a real button.
+    // `onRemove` is a non-interactive-chip affordance and is deliberately not
+    // rendered here (a button inside a button is invalid HTML).
+    const buttonProps = rest as unknown as ComponentPropsWithRef<'button'>;
+    return (
+      <button type={buttonType} className={classes} disabled={disabled} {...buttonProps}>
+        {children}
+      </button>
+    );
+  }
 
   const content = (
     <>

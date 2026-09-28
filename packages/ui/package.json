@@ -10,7 +10,9 @@
   },
   "scripts": {
     "lint": "tsc --noEmit",
-    "test": "jest"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:unit": "jest"
   },
   "peerDependencies": {
     "lucide-react": "^1.47.0",

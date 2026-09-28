@@ -37,7 +37,64 @@ and the notes app's current pages map onto these one-to-one.
                                                     //   owns .editor-legacy-tags
 <PageActions>children</PageActions>                // page-level action container —
                                                    //   owns .trash-actions
+<TagPicker tags: {id: number; name: string}[]      // attach/detach tags by id
+           selectedIds: number[]
+           onToggle: (id: number) => void
+           onCreate?: (name: string) => void
+           disabled? label? placeholder? createLabel? />
+<TagManager tags: {id: number; name: string}[]     // registry management
+            onCreate: (name: string) => void
+            onRename: (id: number, name: string) => void
+            onDelete: (id: number) => void
+            disabled? label? placeholder? createLabel? />
+<DueDatePill dueDate: string | null                // grouping read-out (atom —
+             today?: string                        //   documented in SPEC-ui-atoms)
+             emptyLabel? />
+<ListManager lists: {id: string; name: string}[]   // todo-list management
+             onCreate: (name: string) => void
+             onRename: (id: string, name: string) => void
+             onDelete: (id: string) => void
+             disabled? label? placeholder? createLabel? />
 ```
+
+### Todo-ecosystem additions (T7)
+
+The `todo-ui` module needs a shared tag UX (used identically from `/notes` and
+`/todos`) and management surfaces. Three blocks are presentational + prop-driven:
+**no data fetching, no routing, no domain copy baked in** — the app supplies data and
+callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.)
+
+- **`TagPicker`** — attach/detach tags by `id`. Renders one toggle per available
+  tag (id + display name supplied as props) in the selected state, plus an optional
+  create-from-input affordance.
+- **`TagManager`** — manage the registry: list tags with inline rename + delete, and
+  create from a draft input.
+- **`ListManager`** — todo-list management (`Array<{id: string; name: string}>`), the
+  same create/rename/delete shape as `TagManager` (the id is a string, not a number).
+
+#### Composition (element by element)
+
+| Element | Composed from |
+|---|---|
+| `TagPicker` root (`role="group"`, `aria-label`) | block container `.ui-tag-picker` (structural glue) |
+| per-tag toggle | `Pill as="button" size="chip" active aria-pressed disabled` + lucide `Check`/`Plus` icon + tag name |
+| `TagPicker` create | `Input` (`aria-label`/`placeholder`) + `IconButton` (`Plus`, `createLabel`) |
+| `TagManager` / `ListManager` root | block container `.ui-tag-manager` / `.ui-list-manager` (structural glue) |
+| create row | `Input` + `IconButton` (`Plus`) |
+| rows | `ul`/`li` (`.ui-*-manager__row`) with a name `span` |
+| view affordances | `IconButton label="Rename tag <name>"` (`Pencil`) + `IconButton label="Delete tag <name>"` (`CircleX`) |
+| inline edit | `Input` (`aria-label="Rename tag <name>"`) + `IconButton` `Save` (`Check`) + `IconButton` `Cancel` (`X`) |
+
+#### Accessibility
+
+- The tag toggle chips are **real buttons** (via `Pill as="button"`) carrying
+  `aria-pressed`; the whole picker is a `role="group"` with an `aria-label`.
+- Icon-only actions carry verbatim `aria-label`s (`Rename tag <name>`,
+  `Delete tag <name>`, `Rename list <name>`, `Delete list <name>`, `Save`, `Cancel`);
+  create inputs are labelled by `placeholder`, and Enter submits a draft or an edit.
+- `onCreate`/`onRename` fire only on a non-blank trimmed name; with a blank name the
+  Save/Add control is `disabled` and no callback fires. `disabled` propagates to every
+  control in the block.
 
 ## CSS ownership (legacy `globals.css` classes owned by blocks)
 

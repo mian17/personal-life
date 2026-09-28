@@ -12,7 +12,7 @@ export { Textarea } from './components/textarea';
 export type { TextareaProps, TextareaVariant } from './components/textarea';
 
 export { Pill } from './components/pill';
-export type { PillProps, PillSize, PillTag } from './components/pill';
+export type { PillButtonType, PillProps, PillSize, PillTag } from './components/pill';
 
 export { Card } from './components/card';
 export type { CardProps } from './components/card';
@@ -73,6 +73,18 @@ export type { PillGroupProps } from './components/pill-group';
 
 export { PageActions } from './components/page-actions';
 export type { PageActionsProps } from './components/page-actions';
+
+export { TagPicker } from './components/tag-picker';
+export type { TagOption, TagPickerProps } from './components/tag-picker';
+
+export { TagManager } from './components/tag-manager';
+export type { TagManagerProps } from './components/tag-manager';
+
+export { DueDatePill, dueDateState, todayIso } from './components/due-date-pill';
+export type { DueDatePillProps, DueDateState } from './components/due-date-pill';
+
+export { ListManager } from './components/list-manager';
+export type { ListManagerProps, TodoListOption } from './components/list-manager';
 
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';

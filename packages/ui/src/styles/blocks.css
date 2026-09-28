@@ -21,6 +21,9 @@
  * | SearchField    | `.search-box` container only (the input visuals are Input's) |
  * | PillGroup      | `.editor-legacy-tags` (the chips are Pill's) |
  * | PageActions    | `.trash-actions`                  |
+ * | TagPicker      | (new) tag attach/detach surface; the chips are Pill's, the create input Input's |
+ * | TagManager     | (new) tag registry surface; rows are a local ul, controls are Input/IconButton |
+ * | ListManager    | (new) todo-list registry surface; controls are Input/IconButton |
  *
  * Token policy: all lengths/colors come from tokens.css custom properties,
  * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
@@ -258,4 +261,58 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--space-1-25);
+}
+
+/* -------------------------------------------------------- TagPicker */
+
+.ui-tag-picker__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-4);
+}
+
+.ui-tag-picker__create {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin-top: var(--space-0-5);
+}
+
+/* -------------------------------------------------- TagManager / ListManager */
+
+.ui-tag-manager__create,
+.ui-list-manager__create {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.ui-tag-manager__list,
+.ui-list-manager__list {
+  list-style: none;
+  margin: var(--space-0-5) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-0-4);
+}
+
+.ui-tag-manager__row,
+.ui-list-manager__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.ui-tag-manager__name,
+.ui-list-manager__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-tag-manager__edit,
+.ui-list-manager__edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  flex: 1;
 }
