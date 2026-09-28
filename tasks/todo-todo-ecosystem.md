@@ -352,4 +352,17 @@ Case counts are referenced by spec section, never by number (kills count drift).
   dev keys generated into untracked `.env.development` (never echoed). Integration
   pass: typecheck clean, 6 builds ok, suites 15+9+62+71+128+103+204+173 = 765 tests
   green, secrets scan clean, bounded dev boot of tags+todo with real dev keys:
-  `/health/ready` 200/200. Consumers+UI checkpoints already green. Next: five-lane.
+  `/health/ready` 200/200. Consumers+UI checkpoints already green.
+- 2026-09-28: five-lane gate (5 parallel lanes over master..HEAD): lanes 3 PASS_WITH_NITS
+  + 4 PASS (765/765 independently reproduced) vs lanes 1/2/5 FAIL — one shared
+  CRITICAL (import.ts default DB paths one `..` short → `apps/apps/...` phantom
+  registry + real `tag` table dropped: silent vocabulary loss on a
+  TAGS_DB_PATH-unset run) + one shared HIGH (compose app lacked
+  `TAGS_API_URL`/`TODO_API_URL` → production tag/todo flows dead on container-local
+  loopback fallbacks) + 2 MEDIUM (dev-example audience drift, note-service verifier
+  default). Exactly one fix pass `3d6f9f7` (tests_pass=true: 17/17 migration incl.
+  the new path regression test, auth 14/14, typecheck clean) — all four fixed plus
+  two doc nits; ledger checkboxes ticked. Failed lanes re-run: all three
+  PASS_WITH_NITS, zero blockers. **FIVE-LANE GATE: 5/5 N/N — MERGEABLE**
+  (`tasks/five-lane-todo-ecosystem.md`). Merge + production migration + the human's
+  Playwright pass remain human-gated.
