@@ -48,3 +48,68 @@ export interface NotePage {
 
 export const NOTE_BODY_MAX = 20000;
 export const TAG_NAME_MAX = 50;
+
+/**
+ * The todo domain wire contract (`SPEC-todo-service`), owned by
+ * `apps/todo-service` and consumed by clients (`apps/app`, T8) — the app never
+ * re-declares these (the `Note`/`CreateNoteInput` precedent). Todos carry
+ * `title`/`note` as decrypted plaintext on the wire; the service stores
+ * `enc.v1.` envelopes at rest. `dueDate` is plaintext metadata (`YYYY-MM-DD`);
+ * `tagIds` are registry-owned `TagRef` ids (names resolve through
+ * `tags-service`); `version` is the kernel concurrency counter.
+ *
+ * `origin` is a reserved orchestrator-seam column on todo rows
+ * (`SPEC-service-kernel`) — nothing populates it in this chapter, so it is
+ * deliberately absent from the wire DTO.
+ */
+export interface Todo {
+  id: string;
+  title: string;
+  note: string | null;
+  done: boolean;
+  dueDate: string | null;
+  listId: string | null;
+  tagIds: number[];
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface CreateTodoInput {
+  title: string;
+  note?: string;
+  dueDate?: string;
+  listId?: string;
+  tagIds?: number[];
+}
+
+export interface UpdateTodoInput {
+  title?: string;
+  /** `null` clears the note; omitting leaves it unchanged. */
+  note?: string | null;
+  done?: boolean;
+  /** `null` clears the due date; omitting leaves it unchanged. */
+  dueDate?: string | null;
+  /** `null` detaches the list; omitting leaves it unchanged. */
+  listId?: string | null;
+  /** A `tagIds` write REPLACES the association set (kernel detach semantics). */
+  tagIds?: number[];
+  expectedVersion?: number;
+}
+
+export interface TodoPage {
+  todos: Todo[];
+  nextCursor: string | null;
+}
+
+/** A todo-local list (`SPEC-todo-service`); `version` is the OCC counter. */
+export interface List {
+  id: string;
+  name: string;
+  version: number;
+  createdAt: string;
+}
+
+export const TODO_TITLE_MAX = 500;
+export const TODO_NOTE_MAX = 20000;
+export const TODO_LIST_NAME_MAX = 100;

@@ -5,6 +5,7 @@
   "workspaces": [
     "apps/note-service",
     "apps/tags-service",
+    "apps/todo-service",
     "apps/app",
     "apps/idp",
     "packages/shared",

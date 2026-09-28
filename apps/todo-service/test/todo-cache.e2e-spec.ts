@@ -1,0 +1,295 @@
+import { rmSync } from 'fs';
+import { ENC_PREFIX } from '@life/crypto';
+import {
+  TODO_ALL,
+  TODO_LISTS,
+  TODO_TAGS,
+  createTodosCache,
+  generationKey,
+  TodosCache,
+} from '../src/cache/todo-cache';
+import {
+  makeUnitHarness,
+  SUB,
+  type UnitHarness,
+} from './todo-harness';
+import { FakeRedisClient, FailingRedisClient } from './fake-redis';
+
+/**
+ * `SPEC-todo-service` Cache Rules (AGENTS.md Contract 2):
+ * - three cached shapes — the owner's serialized **ciphertext** todo rows
+ *   (`todo:all`, each carrying its `tagIds`), list rows (`todo:lists`), and
+ *   tag-usage metadata (`todo:tags`);
+ * - keys `todo:<sub>:v<gen>:<rest>`; no request parameter (q, tagId, listId,
+ *   done, due dates, cursor, limit) enters the key — one entry serves every
+ *   variant;
+ * - per-owner generation counter `todo:gen:<sub>` bumped per write, 60s TTL,
+ *   fail-open, and **no plaintext ever** reaches Redis.
+ *
+ * The cache is a real `@life/cache` instance over the recording fake client; the
+ * DB is a real throwaway sqlite file so the loader genuinely reads ciphertext
+ * rows. Never touches `apps/todo-service/data/**` (hard line).
+ */
+
+/** Records every raw value written, so no-plaintext assertions inspect the wire. */
+class CapturingRedisClient extends FakeRedisClient {
+  readonly values: Array<{ key: string; value: string }> = [];
+
+  override async set(key: string, value: string, options?: { EX?: number }): Promise<'OK'> {
+    this.values.push({ key, value });
+    return super.set(key, value, options);
+  }
+}
+
+describe('TodosCache (read-through + generation invalidation)', () => {
+  let h: UnitHarness;
+
+  afterEach(async () => {
+    if (h) {
+      await h.dataSource.destroy();
+      rmSync(h.dir, { recursive: true, force: true });
+      h = undefined as unknown as UnitHarness;
+    }
+  });
+
+  const currentGen = (client: FakeRedisClient, sub: string): number =>
+    Number.parseInt(client.store.get(generationKey(sub)) ?? '0', 10) || 0;
+
+  /** Count the loader queries the driver emitted for one table. */
+  const loaderCalls = (h2: UnitHarness, table: string): number =>
+    h2.log.filter((sql) => new RegExp(`from "${table}"`, 'i').test(sql)).length;
+
+  it('a second findAll is served from cache: one loader call, key todo:<sub>:v<gen>:all, 60s TTL', async () => {
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, { title: 'cached todo', note: 'body', tagIds: [4, 2] });
+    h.log.length = 0;
+    const gen = currentGen(client, SUB);
+
+    const first = await h.todos.findAll(SUB, {});
+    const second = await h.todos.findAll(SUB, {});
+
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+    expect(first.todos[0].title).toBe('cached todo');
+    expect(loaderCalls(h, 'todo')).toBe(1);
+    expect(client.sets).toHaveLength(1);
+    expect(client.sets[0].key).toBe(`todo:${SUB}:v${gen}:all`);
+    expect(client.sets[0].options).toEqual({ EX: 60 });
+    // The stored value is ciphertext rows carrying tagIds — not a decrypted DTO.
+    expect(client.values[0].value).toContain(ENC_PREFIX);
+    expect(client.values[0].value).not.toContain('cached todo');
+    expect(client.values[0].value).toContain('"tagIds":[2,4]');
+  });
+
+  it('no request parameter enters the key: filters/pagination share the one `all` entry', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const l = await h.lists.create(SUB, 'Filter-list');
+    const t = await h.todos.create(SUB, { title: 'alpha', note: 'beta', listId: l.id, tagIds: [1] });
+    const gen = currentGen(client, SUB);
+    h.log.length = 0;
+
+    await h.todos.findAll(SUB, {});
+    await h.todos.findAll(SUB, { q: 'alpha' });
+    await h.todos.findAll(SUB, { tagId: 1 });
+    await h.todos.findAll(SUB, { listId: l.id });
+    await h.todos.findAll(SUB, { done: false });
+    await h.todos.findAll(SUB, { dueBefore: '2030-01-01', dueAfter: '2000-01-01' });
+    await h.todos.findAll(SUB, { limit: 1, cursor: 'x' });
+
+    expect(loaderCalls(h, 'todo')).toBe(1);
+    expect(client.setCalls).toEqual([`todo:${SUB}:v${gen}:all`]);
+    void t;
+  });
+
+  it('applies the tag filter from the cached hit (each row carries its tagIds)', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, { title: 'tagged one', tagIds: [1] });
+    await h.todos.create(SUB, { title: 'tagged two', tagIds: [2] });
+    h.log.length = 0;
+
+    const all = await h.todos.findAll(SUB, {});
+    const byTag = await h.todos.findAll(SUB, { tagId: 2 });
+
+    expect(all.todos).toHaveLength(2);
+    expect(byTag.todos.map((t) => t.title)).toEqual(['tagged two']);
+    // Both served from the single cached row-set.
+    expect(loaderCalls(h, 'todo')).toBe(1);
+  });
+
+  it('list rows cache under todo:<sub>:v<gen>:lists as ciphertext', async () => {
+    const LIST = 'TOPSECRET-LIST-NAME';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.lists.create(SUB, LIST);
+    h.log.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.lists.list(SUB);
+    await h.lists.list(SUB);
+
+    expect(loaderCalls(h, 'list')).toBe(1);
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:lists`)!;
+    expect(entry).toBeDefined();
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(LIST);
+  });
+
+  it('tag usage caches under todo:<sub>:v<gen>:tags as metadata-only (no ciphertext, no names)', async () => {
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, { title: 'usage-1', tagIds: [5] });
+    await h.todos.create(SUB, { title: 'usage-2', tagIds: [5, 6] });
+    h.log.length = 0;
+    const gen = currentGen(client, SUB);
+
+    const first = await h.todos.listTagUsage(SUB);
+    const second = await h.todos.listTagUsage(SUB);
+
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+    expect(first).toEqual([
+      { tagId: 5, count: 2 },
+      { tagId: 6, count: 1 },
+    ]);
+    expect(loaderCalls(h, 'todo_tag')).toBe(1);
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:tags`)!;
+    expect(entry).toBeDefined();
+    expect(entry.value).toContain('"tagId":5');
+    expect(entry.value).toContain('"count":2');
+    expect(entry.value).not.toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain('usage-1');
+  });
+
+  it('ciphertext-only: no known plaintext is serialized into any content value', async () => {
+    const TITLE = 'TOPSECRET-TODO-TITLE';
+    const NOTE = 'TOPSECRET-TODO-NOTE';
+    const LIST = 'TOPSECRET-LIST';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const l = await h.lists.create(SUB, LIST);
+    const t = await h.todos.create(SUB, { title: TITLE, note: NOTE, listId: l.id, tagIds: [8] });
+    client.values.length = 0;
+
+    await h.todos.findAll(SUB, {});
+    await h.todos.findOne(SUB, t.id);
+    await h.lists.list(SUB);
+    await h.todos.listTagUsage(SUB);
+
+    // Exactly the three spec shapes; `findOne` serves from the `all` entry (no
+    // id-keyed shape exists), so it adds no SET.
+    const gen = currentGen(client, SUB);
+    expect(client.values.map((v) => v.key)).toEqual([
+      `todo:${SUB}:v${gen}:all`,
+      `todo:${SUB}:v${gen}:lists`,
+      `todo:${SUB}:v${gen}:tags`,
+    ]);
+    const contentValues = client.values.filter((v) => !v.key.endsWith(':tags'));
+    expect(contentValues).toHaveLength(2);
+    for (const { value } of contentValues) {
+      expect(value).toContain(ENC_PREFIX);
+      expect(value).not.toContain(TITLE);
+      expect(value).not.toContain(NOTE);
+      expect(value).not.toContain(LIST);
+    }
+    const tagsValue = client.values.find((v) => v.key.endsWith(':tags'))!;
+    expect(tagsValue.value).not.toContain(ENC_PREFIX);
+    expect(tagsValue.value).not.toContain(TITLE);
+    expect(tagsValue.value).not.toContain(LIST);
+  });
+
+  it('findOne serves from the one `all` entry (no id ever enters the key space)', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const t = await h.todos.create(SUB, { title: 'one', tagIds: [1] });
+    h.log.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.todos.findAll(SUB, {});
+    const one = await h.todos.findOne(SUB, t.id);
+
+    expect(one.title).toBe('one');
+    expect(one.tagIds).toEqual([1]);
+    expect(loaderCalls(h, 'todo')).toBe(1); // served from the hit
+    expect(client.setCalls).toEqual([`todo:${SUB}:v${gen}:all`]);
+  });
+
+  it('every successful write bumps the owner generation exactly once; a failed write never bumps', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+
+    const created = await h.todos.create(SUB, { title: 'bumpable' });
+    expect(client.incrCalls).toEqual([generationKey(SUB)]);
+
+    client.incrCalls.length = 0;
+    await h.todos.update(SUB, created.id, { title: 'bumped' });
+    expect(client.incrCalls).toEqual([generationKey(SUB)]);
+
+    client.incrCalls.length = 0;
+    await h.todos.remove(SUB, created.id);
+    expect(client.incrCalls).toEqual([generationKey(SUB)]);
+
+    client.incrCalls.length = 0;
+    await expect(h.todos.update(SUB, 'missing-id', { title: 'nope' })).rejects.toThrow();
+    await expect(h.lists.remove(SUB, 'missing-id')).rejects.toThrow();
+    expect(client.incrCalls).toHaveLength(0);
+  });
+
+  it('invalidation: after a write the stale entry is unreachable and a fresh read repopulates', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+
+    await h.todos.findAll(SUB, {});
+    expect(client.setCalls).toEqual([`todo:${SUB}:v0:all`]);
+
+    await h.todos.create(SUB, { title: 'after' });
+    h.log.length = 0;
+    const after = await h.todos.findAll(SUB, {});
+
+    expect(client.setCalls).toContain(`todo:${SUB}:v1:all`);
+    expect(after.todos.map((t) => t.title)).toEqual(['after']);
+  });
+
+  it('per-owner isolation: one owner\'s write never bumps another owner\'s counter', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const A = 'user-a';
+    const B = 'user-b';
+
+    await h.todos.findAll(A, {});
+    await h.todos.findAll(B, {});
+    expect(client.setCalls).toEqual([`todo:${A}:v0:all`, `todo:${B}:v0:all`]);
+
+    await h.todos.create(A, { title: 'a-only' });
+    expect(client.incrCalls).toEqual([generationKey(A)]);
+    expect(client.incrCalls).not.toContain(generationKey(B));
+
+    h.log.length = 0;
+    await h.todos.findAll(B, {}); // B's entry survives: still a hit
+    expect(loaderCalls(h, 'todo')).toBe(0);
+  });
+
+  it('fail-open: Redis errors degrade to the DB path for reads and writes', async () => {
+    h = await makeUnitHarness(new TodosCache(new FailingRedisClient()));
+    const l = await h.lists.create(SUB, 'Resilient');
+    const created = await h.todos.create(SUB, { title: 'resilient', listId: l.id, tagIds: [2] });
+
+    const page = await h.todos.findAll(SUB, {});
+    expect(page.todos.map((t) => t.title)).toEqual(['resilient']);
+    expect((await h.todos.findOne(SUB, created.id)).title).toBe('resilient');
+    expect((await h.lists.list(SUB)).map((x) => x.name)).toEqual(['Resilient']);
+    expect(await h.todos.listTagUsage(SUB)).toEqual([{ tagId: 2, count: 1 }]);
+  });
+
+  it('selection: no REDIS_URL means the direct DB path (loader every call)', async () => {
+    const cache = createTodosCache(undefined);
+    const loader = jest.fn(async () => [{ id: 'x', title: ENC_PREFIX + 'a.b' }]);
+    await cache.getThrough(SUB, TODO_ALL, loader);
+    await cache.getThrough(SUB, TODO_ALL, loader);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('pins the three <rest> constants', () => {
+    expect([TODO_ALL, TODO_LISTS, TODO_TAGS]).toEqual(['all', 'lists', 'tags']);
+  });
+});
