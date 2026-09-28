@@ -13,7 +13,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
 
 ## Tasks
 
-- [ ] T1: shared kernel primitives (`@life/cache` + `likeMatch`) — module `service-kernel`
+- [x] T1: shared kernel primitives (`@life/cache` + `likeMatch`) — module `service-kernel`
   - Description: Extract the generic read-through cache from `apps/note-service/src/notes/notes-cache.ts`
     into `packages/cache` (`@life/cache`, per SPEC-service-kernel's generic signature:
     `createCache({service, client, ttlSeconds})` → `getThrough(sub, rest, loader, opts)`;
@@ -43,7 +43,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     `npm run test:unit -w @life/cache` && `npm run test:unit -w @life/shared` &&
     `npm run test:unit -w @life/note-service -- test/notes-cache.e2e-spec.ts` && `npm run typecheck`.
   - Dependencies: none. Size: M.
-- [ ] T2: health dialect retrofit — module `service-kernel`
+- [x] T2: health dialect retrofit — module `service-kernel`
   - Description: Add `/health/live`, `/health/ready`, and the `/health` alias
     (readiness semantics) to note-service (registering the controller in
     `app.module.ts` — it currently declares none); align idp's existing
@@ -74,7 +74,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Verify: `npm run test:unit -w @life/note-service -- test/health.e2e-spec.ts` &&
     `npm run test:unit -w @life/idp -- test/health.e2e-spec.ts` && `npm run typecheck`.
   - Dependencies: none. Size: S.
-- [ ] T3: `apps/tags-service` registry — module `tags-service`
+- [x] T3: `apps/tags-service` registry — module `tags-service`
   - Description: New service — `GET/POST /api/tags`, `PATCH/DELETE /api/tags/:id`,
     `POST /api/tags/resolve`; own key custody (`TAGS_MASTER_KEY`), `@life/crypto`
     at rest, `@life/cache`, health routes, DB paths resolved via `@life/shared`'s `resolveDbPath` (default
@@ -90,7 +90,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Verify: `npm run test:unit -w @life/tags-service` &&
     `npm run build -w @life/tags-service` && `npm run typecheck`.
   - Dependencies: T1 (uses `@life/cache`). Size: L.
-- [ ] T4: `import-tags` migration script — module `tags-extraction`
+- [x] T4: `import-tags` migration script — module `tags-extraction`
   - Description: Id-preserving, idempotent note-DB → tags-DB import (re-encrypt under
     registry DEKs; dual-read input — decrypt `enc.v1.` values, pass legacy plaintext
     through, always re-encrypt; `_legacy_` sentinel), self-verified backup first
@@ -111,7 +111,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     TagRef/round-trip behaviors.
   - Verify: `npm run test:unit -w @life/tags-service -- test/import-tags.test.ts` && `npm run typecheck`.
   - Dependencies: T3. Size: M.
-- [ ] T5: note-service TagRef conversion — module `tags-extraction`
+- [x] T5: note-service TagRef conversion — module `tags-extraction`
   - Description: note-service stops owning tag names — `tags: string[]` DTOs → `tagIds: number[]`;
     `note_tag` association only via an explicit `NoteTag` join entity mapped to the
     existing `note_tag` table (no `Tag` entity remains; `tagId` plain integer, no FK —
@@ -153,7 +153,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     && `npm run typecheck`. (T5 edits shared's public types — its `dist` must be
     rebuilt before tsc typechecks note-service against it; same trap as T1.)
   - Dependencies: T3. Size: L (single concern: the whole note-service tag surface).
-- [ ] T6: `apps/todo-service` — module `todo-service`
+- [x] T6: `apps/todo-service` — module `todo-service`
   - Description: New service — todos (title, note, done, dueDate) + lists + TagRefs +
     `origin` links; own key custody (`TODO_MASTER_KEY`), `@life/crypto` at rest,
     `@life/cache`, health routes; the SPEC-todo-service endpoints (5 todo + 4 list +
@@ -174,7 +174,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
   - Verify: `npm run test:unit -w @life/todo-service` &&
     `npm run build -w @life/todo-service` && `npm run typecheck`.
   - Dependencies: T1 (`@life/cache`, `likeMatch`), T3 (TagRef contract). Size: L.
-- [ ] T7: `@life/ui` upstream additions — module `todo-ui`
+- [x] T7: `@life/ui` upstream additions — module `todo-ui`
   - Description: The named primitives, added **upstream** with spec updates before
     apps consume them (AGENTS.md Contract 1 Rule 3): `TagPicker` (attach/detach by id),
     `TagManager` (create/rename/delete), `DueDatePill` (due-date display/grouping),
@@ -186,7 +186,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     the same change; no raw-HTML/raw-value/token leaks (Contract 1 mechanical checks).
   - Verify: `npm run test:unit -w @life/ui` && `npm run typecheck`.
   - Dependencies: none (can precede T8). Size: M.
-- [ ] T8: `apps/app` UI — module `todo-ui`
+- [x] T8: `apps/app` UI — module `todo-ui`
   - Description: Move `/` → `/notes` (+ redirect), build `/todos` (grouped
     Overdue/Today/Later/No date, done toggle, composer, inline edit, filters), wire the
     shared `TagPicker`/`TagManager` to `tags-service` from both apps and the
@@ -203,7 +203,7 @@ Case counts are referenced by spec section, never by number (kills count drift).
     diff = I5 URLs and nothing else.
   - Verify: `npm run test:unit -w @life/app` && `npm run build -w @life/app` && `npm run typecheck`.
   - Dependencies: T5 (note-service TagRef), T6 (todo-service), T7 (primitives). Size: L.
-- [ ] T9: wiring + integration pass — module `todo-ui` (close)
+- [x] T9: wiring + integration pass — module `todo-ui` (close)
   - Description: Create `apps/tags-service/Dockerfile` and `apps/todo-service/Dockerfile`;
     update `apps/app/Dockerfile`, `apps/idp/Dockerfile`, `apps/note-service/Dockerfile`
     for the new `packages/cache` + new workspace manifests (the data-privacy

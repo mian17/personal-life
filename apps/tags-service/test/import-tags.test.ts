@@ -5,6 +5,8 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { decryptField, encryptField, unwrapDek, wrapDek } from '@life/crypto';
 import {
+  DEFAULT_NOTE_DB_PATH,
+  DEFAULT_TAGS_DB_PATH,
   LEGACY_OWNER,
   ImportRowError,
   applyImport,
@@ -655,5 +657,26 @@ describe('import-tags migration (SPEC-tags-extraction)', () => {
     expect(formatImportReport(report)).toBe(
       'import-tags [apply]: imported=3 skipped=1 merges=2 keysCreated=4 errors=0',
     );
+  });
+});
+
+
+describe('import-tags default DB paths (regression)', () => {
+  it('anchors both defaults at the repo root regardless of module depth', () => {
+    // The module lives at apps/tags-service/src/tags (ts-node) and
+    // apps/tags-service/dist/tags (built): three levels below apps/, four below
+    // the repo root. A missing hop silently resolved to <repo>/apps/apps/... and
+    // the documented no-var runbook would have written a phantom registry next to
+    // dropping the real tag table (five-lane CRITICAL). String assertions only —
+    // this suite never opens anything under apps/*/data/.
+    const repoRoot = join(__dirname, '..', '..', '..');
+    expect(DEFAULT_NOTE_DB_PATH).toBe(
+      join(repoRoot, 'apps', 'note-service', 'data', 'life.db'),
+    );
+    expect(DEFAULT_TAGS_DB_PATH).toBe(
+      join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'),
+    );
+    expect(DEFAULT_NOTE_DB_PATH).not.toContain(join('apps', 'apps'));
+    expect(DEFAULT_TAGS_DB_PATH).not.toContain(join('apps', 'apps'));
   });
 });

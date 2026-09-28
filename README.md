@@ -141,7 +141,7 @@ decides whether a device can reach the app, never *who* the user is.
    returns a code to the callback, and the app exchanges it for tokens. The app keeps an
    `HttpOnly`, `SameSite=Lax`, `Secure` session cookie (7-day sliding); tokens live
    server-side only and never reach the browser.
-3. **Tokens.** Access tokens are **JWTs** (EdDSA/Ed25519) with `aud=<target service>`
+3. **Tokens.** Access tokens are **JWTs** (EdDSA/Ed25519) with `aud=life-api (the shared ecosystem audience)`
    (the shared ecosystem value `life-api`, per SPEC-service-kernel) and a 10-minute lifetime; resource servers verify them
    offline against the IdP's JWKS (`GET /jwks`) — no call back to the IdP per request.
    Refresh tokens are opaque, 30-day, rotated on every use, with reuse detection that

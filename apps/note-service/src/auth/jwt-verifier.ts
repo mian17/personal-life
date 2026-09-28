@@ -33,7 +33,7 @@ export function resolveVerifierConfig(env: NodeJS.ProcessEnv = process.env): Ver
   return {
     issuer,
     jwksUrl,
-    audience: env.NOTE_SERVICE_AUDIENCE?.trim() || 'note-service',
+    audience: env.NOTE_SERVICE_AUDIENCE?.trim() || 'life-api',
     clockToleranceS: 30,
     jwksCacheMaxAgeMs: Number(env.IDP_JWKS_CACHE_MAX_AGE_MS ?? 10 * 60 * 1000),
     jwksCooldownMs: Number(env.IDP_JWKS_COOLDOWN_MS ?? 30 * 1000),

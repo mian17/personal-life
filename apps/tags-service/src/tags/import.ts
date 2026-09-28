@@ -58,6 +58,7 @@ export const DEFAULT_NOTE_DB_PATH = join(
   '..',
   '..',
   '..',
+  '..',
   'apps',
   'note-service',
   'data',
@@ -65,6 +66,7 @@ export const DEFAULT_NOTE_DB_PATH = join(
 );
 export const DEFAULT_TAGS_DB_PATH = join(
   __dirname,
+  '..',
   '..',
   '..',
   '..',

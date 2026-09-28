@@ -182,6 +182,11 @@ services:
       PORT: "3002"
       HOSTNAME: 0.0.0.0
       API_URL: http://note-service:3001
+      # Ecosystem base URLs (SPEC-service-kernel transport contract). Without
+      # these the BFF falls back to container-local loopback and every tag/todo
+      # call dies inside the app container.
+      TAGS_API_URL: http://tags-service:3004
+      TODO_API_URL: http://todo-service:3005
       # OIDC relying-party config (values from .env). The issuer must be the
       # browser-reachable URL; the app validates at boot and fails loudly.
       IDP_ISSUER: ${IDP_ISSUER:-}
@@ -197,6 +202,10 @@ services:
       - "127.0.0.1:3002:3002"
     depends_on:
       note-service:
+        condition: service_healthy
+      tags-service:
+        condition: service_healthy
+      todo-service:
         condition: service_healthy
       idp:
         condition: service_healthy
