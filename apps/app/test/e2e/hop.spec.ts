@@ -67,7 +67,7 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
       extraHTTPHeaders: { 'tailscale-user-login': E2E_OWNER },
     });
     const page = await context.newPage();
-    await page.goto(`${apps.a.origin}/`);
+    await page.goto(`${apps.a.origin}/notes`);
     await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
     await page.fill('input[name="username"]', E2E_USER);
     await page.fill('input[name="password"]', E2E_PASSWORD);
@@ -100,7 +100,7 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
     });
     await bContext.addCookies([sessionCookie(sessionId)]);
     const bPage = await bContext.newPage();
-    await bPage.goto(`${apps.b.origin}/`);
+    await bPage.goto(`${apps.b.origin}/notes`);
     await expect(bPage.getByRole('heading', { name: 'Notes' })).toBeVisible({ timeout: 30_000 });
     await bContext.close();
   });
@@ -113,7 +113,7 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
       extraHTTPHeaders: { 'tailscale-user-login': E2E_OWNER },
     });
     const page = await context.newPage();
-    await page.goto(`${apps.a.origin}/`);
+    await page.goto(`${apps.a.origin}/notes`);
     await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
     await page.fill('input[name="username"]', E2E_USER);
     await page.fill('input[name="password"]', E2E_PASSWORD);
@@ -145,7 +145,7 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
       bCtx.addCookies([sessionCookie(sessionId)]),
     ]);
     const [aPage, bPage] = await Promise.all([aCtx.newPage(), bCtx.newPage()]);
-    await Promise.all([aPage.goto(`${apps.a.origin}/`), bPage.goto(`${apps.b.origin}/`)]);
+    await Promise.all([aPage.goto(`${apps.a.origin}/notes`), bPage.goto(`${apps.b.origin}/notes`)]);
 
     // Both replicas must serve Notes. If the lock failed, both would present the
     // same rotating refresh token, the IdP's reuse detection would revoke the
@@ -169,7 +169,7 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
     });
     await later.addCookies([sessionCookie(sessionId)]);
     const laterPage = await later.newPage();
-    await laterPage.goto(`${apps.a.origin}/`);
+    await laterPage.goto(`${apps.a.origin}/notes`);
     await expect(laterPage.getByRole('heading', { name: 'Notes' })).toBeVisible({
       timeout: 30_000,
     });

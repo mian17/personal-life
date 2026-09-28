@@ -1,0 +1,87 @@
+import 'server-only';
+import type {
+  CreateTodoInput,
+  List,
+  TagUsage,
+  Todo,
+  TodoPage,
+  UpdateTodoInput,
+} from '@life/shared';
+import { callService } from './client';
+
+const TODO_API_URL = process.env.TODO_API_URL ?? 'http://127.0.0.1:3005';
+
+function call<T>(path: string, init?: RequestInit): Promise<T> {
+  return callService<T>(TODO_API_URL, path, init);
+}
+
+export interface TodoFilters {
+  q?: string;
+  listId?: string;
+  tagId?: number;
+  done?: boolean;
+  dueBefore?: string;
+  dueAfter?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/** `GET /api/todos` — cursor page; filters are applied in memory by the service. */
+export function listTodos(filters: TodoFilters = {}): Promise<TodoPage> {
+  const params = new URLSearchParams();
+  if (filters.q) params.set('q', filters.q);
+  if (filters.listId !== undefined) params.set('listId', filters.listId);
+  if (filters.tagId !== undefined) params.set('tagId', String(filters.tagId));
+  if (filters.done !== undefined) params.set('done', String(filters.done));
+  if (filters.dueBefore !== undefined) params.set('dueBefore', filters.dueBefore);
+  if (filters.dueAfter !== undefined) params.set('dueAfter', filters.dueAfter);
+  if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+  if (filters.cursor !== undefined) params.set('cursor', filters.cursor);
+  const qs = params.toString();
+  return call<TodoPage>(`/api/todos${qs ? `?${qs}` : ''}`);
+}
+
+export function getTodo(id: string): Promise<Todo> {
+  return call<Todo>(`/api/todos/${id}`);
+}
+
+/**
+ * `GET /api/todos/tags` — the todo domain's usage surface
+ * (`[{tagId, count}]`); names resolve through `tags-service`.
+ */
+export function listTodoTagUsage(): Promise<TagUsage[]> {
+  return call<TagUsage[]>('/api/todos/tags');
+}
+
+export function createTodo(input: CreateTodoInput): Promise<Todo> {
+  return call<Todo>('/api/todos', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo> {
+  return call<Todo>(`/api/todos/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function deleteTodo(id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/todos/${id}`, { method: 'DELETE' });
+}
+
+/** `GET /api/lists` — the owner's todo-local lists. */
+export function listLists(): Promise<List[]> {
+  return call<List[]>('/api/lists');
+}
+
+export function createList(name: string): Promise<List> {
+  return call<List>('/api/lists', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export function renameList(id: string, name: string, expectedVersion?: number): Promise<List> {
+  return call<List>(`/api/lists/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name, ...(expectedVersion !== undefined ? { expectedVersion } : {}) }),
+  });
+}
+
+/** `DELETE /api/lists/:id` — detach semantics; its todos survive with `listId` cleared. */
+export function deleteList(id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/lists/${id}`, { method: 'DELETE' });
+}

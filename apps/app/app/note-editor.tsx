@@ -10,14 +10,21 @@ import {
   EditorScreen,
   EditorToolbar,
   IconButton,
-  Pill,
-  PillGroup,
   StatusText,
+  TagPicker,
   Textarea,
+  type TagOption,
 } from '@life/ui';
-import { dedupeTags, parseInlineTags } from './tags';
+import { parseInlineTags } from '@/lib/inline-tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
+type FlushResponse = {
+  id?: string;
+  version?: number;
+  tagIds?: number[];
+  note?: Note;
+  error?: string;
+};
 
 const STATUS_TEXT: Record<Status, string> = {
   idle: '',
@@ -27,24 +34,21 @@ const STATUS_TEXT: Record<Status, string> = {
   conflict: 'Changed on another device',
 };
 
-function tagsFor(body: string, retained: readonly string[]): string[] {
-  // Inline hashtags win casing; retained legacy tags union in.
-  return dedupeTags([...parseInlineTags(body), ...retained]);
+function sameIds(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-function sameTags(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((tag, i) => tag === b[i]);
-}
-
-function noteTagNames(note: Note): string[] {
-  return note.tags.map((t) => t.name);
-}
-
-export function NoteEditor({ note }: { note?: Note }) {
+/**
+ * The editor's tag state is the attached `tagIds`. Inline `#tag` names are
+ * parsed from the body (frozen behavior) and sent alongside the attached ids;
+ * the flush route resolves both through the registry's create-or-get and
+ * persists `tagIds`. Unresolvable ids (a tag deleted in the other app) come back
+ * in the response's `tagIds` as the detached set, and rendering omits them.
+ */
+export function NoteEditor({ note, availableTags }: { note?: Note; availableTags: TagOption[] }) {
   const router = useRouter();
-  const initialLegacy = note ? noteTagNames(note) : [];
   const [body, setBody] = useState(note?.body ?? '');
-  const [retained, setRetained] = useState<string[]>(initialLegacy);
+  const [selectedIds, setSelectedIds] = useState<number[]>(note?.tagIds ?? []);
   const [status, setStatus] = useState<Status>('idle');
   const [conflictNote, setConflictNote] = useState<Note | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,19 +57,18 @@ export function NoteEditor({ note }: { note?: Note }) {
   const dirtyRef = useRef(false);
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
-  const retainedRef = useRef<string[]>(initialLegacy);
+  const selectedRef = useRef<number[]>(note?.tagIds ?? []);
   // Server version last seen from a successful read/write; sent as expectedVersion
   // so a PATCH from a stale tab is rejected (409) instead of silently overwriting.
   const versionRef = useRef(note?.version ?? 0);
   // The server note that won the race. Kept in a ref so save()/leave() can read it
   // synchronously, and in state so the conflict bar renders.
   const conflictRef = useRef<Note | null>(null);
-  // The body/tags the in-flight request is persisting, so a newer edit can win.
-  const sentRef = useRef<{ body: string; tags: string[] } | null>(null);
+  // The body/ids the in-flight request is persisting, so a newer edit can win.
+  const sentRef = useRef<{ body: string; tagIds: number[] } | null>(null);
   // One shared drain promise: concurrent calls (debounce + blur + explicit Save)
   // coalesce instead of each forcing a redundant request, and every joiner sees the
-  // same success boolean. The drain loops until nothing is dirty, so flush() settles
-  // once all pending work is sent; it resolves true only when nothing is left dirty.
+  // same success boolean.
   const drainRef = useRef<Promise<boolean> | null>(null);
 
   const enterConflict = useCallback((server: Note) => {
@@ -92,7 +95,7 @@ export function NoteEditor({ note }: { note?: Note }) {
         if (!dirtyRef.current) return true;
         const id = idRef.current;
         const nextBody = bodyRef.current;
-        const nextTags = tagsFor(nextBody, retainedRef.current);
+        const nextTagIds = selectedRef.current;
         if (!nextBody.trim()) {
           // An empty new note is not created (success); an existing one is rejected
           // and stays unsaved (failure) so leaving cannot look like a saved clear.
@@ -107,7 +110,7 @@ export function NoteEditor({ note }: { note?: Note }) {
         }
         inFlightRef.current = true;
         dirtyRef.current = false;
-        sentRef.current = { body: nextBody, tags: nextTags };
+        sentRef.current = { body: nextBody, tagIds: nextTagIds };
         setStatus('saving');
         let failed = false;
         try {
@@ -116,18 +119,19 @@ export function NoteEditor({ note }: { note?: Note }) {
           const res = await fetch(id === null ? '/api/notes/flush' : `/api/notes/${id}/flush`, {
             method: id === null ? 'POST' : 'PATCH',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(
-              id === null
-                ? { body: nextBody, tags: nextTags }
-                : { body: nextBody, tags: nextTags, expectedVersion: versionRef.current },
-            ),
+            body: JSON.stringify({
+              body: nextBody,
+              inlineTagNames: parseInlineTags(nextBody),
+              tagIds: nextTagIds,
+              ...(id === null ? {} : { expectedVersion: versionRef.current }),
+            }),
           });
           if (res.status === 409) {
             // Stop the drain and keep the local edit. The response carries the
             // current server note so the user can choose without another request.
             let server: Note | null = null;
             try {
-              const data = (await res.json()) as { note?: Note };
+              const data = (await res.json()) as FlushResponse;
               server = data.note ?? null;
             } catch {
               server = null;
@@ -146,7 +150,7 @@ export function NoteEditor({ note }: { note?: Note }) {
             failed = true;
             setStatus('error');
           } else {
-            const data = (await res.json()) as { id?: string; version?: number };
+            const data = (await res.json()) as FlushResponse;
             if (id === null && typeof data.id === 'string') {
               idRef.current = data.id;
               // replaceState, not router.replace: a router transition is exactly what
@@ -154,11 +158,18 @@ export function NoteEditor({ note }: { note?: Note }) {
               window.history.replaceState(null, '', `/notes/${data.id}`);
             }
             if (typeof data.version === 'number') versionRef.current = data.version;
+            if (Array.isArray(data.tagIds)) {
+              // The server returns the ids that actually persisted; a tag deleted
+              // elsewhere was omitted and is detached here too.
+              selectedRef.current = data.tagIds;
+              setSelectedIds(data.tagIds);
+            }
             const sent = sentRef.current;
             sentRef.current = null;
-            const latestTags = tagsFor(bodyRef.current, retainedRef.current);
             const changed =
-              sent === null || bodyRef.current !== sent.body || !sameTags(latestTags, sent.tags);
+              sent === null ||
+              bodyRef.current !== sent.body ||
+              !sameIds(selectedRef.current, sent.tagIds);
             if (dirtyRef.current || changed) {
               // Latest-wins: a newer edit arrived during the request.
               dirtyRef.current = true;
@@ -197,7 +208,7 @@ export function NoteEditor({ note }: { note?: Note }) {
   // pending debounced save (creating a non-empty new note) before navigating home.
   const leave = useCallback(async () => {
     const ok = await flush();
-    if (ok) router.push('/');
+    if (ok) router.push('/notes');
   }, [flush, router]);
 
   // Server Actions do not survive navigation, so a pending edit is sent via a
@@ -205,11 +216,10 @@ export function NoteEditor({ note }: { note?: Note }) {
   const flushKeepalive = useCallback((allowCreate: boolean) => {
     // Hidden-but-alive (tab switch, app background): a new note must not be
     // created here, because idRef and the URL stay null/'/notes/new'. Returning
-    // to type would then POST again and duplicate it. Leave it dirty for the
-    // normal debounced save. Only pagehide (allowCreate) may create.
+    // to type would then POST again and duplicate it.
     if (idRef.current === null && !allowCreate) return;
     const nextBody = bodyRef.current;
-    const nextTags = tagsFor(nextBody, retainedRef.current);
+    const nextTagIds = selectedRef.current;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -218,13 +228,17 @@ export function NoteEditor({ note }: { note?: Note }) {
       dirtyRef.current = true;
       setStatus('error');
     };
-    // A rejected fetch or a non-2xx (e.g. the API rejecting an empty body) both
-    // leave the edit dirty so it can be retried.
     const send = (url: string, method: 'POST' | 'PATCH') => {
       dirtyRef.current = false;
-      const payload: { body: string; tags: string[]; expectedVersion?: number } = {
+      const payload: {
+        body: string;
+        inlineTagNames: string[];
+        tagIds: number[];
+        expectedVersion?: number;
+      } = {
         body: nextBody,
-        tags: nextTags,
+        inlineTagNames: parseInlineTags(nextBody),
+        tagIds: nextTagIds,
       };
       // Best-effort concurrency guard: a stale keepalive PATCH must not clobber
       // another writer. A conflict here only marks the editor paused, never retries.
@@ -239,7 +253,7 @@ export function NoteEditor({ note }: { note?: Note }) {
           if (res.ok) return;
           if (res.status === 409) {
             try {
-              const data = (await res.json()) as { note?: Note };
+              const data = (await res.json()) as FlushResponse;
               if (data.note) enterConflict(data.note);
               else fail();
             } catch {
@@ -280,10 +294,12 @@ export function NoteEditor({ note }: { note?: Note }) {
     }, 400);
   }
 
-  function removeLegacyTag(name: string) {
-    const next = retainedRef.current.filter((t) => t.toLowerCase() !== name.toLowerCase());
-    retainedRef.current = next;
-    setRetained(next);
+  function toggleTag(id: number) {
+    const next = selectedRef.current.includes(id)
+      ? selectedRef.current.filter((current) => current !== id)
+      : [...selectedRef.current, id];
+    selectedRef.current = next;
+    setSelectedIds(next);
     schedule();
   }
 
@@ -294,9 +310,8 @@ export function NoteEditor({ note }: { note?: Note }) {
     setConflictNote(null);
     bodyRef.current = server.body;
     setBody(server.body);
-    const names = noteTagNames(server);
-    retainedRef.current = names;
-    setRetained(names);
+    selectedRef.current = server.tagIds;
+    setSelectedIds(server.tagIds);
     versionRef.current = server.version;
     dirtyRef.current = false;
     sentRef.current = null;
@@ -321,8 +336,7 @@ export function NoteEditor({ note }: { note?: Note }) {
     if (el) {
       // Browser form restoration can repopulate the DOM textarea after a
       // pagehide create without React state knowing, so a restored draft would
-      // masquerade as new input and POST a duplicate note. Align the DOM to the
-      // React value (empty for a new note) before focusing.
+      // masquerade as new input and POST a duplicate note.
       if (el.value !== bodyRef.current) el.value = bodyRef.current;
       el.focus();
       el.setSelectionRange(0, 0);
@@ -331,13 +345,9 @@ export function NoteEditor({ note }: { note?: Note }) {
 
   useEffect(() => {
     function onPageHide() {
-      // The page is actually leaving: a new note may be created here, and this
-      // is the final act — there is no live page left to duplicate from.
       flushKeepalive(true);
     }
     function onVisibility() {
-      // Hidden but alive: existing notes keepalive-PATCH, new notes stay dirty
-      // for the normal debounced save (see flushKeepalive).
       if (document.visibilityState === 'hidden') flushKeepalive(false);
     }
     document.addEventListener('visibilitychange', onVisibility);
@@ -348,9 +358,9 @@ export function NoteEditor({ note }: { note?: Note }) {
     };
   }, [flushKeepalive]);
 
-  const inlineNames = new Set(parseInlineTags(body).map((t) => t.toLowerCase()));
-  const legacyChips = retained.filter((name) => !inlineNames.has(name.toLowerCase()));
-
+  // Render every registry tag in the picker (the attach/detach surface). Inline
+  // `#tag` names not yet in the registry are created by the flush route's
+  // create-or-get, so the picker never needs a create affordance here.
   return (
     <EditorScreen>
       <EditorToolbar
@@ -402,19 +412,13 @@ export function NoteEditor({ note }: { note?: Note }) {
         }}
         onBlur={() => void flush()}
       />
-      {legacyChips.length > 0 && (
-        <PillGroup role="group" aria-label="Saved tags">
-          {legacyChips.map((name) => (
-            <Pill
-              key={name}
-              size="chip"
-              onRemove={() => removeLegacyTag(name)}
-              removeLabel={`Remove tag ${name}`}
-            >
-              {name}
-            </Pill>
-          ))}
-        </PillGroup>
+      {availableTags.length > 0 && (
+        <TagPicker
+          tags={availableTags}
+          selectedIds={selectedIds}
+          onToggle={toggleTag}
+          label="Attached tags"
+        />
       )}
     </EditorScreen>
   );

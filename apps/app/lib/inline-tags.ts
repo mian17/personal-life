@@ -1,5 +1,13 @@
 import { TAG_NAME_MAX } from '@life/shared';
 
+/**
+ * Inline `#tag` parsing for the note composer — frozen behavior: typing
+ * `#errand` still yields the `errand` filter link. The parsed *names* are sent
+ * through the registry's create-or-get and the note write carries their
+ * `tagIds` (`SPEC-tags-extraction`); the picker is an addition to this flow,
+ * not a replacement.
+ */
+
 const INLINE_TAG = /#([^\s#]+)/g;
 
 function normalizeName(raw: string): string | null {

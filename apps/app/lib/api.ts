@@ -1,49 +1,27 @@
 import 'server-only';
-import type { CreateNoteInput, Note, NotePage, Tag, UpdateNoteInput } from '@life/shared';
-import { requireSession } from './auth/require-session';
+import type {
+  CreateNoteInput,
+  Note,
+  NotePage,
+  TagUsage,
+  UpdateNoteInput,
+} from '@life/shared';
+import { callService } from './client';
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
 
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
+export { ApiError } from './client';
+
+function call<T>(path: string, init?: RequestInit): Promise<T> {
+  return callService<T>(API_URL, path, init);
 }
 
 /**
- * The BFF authenticates to `note-service` with the caller's IdP access token
- * (Task 10 — JWT-only). The token comes from the server-side session, refreshed
- * when near expiry; a refresh failure means "re-login" (the session is destroyed
- * and `requireSession` redirects to `/auth/login`). The browser never sees it.
- *
- * `requireSession` is the single choke point: every data call from a page, action,
- * or route handler degrades to a login redirect when there is no session, rather
- * than throwing an error page.
+ * `GET /api/notes` — filter by registry tag id (TagRef) and/or a content query.
  */
-async function authHeaders(): Promise<HeadersInit> {
-  const session = await requireSession();
-  return { Authorization: `Bearer ${session.accessToken}`, 'content-type': 'application/json' };
-}
-
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { ...(await authHeaders()), ...(init?.headers ?? {}) },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new ApiError(res.status, `API ${res.status} on ${path}`);
-  }
-  return res.json() as Promise<T>;
-}
-
-export function listNotes(tag?: string, q?: string): Promise<NotePage> {
+export function listNotes(tagId?: number, q?: string): Promise<NotePage> {
   const params = new URLSearchParams();
-  if (tag) params.set('tag', tag);
+  if (tagId !== undefined) params.set('tagId', String(tagId));
   if (q) params.set('q', q);
   const qs = params.toString();
   return call<NotePage>(`/api/notes${qs ? `?${qs}` : ''}`);
@@ -53,8 +31,13 @@ export function getNote(id: string): Promise<Note> {
   return call<Note>(`/api/notes/${id}`);
 }
 
-export function listTags(): Promise<Tag[]> {
-  return call<Tag[]>('/api/tags');
+/**
+ * `GET /api/tags` on note-service — the owner's tag usage surface
+ * (`[{tagId, count}]`, `SPEC-tags-extraction`). Ids + counts only; names are
+ * resolved through `tags-service` (`lib/tags-api.ts`, MAP M4).
+ */
+export function listNoteTagUsage(): Promise<TagUsage[]> {
+  return call<TagUsage[]>('/api/tags');
 }
 
 export function createNote(input: CreateNoteInput): Promise<Note> {

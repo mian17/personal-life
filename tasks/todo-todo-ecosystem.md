@@ -330,4 +330,14 @@ Case counts are referenced by spec section, never by number (kills count drift).
   `NoteTag` entity (the data-privacy D7 class — the boot-mutates-nothing tripwire
   fired on the schema change; script-side fix, its suite passes unchanged). Notes
   cache harness spy gained the `find` the set-replacement path needs. Final: 12/12
-  suites, 128/128 tests, typecheck clean. Consumers checkpoint pending T6.
+  suites, 128/128 tests, typecheck clean.
+- 2026-09-28: T6 (`224d3e2`, 71 tests — Consumers checkpoint green), T7 (`1a14641`,
+  204 UI tests, Contract 1 checks clean), T8 done: `/notes` + `/todos` live with the
+  shared TagPicker/TagManager/ListManager/DueDatePill, inline `#tag` preserved
+  (frozen behavior), BFF detach semantics (omit unresolvable ids at render AND
+  write), wire types from `@life/shared`, e2e diff = navigation URLs only (12/12,
+  the I5 exception). App suite 173 tests. UI checkpoint green. Residual for the
+  human's e2e pass at deploy: the editor's legacy retained-tag chips were replaced
+  by `TagPicker` toggles (deviation T8-2) — the frozen journey's `#errand` filter
+  expectation is preserved per the suite's own reading, but only the human run
+  proves it. Redirect is 307 (RSC channel), not 308 (T8-1).

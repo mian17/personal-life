@@ -17,7 +17,7 @@ export function SearchBox({ q = '', tag }: { q?: string; tag?: string }) {
         params.set('q', value);
       }
       const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
+      router.replace(qs ? `/notes?${qs}` : '/notes', { scroll: false });
     },
     [tag, router],
   );

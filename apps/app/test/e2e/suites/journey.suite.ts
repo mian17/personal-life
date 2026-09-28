@@ -97,7 +97,7 @@ export function registerJourney(options: JourneyOptions): void {
 
       // Trash it again, then permanently delete it.
       await page.getByLabel('Back').click();
-      await page.waitForURL(/\/$/, { timeout: 15_000 });
+      await page.waitForURL(/\/notes$/, { timeout: 15_000 });
       await trashNote(page, tagged);
       await page.getByLabel('Trash').click();
       await page.waitForURL(/\/trash$/, { timeout: 15_000 });
@@ -122,7 +122,7 @@ export function registerJourney(options: JourneyOptions): void {
     }) => {
       const context = await browser.newContext();
       const fresh = await context.newPage();
-      await fresh.goto(`${origin}/`);
+      await fresh.goto(`${origin}/notes`);
       await fresh.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
       await expect(fresh.locator('input[name="password"]')).toBeVisible();
       await context.close();
@@ -148,7 +148,7 @@ export function registerJourney(options: JourneyOptions): void {
     test('the login journey also passes from the alternate loopback origin', async ({ page }) => {
       // Next normalizes loopback hosts, so this proves both spellings reach the
       // same journey (the bug class that hid behind a single-origin harness).
-      await page.goto(`${alternateOrigin}/`);
+      await page.goto(`${alternateOrigin}/notes`);
       await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
       await submitCredentials(page, E2E_USER, E2E_PASSWORD);
       await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible({ timeout: 30_000 });

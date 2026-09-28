@@ -61,8 +61,9 @@ export async function destroySession(
  * reloads modules — all share one process, so the map must be process-wide.
  *
  * Why single-flight: a page can fan out two callers that both call
- * `requireSession()` for the same cookie (`app/page.tsx` does
- * `Promise.all([listNotes, listTags])`). When the access token is inside
+ * `requireSession()` for the same cookie (`app/notes/page.tsx` does
+ * `Promise.all([listNotes, listNoteTagUsage])`, and the tag-name resolution
+ * fans out again). When the access token is inside
  * `REFRESH_SKEW_MS`, both would present the *same* rotating refresh token to the
  * IdP. Refresh rotation has reuse detection, so the second use revokes the whole
  * grant family and forces a re-login about every access-token lifetime. Sharing

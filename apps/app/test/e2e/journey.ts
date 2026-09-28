@@ -14,7 +14,7 @@ export function noteBody(marker: string, suffix = ''): string {
 
 /** Opens the app and waits for the IdP login form. */
 export async function startLogin(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/notes');
   await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
 }
 
@@ -42,7 +42,7 @@ export async function logIn(
 
 /** Asserts the notes UI is NOT reachable and the login wall is shown again. */
 export async function expectLoginWall(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/notes');
   await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
 }
 
@@ -66,7 +66,7 @@ export async function createNote(page: Page, body: string): Promise<void> {
   await page.waitForURL(/\/notes\/new$/, { timeout: 15_000 });
   await page.getByLabel('Note body').fill(body);
   await page.getByLabel('Save').click();
-  await page.waitForURL(/\/$/, { timeout: 15_000 });
+  await page.waitForURL(/\/notes$/, { timeout: 15_000 });
 }
 
 /** Opens a note by its visible title link and edits its body. */
@@ -76,7 +76,7 @@ export async function editNote(page: Page, title: string, body: string): Promise
   const textarea = page.getByLabel('Note body');
   await textarea.fill(body);
   await page.getByLabel('Save').click();
-  await page.waitForURL(/\/$/, { timeout: 15_000 });
+  await page.waitForURL(/\/notes$/, { timeout: 15_000 });
 }
 
 /** Types into the home search box and waits for the filtered result. */
