@@ -35,7 +35,8 @@ client secret with `openssl rand -hex 32` (see the OIDC keys in `.env.example`).
 ## Production (Docker Compose)
 
 Docker Compose is the production path; `npm run start` is no longer used. Three services
-run on the internal `life` network: `note-service` (no published port), `idp` (published
+run on the internal `life` network: `note-service`, `tags-service`, `todo-service`
+(no published ports), `idp` (published
 on host loopback `127.0.0.1:3003` so Tailscale Serve can proxy to it), and `app`
 (published on host loopback `127.0.0.1:3002`).
 
@@ -141,7 +142,7 @@ decides whether a device can reach the app, never *who* the user is.
    `HttpOnly`, `SameSite=Lax`, `Secure` session cookie (7-day sliding); tokens live
    server-side only and never reach the browser.
 3. **Tokens.** Access tokens are **JWTs** (EdDSA/Ed25519) with `aud=<target service>`
-   (default `note-service`) and a 10-minute lifetime; resource servers verify them
+   (the shared ecosystem value `life-api`, per SPEC-service-kernel) and a 10-minute lifetime; resource servers verify them
    offline against the IdP's JWKS (`GET /jwks`) — no call back to the IdP per request.
    Refresh tokens are opaque, 30-day, rotated on every use, with reuse detection that
    revokes the whole grant family.

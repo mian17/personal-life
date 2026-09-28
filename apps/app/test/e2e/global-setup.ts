@@ -8,11 +8,13 @@ import { prodPidsFile, repoRoot, testPorts } from './config';
  * access gate active, `localhost` origin. Mirrors `docker compose up` behavior.
  */
 export default async function globalSetup(): Promise<void> {
-  const { idpPort, notePort, appPort } = testPorts();
+  const { idpPort, notePort, tagsPort, todoPort, appPort } = testPorts();
   const cfg: StackConfig = {
     mode: 'production',
     idpPort,
     notePort,
+    tagsPort,
+    todoPort,
     appPort,
     appOrigin: `http://localhost:${appPort}`,
     // Never under any service's real `data/` directory.

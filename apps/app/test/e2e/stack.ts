@@ -45,6 +45,8 @@ export interface StackConfig {
   appPort: number;
   idpPort: number;
   notePort: number;
+  tagsPort: number;
+  todoPort: number;
   /** Browser origin the app is reached on (`localhost` or `127.0.0.1`). */
   appOrigin: string;
   /** Scratch directory for the IdP/note-service DBs and keys. */
@@ -87,6 +89,11 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     ].join(','),
     SEED_USERNAME: E2E_USER,
     SEED_PASSWORD: E2E_PASSWORD,
+    // Shared ecosystem audience (SPEC-service-kernel): one token serves all
+    // three resource services in the harness exactly as in compose.
+    OIDC_DEFAULT_RESOURCE: 'https://note-service',
+    OIDC_AUDIENCE_MAP:
+      'https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api',
   };
 }
 
@@ -97,7 +104,34 @@ function noteEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     HOST: '127.0.0.1',
     DB_PATH: `${cfg.stateDir}/note-service.db`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
-    NOTE_SERVICE_AUDIENCE: 'note-service',
+    NOTE_SERVICE_AUDIENCE: 'life-api',
+  };
+}
+
+/** Deterministic, obviously-fake harness key (public by design, like a test cert). */
+const HARNESS_MASTER_KEY = Buffer.alloc(32, 0x2a).toString('base64');
+
+function tagsEnv(cfg: StackConfig): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(cfg.tagsPort),
+    HOST: '127.0.0.1',
+    DB_PATH: `${cfg.stateDir}/tags-service.db`,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    TAGS_SERVICE_AUDIENCE: 'life-api',
+    TAGS_MASTER_KEY: HARNESS_MASTER_KEY,
+  };
+}
+
+function todoEnv(cfg: StackConfig): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(cfg.todoPort),
+    HOST: '127.0.0.1',
+    DB_PATH: `${cfg.stateDir}/todo-service.db`,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    TODO_SERVICE_AUDIENCE: 'life-api',
+    TODO_MASTER_KEY: HARNESS_MASTER_KEY,
   };
 }
 
@@ -108,6 +142,8 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     PORT: String(cfg.appPort),
     HOSTNAME: '127.0.0.1',
     API_URL: `http://127.0.0.1:${cfg.notePort}`,
+    TAGS_API_URL: `http://127.0.0.1:${cfg.tagsPort}`,
+    TODO_API_URL: `http://127.0.0.1:${cfg.todoPort}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
@@ -157,11 +193,35 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     }),
   );
 
+  await build('apps/tags-service');
+  services.push(
+    await spawnService({
+      name: 'tags-service',
+      command: 'node',
+      args: ['dist/main.js'],
+      cwd: `${repoRoot()}/apps/tags-service`,
+      env: tagsEnv(cfg),
+    }),
+  );
+
+  await build('apps/todo-service');
+  services.push(
+    await spawnService({
+      name: 'todo-service',
+      command: 'node',
+      args: ['dist/main.js'],
+      cwd: `${repoRoot()}/apps/todo-service`,
+      env: todoEnv(cfg),
+    }),
+  );
+
   const app = await spawnApp(cfg);
   services.push(app);
 
   await waitForHttp(`http://127.0.0.1:${cfg.idpPort}/jwks`);
   await waitForHttp(`http://127.0.0.1:${cfg.notePort}/health`);
+  await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
+  await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
   await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
 
   return services;

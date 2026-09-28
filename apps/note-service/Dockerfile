@@ -14,15 +14,20 @@ COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 COPY packages/crypto/package.json packages/crypto/
+COPY packages/cache/package.json packages/cache/
+COPY apps/tags-service/package.json apps/tags-service/
+COPY apps/todo-service/package.json apps/todo-service/
 RUN npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/crypto ./packages/crypto
+COPY packages/cache ./packages/cache
 COPY apps/note-service ./apps/note-service
 
 RUN npm run build -w @life/shared \
   && npm run build -w @life/crypto \
+  && npm run build -w @life/cache \
   && npm run build -w @life/note-service \
   && npm prune --omit=dev
 
@@ -38,6 +43,8 @@ COPY --from=build /repo/packages/shared/package.json ./packages/shared/package.j
 COPY --from=build /repo/packages/shared/dist ./packages/shared/dist
 COPY --from=build /repo/packages/crypto/package.json ./packages/crypto/package.json
 COPY --from=build /repo/packages/crypto/dist ./packages/crypto/dist
+COPY --from=build /repo/packages/cache/package.json ./packages/cache/package.json
+COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
 COPY --from=build /repo/apps/note-service/package.json ./package.json
 COPY --from=build /repo/apps/note-service/dist ./dist
 

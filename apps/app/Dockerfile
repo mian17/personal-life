@@ -14,6 +14,9 @@ COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 COPY packages/crypto/package.json packages/crypto/
+COPY packages/cache/package.json packages/cache/
+COPY apps/tags-service/package.json apps/tags-service/
+COPY apps/todo-service/package.json apps/todo-service/
 RUN npm ci
 
 COPY tsconfig.base.json ./

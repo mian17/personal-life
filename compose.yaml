@@ -15,7 +15,9 @@ services:
       # compose network (no tailnet round-trip) — hence the two vars.
       IDP_ISSUER: ${IDP_ISSUER:-}
       IDP_JWKS_URL: ${NOTE_SERVICE_IDP_JWKS_URL:-http://idp:3003/jwks}
-      NOTE_SERVICE_AUDIENCE: ${NOTE_SERVICE_AUDIENCE:-note-service}
+      # Shared ecosystem audience (SPEC-service-kernel token model): one token,
+      # `aud: life-api`, accepted by all three resource services.
+      NOTE_SERVICE_AUDIENCE: ${NOTE_SERVICE_AUDIENCE:-life-api}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-note:6379
       # Content-encryption master key (data-privacy chapter). 32 bytes base64:
@@ -36,6 +38,82 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3001/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  tags-service:
+    build:
+      context: .
+      dockerfile: apps/tags-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3004"
+      HOST: 0.0.0.0
+      DB_PATH: /data/tags.db
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      TAGS_IDP_JWKS_URL: ${TAGS_IDP_JWKS_URL:-http://idp:3003/jwks}
+      TAGS_SERVICE_AUDIENCE: ${TAGS_SERVICE_AUDIENCE:-life-api}
+      # Content-encryption master key (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      TAGS_MASTER_KEY: ${TAGS_MASTER_KEY:?TAGS_MASTER_KEY is required (openssl rand -base64 32)}
+      REDIS_URL: redis://redis-note:6379
+    volumes:
+      - ./apps/tags-service/data:/data
+    depends_on:
+      redis-note:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3004/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  todo-service:
+    build:
+      context: .
+      dockerfile: apps/todo-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3005"
+      HOST: 0.0.0.0
+      DB_PATH: /data/todo.db
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      TODO_IDP_JWKS_URL: ${TODO_IDP_JWKS_URL:-http://idp:3003/jwks}
+      TODO_SERVICE_AUDIENCE: ${TODO_SERVICE_AUDIENCE:-life-api}
+      # Content-encryption master key (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      TODO_MASTER_KEY: ${TODO_MASTER_KEY:?TODO_MASTER_KEY is required (openssl rand -base64 32)}
+      REDIS_URL: redis://redis-note:6379
+    volumes:
+      - ./apps/todo-service/data:/data
+    depends_on:
+      redis-note:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3005/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 3s
@@ -64,7 +142,9 @@ services:
       OIDC_APP_REDIRECT_URIS: ${OIDC_APP_REDIRECT_URI:-}
       # Audience/resource mapping (defaults preserve note-service).
       OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
-      OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=note-service}
+      # Every registered resource maps to the shared ecosystem audience; each
+      # service verifies `life-api` via its own *_SERVICE_AUDIENCE knob.
+      OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-idp:6379
     ports:

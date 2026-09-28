@@ -341,3 +341,15 @@ Case counts are referenced by spec section, never by number (kills count drift).
   by `TagPicker` toggles (deviation T8-2) — the frozen journey's `#errand` filter
   expectation is preserved per the suite's own reading, but only the human run
   proves it. Redirect is 307 (RSC channel), not 308 (T8-1).
+- 2026-09-28: T9 done (tech lead — secret handling + config judgment): five
+  Dockerfiles (tags/todo created; app/idp/note-service carry the full workspace
+  manifest set + note-service consumes `@life/cache` at runtime), compose services
+  for tags/todo (fail-fast `TAGS_MASTER_KEY`/`TODO_MASTER_KEY`, `DB_PATH` volumes,
+  `/health/ready` healthchecks, shared `redis-note`), shared `life-api` audience
+  across compose + `.env.example` + README (config-only; idp tests pin the map
+  mechanism, unaffected), Playwright harness brings tags/todo up (stack/config/
+  global-setups; frozen assertions untouched), root dev script runs five services,
+  dev keys generated into untracked `.env.development` (never echoed). Integration
+  pass: typecheck clean, 6 builds ok, suites 15+9+62+71+128+103+204+173 = 765 tests
+  green, secrets scan clean, bounded dev boot of tags+todo with real dev keys:
+  `/health/ready` 200/200. Consumers+UI checkpoints already green. Next: five-lane.
