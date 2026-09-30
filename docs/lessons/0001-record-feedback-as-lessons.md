@@ -12,14 +12,22 @@ Amended by:
 
 > "ok but it should be only record lessons learned when i tell you to, do not save everything"
 
+> "i only want to save only when i tell you to, for example only save when i tell you this
+> is something a lesson you should learn, because not every little feedback is worth recording"
+
 ## Lesson
 
-Feedback is **not** captured automatically. Write a lesson file only when the user
-explicitly asks for one. Do not turn every correction, preference, or remark into a file —
-most feedback is just a change to make, and the reply is its record.
+Feedback is **not** captured automatically, and ordinary feedback is never assumed to be
+lesson-worthy. Write a lesson file ONLY when the user explicitly says a piece of feedback
+*is* a lesson to learn ("this is a lesson you should learn", "save this as a lesson",
+"record this"). Absent that instruction, write nothing — most feedback is just a change to
+make, and the reply is its record.
 
-When the user does ask, write it up as a markdown file here in `docs/lessons/`, then act
-on it. A requested lesson is a durable rule, not a one-off reply.
+When the instruction is given, write it up as a markdown file here in `docs/lessons/`,
+then act on it. A requested lesson is a durable rule, not a one-off reply.
+
+This rule lives as a global rule in `~/.config/opencode/AGENTS.md` §11 as well; this file
+is its project-scoped record.
 
 ## Convention
 
