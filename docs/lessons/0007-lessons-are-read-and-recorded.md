@@ -1,6 +1,6 @@
-# 0007 — Lessons are read before work and recorded on receipt
+# 0007 — Lessons are read before work and recorded on request
 
-**Date:** 2026-10-01.
+**Date:** 2026-10-01. **Amended:** 2026-10-01 — capture is on-request only, never automatic.
 
 ## The feedback
 
@@ -18,9 +18,9 @@ lesson that is never read back prevents nothing.
 
 - **Recall is the other half.** Read the repo's lessons directory end to end before the
   first change in any repo — prior feedback shapes the current task.
-- **Capture on receipt.** Every correction, preference, clarification, or design principle
-  becomes `NNNN-<slug>.md` on the current branch, committed with the work it belongs to.
+- **Capture on request only.** A lesson is written only when the user explicitly asks;
+  never automatically. Most feedback is just a change to make, and the reply is its record.
 - **Scope per project.** Lessons live in the repo they were earned in; only a genuinely
   cross-project rule moves into the global `~/.config/opencode/AGENTS.md`.
-- Now encoded as global §11 (recall + capture + scope + enforcement) and as the `lessons`
-  profile knob in this repo's `AGENTS.md`.
+- Now encoded as global §11 (recall + capture + scope) and as the `lessons` profile knob
+  in this repo's `AGENTS.md`.
