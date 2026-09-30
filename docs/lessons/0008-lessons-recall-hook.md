@@ -9,8 +9,8 @@
 
 ## What it corrected
 
-Lesson 0007 wrote recall into the global protocol ("read the repo's lessons before the
-first change"), but that stays a *convention* — it only works if the agent remembers to
+The global protocol wrote recall in as "read the repo's lessons before the first change",
+but that stays a *convention* — it only works if the agent remembers to
 follow it. The user asked for a mechanism, not another paragraph: a hook that makes the
 recall happen at prompt submission regardless of what the agent remembers.
 
