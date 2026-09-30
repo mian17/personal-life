@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, resolve } from 'path';
 import { SeedModule } from '../src/config/seed.module';
 import { UsersService } from '../src/users/users.service';
 import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
@@ -23,7 +23,26 @@ import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
 const DEV_SEED_USERNAME = 'dev';
 const DEV_SEED_PASSWORD = 'dev-password-not-a-secret';
 
+/**
+ * Honor the local dev env file for the DEV FLOW ONLY, behind an explicit opt-in
+ * (`SEED_LOAD_DEV_ENV=1`, set by the root `dev:seed` script). Without the opt-in
+ * the process reads its environment and nothing else — so a stray developer
+ * `.env.development` can never inject credentials into a production run or into
+ * a test that deliberately controls the environment (it silently defeated the
+ * production-refusal test before this gate). `process.loadEnvFile` assigns only
+ * unset keys, so explicit env always wins even when the file is loaded.
+ */
+function loadDevEnvFile(): void {
+  if (process.env.SEED_LOAD_DEV_ENV !== '1') return;
+  try {
+    process.loadEnvFile(resolve(__dirname, '..', '..', '..', '.env.development'));
+  } catch {
+    // No dev env file — fine; defaults apply.
+  }
+}
+
 async function main(): Promise<void> {
+  loadDevEnvFile();
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Credentials: production MUST supply them explicitly (no defaulted prod
