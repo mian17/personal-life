@@ -2,9 +2,8 @@ import { listNoteTagUsage, listNotes } from '@/lib/api';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { SearchBox } from '../search-box';
-import { TagManagerSection } from '../tag-manager-section';
 import { FabLink, IconLink, NavBar, PageShell, PageTitle, TagFilterNav, ThemeToggle } from '@life/ui';
-import { ListTodo, Plus, Trash2 } from 'lucide-react';
+import { ListTodo, Plus, Tags, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +50,9 @@ export default async function NotesPage({
             <IconLink href="/notes/trash" label="Trash">
               <Trash2 size={20} aria-hidden />
             </IconLink>
+            <IconLink href="/notes/tags" label="Manage tags">
+              <Tags size={20} aria-hidden />
+            </IconLink>
             <ThemeToggle />
           </>
         }
@@ -63,8 +65,6 @@ export default async function NotesPage({
       {namedTags.length > 0 && <TagFilterNav label="Tags" items={filterItems} />}
 
       <NoteList notes={notes} />
-
-      <TagManagerSection />
 
       <FabLink href="/notes/new" label="New note">
         <Plus size={28} strokeWidth={2.5} aria-hidden />
