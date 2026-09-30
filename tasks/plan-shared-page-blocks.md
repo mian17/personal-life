@@ -816,6 +816,22 @@ T5 (app-kit)       ┘  depends only on @life/ui's SearchField
 6. **Contract 2 not engaged.** No backend service or cache layer is touched, so no
    `## Cache Rules` section applies to this change.
 
+7. **E2E harness ports are a human-owned hard line.** The plan's literal E2E command uses
+   the config's default ports (3100/3101/3103/3104/3105). On this machine a pre-existing
+   dev stack (`next dev -p 3100`, plus idp/note/tags/todo on 3102-3105) had been running
+   ~1h48m. `stack.ts`'s `waitForHttp` treats any status <500 as ready, so `globalSetup`
+   mistook the leftover stack for its own and never bound its services; login then
+   redirected to the leftover IdP (no harness seed) and the run failed at `logIn` — before
+   any ported route rendered. The same spec, same `-g`, on free ports (the config's own
+   `E2E_*_PORT` knobs) passed end-to-end with clean teardown. T6's code is unaffected; the
+   default command keeps failing until the stale stack is stopped.
+
+   **Human checklist (ports are a hard line — the Tech Lead does not kill processes):**
+   - [ ] Confirm the stale stack: `ss -ltnp | grep -E ':(3100|3101|3102|3103|3104|3105)\b'`.
+   - [ ] Stop only the processes owning those ports (the pre-existing dev stack).
+   - [ ] Re-run once on default ports: `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/journey.prod.spec.ts -g "create → edit → tag → search → reload keeps session → trash → restore → permanent delete"`.
+   - [ ] Confirm teardown left 3100-3105 free.
+
 ## Open Questions
 
 None. The intent, the capability map and the five owning specs fix every boundary; the
