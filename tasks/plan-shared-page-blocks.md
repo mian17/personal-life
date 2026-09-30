@@ -139,8 +139,11 @@ load-or-`notFound()` try/catch. The rendered roles, headings, visible text, aria
 ### Five build units, one integration unit
 
 T1–T5 are independent (four blocks share only `ui-blocks`; `app-kit` depends only on
-`@life/ui`'s `SearchField`), so they can be built and verified in parallel. T6 depends on
-all five and is the only task that touches `apps/app` and runs E2E.
+`@life/ui`'s `SearchField`), so they are built and verified in parallel on their own files.
+The single shared file, `packages/ui/src/index.ts`, is written once after T1–T4 by one
+writer (the Blocks checkpoint) so four concurrent tasks cannot drop each other's export.
+T6 depends on all five, is the only task that ports `apps/app`, and is the only task that
+runs E2E.
 
 ## File structure
 
@@ -173,8 +176,11 @@ Create:
 
 Modify:
 
-- `packages/ui/src/index.ts` (T1–T4: add each block + its exported types)
+- `packages/ui/src/index.ts` (Blocks checkpoint — all four block exports, appended in one
+  edit after T1–T4 so this shared barrel has a single writer)
 - `package.json` (T5: add `packages/app-kit` to `workspaces`)
+- `apps/app/package.json` (T5: declare the `@life/app-kit` dependency)
+- `package-lock.json` (T5: written by the workspace install)
 - `apps/app/app/notes/page.tsx` (T6)
 - `apps/app/app/todos/page.tsx` (T6)
 - `apps/app/app/notes/trash/page.tsx` (T6)
@@ -205,20 +211,33 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 ## Task List
 
 ### Phase 1 — `@life/ui` page blocks (parallel: T1 ∥ T2 ∥ T3 ∥ T4)
-- [ ] T1: `ui-trash-block` — `trash-block.tsx` + re-export + suite
-- [ ] T2: `ui-manager-block` — `manager-block.tsx` + re-export + suite
-- [ ] T3: `ui-list-shell` — `list-shell.tsx` + re-export + suite
-- [ ] T4: `ui-editor-chrome` — `editor-chrome.tsx` + re-export + suite
+- [ ] T1: `ui-trash-block` — `trash-block.tsx` + suite
+- [ ] T2: `ui-manager-block` — `manager-block.tsx` + suite
+- [ ] T3: `ui-list-shell` — `list-shell.tsx` + suite
+- [ ] T4: `ui-editor-chrome` — `editor-chrome.tsx` + suite
 
-### Checkpoint: Blocks
+The four tasks run in parallel on their own files only. `packages/ui/src/index.ts` is a
+shared barrel: its four export lines are applied once, serialized, by the Tech Lead at the
+Blocks checkpoint below — never by the parallel tasks (four concurrent writers to one file
+would drop exports).
+
+### Checkpoint: Blocks (single writer: the Tech Lead)
+- [ ] Append all four exports to `packages/ui/src/index.ts` in one edit: `TrashBlock`,
+      `ManagerBlock`, `ListShell`, `EditorChrome` and their exported prop types.
 - [ ] `npm run typecheck -w packages/ui` exits 0.
 - [ ] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx test/manager-block.test.tsx test/list-shell.test.tsx test/editor-chrome.test.tsx` green.
-- [ ] `grep -riE "note|todo|list" packages/ui/src/components/{trash,manager,list-shell,editor-chrome}-block.tsx` shows only frozen e2e hook classes/attribute strings (see Deviations 1).
+- [ ] `grep -riE "note|trash|tag-chip" packages/ui/src/components/{trash-block,manager-block,list-shell,editor-chrome}.tsx`
+      returns only the frozen e2e hook classes/attribute strings (see Deviations 1). Real
+      paths — a `*-block.tsx` brace expansion would miss two of them, and a `list` term
+      would match the composed `List`/`ListItem` imports.
 
 ### Phase 2 — `@life/app-kit` (parallel with Phase 1: T5)
-- [ ] T5: create `packages/app-kit` workspace + exports + suites + root workspaces entry
+- [ ] T5: create `packages/app-kit` workspace + exports + suites + root workspaces entry +
+      `apps/app` dependency + the `npm install` workspace link
 
 ### Checkpoint: Kit
+- [ ] `npm install` ran once at the root; `node_modules/@life/app-kit` resolves and
+      `apps/app/package.json` declares `"@life/app-kit": "*"`.
 - [ ] `npm run typecheck -w packages/app-kit` exits 0.
 - [ ] `npm run test:unit -w packages/app-kit -- test/filter-href.test.ts test/parse-tag-id.test.ts test/preserving-search-box.test.tsx test/load-or-not-found.test.ts test/route-layout.test.tsx` green.
 - [ ] `grep -rnE "Note|Todo|List\b" packages/app-kit/src` finds no domain identifiers.
@@ -250,8 +269,11 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/components/trash-block.tsx` (new),
-    `packages/ui/src/index.ts` (append the `TrashBlock` + type export),
     `packages/ui/test/trash-block.test.tsx` (new).
+  - **`packages/ui/src/index.ts` is NOT this task's to edit.** This task runs in parallel
+    with T2–T4; the four block exports are appended once, serialized, by the Tech Lead at
+    the Blocks checkpoint. The test imports the block directly from
+    `../src/components/trash-block`.
   - Reference files (read-only): `docs/specs/SPEC-ui-trash-block.md`,
     `docs/specs/SPEC-ui-blocks.md`, `packages/ui/src/components/page-shell.tsx`,
     `nav-bar.tsx`, `page-title.tsx`, `empty-state.tsx`, `list.tsx`, `list-item.tsx`,
@@ -264,8 +286,14 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 [IMPLEMENTATION REQUIREMENTS]
   - Export, verbatim from the spec: `interface TrashBlockItem { id: string; title: string;
     meta?: ReactNode; snippet?: string }`, `type TrashFormAction = (formData: FormData) =>
-    void | Promise<void>`, `interface TrashBlockProps { … }` and
-    `function TrashBlock(props: TrashBlockProps): JSX.Element`.
+    void | Promise<void>`, the full `interface TrashBlockProps { title: string;
+    backHref: string; backLabel?: string; items: readonly TrashBlockItem[];
+    emptyMessage: string; restoreAction: (id: string) => TrashFormAction;
+    deleteForeverAction: (id: string) => TrashFormAction;
+    deleteForeverMessage: (item: TrashBlockItem) => string;
+    emptyTrashAction: TrashFormAction; emptyTrashMessage: string; restoreLabel?: string;
+    emptyTrashLabel?: string }` and `function TrashBlock(props: TrashBlockProps):
+    JSX.Element`.
   - Render the spec's structure top-to-bottom: `PageShell` → `NavBar leading` (back
     `IconLink` + `ArrowLeft`) → `PageTitle` → `items.length === 0 ? EmptyState : (List of
     ListItem + PageActions)`.
@@ -331,8 +359,11 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/components/manager-block.tsx` (new),
-    `packages/ui/src/index.ts` (append the `ManagerBlock` + type export),
     `packages/ui/test/manager-block.test.tsx` (new).
+  - **`packages/ui/src/index.ts` is NOT this task's to edit.** This task runs in parallel
+    with T1/T3/T4; the four block exports are appended once, serialized, by the Tech Lead at
+    the Blocks checkpoint. The test imports the block directly from
+    `../src/components/manager-block`.
   - Reference files (read-only): `docs/specs/SPEC-ui-manager-block.md`,
     `docs/specs/SPEC-ui-blocks.md`, `packages/ui/src/components/page-shell.tsx`,
     `nav-bar.tsx`, `page-title.tsx`, `icon-link.tsx`,
@@ -390,8 +421,11 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/components/list-shell.tsx` (new),
-    `packages/ui/src/index.ts` (append the `ListShell` + type export),
     `packages/ui/test/list-shell.test.tsx` (new).
+  - **`packages/ui/src/index.ts` is NOT this task's to edit.** This task runs in parallel
+    with T1/T2/T4; the four block exports are appended once, serialized, by the Tech Lead at
+    the Blocks checkpoint. The test imports the shell directly from
+    `../src/components/list-shell`.
   - Reference files (read-only): `docs/specs/SPEC-ui-list-shell.md`,
     `docs/specs/SPEC-ui-blocks.md`, `packages/ui/src/components/page-shell.tsx`,
     `nav-bar.tsx`, `page-title.tsx`, `fab-link.tsx`,
@@ -453,8 +487,11 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/components/editor-chrome.tsx` (new),
-    `packages/ui/src/index.ts` (append the `EditorChrome` + type exports),
     `packages/ui/test/editor-chrome.test.tsx` (new).
+  - **`packages/ui/src/index.ts` is NOT this task's to edit.** This task runs in parallel
+    with T1–T3; the four block exports are appended once, serialized, by the Tech Lead at
+    the Blocks checkpoint. The test imports the chrome directly from
+    `../src/components/editor-chrome`.
   - Reference files (read-only): `docs/specs/SPEC-ui-editor-chrome.md`,
     `docs/specs/SPEC-ui-blocks.md`, `packages/ui/src/components/editor-screen.tsx`,
     `editor-toolbar.tsx`, `editor-stack.tsx`, `tag-picker.tsx`, `stack.tsx`,
@@ -531,7 +568,9 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
     `packages/app-kit/test/load-or-not-found.test.ts` (new),
     `packages/app-kit/test/route-layout.test.tsx` (new),
     `packages/app-kit/test/stubs/next-navigation.tsx` (new),
-    `package.json` (root — add `"packages/app-kit"` to `workspaces`).
+    `package.json` (root — add `"packages/app-kit"` to `workspaces`),
+    `apps/app/package.json` (add `"@life/app-kit": "*"` to `dependencies`),
+    `package-lock.json` (root — written by the workspace install).
   - Reference files (read-only): `docs/specs/SPEC-app-kit.md`,
     `packages/ui/package.json`, `packages/ui/tsconfig.json`,
     `packages/ui/tsconfig.test.json`, `packages/ui/jest` config (in
@@ -539,8 +578,9 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
     `apps/app/app/search-box.tsx`, `apps/app/app/todo-search-box.tsx`,
     `apps/app/app/notes/page.tsx:11-17`, `apps/app/app/todos/page.tsx:25-37`,
     `apps/app/app/notes/[id]/page.tsx:11-19`, `docs/lessons/` (recall).
-  - Strictly prohibited files: every file not listed above; `packages/ui/**`;
-    `apps/**` (except reads); any data directory; token files; the e2e selector surface.
+  - Strictly prohibited files: every file not listed above; `packages/ui/**`; `apps/**`
+    except the one `apps/app/package.json` dependency line above; any data directory; token
+    files; the e2e selector surface.
 
 [IMPLEMENTATION REQUIREMENTS]
   - Implement exactly the Public API block of `SPEC-app-kit.md` — no extra public surface:
@@ -575,16 +615,24 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
     `SearchField` reimplementation. `next/navigation`/`next` enter only here.
   - The root `package.json` edit is one line: insert `"packages/app-kit"` into the
     `workspaces` array after `"packages/ui"`.
+  - Declare the consumer: add `"@life/app-kit": "*"` to `apps/app`'s `dependencies`,
+    directly under the existing `"@life/ui": "*"` line.
+  - **Link the workspace:** run `npm install` at the repo root after the `workspaces` entry
+    exists. Without it no `node_modules/@life/app-kit` symlink is created and T6's
+    `npm run typecheck -w @life/app` cannot resolve the import. This is the only install
+    run in the plan.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test commands: `npm run typecheck -w packages/app-kit` and
+  - Permitted commands: `npm install` (repo root, exactly one run — the workspace link),
+    `npm run typecheck -w packages/app-kit` and
     `npm run test:unit -w packages/app-kit -- test/filter-href.test.ts test/parse-tag-id.test.ts test/preserving-search-box.test.tsx test/load-or-not-found.test.ts test/route-layout.test.tsx`.
   - Required cases, per the spec's Testing Strategy: `filter-href.test.ts` (preserve across
     an override; drop `undefined` and `''`; unknown keys preserved; no trailing `?`;
     absolute vs relative `path`; notes/todos call shapes); `parse-tag-id.test.ts` (the
     accepted/rejected matrix); `preserving-search-box.test.tsx` (labelled `searchbox`;
     fake-timer debounce; `router.replace` once with merged href + `{ scroll: false }`; `q`
-    dropped when empty; sibling params preserved; no `fetch(`); `load-or-not-found.test.ts`
+    dropped when empty; sibling params preserved; a source assertion that the component
+    carries no `fetch(` and no visual markup beyond `SearchField`); `load-or-not-found.test.ts`
     (pass-through; 404 → `notFound()` mocked; rethrow others; custom `isNotFound`);
     `route-layout.test.tsx` (metadata shape; `RouteLayout` renders children with no wrapper).
   - Strict constraints: NO full suites; NO E2E; only these named files; max test
@@ -594,7 +642,10 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 [DEFINITION OF DONE]
   - [ ] Every `SPEC-app-kit.md` export exists with the declared signature and no extra public surface.
   - [ ] The workspace mirrors `@life/ui`'s package/tsconfig/jest shape; the stub exists.
-  - [ ] `packages/app-kit` is in the root `workspaces` array.
+  - [ ] `packages/app-kit` is in the root `workspaces` array and `apps/app` declares
+        `"@life/app-kit": "*"` in `dependencies`.
+  - [ ] `npm install` ran once at the root and `node_modules/@life/app-kit` resolves
+        (T6's app typecheck depends on this link).
   - [ ] No files outside the allowed scope were modified.
   - [ ] `npm run typecheck -w packages/app-kit` passes with zero errors.
   - [ ] The prescribed app-kit test command passes.
@@ -624,7 +675,7 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
     `apps/app/app/todo-actions.ts`, `apps/app/lib/api.ts`, `lib/todo-api.ts`,
     `lib/tags-api.ts`, `apps/app/test/e2e/suites/journey.suite.ts`,
     `apps/app/test/e2e/journey.ts`, `apps/app/playwright.config.ts`,
-    `docs/lessons/` (recall).
+    `apps/app/test/manifests.test.ts`, `docs/lessons/` (recall).
   - Strictly prohibited files: `apps/app/app/actions.ts`, `todo-actions.ts`,
     `lib/api.ts`, `lib/todo-api.ts`, `lib/tags-api.ts`, `middleware.ts`, `lib/auth/**`,
     `lib/todo-groups.ts`, `lib/todo-query.ts`, `lib/inline-tags.ts`,
@@ -670,11 +721,13 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
     role/text/aria-label/class.
   - No raw HTML, no inline style, no raw colors, no new CSS class in `apps/**`; `form`
     remains the only structural exemption. No `next/navigation` in `packages/ui`.
-  - No unit-test file is required by this task; the port is proved by typecheck + the one
-    targeted E2E below.
+  - `apps/app/test/manifests.test.ts` imports both route layouts' `metadata`, so it is the
+    one unit suite this port affects — it is run (§3's second rung). Proving the port with
+    E2E alone would skip the cheapest check on the layout rewrite.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test commands: `npm run typecheck -w @life/app` and, exactly once, the single
+  - Permitted test commands: `npm run typecheck -w @life/app`,
+    `npm run test:unit -w @life/app -- test/manifests.test.ts`, and, exactly once, the single
     targeted journey E2E:
     `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/journey.prod.spec.ts -g "create → edit → tag → search → reload keeps session → trash → restore → permanent delete"`.
     Expected: 1 passed.
@@ -693,6 +746,7 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
   - [ ] Every frozen e2e selector renders byte-identically; token values unchanged.
   - [ ] No files outside the allowed scope were modified.
   - [ ] `npm run typecheck -w @life/app` passes with zero errors.
+  - [ ] `npm run test:unit -w @life/app -- test/manifests.test.ts` passes.
   - [ ] The single targeted journey E2E passes (1/1).
 
 ## Dependency order and parallelization
@@ -757,7 +811,9 @@ Project Profile. All greps exclude `apps/app/.next/**` build output.
    - `grep -rn "next/link" apps --include='*.tsx'` → zero hits.
    - `grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(" apps packages/ui/src --include='*.css'` → hits
      only inside `packages/ui/src/styles/tokens.css`.
-   - `grep -riE "note|todo|trash|tag-chip" packages/ui/src` → only the documented CSS
+   - `grep -riE "note|trash|tag-chip" packages/ui/src` (AGENTS.md's exact pattern — `todo`
+     is deliberately NOT added: it matches pre-existing source such as `list-manager.tsx`'s
+     `TodoListOption`, `due-date-pill.tsx` and `format-date.ts`) → only the documented CSS
      mapping-table comments and the frozen e2e hook literals/attribute strings recorded in
      Deviations 1; zero domain **identifiers** in the four new block files.
    - `grep -rnE "Note|Todo|List\b" packages/app-kit/src` → zero hits.
