@@ -91,3 +91,51 @@ no visual or interaction changes beyond the login entry.
 3. **Logout:** the app's logout ends the IdP session and **revokes the user's grants
    server-side** (decision B, 2026-09-25) — refresh tokens die immediately. Full
    RP-initiated logout (`end_session`) is deferred to the multi-RP chapter (decision C).
+
+## Post-login destination (`returnTo`)
+
+A gated GET must be able to return the user to the route they asked for instead of
+always landing on the default (`/` → `/notes`).
+
+- **Capture (identity gate):** on `redirect-login`, the gate appends
+  `?returnTo=<path>` to the `/auth/login` redirect — **only for GET navigations outside
+  `/api/*`**. API requests keep the default landing (a GET to a POST-only BFF route
+  after login would be a 405).
+- **Validation:** `returnTo` is accepted only as a local absolute path: it starts with
+  `/`, does not start with `//`, contains no `\`, contains no control character, and is
+  at most 2048 chars. Anything else is rejected and dropped.
+- **Storage:** the value is carried in the **existing `app_auth_attempt` cookie**
+  (the per-attempt code+PKCE cookie) — **no new cookie is introduced**. It is set in the
+  login route before the value enters the cookie, and re-validated on every read
+  (defense in depth: a tampered/crafted cookie cannot redirect off-origin). It is
+  cleared with the attempt cookie in the callback; no separate lifecycle.
+- **Consumption:** on success the callback redirects to the validated `returnTo`; when
+  it is absent or rejected it falls back to `/`, which `permanentRedirect`s to `/notes`
+  (the current default landing).
+- **IdP:** `returnTo` is **not sent to the IdP** and the IdP is unchanged — it lives
+  only in the app RP's cookie and the callback redirect. No IdP-side destination logic
+  exists or is added.
+
+## Per-route PWA manifests
+
+Each app route gets its own PWA identity so a PWA saved from a route opens that route.
+The root stays the default app.
+
+- **Root (default app):** `apps/app/public/manifest.json` stays the default
+  (`start_url "/"`, name "Personal Life — Notes").
+- **`/notes`:** serves `apps/app/public/manifest-notes.json` with
+  `id` / `start_url` / `scope` all `/notes`.
+- **`/todos`:** serves `apps/app/public/manifest-todos.json` with
+  `id` / `start_url` / `scope` all `/todos`.
+- **Wiring:** the nested route segment links its manifest via `metadata.manifest` in a
+  fragment `layout.tsx` (a `{children}` pass-through with zero visual responsibility),
+  overriding the root layout's link for that segment.
+- **Public access:** the manifest files are public — fetchable with no session
+  (the gate serves them like `/manifest.json` and `/icon.svg`).
+- **Mechanism:** nested `manifest.ts` file-convention routes are **NOT used** — in the
+  installed Next.js the `manifest` metadata convention is anchored to the app root, so a
+  colocated `app/<segment>/manifest.ts` is not a route. The verified mechanism is a
+  `public/*.json` manifest linked by `metadata.manifest`.
+
+This change adds files and does not alter token values, `viewport.themeColor`, or the
+e2e selector surface.
