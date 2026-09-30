@@ -4,6 +4,7 @@ import {
   TODO_ALL,
   TODO_LISTS,
   TODO_TAGS,
+  TODO_TRASH,
   createTodosCache,
   generationKey,
   TodosCache,
@@ -79,6 +80,35 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(client.values[0].value).toContain(ENC_PREFIX);
     expect(client.values[0].value).not.toContain('cached todo');
     expect(client.values[0].value).toContain('"tagIds":[2,4]');
+  });
+
+  it('findTrash reads through the cache: two reads consult the repository once under todo:<sub>:v0:trash', async () => {
+    const TITLE = 'TOPSECRET-TRASH-TITLE';
+    const NOTE = 'TOPSECRET-TRASH-NOTE';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const t = await h.todos.create(SUB, { title: TITLE, note: NOTE, tagIds: [3] });
+    await h.todos.remove(SUB, t.id);
+
+    // The write path above only bumps the generation counter; dropping it pins
+    // the trash key at `v0` for the assertion.
+    client.store.delete(generationKey(SUB));
+    h.log.length = 0;
+
+    const first = await h.todos.findTrash(SUB, {});
+    const second = await h.todos.findTrash(SUB, {});
+
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+    expect(first.todos.map((row) => row.title)).toEqual([TITLE]);
+    expect(loaderCalls(h, 'todo')).toBe(1);
+    expect(client.sets).toHaveLength(1);
+    expect(client.sets[0].key).toBe(`todo:${SUB}:v0:trash`);
+    expect(client.sets[0].options).toEqual({ EX: 60 });
+    // The stored value is ciphertext rows exactly as stored — never a decrypted DTO.
+    expect(client.values[0].value).toContain(ENC_PREFIX);
+    expect(client.values[0].value).not.toContain(TITLE);
+    expect(client.values[0].value).not.toContain(NOTE);
+    expect(client.values[0].value).toContain('"tagIds":[3]');
   });
 
   it('no request parameter enters the key: filters/pagination share the one `all` entry', async () => {
@@ -232,6 +262,44 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     client.incrCalls.length = 0;
     await expect(h.todos.update(SUB, 'missing-id', { title: 'nope' })).rejects.toThrow();
     await expect(h.lists.remove(SUB, 'missing-id')).rejects.toThrow();
+    expect(client.incrCalls).toHaveLength(0);
+  });
+
+  it('the four trash writes bump todo:gen:<sub> after the mutation; a failed trash write never bumps', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const gen = generationKey(SUB);
+
+    const a = await h.todos.create(SUB, { title: 'trash-a' });
+    const b = await h.todos.create(SUB, { title: 'trash-b' });
+    const c = await h.todos.create(SUB, { title: 'trash-c' });
+
+    // soft `remove`
+    client.incrCalls.length = 0;
+    await h.todos.remove(SUB, a.id);
+    expect(client.incrCalls).toEqual([gen]);
+
+    // `restore`
+    client.incrCalls.length = 0;
+    await h.todos.restore(SUB, a.id);
+    expect(client.incrCalls).toEqual([gen]);
+
+    // `removePermanent`
+    await h.todos.remove(SUB, b.id);
+    await h.todos.remove(SUB, c.id);
+    client.incrCalls.length = 0;
+    await h.todos.removePermanent(SUB, b.id);
+    expect(client.incrCalls).toEqual([gen]);
+
+    // `emptyTrash`
+    client.incrCalls.length = 0;
+    await h.todos.emptyTrash(SUB);
+    expect(client.incrCalls).toEqual([gen]);
+
+    // A trash verb that matches nothing fails closed and never bumps.
+    client.incrCalls.length = 0;
+    await expect(h.todos.restore(SUB, 'missing-id')).rejects.toThrow();
+    await expect(h.todos.removePermanent(SUB, 'missing-id')).rejects.toThrow();
     expect(client.incrCalls).toHaveLength(0);
   });
 

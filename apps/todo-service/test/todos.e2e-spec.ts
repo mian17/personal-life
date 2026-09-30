@@ -74,6 +74,13 @@ describe('Todos API (e2e)', () => {
     auth(request(server()).patch(`/api/todos/${id}`), token).send(body);
   const remove = (id: string, token = tokenA) =>
     auth(request(server()).delete(`/api/todos/${id}`), token);
+  const trash = (token = tokenA) => auth(request(server()).get('/api/todos/trash'), token);
+  const restore = (id: string, token = tokenA) =>
+    auth(request(server()).post(`/api/todos/${id}/restore`), token);
+  const removePermanent = (id: string, token = tokenA) =>
+    auth(request(server()).delete(`/api/todos/${id}/permanent`), token);
+  const emptyTrash = (token = tokenA) =>
+    auth(request(server()).delete('/api/todos/trash'), token);
   const tags = (token = tokenA) => auth(request(server()).get('/api/todos/tags'), token);
   const createList = (name: string, token = tokenA) =>
     auth(request(server()).post('/api/lists'), token).send({ name });
@@ -100,6 +107,7 @@ describe('Todos API (e2e)', () => {
 
       expect(Object.keys(created.body).sort()).toEqual([
         'createdAt',
+        'deletedAt',
         'done',
         'dueDate',
         'id',
@@ -350,15 +358,87 @@ describe('Todos API (e2e)', () => {
       expect(second.body).toMatchObject({ title: 'lww two', version: 2 });
     });
 
-    it('permanently deletes (no trash): the todo and its tag associations are gone', async () => {
-      const created = await create({ title: 'gone', tagIds: [44] }).expect(201);
-      await remove(created.body.id).expect(200).then((r) => expect(r.body).toEqual({ ok: true }));
+    it('soft-deletes: the todo moves to trash and vanishes from list, GET /:id and PATCH', async () => {
+      const created = await create({ title: 'trash me', tagIds: [44] }).expect(201);
+      const id = created.body.id;
 
-      await getOne(created.body.id).expect(404);
-      const assoc = await dataSource.query('SELECT COUNT(*) AS c FROM todo_tag WHERE todoId = ?', [created.body.id]);
+      const removed = await remove(id).expect(200);
+      expect(removed.body).toEqual({ ok: true });
+
+      const listed = await list().expect(200);
+      expect(listed.body.todos.map((t: { id: string }) => t.id)).not.toContain(id);
+      await getOne(id).expect(404);
+      await patch(id, { title: 'nope' }).expect(404);
+
+      const inTrash = await trash().expect(200);
+      const row = inTrash.body.todos.find((t: { id: string }) => t.id === id);
+      expect(row).toBeDefined();
+      expect(row.deletedAt).not.toBeNull();
+    });
+
+    it('restores the trashed todo with the same createdAt, tags and version', async () => {
+      const created = await create({ title: 'restore me', tagIds: [55] }).expect(201);
+      const id = created.body.id;
+
+      const updated = await patch(id, { title: 'restore me edited' }).expect(200);
+      expect(updated.body.version).toBe(1);
+
+      await remove(id).expect(200);
+      const restored = await restore(id).expect(201);
+      expect(restored.body.createdAt).toBe(created.body.createdAt);
+      expect(restored.body.tagIds).toEqual([55]);
+      expect(restored.body.version).toBe(1);
+      expect(restored.body.deletedAt).toBeNull();
+
+      const listed = await list().expect(200);
+      expect(listed.body.todos.map((t: { id: string }) => t.id)).toContain(id);
+    });
+
+    it('never changes version on trash or restore', async () => {
+      const created = await create({ title: 'version stable' }).expect(201);
+      const id = created.body.id;
+      expect(created.body.version).toBe(0);
+
+      await remove(id).expect(200);
+      const inTrash = await trash().expect(200);
+      const row = inTrash.body.todos.find((t: { id: string }) => t.id === id);
+      expect(row.version).toBe(0);
+
+      const restored = await restore(id).expect(201);
+      expect(restored.body.version).toBe(0);
+    });
+
+    it('permanently deletes the trashed todo (row and todo_tag) and 404s on a second call', async () => {
+      const created = await create({ title: 'gone forever', tagIds: [44] }).expect(201);
+      const id = created.body.id;
+      await remove(id).expect(200);
+
+      const gone = await removePermanent(id).expect(200);
+      expect(gone.body).toEqual({ ok: true });
+
+      const row = await dataSource.query('SELECT COUNT(*) AS c FROM todo WHERE id = ?', [id]);
+      expect(Number(row[0].c)).toBe(0);
+      const assoc = await dataSource.query('SELECT COUNT(*) AS c FROM todo_tag WHERE todoId = ?', [id]);
       expect(Number(assoc[0].c)).toBe(0);
-      // Second delete of the same id is a missing id → 404.
-      await remove(created.body.id).expect(404);
+      const inTrash = await trash().expect(200);
+      expect(inTrash.body.todos.map((t: { id: string }) => t.id)).not.toContain(id);
+
+      // Second permanent delete of the same id is a missing id → 404.
+      await removePermanent(id).expect(404);
+    });
+
+    it('DELETE /api/todos/trash empties the trash and returns the count', async () => {
+      const a = await create({ title: 'empty a' }).expect(201);
+      const b = await create({ title: 'empty b' }).expect(201);
+      await remove(a.body.id).expect(200);
+      await remove(b.body.id).expect(200);
+
+      const emptied = await emptyTrash().expect(200);
+      expect(emptied.body.ok).toBe(true);
+      expect(emptied.body.count).toBeGreaterThanOrEqual(2);
+
+      const inTrash = await trash().expect(200);
+      expect(inTrash.body.todos).toHaveLength(0);
     });
   });
 
