@@ -105,6 +105,7 @@ function noteEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     DB_PATH: `${cfg.stateDir}/note-service.db`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     NOTE_SERVICE_AUDIENCE: 'life-api',
+    NOTE_MASTER_KEY: HARNESS_MASTER_KEY,
   };
 }
 
