@@ -96,6 +96,18 @@ export type { DueDatePillProps, DueDateState } from './components/due-date-pill'
 export { ListManager } from './components/list-manager';
 export type { ListManagerProps, TodoListOption } from './components/list-manager';
 
+export { TrashBlock } from './components/trash-block';
+export type { TrashBlockItem, TrashBlockProps, TrashFormAction } from './components/trash-block';
+
+export { ManagerBlock } from './components/manager-block';
+export type { ManagerBlockProps } from './components/manager-block';
+
+export { ListShell } from './components/list-shell';
+export type { ListShellProps } from './components/list-shell';
+
+export { EditorChrome } from './components/editor-chrome';
+export type { EditorChromeProps, EditorChromeTagPicker } from './components/editor-chrome';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 
