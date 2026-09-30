@@ -53,6 +53,25 @@ describe('GET /auth/callback decision logic (seam-mocked)', () => {
     expect(createSessionMock).toHaveBeenCalledWith(tokens());
   });
 
+  it('surfaces a valid returnTo on success', async () => {
+    const d = deps();
+    const attempt: LoginAttempt = { ...ATTEMPT, returnTo: '/todos' };
+    const outcome = await resolveCallback(CALLBACK, REDIRECT_URI, encodeLoginAttempt(attempt), d);
+
+    expect(outcome).toEqual({ ok: true, sessionId: 'session-1', returnTo: '/todos' });
+  });
+
+  it('drops an unsafe returnTo on success (never surfaces it)', async () => {
+    const d = deps();
+    const handcrafted = Buffer.from(
+      JSON.stringify({ ...ATTEMPT, returnTo: '//evil.com' }),
+    ).toString('base64url');
+    const outcome = await resolveCallback(CALLBACK, REDIRECT_URI, handcrafted, d);
+
+    expect(outcome).toEqual({ ok: true, sessionId: 'session-1' });
+    expect(outcome).not.toHaveProperty('returnTo');
+  });
+
   it('fails closed with no attempt cookie', async () => {
     const d = deps();
     const outcome = await resolveCallback(CALLBACK, REDIRECT_URI, undefined, d);

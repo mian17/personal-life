@@ -26,7 +26,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   );
 
   const res = outcome.ok
-    ? NextResponse.redirect(absoluteUrl(req, '/'), { status: 303 })
+    ? NextResponse.redirect(absoluteUrl(req, outcome.returnTo ?? '/'), { status: 303 })
     : new NextResponse(outcome.message, { status: outcome.status });
 
   // The attempt is single-use regardless of outcome.

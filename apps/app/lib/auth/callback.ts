@@ -15,7 +15,7 @@ import { decodeLoginAttempt } from './login-attempt';
  */
 
 export type CallbackResult =
-  | { ok: true; sessionId: string }
+  | { ok: true; sessionId: string; returnTo?: string }
   | { ok: false; status: number; message: string };
 
 export interface CallbackDeps {
@@ -80,7 +80,7 @@ export async function resolveCallback(
 
   try {
     const session = await deps.createSession(tokens);
-    return { ok: true, sessionId: session.id };
+    return { ok: true, sessionId: session.id, ...(attempt.returnTo ? { returnTo: attempt.returnTo } : {}) };
   } catch {
     // Store unavailable (Redis down/connecting) — the IdP dance succeeded but we
     // cannot persist the session. Fail closed with the same clean failure shape
