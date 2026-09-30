@@ -70,6 +70,24 @@ describe('Button', () => {
     expect(fallback).not.toMatch(/line-height/);
   });
 
+  it('gives both danger controls the icon-button look: bordered --radius-md square', () => {
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    const border = /border:\s*var\(--border-width\)\s+solid\s+var\(--border\)/;
+    const radius = /border-radius:\s*var\(--radius-md\)/;
+
+    const icon = block('.ui-btn--danger.ui-btn--icon');
+    expect(icon).toMatch(border);
+    expect(icon).toMatch(radius);
+
+    const fallback = block('.ui-btn--danger.ui-btn--default');
+    expect(fallback).toMatch(border);
+    expect(fallback).toMatch(radius);
+  });
+
   it('merges className instead of replacing it', () => {
     render(<Button className="legacy-hook">x</Button>);
     const classes = classesOf(screen.getByRole('button'));

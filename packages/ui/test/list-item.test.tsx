@@ -107,6 +107,16 @@ describe('ListItem', () => {
     expect(css).toMatch(/\.ui-list-item\s+form\s*\{[^}]*display:\s*flex/);
   });
 
+  it('centres row action slots while the row link stretches to full height', () => {
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    expect(block('.ui-list-item')).toMatch(/align-items:\s*center/);
+    expect(block('.ui-list-item__link')).toMatch(/align-self:\s*stretch/);
+  });
+
   it('merges className instead of replacing it', () => {
     render(
       <ul>

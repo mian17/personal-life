@@ -175,7 +175,9 @@
    by row layout. Both halves ride the row `li`, so ListItem owns both. */
 .ui-list-item {
   display: flex;
-  align-items: stretch;
+  /* Row action slots (trailing / deleteAction) are fixed-height controls and
+     centre against the row; the row link stretches back to full height below. */
+  align-items: center;
   background: var(--panel);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -187,6 +189,8 @@
   gap: var(--space-0-75);
   flex: 1;
   min-width: 0;
+  /* Keep the full-row tap/hover area even though the row centres its children. */
+  align-self: stretch;
   padding: var(--space-0-9);
   color: inherit;
   text-decoration: none;

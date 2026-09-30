@@ -116,7 +116,10 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 `List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
 layout — the legacy class rode the row `li`, now carried by `ListItem`), `.note-link`,
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
-`.note-snippet`. `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
+`.note-snippet`. The row action slots (trailing / deleteAction) are vertically
+centred against the row (`align-items: center`), while the row link still stretches
+to full height (`align-self: stretch`) so the tap/hover area is unchanged.
+`AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
 `.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
 by `Button`, see `SPEC-ui-atoms`). Element defaults: bare `h1` → `PageTitle`,
 `main` → `PageShell`. The remaining legacy classes are owned per
