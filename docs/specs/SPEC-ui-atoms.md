@@ -27,8 +27,6 @@ for these without any visible change.
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
 <Pill size="chip" | "filter" active? as="span" | "a" | "button" href?
-   // chip and filter now render the SAME pill (one vocabulary across attach
-   // pickers and filter rows); the two sizes remain as the API surface
      disabled? buttonType? onRemove?: () => void removeLabel?: string />
    // remove affordance lives inside the chip (owns .tag-chip-remove);
    //   removeLabel renders verbatim as the remove button's aria-label (frozen)

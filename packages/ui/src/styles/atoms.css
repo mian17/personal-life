@@ -264,18 +264,23 @@
   color: var(--muted);
 }
 
-/* One pill look. `chip` and `filter` are kept as the two API sizes (call sites
-   unchanged) but render identically — a single pill vocabulary across attach
-   pickers and filter rows, per the redesign. */
-.ui-pill--chip,
-.ui-pill--filter {
+.ui-pill--chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-0-3);
+  /* Symmetric horizontal padding. The old rule reserved a narrower right edge
+     for the optional remove-✕ (`onRemove`), which no caller uses — so every
+     real chip (icons live inside, `gap` spaces them) rendered cramped on the
+     right. The chip must read the same with or without its leading icon. */
   padding: var(--space-0-2) var(--space-0-5);
   border: var(--border-width) solid var(--border);
+  font-size: var(--space-0-8);
+}
+
+.ui-pill--filter {
+  padding: var(--space-0-35) var(--space-0-7);
+  text-decoration: none;
   font-size: var(--space-0-85);
-  text-decoration: none; /* pill used as a link */
 }
 
 .ui-pill--active {
