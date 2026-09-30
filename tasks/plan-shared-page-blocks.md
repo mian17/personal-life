@@ -793,6 +793,12 @@ T5 (app-kit)       ┘  depends only on @life/ui's SearchField
    documented exemption class. The gate in *Verification gate* therefore checks the four
    block files for **domain identifiers** separately from the frozen-hook exception, and
    the exact grep result is recorded in the five-lane report. No AGENTS.md text is changed.
+   *Observed at the Blocks checkpoint* (`bcabf93`): the grep over the four new block files
+   hits only `trash-block.tsx` — every line is the block's own name (`TrashBlock`,
+   `TrashBlockItem`, `TrashFormAction`, `Trash2`), a frozen hook class
+   (`trash-restore` / `trash-delete` / `trash-empty`) or frozen copy (`Empty Trash`);
+   `manager-block.tsx`, `list-shell.tsx` and `editor-chrome.tsx` are zero-hit. No domain
+   type, id, or styling rule leaks.
 2. **`app-kit` is the first new workspace since `@life/ui`.** Risk: root workspace scripts
    (`--workspaces --if-present`) silently skip it if the array entry is mistyped. Mitigation:
    T5's definition of done includes `npm run typecheck -w packages/app-kit` and the array
