@@ -22,8 +22,11 @@ jest.mock('@/lib/auth/session-store', () => ({
 import { middleware } from '../middleware';
 import { SESSION_COOKIE } from '@/lib/auth/cookies';
 
-function request(path = '/', cookie?: string): NextRequest {
-  return new NextRequest(`http://localhost${path}`, cookie ? { headers: { cookie } } : undefined);
+function request(path = '/', cookie?: string, method = 'GET'): NextRequest {
+  return new NextRequest(`http://localhost${path}`, {
+    method,
+    ...(cookie ? { headers: { cookie } } : {}),
+  });
 }
 
 describe('middleware identity gate (async store)', () => {
@@ -62,5 +65,33 @@ describe('middleware identity gate (async store)', () => {
 
     expect(res.headers.get('x-middleware-next')).toBe('1');
     expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('carries the requested GET path as returnTo', async () => {
+    mockGet.mockResolvedValue(undefined);
+    const res = await middleware(request('/todos'));
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/auth/login');
+    expect(location).toContain('returnTo=%2Ftodos');
+  });
+
+  it('carries the query string in returnTo', async () => {
+    mockGet.mockResolvedValue(undefined);
+    const res = await middleware(request('/todos?done=false'));
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('returnTo=%2Ftodos%3Fdone%3Dfalse');
+  });
+
+  it('does not carry returnTo for a POST to an API route', async () => {
+    mockGet.mockResolvedValue(undefined);
+    const res = await middleware(request('/api/notes/flush', undefined, 'POST'));
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/auth/login');
+    expect(location).not.toContain('returnTo');
   });
 });

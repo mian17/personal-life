@@ -21,6 +21,10 @@ import { absoluteUrl } from '@/lib/auth/origin';
  * Promise. The `await` below is load-bearing for security: `Boolean(promise)` is
  * always `true`, so a bare `Boolean(sessionStore.get(...))` would pass every
  * unauthenticated request. `middleware.test.ts` pins “no session → login”.
+ *
+ * The login redirect carries the requested path as `returnTo` when it is safe to
+ * resume (a GET navigation outside `/api/*`); the value is validated downstream
+ * by `sanitizeReturnTo`, so it can never move the browser off-origin.
  */
 export async function middleware(req: NextRequest) {
   const hasValidSession = Boolean(await sessionStore.get(req.cookies.get(SESSION_COOKIE)?.value));
@@ -40,7 +44,13 @@ export async function middleware(req: NextRequest) {
   if (decision === 'redirect-login') {
     // Built on the request's external origin; Next normalizes loopback hosts
     // (127.0.0.1 → localhost) in redirects, so the test client uses localhost too.
-    return NextResponse.redirect(absoluteUrl(req, '/auth/login'));
+    const login = absoluteUrl(req, '/auth/login');
+    // Resume where the user was headed, but only for a safe navigation: a GET to
+    // a page (not a POST-only BFF route), and never for API calls.
+    if (req.method === 'GET' && !req.nextUrl.pathname.startsWith('/api/')) {
+      login.searchParams.set('returnTo', `${req.nextUrl.pathname}${req.nextUrl.search}`);
+    }
+    return NextResponse.redirect(login);
   }
   return NextResponse.next();
 }
