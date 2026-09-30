@@ -171,7 +171,7 @@ describe('Seed script (e2e)', () => {
   );
 
   it(
-    'refuses to overwrite an existing user on a second run',
+    'is idempotent: a second run reports the existing user and does not overwrite it',
     async () => {
       const env = {
         SEED_USERNAME: 'seed-user-2',
@@ -180,9 +180,23 @@ describe('Seed script (e2e)', () => {
       };
       expect((await runSeed(env)).code).toBe(0);
 
+      const db = new Database(EXISTING_DB, { readonly: true });
+      const before = db
+        .prepare('SELECT passwordHash FROM user WHERE username = ?')
+        .get('seed-user-2') as { passwordHash: string };
+      db.close();
+
       const second = await runSeed(env);
-      expect(second.code).not.toBe(0);
-      expect(second.stderr).toContain('already exists');
+      expect(second.code).toBe(0);
+      expect(second.stdout).toContain('already exists');
+      expect(second.stdout + second.stderr).not.toContain(FIXTURE_PASSWORD);
+
+      const db2 = new Database(EXISTING_DB, { readonly: true });
+      const after = db2
+        .prepare('SELECT passwordHash FROM user WHERE username = ?')
+        .get('seed-user-2') as { passwordHash: string };
+      db2.close();
+      expect(after.passwordHash).toBe(before.passwordHash);
     },
     30000,
   );

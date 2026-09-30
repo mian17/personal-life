@@ -122,6 +122,32 @@ describe('Seed DB targeting (e2e)', () => {
       rmSync(scratch, { force: true });
     }
   }, 30000);
+
+  it('NODE_ENV=production with NO credentials set refuses (never defaults prod creds)', async () => {
+    const scratch = join(__dirname, 'test-seed-env-nocreds.db');
+    rmSync(scratch, { force: true });
+    try {
+      const res = await runSeed({ NODE_ENV: 'production', DB_PATH: scratch });
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toContain('SEED_USERNAME and SEED_PASSWORD must both be set');
+      expect(existsSync(scratch)).toBe(false);
+    } finally {
+      rmSync(scratch, { force: true });
+    }
+  }, 30000);
+
+  it('non-production with NO credentials seeds the default dev user', async () => {
+    const scratch = join(__dirname, 'test-seed-env-devdefault.db');
+    rmSync(scratch, { force: true });
+    try {
+      const res = await runSeed({ NODE_ENV: 'test', DB_PATH: scratch });
+      expect(res.code).toBe(0);
+      expect(res.stdout).toContain('user "dev"');
+      expect(existsSync(scratch)).toBe(true);
+    } finally {
+      rmSync(scratch, { force: true });
+    }
+  }, 30000);
 });
 
 describe('DB path resolver', () => {

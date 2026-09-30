@@ -14,7 +14,8 @@
     "packages/cache"
   ],
   "scripts": {
-    "dev": "node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,app,idp -c blue,yellow,cyan,green,magenta \"npm:dev -w apps/note-service\" \"PORT=3104 npm run dev -w apps/tags-service\" \"PORT=3105 npm run dev -w apps/todo-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",
+    "dev:seed": "npm run seed -w apps/idp",
+    "dev": "npm run dev:seed && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,app,idp -c blue,yellow,cyan,green,magenta \"npm:dev -w apps/note-service\" \"PORT=3104 npm run dev -w apps/tags-service\" \"PORT=3105 npm run dev -w apps/todo-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

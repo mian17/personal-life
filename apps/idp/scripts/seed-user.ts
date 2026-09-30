@@ -15,9 +15,21 @@ import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
  * default target is `data/scratch.db`, and pointing at the production DB is
  * refused outright — before any file or DB write.
  */
+/**
+ * Default dev credentials. Non-production only (see the guarantee below) — a
+ * convenience so a fresh scratch DB is usable without running the seed by hand.
+ * The values are checked into the dev env example; they are not secrets.
+ */
+const DEV_SEED_USERNAME = 'dev';
+const DEV_SEED_PASSWORD = 'dev-password-not-a-secret';
+
 async function main(): Promise<void> {
-  const username = process.env.SEED_USERNAME?.trim();
-  const password = process.env.SEED_PASSWORD;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Credentials: production MUST supply them explicitly (no defaulted prod
+  // credentials, ever). Non-production falls back to the documented dev pair.
+  const username = process.env.SEED_USERNAME?.trim() || (isProduction ? undefined : DEV_SEED_USERNAME);
+  const password = process.env.SEED_PASSWORD ?? (isProduction ? undefined : DEV_SEED_PASSWORD);
 
   if (!username || !password) {
     console.error('SEED_USERNAME and SEED_PASSWORD must both be set');
@@ -25,7 +37,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  const isProduction = process.env.NODE_ENV === 'production';
   const dbPath = resolveDbPath();
 
   // Refuse to touch the production identity DB outside production, before any
@@ -52,8 +63,9 @@ async function main(): Promise<void> {
     const users = app.get(UsersService);
 
     if (await users.findByUsername(username)) {
-      console.error(`user "${username}" already exists`);
-      process.exitCode = 1;
+      // Idempotent: an already-seeded user is success, not an error — so a
+      // dev-start hook can call this on every boot without failing.
+      console.log(`user "${username}" already exists — nothing to do`);
       return;
     }
 
