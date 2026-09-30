@@ -10,18 +10,25 @@ export interface EditorToolbarBack {
 
 export interface EditorToolbarProps {
   back: EditorToolbarBack;
+  /** A centred screen title. Rendered as a real `<h1>`, so every editor screen
+   *  has a heading (create/edit screens are otherwise headed-less). */
+  title?: ReactNode;
   status?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
 
-export function EditorToolbar({ back, status, actions, className }: EditorToolbarProps) {
+export function EditorToolbar({ back, title, status, actions, className }: EditorToolbarProps) {
   return (
     <div className={cx('ui-editor-toolbar', className)}>
       <IconButton label={back.label} onClick={back.onBack}>
         <ChevronLeft size={20} aria-hidden />
       </IconButton>
-      {status}
+      {title != null ? (
+        <h1 className="ui-editor-toolbar__title">{title}</h1>
+      ) : (
+        status
+      )}
       {actions}
     </div>
   );

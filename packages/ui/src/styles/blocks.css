@@ -101,6 +101,17 @@
   margin-bottom: var(--space-0-5);
 }
 
+/* Centred screen title (back · title · action), so create/edit screens carry a
+   heading. Sized below the list `PageTitle` (an editor is a sub-screen). */
+.ui-editor-toolbar__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  font-size: var(--space-0-95);
+  font-weight: 600;
+}
+
 /* ----------------------------------------------------- EditorScreen */
 
 .ui-editor-screen {

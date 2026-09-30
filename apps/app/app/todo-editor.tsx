@@ -57,6 +57,7 @@ export function TodoEditor({
     <EditorScreen>
       <EditorToolbar
         back={{ label: 'Back', onBack: () => router.back() }}
+        title="New Todo"
         actions={
           <IconButton label="Save todo" onClick={save} disabled={!canSave}>
             <Check size={20} aria-hidden />

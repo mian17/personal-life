@@ -7,6 +7,17 @@ function classesOf(el: Element): string[] {
 }
 
 describe('EditorToolbar', () => {
+  it('renders the title as a real h1 (heading) when given', () => {
+    render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} title="New Todo" />);
+    const heading = screen.getByRole('heading', { level: 1, name: 'New Todo' });
+    expect(heading.className).toContain('ui-editor-toolbar__title');
+  });
+
+  it('renders no heading when no title is given', () => {
+    render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} />);
+    expect(screen.queryByRole('heading')).toBeNull();
+  });
+
   it('renders a container with the ui-editor-toolbar class', () => {
     render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} />);
     const toolbar = document.querySelector('.ui-editor-toolbar')!;

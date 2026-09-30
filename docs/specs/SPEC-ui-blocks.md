@@ -40,7 +40,8 @@ and the notes app's current pages map onto these one-to-one.
 <EditorStack gap?="sm|md|lg">children</EditorStack> // full-height field stack under an EditorToolbar
                                                    //   (flex:1, token gap; no outer margins; added by the
                                                    //   /todos redesign)
-<EditorToolbar back status? actions? />            // (unchanged) back is {label,onBack}; actions slot
+<EditorToolbar back title? status? actions? />    // back {label,onBack}; title = centred <h1>
+                                                   //   (create/edit screens carry a heading)
                                                    //   routing stays in the app
 <EditorScreen>children</EditorScreen>            // full-screen fixed editor container
                                                  //   (safe-area aware) — owns .editor-screen
