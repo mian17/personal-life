@@ -74,6 +74,9 @@ export type { PillGroupProps } from './components/pill-group';
 export { PageActions } from './components/page-actions';
 export type { PageActionsProps } from './components/page-actions';
 
+export { Stack } from './components/stack';
+export type { StackGap, StackProps } from './components/stack';
+
 export { TagPicker } from './components/tag-picker';
 export type { TagOption, TagPickerProps } from './components/tag-picker';
 

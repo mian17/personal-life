@@ -21,6 +21,7 @@
  * | SearchField    | `.search-box` container only (the input visuals are Input's) |
  * | PillGroup      | `.editor-legacy-tags` (the chips are Pill's) |
  * | PageActions    | `.trash-actions`                  |
+ * | Stack          | (new) vertical-rhythm grid; no legacy class |
  * | TagPicker      | (new) tag attach/detach surface; the chips are Pill's, the create input Input's |
  * | TagManager     | (new) tag registry surface; rows are a local ul, controls are Input/IconButton |
  * | ListManager    | (new) todo-list registry surface; controls are Input/IconButton |
@@ -261,6 +262,27 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--space-1-25);
+}
+
+/* -------------------------------------------------------------- Stack */
+
+/* Purely presentational vertical rhythm: grid so children stack regardless of
+   their own `display`; the only spacing is the `gap`, mapped from `gap` prop to
+   the spacing tokens. No outer margins — a section's job. */
+.ui-stack {
+  display: grid;
+}
+
+.ui-stack--sm {
+  gap: var(--space-0-5);
+}
+
+.ui-stack--md {
+  gap: var(--space-1);
+}
+
+.ui-stack--lg {
+  gap: var(--space-2);
 }
 
 /* -------------------------------------------------------- TagPicker */
