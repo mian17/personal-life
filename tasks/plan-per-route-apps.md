@@ -212,35 +212,35 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
 ## Task List
 
 ### Phase 1 — Spec (spec-first)
-- [ ] T1: amend `docs/specs/SPEC-app-rp.md` with the `returnTo` contract and the per-route PWA manifest contract.
+- [x] T1: amend `docs/specs/SPEC-app-rp.md` with the `returnTo` contract and the per-route PWA manifest contract.
 
 ### Checkpoint: Spec
-- [ ] `grep -n "returnTo" docs/specs/SPEC-app-rp.md` is non-empty.
-- [ ] `grep -n "manifest-notes.json" docs/specs/SPEC-app-rp.md` is non-empty.
+- [x] `grep -n "returnTo" docs/specs/SPEC-app-rp.md` is non-empty.
+- [x] `grep -n "manifest-notes.json" docs/specs/SPEC-app-rp.md` is non-empty.
 
 ### Phase 2 — Login chain (`returnTo`)
-- [ ] T2: `sanitizeReturnTo` + `returnTo` on the attempt cookie (`login-attempt.ts`).
-- [ ] T3: middleware appends `returnTo` to the login redirect (`middleware.ts`).
-- [ ] T4: login route validates + stores `returnTo` (`app/auth/login/route.ts`).
-- [ ] T5: callback resolves + redirects to `returnTo` (`lib/auth/callback.ts`, `app/auth/callback/route.ts`).
+- [x] T2: `sanitizeReturnTo` + `returnTo` on the attempt cookie (`login-attempt.ts`).
+- [x] T3: middleware appends `returnTo` to the login redirect (`middleware.ts`).
+- [x] T4: login route validates + stores `returnTo` (`app/auth/login/route.ts`).
+- [x] T5: callback resolves + redirects to `returnTo` (`lib/auth/callback.ts`, `app/auth/callback/route.ts`).
 
 ### Checkpoint: Login chain
-- [ ] `npm run typecheck -w @life/app` exits 0.
-- [ ] `npm run test:unit -w @life/app -- test/login-attempt.test.ts test/middleware.test.ts test/login-route.test.ts test/callback.test.ts test/callback-route.test.ts` green.
+- [x] `npm run typecheck -w @life/app` exits 0.
+- [x] `npm run test:unit -w @life/app -- test/login-attempt.test.ts test/middleware.test.ts test/login-route.test.ts test/callback.test.ts test/callback-route.test.ts` green.
 
 ### Phase 3 — Per-route PWA identity
-- [ ] T6: manifests + nested layouts + gate public paths.
+- [x] T6: manifests + nested layouts + gate public paths.
 
 ### Checkpoint: PWA
-- [ ] `npm run typecheck -w @life/app` exits 0.
-- [ ] `npm run test:unit -w @life/app -- test/manifests.test.ts test/gate.test.ts` green.
+- [x] `npm run typecheck -w @life/app` exits 0.
+- [x] `npm run test:unit -w @life/app -- test/manifests.test.ts test/gate.test.ts` green.
 
 ### Phase 4 — E2E
-- [ ] T7a: pass `NOTE_MASTER_KEY` to note-service in the prod e2e stack (`apps/app/test/e2e/stack.ts`) — unblocks any prod e2e run.
-- [ ] T7: extend the journey suite with the `/todos` landing and per-route manifest assertions; run the two new tests once.
+- [x] T7a: pass `NOTE_MASTER_KEY` to note-service in the prod e2e stack (`apps/app/test/e2e/stack.ts`) — unblocks any prod e2e run.
+- [x] T7: extend the journey suite with the `/todos` landing and per-route manifest assertions; run the two new tests once.
 
 ### Phase 5 — Close
-- [ ] T8: five-lane verification gate (global protocol §7.6) on the final state.
+- [x] T8: five-lane verification gate (global protocol §7.6) on the final state.
 
 ## Tasks in §5 template form
 
@@ -285,10 +285,10 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     only); max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] Code meets all implementation requirements.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] The two grep verifications return non-empty.
-  - [ ] No placeholder or contradictory text remains.
+  - [x] Code meets all implementation requirements.
+  - [x] No files outside the allowed scope were modified.
+  - [x] The two grep verifications return non-empty.
+  - [x] No placeholder or contradictory text remains.
 
 ---
 
@@ -334,12 +334,12 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `LoginAttempt.returnTo` and `sanitizeReturnTo` exist with the exact
+  - [x] `LoginAttempt.returnTo` and `sanitizeReturnTo` exist with the exact
         signatures/contract above.
-  - [ ] The existing callback round-trip expectation is preserved.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] `npm run test:unit -w @life/app -- test/login-attempt.test.ts` passes.
+  - [x] The existing callback round-trip expectation is preserved.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] `npm run test:unit -w @life/app -- test/login-attempt.test.ts` passes.
 
 ---
 
@@ -385,12 +385,12 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] GET gated requests carry `returnTo` = requested path+search; API/POST
+  - [x] GET gated requests carry `returnTo` = requested path+search; API/POST
         requests do not.
-  - [ ] The gate decision logic is unchanged.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] `npm run test:unit -w @life/app -- test/middleware.test.ts` passes.
+  - [x] The gate decision logic is unchanged.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] `npm run test:unit -w @life/app -- test/middleware.test.ts` passes.
 
 ---
 
@@ -431,12 +431,12 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `/auth/login` validates the query value with `sanitizeReturnTo` and
+  - [x] `/auth/login` validates the query value with `sanitizeReturnTo` and
         stores only a valid `returnTo`.
-  - [ ] The 503 failure path is unchanged.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] `npm run test:unit -w @life/app -- test/login-route.test.ts` passes.
+  - [x] The 503 failure path is unchanged.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] `npm run test:unit -w @life/app -- test/login-route.test.ts` passes.
 
 ---
 
@@ -485,12 +485,12 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `resolveCallback` surfaces the validated `returnTo`; the route redirects
+  - [x] `resolveCallback` surfaces the validated `returnTo`; the route redirects
         to it with a `/` fallback.
-  - [ ] All existing failure-path behaviour is unchanged.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] The prescribed two-file test command passes.
+  - [x] All existing failure-path behaviour is unchanged.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] The prescribed two-file test command passes.
 
 ---
 
@@ -552,14 +552,14 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] Both manifest files exist with the exact fields above; the root manifest
+  - [x] Both manifest files exist with the exact fields above; the root manifest
         is unchanged.
-  - [ ] `/notes` and `/todos` layouts export the matching `metadata.manifest`
+  - [x] `/notes` and `/todos` layouts export the matching `metadata.manifest`
         and are fragment pass-throughs.
-  - [ ] Both new manifest paths are in `PUBLIC_EXACT`.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] The prescribed two-file test command passes.
+  - [x] Both new manifest paths are in `PUBLIC_EXACT`.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] The prescribed two-file test command passes.
 
 ---
 
@@ -594,9 +594,9 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     The behavioural proof is T7's single targeted e2e run, recorded there.
 
 [DEFINITION OF DONE]
-  - [ ] `noteEnv` returns `NOTE_MASTER_KEY: HARNESS_MASTER_KEY`.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] `noteEnv` returns `NOTE_MASTER_KEY: HARNESS_MASTER_KEY`.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
 
 ---
 
@@ -644,12 +644,12 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
     existing `/notes` landing tests remain valid unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] The two new tests assert the `/todos` landing and the per-route manifest
+  - [x] The two new tests assert the `/todos` landing and the per-route manifest
         links.
-  - [ ] No existing test/selector changed.
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] The prescribed targeted E2E command passes (2/2).
+  - [x] No existing test/selector changed.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] The prescribed targeted E2E command passes (2/2).
 
 ---
 
@@ -701,10 +701,10 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
   - The gate's evidence is the per-round lane reports (verdicts + blockers).
 
 [DEFINITION OF DONE]
-  - [ ] Both suite-gate commands pass.
-  - [ ] Five lanes each return a verdict; every lane is PASS (N/N).
-  - [ ] No partial verdict was treated as done; no commit outside explicit paths.
-  - [ ] Any blocker was fixed and only the failed lanes were re-run.
+  - [x] Both suite-gate commands pass.
+  - [x] Five lanes each return a verdict; every lane is PASS (N/N).
+  - [x] No partial verdict was treated as done; no commit outside explicit paths.
+  - [x] Any blocker was fixed and only the failed lanes were re-run.
 
 ## Dependency order and parallelization
 
