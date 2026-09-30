@@ -4,11 +4,11 @@ import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
 import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
-import { TodoComposer } from '../todo-composer';
 import { TodoSearchBox } from '../todo-search-box';
 import { ListManagerSection } from '../list-manager-section';
 import { TagManagerSection } from '../tag-manager-section';
 import {
+  FabLink,
   IconLink,
   NavBar,
   PageShell,
@@ -20,7 +20,7 @@ import {
   ThemeToggle,
   todayIso,
 } from '@life/ui';
-import { StickyNote } from 'lucide-react';
+import { Plus, StickyNote } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,8 +97,6 @@ export default async function TodosPage({
 
       <PageTitle>Todos</PageTitle>
 
-      <TodoComposer lists={lists} availableTags={availableTags} />
-
       <TodoSearchBox q={q} listId={list} tag={tag} done={done} />
 
       <PillGroup label="Status" aria-label="Status">
@@ -137,6 +135,10 @@ export default async function TodosPage({
       <Section label="Tags">
         <TagManagerSection />
       </Section>
+
+      <FabLink href="/todos/new" label="New todo">
+        <Plus size={28} strokeWidth={2.5} aria-hidden />
+      </FabLink>
     </PageShell>
   );
 }

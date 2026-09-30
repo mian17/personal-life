@@ -1,44 +1,47 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { List } from '@life/shared';
 import {
   Button,
+  EditorScreen,
+  EditorToolbar,
   IconButton,
   Input,
   Pill,
   PillGroup,
-  Row,
-  Stack,
   TagPicker,
   Textarea,
   type TagOption,
 } from '@life/ui';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { createTodoAction } from './todo-actions';
 
 /**
- * The `/todos` composer: title (required), optional note, due date, list, and
- * tags — every control an `@life/ui` primitive. Submitting clears the draft for
- * the next capture.
+ * The `/todos/new` editor screen — the FAB target, mirroring the notes editor
+ * pattern (full-screen `EditorScreen` + `EditorToolbar`, not an always-open
+ * inline form). Title is required; note, due date, list and tags are optional.
+ * All visuals come from `@life/ui`.
  */
-export function TodoComposer({
+export function TodoEditor({
   lists,
   availableTags,
 }: {
   lists: List[];
   availableTags: TagOption[];
 }) {
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [listId, setListId] = useState<string | null>(null);
   const [tagIds, setTagIds] = useState<number[]>([]);
 
-  const canCreate = title.trim() !== '';
+  const canSave = title.trim() !== '';
 
-  function submit() {
-    if (!canCreate) return;
+  function save() {
+    if (!canSave) return;
     void createTodoAction({
       title,
       note: note.trim() === '' ? undefined : note,
@@ -46,45 +49,50 @@ export function TodoComposer({
       listId: listId ?? undefined,
       tagIds,
     });
-    setTitle('');
-    setNote('');
-    setDueDate('');
-    setListId(null);
-    setTagIds([]);
+    router.back();
   }
 
   return (
-    <Stack role="group" aria-label="New todo" gap="md">
+    <EditorScreen>
+      <EditorToolbar
+        back={{ label: 'Back', onBack: () => router.back() }}
+        actions={
+          <IconButton label="Save todo" onClick={save} disabled={!canSave}>
+            <Check size={20} aria-hidden />
+          </IconButton>
+        }
+      />
+
       <Input
         type="text"
         aria-label="Todo title"
         placeholder="What needs doing?"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            submit();
-          }
-        }}
+        autoFocus
       />
+
       <Textarea
         aria-label="Todo note"
         placeholder="Details (optional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
-      <Row gap="sm">
+
+      <PillGroup label="Due" aria-label="Due date">
         <Input
           type="date"
           aria-label="Due date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
         />
-        <IconButton label="Clear due date" onClick={() => setDueDate('')}>
-          <X size={16} aria-hidden />
-        </IconButton>
-      </Row>
+        {dueDate !== '' && (
+          <IconButton label="Clear due date" onClick={() => setDueDate('')}>
+            <X size={16} aria-hidden />
+          </IconButton>
+        )}
+      </PillGroup>
+
       {lists.length > 0 && (
         <PillGroup label="List" aria-label="List">
           <Pill
@@ -110,6 +118,7 @@ export function TodoComposer({
           ))}
         </PillGroup>
       )}
+
       <TagPicker
         tags={availableTags}
         selectedIds={tagIds}
@@ -118,9 +127,10 @@ export function TodoComposer({
         }
         label="Tags"
       />
-      <Button variant="primary" onClick={submit} disabled={!canCreate}>
+
+      <Button variant="primary" onClick={save} disabled={!canSave}>
         Add todo
       </Button>
-    </Stack>
+    </EditorScreen>
   );
 }
