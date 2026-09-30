@@ -92,4 +92,8 @@ lead's final integrated run, and the user's e2e pass is separate.
   roles), T4's e2e note corrected (the frozen suite has no `/todos` navigation),
   the heading-query claim corrected, the residual `ui-layout` naming eliminated
   (files renamed `-ui-blocks-revision`), T3's primitive-reuse plan added, and the
-  presentational coverage gap stated explicitly. §6 round 3: PENDING.
+  presentational coverage gap stated explicitly.
+- 2026-09-30: **§6 plan-validation round 3: PLAN VALIDATED (0 findings)** — all 12
+  round-2 items verified closed against the tree; whole-plan walk clean (coverage,
+  commands, §5 compliance, frozen surface, root cause). **Gate open — implementation
+  starts at T1.**
