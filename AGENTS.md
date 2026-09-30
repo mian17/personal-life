@@ -9,6 +9,7 @@
 | `max-test-runs` | 2 |
 | `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md` value table); PWA constants (`public/manifest.json`, `viewport.themeColor`) |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
+| `lessons` | `docs/lessons/` |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
 thinking discipline) are in the global protocol at `~/.config/opencode/AGENTS.md`.
