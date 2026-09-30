@@ -99,7 +99,7 @@ export function TodoEditor({
         {lists.length > 0 && (
           <PillGroup label="List" aria-label="List">
             <Pill
-              as="button"
+              as="a"
               size="filter"
               active={listId === null}
               aria-pressed={listId === null}
@@ -110,7 +110,7 @@ export function TodoEditor({
             {lists.map((list) => (
               <Pill
                 key={list.id}
-                as="button"
+                as="a"
                 size="filter"
                 active={listId === list.id}
                 aria-pressed={listId === list.id}
