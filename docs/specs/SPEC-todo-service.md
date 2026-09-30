@@ -24,7 +24,8 @@ todo(
   ownerSub  TEXT NOT NULL,
   version   INTEGER NOT NULL DEFAULT 0,
   createdAt DATETIME NOT NULL,
-  updatedAt DATETIME NOT NULL
+  updatedAt DATETIME NOT NULL,
+  deletedAt DATETIME NULL            -- null = active
 )
 todo_tag(todoId TEXT, tagId INTEGER, PRIMARY KEY(todoId, tagId),
          FOREIGN KEY(todoId) REFERENCES todo(id) ON DELETE CASCADE)  -- TagRefs, no names
@@ -46,8 +47,11 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   (note-service's split: the service reads `DB_PATH` inline, scripts resolve their
   own vars); compose bind-mounts
   `./apps/todo-service/data:/data` with `DB_PATH=/data/todo.db`.
-- No trash (decision): `DELETE` is permanent; trash is a v2 candidate alongside
-  recurrence/subtasks/priorities.
+- Soft delete / trash (user-authorised full soft-delete scope): `deletedAt DATETIME
+  NULL` — null = active; `DELETE /api/todos/:id` is a **soft** delete (sets
+  `deletedAt`) and the todo stays recoverable from `GET /api/todos/trash`. Trash and
+  restore verbs never change `version` (only `update` bumps the OCC counter). No
+  separate trash table, no scheduled purge (mirrors `SPEC-notes.md`).
 
 ## Behavior / API (kernel contracts apply)
 
@@ -67,7 +71,20 @@ the app consumes, never re-declares (the orchestrator seam is the wire contract)
   cache hits (AGENTS.md Contract 2).
 - `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?,
   listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins) ·
-  `DELETE /api/todos/:id` (permanent).
+  `DELETE /api/todos/:id` (**soft** delete: sets `deletedAt`).
+- `GET /api/todos/trash?{limit, cursor}` → cursor page of soft-deleted todos,
+  ordered `deletedAt DESC, id DESC` (cursor payload `base64(<deletedAt>|<id>)`; same
+  `limit` rules as the main list) · `DELETE /api/todos/trash` → `{ok: true, count}`
+  (empties the caller's trash).
+- `POST /api/todos/:id/restore` → clears `deletedAt`, preserving `createdAt`, tags,
+  and `version` · `DELETE /api/todos/:id/permanent` → hard-deletes a trashed todo
+  (404 if it is not in trash; a failed mutation never bumps the generation).
+- **Declare the static `trash` routes before the `:id` routes** (`GET`/`DELETE
+  /api/todos/trash` before `GET /api/todos/:id`) so `/trash` is not parsed as an id
+  (kernel route-ordering clause, notes precedent).
+- Trashed todos are hidden from `GET /api/todos` (list), `GET /api/todos/:id`,
+  `PATCH /api/todos/:id`, and `GET /api/todos/tags` (a tag with only trashed todos is
+  hidden) — only the trash routes surface them.
 - Lists: `POST /api/lists {name}` · `GET /api/lists` · `PATCH /api/lists/:id
   {name, expectedVersion?}` (case-insensitive collision within owner → 409; stale
   `expectedVersion` → 409, omit = last-write-wins) · `DELETE /api/lists/:id` —
@@ -83,13 +100,23 @@ the app consumes, never re-declares (the orchestrator seam is the wire contract)
 
 - Cached shapes: serialized **ciphertext** todo rows (`todo:all` — the owner's full
   row set; **each row carries its `tagIds`** so the tag filter and counts serve from
-  the hit), list rows (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
+  the hit), trash rows (`todo:trash` — the owner's soft-deleted rows serialized
+  exactly as stored, each carrying its `deletedAt` and `tagIds`), list rows
+  (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
   ids + counts, no ciphertext by design).
-- Key composition `todo:<sub>:v<gen>:<rest>`. `q`/`tagId`/`listId`/`done`/`due*`/
-  cursor/limit never enter the key — `listId` and every other filter are applied in
-  memory off `todo:all` after the hit; one entry serves every filter/page variant.
-- Per-owner generation counter bumped on every successful write; 60s TTL backstop;
-  fail-open on cache errors (direct loader; never plaintext on the fallback path).
+- Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash`.
+  `q`/`tagId`/`listId`/`done`/`due*`/ cursor/limit never enter the key — `listId` and
+  every other filter are applied in memory off `todo:all` after the hit; one entry
+  serves every filter/page variant, and one trash entry serves every trash
+  cursor/limit variant.
+- Loader guards: the `todo:all` loader (and the `findOne`/`update`/`todo:tags`
+  paths) apply `deletedAt IS NULL`, so a generation bump makes a trashed row vanish
+  from the list; the `todo:trash` loader applies `deletedAt IS NOT NULL`.
+- Per-owner generation counter bumped **after** every successful write — including
+  the four trash writes (`remove` soft, `restore`, `removePermanent`, `emptyTrash`)
+  on the same `todo:all` counter; a failed mutation never bumps; 60s TTL backstop;
+  fail-open on cache errors (direct loader); the fallback path never writes
+  plaintext.
 - Decrypt, filter, and paginate after every hit. No plaintext in Redis.
 
 ## Health
@@ -122,19 +149,25 @@ Build:     npm run build -w @life/todo-service
    serialized values — the `todo:tags` shape is ids+counts metadata by design and
    asserts no plaintext content (no names); gen-counter invalidation; fail-open.
 8. Health routes; version/`expectedVersion` 409 semantics.
+9. Soft delete / trash: a soft-deleted todo is absent from the list, `GET /:id`
+   (404), and tag filters but present in `GET /api/todos/trash`; restore returns it
+   with the same `createdAt`, tags, and `version`; permanent delete removes it (and
+   its `todo_tag` rows) and 404s on a second call; `DELETE /api/todos/trash` empties
+   the caller's trash and returns a `count`; trash/restore never bump `version`.
 
 ## Boundaries
 
 - Always: kernel contracts as written; content encrypted; cache values
   ciphertext-only.
-- Ask first: adding fields beyond the I2 MVP (recurrence/subtasks/priorities/trash
-  are v2 and need their own intent).
+- Ask first: adding fields beyond the I2 MVP (recurrence/subtasks/priorities are v2
+  and need their own intent; trash was moved out of this list by the user-authorised
+  full soft-delete scope).
 - Never: store tag names (M1); plaintext in cache or logs; SQL content matching over
   encrypted columns.
 
 ## Success Criteria
 
-1. `apps/todo-service` boots with `TODO_MASTER_KEY`; all eight test groups green.
+1. `apps/todo-service` boots with `TODO_MASTER_KEY`; all nine test groups green.
 2. A todo created with tags + a list round-trips through cache and cold paths
    identically.
 3. `SPEC-todo-ui` can build `/todos` entirely against these contracts.

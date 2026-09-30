@@ -20,9 +20,11 @@ both apps — so tags feel identical everywhere (I3).
   paths — the explicitly approved changes; no selector/text/role in the frozen e2e
   surface changes.
 - **`/todos`:** grouped `Overdue` / `Today` / `Later` / `No date`; done toggle;
-  create (composer/FAB); inline edit title, note, due date, list; permanent delete;
-  filters by list, tag, and done state. Data via the todo-service API (server
-  actions compose registry + todo calls — BFF composition, MAP M4).
+  create (composer/FAB); inline edit title, note, due date, list; **soft delete to
+  trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
+  Trash entry in the toolbar; filters by list, tag, and done state. Data via the
+  todo-service API (server actions compose registry + todo calls — BFF composition,
+  MAP M4).
 - **Shared tag UX:** tag picker (attach/detach by `tagId`) and tag manager (create,
   rename, delete) usable from both `/notes` and `/todos`, backed by `tags-service`
   exclusively. Rename/delete in either app reflect everywhere immediately (single
