@@ -244,6 +244,7 @@
 .ui-tag-filter-nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--space-0-5);
   margin: var(--space-1-25) 0;
 }
@@ -279,6 +280,17 @@
 
 .ui-search-box {
   margin: 0 0 var(--space-1);
+}
+
+/* ---------------------------------------------------------- FieldLabel */
+
+/* One label treatment for a row of chips/pills: quiet, on the text line. Shared
+   by PillGroup-style rows, TagPicker and TagFilterNav so a label reads the same
+   everywhere (the user asked for consistency across screens). */
+.ui-field-label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--space-0-85);
 }
 
 /* ---------------------------------------------------------- PillGroup */
@@ -375,20 +387,20 @@
 
 /* -------------------------------------------------------- TagPicker */
 
-/* A picker is a labelled region even when the label was previously aria-only:
-   without a visible label, a row of chips reads as an unlabelled control. */
-.ui-tag-picker__label {
-  display: block;
-  font-size: var(--space-1-25);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0;
-  margin-block-end: var(--space-0-5);
+/* A picker is a labelled region: the label sits BESIDE the chips (one row,
+   the `PillGroup` pattern) so it reads as a labelled control, not an orphan
+   row. `align-items: baseline` keeps the label on the chips' text line. */
+.ui-tag-picker__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-0-5);
 }
 
 .ui-tag-picker__tags {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-0-4);
 }
 

@@ -60,7 +60,7 @@ export default async function NotesPage({
 
       <SearchBox q={q} tag={tag} />
 
-      {namedTags.length > 0 && <TagFilterNav items={filterItems} />}
+      {namedTags.length > 0 && <TagFilterNav label="Tags" items={filterItems} />}
 
       <NoteList notes={notes} />
 

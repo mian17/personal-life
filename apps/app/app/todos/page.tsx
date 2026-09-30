@@ -126,8 +126,8 @@ export default async function TodosPage({
         </Pill>
       </PillGroup>
 
-      {namedTags.length > 0 && <TagFilterNav items={tagFilterItems} />}
-      {lists.length > 0 && <TagFilterNav items={listFilterItems} />}
+      {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
+      {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
 
       <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
 

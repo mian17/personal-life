@@ -48,25 +48,27 @@ export function TagPicker({
 
   return (
     <div role="group" aria-label={label} className={cx('ui-tag-picker', className)} {...rest}>
-      <h2 className="ui-tag-picker__label">{label}</h2>
-      <div className="ui-tag-picker__tags">
-        {tags.map((tag) => {
-          const selected = selectedIds.includes(tag.id);
-          return (
-            <Pill
-              key={tag.id}
-              as="button"
-              size="chip"
-              active={selected}
-              aria-pressed={selected}
-              disabled={disabled}
-              onClick={() => onToggle(tag.id)}
-            >
-              {selected ? <Check size={14} aria-hidden /> : <Plus size={14} aria-hidden />}
-              {tag.name}
-            </Pill>
-          );
-        })}
+      <div className="ui-tag-picker__row">
+        <span className="ui-field-label">{label}</span>
+        <div className="ui-tag-picker__tags">
+          {tags.map((tag) => {
+            const selected = selectedIds.includes(tag.id);
+            return (
+              <Pill
+                key={tag.id}
+                as="button"
+                size="chip"
+                active={selected}
+                aria-pressed={selected}
+                disabled={disabled}
+                onClick={() => onToggle(tag.id)}
+              >
+                {selected ? <Check size={14} aria-hidden /> : <Plus size={14} aria-hidden />}
+                {tag.name}
+              </Pill>
+            );
+          })}
+        </div>
       </div>
       {onCreate != null && (
         <div className="ui-tag-picker__create">
