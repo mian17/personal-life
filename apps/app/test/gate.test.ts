@@ -83,7 +83,16 @@ describe('identity gate (IdP session)', () => {
 
 describe('public paths', () => {
   it('exempts the auth routes and static assets', () => {
-    for (const p of ['/auth/login', '/auth/callback', '/auth/logout', '/manifest.json', '/icon.svg', '/favicon.ico']) {
+    for (const p of [
+      '/auth/login',
+      '/auth/callback',
+      '/auth/logout',
+      '/manifest.json',
+      '/manifest-notes.json',
+      '/manifest-todos.json',
+      '/icon.svg',
+      '/favicon.ico',
+    ]) {
       expect(isPublicPath(p)).toBe(true);
     }
   });

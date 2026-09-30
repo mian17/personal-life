@@ -1,0 +1,18 @@
+{
+  "id": "/todos",
+  "name": "Personal Life — Todos",
+  "short_name": "Todos",
+  "start_url": "/todos",
+  "scope": "/todos",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -18,7 +18,13 @@ export type GateDecision = 'next' | 'forbidden' | 'redirect-login';
 /** Paths that must be reachable without a session (they start or finish login). */
 const PUBLIC_PREFIXES = ['/auth/'];
 /** Public static assets not worth gating (the app HTML only renders when authed). */
-const PUBLIC_EXACT = new Set(['/favicon.ico', '/manifest.json', '/icon.svg']);
+const PUBLIC_EXACT = new Set([
+  '/favicon.ico',
+  '/manifest.json',
+  '/manifest-notes.json',
+  '/manifest-todos.json',
+  '/icon.svg',
+]);
 export function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
