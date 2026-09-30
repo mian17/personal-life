@@ -4,6 +4,7 @@ import {
   LOGIN_ATTEMPT_COOKIE,
   encodeLoginAttempt,
   loginAttemptCookieOptions,
+  sanitizeReturnTo,
 } from '@/lib/auth/login-attempt';
 
 export const dynamic = 'force-dynamic';
@@ -30,12 +31,14 @@ function identityUnavailable(): NextResponse {
  * `GET /auth/login` — starts the authorization code + PKCE dance: builds the
  * IdP authorization URL (with `state`, `nonce`, S256 challenge, and the
  * `resource` indicator), stashes the per-attempt values in a short-lived
- * HttpOnly cookie, and redirects the browser to the IdP.
+ * HttpOnly cookie — carrying `?returnTo=` through it, after `sanitizeReturnTo`
+ * drops anything that is not a local absolute path — and redirects the browser
+ * to the IdP.
  *
  * If the IdP is unreachable (discovery/token-endpoint fetch fails), returns a
  * small honest `503` page instead of surfacing a raw 500 with a stack trace.
  */
-export async function GET(_req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   let attempt;
   try {
     attempt = await buildAuthorizationRequest();
@@ -43,6 +46,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     return identityUnavailable();
   }
 
+  const returnTo = sanitizeReturnTo(req.nextUrl.searchParams.get('returnTo'));
   const res = NextResponse.redirect(attempt.url, { status: 303 });
   res.cookies.set(
     LOGIN_ATTEMPT_COOKIE,
@@ -50,6 +54,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       state: attempt.state,
       nonce: attempt.nonce,
       codeVerifier: attempt.codeVerifier,
+      ...(returnTo ? { returnTo } : {}),
     }),
     loginAttemptCookieOptions(),
   );
