@@ -38,6 +38,7 @@ const SERVICE = 'todo';
 export const TODO_ALL = 'all';
 export const TODO_LISTS = 'lists';
 export const TODO_TAGS = 'tags';
+export const TODO_TRASH = 'trash';
 
 /** The per-user counter every one of that user's read keys embeds; bumped per write. */
 export function generationKey(sub: string): string {

@@ -58,6 +58,9 @@ export class Todo {
   @Column({ type: 'datetime' })
   updatedAt: Date;
 
+  @Column({ type: 'datetime', nullable: true })
+  deletedAt: Date | null;
+
   // Association-only (TagRefs by id). todo-service owns no tag vocabulary; tag
   // names live in `tags-service`. Join rows are managed explicitly by the
   // service (replace-the-set on writes).

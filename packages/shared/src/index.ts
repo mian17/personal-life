@@ -72,6 +72,7 @@ export interface Todo {
   tagIds: number[];
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
   version: number;
 }
 
