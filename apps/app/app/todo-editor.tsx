@@ -15,7 +15,7 @@ import {
   Textarea,
   type TagOption,
 } from '@life/ui';
-import { Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { createTodoAction, updateTodoAction } from './todo-actions';
 
 /**
@@ -106,11 +106,6 @@ export function TodoEditor({
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
-          {dueDate !== '' && (
-            <IconButton label="Clear due date" onClick={() => setDueDate('')}>
-              <X size={16} aria-hidden />
-            </IconButton>
-          )}
         </PillGroup>
 
         {lists.length > 0 && (
