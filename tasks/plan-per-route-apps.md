@@ -203,6 +203,7 @@ Modify:
 - `apps/app/test/gate.test.ts`
 - `apps/app/test/e2e/journey.ts`
 - `apps/app/test/e2e/suites/journey.suite.ts`
+- `apps/app/test/e2e/stack.ts` (T7a — discovered harness gap, see Deviations 7)
 
 Not modified: `apps/app/lib/auth/require-session.ts` (documented gap, see
 Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
@@ -235,6 +236,7 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
 - [ ] `npm run test:unit -w @life/app -- test/manifests.test.ts test/gate.test.ts` green.
 
 ### Phase 4 — E2E
+- [ ] T7a: pass `NOTE_MASTER_KEY` to note-service in the prod e2e stack (`apps/app/test/e2e/stack.ts`) — unblocks any prod e2e run.
 - [ ] T7: extend the journey suite with the `/todos` landing and per-route manifest assertions; run the two new tests once.
 
 ### Phase 5 — Close
@@ -561,6 +563,43 @@ Deviations), `apps/idp/**`, `apps/app/public/manifest.json`, token files,
 
 ---
 
+### T7a — Prod e2e harness: note-service master key (module `per-route-apps`)
+
+[TASK OBJECTIVE]
+  Make the prod e2e stack pass a master key to note-service so it can boot,
+  removing the pre-existing harness gap that fails the run before setup finishes.
+
+[SCOPE & REPOSITORY CONTEXT]
+  - Allowed files to edit/create: `apps/app/test/e2e/stack.ts` ONLY.
+  - Reference files (read-only): `apps/app/test/e2e/services.ts`,
+    `apps/app/test/e2e/global-setup.ts`, `apps/app/test/e2e/teardown.ts`,
+    `tasks/plan-per-route-apps.md`.
+  - Strictly prohibited files: every other file (no app source, no unit tests, no
+    journey suite, no e2e spec).
+
+[IMPLEMENTATION REQUIREMENTS]
+  - In `noteEnv(cfg)` (`stack.ts:100-108`), add `NOTE_MASTER_KEY: HARNESS_MASTER_KEY,`,
+    mirroring `tagsEnv` (`stack.ts:122`) and `todoEnv` (`stack.ts:134`), so
+    note-service receives a key and boots instead of failing closed at bootstrap.
+  - Do NOT change `HARNESS_MASTER_KEY`, the other `*Env` functions,
+    `spawnService`, or the `process.env` merging.
+  - The value is the deterministic, obviously-fake harness key already in the file;
+    no secret is introduced and no file outside `stack.ts` changes.
+
+[VERIFICATION & TESTING RULES]
+  - Permitted command ONLY: `npm run typecheck -w @life/app`.
+  - Verification (read-only): `grep -n "NOTE_MASTER_KEY" apps/app/test/e2e/stack.ts`
+    is non-empty and appears inside `noteEnv`.
+  - Strict constraints: NO unit tests, NO E2E, NO build; max test executions: 1.
+    The behavioural proof is T7's single targeted e2e run, recorded there.
+
+[DEFINITION OF DONE]
+  - [ ] `noteEnv` returns `NOTE_MASTER_KEY: HARNESS_MASTER_KEY`.
+  - [ ] No files outside the allowed scope were modified.
+  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
+
+---
+
 ### T7 — E2E coverage for the two behaviours (module `per-route-apps`)
 
 [TASK OBJECTIVE]
@@ -681,7 +720,8 @@ T1 (spec)
 - After T1: **T2, T3, T6 run in parallel** (T3 and T6 do not depend on T2).
 - T4 depends on T2 (uses `sanitizeReturnTo`/`LoginAttempt.returnTo`).
 - T5 depends on T2 (surfaces `returnTo`) and can run in parallel with T4.
-- T7 depends on T4, T5, T6 (the behaviour under test must exist).
+- **T7a depends on nothing and unblocks T7** (the prod harness must boot).
+- T7 depends on T4, T5, T6 (the behaviour under test must exist) and on T7a.
 - T8 is last, after every change.
 
 ## Deviations / risks
@@ -726,6 +766,16 @@ T1 (spec)
    Documented, not changed.
 6. **Contract 2.** Not engaged — no backend data service is touched, so no
    `## Cache Rules` work is required for this change.
+7. **Discovered prod-e2e harness gap (→ T7a).** The first attempt at T7's
+   sanctioned run failed in `globalSetup` before the stack was ready:
+   `noteEnv` (`apps/app/test/e2e/stack.ts:100-108`) sets no master key, so
+   note-service exits at bootstrap (`CryptoError: missing master key`) while
+   `tagsEnv`/`todoEnv` do get `HARNESS_MASTER_KEY` (`stack.ts:122,134`). The gap
+   is pre-existing and unrelated to this change (no prior prod e2e run exercised
+   `journey.prod.spec.ts`). T7a closes it. A failed `globalSetup` also skips
+   `globalTeardown`, so the run leaked four stack processes (ports 3100, 3103,
+   3104, 3105) that must be cleared before the next attempt — a hard-line port
+   action, run by the human.
 
 ## Open Questions
 
