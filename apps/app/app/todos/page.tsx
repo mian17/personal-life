@@ -129,12 +129,7 @@ export default async function TodosPage({
       {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
       {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
 
-      <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
-
-      <ListManagerSection />
-      <Section label="Tags">
-        <TagManagerSection />
-      </Section>
+      <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} /> 
 
       <FabLink href="/todos/new" label="New todo">
         <Plus size={28} strokeWidth={2.5} aria-hidden />
