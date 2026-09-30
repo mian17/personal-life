@@ -57,15 +57,6 @@ export function TodoItem({
         </form>
       }
     >
-      {attached.length > 0 && (
-        <PillGroup aria-label="Tags">
-          {attached.map((tag) => (
-            <Pill key={tag.id} size="chip">
-              {tag.name}
-            </Pill>
-          ))}
-        </PillGroup>
-      )}
     </ListItem>
   );
 }
