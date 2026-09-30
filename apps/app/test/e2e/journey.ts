@@ -13,8 +13,8 @@ export function noteBody(marker: string, suffix = ''): string {
 }
 
 /** Opens the app and waits for the IdP login form. */
-export async function startLogin(page: Page): Promise<void> {
-  await page.goto('/notes');
+export async function startLogin(page: Page, path = '/notes'): Promise<void> {
+  await page.goto(path);
   await page.waitForURL(/\/interaction\/[^/]+$/, { timeout: 30_000 });
 }
 

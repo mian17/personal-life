@@ -153,5 +153,24 @@ export function registerJourney(options: JourneyOptions): void {
       await submitCredentials(page, E2E_USER, E2E_PASSWORD);
       await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible({ timeout: 30_000 });
     });
+
+    test('per-route returnTo: a saved /todos entry logs in and lands on /todos', async ({ page }) => {
+      await startLogin(page, '/todos');
+      await submitCredentials(page, E2E_USER, E2E_PASSWORD);
+      await expect(page.getByRole('heading', { name: 'Todos' })).toBeVisible({ timeout: 30_000 });
+    });
+
+    test('per-route PWA: each route links its own manifest', async ({ page }) => {
+      await logIn(page);
+      await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+        'href',
+        '/manifest-notes.json',
+      );
+      await page.goto('/todos');
+      await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+        'href',
+        '/manifest-todos.json',
+      );
+    });
   });
 }
