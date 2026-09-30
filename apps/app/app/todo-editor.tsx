@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { List } from '@life/shared';
+import type { List, Todo } from '@life/shared';
 import {
   EditorScreen,
   EditorStack,
@@ -16,40 +16,57 @@ import {
   type TagOption,
 } from '@life/ui';
 import { Check, X } from 'lucide-react';
-import { createTodoAction } from './todo-actions';
+import { createTodoAction, updateTodoAction } from './todo-actions';
 
 /**
- * The `/todos/new` editor screen — the FAB target, mirroring the notes editor
- * pattern (full-screen `EditorScreen` + `EditorToolbar`). Title is required; the
- * toolbar's ✓ is the single save action (no duplicate button). All visuals come
- * from `@life/ui`; the fields stack through `EditorStack` so the editor never
- * hand-stacks controls.
+ * The todo editor screen, shared by create (`/todos/new`) and edit
+ * (`/todos/[id]/edit`). One component, two modes — the same fields and layout;
+ * only the initial values and the save action differ. All visuals come from
+ * `@life/ui`; the fields stack through `EditorStack`.
  */
 export function TodoEditor({
+  todo,
   lists,
   availableTags,
 }: {
+  /** Absent = create mode. */
+  todo?: Todo;
   lists: List[];
   availableTags: TagOption[];
 }) {
   const router = useRouter();
-  const [title, setTitle] = useState('');
-  const [note, setNote] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [listId, setListId] = useState<string | null>(null);
-  const [tagIds, setTagIds] = useState<number[]>([]);
+  const editing = todo != null;
+  const [title, setTitle] = useState(todo?.title ?? '');
+  const [note, setNote] = useState(todo?.note ?? '');
+  const [dueDate, setDueDate] = useState(todo?.dueDate ?? '');
+  const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
+  const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
 
   const canSave = title.trim() !== '';
 
   function save() {
     if (!canSave) return;
-    void createTodoAction({
-      title,
-      note: note.trim() === '' ? undefined : note,
-      dueDate: dueDate === '' ? undefined : dueDate,
-      listId: listId ?? undefined,
-      tagIds,
-    });
+    if (editing) {
+      void updateTodoAction(
+        todo.id,
+        {
+          title,
+          note: note.trim() === '' ? null : note,
+          dueDate: dueDate === '' ? null : dueDate,
+          listId,
+          tagIds,
+        },
+        todo.version,
+      );
+    } else {
+      void createTodoAction({
+        title,
+        note: note.trim() === '' ? undefined : note,
+        dueDate: dueDate === '' ? undefined : dueDate,
+        listId: listId ?? undefined,
+        tagIds,
+      });
+    }
     router.back();
   }
 
@@ -57,9 +74,9 @@ export function TodoEditor({
     <EditorScreen>
       <EditorToolbar
         back={{ label: 'Back', onBack: () => router.back() }}
-        title="New Todo"
+        title={editing ? 'Edit Todo' : 'New Todo'}
         actions={
-          <IconButton label="Save todo" onClick={save} disabled={!canSave}>
+          <IconButton label={editing ? 'Save todo' : 'Add todo'} onClick={save} disabled={!canSave}>
             <Check size={20} aria-hidden />
           </IconButton>
         }
@@ -72,7 +89,7 @@ export function TodoEditor({
           placeholder="What needs doing?"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          autoFocus
+          autoFocus={!editing}
         />
 
         <Textarea
@@ -99,8 +116,8 @@ export function TodoEditor({
         {lists.length > 0 && (
           <PillGroup label="List" aria-label="List">
             <Pill
-              as="a"
-              size="filter"
+              as="button"
+              size="chip"
               active={listId === null}
               aria-pressed={listId === null}
               onClick={() => setListId(null)}
@@ -110,8 +127,8 @@ export function TodoEditor({
             {lists.map((list) => (
               <Pill
                 key={list.id}
-                as="a"
-                size="filter"
+                as="button"
+                size="chip"
                 active={listId === list.id}
                 aria-pressed={listId === list.id}
                 onClick={() => setListId(list.id)}

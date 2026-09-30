@@ -1,29 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import type { List, Todo } from '@life/shared';
-import {
-  Button,
-  ConfirmButton,
-  DueDatePill,
-  IconButton,
-  Input,
-  ListItem,
-  Pill,
-  PillGroup,
-  Row,
-  Stack,
-  TagPicker,
-  Textarea,
-  type TagOption,
-} from '@life/ui';
-import { Circle, CircleCheck, Pencil, Trash2, X } from 'lucide-react';
+import { ConfirmButton, DueDatePill, IconButton, ListItem, Pill, PillGroup, type TagOption } from '@life/ui';
+import { Circle, CircleCheck, Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
 
 /**
- * One todo row: done toggle, inline edit (title, note, due date, list), tag
- * attach/detach through the shared `TagPicker`, and permanent delete. All
- * visuals come from `@life/ui`; the date state is `DueDatePill`'s (`data-state`).
+ * One todo row: a link to its edit screen (`/todos/[id]/edit`, the same editor
+ * as create, in edit mode), a done toggle, and a permanent delete. Editing lives
+ * on the dedicated screen; the row only reads + toggles. All visuals come from
+ * `@life/ui`; the date state is `DueDatePill`'s.
  */
 export function TodoItem({
   todo,
@@ -36,46 +22,12 @@ export function TodoItem({
   lists: List[];
   availableTags: TagOption[];
 }) {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(todo.title);
-  const [note, setNote] = useState(todo.note ?? '');
-  const [dueDate, setDueDate] = useState(todo.dueDate ?? '');
-  const [listId, setListId] = useState<string | null>(todo.listId);
-  const [tagIds, setTagIds] = useState<number[]>(todo.tagIds);
-
-  const attached = availableTags.filter((tag) => tagIds.includes(tag.id));
-  const list = lists.find((candidate) => candidate.id === listId);
-
-  function reset() {
-    setTitle(todo.title);
-    setNote(todo.note ?? '');
-    setDueDate(todo.dueDate ?? '');
-    setListId(todo.listId);
-    setTagIds(todo.tagIds);
-  }
-
-  function cancel() {
-    reset();
-    setEditing(false);
-  }
-
-  function save() {
-    void updateTodoAction(
-      todo.id,
-      {
-        title,
-        note: note.trim() === '' ? null : note,
-        dueDate: dueDate === '' ? null : dueDate,
-        listId,
-        tagIds,
-      },
-      todo.version,
-    );
-    setEditing(false);
-  }
+  const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
+  const list = lists.find((candidate) => candidate.id === todo.listId);
 
   return (
     <ListItem
+      href={`/todos/${todo.id}/edit`}
       title={todo.title}
       meta={
         <>
@@ -87,7 +39,6 @@ export function TodoItem({
       trailing={
         <IconButton
           label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-          disabled={editing}
           onClick={() => void updateTodoAction(todo.id, { done: !todo.done }, todo.version)}
         >
           {todo.done ? <CircleCheck size={20} aria-hidden /> : <Circle size={20} aria-hidden />}
@@ -114,74 +65,6 @@ export function TodoItem({
             </Pill>
           ))}
         </PillGroup>
-      )}
-
-      {editing ? (
-        <Stack>
-          <Input
-            type="text"
-            aria-label="Todo title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <Textarea aria-label="Todo note" value={note} onChange={(e) => setNote(e.target.value)} />
-          <Row gap="sm">
-            <Input
-              type="date"
-              aria-label="Due date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-            <IconButton label="Clear due date" onClick={() => setDueDate('')}>
-              <X size={16} aria-hidden />
-            </IconButton>
-          </Row>
-          {lists.length > 0 && (
-            <PillGroup label="List" aria-label="List">
-              <Pill
-                as="button"
-                size="chip"
-                active={listId === null}
-                aria-pressed={listId === null}
-                onClick={() => setListId(null)}
-              >
-                No list
-              </Pill>
-              {lists.map((candidate) => (
-                <Pill
-                  key={candidate.id}
-                  as="button"
-                  size="chip"
-                  active={listId === candidate.id}
-                  aria-pressed={listId === candidate.id}
-                  onClick={() => setListId(candidate.id)}
-                >
-                  {candidate.name}
-                </Pill>
-              ))}
-            </PillGroup>
-          )}
-          <TagPicker
-            tags={availableTags}
-            selectedIds={tagIds}
-            onToggle={(id) =>
-              setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
-            }
-            label="Tags"
-          />
-          <PillGroup>
-            <Button variant="primary" size="bare" onClick={save}>
-              Save
-            </Button>
-            <Button variant="ghost" size="bare" onClick={cancel}>
-              Cancel
-            </Button>
-          </PillGroup>
-        </Stack>
-      ) : (
-        <IconButton label={`Edit ${todo.title}`} onClick={() => setEditing(true)}>
-          <Pencil size={18} aria-hidden />
-        </IconButton>
       )}
     </ListItem>
   );
