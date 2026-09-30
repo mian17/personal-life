@@ -2,7 +2,17 @@
 
 import { revalidatePath } from 'next/cache';
 import type { CreateTodoInput, UpdateTodoInput } from '@life/shared';
-import { createTodo, deleteTodo, updateTodo, createList, deleteList, renameList } from '@/lib/todo-api';
+import {
+  createTodo,
+  deleteTodo,
+  updateTodo,
+  createList,
+  deleteList,
+  renameList,
+  restoreTodo,
+  deleteTodoPermanently,
+  emptyTodoTrash,
+} from '@/lib/todo-api';
 import { retainedTagIds } from '@/lib/tags-compose';
 
 /**
@@ -14,6 +24,7 @@ import { retainedTagIds } from '@/lib/tags-compose';
 
 function revalidateTodos() {
   revalidatePath('/todos');
+  revalidatePath('/todos/trash');
 }
 
 export async function createTodoAction(input: CreateTodoInput) {
@@ -37,6 +48,21 @@ export async function updateTodoAction(
 
 export async function deleteTodoAction(id: string) {
   await deleteTodo(id);
+  revalidateTodos();
+}
+
+export async function restoreTodoAction(id: string) {
+  await restoreTodo(id);
+  revalidateTodos();
+}
+
+export async function deleteForeverTodoAction(id: string) {
+  await deleteTodoPermanently(id);
+  revalidateTodos();
+}
+
+export async function emptyTodoTrashAction() {
+  await emptyTodoTrash();
   revalidateTodos();
 }
 

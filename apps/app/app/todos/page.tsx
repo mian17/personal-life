@@ -17,7 +17,7 @@ import {
   ThemeToggle,
   todayIso,
 } from '@life/ui';
-import { List, Plus, StickyNote, Tags } from 'lucide-react';
+import { List, Plus, StickyNote, Tags, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +92,9 @@ export default async function TodosPage({
             </IconLink>
             <IconLink href="/todos/lists" label="Manage lists">
               <List size={20} aria-hidden />
+            </IconLink>
+            <IconLink href="/todos/trash" label="Trash">
+              <Trash2 size={20} aria-hidden />
             </IconLink>
             <ThemeToggle />
           </>

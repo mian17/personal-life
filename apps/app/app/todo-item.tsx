@@ -1,15 +1,15 @@
 'use client';
 
 import type { List, Todo } from '@life/shared';
-import { ConfirmButton, DueDatePill, IconButton, ListItem, Pill, PillGroup, type TagOption } from '@life/ui';
+import { Button, DueDatePill, IconButton, ListItem, Pill, PillGroup, type TagOption } from '@life/ui';
 import { Circle, CircleCheck, Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
 
 /**
  * One todo row: a link to its edit screen (`/todos/[id]/edit`, the same editor
- * as create, in edit mode), a done toggle, and a permanent delete. Editing lives
- * on the dedicated screen; the row only reads + toggles. All visuals come from
- * `@life/ui`; the date state is `DueDatePill`'s.
+ * as create, in edit mode), a done toggle, and a silent soft delete to trash.
+ * Editing lives on the dedicated screen; the row only reads + toggles. All
+ * visuals come from `@life/ui`; the date state is `DueDatePill`'s.
  */
 export function TodoItem({
   todo,
@@ -46,14 +46,14 @@ export function TodoItem({
       }
       deleteAction={
         <form action={deleteTodoAction.bind(null, todo.id)}>
-          <ConfirmButton
+          <Button
+            type="submit"
             variant="danger"
             size="icon"
-            message="Delete this todo forever? This cannot be undone."
             aria-label={`Delete ${todo.title}`}
           >
             <Trash2 size={18} aria-hidden />
-          </ConfirmButton>
+          </Button>
         </form>
       }
     >
