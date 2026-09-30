@@ -69,13 +69,31 @@ export function Pill({
   );
 
   if (as === 'a') {
-    // The atom renders either a span or a link; a single prop bag cannot be
-    // statically narrowed, so the link branch re-types it at the boundary. The
-    // legacy `.filters a` pills used next/link, so client-side navigation is
-    // preserved (not a raw <a> full document load).
+    // A pill anchor with NO href is a toggle, not a navigation: next/link with an
+    // empty href would reload the page, and an empty-href <a> is invalid. Render
+    // a real anchor for the visual contract (inline, `text-decoration: none`, no
+    // button chrome) but suppress the default navigation so the caller's onClick
+    // toggles state in place. With an href it is a normal next/link.
     const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
+    if (href == null) {
+      return (
+        <a
+          {...linkProps}
+          role="button"
+          className={classes}
+          aria-disabled={disabled || undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            if (disabled) return;
+            (linkProps.onClick as ((e: unknown) => void) | undefined)?.(event);
+          }}
+        >
+          {content}
+        </a>
+      );
+    }
     return (
-      <Link href={href ?? ''} className={classes} {...linkProps}>
+      <Link href={href} className={classes} {...linkProps}>
         {content}
       </Link>
     );

@@ -278,6 +278,8 @@
 }
 
 .ui-pill--filter {
+  display: inline-flex;
+  align-items: center;
   padding: var(--space-0-35) var(--space-0-7);
   text-decoration: none;
   font-size: var(--space-0-85);
@@ -290,8 +292,15 @@
 
 /* Interactive chip (Pill as="button"): same shell, reset the button chrome so
    only the pill geometry/active pair above carries the visual. */
+/* Interactive pill: strip ONLY the UA button chrome (appearance, font family,
+   line-height) so a button pill is byte-identical to the anchor/span pill of the
+   same size. `font: inherit` (the shorthand) was clobbering the size class's
+   `font-size`, and UA appearance/line-height made a button look heavier — that
+   was the "button styling" the toggle pills showed. */
 .ui-pill--button {
-  font: inherit;
+  appearance: none;
+  font-family: inherit;
+  line-height: inherit;
   cursor: pointer;
 }
 

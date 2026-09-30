@@ -13,8 +13,10 @@ describe('TagPicker', () => {
     render(<TagPicker tags={TAGS} selectedIds={[]} onToggle={() => {}} />);
     const group = screen.getByRole('group', { name: 'Tags' });
     expect(group.tagName).toBe('DIV');
-    expect(screen.getByRole('button', { name: 'errand' }).tagName).toBe('BUTTON');
-    expect(screen.getByRole('button', { name: 'home' }).tagName).toBe('BUTTON');
+    // Toggle pills render as anchors carrying role="button" (they toggle state
+    // in place, they do not navigate — the user's chosen pill configuration).
+    expect(screen.getByRole('button', { name: 'errand' }).tagName).toBe('A');
+    expect(screen.getByRole('button', { name: 'home' }).tagName).toBe('A');
   });
 
   it('marks selected tags with the active modifier and aria-pressed', () => {
@@ -91,7 +93,11 @@ describe('TagPicker', () => {
 
   it('honours the disabled flag on every control', () => {
     render(<TagPicker tags={TAGS} selectedIds={[]} onToggle={() => {}} onCreate={() => {}} disabled />);
-    expect((screen.getByRole('button', { name: 'errand' }) as HTMLButtonElement).disabled).toBe(true);
+    // Anchors have no native `disabled`; the pill exposes aria-disabled and
+    // suppresses the toggle.
+    expect(screen.getByRole('button', { name: 'errand' }).getAttribute('aria-disabled')).toBe(
+      'true',
+    );
     expect((screen.getByRole('button', { name: 'Add tag' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByLabelText('New tag') as HTMLInputElement).disabled).toBe(true);
   });
