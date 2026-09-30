@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { LocalTime } from '../src/components/local-time';
+import { formatDate } from '../src/lib/format-date';
 
 // jsdom resolves `react-dom/server` to the browser build, which expects browser
 // globals (MessageChannel/TextEncoder). The Node build has the same API and is
@@ -8,10 +9,6 @@ import { LocalTime } from '../src/components/local-time';
 const { renderToStaticMarkup } = require('react-dom/server.node') as typeof import('react-dom/server');
 
 const ISO = '2026-09-27T12:34:56.000Z';
-
-function localized(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
-}
 
 describe('LocalTime', () => {
   it('renders empty content before effects run, keeping the dateTime attribute', () => {
@@ -28,16 +25,17 @@ describe('LocalTime', () => {
     expect(time?.getAttribute('datetime')).toBe(ISO);
   });
 
-  it('fills with the localized date after mount', () => {
+  it('renders the dd/mm/yyyy date after mount', () => {
     const { container } = render(<LocalTime dateTime={ISO} />);
-    expect(container.querySelector('time')?.textContent).toBe(localized(ISO));
+    expect(container.querySelector('time')?.textContent).toBe(formatDate(ISO));
+    expect(container.querySelector('time')?.textContent).toBe('27/09/2026');
   });
 
-  it('re-localizes when dateTime changes', () => {
+  it('formats the next date deterministically when dateTime changes', () => {
     const next = '2025-01-02T03:04:05.000Z';
     const { container, rerender } = render(<LocalTime dateTime={ISO} />);
     rerender(<LocalTime dateTime={next} />);
-    expect(container.querySelector('time')?.textContent).toBe(localized(next));
+    expect(container.querySelector('time')?.textContent).toBe('02/01/2025');
   });
 
   it('merges className instead of replacing it', () => {

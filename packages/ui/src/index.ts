@@ -98,3 +98,5 @@ export type { ListManagerProps, TodoListOption } from './components/list-manager
 
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
+
+export { dueDateLabel, formatDate } from './lib/format-date';
