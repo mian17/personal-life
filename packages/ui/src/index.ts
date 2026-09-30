@@ -77,6 +77,9 @@ export type { PageActionsProps } from './components/page-actions';
 export { Stack } from './components/stack';
 export type { StackGap, StackProps } from './components/stack';
 
+export { Section } from './components/section';
+export type { SectionHeadingLevel, SectionProps } from './components/section';
+
 export { TagPicker } from './components/tag-picker';
 export type { TagOption, TagPickerProps } from './components/tag-picker';
 

@@ -264,6 +264,35 @@
   margin-top: var(--space-1-25);
 }
 
+/* ------------------------------------------------------------ Section */
+
+/* Labelled region: a `<section>` owning the outer rhythm, a glue heading row
+   (label + trailing actions), and a `Stack` body. The section is the only
+   element allowed an outer margin here — the Stack deliberately has none. */
+.ui-section {
+  margin-block-start: var(--space-2);
+}
+
+.ui-section__heading-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-0-5);
+}
+
+/* Heading treatment: PageTitle's type treatment (weight, tracking) one step
+   down the scale so the section heading sits below the page `h1`. Tokens only. */
+.ui-section__heading {
+  font-size: var(--space-1-25);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  margin-block-end: var(--space-0-5);
+}
+
+.ui-section__actions {
+  margin-left: auto;
+}
+
 /* -------------------------------------------------------------- Stack */
 
 /* Purely presentational vertical rhythm: grid so children stack regardless of
