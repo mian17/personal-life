@@ -5,8 +5,6 @@ import { groupTodos } from '@/lib/todo-groups';
 import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
 import { TodoSearchBox } from '../todo-search-box';
-import { ListManagerSection } from '../list-manager-section';
-import { TagManagerSection } from '../tag-manager-section';
 import {
   FabLink,
   IconLink,
@@ -15,12 +13,11 @@ import {
   PageTitle,
   Pill,
   PillGroup,
-  Section,
   TagFilterNav,
   ThemeToggle,
   todayIso,
 } from '@life/ui';
-import { Plus, StickyNote } from 'lucide-react';
+import { List, Plus, StickyNote, Tags } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +87,12 @@ export default async function TodosPage({
             <IconLink href="/notes" label="Notes">
               <StickyNote size={20} aria-hidden />
             </IconLink>
+            <IconLink href="/todos/tags" label="Manage tags">
+              <Tags size={20} aria-hidden />
+            </IconLink>
+            <IconLink href="/todos/lists" label="Manage lists">
+              <List size={20} aria-hidden />
+            </IconLink>
             <ThemeToggle />
           </>
         }
@@ -129,7 +132,7 @@ export default async function TodosPage({
       {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
       {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
 
-      <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} /> 
+      <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
 
       <FabLink href="/todos/new" label="New todo">
         <Plus size={28} strokeWidth={2.5} aria-hidden />
