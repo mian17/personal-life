@@ -1,7 +1,15 @@
 'use client';
 
 import type { List, Todo } from '@life/shared';
-import { Button, DueDatePill, IconButton, ListItem, Pill, PillGroup, type TagOption } from '@life/ui';
+import {
+  Button,
+  dueDateLabel,
+  IconButton,
+  ListItem,
+  Pill,
+  PillGroup,
+  type TagOption,
+} from '@life/ui';
 import { Circle, CircleCheck, Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
 
@@ -9,7 +17,8 @@ import { deleteTodoAction, updateTodoAction } from './todo-actions';
  * One todo row: a link to its edit screen (`/todos/[id]/edit`, the same editor
  * as create, in edit mode), a done toggle, and a silent soft delete to trash.
  * Editing lives on the dedicated screen; the row only reads + toggles. All
- * visuals come from `@life/ui`; the date state is `DueDatePill`'s.
+ * visuals come from `@life/ui`; the due date reads out through `dueDateLabel`
+ * (Today / Tomorrow / dd/mm/yyyy, muted).
  */
 export function TodoItem({
   todo,
@@ -31,7 +40,7 @@ export function TodoItem({
       title={todo.title}
       meta={
         <>
-          <DueDatePill dueDate={todo.dueDate} today={today} />
+          {dueDateLabel(todo.dueDate, today)}
           {list && <span>{list.name}</span>}
         </>
       }
