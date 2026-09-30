@@ -100,7 +100,7 @@ export function TodoEditor({
           <PillGroup label="List" aria-label="List">
             <Pill
               as="button"
-              size="chip"
+              size="filter"
               active={listId === null}
               aria-pressed={listId === null}
               onClick={() => setListId(null)}
@@ -111,7 +111,7 @@ export function TodoEditor({
               <Pill
                 key={list.id}
                 as="button"
-                size="chip"
+                size="filter"
                 active={listId === list.id}
                 aria-pressed={listId === list.id}
                 onClick={() => setListId(list.id)}
