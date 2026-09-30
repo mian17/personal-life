@@ -268,7 +268,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-0-3);
-  padding: var(--space-0-2) var(--space-0-3) var(--space-0-2) var(--space-0-6);
+  /* Symmetric horizontal padding. The old rule reserved a narrower right edge
+     for the optional remove-✕ (`onRemove`), which no caller uses — so every
+     real chip (icons live inside, `gap` spaces them) rendered cramped on the
+     right. The chip must read the same with or without its leading icon. */
+  padding: var(--space-0-2) var(--space-0-5);
   border: var(--border-width) solid var(--border);
   font-size: var(--space-0-8);
 }
