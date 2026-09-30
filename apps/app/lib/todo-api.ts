@@ -65,6 +65,23 @@ export function deleteTodo(id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/todos/${id}`, { method: 'DELETE' });
 }
 
+/** `GET /api/todos/trash` — cursor page of the owner's soft-deleted todos. */
+export function listTodoTrash(): Promise<TodoPage> {
+  return call<TodoPage>('/api/todos/trash');
+}
+
+export function restoreTodo(id: string): Promise<Todo> {
+  return call<Todo>(`/api/todos/${id}/restore`, { method: 'POST' });
+}
+
+export function deleteTodoPermanently(id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/todos/${id}/permanent`, { method: 'DELETE' });
+}
+
+export function emptyTodoTrash(): Promise<{ ok: true; count: number }> {
+  return call<{ ok: true; count: number }>('/api/todos/trash', { method: 'DELETE' });
+}
+
 /** `GET /api/lists` — the owner's todo-local lists. */
 export function listLists(): Promise<List[]> {
   return call<List[]>('/api/lists');
