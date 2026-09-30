@@ -179,7 +179,11 @@ soft-delete scope, so the new intent overrides that spec line.
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/shared/src/index.ts`,
     `apps/todo-service/src/todos/todo.entity.ts`,
-    `apps/todo-service/src/cache/todo-cache.ts`.
+    `apps/todo-service/src/cache/todo-cache.ts`, plus the two app test fixtures
+    `apps/app/test/todo-groups.test.ts` and `apps/app/test/todo-query.test.ts` —
+    each needs a one-line `deletedAt: null` added to its `Todo` literal once the
+    wire type gains the required field (documented scope amendment; without it the
+    app typecheck fails on fixtures that predate the field).
   - Reference files (read-only): `apps/note-service/src/notes/note.entity.ts`
     (`deletedAt` column precedent), `packages/shared/src/index.ts` (`Note` shape),
     `apps/todo-service/src/todos/todos.service.ts`.
