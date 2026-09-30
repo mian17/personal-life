@@ -129,6 +129,10 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* Breathing room between the toolbar and the first field: the toolbar's own
+     bottom margin is small (shared with the notes editor), so the editor body
+     owns the larger separation. */
+  margin-top: var(--space-2);
 }
 
 .ui-editor-stack--sm {
