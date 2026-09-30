@@ -18,10 +18,35 @@ export interface LoginAttempt {
   state: string;
   nonce: string;
   codeVerifier: string;
+  /** Validated same-origin path to land on after auth; absent → default landing. */
+  returnTo?: string;
+}
+
+const MAX_RETURN_TO_LENGTH = 2048;
+
+/**
+ * Pure `returnTo` gate: only a LOCAL absolute path survives — leading `/`, not
+ * protocol-relative (`//host`), no backslash, no control character, bounded
+ * length. Percent-encoding is deliberately NOT decoded, so an encoded `//` can
+ * never become a different origin here; consumers redirect with it as-is or drop
+ * it. `undefined` in, `undefined` out.
+ */
+export function sanitizeReturnTo(value: string | null | undefined): string | undefined {
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  if (value.length > MAX_RETURN_TO_LENGTH) return undefined;
+  if (!value.startsWith('/')) return undefined;
+  if (value.startsWith('//')) return undefined;
+  if (value.includes('\\')) return undefined;
+  if (/[\u0000-\u001f\u007f]/.test(value)) return undefined;
+  return value;
 }
 
 export function encodeLoginAttempt(attempt: LoginAttempt): string {
-  return Buffer.from(JSON.stringify(attempt)).toString('base64url');
+  const returnTo = sanitizeReturnTo(attempt.returnTo);
+  const payload: LoginAttempt = returnTo
+    ? { state: attempt.state, nonce: attempt.nonce, codeVerifier: attempt.codeVerifier, returnTo }
+    : { state: attempt.state, nonce: attempt.nonce, codeVerifier: attempt.codeVerifier };
+  return Buffer.from(JSON.stringify(payload)).toString('base64url');
 }
 
 export function decodeLoginAttempt(value: string | undefined): LoginAttempt | undefined {
@@ -33,6 +58,9 @@ export function decodeLoginAttempt(value: string | undefined): LoginAttempt | un
       typeof parsed.nonce === 'string' &&
       typeof parsed.codeVerifier === 'string'
     ) {
+      const returnTo = sanitizeReturnTo(parsed.returnTo);
+      if (returnTo) return { ...parsed, returnTo };
+      delete parsed.returnTo;
       return parsed;
     }
     return undefined;
