@@ -34,8 +34,9 @@ there:
   so it stacks children regardless of their own `display`. Purely presentational; no
   outer margins of its own.
 - **`Section`** — labelled region: `label?: ReactNode`, `headingLevel?: 'h2' | 'h3'`
-  (default `'h2'`), `actions?: ReactNode` (trailing heading-row slot), `gap?: StackGap`,
-  `className?`, children, ref. Renders `<section>` → heading row (label + actions) →
+  (default `'h2'`), `actions?: ReactNode` (trailing heading-row slot), `gap?: StackGap`
+  (default `'md'`, same as the `Stack` body), `className?`, children, ref. Renders
+  `<section>` → heading row (label + actions) →
   `Stack` body. Owns `margin-block-start: var(--space-2)` and a
   `margin-block-end: var(--space-0-5)` on its heading. Non-interactive.
 - `export type StackGap = 'sm' | 'md' | 'lg'` from `packages/ui/src/index.ts`.
@@ -43,9 +44,10 @@ there:
 ## Consumption (this revision's app change)
 
 - `apps/app/app/todo-list.tsx` — `Section label={group.label}` wrapping `<List>`
-  (drops the `PillGroup`-as-heading misuse). **This adds heading roles to `/todos`**;
-  it does not change any existing `getByRole` query (the e2e suite's headings are
-  `Notes`/`Todos`/page headings, not group labels).
+  (drops the `PillGroup`-as-heading misuse). **This adds heading roles to `/todos`**
+  (user-approved per the intent's Frozen-surface line); it changes no existing
+  `getByRole` query — the frozen suite's only heading query is
+  `heading { name: 'Notes' }`, which is unaffected.
 - `apps/app/app/todo-composer.tsx` — `<div role="group" aria-label="New todo">` →
   `<Stack role="group" aria-label="New todo" gap="md">` (the frozen selector is
   preserved by the pass-through). No "actions row" — the single "Add todo" `Button`
@@ -55,9 +57,11 @@ there:
   genuinely are pill rows).
 - `apps/app/app/list-manager-section.tsx` — wrap its panel in
   `<Section label="Lists">`.
-- **`apps/app/app/tag-manager-section.tsx` is NOT in this change**: it is mounted on
-  `/notes` too (`apps/app/app/notes/page.tsx`), so wrapping it here would alter
-  `/notes` — out of scope. Its `/todos` placement stays as-is.
+- `apps/app/app/todos/page.tsx` — wrap the shared tag-manager instance at the page
+  level: `<Section label="Tags"><TagManagerSection /></Section>`. This gives both
+  `/todos` manager panels the section treatment (the confirmed intent) WITHOUT
+  touching `/notes` — **`apps/app/app/tag-manager-section.tsx` itself is not
+  modified** (it is mounted on `/notes` too), only the `/todos` call site.
 
 ## Commands
 

@@ -1,9 +1,12 @@
 # Implementation Plan: Stack + Section (ui-blocks revision → /todos parity)
 
+Note: the revision spec / this plan / the ledger use `-ui-blocks-revision` filenames.
+The module id is `ui-blocks` (existing) — no `ui-layout` module exists.
+
 Branch: `feature/todo-ecosystem` (follow-up to the unmerged chapter; `master` stays
 untouched). Intent: `docs/intent/todos-presentation.md`. Revision spec:
-`docs/specs/SPEC-ui-layout.md` (prop contracts owned by `docs/specs/SPEC-ui-blocks.md`).
-Ledger: `tasks/todo-ui-layout.md`.
+`docs/specs/SPEC-ui-blocks-revision.md` (prop contracts owned by `docs/specs/SPEC-ui-blocks.md`).
+Ledger: `tasks/todo-ui-blocks-revision.md`.
 
 ## Overview
 
@@ -52,5 +55,6 @@ all." Module id is the existing `ui-blocks`; no new module is invented.
 
 ## Open Questions
 
-None — the interview closed capture model, manager-panel placement, and scope; the
-plan-validation gate closed module id, shared-file, and command scoping.
+None — the interview closed capture model, manager-panel placement, and scope. The
+plan-validation gate (§6) is in progress; round 1 closed module id, the shared-file
+handling, and command scoping, and this revision is being re-validated.

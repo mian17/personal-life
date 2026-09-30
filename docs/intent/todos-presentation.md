@@ -16,10 +16,13 @@ Confirmed by the user 2026-09-30 via interview-me (explicit "yes").
 - Success: `/todos` breathes like `/notes` — real vertical rhythm, consistent
   list/section shapes, headings that read as headings — with zero app-side CSS.
 - Constraint: upstream-first per AGENTS.md Contract 1 Rule 3 (spec + MAP + tests,
-  then consume); tokens only; no raw HTML/`next/link`; frozen e2e selector surface
-  untouched (no navigation change); work stays on `feature/todo-ecosystem`; the
-  protocol's plan-validation gate runs before code and the feature closes through
-  the five-lane gate on the final state.
+  then consume); tokens only; no raw HTML/`next/link`; work stays on
+  `feature/todo-ecosystem`; the protocol's plan-validation gate runs before code and
+  the feature closes through the five-lane gate on the final state.
+- Frozen surface: no existing selector, role, or visible text changes; the fix ADDS
+  heading roles for the `/todos` group labels (replacing `PillGroup`'s span), which
+  the user explicitly approved during the interview. No e2e assertion is added or
+  changed.
 - Out of scope: capture-model change (no FAB, no `/todos/new`); collapsing or
   relocating the manager panels; any `/notes` redesign; new token *values*; adding
   or changing e2e assertions.
