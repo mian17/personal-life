@@ -7,11 +7,9 @@ import type { Note } from '@life/shared';
 import {
   AlertBanner,
   Button,
-  EditorScreen,
-  EditorToolbar,
+  EditorChrome,
   IconButton,
   StatusText,
-  TagPicker,
   Textarea,
   type TagOption,
 } from '@life/ui';
@@ -362,43 +360,49 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
   // `#tag` names not yet in the registry are created by the flush route's
   // create-or-get, so the picker never needs a create affordance here.
   return (
-    <EditorScreen>
-      <EditorToolbar
-        back={{ label: 'Back', onBack: () => void leave() }}
-        status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
-        actions={
-          <IconButton label="Save" onClick={() => void leave()}>
-            <Check size={20} aria-hidden />
-          </IconButton>
-        }
-      />
-      {conflictNote && (
-        <AlertBanner
-          role="alert"
-          actions={
-            <>
-              <Button
-                variant="primary"
-                size="bare"
-                className="editor-conflict-load"
-                onClick={loadLatest}
-              >
-                Load latest
-              </Button>
-              <Button
-                variant="ghost"
-                size="bare"
-                className="editor-conflict-overwrite"
-                onClick={keepMine}
-              >
-                Keep mine (overwrite)
-              </Button>
-            </>
-          }
-        >
-          This note changed on another device.
-        </AlertBanner>
-      )}
+    <EditorChrome
+      back={{ label: 'Back', onBack: () => void leave() }}
+      status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
+      actions={
+        <IconButton label="Save" onClick={() => void leave()}>
+          <Check size={20} aria-hidden />
+        </IconButton>
+      }
+      banner={
+        conflictNote && (
+          <AlertBanner
+            role="alert"
+            actions={
+              <>
+                <Button
+                  variant="primary"
+                  size="bare"
+                  className="editor-conflict-load"
+                  onClick={loadLatest}
+                >
+                  Load latest
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="bare"
+                  className="editor-conflict-overwrite"
+                  onClick={keepMine}
+                >
+                  Keep mine (overwrite)
+                </Button>
+              </>
+            }
+          >
+            This note changed on another device.
+          </AlertBanner>
+        )
+      }
+      tagPicker={
+        availableTags.length > 0
+          ? { tags: availableTags, selectedIds, onToggle: toggleTag, label: 'Attached tags' }
+          : undefined
+      }
+    >
       <Textarea
         ref={textareaRef}
         variant="editor"
@@ -412,14 +416,6 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
         }}
         onBlur={() => void flush()}
       />
-      {availableTags.length > 0 && (
-        <TagPicker
-          tags={availableTags}
-          selectedIds={selectedIds}
-          onToggle={toggleTag}
-          label="Attached tags"
-        />
-      )}
-    </EditorScreen>
+    </EditorChrome>
   );
 }

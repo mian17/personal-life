@@ -1,25 +1,13 @@
-import { notFound } from 'next/navigation';
-import type { Note } from '@life/shared';
-import { ApiError, getNote } from '@/lib/api';
+import { loadOrNotFound } from '@life/app-kit';
+import { getNote } from '@/lib/api';
 import { listTags } from '@/lib/tags-api';
 import { NoteEditor } from '../../note-editor';
 
 export const dynamic = 'force-dynamic';
 
-async function loadNote(id: string): Promise<Note> {
-  try {
-    return await getNote(id);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      notFound();
-    }
-    throw error;
-  }
-}
-
 export default async function NotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [note, tags] = await Promise.all([loadNote(id), listTags()]);
+  const [note, tags] = await Promise.all([loadOrNotFound(() => getNote(id)), listTags()]);
 
   return (
     <NoteEditor

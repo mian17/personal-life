@@ -1,7 +1,5 @@
-import type { Metadata } from 'next';
+import { RouteLayout, routeLayoutMetadata } from '@life/app-kit';
 
-export const metadata: Metadata = { manifest: '/manifest-todos.json' };
+export const metadata = routeLayoutMetadata('/manifest-todos.json');
 
-export default function TodosLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
+export default RouteLayout;

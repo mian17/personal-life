@@ -4,14 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { List, Todo } from '@life/shared';
 import {
-  EditorScreen,
-  EditorStack,
-  EditorToolbar,
+  EditorChrome,
   IconButton,
   Input,
   Pill,
   PillGroup,
-  TagPicker,
   Textarea,
   type TagOption,
 } from '@life/ui';
@@ -71,78 +68,73 @@ export function TodoEditor({
   }
 
   return (
-    <EditorScreen>
-      <EditorToolbar
-        back={{ label: 'Back', onBack: () => router.back() }}
-        title={editing ? 'Edit Todo' : 'New Todo'}
-        actions={
-          <IconButton label={editing ? 'Save todo' : 'Add todo'} onClick={save} disabled={!canSave}>
-            <Check size={20} aria-hidden />
-          </IconButton>
-        }
+    <EditorChrome
+      back={{ label: 'Back', onBack: () => router.back() }}
+      title={editing ? 'Edit Todo' : 'New Todo'}
+      actions={
+        <IconButton label={editing ? 'Save todo' : 'Add todo'} onClick={save} disabled={!canSave}>
+          <Check size={20} aria-hidden />
+        </IconButton>
+      }
+      gap="lg"
+      tagPicker={{
+        tags: availableTags,
+        selectedIds: tagIds,
+        onToggle: (id) =>
+          setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])),
+        label: 'Tags',
+      }}
+    >
+      <Input
+        type="text"
+        aria-label="Todo title"
+        placeholder="What needs doing?"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        autoFocus={!editing}
       />
 
-      <EditorStack gap="lg">
+      <Textarea
+        aria-label="Todo note"
+        placeholder="Details (optional)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+
+      <PillGroup label="Due" aria-label="Due">
         <Input
-          type="text"
-          aria-label="Todo title"
-          placeholder="What needs doing?"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          autoFocus={!editing}
+          type="date"
+          aria-label="Due date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
         />
+      </PillGroup>
 
-        <Textarea
-          aria-label="Todo note"
-          placeholder="Details (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-
-        <PillGroup label="Due" aria-label="Due">
-          <Input
-            type="date"
-            aria-label="Due date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </PillGroup>
-
-        {lists.length > 0 && (
-          <PillGroup label="List" aria-label="List">
+      {lists.length > 0 && (
+        <PillGroup label="List" aria-label="List">
+          <Pill
+            as="button"
+            size="chip"
+            active={listId === null}
+            aria-pressed={listId === null}
+            onClick={() => setListId(null)}
+          >
+            No list
+          </Pill>
+          {lists.map((list) => (
             <Pill
+              key={list.id}
               as="button"
               size="chip"
-              active={listId === null}
-              aria-pressed={listId === null}
-              onClick={() => setListId(null)}
+              active={listId === list.id}
+              aria-pressed={listId === list.id}
+              onClick={() => setListId(list.id)}
             >
-              No list
+              {list.name}
             </Pill>
-            {lists.map((list) => (
-              <Pill
-                key={list.id}
-                as="button"
-                size="chip"
-                active={listId === list.id}
-                aria-pressed={listId === list.id}
-                onClick={() => setListId(list.id)}
-              >
-                {list.name}
-              </Pill>
-            ))}
-          </PillGroup>
-        )}
-
-        <TagPicker
-          tags={availableTags}
-          selectedIds={tagIds}
-          onToggle={(id) =>
-            setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
-          }
-          label="Tags"
-        />
-      </EditorStack>
-    </EditorScreen>
+          ))}
+        </PillGroup>
+      )}
+    </EditorChrome>
   );
 }

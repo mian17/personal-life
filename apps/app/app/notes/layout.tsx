@@ -1,7 +1,5 @@
-import type { Metadata } from 'next';
+import { RouteLayout, routeLayoutMetadata } from '@life/app-kit';
 
-export const metadata: Metadata = { manifest: '/manifest-notes.json' };
+export const metadata = routeLayoutMetadata('/manifest-notes.json');
 
-export default function NotesLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
+export default RouteLayout;

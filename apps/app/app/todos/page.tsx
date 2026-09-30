@@ -4,13 +4,10 @@ import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
 import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
-import { TodoSearchBox } from '../todo-search-box';
+import { filterHref, parseTagId, PreservingSearchBox } from '@life/app-kit';
 import {
-  FabLink,
   IconLink,
-  NavBar,
-  PageShell,
-  PageTitle,
+  ListShell,
   Pill,
   PillGroup,
   TagFilterNav,
@@ -21,28 +18,13 @@ import { List, Plus, StickyNote, Tags, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-/** Build a `/todos` href carrying the current filters, overriding one axis. */
-function todoHref(
-  current: { q?: string; list?: string; tag?: string; done?: string },
-  overrides: Partial<{ q?: string; list?: string; tag?: string; done?: string }>,
-): string {
-  const merged = { ...current, ...overrides };
-  const params = new URLSearchParams();
-  if (merged.q) params.set('q', merged.q);
-  if (merged.list) params.set('list', merged.list);
-  if (merged.tag) params.set('tag', merged.tag);
-  if (merged.done) params.set('done', merged.done);
-  const qs = params.toString();
-  return qs ? `/todos?${qs}` : '/todos';
-}
-
 export default async function TodosPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; list?: string; tag?: string; done?: string }>;
 }) {
   const { q, list, tag, done } = await searchParams;
-  const tagId = tag !== undefined && /^\d+$/.test(tag) ? Number(tag) : undefined;
+  const tagId = parseTagId(tag);
   const doneFilter = done === 'true' ? true : done === 'false' ? false : undefined;
 
   const filters: TodoFilters = { q, listId: list, tagId, done: doneFilter };
@@ -59,87 +41,96 @@ export default async function TodosPage({
 
   const tagFilterItems = [
     ...(tagId !== undefined
-      ? [{ name: 'All tags', href: todoHref({ q, list, done }, { tag: undefined }), active: false }]
+      ? [
+          {
+            name: 'All tags',
+            href: filterHref({ path: '/todos', current: { q, list, done }, overrides: { tag: undefined } }),
+            active: false,
+          },
+        ]
       : []),
     ...namedTags.map((t) => ({
       name: t.name,
-      href: todoHref({ q, list, done }, { tag: String(t.tagId) }),
+      href: filterHref({ path: '/todos', current: { q, list, done }, overrides: { tag: String(t.tagId) } }),
       active: tagId === t.tagId,
     })),
   ];
 
   const listFilterItems = [
     ...(list !== undefined
-      ? [{ name: 'All lists', href: todoHref({ q, tag, done }, { list: undefined }), active: false }]
+      ? [
+          {
+            name: 'All lists',
+            href: filterHref({ path: '/todos', current: { q, tag, done }, overrides: { list: undefined } }),
+            active: false,
+          },
+        ]
       : []),
     ...lists.map((l) => ({
       name: l.name,
-      href: todoHref({ q, tag, done }, { list: l.id }),
+      href: filterHref({ path: '/todos', current: { q, tag, done }, overrides: { list: l.id } }),
       active: list === l.id,
     })),
   ];
 
   return (
-    <PageShell>
-      <NavBar
-        trailing={
-          <>
-            <IconLink href="/notes" label="Notes">
-              <StickyNote size={20} aria-hidden />
-            </IconLink>
-            <IconLink href="/todos/tags" label="Manage tags">
-              <Tags size={20} aria-hidden />
-            </IconLink>
-            <IconLink href="/todos/lists" label="Manage lists">
-              <List size={20} aria-hidden />
-            </IconLink>
-            <IconLink href="/todos/trash" label="Trash">
-              <Trash2 size={20} aria-hidden />
-            </IconLink>
-            <ThemeToggle />
-          </>
-        }
-      />
+    <ListShell
+      title="Todos"
+      navTrailing={
+        <>
+          <IconLink href="/notes" label="Notes">
+            <StickyNote size={20} aria-hidden />
+          </IconLink>
+          <IconLink href="/todos/tags" label="Manage tags">
+            <Tags size={20} aria-hidden />
+          </IconLink>
+          <IconLink href="/todos/lists" label="Manage lists">
+            <List size={20} aria-hidden />
+          </IconLink>
+          <IconLink href="/todos/trash" label="Trash">
+            <Trash2 size={20} aria-hidden />
+          </IconLink>
+          <ThemeToggle />
+        </>
+      }
+      search={<PreservingSearchBox path="/todos" q={q} params={{ list, tag, done }} label="Search todos" />}
+      filters={
+        <>
+          <PillGroup label="Status" aria-label="Status">
+            <Pill
+              as="a"
+              size="filter"
+              href={filterHref({ path: '/todos', current: { q, list, tag }, overrides: { done: undefined } })}
+              active={doneFilter === undefined}
+            >
+              All
+            </Pill>
+            <Pill
+              as="a"
+              size="filter"
+              href={filterHref({ path: '/todos', current: { q, list, tag }, overrides: { done: 'false' } })}
+              active={doneFilter === false}
+            >
+              Open
+            </Pill>
+            <Pill
+              as="a"
+              size="filter"
+              href={filterHref({ path: '/todos', current: { q, list, tag }, overrides: { done: 'true' } })}
+              active={doneFilter === true}
+            >
+              Done
+            </Pill>
+          </PillGroup>
 
-      <PageTitle>Todos</PageTitle>
-
-      <TodoSearchBox q={q} listId={list} tag={tag} done={done} />
-
-      <PillGroup label="Status" aria-label="Status">
-        <Pill
-          as="a"
-          size="filter"
-          href={todoHref({ q, list, tag }, { done: undefined })}
-          active={doneFilter === undefined}
-        >
-          All
-        </Pill>
-        <Pill
-          as="a"
-          size="filter"
-          href={todoHref({ q, list, tag }, { done: 'false' })}
-          active={doneFilter === false}
-        >
-          Open
-        </Pill>
-        <Pill
-          as="a"
-          size="filter"
-          href={todoHref({ q, list, tag }, { done: 'true' })}
-          active={doneFilter === true}
-        >
-          Done
-        </Pill>
-      </PillGroup>
-
-      {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
-      {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
-
-      <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
-
-      <FabLink href="/todos/new" label="New todo">
-        <Plus size={28} strokeWidth={2.5} aria-hidden />
-      </FabLink>
-    </PageShell>
+          {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
+          {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
+        </>
+      }
+      body={<TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />}
+      fabHref="/todos/new"
+      fabLabel="New todo"
+      fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}
+    />
   );
 }
