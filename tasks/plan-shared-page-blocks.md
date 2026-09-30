@@ -178,6 +178,8 @@ Modify:
 
 - `packages/ui/src/index.ts` (Blocks checkpoint — all four block exports, appended in one
   edit after T1–T4 so this shared barrel has a single writer)
+- `docs/specs/MAP-ui-primitives.md` (Blocks checkpoint — register the four new blocks in
+  the `ui-blocks` row; same single-writer rule, Contract 1 Rule 3)
 - `package.json` (T5: add `packages/app-kit` to `workspaces`)
 - `apps/app/package.json` (T5: declare the `@life/app-kit` dependency)
 - `package-lock.json` (T5: written by the workspace install)
@@ -224,6 +226,8 @@ would drop exports).
 ### Checkpoint: Blocks (single writer: the Tech Lead)
 - [ ] Append all four exports to `packages/ui/src/index.ts` in one edit: `TrashBlock`,
       `ManagerBlock`, `ListShell`, `EditorChrome` and their exported prop types.
+- [ ] Register the four blocks in `docs/specs/MAP-ui-primitives.md`'s `ui-blocks` row
+      (Contract 1 Rule 3: a new `@life/ui` component lands in the map in the same change).
 - [ ] `npm run typecheck -w packages/ui` exits 0.
 - [ ] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx test/manager-block.test.tsx test/list-shell.test.tsx test/editor-chrome.test.tsx` green.
 - [ ] `grep -riE "note|trash|tag-chip" packages/ui/src/components/{trash-block,manager-block,list-shell,editor-chrome}.tsx`
@@ -673,7 +677,10 @@ would drop exports).
     `apps/app/app/todo-list.tsx`, `apps/app/app/tag-manager-section.tsx`,
     `apps/app/app/list-manager-section.tsx`, `apps/app/app/actions.ts`,
     `apps/app/app/todo-actions.ts`, `apps/app/lib/api.ts`, `lib/todo-api.ts`,
-    `lib/tags-api.ts`, `apps/app/test/e2e/suites/journey.suite.ts`,
+    `lib/tags-api.ts`, `docs/specs/SPEC-app-kit.md`,
+    `docs/specs/SPEC-ui-trash-block.md`, `docs/specs/SPEC-ui-manager-block.md`,
+    `docs/specs/SPEC-ui-list-shell.md`, `docs/specs/SPEC-ui-editor-chrome.md`,
+    `apps/app/test/e2e/suites/journey.suite.ts`,
     `apps/app/test/e2e/journey.ts`, `apps/app/playwright.config.ts`,
     `apps/app/test/manifests.test.ts`, `docs/lessons/` (recall).
   - Strictly prohibited files: `apps/app/app/actions.ts`, `todo-actions.ts`,
@@ -708,8 +715,14 @@ would drop exports).
     `export const metadata = routeLayoutMetadata('/manifest-notes.json' | '/manifest-todos.json')`
     and `export default RouteLayout` from `@life/app-kit`.
   - **Search boxes**: delete `search-box.tsx` / `todo-search-box.tsx`; their consumers use
-    `PreservingSearchBox` with the existing `label` (`Search notes` / `Search todos`) and
-    `params` (notes: `{ tag }`; todos: `{ list, tag, done }`).
+    `PreservingSearchBox` with the required `path` (`/notes` / `/todos`), the controlled
+    current value `q` read from `searchParams`, the existing `label` (`Search notes` /
+    `Search todos`) and `params` (notes: `{ tag }`; todos: `{ list, tag, done }`).
+  - **Route config preserved**: every touched route file keeps its Next route segment
+    config exports unchanged — in particular `export const dynamic = 'force-dynamic'`
+    (present on the ported page files) and any `revalidate`/`runtime` export. The port
+    rewrites the rendered JSX only; dropping `dynamic` would silently move these
+    API/session-backed pages to static rendering.
   - Preserve every frozen, test-asserted selector verbatim: the `Notes`/`Todos` headings,
     `New note`, `Search notes`, the nav `Trash` link, `Back`, `Save`, `Note body`,
     `Delete ${title}`, `Restore ${title}`, `button.trash-delete`, the `errand` filter link,
@@ -744,6 +757,8 @@ would drop exports).
         href builder, no local tag parse, no inline load-or-`notFound()`).
   - [ ] `search-box.tsx` / `todo-search-box.tsx` are deleted; consumers use `PreservingSearchBox`.
   - [ ] Every frozen e2e selector renders byte-identically; token values unchanged.
+  - [ ] Every ported route file still exports its original `dynamic` / `revalidate` route
+        config (no route moved to static rendering).
   - [ ] No files outside the allowed scope were modified.
   - [ ] `npm run typecheck -w @life/app` passes with zero errors.
   - [ ] `npm run test:unit -w @life/app -- test/manifests.test.ts` passes.
