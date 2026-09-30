@@ -52,7 +52,8 @@ and the notes app's current pages map onto these one-to-one.
                                                     //   owns .editor-legacy-tags
 <PageActions>children</PageActions>                // page-level action container —
                                                    //   owns .trash-actions
-<TagPicker tags: {id: number; name: string}[]      // attach/detach tags by id; label? sits BESIDE the chips
+<TagPicker tags: {id: number; name: string}[]      // attach/detach tags by id; label? sits BESIDE the pills;
+                                                   //   pills use the filter size (match the tag-filter rows), no icon
            selectedIds: number[]
            onToggle: (id: number) => void
            onCreate?: (name: string) => void

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { ComponentPropsWithRef } from 'react';
-import { Check, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
 import { IconButton } from './icon-button';
@@ -57,13 +57,12 @@ export function TagPicker({
               <Pill
                 key={tag.id}
                 as="button"
-                size="chip"
+                size="filter"
                 active={selected}
                 aria-pressed={selected}
                 disabled={disabled}
                 onClick={() => onToggle(tag.id)}
               >
-                {selected ? <Check size={14} aria-hidden /> : <Plus size={14} aria-hidden />}
                 {tag.name}
               </Pill>
             );
