@@ -12,8 +12,8 @@
  * | primary   | bare    | `.editor-conflict-actions button` + `.editor-conflict-load` |
  * | ghost     | default | (new) outline button, no legacy counterpart         |
  * | ghost     | bare    | `.editor-conflict-actions button` + `.editor-conflict-overwrite` |
- * | danger    | icon    | `.note-delete` (48px square, 1.25rem/1 glyph; bordered --radius-md) |
- * | danger    | default | `.trash-delete` (48px square, inherited body type; bordered --radius-md) |
+ * | danger    | icon    | `.note-delete` (48px square, 1.25rem/1 glyph)       |
+ * | danger    | default | `.trash-delete` (48px square, inherited body type)  |
  * | danger    | bare    | `.trash-empty`                                      |
  * | quiet     | default | `.trash-restore`                                    |
  * | quiet     | bare    | (new) compact quiet button, no legacy counterpart   |
@@ -133,18 +133,16 @@
   color: var(--text);
 }
 
-/* danger/icon -> .note-delete (icon-button look: bordered --radius-md square) */
+/* danger/icon -> .note-delete */
 .ui-btn--danger.ui-btn--icon {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: transparent;
   color: var(--danger);
   font-size: var(--space-1-25);
   line-height: 1;
 }
 
-/* danger/default -> .trash-delete (icon-button look: bordered --radius-md square;
-   no type override: inherits body 16px/1.5) */
+/* danger/default -> .trash-delete (no type override: inherits body 16px/1.5) */
 .ui-btn--danger.ui-btn--default {
   display: inline-flex;
   align-items: center;
@@ -152,8 +150,7 @@
   width: var(--tap-height);
   min-height: var(--tap-height);
   padding: 0;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: transparent;
   color: var(--danger);
 }

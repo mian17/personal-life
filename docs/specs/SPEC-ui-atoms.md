@@ -62,9 +62,7 @@ for these without any visible change.
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
 `button` element rule + button overrides — its three sizes split the legacy shapes
 exactly: `size="icon"` `→` `.note-delete` (1.25rem/1 icon control), `size="default"`
-`→` `.trash-delete` (no type override; inherits the body 16px/1.5) — both danger
-controls now carry the icon-button look, a `--border-width solid --border` border
-and `--radius-md` radius, sizes unchanged; `size="bare"`
+`→` `.trash-delete` (no type override; inherits the body 16px/1.5), `size="bare"`
 `→` `.trash-empty` / `.editor-conflict-actions button` (`.editor-conflict-load`,
 `.editor-conflict-overwrite`), with `quiet/default` `→` `.trash-restore`;
 `Input`/`Textarea` absorb the global `textarea, input`
