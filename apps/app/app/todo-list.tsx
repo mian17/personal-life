@@ -1,5 +1,5 @@
 import type { List as TodoList } from '@life/shared';
-import { EmptyState, List, PillGroup, type TagOption } from '@life/ui';
+import { EmptyState, List, Section, type TagOption } from '@life/ui';
 import type { TodoGroup } from '@/lib/todo-groups';
 import { TodoItem } from './todo-item';
 
@@ -29,7 +29,7 @@ export function TodoList({
     <>
       {groups.map((group) =>
         group.todos.length === 0 ? null : (
-          <PillGroup key={group.key} label={group.label}>
+          <Section key={group.key} label={group.label}>
             <List>
               {group.todos.map((todo) => (
                 <TodoItem
@@ -41,7 +41,7 @@ export function TodoList({
                 />
               ))}
             </List>
-          </PillGroup>
+          </Section>
         ),
       )}
     </>

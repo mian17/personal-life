@@ -8,6 +8,7 @@ import {
   Input,
   Pill,
   PillGroup,
+  Stack,
   TagPicker,
   Textarea,
   type TagOption,
@@ -52,7 +53,7 @@ export function TodoComposer({
   }
 
   return (
-    <div role="group" aria-label="New todo">
+    <Stack role="group" aria-label="New todo" gap="md">
       <Input
         type="text"
         aria-label="Todo title"
@@ -117,6 +118,6 @@ export function TodoComposer({
       <Button variant="primary" onClick={submit} disabled={!canCreate}>
         Add todo
       </Button>
-    </div>
+    </Stack>
   );
 }

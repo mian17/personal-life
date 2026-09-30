@@ -11,6 +11,7 @@ import {
   ListItem,
   Pill,
   PillGroup,
+  Stack,
   TagPicker,
   Textarea,
   type TagOption,
@@ -115,7 +116,7 @@ export function TodoItem({
       )}
 
       {editing ? (
-        <div>
+        <Stack>
           <Input
             type="text"
             aria-label="Todo title"
@@ -173,7 +174,7 @@ export function TodoItem({
               Cancel
             </Button>
           </PillGroup>
-        </div>
+        </Stack>
       ) : (
         <IconButton label={`Edit ${todo.title}`} onClick={() => setEditing(true)}>
           <Pencil size={18} aria-hidden />

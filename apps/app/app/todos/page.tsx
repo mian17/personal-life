@@ -15,6 +15,7 @@ import {
   PageTitle,
   Pill,
   PillGroup,
+  Section,
   TagFilterNav,
   ThemeToggle,
   todayIso,
@@ -133,7 +134,9 @@ export default async function TodosPage({
       <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
 
       <ListManagerSection />
-      <TagManagerSection />
+      <Section label="Tags">
+        <TagManagerSection />
+      </Section>
     </PageShell>
   );
 }
