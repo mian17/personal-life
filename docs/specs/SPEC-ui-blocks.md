@@ -19,7 +19,8 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, trailing, deleteAction?,
                                                    //   children? (render slots; no domain types)
-<TagFilterNav items: {name, href, active}[] />     // .filters pill nav
+<TagFilterNav items: {name, href, active}[]        // .filters pill nav; label? sits BESIDE the pills
+                                                   //   (shared .ui-field-label; also the nav's aria-label)
 <FabLink href label>children</FabLink>             // .add-note fixed action
 <EditorToolbar back={{label, onBack: () => void}}  // back is a BUTTON (frozen:
                status?: ReactNode                  //   onBack is leave(), which
@@ -51,7 +52,7 @@ and the notes app's current pages map onto these one-to-one.
                                                     //   owns .editor-legacy-tags
 <PageActions>children</PageActions>                // page-level action container —
                                                    //   owns .trash-actions
-<TagPicker tags: {id: number; name: string}[]      // attach/detach tags by id
+<TagPicker tags: {id: number; name: string}[]      // attach/detach tags by id; label? sits BESIDE the chips
            selectedIds: number[]
            onToggle: (id: number) => void
            onCreate?: (name: string) => void
