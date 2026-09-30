@@ -10,6 +10,7 @@
     "apps/idp",
     "packages/shared",
     "packages/ui",
+    "packages/app-kit",
     "packages/crypto",
     "packages/cache"
   ],

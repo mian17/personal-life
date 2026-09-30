@@ -17,6 +17,7 @@
   "dependencies": {
     "@life/shared": "*",
     "@life/ui": "*",
+    "@life/app-kit": "*",
     "lucide-react": "^1.47.0",
     "next": "^15.2.4",
     "openid-client": "^6.8.8",
