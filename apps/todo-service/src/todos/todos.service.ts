@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import type { TagUsage, Todo as TodoDto, TodoPage } from '@life/shared';
@@ -16,7 +16,7 @@ import { Todo } from './todo.entity';
 import { TodoTag } from './todo-tag.entity';
 import { KeysService } from '../keys/keys.service';
 import { ListsService } from '../lists/lists.service';
-import { TODO_ALL, TODO_CACHE, TODO_TAGS, TodosCache } from '../cache/todo-cache';
+import { TODO_ALL, TODO_CACHE, TODO_TAGS, TODO_TRASH, TodosCache } from '../cache/todo-cache';
 import { DATE_ONLY } from './dto/create-todo.dto';
 
 /**
@@ -54,8 +54,8 @@ function todoNoteAad(ownerSub: string, id: string): string {
  * Ciphertext-row shape stored in Redis (`SPEC-todo-service` Cache Rules). The
  * cache holds **rows as stored** — `title`/`note` are `enc.v1.` envelopes —
  * never a decrypted DTO. `tagIds` are association ids (metadata) copied verbatim
- * so the tag filter and the DTO can run after a hit; `dueDate`/`done`/`listId`
- * are plaintext metadata. `origin` is the reserved seam (unused).
+ * so the tag filter and the DTO can run after a hit; `dueDate`/`done`/`listId`/
+ * `deletedAt` are plaintext metadata. `origin` is the reserved seam (unused).
  */
 interface CachedTodoRow {
   id: string;
@@ -68,6 +68,7 @@ interface CachedTodoRow {
   version: number;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
   tagIds: number[];
 }
 
@@ -84,6 +85,7 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
     version: todo.version,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
+    deletedAt: todo.deletedAt ? todo.deletedAt.toISOString() : null,
     tagIds: (todo.todoTags ?? []).map((tt) => tt.tagId).sort((a, b) => a - b),
   };
 }
@@ -190,6 +192,33 @@ function afterCursor(item: OrderedTodo, cursor: { due: string; createdAt: string
   );
 }
 
+/**
+ * Trash keyset cursor, `base64(<deletedAt>|<id>)`. Trash order is
+ * `deletedAt DESC, id DESC`, so the pair is the stable boundary key.
+ */
+function encodeTrashCursor(item: { deletedAt: string; id: string }): string {
+  return Buffer.from(`${item.deletedAt}|${item.id}`).toString('base64');
+}
+
+function decodeTrashCursor(cursor: string): { deletedAt: string; id: string } {
+  const [deletedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
+  return { deletedAt, id };
+}
+
+/**
+ * True when `item` falls strictly after the cursor in `deletedAt DESC, id DESC`
+ * order, so a page boundary can neither repeat nor skip a row.
+ */
+function afterTrashCursor(
+  item: { deletedAt: string; id: string },
+  cursor: { deletedAt: string; id: string },
+): boolean {
+  return (
+    item.deletedAt < cursor.deletedAt ||
+    (item.deletedAt === cursor.deletedAt && item.id < cursor.id)
+  );
+}
+
 @Injectable()
 export class TodosService {
   private readonly logger = new Logger(TodosService.name);
@@ -241,6 +270,7 @@ export class TodosService {
       tagIds: [...row.tagIds],
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      deletedAt: row.deletedAt,
       version: row.version,
     };
   }
@@ -268,6 +298,7 @@ export class TodosService {
           .createQueryBuilder('todo')
           .leftJoinAndSelect('todo.todoTags', 'todoTag')
           .where('todo.ownerSub = :sub', { sub })
+          .andWhere('todo.deletedAt IS NULL')
           .getMany();
         return found.map(toCachedTodoRow);
       },
@@ -306,6 +337,7 @@ export class TodosService {
       version: 0,
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
     });
     const saved = await this.todos.save(todo);
     // Association rows are managed explicitly (TagRef joins, not a cascade
@@ -379,10 +411,65 @@ export class TodosService {
   }
 
   /**
+   * `GET /api/todos/trash` — the owner's trashed rows through the read-through
+   * cache under the reserved rest key `todo:trash` (one entry serves every
+   * cursor/limit variant). Cached value = serialized ciphertext rows as stored;
+   * decrypt, order (`deletedAt DESC, id DESC`) and keyset-paginate in memory
+   * after the hit. The loader lives inside `getThrough` (Contract 2 Rule 1).
+   */
+  async findTrash(sub: string, opts: { limit?: number; cursor?: string }): Promise<TodoPage> {
+    const limit = opts.limit ?? 50;
+    const rows = await this.cache.getThrough(
+      sub,
+      TODO_TRASH,
+      async () => {
+        // Metadata-only SQL: trashed rows only, in the `deletedAt DESC, id DESC`
+        // order; pagination runs in memory after decryption so a same-timestamp
+        // tie can never repeat or skip the boundary row.
+        const found = await this.todos
+          .createQueryBuilder('todo')
+          .leftJoinAndSelect('todo.todoTags', 'todoTag')
+          .where('todo.deletedAt IS NOT NULL')
+          .andWhere('todo.ownerSub = :sub', { sub })
+          .orderBy('todo.deletedAt', 'DESC')
+          .addOrderBy('todo.id', 'DESC')
+          .getMany();
+        return found.map(toCachedTodoRow);
+      },
+      { decode: decodeCiphertextTodoRowList, cacheable: isCiphertextTodoRowList },
+    );
+
+    const dek = await this.readDek(sub, rows);
+    // The loader guarantees `deletedAt` is set on every row; the type guard
+    // narrows that for the cursor helpers without an assertion.
+    const decoded = rows
+      .map((row) => this.decodeCachedTodoRow(row, sub, dek))
+      .filter((todo): todo is TodoDto & { deletedAt: string } => todo.deletedAt !== null);
+    const desc = (a: string, b: string) => (a === b ? 0 : a < b ? 1 : -1);
+    const ordered = [...decoded].sort(
+      (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
+    );
+
+    const after = opts.cursor
+      ? ordered.filter((item) =>
+          afterTrashCursor({ deletedAt: item.deletedAt, id: item.id }, decodeTrashCursor(opts.cursor!)),
+        )
+      : ordered;
+
+    const hasMore = after.length > limit;
+    const page = hasMore ? after.slice(0, limit) : after;
+    const last = page[page.length - 1];
+    const nextCursor =
+      hasMore && last ? encodeTrashCursor({ deletedAt: last.deletedAt, id: last.id }) : null;
+    return { todos: page, nextCursor };
+  }
+
+  /**
    * `GET /api/todos/:id` — served from the one cached `todo:all` row-set (the
    * spec enumerates exactly three todo cache shapes; the id is a filter, so no
    * id ever enters the key space). Decrypt, then slice by id in memory after the
-   * hit. A foreign or missing id is a byte-identical 404.
+   * hit. A foreign or missing id is a byte-identical 404 — the `rawRows` loader
+   * guards `deletedAt IS NULL`, so a trashed id reads as absent.
    */
   async findOne(sub: string, id: string): Promise<TodoDto> {
     const rows = await this.rawRows(sub);
@@ -417,7 +504,7 @@ export class TodosService {
     }
 
     // Load WITHOUT the relation: associations are managed explicitly below.
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub } });
+    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!todo) throw new NotFoundException('Todo not found');
     if (patch.expectedVersion !== undefined && todo.version !== patch.expectedVersion) {
       throw new ConflictException('Todo was modified');
@@ -459,14 +546,55 @@ export class TodosService {
   }
 
   /**
-   * `DELETE /api/todos/:id` — permanent (no trash in the MVP). The `todoId` FK
-   * (`ON DELETE CASCADE`) removes the todo's association rows. Foreign/missing
-   * ids are a byte-identical 404.
+   * `DELETE /api/todos/:id` — **soft** delete to trash. Sets `deletedAt` and
+   * leaves `version` untouched (trash verbs never bump OCC, L2). Foreign/missing
+   * ids are a byte-identical 404; a failed mutation never bumps the generation.
    */
   async remove(sub: string, id: string): Promise<void> {
-    const result = await this.todos.delete({ id, ownerSub: sub });
-    if (!result.affected) throw new NotFoundException('Todo not found');
+    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!todo) throw new NotFoundException('Todo not found');
+    todo.deletedAt = new Date();
+    await this.todos.save(todo);
+    // Bump AFTER the mutation: pre-mutation entries die here. No version change.
     await this.cache.bumpGeneration(sub);
+  }
+
+  /**
+   * `POST /api/todos/:id/restore` — clear `deletedAt` on one trashed row and
+   * return the decoded DTO. Preserves `createdAt`, tags and `version` (L2).
+   * Foreign/missing/non-trashed ids are a byte-identical 404.
+   */
+  async restore(sub: string, id: string): Promise<TodoDto> {
+    const todo = await this.todos.findOne({
+      where: { id, ownerSub: sub, deletedAt: Not(IsNull()) },
+      relations: { todoTags: true },
+    });
+    if (!todo) throw new NotFoundException('Todo not found');
+    todo.deletedAt = null;
+    const saved = await this.todos.save(todo);
+    await this.cache.bumpGeneration(sub);
+    const row = toCachedTodoRow(saved);
+    const dek = await this.readDek(sub, [row]);
+    return this.decodeCachedTodoRow(row, sub, dek);
+  }
+
+  /**
+   * `DELETE /api/todos/:id/permanent` — hard-delete one trashed row; the
+   * `todoId` FK (`ON DELETE CASCADE`) removes its association rows. Foreign/
+   * missing/non-trashed ids are a byte-identical 404.
+   */
+  async removePermanent(sub: string, id: string): Promise<void> {
+    const result = await this.todos.delete({ id, ownerSub: sub, deletedAt: Not(IsNull()) });
+    if (!result.affected) throw new NotFoundException('Todo not found');
+    // Only a successful delete reaches the bump.
+    await this.cache.bumpGeneration(sub);
+  }
+
+  /** `DELETE /api/todos/trash` — hard-delete every trashed row the caller owns. */
+  async emptyTrash(sub: string): Promise<{ count: number }> {
+    const result = await this.todos.delete({ ownerSub: sub, deletedAt: Not(IsNull()) });
+    await this.cache.bumpGeneration(sub);
+    return { count: result.affected ?? 0 };
   }
 
   /**
@@ -486,6 +614,7 @@ export class TodosService {
           .select('todoTag.tagId', 'tagId')
           .addSelect('COUNT(*)', 'count')
           .where('todo.ownerSub = :sub', { sub })
+          .andWhere('todo.deletedAt IS NULL')
           .groupBy('todoTag.tagId')
           .orderBy('todoTag.tagId', 'ASC')
           .getRawMany()) as Array<{ tagId: number | string; count: number | string }>;

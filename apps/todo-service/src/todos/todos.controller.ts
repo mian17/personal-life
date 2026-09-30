@@ -9,9 +9,10 @@ import { TodosService } from './todos.service';
 /**
  * The todo HTTP surface (`SPEC-todo-service` API).
  *
- * Route declaration order matters: the literal `tags` route is declared
- * **before** any `:id` route so Nest does not shadow it (the
- * `GET /api/todos/tags` usage surface must not be read as an id).
+ * Route declaration order matters: the literal `tags`/`trash` routes are
+ * declared **before** any `:id` route so Nest does not shadow them (the
+ * `GET`/`DELETE /api/todos/trash` verbs must not be read as an id), and the
+ * `:id` suffix verbs (`restore`/`permanent`) before the plain `@Delete(':id')`.
  */
 @Controller('api/todos')
 export class TodosController {
@@ -33,6 +34,17 @@ export class TodosController {
     return this.todos.listTagUsage(principal.sub);
   }
 
+  // Literal routes declared before the `:id` route; only limit/cursor are read.
+  @Get('trash')
+  findTrash(@Principal() principal: Principal, @Query() query: ListTodosQuery) {
+    return this.todos.findTrash(principal.sub, { limit: query.limit, cursor: query.cursor });
+  }
+
+  @Delete('trash')
+  async emptyTrash(@Principal() principal: Principal) {
+    return { ok: true, ...(await this.todos.emptyTrash(principal.sub)) };
+  }
+
   @Get(':id')
   findOne(@Principal() principal: Principal, @Param('id') id: string) {
     return this.todos.findOne(principal.sub, id);
@@ -41,6 +53,17 @@ export class TodosController {
   @Patch(':id')
   update(@Principal() principal: Principal, @Param('id') id: string, @Body() dto: UpdateTodoDto) {
     return this.todos.update(principal.sub, id, dto);
+  }
+
+  @Post(':id/restore')
+  restore(@Principal() principal: Principal, @Param('id') id: string) {
+    return this.todos.restore(principal.sub, id);
+  }
+
+  @Delete(':id/permanent')
+  async removePermanent(@Principal() principal: Principal, @Param('id') id: string) {
+    await this.todos.removePermanent(principal.sub, id);
+    return { ok: true };
   }
 
   @Delete(':id')
