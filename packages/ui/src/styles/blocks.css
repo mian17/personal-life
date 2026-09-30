@@ -111,6 +111,27 @@
     calc(var(--space-1) + env(safe-area-inset-bottom));
 }
 
+/* Full-height field stack under an EditorToolbar: fills the remaining height,
+   owns the vertical rhythm (the editor's fields never hand-stack). */
+.ui-editor-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.ui-editor-stack--sm {
+  gap: var(--space-0-5);
+}
+
+.ui-editor-stack--md {
+  gap: var(--space-1);
+}
+
+.ui-editor-stack--lg {
+  gap: var(--space-2);
+}
+
 /* -------------------------------------------------------- EmptyState */
 
 .ui-empty {
@@ -250,6 +271,7 @@
 .ui-pill-group {
   display: flex;
   flex-wrap: wrap;
+  align-items: center; /* the label centres against the pills, not stretches */
   gap: var(--space-0-4);
   margin-top: var(--space-0-5);
   padding-top: var(--space-0-6);
@@ -337,6 +359,17 @@
 }
 
 /* -------------------------------------------------------- TagPicker */
+
+/* A picker is a labelled region even when the label was previously aria-only:
+   without a visible label, a row of chips reads as an unlabelled control. */
+.ui-tag-picker__label {
+  display: block;
+  font-size: var(--space-1-25);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  margin-block-end: var(--space-0-5);
+}
 
 .ui-tag-picker__tags {
   display: flex;

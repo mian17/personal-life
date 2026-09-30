@@ -48,6 +48,7 @@ export function TagPicker({
 
   return (
     <div role="group" aria-label={label} className={cx('ui-tag-picker', className)} {...rest}>
+      <h2 className="ui-tag-picker__label">{label}</h2>
       <div className="ui-tag-picker__tags">
         {tags.map((tag) => {
           const selected = selectedIds.includes(tag.id);

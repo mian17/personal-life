@@ -37,6 +37,10 @@ and the notes app's current pages map onto these one-to-one.
 <Row gap?="sm|md|lg">children</Row>                // horizontal companion to Stack: flex, wraps,
                                                    //   same token gap, no outer margins (added by the
                                                    //   ui-blocks revision change)
+<EditorStack gap?="sm|md|lg">children</EditorStack> // full-height field stack under an EditorToolbar
+                                                   //   (flex:1, token gap; no outer margins; added by the
+                                                   //   /todos redesign)
+<EditorToolbar back status? actions? />            // (unchanged) back is {label,onBack}; actions slot
                                                    //   routing stays in the app
 <EditorScreen>children</EditorScreen>            // full-screen fixed editor container
                                                  //   (safe-area aware) — owns .editor-screen

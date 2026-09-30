@@ -76,6 +76,8 @@ export type { PageActionsProps } from './components/page-actions';
 
 export { Stack } from './components/stack';
 export { Row } from './components/row';
+export { EditorStack } from './components/editor-stack';
+export type { EditorStackProps } from './components/editor-stack';
 export type { RowProps } from './components/row';
 export type { StackGap, StackProps } from './components/stack';
 

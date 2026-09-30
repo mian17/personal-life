@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { List } from '@life/shared';
 import {
-  Button,
   EditorScreen,
+  EditorStack,
   EditorToolbar,
   IconButton,
   Input,
@@ -20,9 +20,10 @@ import { createTodoAction } from './todo-actions';
 
 /**
  * The `/todos/new` editor screen — the FAB target, mirroring the notes editor
- * pattern (full-screen `EditorScreen` + `EditorToolbar`, not an always-open
- * inline form). Title is required; note, due date, list and tags are optional.
- * All visuals come from `@life/ui`.
+ * pattern (full-screen `EditorScreen` + `EditorToolbar`). Title is required; the
+ * toolbar's ✓ is the single save action (no duplicate button). All visuals come
+ * from `@life/ui`; the fields stack through `EditorStack` so the editor never
+ * hand-stacks controls.
  */
 export function TodoEditor({
   lists,
@@ -63,74 +64,72 @@ export function TodoEditor({
         }
       />
 
-      <Input
-        type="text"
-        aria-label="Todo title"
-        placeholder="What needs doing?"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        autoFocus
-      />
-
-      <Textarea
-        aria-label="Todo note"
-        placeholder="Details (optional)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-
-      <PillGroup label="Due" aria-label="Due date">
+      <EditorStack gap="lg">
         <Input
-          type="date"
-          aria-label="Due date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
+          type="text"
+          aria-label="Todo title"
+          placeholder="What needs doing?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
         />
-        {dueDate !== '' && (
-          <IconButton label="Clear due date" onClick={() => setDueDate('')}>
-            <X size={16} aria-hidden />
-          </IconButton>
-        )}
-      </PillGroup>
 
-      {lists.length > 0 && (
-        <PillGroup label="List" aria-label="List">
-          <Pill
-            as="button"
-            size="chip"
-            active={listId === null}
-            aria-pressed={listId === null}
-            onClick={() => setListId(null)}
-          >
-            No list
-          </Pill>
-          {lists.map((list) => (
+        <Textarea
+          aria-label="Todo note"
+          placeholder="Details (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+
+        <PillGroup label="Due" aria-label="Due">
+          <Input
+            type="date"
+            aria-label="Due date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+          {dueDate !== '' && (
+            <IconButton label="Clear due date" onClick={() => setDueDate('')}>
+              <X size={16} aria-hidden />
+            </IconButton>
+          )}
+        </PillGroup>
+
+        {lists.length > 0 && (
+          <PillGroup label="List" aria-label="List">
             <Pill
-              key={list.id}
               as="button"
               size="chip"
-              active={listId === list.id}
-              aria-pressed={listId === list.id}
-              onClick={() => setListId(list.id)}
+              active={listId === null}
+              aria-pressed={listId === null}
+              onClick={() => setListId(null)}
             >
-              {list.name}
+              No list
             </Pill>
-          ))}
-        </PillGroup>
-      )}
+            {lists.map((list) => (
+              <Pill
+                key={list.id}
+                as="button"
+                size="chip"
+                active={listId === list.id}
+                aria-pressed={listId === list.id}
+                onClick={() => setListId(list.id)}
+              >
+                {list.name}
+              </Pill>
+            ))}
+          </PillGroup>
+        )}
 
-      <TagPicker
-        tags={availableTags}
-        selectedIds={tagIds}
-        onToggle={(id) =>
-          setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
-        }
-        label="Tags"
-      />
-
-      <Button variant="primary" onClick={save} disabled={!canSave}>
-        Add todo
-      </Button>
+        <TagPicker
+          tags={availableTags}
+          selectedIds={tagIds}
+          onToggle={(id) =>
+            setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+          }
+          label="Tags"
+        />
+      </EditorStack>
     </EditorScreen>
   );
 }
