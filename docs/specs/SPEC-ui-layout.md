@@ -1,104 +1,100 @@
-# Spec: ui-layout (upstream layout primitives: Stack + Section)
+# Spec: ui-blocks revision — Stack + Section (for /todos parity)
 
-Module id: `ui-layout` (see `MAP-todo-ecosystem.md` — this is the follow-up module
-that unblocks `/todos` presentation parity). Package: `packages/ui`. Contract:
-AGENTS.md Contract 1 (Shared UI Contract) — Rule 3 upstream-first.
+Module id: `ui-blocks` (map: `docs/specs/MAP-ui-primitives.md`). This is a revision
+of the existing `ui-blocks` spec, not a new module: the two components' prop
+contracts are owned by `docs/specs/SPEC-ui-blocks.md` (its "Components" table);
+this file records the change, the root cause, and the `/todos` consumption.
+Contract: AGENTS.md Contract 1 — Rule 3 upstream-first, spec-first.
 
 ## Objective
 
-Add the two container primitives `@life/ui` is missing — a **vertical-rhythm
-stack** and a **section with a heading** — so pages that stack bare primitives
-(`/todos` composer) and group content (`/todos` todo groups) get the same spacing
-and heading language as the pages that never needed it (`/notes`). Then consume
-them from `/todos`. No app-side CSS; tokens only.
+Add the two container primitives `@life/ui` is missing — a **vertical-rhythm stack**
+and a **section with a heading** — then consume them from `/todos`, so a page that
+stacks bare primitives (the composer) and groups content (the todo groups) gets the
+same spacing and heading language as the pages that never needed it.
 
 ## Root cause this fixes
 
-See `docs/intent/todos-presentation.md`. In short: `Input`/`Textarea`/`Button`/
-`IconButton` carry no margin rules; `/notes` never stacks them directly, `/todos`
-does (composer) — so its controls touch. And `/todos` wraps each group's `<List>`
-in `PillGroup` (a filter-pill flex row) to fake a heading, which breaks the list
-layout. Both are missing-primitive symptoms, not styling bugs.
+See `docs/intent/todos-presentation.md`. `Input`/`Textarea`/`Button`/`IconButton`
+carry no margin rules (`packages/ui/src/styles/atoms.css`), and `/notes` never stacks
+them directly — every notes section is a self-spacing block. `/todos` is the first
+page that stacks bare primitives (`todo-composer.tsx`'s `<div role="group">`) and the
+first that needs group headings (`todo-list.tsx` wraps each `<List>` in `PillGroup`,
+a filter-pill flex row: `display:flex; flex-wrap:wrap`). Both are missing-primitive
+symptoms. The fix is upstream (Contract 1 Rule 3), never app CSS.
 
 ## Components
 
-### `Stack` (block — `ui-blocks`)
+Prop contracts live in `SPEC-ui-blocks.md` (owner). Summary of what this revision adds
+there:
 
-A vertical rhythm container. This is the primitive whose absence produced the
-"no margin at all" symptom.
+- **`Stack`** — vertical rhythm container: `gap?: StackGap` (`'sm' | 'md' | 'lg'`,
+  token-mapped, default `'md'`), `as?: 'div'`, `className?`, children, ref. Renders a
+  single `div` with `display: grid; gap: var(--space-*)`. `display: grid` (not flex)
+  so it stacks children regardless of their own `display`. Purely presentational; no
+  outer margins of its own.
+- **`Section`** — labelled region: `label?: ReactNode`, `headingLevel?: 'h2' | 'h3'`
+  (default `'h2'`), `actions?: ReactNode` (trailing heading-row slot), `gap?: StackGap`,
+  `className?`, children, ref. Renders `<section>` → heading row (label + actions) →
+  `Stack` body. Owns `margin-block-start: var(--space-2)` and a
+  `margin-block-end: var(--space-0-5)` on its heading. Non-interactive.
+- `export type StackGap = 'sm' | 'md' | 'lg'` from `packages/ui/src/index.ts`.
 
-- Props: `gap?: 'sm' | 'md' | 'lg'` (token-mapped: `--space-0-5` / `--space-1` /
-  `--space-2`; default `md`), plus `as?`, `className?`, standard children/ref.
-- Renders a single `div` with `display: grid; gap: var(--space-*)`.
-  `display: grid` (not flex) so a single column stacks regardless of child
-  `display` — no child needs to know it is in a stack.
-- Accessibility: purely presentational; `role="group"` + `aria-label` pass-through
-  when a caller groups a form region (the composer does).
-- Never sets its own outer margins — outer spacing is a section's job.
-
-### `Section` (block — `ui-blocks`)
-
-A labelled content region: an optional heading + a stacked body.
-
-- Props: `label?: ReactNode` (renders as the heading), `headingLevel?: 'h2' | 'h3'`
-  (default `'h2'`), `actions?: ReactNode` (trailing heading row slot),
-  `gap?: StackGap`, plus `className?`, children, ref.
-- Renders: region wrapper → heading row (`label` + `actions`) → `Stack` body.
-  Spacing: `margin-block-start: var(--space-2)` between sections, heading
-  `margin-block-end: var(--space-0-5)`.
-- Replaces the `PillGroup`-as-heading usage in `todo-list.tsx`: the group label
-  becomes a real heading, the `<List>` is the section body with correct layout.
-- Purely presentational; no interactivity, so no `@life/ui` data/routing concerns.
-
-## Consumption (this module's app change)
+## Consumption (this revision's app change)
 
 - `apps/app/app/todo-list.tsx` — `Section label={group.label}` wrapping `<List>`
-  (drops the `PillGroup` misuse).
-- `apps/app/app/todo-composer.tsx` — bare `<div role="group">` → `<Stack role="group"
-  aria-label="New todo" gap="md">`; controls get rhythm; the actions row uses
-  `Stack` too.
-- `apps/app/app/todo-item.tsx` — the edit block's bare `<div>` → `<Stack>`; the
-  attached-chip `PillGroup` stays (it genuinely is a pill row).
-- `apps/app/app/list-manager-section.tsx` / `tag-manager-section.tsx` — wrap their
-  panels in `Section` for a consistent heading + spacing.
-- No other app file changes; `/notes` is untouched.
+  (drops the `PillGroup`-as-heading misuse). **This adds heading roles to `/todos`**;
+  it does not change any existing `getByRole` query (the e2e suite's headings are
+  `Notes`/`Todos`/page headings, not group labels).
+- `apps/app/app/todo-composer.tsx` — `<div role="group" aria-label="New todo">` →
+  `<Stack role="group" aria-label="New todo" gap="md">` (the frozen selector is
+  preserved by the pass-through). No "actions row" — the single "Add todo" `Button`
+  stays the last stacked child.
+- `apps/app/app/todo-item.tsx` — the edit block's bare `<div>` → `<Stack>`. The
+  attached-chip `PillGroup` and the Save/Cancel `PillGroup` are both **kept** (they
+  genuinely are pill rows).
+- `apps/app/app/list-manager-section.tsx` — wrap its panel in
+  `<Section label="Lists">`.
+- **`apps/app/app/tag-manager-section.tsx` is NOT in this change**: it is mounted on
+  `/notes` too (`apps/app/app/notes/page.tsx`), so wrapping it here would alter
+  `/notes` — out of scope. Its `/todos` placement stays as-is.
 
 ## Commands
 
 ```
 Typecheck: npm run typecheck
-Test:      npm run test:unit -w @life/ui
-           npm run test:unit -w @life/app
+Test:      npm run test:unit -w @life/ui -- test/stack.test.tsx test/section.test.tsx
+           npm run test:unit -w @life/app -- test/todo-groups.test.ts
 Build:     npm run build -w @life/app
 ```
 
 ## Testing Strategy
 
-- `@life/ui` unit tests: `Stack` renders children in a grid with the token gap per
-  `gap` prop; `Section` renders the heading at the requested level, the actions
-  slot, and a `Stack` body; both accept `className`/ref and pass through ARIA.
-- `@life/app` tests: a render/logic test is thin here (presentational), so the
-  meaningful app assertion is that `/todos` still composes the same data (groups,
-  composer submit, item save) — the existing app suite must stay green.
-- Mechanical (Contract 1): no raw interactive HTML in `apps`, no `next/link` in
-  `apps`, raw colors only in `tokens.css`, no domain words in `packages/ui/src`,
-  no app CSS recreating primitives.
-- Visual verification: the user eyeballs `/todos` in `npm run dev` (the acceptance
-  that started this) — agents do not run Playwright.
+- `@life/ui`: `stack.test.tsx` (grid gap per `gap` prop resolves to the token value;
+  children render; `className`/ref/ARIA pass through), `section.test.tsx` (heading at
+  the requested level, absent when no `label`, actions slot renders, body is a
+  `Stack`).
+- `@life/app`: the existing suite stays green; `todo-groups.test.ts` (grouping
+  unchanged). Presentational change — the app assertion is non-regression, not new
+  behavior.
+- Mechanical (Contract 1), run by the tech lead: raw-HTML grep in `apps`, `next/link`
+  grep, raw-color grep (tokens.css only), domain-word grep in `packages/ui/src`.
+- Visual: the user eyeballs `/todos` in `npm run dev` — the acceptance that started
+  this. Agents run no Playwright.
 
 ## Boundaries
 
-- Always: spec + `MAP-ui-primitives.md` updated with the code; tokens only;
-  compose from existing primitives where possible.
-- Ask first: new token *values* (frozen); any change to the frozen e2e surface.
-- Never: app-side CSS/`style=` recreating visuals; raw interactive HTML; a second
-  app-wide stylesheet; changing `/notes`; adding e2e assertions.
+- Always: prop contracts updated in `SPEC-ui-blocks.md` + `MAP-ui-primitives.md` in the
+  same change; tokens only; `/notes` untouched.
+- Ask first: new token *values* (frozen); any frozen-e2e-surface change.
+- Never: app-side CSS/`style=`; raw interactive HTML; changing `/notes`; adding e2e
+  assertions or running e2e.
 
 ## Success Criteria
 
-1. `Stack` and `Section` exist in `@life/ui` with tests, documented in
-   `SPEC-ui-blocks.md` + `MAP-ui-primitives.md` in the same change.
-2. `/todos` uses them; no bare stacking `div` remains in the todo components; the
-   `PillGroup`-as-heading misuse is gone.
-3. `/notes`, the frozen e2e surface, and token values are unchanged.
-4. `npm run test:unit -w @life/ui` + `-w @life/app` green; typecheck + app build clean.
+1. `Stack` + `Section` exist in `@life/ui` with tests; contracts documented in
+   `SPEC-ui-blocks.md` (owner) and listed in `MAP-ui-primitives.md`.
+2. `/todos` uses them; no bare stacking `div` remains in the todo components;
+   `PillGroup`-as-heading is gone.
+3. `/notes`, the frozen e2e selector/role/text surface, and token values unchanged.
+4. The named targeted suites pass; typecheck + app build clean.
