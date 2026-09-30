@@ -34,6 +34,9 @@ and the notes app's current pages map onto these one-to-one.
          gap?>children</Section>                   //   → Stack body; section margin-block-start
                                                    //   --space-2; heading margin-block-end --space-0-5
                                                    //   (added by the ui-blocks revision change)
+<Row gap?="sm|md|lg">children</Row>                // horizontal companion to Stack: flex, wraps,
+                                                   //   same token gap, no outer margins (added by the
+                                                   //   ui-blocks revision change)
                                                    //   routing stays in the app
 <EditorScreen>children</EditorScreen>            // full-screen fixed editor container
                                                  //   (safe-area aware) — owns .editor-screen

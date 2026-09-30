@@ -12,7 +12,7 @@ lead's final integrated run, and the user's e2e pass is separate.
 
 ## Tasks
 
-- [ ] T1: `Stack` primitive — module `ui-blocks`
+- [x] T1: `Stack` primitive — module `ui-blocks`
   - Description: add the vertical-rhythm stack container and its `StackGap` type.
   - Files: `packages/ui/src/components/stack.tsx` (new), `packages/ui/src/index.ts`,
     `packages/ui/src/styles/blocks.css`, `packages/ui/test/stack.test.tsx` (new),
@@ -22,7 +22,7 @@ lead's final integrated run, and the user's e2e pass is separate.
     outer margins; `as`/`className`/ref/ARIA pass through; `StackGap` exported.
   - Verify: `npm run test:unit -w @life/ui -- test/stack.test.tsx` && `npm run typecheck -w @life/ui`.
   - Dependencies: none. Size: S.
-- [ ] T2: `Section` primitive — module `ui-blocks`
+- [x] T2: `Section` primitive — module `ui-blocks`
   - Description: add the labelled section (heading + actions slot + `Stack` body).
   - Files: `packages/ui/src/components/section.tsx` (new), `packages/ui/src/index.ts`,
     `packages/ui/src/styles/blocks.css`, `packages/ui/test/section.test.tsx` (new),
@@ -33,7 +33,7 @@ lead's final integrated run, and the user's e2e pass is separate.
     className/ref pass through.
   - Verify: `npm run test:unit -w @life/ui -- test/section.test.tsx` && `npm run typecheck -w @life/ui`.
   - Dependencies: T1 (Section's body is a `Stack`). Size: S.
-- [ ] T3: consume `Stack`/`Section` from `/todos` — module `ui-blocks`
+- [x] T3: consume `Stack`/`Section` from `/todos` — module `ui-blocks`
   - Description: rewire the todo page's presentation onto the new primitives.
   - Files: `apps/app/app/todo-list.tsx`, `todo-composer.tsx`, `todo-item.tsx`,
     `list-manager-section.tsx`, `todos/page.tsx` (wraps the shared tag manager).
@@ -59,7 +59,7 @@ lead's final integrated run, and the user's e2e pass is separate.
   - Verify: `npm run test:unit -w @life/app -- test/todo-groups.test.ts` &&
     `npm run build -w @life/app` && `npm run typecheck -w @life/app`.
   - Dependencies: T1, T2. Size: S.
-- [ ] T4: close — gate on the final state
+- [x] T4: close — gate on the final state
   - Description: on completion re-run the five-lane gate across the chapter's final
     state and record it (`tasks/five-lane-todo-ecosystem.md` updated). `/todos`
     acceptance is the user's visual pass in `npm run dev`; the frozen Playwright
@@ -97,3 +97,15 @@ lead's final integrated run, and the user's e2e pass is separate.
   round-2 items verified closed against the tree; whole-plan walk clean (coverage,
   commands, §5 compliance, frozen surface, root cause). **Gate open — implementation
   starts at T1.**
+- 2026-09-30: T1 (`c4f09cc`, Stack 9 tests), T2 (`58db845`, Section 14 tests,
+  Primitives checkpoint), T3 (`9cbf391`, Consumption checkpoint) done.
+- 2026-09-30 (late revision, post-gate — user's visual pass reported remaining flush
+  padding): **`Row` primitive added** (`gap`-scaled flex row, the horizontal companion
+  to `Stack`) and **`Card` atom given padding** (`--space-0-9`; it had none, so both
+  manager panels sat flush). The composer/edit date row now uses `Row gap="sm"` so the
+  date input and clear button stay on one line. Spec/map updated spec-first. UI 231/231,
+  app 173/173, typecheck + build clean, mechanical checks clean.
+- 2026-09-30: **five-lane gate (final chapter state): 5/5 — lanes 1 PASS, 3 PASS,
+  2/4/5 PASS_WITH_NITS**, zero blockers after the late revision absorbed the reported
+  defect. Lane 5's two bookkeeping items are closed here (T1-T4 ticked; the chapter
+  five-lane report is refreshed to the final range). T4 CLOSED.

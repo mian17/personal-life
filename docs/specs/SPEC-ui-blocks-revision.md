@@ -39,7 +39,20 @@ there:
   `<section>` → heading row (label + actions) →
   `Stack` body. Owns `margin-block-start: var(--space-2)` and a
   `margin-block-end: var(--space-0-5)` on its heading. Non-interactive.
+- **`Row`** — horizontal companion to `Stack`: `gap?: StackGap` (default `'md'`),
+  `className?`, children, ref. Renders a `div` with `display: flex; flex-wrap: wrap`
+  and the same token gap; no outer margins. Groups children the parent's vertical
+  rhythm must not split (e.g. a date field with its clear control).
 - `export type StackGap = 'sm' | 'md' | 'lg'` from `packages/ui/src/index.ts`.
+
+## Late revision (post-gate, user-reported)
+
+The user's visual pass found remaining flush/padding problems, both fixed:
+1. **`Card` had no padding** (atom): both manager panels (`/todos` `Lists`, and the
+   shared `Tags`) rendered their content flush against the panel edge. `Card` now owns
+   `padding: var(--space-0-9)` — the atom fix; `Card` has exactly these two call sites.
+2. **The composer/edit date row split** across two `Stack` rows (the date input and
+   its clear button are separate children). `Row` (above) groups them on one line.
 
 ## Consumption (this revision's app change)
 

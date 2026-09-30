@@ -324,11 +324,14 @@
 /* The legacy `.note` surface declarations (panel background, `--radius-lg`,
    clipping) are owned by ListItem: the `.note` class rode the row `li`, so the
    shipped row carries both surface and row layout. Card stays as a generic panel
-   atom for future apps and has no legacy counterpart. */
+   atom for future apps and has no legacy counterpart. It owns the panel's inner
+   padding: with `overflow: hidden` and no padding, any block-level content sat
+   flush against the edge (the `/todos` manager panels). */
 .ui-card {
   background: var(--panel);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  padding: var(--space-0-9);
 }
 
 /* ------------------------------------------------------- StatusText */

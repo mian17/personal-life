@@ -11,6 +11,7 @@ import {
   ListItem,
   Pill,
   PillGroup,
+  Row,
   Stack,
   TagPicker,
   Textarea,
@@ -124,15 +125,17 @@ export function TodoItem({
             onChange={(e) => setTitle(e.target.value)}
           />
           <Textarea aria-label="Todo note" value={note} onChange={(e) => setNote(e.target.value)} />
-          <Input
-            type="date"
-            aria-label="Due date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-          <IconButton label="Clear due date" onClick={() => setDueDate('')}>
-            <X size={16} aria-hidden />
-          </IconButton>
+          <Row gap="sm">
+            <Input
+              type="date"
+              aria-label="Due date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+            <IconButton label="Clear due date" onClick={() => setDueDate('')}>
+              <X size={16} aria-hidden />
+            </IconButton>
+          </Row>
           {lists.length > 0 && (
             <PillGroup label="List" aria-label="List">
               <Pill

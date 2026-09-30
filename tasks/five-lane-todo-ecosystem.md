@@ -1,6 +1,6 @@
 # Five-Lane Gate: todo-ecosystem (shared tag registry + todo service + ecosystem contracts)
 
-Branch: `feature/todo-ecosystem` · Range: `master..HEAD` (ba47237..3d6f9f7)
+Branch: `feature/todo-ecosystem` · Range: `master..HEAD` (ba47237..9cbf391)
 Plan: `tasks/plan-todo-ecosystem.md` · Ledger: `tasks/todo-todo-ecosystem.md`
 
 ## Final verdict: **N/N — MERGEABLE** (merge parked: user's explicit request only)
@@ -65,6 +65,22 @@ tracked files.
 ```json
 {"gate":"MERGEABLE","score":"5/5","merge_condition":"N/N","merge_status":"PARKED_AWAITING_USER_EXPLICIT_REQUEST","suite":"8 workspaces, 765 tests, typecheck clean","fix_pass":"3d6f9f7 (tests_pass=true)","human_run_required":"production import-tags migration + deploy + Playwright e2e (frozen surface) — see SPEC-tags-extraction.md checklist"}
 ```
+
+## Post-gate deltas re-gated (2026-09-30)
+
+After this gate, two user-requested changes landed and were re-gated across the final
+state (§7.6: fix blockers, re-run lanes until N/N):
+1. `/trash` → `/notes/trash` (route move; URL-only frozen-surface change, user-approved).
+2. The **ui-blocks revision** — `Stack`/`Section` primitives + `/todos` consumption
+   (its own §6 validation gate: 3 rounds) **plus a late `Row` primitive and a `Card`
+   padding fix** from the user's visual pass (the composer date row had split across
+   two rows; both manager panels sat flush because `Card` had no padding).
+
+Final five-lane verdict on the re-gated state: **5/5** — lane 1 PASS, lane 3 PASS,
+lanes 2/4/5 PASS_WITH_NITS, zero blockers. Suite gate: 789 tests across 8 workspaces
+(ui 231, app 173, tags 63, todo 71, note 128, idp 103, cache 15, shared 9) + typecheck
+clean. Outstanding human step: the visual pass on `/todos` in `npm run dev` (the
+original defect) and the frozen Playwright run.
 
 ## Next
 
