@@ -184,9 +184,13 @@ through the app's existing todo/list actions:
   write path (`apps/app/app/todo-actions.ts` `renameListAction` →
   `apps/app/lib/todo-api.ts` `renameList`, the list PATCH).
 - **Per-todo importance** — a toggle in the todo editor
-  (`apps/app/app/todo-editor.tsx` + `apps/app/app/todo-actions.ts`) writing
-  `todo.important` as an explicit `true`/`false` override; `null` (inherit the list default)
-  remains the value for a todo the user has never overridden.
+  (`apps/app/app/todo-editor.tsx` + `apps/app/app/todo-actions.ts`) whose displayed value is
+  the user's explicit override when one exists, otherwise seeded from
+  `todo.important ?? todo.effectiveImportant` (edit) / the selected list's
+  `importantDefault ?? false` (create). `todo.important` is written as an explicit
+  `true`/`false` **only when the user overrides it** — an untouched save omits the field, so
+  `null` (inherit the list default) remains the value for a todo the user has never
+  overridden.
 
 Both surfaces compose the `Switch` atom (`SPEC-ui-settings.md`) — no raw HTML — and the
 app owns their copy: the frozen accessible names are `Important` (per-todo) and

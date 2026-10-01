@@ -91,25 +91,25 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 ### Phase 1 — Upstream UI (`@life/ui`; parallelizable, executed sequentially under review)
 
-- [ ] T1: `ui-settings` — `Switch` atom (`switch.tsx`, `atoms.css`, `index.ts`,
+- [x] T1: `ui-settings` — `Switch` atom (`switch.tsx`, `atoms.css`, `index.ts`,
   `test/switch.test.tsx`); verify `grep -riE "note|todo" packages/ui/src/components/switch.tsx`
   → zero hits (`SPEC-ui-settings.md` Success Criteria 3)
-- [ ] T2: `ui-settings` — `SettingsRow` + `SettingsBlock` blocks (`settings-row.tsx`,
+- [x] T2: `ui-settings` — `SettingsRow` + `SettingsBlock` blocks (`settings-row.tsx`,
   `settings-block.tsx`, `blocks.css`, `index.ts`, `test/settings-{row,block}.test.tsx`);
   verify `grep -riE "note|todo" packages/ui/src/components/settings-row.tsx
   packages/ui/src/components/settings-block.tsx` → zero hits (`SPEC-ui-settings.md`
   Success Criteria 3)
-- [ ] T3: `ui-tabs` — `TabBar`/`Tab` + `ListShell` `tabs?` slot (`tab-bar.tsx`,
+- [x] T3: `ui-tabs` — `TabBar`/`Tab` + `ListShell` `tabs?` slot (`tab-bar.tsx`,
   `list-shell.tsx`, `blocks.css`, `index.ts`, `test/tab-bar.test.tsx`,
   `test/list-shell.test.tsx`); verify
   `grep -riE "note|todo" packages/ui/src/components/tab-bar.tsx` → zero hits and
   `grep -rn "PillGroup" packages/ui/src/components/tab-bar.tsx` → zero hits
   (`SPEC-ui-tabs.md` Success Criteria 4)
-- [ ] T4: `ui-blocks` — `MatrixBlock` upstream block, `@life/ui` (`matrix-block.tsx`,
+- [x] T4: `ui-blocks` — `MatrixBlock` upstream block, `@life/ui` (`matrix-block.tsx`,
   `blocks.css`, `index.ts`, `test/matrix-block.test.tsx`); verify
   `grep -riE "note|todo|urgent|important" packages/ui/src/components/matrix-block.tsx`
   → zero hits in code (`SPEC-matrix-ui.md` Testing Strategy)
-- [ ] T5: `ui-blocks` — `ListManager` per-row slot (`list-manager.tsx`, `index.ts`,
+- [x] T5: `ui-blocks` — `ListManager` per-row slot (`list-manager.tsx`, `index.ts`,
   `test/list-manager.test.tsx`, `docs/specs/SPEC-ui-blocks.md`); adds one optional
   domain-free `rowExtra?: (list: TodoListOption) => ReactNode` rendered in each row (the
   block must not know the word "important"); verify `npm run typecheck -w @life/ui` &&
@@ -122,12 +122,12 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 ### Phase 2 — Backend `todo-importance` (parallel with Phase 1)
 
-- [ ] T6: importance data model + request DTOs + query-filter contract (entities, todo/list
+- [x] T6: importance data model + request DTOs + query-filter contract (entities, todo/list
   request DTOs, `ListTodosQuery`)
-- [ ] T7: shared read contract + effective computation + list default + list input
+- [x] T7: shared read contract + effective computation + list default + list input
   (`@life/shared` `Todo`/`List`, `todos.service.ts`, `lists.service.ts`,
   `lists.controller.ts`, `lists/dto/create-list.dto.ts`, `lists/dto/update-list.dto.ts`)
-- [ ] T8: cache ciphertext suite (`test/todo-cache.e2e-spec.ts`) — the `## Cache Rules`
+- [x] T8: cache ciphertext suite (`test/todo-cache.e2e-spec.ts`) — the `## Cache Rules`
   assertion task
 
 ### Checkpoint: Backend
@@ -138,12 +138,12 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 ### Phase 3 — `app-kit-settings`
 
-- [ ] T9: preference cookie name/parse/read (`preferences.ts`, `types.ts`, `package.json`
+- [x] T9: preference cookie name/parse/read (`preferences.ts`, `types.ts`, `package.json`
   `next/headers` mapper, `test/stubs/next-headers.ts`, `test/pref-cookie.test.ts`,
   `test/read-pref.test.ts`)
-- [ ] T10: server action write (`preference-action.ts`, `package.json` `next/cache` mapper,
+- [x] T10: server action write (`preference-action.ts`, `package.json` `next/cache` mapper,
   `test/stubs/next-cache.ts`, `test/set-pref.test.ts`)
-- [ ] T11: settings-route helper + barrel (`settings-route.ts`, `index.ts`,
+- [x] T11: settings-route helper + barrel (`settings-route.ts`, `index.ts`,
   `test/settings-route.test.ts`)
 
 ### Checkpoint: app-kit
@@ -157,11 +157,11 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 ### Phase 4 — `matrix-ui` integration (`apps/app`)
 
-- [ ] T12: app wire-type conformance (`test/todo-query.test.ts`, `test/todo-groups.test.ts`,
+- [x] T12: app wire-type conformance (`test/todo-query.test.ts`, `test/todo-groups.test.ts`,
   `test/routes-todos-trash.test.tsx`, `test/routes-todo-edit.test.tsx`,
   `test/routes-todos-list.test.tsx`)
-- [ ] T13: app matrix domain logic (`lib/matrix.ts`, `test/matrix.test.ts`)
-- [ ] T14: settings pages + preference glue (`lib/preferences.ts`,
+- [x] T13: app matrix domain logic (`lib/matrix.ts`, `test/matrix.test.ts`)
+- [x] T14: settings pages + preference glue (`lib/preferences.ts`,
   `app/settings/matrix-switch.tsx`, `app/todos/settings/page.tsx`,
   `app/notes/settings/page.tsx`, `test/routes-settings.test.tsx`, plus the subpath
   plumbing: `packages/app-kit/package.json`, `apps/app/tsconfig.json`,
@@ -170,19 +170,22 @@ from `effectiveImportant` + urgency derived from `dueDate`.
   barrel nor `@/lib/preferences` (both re-export the server-only
   `readPref`/`next/headers`); the subpath is mapped in the app's tsconfig `paths` and
   jest `moduleNameMapper`
-- [ ] T15: nav gear in both apps + `/todos` tabs slot (`app/todos/page.tsx`,
+- [x] T15: nav gear in both apps + `/todos` tabs slot (`app/todos/page.tsx`,
   `app/notes/page.tsx`, `test/routes-todos-list.test.tsx`)
-- [ ] T16: `/todos/matrix` server-gated lens (`app/todos/matrix/page.tsx`,
+- [x] T16: `/todos/matrix` server-gated lens (`app/todos/matrix/page.tsx`,
   `test/routes-matrix.test.tsx`)
-- [ ] T17: list importance-default control (`app/list-manager-panel.tsx`, `app/todo-actions.ts`,
+- [x] T17: list importance-default control (`app/list-manager-panel.tsx`, `app/todo-actions.ts`,
   `lib/todo-api.ts`, `test/routes-manager-blocks.test.tsx`) — L6 consumer path; renders the
   per-list `Switch` through T5's `ListManager` `rowExtra` slot (upstream host, Contract 1)
-- [ ] T18: per-todo importance toggle (`app/todo-editor.tsx`,
-  `test/routes-todo-edit.test.tsx`) — L6 consumer path
+- [x] T18: per-todo importance toggle (`app/todo-editor.tsx`,
+  `test/routes-todo-edit.test.tsx`) — L6 consumer path: the `Switch` displays the user's
+  explicit override when one exists, else seeds from `todo.important ?? todo.effectiveImportant`
+  (edit) / the selected list's `importantDefault ?? false` (create); `important` is written
+  only when the user overrides, so an untouched todo stays `null` (inherit)
 
 ### Checkpoint: UI integration
 
-- [ ] `/todos/settings`, `/notes/settings`, `/todos` tabs and `/todos/matrix` render from
+- [x] `/todos/settings`, `/notes/settings`, `/todos` tabs and `/todos/matrix` render from
   `@life/ui` / `@life/app-kit` only; opt-in off ⇒ `/todos` renders no tabs node and
   `/todos/matrix` is a 404; the two L6 importance inputs (`Important` / `Default important`)
   are wired; Contract 1 mechanical greps green; `cd
@@ -190,16 +193,16 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 ### Phase 5 — Close
 
-- [ ] T19: frozen-surface/e2e record close-out + Contract 1 mechanical checks (chapter-scoped
+- [x] T19: frozen-surface/e2e record close-out + Contract 1 mechanical checks (chapter-scoped
   `note|trash|tag-chip` grep over the files this chapter adds/changes — the whole-repo hits in
   `packages/ui/src/components/trash-block.tsx` are a pre-existing, out-of-scope condition; the
   raw-HTML, `next/link`, and raw-hex greps stay green, with the raw-hex grep scoped
   `--exclude-dir=.next` so generated `apps/app/.next/**` CSS is not matched)
-- [ ] T20: five-lane verification gate → `tasks/five-lane-settings-and-matrix.md` → report
+- [x] T20: five-lane verification gate → `tasks/five-lane-settings-and-matrix.md` → report
 
 ### Checkpoint: Complete
 
-- [ ] All acceptance criteria met; five-lane gate N/N PASS (T20); merge awaits the user's
+- [x] All acceptance criteria met; five-lane gate N/N PASS (T20); merge awaits the user's
   explicit request
 
 ## Parallelization

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { List, Todo } from '@life/shared';
-import { Switch, type SwitchProps, type TagOption } from '@life/ui';
+import { Pill, PillGroup, Switch, type SwitchProps, type TagOption } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('next/navigation', () => ({
@@ -148,6 +148,13 @@ const editorLists: List[] = [
     version: 0,
     createdAt: '2026-09-01T00:00:00.000Z',
   },
+  {
+    id: 'l2',
+    name: 'Work',
+    importantDefault: true,
+    version: 0,
+    createdAt: '2026-09-01T00:00:00.000Z',
+  },
 ];
 
 const noTags: TagOption[] = [];
@@ -224,6 +231,32 @@ function switchOf(tree: EditorTree): ReactElement<SwitchProps> {
   return found as ReactElement<SwitchProps>;
 }
 
+/** The `Pill` for a list, found by walking the editor's element tree. */
+function listPill(tree: EditorTree, name: string): ReactElement<{ onClick: () => void }> {
+  const found = findPill(tree, name);
+  if (!found) throw new Error(`no list Pill named ${name}`);
+  return found;
+}
+
+function findPill(
+  node: unknown,
+  name: string,
+): ReactElement<{ onClick: () => void }> | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findPill(child, name);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  if (node == null || typeof node !== 'object') return undefined;
+  const el = node as ReactElement<Record<string, unknown>>;
+  if (el.type === Pill && el.props.children === name) {
+    return el as unknown as ReactElement<{ onClick: () => void }>;
+  }
+  return findPill(el.props?.children, name);
+}
+
 describe('TodoEditor important Switch', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -251,6 +284,23 @@ describe('TodoEditor important Switch', () => {
         const node = switchOf(harness.renderTree(undefined));
         expect(node.props.label).toBe('Important');
         expect(node.props.checked).toBe(false);
+      } finally {
+        harness.restore();
+      }
+    });
+
+    it("create mode seeds from the selected list's importantDefault", () => {
+      const harness = stateHarness();
+      try {
+        const first = harness.renderTree(undefined);
+        expect(switchOf(first).props.checked).toBe(false);
+
+        listPill(first, 'Work').props.onClick();
+
+        const second = harness.renderTree(undefined);
+        const node = switchOf(second);
+        expect(node.props.label).toBe('Important');
+        expect(node.props.checked).toBe(true);
       } finally {
         harness.restore();
       }
@@ -333,6 +383,42 @@ describe('TodoEditor important Switch', () => {
           tagIds: [],
           important: true,
         });
+      } finally {
+        harness.restore();
+      }
+    });
+
+    it('edit mode untouched save omits important so an inheriting todo stays null', () => {
+      const fixture = todo({ important: null, effectiveImportant: true, version: 3 });
+      const harness = stateHarness();
+      try {
+        const tree = harness.renderTree(fixture);
+        expect(switchOf(tree).props.checked).toBe(true);
+
+        tree.props.actions.props.onClick();
+
+        expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+        const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+        expect('important' in patch).toBe(false);
+      } finally {
+        harness.restore();
+      }
+    });
+
+    it('create mode untouched save omits important', () => {
+      const harness = stateHarness();
+      try {
+        harness
+          .renderTree(undefined)
+          .props.children.find((child) => child.props['aria-label'] === 'Todo title')!
+          .props.onChange!({ target: { value: 'New task' } });
+
+        const tree = harness.renderTree(undefined);
+        tree.props.actions.props.onClick();
+
+        expect(mockedCreateTodoAction).toHaveBeenCalledTimes(1);
+        const [input] = mockedCreateTodoAction.mock.calls[0];
+        expect('important' in input).toBe(false);
       } finally {
         harness.restore();
       }

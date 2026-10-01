@@ -72,10 +72,13 @@ sets them.
   existing list action (`apps/app/app/todo-actions.ts`). Accessible name (frozen app text):
   `Default important`.
 - **Per-todo importance** — a `Switch` in the todo editor
-  (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`), writing
-  `todo.important` as an explicit `true`/`false` override; `null` (inherit the list default)
-  remains the value for a todo the user has never overridden. Accessible name (frozen app
-  text): `Important`.
+  (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`), displayed
+  from the user's explicit override when one exists, otherwise seeded from
+  `todo.important ?? todo.effectiveImportant` (edit) / the selected list's
+  `importantDefault ?? false` (create). `todo.important` is written **only when the user
+  overrides it** (the patch/input omits the key otherwise), so `null` (inherit the list
+  default) remains the value for a todo the user has never overridden; an override writes an
+  explicit `true`/`false`. Accessible name (frozen app text): `Important`.
 
 No raw HTML: both controls are the upstream `Switch` atom; the app supplies label, checked
 value and handler. `/todos` otherwise stays a normal list page (map `matrix-ui`).

@@ -18,7 +18,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
 
 ## Tasks
 
-- [ ] T1: `ui-settings` — `Switch` atom — module `ui-settings`
+- [x] T1: `ui-settings` — `Switch` atom — module `ui-settings`
   - Description: Add the controlled boolean `Switch` atom upstream (`SPEC-ui-settings.md`
     Components / CSS ownership). One real `<button type="button" role="switch">`; the
     track/thumb is pure CSS (`.ui-switch` + `.ui-switch--on` in `atoms.css`); accessible name
@@ -35,7 +35,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
   - Verify: `npm run typecheck -w @life/ui` && `npm run test:unit -w @life/ui -- test/switch.test.tsx`
     && `grep -riE "note|todo" packages/ui/src/components/switch.tsx` → zero hits
   - Dependencies: none. Size: S.
-- [ ] T2: `ui-settings` — `SettingsRow` + `SettingsBlock` blocks — module `ui-settings`
+- [x] T2: `ui-settings` — `SettingsRow` + `SettingsBlock` blocks — module `ui-settings`
   - Description: Add the two presentational blocks (`SPEC-ui-settings.md`): `SettingsRow`
     (label + optional muted description left, caller's `control` right — two-column,
     token-spaced, wraps on narrow widths) and `SettingsBlock` (optional `title` heading over
@@ -55,7 +55,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
   - Verify: `npm run typecheck -w @life/ui` && `npm run test:unit -w @life/ui -- test/settings-row.test.tsx` && `npm run test:unit -w @life/ui -- test/settings-block.test.tsx`
     && `grep -riE "note|todo" packages/ui/src/components/settings-row.tsx packages/ui/src/components/settings-block.tsx` → zero hits
   - Dependencies: none. Size: S.
-- [ ] T3: `ui-tabs` — `TabBar`/`Tab` + `ListShell` `tabs?` slot — module `ui-tabs`
+- [x] T3: `ui-tabs` — `TabBar`/`Tab` + `ListShell` `tabs?` slot — module `ui-tabs`
   - Description: Add the new tab navigation atom (`SPEC-ui-tabs.md`): `Tab` renders a
     `next/link` `Link` (`aria-current="page"` when `active`, omitted otherwise); `TabBar`
     renders a `<nav aria-label>` wrapping ordered children. Add the `tabs?: ReactNode` slot
@@ -77,7 +77,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     && `grep -riE "note|todo" packages/ui/src/components/tab-bar.tsx` → zero hits
     && `grep -rn "PillGroup" packages/ui/src/components/tab-bar.tsx` → zero hits
   - Dependencies: none. Size: S.
-- [ ] T4: `ui-blocks` — `MatrixBlock` upstream block (`@life/ui`) — module `ui-blocks`
+- [x] T4: `ui-blocks` — `MatrixBlock` upstream block (`@life/ui`) — module `ui-blocks`
   - Description: Add the presentational `MatrixBlock` upstream (`SPEC-matrix-ui.md` Upstream
     section): one `<section>` per `MatrixQuadrant` (id key, label heading, items verbatim),
     fixed CSS responsive behaviour — one column (four stacked labelled sections) default,
@@ -95,7 +95,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
   - Verify: `npm run typecheck -w @life/ui` && `npm run test:unit -w @life/ui -- test/matrix-block.test.tsx`
     && `grep -riE "note|todo|urgent|important" packages/ui/src/components/matrix-block.tsx` → zero hits in code
   - Dependencies: none. Size: S.
-- [ ] T5: `ui-blocks` — `ListManager` per-row slot — module `ui-blocks`
+- [x] T5: `ui-blocks` — `ListManager` per-row slot — module `ui-blocks`
   - Description: Add ONE optional, domain-free per-row slot to `ListManager`
     (`SPEC-ui-blocks.md` `ListManager` contract): `rowExtra?: (list: TodoListOption) =>
     ReactNode`, rendered inside each row after the name/actions. The shared block stays
@@ -110,7 +110,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     declares the optional prop; Contract 1 greps green.
   - Verify: `npm run typecheck -w @life/ui` && `npm run test:unit -w @life/ui -- test/list-manager.test.tsx`
   - Dependencies: none. Size: S.
-- [ ] T6: `todo-importance` — importance data model + request DTOs — module `todo-importance`
+- [x] T6: `todo-importance` — importance data model + request DTOs — module `todo-importance`
   - Description: Add the two nullable plaintext boolean columns (`SPEC-todo-importance.md`
     Data model, `SPEC-todo-service.md` Data model): `todo.important BOOLEAN NULL` and
     `list.importantDefault BOOLEAN NULL`; the todo create/update **request** DTOs gain the
@@ -127,7 +127,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     parses `important=true|false` into a typed filter; existing request behaviour unchanged.
   - Verify: `npm run typecheck -w @life/todo-service` && `npm run test:unit -w @life/todo-service -- test/todos.e2e-spec.ts`
   - Dependencies: none. Size: S.
-- [ ] T7: `todo-importance` — shared read contract + effective computation + list default —
+- [x] T7: `todo-importance` — shared read contract + effective computation + list default —
   module `todo-importance`
   - Description: Deliver the importance signal end-to-end (`SPEC-todo-importance.md` Behavior
     / API). Extend the `@life/shared` read types (`Todo.important: boolean | null` +
@@ -156,7 +156,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     can read `dto.importantDefault` without a type error.
   - Verify: `npm run build -w @life/shared` && `npm run typecheck -w @life/todo-service` && `npm run test:unit -w @life/todo-service -- test/todos.e2e-spec.ts` && `npm run test:unit -w @life/todo-service -- test/lists.e2e-spec.ts`
   - Dependencies: T6. Size: M.
-- [ ] T8: `todo-importance` — cache ciphertext suite — module `todo-importance`
+- [x] T8: `todo-importance` — cache ciphertext suite — module `todo-importance`
   - Description: Pin the updated `## Cache Rules` (`SPEC-todo-importance.md` Cache Rules,
     `SPEC-todo-service.md` Cache Rules): the cached `todo:all`/`todo:trash` row values carry
     the plaintext `important: boolean | null` and the `todo:lists` values carry
@@ -169,7 +169,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     content plaintext; the generation bump on a list `importantDefault` write is asserted.
   - Verify: `npm run typecheck -w @life/todo-service` && `npm run test:unit -w @life/todo-service -- test/todo-cache.e2e-spec.ts`
   - Dependencies: T7. Size: S.
-- [ ] T9: `app-kit-settings` — preference cookie name/parse/read — module `app-kit-settings`
+- [x] T9: `app-kit-settings` — preference cookie name/parse/read — module `app-kit-settings`
   - Description: Add the server-only preference read path (`SPEC-app-kit-settings.md` Public
     API): `PrefKey` in `types.ts`; `prefCookieName(name) => 'pref_<name>'`,
     `parsePrefValue(raw) => raw === 'on'`, and `readPref(name)` that awaits `cookies()` and
@@ -186,7 +186,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     `pref_<key>`); no concrete key or markup in the package.
   - Verify: `npm run typecheck -w @life/app-kit` && `npm run test:unit -w @life/app-kit -- test/pref-cookie.test.ts` && `npm run test:unit -w @life/app-kit -- test/read-pref.test.ts`
   - Dependencies: T1 (build order; no code import). Size: S.
-- [ ] T10: `app-kit-settings` — server action write — module `app-kit-settings`
+- [x] T10: `app-kit-settings` — server action write — module `app-kit-settings`
   - Description: Add the `'use server'` preference write action
     (`SPEC-app-kit-settings.md`): `setPref(name, value)` writes `pref_<name>` =
     `value ? 'on' : 'off'` with `path: '/'`, `sameSite: 'lax'`, `httpOnly: true`,
@@ -203,7 +203,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     `revalidatePath('/', 'layout')` is called.
   - Verify: `npm run typecheck -w @life/app-kit` && `npm run test:unit -w @life/app-kit -- test/set-pref.test.ts`
   - Dependencies: T9. Size: S.
-- [ ] T11: `app-kit-settings` — settings-route helper + barrel — module `app-kit-settings`
+- [x] T11: `app-kit-settings` — settings-route helper + barrel — module `app-kit-settings`
   - Description: Add `settingsHref(route)` (`SPEC-app-kit-settings.md`): the app-scoped
     settings path (`'/todos' → '/todos/settings'`, `'/notes' → '/notes/settings'`), trailing
     slash normalized so the join never yields `//settings`. Export `PrefKey`,
@@ -220,7 +220,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     repo's UI-grep convention.
   - Verify: `npm run typecheck -w @life/app-kit` && `npm run test:unit -w @life/app-kit -- test/settings-route.test.ts`
   - Dependencies: T9. Size: S.
-- [ ] T12: `matrix-ui` — app wire-type conformance — module `matrix-ui`
+- [x] T12: `matrix-ui` — app wire-type conformance — module `matrix-ui`
   - Description: Update the five existing `apps/app` fixtures to the extended `@life/shared`
     read types (`Todo.important`/`Todo.effectiveImportant`, `List.importantDefault`) so the app
     typechecks against the new wire contract before any other Phase 4 task adds files that tsc
@@ -240,7 +240,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     `npm run test:unit -- test/routes-todo-edit.test.tsx` &&
     `npm run test:unit -- test/routes-todos-list.test.tsx`.
   - Dependencies: T7. Size: S.
-- [ ] T13: `matrix-ui` — app matrix domain logic — module `matrix-ui`
+- [x] T13: `matrix-ui` — app matrix domain logic — module `matrix-ui`
   - Description: Add the pure app-owned matrix logic (`SPEC-matrix-ui.md` App-owned section):
     `QUADRANTS`, `QuadrantId`, `isUrgent` (overdue / today / tomorrow = urgent, via `@life/ui`'s
     `dueDateState` and the `'Tomorrow'` `dueDateLabel`), `quadrantOf`
@@ -255,7 +255,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/matrix.test.ts`.
   - Dependencies: T4, T12. Size: S.
-- [ ] T14: `matrix-ui` — settings pages + preference glue — module `matrix-ui`
+- [x] T14: `matrix-ui` — settings pages + preference glue — module `matrix-ui`
   - Description: Add the app-owned preference barrel
     (`apps/app/lib/preferences.ts`: `AppPrefKey = 'matrix'`, re-export
     `readPref`/`setPref` from `@life/app-kit`), the controlled `MatrixSwitch` client wrapper
@@ -297,7 +297,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-settings.test.tsx`.
   - Dependencies: T1, T2, T9, T10, T11, T12. Size: M.
-- [ ] T15: `matrix-ui` — nav gear in both apps + `/todos` tabs slot — module `matrix-ui`
+- [x] T15: `matrix-ui` — nav gear in both apps + `/todos` tabs slot — module `matrix-ui`
   - Description: Replace `<ThemeToggle />` with the Settings gear `IconLink`
     (`label="Settings"`, `href={settingsHref('/todos')}` / `settingsHref('/notes')`, lucide
     `Settings size={20} aria-hidden`) in the exact former slot of both `navTrailing`s; drop
@@ -316,7 +316,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-todos-list.test.tsx`.
   - Dependencies: T3, T11, T14. Size: S.
-- [ ] T16: `matrix-ui` — `/todos/matrix` server-gated lens — module `matrix-ui`
+- [x] T16: `matrix-ui` — `/todos/matrix` server-gated lens — module `matrix-ui`
   - Description: Add the server-gated matrix route (`SPEC-matrix-ui.md`): `dynamic =
     'force-dynamic'`; `if (!(await readPref('matrix'))) notFound()`; fetch via the existing
     `collectTodos`/`listTodos` + `listLists`; `groupByQuadrant(todos, todayIso())` mapped to
@@ -334,7 +334,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-matrix.test.tsx`.
   - Dependencies: T3, T4, T7, T13, T14. Size: M.
-- [ ] T17: `matrix-ui` — list importance-default control — module `matrix-ui`
+- [x] T17: `matrix-ui` — list importance-default control — module `matrix-ui`
   - Description: Add the list importance-default input (intent L6, `SPEC-todo-importance.md`
     Consumer surfaces, `SPEC-todo-ui.md` / `SPEC-matrix-ui.md`): a `Switch`
     (`SPEC-ui-settings.md` atom, no raw HTML) rendered per list through the new upstream
@@ -359,24 +359,29 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-manager-blocks.test.tsx`.
   - Dependencies: T1, T5, T12. Size: S.
-- [ ] T18: `matrix-ui` — per-todo importance toggle — module `matrix-ui`
+- [x] T18: `matrix-ui` — per-todo importance toggle — module `matrix-ui`
   - Description: Add the per-todo importance input (intent L6, `SPEC-todo-importance.md`
     Consumer surfaces, `SPEC-todo-ui.md` / `SPEC-matrix-ui.md`): a `Switch`
     (`SPEC-ui-settings.md` atom, no raw HTML) in the todo editor, labelled `Important`,
-    initialised from `todo.important ?? todo.effectiveImportant`, and written through the
-    existing `createTodoAction`/`updateTodoAction` as an explicit `important: boolean`
-    override (`null` — inherit the list default — remains the value for a todo the user has
-    never overridden). No new backend, no new primitive.
+    displaying the user's explicit override when one exists, otherwise seeded from
+    `todo.important ?? todo.effectiveImportant` (edit mode) / the selected list's
+    `importantDefault ?? false` (create mode). `important` is written through the existing
+    `createTodoAction`/`updateTodoAction` **only when the user overrides it** — the patch and
+    the create input omit the key otherwise, so `null` (inherit the list default) remains the
+    value for a todo the user has never overridden; an override writes an explicit
+    `true`/`false`. No new backend, no new primitive.
   - Files: `apps/app/app/todo-editor.tsx`, `apps/app/test/routes-todo-edit.test.tsx`.
-  - Acceptance: the editor renders a `role="switch"` named `Important`, seeded from
-    `todo.important ?? todo.effectiveImportant` in edit mode / the list default in create
-    mode; save writes `important` as an explicit `true`/`false` override; the editor suite
-    still passes; Contract 1 greps green.
+  - Acceptance: the editor renders a `role="switch"` named `Important`, displaying the
+    override when set and otherwise seeded from `todo.important ?? todo.effectiveImportant` in
+    edit mode / the selected list's `importantDefault ?? false` in create mode; an untouched
+    save omits `important` (patch/input has no key), so an inheriting todo stays `null`; a
+    toggled save writes an explicit `true`/`false`; the editor suite still passes; Contract 1
+    greps green.
   - Verify: `cd /home/night/WebstormProjects/personal-life && npm run build -w @life/shared`
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-todo-edit.test.tsx`.
   - Dependencies: T1, T12. Size: S.
-- [ ] T19: close — frozen-surface/e2e record + Contract 1 mechanical checks — module
+- [x] T19: close — frozen-surface/e2e record + Contract 1 mechanical checks — module
   `matrix-ui` (close)
   - Description: Confirm the frozen-surface and spec record is complete: `SPEC-ui-list-shell.md`
     (theme toggle out of `navTrailing`, gear in its place; `tabs?` slot recorded) and
@@ -407,7 +412,7 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     → zero hits in code (chapter-scoped; the `trash-block.tsx` hits are pre-existing and out
     of scope). No test command (E2E documented as not run).
   - Dependencies: T14, T15. Size: S.
-- [ ] T20: close — five-lane verification gate — module `matrix-ui` (close)
+- [x] T20: close — five-lane verification gate — module `matrix-ui` (close)
   - Description: Run the `five-lane-verification` gate over the chapter (`feat/eisenhower-matrix`
     vs its base): correctness, code quality, security, QA, and plan-conformance lanes in
     parallel, fail-closed; any failed lane is fixed and only the failed lanes re-run until

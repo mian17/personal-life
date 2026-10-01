@@ -39,9 +39,13 @@ export function TodoEditor({
   const [dueDate, setDueDate] = useState(todo?.dueDate ?? '');
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
-  const [important, setImportant] = useState<boolean>(
-    todo ? (todo.important ?? todo.effectiveImportant) : false,
-  );
+  // The user's explicit override; `undefined` = untouched (inherit). Not a hook:
+  // the seed is derived from the current list so create mode follows its default.
+  const [importantOverride, setImportantOverride] = useState<boolean | undefined>(undefined);
+  const seedImportant = todo
+    ? (todo.important ?? todo.effectiveImportant)
+    : (lists.find((list) => list.id === listId)?.importantDefault ?? false);
+  const important = importantOverride ?? seedImportant;
 
   const canSave = title.trim() !== '';
 
@@ -56,7 +60,7 @@ export function TodoEditor({
           dueDate: dueDate === '' ? null : dueDate,
           listId,
           tagIds,
-          important,
+          ...(importantOverride !== undefined ? { important: importantOverride } : {}),
         },
         todo.version,
       );
@@ -67,7 +71,7 @@ export function TodoEditor({
         dueDate: dueDate === '' ? undefined : dueDate,
         listId: listId ?? undefined,
         tagIds,
-        important,
+        ...(importantOverride !== undefined ? { important: importantOverride } : {}),
       });
     }
     router.back();
@@ -142,7 +146,7 @@ export function TodoEditor({
         </PillGroup>
       )}
 
-      <Switch label="Important" checked={important} onCheckedChange={setImportant} />
+      <Switch label="Important" checked={important} onCheckedChange={setImportantOverride} />
     </EditorChrome>
   );
 }

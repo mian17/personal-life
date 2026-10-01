@@ -245,10 +245,13 @@ field contracts live in `SPEC-todo-importance.md`.
   (label `Default important`) per list, writing `list.importantDefault` through the existing
   list action in `apps/app/app/todo-actions.ts`.
 - **Per-todo importance** — `apps/app/app/todo-editor.tsx` renders a `Switch` (label
-  `Important`) seeded from `todo.important ?? todo.effectiveImportant`, writing
-  `todo.important` as an explicit `true`/`false` override through
-  `apps/app/app/todo-actions.ts`; `null` (inherit) remains the value for an un-overridden
-  todo.
+  `Important`) whose displayed value is the user's explicit override when one has been made,
+  otherwise a seed: edit mode `todo.important ?? todo.effectiveImportant`, create mode the
+  selected list's `importantDefault ?? false`. `important` is written through
+  `apps/app/app/todo-actions.ts` **only when the user actually toggles it** (both the
+  `updateTodoAction` patch and the `createTodoAction` input omit the key otherwise), so an
+  untouched todo keeps `important: null` (inherit the list default); a toggled todo writes an
+  explicit `true`/`false` override.
 
 The frozen accessible names `Important` and `Default important` are app copy (`Switch`'s
 `label`); no raw HTML, tokens only.
