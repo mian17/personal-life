@@ -95,6 +95,8 @@ describe('MatrixBlock', () => {
 
     const media = css.match(/@media\s*\(min-width:\s*640px\)\s*\{([\s\S]*?)\}\s*\}/)?.[1] ?? '';
     expect(media).toMatch(/\.ui-matrix\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    // Equal-height rows: the two auto rows share the same height in the 2×2 layout.
+    expect(media).toMatch(/\.ui-matrix\s*\{[^}]*grid-auto-rows:\s*1fr/);
     // 2×2 inner cross: reset the phone rule, then re-add between the rows/columns.
     expect(media).toMatch(/\.ui-matrix__quadrant \+ \.ui-matrix__quadrant\s*\{[^}]*border-top:\s*0/);
     expect(media).toMatch(

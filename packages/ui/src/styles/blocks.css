@@ -536,7 +536,8 @@
    outer margin would double-space against the grid gap. The quadrants are
    separated by inner hairline dividers only (never an outer frame): a single
    rule between consecutive stacked quadrants on a phone, an inner cross in the
-   2×2 layout. */
+   2×2 layout. The 2×2 layout gives the two rows equal height, so empty
+   quadrants match populated ones in the same row pair. */
 .ui-matrix {
   display: grid;
   gap: 0;
@@ -571,6 +572,7 @@
 @media (min-width: 640px) {
   .ui-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
   }
   /* 2×2: reset the phone rule, then draw the inner cross only (no outer
      frame). The reset is placed before the `:nth-child` re-adds so the

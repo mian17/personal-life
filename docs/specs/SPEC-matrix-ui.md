@@ -454,7 +454,7 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   .ui-matrix__items { display: grid; gap: var(--space-0-5); }
 
   @media (min-width: 640px) {
-    .ui-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ui-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
     /* 2×2: reset the phone rule, then draw the inner cross only (no outer frame). */
     .ui-matrix__quadrant + .ui-matrix__quadrant { border-top: 0; }
     .ui-matrix__quadrant:nth-child(n + 3) { border-top: var(--border-width) solid var(--border); }
@@ -462,6 +462,9 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   }
   ```
 
+  The 2×2 layout gives the top and bottom rows **equal height** (`grid-auto-rows: 1fr`), so an
+  empty quadrant matches a populated one in the same row pair; `1fr` means `minmax(auto, 1fr)`,
+  so content is never clipped. The phone layout stays a natural stacked height per section.
   One column (four stacked labelled sections) is the phone default; `minmax(0, 1fr)` tracks
   prevent overflow, so no horizontal scroll. The `640px` breakpoint literal matches
   `--content-width` and is the documented non-tokenizable exception (media conditions cannot
