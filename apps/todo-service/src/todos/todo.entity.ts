@@ -35,6 +35,14 @@ export class Todo {
   @Column({ type: 'boolean', default: false })
   done: boolean;
 
+  /**
+   * Plaintext metadata: manual importance override (`SPEC-todo-importance`).
+   * Non-content — never `@life/crypto`-wrapped (mirrors `done`). `NULL` =
+   * inherit the todo's list default.
+   */
+  @Column({ type: 'boolean', nullable: true })
+  important: boolean | null;
+
   /** Plaintext metadata: `YYYY-MM-DD` (service reads/writes it as a string). */
   @Column({ type: 'date', nullable: true })
   dueDate: string | null;

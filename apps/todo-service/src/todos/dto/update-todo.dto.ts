@@ -42,6 +42,12 @@ export class UpdateTodoDto {
   @MaxLength(10)
   dueDate?: string | null;
 
+  /** `null` = clear the override back to inherit (`SPEC-todo-importance`). */
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsBoolean()
+  important?: boolean | null;
+
   @IsOptional()
   @ValidateIf((_o, value) => value !== null)
   @IsString()

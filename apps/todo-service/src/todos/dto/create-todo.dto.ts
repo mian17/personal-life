@@ -1,4 +1,13 @@
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 import { TODO_TITLE_MAX, TODO_NOTE_MAX } from '@life/shared';
 
 /** `YYYY-MM-DD` — the wire form of the plaintext `dueDate` metadata column. */
@@ -24,6 +33,12 @@ export class CreateTodoDto {
   @IsString()
   @MaxLength(64)
   listId?: string;
+
+  /** `null` = inherit the list default (`SPEC-todo-importance`). */
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsBoolean()
+  important?: boolean | null;
 
   // TagRef ids (registry-owned, `tags-service`). todo-service stores exactly
   // these ids (no names, no registry call); the app resolves names.

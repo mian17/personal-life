@@ -24,6 +24,13 @@ export class List {
   @Column({ type: 'text' })
   name: string;
 
+  /**
+   * Plaintext metadata: default importance for the list's todos
+   * (`SPEC-todo-importance`). Non-content, never encrypted. `NULL` = false.
+   */
+  @Column({ type: 'boolean', nullable: true })
+  importantDefault: boolean | null;
+
   @Column({ type: 'text' })
   ownerSub: string;
 
