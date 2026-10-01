@@ -67,6 +67,71 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
   TTL backstop; fail-open on any cache error (direct loader).
 - Decrypt and sort after every hit. No plaintext ever reaches Redis.
 
+## Maintenance scripts
+
+Operator-run scripts that write the `tag` table directly, outside the request
+path and only with the stack stopped (never while the service is serving).
+
+### cleanup-tags — orphan registry cleanup
+
+Operator-run remediation for orphaned registry rows — tags left behind with no
+remaining association. It cleans up rows that a detach path (for example the
+notes autosave partial-token bug) has already produced; it is a remediation
+tool, not a fix for the producing bug.
+
+- **Orphan definition (exact).** With
+  `referenced = { tag.id : tag.id ∈ DISTINCT(note_tag.tagId) ∪
+  DISTINCT(todo_tag.tagId) }` over `note_tag` in the note DB and `todo_tag` in
+  the todo DB, `orphans = { tag.id : tag.id ∉ referenced }`. The set difference
+  is over plaintext integer ids only — no decryption. `scanned` is the `tag` row
+  count, `referenced` the scanned rows that are referenced, and
+  `orphans = scanned − referenced`. The legacy `tag` table in the note DB
+  (dropped by the import migration) is never read.
+- **Trashed rows count as references.** The script never filters on
+  `note.deletedAt` / `todo.deletedAt`: soft-deleted notes and todos keep their
+  join rows, so a tag held only by a trashed row is **not** orphaned and is
+  kept, because restore must keep working. The script's SQL must not mention
+  `deletedAt`.
+- **Ids-only logging / no decryption.** The report prints `id` + `ownerSub`,
+  never `name` (which is `enc.v1.` ciphertext). `TAGS_MASTER_KEY` is not
+  required, and the script never decrypts.
+- **Fail-closed inputs.** If any of `tags.db`, `life.db`, `todo.db` does not
+  exist as a file, the script errors and deletes nothing — orphanhood cannot be
+  proven with an input missing. An existing DB whose join table genuinely does
+  not exist contributes the empty set (`tableExists` guard per DB); a `tags.db`
+  with no `tag` table scans zero rows and deletes nothing.
+- **Backup-before-write.** Apply is the default; `--dry-run` is read-only and
+  byte-pure (no snapshot, no write). Apply takes a self-verified `VACUUM INTO`
+  snapshot (`PRAGMA quick_check` = `ok`, via the shared `snapshotAndVerify`
+  helper reused from `import-tags`) **before** the delete transaction, so the
+  snapshot captures the pre-delete registry state. Deletes are per-owner-scoped
+  hard deletes (`DELETE FROM "tag" WHERE "ownerSub" = ? AND "id" = ?`) inside
+  one transaction; a failed delete rolls the whole transaction back.
+- **Cache staleness / stack-stopped rule.** Raw SQL bypasses the per-owner
+  generation bump the request path performs, so `tags:<sub>:v<gen>:all` can
+  serve a deleted tag up to the next invalidation. The mitigation is to run with
+  the stack stopped (the `import-tags` precedent); the 60 s TTL backstop
+  documented in `## Cache Rules` bounds any residual staleness after a restart.
+  The script never reads through, writes to, or connects to Redis/`@life/cache`,
+  and the service's failure mode is unchanged (fail-open to the direct loader).
+- **Sole-writer deviation (M2).** The data model declares the service sole
+  writer of `tag`; this operator-run script is the one sanctioned second writer,
+  exactly like `import-tags`. It only hard-deletes orphan rows — never inserts,
+  never renames — and the request path remains the sole writer.
+- **Command + env overrides.** `npm run cleanup-tags -w @life/tags-service --
+  [--dry-run]`, with `TAGS_DB_PATH` / `NOTE_DB_PATH` / `TODO_DB_PATH` overrides
+  resolved via `@life/shared`'s `resolveDbPath` (defaults anchored at the repo
+  root: `apps/tags-service/data/tags.db`, `apps/note-service/data/life.db`,
+  `apps/todo-service/data/todo.db`). Agents never point it at real DBs — the
+  human runs it (hard line, `apps/*/data/**`).
+- **Report.** One summary line
+  `cleanup-tags [plan|apply]: scanned=N referenced=R orphans=M deleted=D errors=0`
+  (`deleted` is `0` in plan mode; `errors` is always `0` on a returned report,
+  and any failure prints `cleanup-tags failed: <message>` and exits non-zero),
+  then one detail line per orphan in ascending `id` order,
+  `orphan id=<id> owner=<ownerSub>`. `orphans` equals the number of detail
+  lines; zero orphans prints the summary line only.
+
 ## Health
 
 Per `SPEC-service-kernel`: `/health/live` (no dependency checks), `/health/ready`
