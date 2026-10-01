@@ -268,6 +268,7 @@ import { groupByQuadrant } from '@/lib/matrix';
 import { ListShell, MatrixBlock, Tab, TabBar, todayIso } from '@life/ui';
 import { Plus } from 'lucide-react';
 import { TodoItem } from '../../todo-item';
+import { TodosNav } from '../../todos-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -291,6 +292,7 @@ export default async function TodosMatrixPage() {
   return (
     <ListShell
       title="Todos"
+      navTrailing={<TodosNav />}
       tabs={
         <TabBar aria-label="Todos views">
           <Tab href="/todos">List</Tab>
