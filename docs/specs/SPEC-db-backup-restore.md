@@ -46,7 +46,8 @@ the backup/restore tooling a third copy.
   - tags — `apps/tags-service/data/tags.db` (bind mount `./apps/tags-service/data:/data`)
   - todo — `apps/todo-service/data/todo.db` (bind mount `./apps/todo-service/data:/data`)
   - idp — `apps/idp/data/idp.db` (bind mount `./apps/idp/data:/data`)
-- **Out of scope (D2):** Redis (`redis-app`, `redis-idp`, `redis-note` — caches and a
+- **Out of scope (D2):** Redis (`redis-app`, `redis-idp`, `redis-note`, `redis-tags`,
+  `redis-todo` — caches and a
   session store, never a source of truth per Contract 2); copies off this machine;
   the crontab install itself; any scheduled restore.
 - **Not changed by this spec:** the service request paths, the cache layer, the UI,
@@ -437,8 +438,8 @@ stack stopped for restore and read-only for backup.
   stack stopped (restore, D5). A stopped stack means no service is running to bump
   a per-owner generation counter; the caches that survive in Docker named volumes
   are either AOF session state (`redis-app`, out of scope per D2) or unpersisted
-  read-through caches (`redis-idp`, `redis-note` — `--save "" --appendonly no`,
-  `compose.yaml:238-254`, `:266-281`) whose 60-second TTL backstop
+  read-through caches (`redis-idp`, `redis-note`, `redis-tags`, `redis-todo` — `--save "" --appendonly no`,
+  `compose.yaml` Redis services) whose 60-second TTL backstop
   (`SPEC-tags-service.md:66`) bounds any residual staleness after restart.
 - **Mechanical check:** `grep -rni "redis" packages/db/src` returns zero hits.
 

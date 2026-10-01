@@ -61,11 +61,11 @@ services:
       # Content-encryption master key (own custody, MAP M3). Fail-fast here;
       # the service also refuses to boot without it.
       TAGS_MASTER_KEY: ${TAGS_MASTER_KEY:?TAGS_MASTER_KEY is required (openssl rand -base64 32)}
-      REDIS_URL: redis://redis-note:6379
+      REDIS_URL: redis://redis-tags:6379
     volumes:
       - ./apps/tags-service/data:/data
     depends_on:
-      redis-note:
+      redis-tags:
         condition: service_healthy
     networks:
       - life
@@ -99,11 +99,11 @@ services:
       # Content-encryption master key (own custody, MAP M3). Fail-fast here;
       # the service also refuses to boot without it.
       TODO_MASTER_KEY: ${TODO_MASTER_KEY:?TODO_MASTER_KEY is required (openssl rand -base64 32)}
-      REDIS_URL: redis://redis-note:6379
+      REDIS_URL: redis://redis-todo:6379
     volumes:
       - ./apps/todo-service/data:/data
     depends_on:
-      redis-note:
+      redis-todo:
         condition: service_healthy
     networks:
       - life
@@ -216,9 +216,10 @@ services:
     restart: unless-stopped
 
   # --- Redis (Task 6) ---------------------------------------------------------
-  # One instance per service: app (session store, persisted) and idp/note
-  # (read-through caches, unpersisted). Internal network only — NO published
-  # host ports. See README "Auth model" and tasks/plan-redis.md decisions 2/6.
+  # One instance per service (app, idp, note, tags, todo): app is the persisted
+  # session store; the four others are unpersisted read-through caches. Internal
+  # network only — NO published host ports. See README "Auth model" and
+  # tasks/plan-redis.md decisions 2/6.
   redis-app:
     image: redis:8-alpine
     command: redis-server --appendonly yes
@@ -267,6 +268,62 @@ services:
     # Cache only. `--save ""` + `--appendonly no` turn off both RDB and AOF: note
     # content must not hit a second disk, and the image's default snapshot points
     # would otherwise write it to /data/dump.rdb. See compose decision 6.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-tags:
+    image: redis:8-alpine
+    # Cache only, owned by tags-service (one instance per service, intent decision 3).
+    # `--save ""` + `--appendonly no` turn off both RDB and AOF: tag ciphertext must
+    # not hit a second disk, and the image's default snapshot points would otherwise
+    # write it to /data/dump.rdb. See compose decision 6.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-todo:
+    image: redis:8-alpine
+    # Cache only, owned by todo-service (one instance per service, intent decision 3).
+    # `--save ""` + `--appendonly no` turn off both RDB and AOF: todo ciphertext must
+    # not hit a second disk, and the image's default snapshot points would otherwise
+    # write it to /data/dump.rdb. See compose decision 6.
     command:
       [
         "redis-server",

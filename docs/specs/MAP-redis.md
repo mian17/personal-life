@@ -9,7 +9,9 @@ direction, and build order confirmed line-by-line in the interview restate.
 | `app-state` | `apps/app` session state moves behind the existing store seam onto its own Redis; adds the cross-replica refresh lock. Dev/e2e keep the in-memory store | — |
 | `idp-cache` | `apps/idp` gets a read-through cache in front of its users table (login-path lookups), invalidated on user writes. Rotating OIDC payloads are explicitly **not** cached | — |
 | `note-cache` | `apps/note-service` gets a read-through cache for its read methods (list/trash/one/tags), invalidated by generation-bump on every write | — |
-| `redis-deploy` | Three internal-only Redis services in `compose.yaml` (one per service), env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache` |
+| `tags-cache` | `apps/tags-service` gets a read-through cache for its own tag rows, invalidated by generation-bump on every write | — |
+| `todo-cache` | `apps/todo-service` gets a read-through cache for its own reads, invalidated by generation-bump on every write | — |
+| `redis-deploy` | Five internal-only Redis services in `compose.yaml` — one per service, **never shared** (intent decision 3) — env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache`, `tags-cache`, `todo-cache` |
 
 Build order: `app-state` first (highest risk: distributed refresh lock + fail-closed
 semantics), then `idp-cache` ∥ `note-cache` (independent, parallel-safe), with

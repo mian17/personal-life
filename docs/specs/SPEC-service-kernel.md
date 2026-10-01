@@ -97,8 +97,9 @@ shared primitives that would otherwise be forked (AGENTS.md Contract 2 no-fork r
   over the compose network by default (`http://idp:3003/jwks`), issuer =
   browser-facing URL (the established two-var pattern).
 - Cache wiring: `REDIS_URL` per service (compose-injected, same pattern as
-  note-service). All three services share the one `redis-note` instance —
-  service-prefixed keys (`note:`/`tags:`/`todo:`) keep the namespaces disjoint.
+  note-service). Each service owns its **own** Redis instance (`redis-tags`,
+  `redis-todo`) — one instance per service, per intent decision 3 — so a shared
+  instance is never a coupling point.
 - DB wiring: `DB_PATH` per service (tags/todo bind-mount `./apps/<svc>/data:/data`
   with `DB_PATH=/data/<name>.db`, note-service's pattern).
 - Ownership: T8 implements the app-side client config; T9 wires env/compose/IdP
