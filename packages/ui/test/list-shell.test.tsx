@@ -102,4 +102,40 @@ describe('ListShell', () => {
     );
     expect(screen.getByTestId('body').textContent).toBe('nothing here yet');
   });
+
+  it('without fill adds no body wrapper and no fill class', () => {
+    const { container } = render(
+      <ListShell
+        title="Notes"
+        body={<span data-testid="body" />}
+        fabHref="/notes/new"
+        fabLabel="New note"
+        fabIcon={<span />}
+      />,
+    );
+
+    expect(container.querySelector('.ui-list-shell__body')).toBeNull();
+    const page = container.querySelector('.ui-page')!;
+    expect(page.classList.contains('ui-list-shell--fill')).toBe(false);
+  });
+
+  it('with fill marks the page and wraps the body in a growing slot', () => {
+    const { container } = render(
+      <ListShell
+        title="Notes"
+        body={<p data-testid="body">nothing here yet</p>}
+        fabHref="/notes/new"
+        fabLabel="New note"
+        fabIcon={<span />}
+        fill
+      />,
+    );
+
+    const page = container.querySelector('.ui-page')!;
+    expect(page.classList.contains('ui-list-shell--fill')).toBe(true);
+
+    const wrapper = container.querySelector('.ui-list-shell__body')!;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper.querySelector('[data-testid="body"]')!.textContent).toBe('nothing here yet');
+  });
 });

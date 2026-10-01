@@ -34,6 +34,9 @@ export interface ListShellProps {
   fabLabel: string;
   /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). */
   fabIcon: ReactNode;
+  /** Opt into a full-viewport-height page: the `body` slot grows to fill the
+   * remaining space (for a full-height body such as the matrix). Off by default. */
+  fill?: boolean;
 }
 
 export function ListShell(props: ListShellProps): JSX.Element;
@@ -42,13 +45,13 @@ export function ListShell(props: ListShellProps): JSX.Element;
 Rendered structure, in order:
 
 ```tsx
-<PageShell>
+<PageShell className={fill ? 'ui-list-shell--fill' : undefined}>
   <NavBar trailing={navTrailing} />
   <PageTitle>{title}</PageTitle>
   {tabs}
   {search}
   {filters}
-  {body}
+  {fill ? <div className="ui-list-shell__body">{body}</div> : body}
   <FabLink href={fabHref} label={fabLabel}>{fabIcon}</FabLink>
 </PageShell>
 ```
@@ -59,6 +62,10 @@ byte-identical to today's pages (no wrapper element is added).
 
 ### Semantics and edge cases
 
+- `fill?: boolean` opts into a full-height page: the page column becomes a flex column
+  spanning the viewport and the `body` slot grows via the `.ui-list-shell__body` wrapper
+  (`flex: 1`) to fill the remaining space. Off by default, so other pages are unchanged;
+  used by `/todos/matrix` so the 2×2 matrix spans the screen height.
 - The shell renders `body` verbatim; empty-state versus list is the app's decision, so the
   block carries no emptiness knowledge and no domain copy.
 - `filters` is one slot so a page can stack `PillGroup` + multiple `TagFilterNav` nodes in
@@ -128,9 +135,10 @@ The shell composes existing blocks: `PageShell` (`.ui-page`), `NavBar` (`.ui-nav
 nodes whose classes (`SearchField`'s `.ui-search-box`, `TagFilterNav`'s `.ui-tag-filter-nav`,
 `PillGroup`'s `.ui-pill-group`) are already owned by `ui-atoms`/`ui-blocks` (verified:
 `TagFilterNav`'s class is `.ui-tag-filter-nav`,
-`packages/ui/src/components/tag-filter-nav.tsx:23`). The shell adds
-no CSS and no raw values; it owns the *page's* vertical rhythm by the fixed element order,
-so both segments render identically from tokens only.
+`packages/ui/src/components/tag-filter-nav.tsx:23`). The shell owns only the opt-in
+`fill` classes (`.ui-list-shell--fill`, `.ui-list-shell__body`); it adds no raw values and
+owns the *page's* vertical rhythm by the fixed element order, so both segments render
+identically from tokens only.
 
 ## Tech Stack
 

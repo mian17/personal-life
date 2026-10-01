@@ -48,6 +48,7 @@ export default async function TodosMatrixPage() {
       fabHref="/todos/new"
       fabLabel="New todo"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}
+      fill
     />
   );
 }

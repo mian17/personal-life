@@ -155,6 +155,7 @@ describe('/todos/matrix page wiring', () => {
 
     expect(el.props.fabHref).toBe('/todos/new');
     expect(el.props.fabLabel).toBe('New todo');
+    expect(el.props.fill).toBe(true);
     expect(el.props.search).toBeUndefined();
     expect(el.props.filters).toBeUndefined();
     expect(el.props.navTrailing.type).toBe(TodosNav);

@@ -24,6 +24,12 @@ export interface ListShellProps {
   fabLabel: string;
   /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). */
   fabIcon: ReactNode;
+  /**
+   * Opt into a full-viewport-height page: the `body` slot grows to fill the
+   * remaining space, for a full-height body such as the matrix. Off by default,
+   * so other pages are unchanged.
+   */
+  fill?: boolean;
 }
 
 export function ListShell({
@@ -36,15 +42,16 @@ export function ListShell({
   fabHref,
   fabLabel,
   fabIcon,
+  fill,
 }: ListShellProps): JSX.Element {
   return (
-    <PageShell>
+    <PageShell className={fill ? 'ui-list-shell--fill' : undefined}>
       <NavBar trailing={navTrailing} />
       <PageTitle>{title}</PageTitle>
       {tabs}
       {search}
       {filters}
-      {body}
+      {fill ? <div className="ui-list-shell__body">{body}</div> : body}
       <FabLink href={fabHref} label={fabLabel}>
         {fabIcon}
       </FabLink>

@@ -46,6 +46,23 @@
   padding: var(--space-1) var(--space-1) calc(var(--space-5) + env(safe-area-inset-bottom));
 }
 
+/* Opt-in full-height page (ListShell `fill`): the page column spans the viewport
+   and the body slot grows to fill the rest, so a full-height child (e.g. the
+   matrix) spans the screen. The page's bottom padding still reserves room for the
+   fixed fab. */
+.ui-page.ui-list-shell--fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.ui-list-shell__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
 /* ----------------------------------------------------------- NavBar */
 
 .ui-nav-bar {
