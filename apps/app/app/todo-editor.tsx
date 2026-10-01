@@ -9,6 +9,7 @@ import {
   Input,
   Pill,
   PillGroup,
+  Switch,
   Textarea,
   type TagOption,
 } from '@life/ui';
@@ -38,6 +39,9 @@ export function TodoEditor({
   const [dueDate, setDueDate] = useState(todo?.dueDate ?? '');
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
+  const [important, setImportant] = useState<boolean>(
+    todo ? (todo.important ?? todo.effectiveImportant) : false,
+  );
 
   const canSave = title.trim() !== '';
 
@@ -52,6 +56,7 @@ export function TodoEditor({
           dueDate: dueDate === '' ? null : dueDate,
           listId,
           tagIds,
+          important,
         },
         todo.version,
       );
@@ -62,6 +67,7 @@ export function TodoEditor({
         dueDate: dueDate === '' ? undefined : dueDate,
         listId: listId ?? undefined,
         tagIds,
+        important,
       });
     }
     router.back();
@@ -135,6 +141,8 @@ export function TodoEditor({
           ))}
         </PillGroup>
       )}
+
+      <Switch label="Important" checked={important} onCheckedChange={setImportant} />
     </EditorChrome>
   );
 }
