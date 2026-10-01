@@ -70,6 +70,39 @@ export { setPref } from './preference-action';
 export { settingsHref } from './settings-route';
 ```
 
+### Subpath export — the client-safe action entry
+
+The barrel (`.`) stays the **read path**: `readPref` (server-only — it imports
+`next/headers`), `settingsHref`, and `PrefKey`. The `'use server'` **action** is also exposed
+as its own subpath export, `@life/app-kit/preference-action`, because a client component that
+imports `setPref` through the barrel (or through an app barrel that re-exports it, e.g.
+`@/lib/preferences`) would drag the server-only `readPref`/`next/headers` into the client
+graph — the barrel re-exports both. `packages/app-kit` therefore declares:
+
+```json
+// packages/app-kit/package.json
+"exports": {
+  ".": "./src/index.ts",
+  "./preference-action": "./src/preference-action.ts"
+}
+```
+
+The consuming app must map that subpath in **two** places, because ts-jest resolves with
+`moduleResolution: node` (which does not read `package.json#exports`):
+
+```json
+// apps/app/tsconfig.json — compilerOptions.paths
+"@life/app-kit/preference-action": ["../../packages/app-kit/src/preference-action.ts"]
+
+// apps/app/package.json — jest.moduleNameMapper
+"^@life/app-kit/preference-action$": "<rootDir>/../../packages/app-kit/src/preference-action.ts"
+```
+
+With all three in place, `import { setPref } from '@life/app-kit/preference-action'`
+typechecks under the prod build and resolves under the app's ts-jest, and the client graph
+contains no `readPref`/`next/headers` (Next replaces the `'use server'` module with an action
+reference in a client bundle).
+
 ### Preference cookie contract
 
 - **Name:** one cookie per preference, `pref_<name>` (`prefCookieName`). Keys are
@@ -142,7 +175,8 @@ packages/app-kit/src/preferences.ts        # prefCookieName, parsePrefValue, rea
 packages/app-kit/src/preference-action.ts  # 'use server' — setPref; imports next/headers, next/cache
 packages/app-kit/src/settings-route.ts     # settingsHref
 packages/app-kit/src/types.ts              # + PrefKey
-packages/app-kit/src/index.ts              # barrel additions
+packages/app-kit/src/index.ts              # barrel additions (read path + settingsHref + PrefKey)
+packages/app-kit/package.json              # + "./preference-action" subpath export (client-safe action entry)
 packages/app-kit/test/pref-cookie.test.ts      # name + value parsing
 packages/app-kit/test/read-pref.test.ts        # cookie read via the headers stub
 packages/app-kit/test/set-pref.test.ts         # server-action write + options + revalidate
@@ -231,7 +265,9 @@ No E2E here. The page wiring that consumes these lives in `matrix-ui`.
 ## Success Criteria
 
 1. `prefCookieName`, `parsePrefValue`, `readPref`, `setPref`, `settingsHref`, and the
-   `PrefKey` type exist with the declared signatures and no extra public surface.
+   `PrefKey` type exist with the declared signatures. The **one** intended addition to the
+   public surface beyond that list is the `@life/app-kit/preference-action` subpath export
+   (the client-safe entry to the `setPref` action); there is no other extra public surface.
 2. The preference cookie is `pref_<key>` encoding `'on' | 'off'` with `path=/`,
    `sameSite=lax`, `httpOnly`, long-lived `maxAge`; `readPref` returns `false` on
    absent/malformed/error and never throws.

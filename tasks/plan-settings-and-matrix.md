@@ -163,9 +163,13 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 - [ ] T13: app matrix domain logic (`lib/matrix.ts`, `test/matrix.test.ts`)
 - [ ] T14: settings pages + preference glue (`lib/preferences.ts`,
   `app/settings/matrix-switch.tsx`, `app/todos/settings/page.tsx`,
-  `app/notes/settings/page.tsx`, `test/routes-settings.test.tsx`) — `MatrixSwitch` imports
-  the server action `setPref` from `@life/app-kit`'s action module directly, never through
-  `@/lib/preferences` (whose barrel also re-exports server-only `readPref`/`next/headers`)
+  `app/notes/settings/page.tsx`, `test/routes-settings.test.tsx`, plus the subpath
+  plumbing: `packages/app-kit/package.json`, `apps/app/tsconfig.json`,
+  `apps/app/package.json`) — `MatrixSwitch` imports the server action `setPref` from
+  the `@life/app-kit/preference-action` **subpath**, never through the `@life/app-kit`
+  barrel nor `@/lib/preferences` (both re-export the server-only
+  `readPref`/`next/headers`); the subpath is mapped in the app's tsconfig `paths` and
+  jest `moduleNameMapper`
 - [ ] T15: nav gear in both apps + `/todos` tabs slot (`app/todos/page.tsx`,
   `app/notes/page.tsx`, `test/routes-todos-list.test.tsx`)
 - [ ] T16: `/todos/matrix` server-gated lens (`app/todos/matrix/page.tsx`,

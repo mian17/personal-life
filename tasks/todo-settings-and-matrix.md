@@ -263,23 +263,36 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
     row composed from `ManagerBlock` + `SettingsBlock`/`SettingsRow` + `ThemeToggle` +
     `MatrixSwitch`) and the `/notes/settings` page (Appearance Theme row only).
     `MatrixSwitch` is a client component and MUST import the server action `setPref` from
-    `@life/app-kit`'s `'use server'` action module directly — NEVER through
-    `apps/app/lib/preferences.ts`, whose barrel also re-exports the server-only
-    `readPref`/`next/headers`; importing through it would pull `next/headers` into the client
-    bundle. The server pages import `readPref` from `@/lib/preferences`.
+    the `@life/app-kit/preference-action` **subpath** — NEVER through the `@life/app-kit`
+    barrel nor through `apps/app/lib/preferences.ts`, both of which also re-export the
+    server-only `readPref`/`next/headers`; importing through either would pull `next/headers`
+    into the client bundle. Wire the subpath for both resolvers: add the
+    `"./preference-action": "./src/preference-action.ts"` entry to
+    `packages/app-kit/package.json`'s `exports`, the
+    `"@life/app-kit/preference-action": ["../../packages/app-kit/src/preference-action.ts"]`
+    mapping to `apps/app/tsconfig.json`'s `compilerOptions.paths`, and the
+    `"^@life/app-kit/preference-action$":
+    "<rootDir>/../../packages/app-kit/src/preference-action.ts"` entry to
+    `apps/app/package.json`'s jest `moduleNameMapper` (ts-jest uses
+    `moduleResolution: node`, which does not read `package.json#exports`). The server pages
+    import `readPref` from `@/lib/preferences`.
   - Files: `apps/app/lib/preferences.ts` (new),
     `apps/app/app/settings/matrix-switch.tsx` (new),
     `apps/app/app/todos/settings/page.tsx` (new),
     `apps/app/app/notes/settings/page.tsx` (new),
-    `apps/app/test/routes-settings.test.tsx` (new).
+    `apps/app/test/routes-settings.test.tsx` (new),
+    `packages/app-kit/package.json` (subpath `exports`),
+    `apps/app/tsconfig.json` (`paths`),
+    `apps/app/package.json` (jest `moduleNameMapper`).
   - Acceptance: `/todos/settings` reads `readPref('matrix')` and renders the Theme row plus
     the `Switch` named "Eisenhower matrix" persisting through `setPref('matrix', …)`;
     `/notes/settings` renders the Appearance block only; both compose `ManagerBlock`
     (`title="Settings"`, correct `backHref`) with zero bespoke layout markup; `MatrixSwitch`
-    imports `setPref` from `@life/app-kit` directly (its import graph contains no
-    `readPref`/`next/headers`); the suite mocks the app-owned `@/lib/preferences` barrel
-    (`jest.mock`) so the server-only `next/headers` module is never loaded in the node test
-    env.
+    imports `setPref` from `@life/app-kit/preference-action` and its import graph contains no
+    `readPref`/`next/headers`; the subpath resolves under both the prod typecheck
+    (`apps/app` `tsc --noEmit`) and the app's ts-jest; the suite mocks the app-owned
+    `@/lib/preferences` barrel (`jest.mock`) so the server-only `next/headers` module is never
+    loaded in the node test env.
   - Verify: `cd /home/night/WebstormProjects/personal-life && npm run build -w @life/shared`
     then `cd /home/night/WebstormProjects/personal-life/apps/app && npm run typecheck` &&
     `npm run test:unit -- test/routes-settings.test.tsx`.

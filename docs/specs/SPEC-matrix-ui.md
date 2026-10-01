@@ -174,7 +174,7 @@ in the app. This is the small app-owned client wrapper the settings page consume
 
 import { useState } from 'react';
 import { Switch } from '@life/ui';
-import { setPref } from '@/lib/preferences';
+import { setPref } from '@life/app-kit/preference-action';
 
 /** Controlled wrapper: seeds local state from the server-read `checked` value and
  *  persists each toggle through app-kit's server action. The atom stays presentational. */
@@ -194,10 +194,14 @@ export function MatrixSwitch({ checked }: { checked: boolean }) {
 ```
 
 - `checked` is read server-side (`readPref('matrix')`) and passed down; the wrapper owns the
-  client state. `setPref` is the `'use server'` action of `SPEC-app-kit-settings.md`
-  (imported from the app's `@/lib/preferences` barrel, which re-exports app-kit's
-  `readPref`/`setPref` per that spec's Code Style). `readPref` (server-only, `next/headers`)
-  is imported only by the server components below, never by this client module.
+  client state. `setPref` is the `'use server'` action of `SPEC-app-kit-settings.md`, imported
+  through the **subpath** `@life/app-kit/preference-action` — not through the `@life/app-kit`
+  barrel and not through the app's `@/lib/preferences`, because both of those also re-export
+  the server-only `readPref` (which imports `next/headers`), which would pull `next/headers`
+  into this client module's graph. The subpath entry is mapped in `apps/app/tsconfig.json`
+  `paths` and the app's jest `moduleNameMapper` (`SPEC-app-kit-settings.md`, Subpath export).
+  `readPref` (server-only, `next/headers`) is imported only by the server components below,
+  never by this client module.
 - `label="Eisenhower matrix"` is the atom's accessible name — the frozen switch selector.
 
 ## Pages & routing (integration)

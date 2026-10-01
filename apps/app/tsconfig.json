@@ -17,6 +17,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@life/app-kit/preference-action": [
+        "../../packages/app-kit/src/preference-action.ts"
       ]
     },
     "plugins": [
