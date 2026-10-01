@@ -25,7 +25,9 @@ import { FakeRedisClient, FailingRedisClient } from './fake-redis';
  *   done, due dates, cursor, limit) enters the key — one entry serves every
  *   variant;
  * - per-owner generation counter `todo:gen:<sub>` bumped per write, 60s TTL,
- *   fail-open, and **no plaintext ever** reaches Redis.
+ *   fail-open, and **no content plaintext ever** reaches Redis (the plaintext
+ *   `important`/`importantDefault` booleans are the documented non-content
+ *   exception, mirroring `done` — `SPEC-todo-importance`).
  *
  * The cache is a real `@life/cache` instance over the recording fake client; the
  * DB is a real throwaway sqlite file so the loader genuinely reads ciphertext
@@ -118,6 +120,9 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     const t = await h.todos.create(SUB, { title: 'alpha', note: 'beta', listId: l.id, tagIds: [1] });
     const gen = currentGen(client, SUB);
     h.log.length = 0;
+    // `create` already populated `todo:lists` via the importance join; the
+    // assertion is about the `all` entry, so reset the SET traffic first.
+    client.sets.length = 0;
 
     await h.todos.findAll(SUB, {});
     await h.todos.findAll(SUB, { q: 'alpha' });
@@ -166,6 +171,75 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(entry.value).not.toContain(LIST);
   });
 
+  it('todo rows carry the plaintext importance boolean while title/note stay ciphertext-only', async () => {
+    const TITLE = 'TOPSECRET-IMP-TODO-TITLE';
+    const NOTE = 'TOPSECRET-IMP-TODO-NOTE';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, { title: TITLE, note: NOTE, important: true });
+    client.values.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.todos.findAll(SUB, {});
+
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:all`)!;
+    expect(entry).toBeDefined();
+    // `important` is the documented non-content plaintext exception (mirrors `done`).
+    expect(entry.value).toContain('"important":true');
+    // Content columns are unchanged: `enc.v1.`-only, no plaintext leak.
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(TITLE);
+    expect(entry.value).not.toContain(NOTE);
+  });
+
+  it('list rows carry the plaintext importantDefault boolean while name stays ciphertext-only', async () => {
+    const LIST = 'TOPSECRET-IMP-LIST-NAME';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.lists.create(SUB, LIST, true);
+    client.values.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.lists.list(SUB);
+
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:lists`)!;
+    expect(entry).toBeDefined();
+    expect(entry.value).toContain('"importantDefault":true');
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(LIST);
+  });
+
+  it('fail-closed: the plaintext booleans leak no known content plaintext', async () => {
+    const TITLE = 'TOPSECRET-IMP-CONTENT-TITLE';
+    const NOTE = 'TOPSECRET-IMP-CONTENT-NOTE';
+    const LIST = 'TOPSECRET-IMP-CONTENT-LIST';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const l = await h.lists.create(SUB, LIST, true);
+    await h.todos.create(SUB, { title: TITLE, note: NOTE, listId: l.id, important: true });
+    // Cold cache: `create` already populated `todo:lists` via the importance
+    // join, so wipe the store to make both content shapes repopulate below.
+    client.store.clear();
+    client.values.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.todos.findAll(SUB, {});
+    await h.lists.list(SUB);
+
+    const all = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:all`)!;
+    const lists = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:lists`)!;
+    expect(all).toBeDefined();
+    expect(lists).toBeDefined();
+    expect(all.value).toContain('"important":true');
+    expect(lists.value).toContain('"importantDefault":true');
+    for (const { value } of [all, lists]) {
+      expect(value).toContain(ENC_PREFIX);
+      expect(value).not.toContain(TITLE);
+      expect(value).not.toContain(NOTE);
+      expect(value).not.toContain(LIST);
+    }
+  });
+
   it('tag usage caches under todo:<sub>:v<gen>:tags as metadata-only (no ciphertext, no names)', async () => {
     const client = new CapturingRedisClient();
     h = await makeUnitHarness(new TodosCache(client));
@@ -199,6 +273,9 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     h = await makeUnitHarness(new TodosCache(client));
     const l = await h.lists.create(SUB, LIST);
     const t = await h.todos.create(SUB, { title: TITLE, note: NOTE, listId: l.id, tagIds: [8] });
+    // Cold cache: `create` populated `todo:lists` via the importance join, so
+    // wipe the store to make every content shape repopulate below.
+    client.store.clear();
     client.values.length = 0;
 
     await h.todos.findAll(SUB, {});
@@ -206,8 +283,9 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     await h.lists.list(SUB);
     await h.todos.listTagUsage(SUB);
 
-    // Exactly the three spec shapes; `findOne` serves from the `all` entry (no
-    // id-keyed shape exists), so it adds no SET.
+    // Exactly the three spec shapes; after the cold-cache wipe `findOne` serves
+    // from the `all` populate (no id-keyed shape exists) and `lists.list` from
+    // the `lists` populate, so no fourth SET appears.
     const gen = currentGen(client, SUB);
     expect(client.values.map((v) => v.key)).toEqual([
       `todo:${SUB}:v${gen}:all`,
@@ -263,6 +341,25 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     await expect(h.todos.update(SUB, 'missing-id', { title: 'nope' })).rejects.toThrow();
     await expect(h.lists.remove(SUB, 'missing-id')).rejects.toThrow();
     expect(client.incrCalls).toHaveLength(0);
+  });
+
+  it('a list write that changes importantDefault bumps todo:gen:<sub> exactly once; a read never bumps', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const l = await h.lists.create(SUB, 'Bump-default', false);
+
+    // A read populates the cache from the DB but must not advance the counter.
+    client.incrCalls.length = 0;
+    const gen = currentGen(client, SUB);
+    await h.lists.list(SUB);
+    expect(currentGen(client, SUB)).toBe(gen);
+    expect(client.incrCalls).toHaveLength(0);
+
+    // The `importantDefault` write invalidates once for the whole owner.
+    client.incrCalls.length = 0;
+    await h.lists.update(SUB, l.id, 'Bump-default', true);
+    expect(client.incrCalls).toEqual([generationKey(SUB)]);
+    expect(currentGen(client, SUB)).toBe(gen + 1);
   });
 
   it('the four trash writes bump todo:gen:<sub> after the mutation; a failed trash write never bumps', async () => {
