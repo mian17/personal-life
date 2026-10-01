@@ -33,8 +33,14 @@ per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `comp
       `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`, `IDP_ISSUER`,
       `OIDC_APP_CLIENT_SECRET`, `OIDC_APP_REDIRECT_URI`, `REDIS_URL`.
 - [ ] **New secrets this lane requires:** `TAGS_MASTER_KEY` and `TODO_MASTER_KEY`, 32-byte
-      base64 — `openssl rand -base64 32`. Compose fails fast without them
-      (`compose.yaml:63`, `compose.yaml:101`).
+      base64 — `openssl rand -base64 32`, run **once per service** (two distinct values;
+      independent custody per MAP M3). Compose fails fast without them
+      (`compose.yaml:63`, `compose.yaml:101`). Validated by `loadMasterKeyFromEnv`
+      (`packages/crypto/src/keys.ts:110-128`): standard base64 decoding to exactly 32 bytes.
+      Verify unquoted in `.env` with `printf '%s' "$K" | base64 -d | wc -c` → `32`.
+- [ ] **Do NOT regenerate `NOTE_MASTER_KEY`** — it already exists on a running stack, and
+      changing it makes every existing encrypted note undecryptable. These keys are
+      write-once; losing one loses that service's data.
 - [ ] Record current image tags/digests: `docker compose images`.
 - [ ] Baseline the running stack's health so you know what "healthy" looked like before.
 
