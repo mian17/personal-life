@@ -213,10 +213,10 @@ Not modified: `apps/*/data/**`; token files (`packages/ui/src/styles/tokens.css`
 ## Task List
 
 ### Phase 1 — `@life/ui` page blocks (parallel: T1 ∥ T2 ∥ T3 ∥ T4)
-- [ ] T1: `ui-trash-block` — `trash-block.tsx` + suite
-- [ ] T2: `ui-manager-block` — `manager-block.tsx` + suite
-- [ ] T3: `ui-list-shell` — `list-shell.tsx` + suite
-- [ ] T4: `ui-editor-chrome` — `editor-chrome.tsx` + suite
+- [x] T1: `ui-trash-block` — `trash-block.tsx` + suite
+- [x] T2: `ui-manager-block` — `manager-block.tsx` + suite
+- [x] T3: `ui-list-shell` — `list-shell.tsx` + suite
+- [x] T4: `ui-editor-chrome` — `editor-chrome.tsx` + suite
 
 The four tasks run in parallel on their own files only. `packages/ui/src/index.ts` is a
 shared barrel: its four export lines are applied once, serialized, by the Tech Lead at the
@@ -224,44 +224,44 @@ Blocks checkpoint below — never by the parallel tasks (four concurrent writers
 would drop exports).
 
 ### Checkpoint: Blocks (single writer: the Tech Lead)
-- [ ] Append all four exports to `packages/ui/src/index.ts` in one edit: `TrashBlock`,
+- [x] Append all four exports to `packages/ui/src/index.ts` in one edit: `TrashBlock`,
       `ManagerBlock`, `ListShell`, `EditorChrome` and their exported prop types.
-- [ ] Register the four blocks in `docs/specs/MAP-ui-primitives.md`'s `ui-blocks` row
+- [x] Register the four blocks in `docs/specs/MAP-ui-primitives.md`'s `ui-blocks` row
       (Contract 1 Rule 3: a new `@life/ui` component lands in the map in the same change).
-- [ ] `npm run typecheck -w packages/ui` exits 0.
-- [ ] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx test/manager-block.test.tsx test/list-shell.test.tsx test/editor-chrome.test.tsx` green.
-- [ ] `grep -riE "note|trash|tag-chip" packages/ui/src/components/{trash-block,manager-block,list-shell,editor-chrome}.tsx`
+- [x] `npm run typecheck -w packages/ui` exits 0.
+- [x] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx test/manager-block.test.tsx test/list-shell.test.tsx test/editor-chrome.test.tsx` green.
+- [x] `grep -riE "note|trash|tag-chip" packages/ui/src/components/{trash-block,manager-block,list-shell,editor-chrome}.tsx`
       returns only the frozen e2e hook classes/attribute strings (see Deviations 1). Real
       paths — a `*-block.tsx` brace expansion would miss two of them, and a `list` term
       would match the composed `List`/`ListItem` imports.
 
 ### Phase 2 — `@life/app-kit` (parallel with Phase 1: T5)
-- [ ] T5: create `packages/app-kit` workspace + exports + suites + root workspaces entry +
+- [x] T5: create `packages/app-kit` workspace + exports + suites + root workspaces entry +
       `apps/app` dependency + the `npm install` workspace link
 
 ### Checkpoint: Kit
-- [ ] `npm install` ran once at the root; `node_modules/@life/app-kit` resolves and
+- [x] `npm install` ran once at the root; `node_modules/@life/app-kit` resolves and
       `apps/app/package.json` declares `"@life/app-kit": "*"`.
-- [ ] `npm run typecheck -w packages/app-kit` exits 0.
-- [ ] `npm run test:unit -w packages/app-kit -- test/filter-href.test.ts test/parse-tag-id.test.ts test/preserving-search-box.test.tsx test/load-or-not-found.test.ts test/route-layout.test.tsx` green.
-- [ ] `grep -rnE "Note|Todo|List\b" packages/app-kit/src` finds no domain identifiers.
+- [x] `npm run typecheck -w packages/app-kit` exits 0.
+- [x] `npm run test:unit -w packages/app-kit -- test/filter-href.test.ts test/parse-tag-id.test.ts test/preserving-search-box.test.tsx test/load-or-not-found.test.ts test/route-layout.test.tsx` green.
+- [x] `grep -rnE "Note|Todo|List\b" packages/app-kit/src` finds no domain identifiers.
 
 ### Phase 3 — Segment port (T6)
-- [ ] T6: port `apps/app/app/notes/**` and `apps/app/app/todos/**` onto blocks + kit
+- [x] T6: port `apps/app/app/notes/**` and `apps/app/app/todos/**` onto blocks + kit
 
 ### Checkpoint: Port
-- [ ] `npm run typecheck -w @life/app` exits 0.
-- [ ] Each route file contains no page-shell JSX, no local href builder, no inline
+- [x] `npm run typecheck -w @life/app` exits 0.
+- [x] Each route file contains no page-shell JSX, no local href builder, no inline
       load-or-`notFound()`.
-- [ ] The single targeted journey E2E passes.
+- [x] The single targeted journey E2E passes.
 
 ### Phase 4 — Verification gate
-- [ ] Contract 1 / Contract 2 mechanical greps + the targeted journey E2E (see
+- [x] Contract 1 / Contract 2 mechanical greps + the targeted journey E2E (see
       *Verification gate*).
-- [ ] Five-lane verification (`five-lane-verification`) returns N/N PASS.
+- [x] Five-lane verification (`five-lane-verification`) returns N/N PASS.
 
 ### Checkpoint: Complete
-- [ ] All acceptance criteria met; `master` untouched; merge awaits the user's explicit request.
+- [x] All acceptance criteria met; `master` untouched; merge awaits the user's explicit request.
 
 ## Tasks in §5 template form
 
@@ -347,11 +347,11 @@ would drop exports).
     in `packages/ui`; frozen surfaces unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] `TrashBlock` and its exported types exist with the exact spec signatures.
-  - [ ] The frozen surface contract in `SPEC-ui-trash-block.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
-  - [ ] No files outside the allowed scope were modified; no new CSS class or raw value.
-  - [ ] `npm run typecheck -w packages/ui` passes with zero errors.
-  - [ ] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx` passes.
+  - [x] `TrashBlock` and its exported types exist with the exact spec signatures.
+  - [x] The frozen surface contract in `SPEC-ui-trash-block.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
+  - [x] No files outside the allowed scope were modified; no new CSS class or raw value.
+  - [x] `npm run typecheck -w packages/ui` passes with zero errors.
+  - [x] `npm run test:unit -w packages/ui -- test/trash-block.test.tsx` passes.
 
 ---
 
@@ -409,11 +409,11 @@ would drop exports).
     in `packages/ui`; frozen surfaces unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] `ManagerBlock` and its exported type exist with the exact spec signature.
-  - [ ] The frozen surface contract in `SPEC-ui-manager-block.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
-  - [ ] No files outside the allowed scope were modified; no new CSS class or raw value.
-  - [ ] `npm run typecheck -w packages/ui` passes with zero errors.
-  - [ ] `npm run test:unit -w packages/ui -- test/manager-block.test.tsx` passes.
+  - [x] `ManagerBlock` and its exported type exist with the exact spec signature.
+  - [x] The frozen surface contract in `SPEC-ui-manager-block.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
+  - [x] No files outside the allowed scope were modified; no new CSS class or raw value.
+  - [x] `npm run typecheck -w packages/ui` passes with zero errors.
+  - [x] `npm run test:unit -w packages/ui -- test/manager-block.test.tsx` passes.
 
 ---
 
@@ -475,11 +475,11 @@ would drop exports).
     in `packages/ui`; frozen surfaces unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] `ListShell` and its exported type exist with the exact spec signature.
-  - [ ] The frozen surface contract in `SPEC-ui-list-shell.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
-  - [ ] No files outside the allowed scope were modified; no new CSS class or raw value.
-  - [ ] `npm run typecheck -w packages/ui` passes with zero errors.
-  - [ ] `npm run test:unit -w packages/ui -- test/list-shell.test.tsx` passes.
+  - [x] `ListShell` and its exported type exist with the exact spec signature.
+  - [x] The frozen surface contract in `SPEC-ui-list-shell.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
+  - [x] No files outside the allowed scope were modified; no new CSS class or raw value.
+  - [x] `npm run typecheck -w packages/ui` passes with zero errors.
+  - [x] `npm run test:unit -w packages/ui -- test/list-shell.test.tsx` passes.
 
 ---
 
@@ -543,11 +543,11 @@ would drop exports).
     in `packages/ui`; frozen surfaces unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] `EditorChrome` and its exported types exist with the exact spec signatures.
-  - [ ] The frozen surface contract in `SPEC-ui-editor-chrome.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
-  - [ ] No files outside the allowed scope were modified; no new CSS class or raw value.
-  - [ ] `npm run typecheck -w packages/ui` passes with zero errors.
-  - [ ] `npm run test:unit -w packages/ui -- test/editor-chrome.test.tsx` passes.
+  - [x] `EditorChrome` and its exported types exist with the exact spec signatures.
+  - [x] The frozen surface contract in `SPEC-ui-editor-chrome.md` is reproduced: the test-asserted selectors verbatim, the preserved-but-not-asserted labels unchanged.
+  - [x] No files outside the allowed scope were modified; no new CSS class or raw value.
+  - [x] `npm run typecheck -w packages/ui` passes with zero errors.
+  - [x] `npm run test:unit -w packages/ui -- test/editor-chrome.test.tsx` passes.
 
 ---
 
@@ -644,15 +644,15 @@ would drop exports).
     `apps`; no `next/navigation` in `packages/ui`; frozen surfaces unchanged.
 
 [DEFINITION OF DONE]
-  - [ ] Every `SPEC-app-kit.md` export exists with the declared signature and no extra public surface.
-  - [ ] The workspace mirrors `@life/ui`'s package/tsconfig/jest shape; the stub exists.
-  - [ ] `packages/app-kit` is in the root `workspaces` array and `apps/app` declares
+  - [x] Every `SPEC-app-kit.md` export exists with the declared signature and no extra public surface.
+  - [x] The workspace mirrors `@life/ui`'s package/tsconfig/jest shape; the stub exists.
+  - [x] `packages/app-kit` is in the root `workspaces` array and `apps/app` declares
         `"@life/app-kit": "*"` in `dependencies`.
-  - [ ] `npm install` ran once at the root and `node_modules/@life/app-kit` resolves
+  - [x] `npm install` ran once at the root and `node_modules/@life/app-kit` resolves
         (T6's app typecheck depends on this link).
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w packages/app-kit` passes with zero errors.
-  - [ ] The prescribed app-kit test command passes.
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w packages/app-kit` passes with zero errors.
+  - [x] The prescribed app-kit test command passes.
 
 ---
 
@@ -753,16 +753,16 @@ would drop exports).
     manager), so the journey must re-prove the rendered surface; it is run once, at the end.
 
 [DEFINITION OF DONE]
-  - [ ] Every route/editor file is data + copy + slots only (no page-shell JSX, no local
+  - [x] Every route/editor file is data + copy + slots only (no page-shell JSX, no local
         href builder, no local tag parse, no inline load-or-`notFound()`).
-  - [ ] `search-box.tsx` / `todo-search-box.tsx` are deleted; consumers use `PreservingSearchBox`.
-  - [ ] Every frozen e2e selector renders byte-identically; token values unchanged.
-  - [ ] Every ported route file still exports its original `dynamic` / `revalidate` route
+  - [x] `search-box.tsx` / `todo-search-box.tsx` are deleted; consumers use `PreservingSearchBox`.
+  - [x] Every frozen e2e selector renders byte-identically; token values unchanged.
+  - [x] Every ported route file still exports its original `dynamic` / `revalidate` route
         config (no route moved to static rendering).
-  - [ ] No files outside the allowed scope were modified.
-  - [ ] `npm run typecheck -w @life/app` passes with zero errors.
-  - [ ] `npm run test:unit -w @life/app -- test/manifests.test.ts` passes.
-  - [ ] The single targeted journey E2E passes (1/1).
+  - [x] No files outside the allowed scope were modified.
+  - [x] `npm run typecheck -w @life/app` passes with zero errors.
+  - [x] `npm run test:unit -w @life/app -- test/manifests.test.ts` passes.
+  - [x] The single targeted journey E2E passes (1/1).
 
 ## Dependency order and parallelization
 
