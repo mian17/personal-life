@@ -2,8 +2,10 @@
 import type { JSX, ReactNode } from 'react';
 import { cx } from '../lib/cx';
 
-// ui-blocks — a labelled 2×2 (or stacked) presentation of four quadrants.
-// Presentational only: no data, no domain types, no domain copy, no routing.
+// ui-blocks — four labelled quadrants in a 2×2 grid of muted panels at every
+// width (smallest phones included). Presentational only: no data, no domain
+// types, no domain copy, no routing. An `items == null` quadrant renders the
+// `empty` slot instead.
 export interface MatrixQuadrant {
   /** Stable key for the quadrant (app-supplied). */
   id: string;
@@ -11,6 +13,8 @@ export interface MatrixQuadrant {
   label: string;
   /** The quadrant's content, rendered verbatim (app-composed). */
   items: ReactNode;
+  /** Rendered in place of `items` when `items` is absent (app-supplied copy). */
+  empty?: ReactNode;
 }
 
 export interface MatrixBlockProps {
@@ -26,7 +30,11 @@ export function MatrixBlock({ quadrants, className }: MatrixBlockProps): JSX.Ele
       {quadrants.map((quadrant) => (
         <section key={quadrant.id} className="ui-matrix__quadrant">
           <h2 className="ui-matrix__label">{quadrant.label}</h2>
-          <div className="ui-matrix__items">{quadrant.items}</div>
+          {quadrant.items != null ? (
+            <div className="ui-matrix__items">{quadrant.items}</div>
+          ) : (
+            <p className="ui-matrix__empty">{quadrant.empty}</p>
+          )}
         </section>
       ))}
     </div>

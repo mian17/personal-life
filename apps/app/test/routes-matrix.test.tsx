@@ -117,6 +117,23 @@ describe('/todos/matrix page wiring', () => {
     });
   });
 
+  it('passes items: null and the empty copy for quadrants with no todos', async () => {
+    mockedListTodos.mockResolvedValue({
+      todos: [todo({ id: 'nn-1', dueDate: null, effectiveImportant: false })],
+      nextCursor: null,
+    });
+
+    const el = await TodosMatrixPage();
+    const quadrants = el.props.body.props.quadrants;
+    const byId = Object.fromEntries(quadrants.map((q: any) => [q.id, q]));
+
+    expect(byId['not-urgent-not-important'].items.type).toBe(UiList);
+    for (const id of ['urgent-important', 'urgent-not-important', 'not-urgent-important']) {
+      expect(byId[id].items).toBeNull();
+      expect(byId[id].empty).toBe('No tasks');
+    }
+  });
+
   it('marks Matrix active and List not active', async () => {
     const el = await TodosMatrixPage();
 

@@ -38,8 +38,9 @@ block bakes none. Never `Do First` / `Delegate` / `Drop`.
 ```tsx
 import type { ReactNode } from 'react';
 
-// ui-blocks — a labelled 2×2 (or stacked) presentation of four quadrants.
-// Presentational only: no data, no domain types, no domain copy, no routing.
+// ui-blocks — four labelled quadrants in a 2×2 grid of muted panels at every
+// width (smallest phones included). Presentational only: no data, no domain
+// types, no domain copy, no routing.
 export interface MatrixQuadrant {
   /** Stable key for the quadrant (app-supplied, e.g. `'urgent-important'`). */
   id: string;
@@ -47,6 +48,8 @@ export interface MatrixQuadrant {
   label: string;
   /** The quadrant's content — usually an app-composed todo `List`. */
   items: ReactNode;
+  /** Rendered in place of `items` when `items` is absent (app-supplied copy). */
+  empty?: ReactNode;
 }
 
 export interface MatrixBlockProps {
@@ -66,7 +69,11 @@ Rendered structure (one `<section>` per quadrant, in the given order):
   {quadrants.map((quadrant) => (
     <section key={quadrant.id} className="ui-matrix__quadrant">
       <h2 className="ui-matrix__label">{quadrant.label}</h2>
-      <div className="ui-matrix__items">{quadrant.items}</div>
+      {quadrant.items != null ? (
+        <div className="ui-matrix__items">{quadrant.items}</div>
+      ) : (
+        <p className="ui-matrix__empty">{quadrant.empty}</p>
+      )}
     </section>
   ))}
 </div>
@@ -77,9 +84,11 @@ Semantics and edge cases:
 - The block is a server component (no `'use client'`) and renders `items` verbatim; the app
   owns the todo nodes inside. Zero data, zero domain copy, zero routing (mirrors
   `ListShell`/`Section` contracts).
-- A quadrant with empty `items` still renders its labelled section (an empty quadrant is
-  meaningful in a matrix — it says "nothing Urgent & Important"). The app decides whether to
-  pass an `EmptyState` inside `items`; the block imposes neither.
+- A quadrant with `items == null` still renders its labelled section (an empty quadrant is
+  meaningful in a matrix — it says "nothing Urgent & Important") and renders the `empty` slot
+  instead of an items container. The app supplies the copy (the matrix page passes
+  `empty: 'No tasks'`); the block bakes no domain copy. A quadrant whose `items` is non-null
+  renders `items` verbatim as before.
 - Quadrant order is exactly the app's array order — fixed by `groupByQuadrant` (below):
   Urgent & Important, Urgent & Not Important, Not Urgent & Important,
   Not Urgent & Not Important.
@@ -265,7 +274,7 @@ import { readPref } from '@/lib/preferences';
 import { listTodos, listLists } from '@/lib/todo-api';
 import { collectTodos } from '@/lib/todo-query';
 import { groupByQuadrant } from '@/lib/matrix';
-import { ListShell, MatrixBlock, Tab, TabBar, todayIso } from '@life/ui';
+import { ListShell, List, MatrixBlock, Tab, TabBar, todayIso } from '@life/ui';
 import { Plus } from 'lucide-react';
 import { TodoItem } from '../../todo-item';
 import { TodosNav } from '../../todos-nav';
@@ -284,9 +293,14 @@ export default async function TodosMatrixPage() {
   const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
-    items: bucket.todos.map((todo) => (
-      <TodoItem key={todo.id} todo={todo} today={today} lists={lists} availableTags={[]} />
-    )),
+    items: bucket.todos.length ? (
+      <List>
+        {bucket.todos.map((todo) => (
+          <TodoItem key={todo.id} todo={todo} today={today} lists={lists} availableTags={[]} />
+        ))}
+      </List>
+    ) : null,
+    empty: 'No tasks',
   }));
 
   return (
@@ -430,45 +444,59 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
 ## CSS ownership
 
 - `MatrixBlock` owns `.ui-matrix` (grid container), `.ui-matrix__quadrant`,
-  `.ui-matrix__label`, `.ui-matrix__items` in `blocks.css` — tokens only. Labels reuse the
-  spacing scale for type (as `Section` does) with `margin: 0`; `Stack`-like `gap` only, no
-  outer margins (a grid child with `Section`'s outer margin would double-space against the
-  grid gap).
-- Quadrants are separated by **inner hairline dividers only** — never an outer frame on
-  `.ui-matrix` or `.ui-matrix__quadrant`. One column (phone) gets a single rule between
-  consecutive stacked quadrants (never above the first); the 2×2 layout gets an inner cross
-  (a rule between the rows and between the columns). Dividers use the `--border-width` /
-  `--border` tokens.
-- Responsive (map D6), decided in CSS, no JS, no horizontal scroll:
+  `.ui-matrix__label`, `.ui-matrix__items`, `.ui-matrix__empty` in `blocks.css` — tokens only.
+  Labels reuse the spacing scale for type (as `Section` does) with `margin: 0`; `Stack`-like
+  `gap` only, no outer margins (a grid child with `Section`'s outer margin would double-space
+  against the grid gap).
+- **2×2 at every width, unconditionally** (smallest iPhone SE 375px included) — no media
+  query, no phone stack. Each quadrant is a muted panel (`background: var(--panel)`,
+  `border-radius: var(--radius-lg)`, `padding: var(--space-1)`); separation comes from the
+  grid gap, **not** hairline dividers. There is no inner cross, no outer frame, no `border`
+  on `.ui-matrix` or `.ui-matrix__quadrant`.
+- An empty quadrant shows a muted, centered empty state (`.ui-matrix__empty`:
+  `color: var(--muted)`, `place-content: center`, `text-align: center`). The app supplies the
+  copy (`empty: 'No tasks'`) — the block bakes no domain copy.
+- **Reversal of map D6 and the inner-divider decision** (lesson 0012): the earlier design was
+  "four stacked labelled sections on a phone, a 2×2 grid from 640px" with "inner hairline
+  dividers only". The human explicitly approved the new TickTick-style design, so this spec
+  records the reversal — the 2×2 muted-panel layout is now the only layout, at every width.
 
   ```css
-  .ui-matrix { display: grid; gap: 0; }
-  .ui-matrix__quadrant { display: grid; gap: var(--space-0-5); padding: var(--space-1); min-height: var(--space-5); }
+  .ui-matrix {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    gap: var(--space-0-5);
+  }
 
-  /* Phone (one column): a hairline between consecutive quadrants, never above the first. */
-  .ui-matrix__quadrant + .ui-matrix__quadrant {
-    border-top: var(--border-width) solid var(--border);
+  .ui-matrix__quadrant {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-0-5);
+    padding: var(--space-1);
+    min-height: var(--space-5);
+    background: var(--panel);
+    border-radius: var(--radius-lg);
   }
 
   .ui-matrix__label { font-size: var(--space-1); font-weight: 700; margin: 0; }
   .ui-matrix__items { display: grid; gap: var(--space-0-5); }
 
-  @media (min-width: 640px) {
-    .ui-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
-    /* 2×2: reset the phone rule, then draw the inner cross only (no outer frame). */
-    .ui-matrix__quadrant + .ui-matrix__quadrant { border-top: 0; }
-    .ui-matrix__quadrant:nth-child(n + 3) { border-top: var(--border-width) solid var(--border); }
-    .ui-matrix__quadrant:nth-child(odd) { border-right: var(--border-width) solid var(--border); }
+  /* Empty quadrant: muted and centred in the remaining box height. */
+  .ui-matrix__empty {
+    flex: 1;
+    display: grid;
+    place-content: center;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--space-0-85);
+    text-align: center;
   }
   ```
 
-  The 2×2 layout gives the top and bottom rows **equal height** (`grid-auto-rows: 1fr`), so an
-  empty quadrant matches a populated one in the same row pair; `1fr` means `minmax(auto, 1fr)`,
-  so content is never clipped. The phone layout stays a natural stacked height per section.
-  One column (four stacked labelled sections) is the phone default; `minmax(0, 1fr)` tracks
-  prevent overflow, so no horizontal scroll. The `640px` breakpoint literal matches
-  `--content-width` and is the documented non-tokenizable exception (media conditions cannot
-  read custom properties; `blocks.css` already carries such literals, e.g. `100dvh`, `700`).
+  `grid-auto-rows: 1fr` gives the two rows **equal height**, so an empty quadrant matches a
+  populated one in the same row pair; `1fr` means `minmax(auto, 1fr)`, so content is never
+  clipped. `minmax(0, 1fr)` tracks prevent overflow, so no horizontal scroll.
 - The `/todos`, `/todos/matrix`, `/todos/settings`, `/notes/settings` pages add **no** app
   stylesheet; every class comes from `@life/ui` (`ListShell`, `TabBar`/`Tab`, `ManagerBlock`,
   `SettingsBlock`/`SettingsRow`, `Switch`, `MatrixBlock`).

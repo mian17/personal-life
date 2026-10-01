@@ -22,13 +22,14 @@ export default async function TodosMatrixPage() {
   const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
-    items: (
+    items: bucket.todos.length ? (
       <List>
         {bucket.todos.map((todo) => (
           <TodoItem key={todo.id} todo={todo} today={today} lists={lists} availableTags={[]} />
         ))}
       </List>
-    ),
+    ) : null,
+    empty: 'No tasks',
   }));
 
   return (

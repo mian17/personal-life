@@ -52,11 +52,12 @@ describe('MatrixBlock', () => {
     expect(items.contains(screen.getByTestId('i1'))).toBe(true);
   });
 
-  it('renders a labelled section even when items is empty', () => {
-    render(<MatrixBlock quadrants={[{ id: 'empty', label: 'Empty', items: null }]} />);
+  it('renders a labelled section with the empty slot when items is null', () => {
+    render(<MatrixBlock quadrants={[{ id: 'empty', label: 'Empty', items: null, empty: 'No tasks' }]} />);
     const section = document.querySelector('.ui-matrix__quadrant')!;
     expect(section.querySelector('.ui-matrix__label')!.textContent).toBe('Empty');
-    expect(section.querySelector('.ui-matrix__items')).not.toBeNull();
+    expect(section.querySelector('.ui-matrix__empty')!.textContent).toBe('No tasks');
+    expect(section.querySelector('.ui-matrix__items')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Empty' })).toBeTruthy();
   });
 
@@ -73,41 +74,39 @@ describe('MatrixBlock', () => {
     expect(document.querySelector('.ui-matrix button')).toBeNull();
   });
 
-  it('stacks one column by default and two at the 640px breakpoint (tokens only)', () => {
+  it('is a 2×2 grid of muted panels at every width, unconditionally (tokens only)', () => {
+    // The 2×2 layout is unconditional — there is no phone/media variant.
     const matrix = cssBlock('.ui-matrix');
     expect(matrix).toMatch(/display:\s*grid/);
-    expect(matrix).toMatch(/gap:\s*0/);
+    expect(matrix).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    // Equal-height rows: the two rows share the same height so empty quadrants match.
+    expect(matrix).toMatch(/grid-auto-rows:\s*1fr/);
+    expect(matrix).toMatch(/gap:\s*var\(--space-0-5\)/);
     // No outer frame on the grid itself.
     expect(matrix).not.toMatch(/border/);
 
     const quadrant = cssBlock('.ui-matrix__quadrant');
-    expect(quadrant).toMatch(/display:\s*grid/);
+    expect(quadrant).toMatch(/display:\s*flex/);
+    expect(quadrant).toMatch(/flex-direction:\s*column/);
     expect(quadrant).toMatch(/gap:\s*var\(--space-0-5\)/);
     expect(quadrant).toMatch(/padding:\s*var\(--space-1\)/);
     expect(quadrant).toMatch(/min-height:\s*var\(--space-5\)/);
-
-    // Phone (one column): a hairline between consecutive quadrants, never above the first.
-    const stacked = cssBlock('.ui-matrix__quadrant + .ui-matrix__quadrant');
-    expect(stacked).toMatch(/border-top:\s*var\(--border-width\)\s+solid\s+var\(--border\)/);
+    // A muted panel surface, separated from its siblings by the grid gap.
+    expect(quadrant).toMatch(/background:\s*var\(--panel\)/);
+    expect(quadrant).toMatch(/border-radius:\s*var\(--radius-lg\)/);
 
     expect(cssBlock('.ui-matrix__label')).toMatch(/margin:\s*0/);
     expect(cssBlock('.ui-matrix__items')).toMatch(/display:\s*grid/);
 
-    const media = css.match(/@media\s*\(min-width:\s*640px\)\s*\{([\s\S]*?)\}\s*\}/)?.[1] ?? '';
-    expect(media).toMatch(/\.ui-matrix\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-    // Equal-height rows: the two auto rows share the same height in the 2×2 layout.
-    expect(media).toMatch(/\.ui-matrix\s*\{[^}]*grid-auto-rows:\s*1fr/);
-    // 2×2 inner cross: reset the phone rule, then re-add between the rows/columns.
-    expect(media).toMatch(/\.ui-matrix__quadrant \+ \.ui-matrix__quadrant\s*\{[^}]*border-top:\s*0/);
-    expect(media).toMatch(
-      /\.ui-matrix__quadrant:nth-child\(n \+ 3\)\s*\{[^}]*border-top:\s*var\(--border-width\)\s+solid\s+var\(--border\)/,
-    );
-    expect(media).toMatch(
-      /\.ui-matrix__quadrant:nth-child\(odd\)\s*\{[^}]*border-right:\s*var\(--border-width\)\s+solid\s+var\(--border\)/,
-    );
+    const empty = cssBlock('.ui-matrix__empty');
+    expect(empty).toMatch(/color:\s*var\(--muted\)/);
+    expect(empty).toMatch(/place-content:\s*center/);
 
-    // Guard: divider declarations resolve through tokens, never raw px/hex.
-    const declarations = `${matrix}${quadrant}${stacked}${media}`;
+    // Not media-gated: no 640px media block carries a `.ui-matrix*` rule.
+    expect(/@media[^{]*640px[^{]*\{[^@]*\.ui-matrix/.test(css)).toBe(false);
+
+    // Guard: the matrix declarations resolve through tokens, never raw px/hex.
+    const declarations = `${matrix}${quadrant}${empty}`;
     expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
     expect(declarations).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
   });
