@@ -317,11 +317,15 @@ export default async function TodosMatrixPage() {
       fabHref="/todos/new"
       fabLabel="New todo"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}
+      fill
     />
   );
 }
 ```
 
+- `fill` opts the shell into a full-viewport-height page, so the matrix spans the screen
+  height (see `SPEC-ui-list-shell.md`); the phone-sized 2×2 grid fills the short viewport
+  rather than leaving the page half-empty.
 - The server gate (`notFound()` when the pref is off) makes a disabled matrix a real 404, not
   a dead tab (map D3); the route stays inside the Todos manifest scope (per-route PWA
   identity, lesson 0005) — it is not a new app.
@@ -599,8 +603,8 @@ human-owned suite is updated when the user runs it (global protocol §3).
 - Never: a per-app fork of `TabBar`/`MatrixBlock`/the settings composition; a new `@life/ui`
   primitive for the gear (reuse `IconLink`) or the switch (reuse `Switch`); re-implement
   `effectiveImportant` or the todo importance signal in the app; new backend code or a new
-  API client; raw hex/rgb/px/rem outside `tokens.css` (the one documented media-query
-  breakpoint literal excepted); a Matrix tab or route that exists when the opt-in is off.
+  API client; raw hex/rgb/px/rem outside `tokens.css`; a Matrix tab or route that exists when
+  the opt-in is off.
 
 ## Success Criteria
 
