@@ -71,8 +71,13 @@ export async function createListAction(name: string) {
   revalidateTodos();
 }
 
-export async function renameListAction(id: string, name: string, expectedVersion?: number) {
-  await renameList(id, name, expectedVersion);
+export async function renameListAction(
+  id: string,
+  name: string,
+  importantDefault: boolean | null,
+  expectedVersion?: number,
+) {
+  await renameList(id, name, importantDefault, expectedVersion);
   revalidateTodos();
 }
 

@@ -91,10 +91,19 @@ export function createList(name: string): Promise<List> {
   return call<List>('/api/lists', { method: 'POST', body: JSON.stringify({ name }) });
 }
 
-export function renameList(id: string, name: string, expectedVersion?: number): Promise<List> {
+export function renameList(
+  id: string,
+  name: string,
+  importantDefault: boolean | null,
+  expectedVersion?: number,
+): Promise<List> {
   return call<List>(`/api/lists/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name, ...(expectedVersion !== undefined ? { expectedVersion } : {}) }),
+    body: JSON.stringify({
+      name,
+      importantDefault,
+      ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+    }),
   });
 }
 
