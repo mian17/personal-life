@@ -113,7 +113,11 @@ describe('ListItem', () => {
       (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
-    expect(block('.ui-list-item')).toMatch(/align-items:\s*center/);
+    const row = block('.ui-list-item');
+    expect(row).toMatch(/align-items:\s*center/);
+    expect(row).toMatch(/min-height:\s*calc\(/);
+    const minHeight = row.match(/min-height:\s*([^;]+);/)?.[1] ?? '';
+    expect(minHeight).not.toMatch(/\d+(px|rem)/);
     expect(block('.ui-list-item__link')).toMatch(/align-self:\s*stretch/);
   });
 
