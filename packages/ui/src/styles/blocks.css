@@ -683,7 +683,7 @@
 
 .ui-matrix__items {
   display: grid;
-  gap: var(--space-0-5);
+  gap: var(--space-0-25);
   flex: 1;
   min-height: 0;
   overflow-y: auto;

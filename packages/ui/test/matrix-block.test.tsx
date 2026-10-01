@@ -119,6 +119,7 @@ describe('MatrixBlock', () => {
     expect(quadrant).toMatch(/overflow:\s*hidden/);
     const items = cssBlock('.ui-matrix__items');
     expect(items).toMatch(/display:\s*grid/);
+    expect(items).toMatch(/gap:\s*var\(--space-0-25\)/);
     expect(items).toMatch(/flex:\s*1/);
     expect(items).toMatch(/min-height:\s*0/);
     expect(items).toMatch(/overflow-y:\s*auto/);

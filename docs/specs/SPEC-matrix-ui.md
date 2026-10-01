@@ -563,7 +563,7 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   }
 
   .ui-matrix__label { font-size: var(--space-0-7); font-weight: 700; margin: 0; }
-  .ui-matrix__items { display: grid; gap: var(--space-0-5); }
+  .ui-matrix__items { display: grid; gap: var(--space-0-25); }
 
   /* Empty quadrant: muted and centred in the remaining box height. */
   .ui-matrix__empty {
