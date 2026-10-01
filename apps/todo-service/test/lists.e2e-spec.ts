@@ -89,7 +89,7 @@ describe('Lists API (e2e)', () => {
       const res = await listLists().expect(200);
       expect(res.body.map((l: { name: string }) => l.name)).toEqual(['Alpha', 'zeta']);
       for (const l of res.body) {
-        expect(Object.keys(l).sort()).toEqual(['createdAt', 'id', 'name', 'version']);
+        expect(Object.keys(l).sort()).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
         expect(typeof l.version).toBe('number');
         expect(l.createdAt.endsWith('Z')).toBe(true);
       }
@@ -172,6 +172,58 @@ describe('Lists API (e2e)', () => {
       const m = await renameList(MISSING_ID, { name: 'hijack' }, tokenB).expect(404);
       expect(JSON.stringify(f.body)).toBe(JSON.stringify(m.body));
       expect(f.body).not.toHaveProperty('ownerSub');
+    });
+  });
+
+  describe('list importance default (SPEC-todo-importance)', () => {
+    const createListWith = (name: string, importantDefault: boolean | null, token = tokenA) =>
+      auth(request(server()).post('/api/lists'), token).send({ name, importantDefault });
+
+    it('round-trips importantDefault and defaults omitted/null to null (= false)', async () => {
+      const on = await createListWith('Imp-on', true).expect(201);
+      expect(on.body.importantDefault).toBe(true);
+
+      const off = await createListWith('Imp-off', false).expect(201);
+      expect(off.body.importantDefault).toBe(false);
+
+      const unset = await createListWith('Imp-unset', null).expect(201);
+      expect(unset.body.importantDefault).toBeNull();
+
+      const omitted = await createList('Imp-omitted').expect(201);
+      expect(omitted.body.importantDefault).toBeNull();
+    });
+
+    it('PATCH sets and clears importantDefault without touching name-collision identity', async () => {
+      const l = await createList('Imp-patch').expect(201);
+
+      const set = await renameList(l.body.id, { name: 'Imp-patch', importantDefault: true }).expect(200);
+      expect(set.body.importantDefault).toBe(true);
+      expect(set.body.version).toBe(1);
+
+      const cleared = await renameList(l.body.id, { name: 'Imp-patch', importantDefault: null }).expect(200);
+      expect(cleared.body.importantDefault).toBeNull();
+
+      // Omitted on a later PATCH leaves the stored default unchanged.
+      const renamed = await renameList(l.body.id, { name: 'Imp-patch-2' }).expect(200);
+      expect(renamed.body.importantDefault).toBeNull();
+    });
+
+    it('deleting a list detaches its todos: an inheriting todo falls back to false, an override survives', async () => {
+      const l = await createListWith('Imp-detach', true).expect(201);
+      const inheriting = await createTodo({ title: 'imp-inherit', listId: l.body.id }, tokenA).expect(201);
+      const overriding = await createTodo({ title: 'imp-override', listId: l.body.id, important: false }, tokenA).expect(201);
+      expect(inheriting.body.effectiveImportant).toBe(true);
+
+      await deleteList(l.body.id).expect(200);
+
+      const detached = await getTodo(inheriting.body.id).expect(200);
+      expect(detached.body.listId).toBeNull();
+      expect(detached.body.effectiveImportant).toBe(false);
+
+      const kept = await getTodo(overriding.body.id).expect(200);
+      expect(kept.body.listId).toBeNull();
+      expect(kept.body.important).toBe(false);
+      expect(kept.body.effectiveImportant).toBe(false);
     });
   });
 

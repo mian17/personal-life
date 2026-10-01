@@ -58,6 +58,11 @@ export const TAG_NAME_MAX = 50;
  * `tagIds` are registry-owned `TagRef` ids (names resolve through
  * `tags-service`); `version` is the kernel concurrency counter.
  *
+ * `important`/`effectiveImportant` are the manual importance signal
+ * (`SPEC-todo-importance`): `important` is the stored override (`null` =
+ * inherit the list default) and `effectiveImportant` is the computed
+ * `important ?? list.importantDefault ?? false`, always present on read.
+ *
  * `origin` is a reserved orchestrator-seam column on todo rows
  * (`SPEC-service-kernel`) — nothing populates it in this chapter, so it is
  * deliberately absent from the wire DTO.
@@ -67,6 +72,8 @@ export interface Todo {
   title: string;
   note: string | null;
   done: boolean;
+  important: boolean | null;
+  effectiveImportant: boolean;
   dueDate: string | null;
   listId: string | null;
   tagIds: number[];
@@ -81,6 +88,8 @@ export interface CreateTodoInput {
   note?: string;
   dueDate?: string;
   listId?: string;
+  /** `null` (or omitted) = inherit the list default. */
+  important?: boolean | null;
   tagIds?: number[];
 }
 
@@ -89,6 +98,8 @@ export interface UpdateTodoInput {
   /** `null` clears the note; omitting leaves it unchanged. */
   note?: string | null;
   done?: boolean;
+  /** `null` clears the override back to inherit; omitting leaves it unchanged. */
+  important?: boolean | null;
   /** `null` clears the due date; omitting leaves it unchanged. */
   dueDate?: string | null;
   /** `null` detaches the list; omitting leaves it unchanged. */
@@ -103,10 +114,15 @@ export interface TodoPage {
   nextCursor: string | null;
 }
 
-/** A todo-local list (`SPEC-todo-service`); `version` is the OCC counter. */
+/**
+ * A todo-local list (`SPEC-todo-service`); `version` is the OCC counter.
+ * `importantDefault` is the list's importance default (`null` = false), used as
+ * the fallback in `Todo.effectiveImportant` (`SPEC-todo-importance`).
+ */
 export interface List {
   id: string;
   name: string;
+  importantDefault: boolean | null;
   version: number;
   createdAt: string;
 }

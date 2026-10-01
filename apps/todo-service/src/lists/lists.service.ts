@@ -11,6 +11,7 @@ import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 export interface ListDto {
   id: string;
   name: string;
+  importantDefault: boolean | null;
   version: number;
   createdAt: string;
 }
@@ -19,6 +20,7 @@ export interface ListDto {
 interface CachedListRow {
   id: string;
   name: string;
+  importantDefault: boolean | null;
   version: number;
   createdAt: string;
 }
@@ -37,6 +39,9 @@ function toCachedListRow(list: List): CachedListRow {
   return {
     id: list.id,
     name: list.name,
+    // Plaintext, non-content (`SPEC-todo-importance`): the cache stores rows as
+    // persisted, so the default rides the cached list row exactly like `done`.
+    importantDefault: list.importantDefault,
     version: list.version,
     createdAt: list.createdAt.toISOString(),
   };
@@ -95,8 +100,13 @@ export class ListsService {
     }
   }
 
-  /** The owner's whole ciphertext list row-set — the one cached `todo:lists` entry. */
-  private async rawRows(sub: string): Promise<CachedListRow[]> {
+  /**
+   * The owner's whole ciphertext list row-set — the one cached `todo:lists`
+   * entry. Public because `TodosService` joins it (in memory, post-hit) to
+   * compute `effectiveImportant` from the same cached source, never a second
+   * loader (Contract 2 no-fork).
+   */
+  async rawRows(sub: string): Promise<CachedListRow[]> {
     return this.cache.getThrough(
       sub,
       TODO_LISTS,
@@ -124,6 +134,7 @@ export class ListsService {
     return rows.map((row) => ({
       id: row.id,
       name: this.openNameCb(row.name, dek, sub, row.id),
+      importantDefault: row.importantDefault,
       version: row.version,
       createdAt: row.createdAt,
     }));
@@ -145,10 +156,14 @@ export class ListsService {
   }
 
   /**
-   * `POST /api/lists {name}` — create. A case-insensitive collision with an
-   * existing list of the same owner is 409.
+   * `POST /api/lists {name, importantDefault?}` — create. A case-insensitive
+   * collision with an existing list of the same owner is 409.
    */
-  async create(sub: string, name: string): Promise<ListDto> {
+  async create(
+    sub: string,
+    name: string,
+    importantDefault: boolean | null = null,
+  ): Promise<ListDto> {
     const dek = await this.keys.getOrCreateDek(sub);
     const rows = await this.ownerRows(sub);
     const wanted = name.toLowerCase();
@@ -163,6 +178,7 @@ export class ListsService {
       this.lists.create({
         id,
         name: encryptField(dek, name, listNameAad(sub, id)),
+        importantDefault,
         ownerSub: sub,
         version: 0,
         createdAt: new Date(),
@@ -174,12 +190,19 @@ export class ListsService {
   }
 
   /**
-   * `PATCH /api/lists/:id {name, expectedVersion?}` — rename. A foreign or
-   * missing id is a byte-identical 404 (never 403). A case-insensitive
-   * collision with a *different* list of the same owner is 409; a stale
-   * `expectedVersion` is 409.
+   * `PATCH /api/lists/:id {name, importantDefault?, expectedVersion?}` — rename
+   * and/or set the default importance. A foreign or missing id is a
+   * byte-identical 404 (never 403). A case-insensitive collision with a
+   * *different* list of the same owner is 409; a stale `expectedVersion` is 409.
+   * `importantDefault` omitted = unchanged; `null` = clear to false.
    */
-  async update(sub: string, id: string, name: string, expectedVersion?: number): Promise<ListDto> {
+  async update(
+    sub: string,
+    id: string,
+    name: string,
+    importantDefault?: boolean | null,
+    expectedVersion?: number,
+  ): Promise<ListDto> {
     const list = await this.lists.findOne({ where: { id, ownerSub: sub } });
     if (!list) throw new NotFoundException('List not found');
     if (expectedVersion !== undefined && list.version !== expectedVersion) {
@@ -195,6 +218,7 @@ export class ListsService {
     if (collision) throw new ConflictException('List name already exists');
 
     list.name = encryptField(dek, name, listNameAad(sub, id));
+    if (importantDefault !== undefined) list.importantDefault = importantDefault;
     list.version += 1;
     const saved = await this.lists.save(list);
     await this.cache.bumpGeneration(sub);

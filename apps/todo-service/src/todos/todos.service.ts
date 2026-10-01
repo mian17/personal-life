@@ -54,14 +54,17 @@ function todoNoteAad(ownerSub: string, id: string): string {
  * Ciphertext-row shape stored in Redis (`SPEC-todo-service` Cache Rules). The
  * cache holds **rows as stored** — `title`/`note` are `enc.v1.` envelopes —
  * never a decrypted DTO. `tagIds` are association ids (metadata) copied verbatim
- * so the tag filter and the DTO can run after a hit; `dueDate`/`done`/`listId`/
- * `deletedAt` are plaintext metadata. `origin` is the reserved seam (unused).
+ * so the tag filter and the DTO can run after a hit; `dueDate`/`done`/
+ * `important`/`listId`/`deletedAt` are plaintext metadata (`important` is the
+ * non-content importance override, `SPEC-todo-importance`). `origin` is the
+ * reserved seam (unused).
  */
 interface CachedTodoRow {
   id: string;
   title: string;
   note: string | null;
   done: boolean;
+  important: boolean | null;
   dueDate: string | null;
   listId: string | null;
   origin: string | null;
@@ -79,6 +82,7 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
     title: todo.title,
     note: todo.note,
     done: todo.done,
+    important: todo.important,
     dueDate: todo.dueDate,
     listId: todo.listId,
     origin: todo.origin,
@@ -251,7 +255,12 @@ export class TodosService {
   }
 
   /** Assemble the wire DTO from a validated ciphertext row. */
-  private decodeCachedTodoRow(row: CachedTodoRow, sub: string, dek: Buffer | null): TodoDto {
+  private decodeCachedTodoRow(
+    row: CachedTodoRow,
+    sub: string,
+    dek: Buffer | null,
+    effectiveImportant: boolean,
+  ): TodoDto {
     if (!dek) {
       // Non-empty rows always carry a title envelope; a missing key cannot occur
       // on a well-formed read, and returning ciphertext would be worse.
@@ -265,6 +274,8 @@ export class TodosService {
           ? null
           : this.openField(row.note, dek, todoNoteAad(sub, row.id), row.id),
       done: row.done,
+      important: row.important,
+      effectiveImportant,
       dueDate: row.dueDate,
       listId: row.listId,
       tagIds: [...row.tagIds],
@@ -279,6 +290,46 @@ export class TodosService {
   private async readDek(sub: string, rows: CachedTodoRow[]): Promise<Buffer | null> {
     if (rows.length === 0) return null;
     return this.keys.getDekForRead(sub);
+  }
+
+  /**
+   * The list-default map for one owner, read from the **same** cached
+   * `todo:lists` row-set the service already uses for list names (Contract 2
+   * no-fork: no new cache instance, no second loader). Todos and lists share the
+   * `todo:gen:<sub>` counter, so within a generation both cached row-sets are
+   * consistent; a list write bumps the counter and both refresh together.
+   *
+   * Skipped when no row references a list: nothing can inherit, so the
+   * `todo:lists` entry is not touched at all.
+   */
+  private async listDefaults(
+    sub: string,
+    rows: CachedTodoRow[],
+  ): Promise<Map<string, boolean | null>> {
+    if (!rows.some((row) => row.listId !== null)) return new Map();
+    const lists = await this.lists.rawRows(sub);
+    return new Map(lists.map((row) => [row.id, row.importantDefault]));
+  }
+
+  /**
+   * `effectiveImportant(todo, list) = todo.important ?? list.importantDefault ??
+   * false` (`SPEC-todo-importance`). Computed in the request path, **after** the
+   * cache hit and decryption — never stored, never in the cache key. With
+   * `defaults` omitted there is no list context, so the effective value is
+   * `important ?? false` (todo has no list, or a single-row write).
+   */
+  private effectiveImportant(
+    todo: CachedTodoRow,
+    defaults?: Map<string, boolean | null>,
+  ): boolean {
+    const listDefault = todo.listId !== null ? defaults?.get(todo.listId) ?? null : null;
+    return todo.important ?? listDefault ?? false;
+  }
+
+  /** The effective value for a single row, joining the owner's cached list rows. */
+  private async effectiveForRow(sub: string, row: CachedTodoRow): Promise<boolean> {
+    if (row.listId === null) return this.effectiveImportant(row);
+    return this.effectiveImportant(row, await this.listDefaults(sub, [row]));
   }
 
   /** `['YYYY-MM-DD']` guard for the DTO's length-only check. */
@@ -314,6 +365,7 @@ export class TodosService {
       note?: string;
       dueDate?: string;
       listId?: string;
+      important?: boolean | null;
       tagIds?: number[];
     },
   ): Promise<TodoDto> {
@@ -330,6 +382,8 @@ export class TodosService {
       note:
         input.note === undefined ? null : encryptField(dek, input.note, todoNoteAad(sub, id)),
       done: false,
+      // Omitted or `null` both store `null` (inherit the list default).
+      important: input.important ?? null,
       dueDate: input.dueDate ?? null,
       listId: input.listId ?? null,
       origin: null,
@@ -347,13 +401,14 @@ export class TodosService {
     }
     // Bump AFTER the insert: pre-mutation reads die here; a thrown save never bumps.
     await this.cache.bumpGeneration(sub);
-    return this.decodeCachedTodoRow({ ...toCachedTodoRow(saved), tagIds: ids }, sub, dek);
+    const row = { ...toCachedTodoRow(saved), tagIds: ids };
+    return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
 
   /**
    * `GET /api/todos` — cursor page over the domain order with every filter
    * applied in memory after the cache hit. One `todo:all` entry serves every
-   * `q`/`tagId`/`listId`/`done`/`due*`/cursor/limit variant.
+   * `q`/`tagId`/`listId`/`done`/`important`/`due*`/cursor/limit variant.
    */
   async findAll(
     sub: string,
@@ -362,6 +417,7 @@ export class TodosService {
       listId?: string;
       tagId?: number;
       done?: boolean;
+      important?: boolean;
       dueBefore?: string;
       dueAfter?: string;
       limit?: number;
@@ -371,12 +427,19 @@ export class TodosService {
     const limit = opts.limit ?? 50;
     const rows = await this.rawRows(sub);
     const dek = await this.readDek(sub, rows);
-    const decoded = rows.map((row) => this.decodeCachedTodoRow(row, sub, dek));
+    // One join against the owner's cached `todo:lists` row-set serves the whole
+    // page; `effectiveImportant` is computed post-decrypt, never cached/stored.
+    const defaults = await this.listDefaults(sub, rows);
+    const decoded = rows.map((row) =>
+      this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)),
+    );
 
     const filtered = decoded.filter((todo) => {
       if (opts.listId !== undefined && todo.listId !== opts.listId) return false;
       if (opts.tagId !== undefined && !todo.tagIds.includes(opts.tagId)) return false;
       if (opts.done !== undefined && todo.done !== opts.done) return false;
+      // In memory against the computed value — never a SQL predicate, never in the key.
+      if (opts.important !== undefined && todo.effectiveImportant !== opts.important) return false;
       if (opts.dueBefore !== undefined && !(todo.dueDate !== null && todo.dueDate < opts.dueBefore)) {
         return false;
       }
@@ -440,10 +503,13 @@ export class TodosService {
     );
 
     const dek = await this.readDek(sub, rows);
+    const defaults = await this.listDefaults(sub, rows);
     // The loader guarantees `deletedAt` is set on every row; the type guard
     // narrows that for the cursor helpers without an assertion.
     const decoded = rows
-      .map((row) => this.decodeCachedTodoRow(row, sub, dek))
+      .map((row) =>
+        this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)),
+      )
       .filter((todo): todo is TodoDto & { deletedAt: string } => todo.deletedAt !== null);
     const desc = (a: string, b: string) => (a === b ? 0 : a < b ? 1 : -1);
     const ordered = [...decoded].sort(
@@ -476,14 +542,15 @@ export class TodosService {
     const dek = await this.readDek(sub, rows);
     const found = rows.find((row) => row.id === id);
     if (!found) throw new NotFoundException('Todo not found');
-    return this.decodeCachedTodoRow(found, sub, dek);
+    return this.decodeCachedTodoRow(found, sub, dek, await this.effectiveForRow(sub, found));
   }
 
   /**
    * `PATCH /api/todos/:id` — partial update. An omitted field is unchanged
-   * (last-write-wins); explicit `null` clears `note`/`dueDate`/`listId`; a
-   * `tagIds` write REPLACES the association set; a stale `expectedVersion` is
-   * 409. Foreign/missing ids are a byte-identical 404.
+   * (last-write-wins); explicit `null` clears `note`/`dueDate`/`listId` and
+   * resets `important` to inherit; a `tagIds` write REPLACES the association
+   * set; a stale `expectedVersion` is 409. Foreign/missing ids are a
+   * byte-identical 404.
    */
   async update(
     sub: string,
@@ -492,6 +559,7 @@ export class TodosService {
       title?: string;
       note?: string | null;
       done?: boolean;
+      important?: boolean | null;
       dueDate?: string | null;
       listId?: string | null;
       tagIds?: number[];
@@ -520,6 +588,8 @@ export class TodosService {
       todo.note = patch.note === null ? null : encryptField(dek, patch.note, todoNoteAad(sub, id));
     }
     if (patch.done !== undefined) todo.done = patch.done;
+    // Explicit `null` clears the override back to inherit.
+    if (patch.important !== undefined) todo.important = patch.important;
     if (patch.dueDate !== undefined) todo.dueDate = patch.dueDate;
     if (patch.listId !== undefined) todo.listId = patch.listId;
 
@@ -542,7 +612,8 @@ export class TodosService {
     const saved = await this.todos.save(todo);
     // Bump AFTER the mutation — a 409 above never bumps.
     await this.cache.bumpGeneration(sub);
-    return this.decodeCachedTodoRow({ ...toCachedTodoRow(saved), tagIds: currentIds }, sub, dek);
+    const row = { ...toCachedTodoRow(saved), tagIds: currentIds };
+    return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
 
   /**
@@ -575,7 +646,7 @@ export class TodosService {
     await this.cache.bumpGeneration(sub);
     const row = toCachedTodoRow(saved);
     const dek = await this.readDek(sub, [row]);
-    return this.decodeCachedTodoRow(row, sub, dek);
+    return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
 
   /**

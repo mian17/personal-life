@@ -11,7 +11,7 @@ export class ListsController {
 
   @Post()
   create(@Principal() principal: Principal, @Body() dto: CreateListDto) {
-    return this.lists.create(principal.sub, dto.name);
+    return this.lists.create(principal.sub, dto.name, dto.importantDefault ?? null);
   }
 
   @Get()
@@ -21,7 +21,7 @@ export class ListsController {
 
   @Patch(':id')
   update(@Principal() principal: Principal, @Param('id') id: string, @Body() dto: UpdateListDto) {
-    return this.lists.update(principal.sub, id, dto.name, dto.expectedVersion);
+    return this.lists.update(principal.sub, id, dto.name, dto.importantDefault, dto.expectedVersion);
   }
 
   @Delete(':id')

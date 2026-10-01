@@ -110,7 +110,9 @@ describe('Todos API (e2e)', () => {
         'deletedAt',
         'done',
         'dueDate',
+        'effectiveImportant',
         'id',
+        'important',
         'listId',
         'note',
         'tagIds',
@@ -122,6 +124,8 @@ describe('Todos API (e2e)', () => {
         title: 'buy milk',
         note: 'semi-skimmed',
         done: false,
+        important: null,
+        effectiveImportant: false,
         dueDate: null,
         listId: null,
         tagIds: [],
@@ -439,6 +443,85 @@ describe('Todos API (e2e)', () => {
 
       const inTrash = await trash().expect(200);
       expect(inTrash.body.todos).toHaveLength(0);
+    });
+  });
+
+  describe('importance (SPEC-todo-importance)', () => {
+    const createListWith = (name: string, importantDefault: boolean | null, token = tokenA) =>
+      auth(request(server()).post('/api/lists'), token).send({ name, importantDefault });
+    const patchList = (id: string, body: Record<string, unknown>, token = tokenA) =>
+      auth(request(server()).patch(`/api/lists/${id}`), token).send(body);
+
+    it('round-trips an explicit override and defaults an omitted/null important to inherit', async () => {
+      const explicit = await create({ title: 'explicit', important: true }).expect(201);
+      expect(explicit.body.important).toBe(true);
+      expect(explicit.body.effectiveImportant).toBe(true);
+
+      const inherit = await create({ title: 'inherit', important: null }).expect(201);
+      expect(inherit.body.important).toBeNull();
+      expect(inherit.body.effectiveImportant).toBe(false);
+
+      const omitted = await create({ title: 'omitted' }).expect(201);
+      expect(omitted.body.important).toBeNull();
+      expect(omitted.body.effectiveImportant).toBe(false);
+    });
+
+    it('inherits the list default and an explicit override wins', async () => {
+      const l = await createListWith('Imp-default', true).expect(201);
+      const inheriting = await create({ title: 'inheriting', listId: l.body.id }).expect(201);
+      expect(inheriting.body.important).toBeNull();
+      expect(inheriting.body.effectiveImportant).toBe(true);
+
+      const overriding = await create({ title: 'overriding', listId: l.body.id, important: false }).expect(201);
+      expect(overriding.body.effectiveImportant).toBe(false);
+    });
+
+    it('a list-default change reaches inheriting todos with no fan-out write and no version bump', async () => {
+      const l = await createListWith('No-fanout', null).expect(201);
+      const t = await create({ title: 'no-fanout', listId: l.body.id }).expect(201);
+      expect(t.body.effectiveImportant).toBe(false);
+
+      await patchList(l.body.id, { name: 'No-fanout', importantDefault: true }).expect(200);
+
+      // The todo row itself is untouched (same version, same stored override) …
+      const reread = await getOne(t.body.id).expect(200);
+      expect(reread.body.version).toBe(0);
+      expect(reread.body.important).toBeNull();
+      // … yet the computed effective value picked up the new default.
+      expect(reread.body.effectiveImportant).toBe(true);
+    });
+
+    it('clearing the override with PATCH null returns the todo to inheritance', async () => {
+      const l = await createListWith('Clearing-imp', true).expect(201);
+      const t = await create({ title: 'clear-imp', listId: l.body.id, important: false }).expect(201);
+      expect(t.body.effectiveImportant).toBe(false);
+
+      const cleared = await patch(t.body.id, { important: null }).expect(200);
+      expect(cleared.body.important).toBeNull();
+      expect(cleared.body.effectiveImportant).toBe(true);
+    });
+
+    it('a todo with no list reports important ?? false', async () => {
+      const t = await create({ title: 'no-list', listId: null, important: true }).expect(201);
+      expect(t.body.effectiveImportant).toBe(true);
+
+      const inheriting = await create({ title: 'no-list-inherit', listId: null }).expect(201);
+      expect(inheriting.body.effectiveImportant).toBe(false);
+    });
+
+    it('filters on effectiveImportant in memory off the one cached todo:all entry', async () => {
+      const l = await createListWith('Filter-imp', true).expect(201);
+      const viaDefault = await create({ title: 'via-default', listId: l.body.id }).expect(201);
+      const explicitFalse = await create({ title: 'explicit-false', listId: l.body.id, important: false }).expect(201);
+      const explicitTrue = await create({ title: 'explicit-true', important: true }).expect(201);
+
+      const imp = await list(`?listId=${l.body.id}&important=true`).expect(200);
+      expect(imp.body.todos.map((x: { id: string }) => x.id)).toEqual([viaDefault.body.id]);
+
+      const notImp = await list(`?listId=${l.body.id}&important=false`).expect(200);
+      expect(notImp.body.todos.map((x: { id: string }) => x.id)).toEqual([explicitFalse.body.id]);
+
+      expect((await getOne(explicitTrue.body.id).expect(200)).body.effectiveImportant).toBe(true);
     });
   });
 

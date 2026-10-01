@@ -1,5 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import { TODO_LIST_NAME_MAX } from '@life/shared';
 
 export class UpdateListDto {
@@ -7,6 +16,12 @@ export class UpdateListDto {
   @IsNotEmpty()
   @MaxLength(TODO_LIST_NAME_MAX)
   name: string;
+
+  /** `null` = false (clear the default); omitting leaves it unchanged. */
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsBoolean()
+  importantDefault?: boolean | null;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined || value === '' ? undefined : Number(value)))
