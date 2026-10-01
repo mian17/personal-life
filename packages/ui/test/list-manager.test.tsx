@@ -115,4 +115,37 @@ describe('ListManager', () => {
     );
     expect(document.querySelector('.ui-list-manager')!.classList.contains('legacy-hook')).toBe(true);
   });
+
+  it('calls rowExtra once per list and renders each node in its own row', () => {
+    const rowExtra = jest.fn((list: TodoListOption) => <span>extra-{list.id}</span>);
+    render(
+      <ListManager
+        lists={LISTS}
+        onCreate={() => {}}
+        onRename={() => {}}
+        onDelete={() => {}}
+        rowExtra={rowExtra}
+      />,
+    );
+    expect(rowExtra).toHaveBeenCalledTimes(2);
+    expect(rowExtra).toHaveBeenCalledWith(LISTS[0]);
+    expect(rowExtra).toHaveBeenCalledWith(LISTS[1]);
+    const rows = document.querySelectorAll('.ui-list-manager__row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('Groceries');
+    expect(rows[0].textContent).toContain('extra-l1');
+    expect(rows[1].textContent).toContain('Work');
+    expect(rows[1].textContent).toContain('extra-l2');
+  });
+
+  it('renders the existing rows unchanged when rowExtra is omitted', () => {
+    setup();
+    expect(screen.getByText('Groceries')).toBeTruthy();
+    expect(screen.getByText('Work')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add list' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Rename list Groceries' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete list Groceries' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Rename list Work' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete list Work' })).toBeTruthy();
+  });
 });

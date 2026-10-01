@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ComponentPropsWithRef } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { Check, CircleX, Pencil, Plus, X } from 'lucide-react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
@@ -21,6 +21,7 @@ export interface ListManagerProps extends ComponentPropsWithRef<'div'> {
   label?: string;
   placeholder?: string;
   createLabel?: string;
+  rowExtra?: (list: TodoListOption) => ReactNode;
 }
 
 export function ListManager({
@@ -32,6 +33,7 @@ export function ListManager({
   label = 'Manage lists',
   placeholder = 'New list',
   createLabel = 'Add list',
+  rowExtra,
   className,
   ...rest
 }: ListManagerProps) {
@@ -131,6 +133,7 @@ export function ListManager({
                 </IconButton>
               </>
             )}
+            {rowExtra?.(list)}
           </li>
         ))}
       </ul>
