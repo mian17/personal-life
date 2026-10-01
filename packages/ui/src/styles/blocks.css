@@ -27,12 +27,14 @@
  * | ListManager    | (new) todo-list registry surface; controls are Input/IconButton |
  * | SettingsRow    | (new) label + control two-column row; no legacy class |
  * | TabBar / Tab   | (new) navigation row + tab links; no legacy class |
+ * | MatrixBlock    | (new) responsive quadrant grid; no legacy class |
  *
  * Token policy: all lengths/colors come from tokens.css custom properties,
  * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
  * atoms.css does (`--space-2` = 2rem, `--space-1` = 1rem). Non-tokenizable
  * keywords/units are kept verbatim: `auto`, `flex`, `fixed`, `100dvh`, `10`,
  * `700`, `-0.02em` (no letter-spacing token exists in the frozen token layer),
+ * the `640px` media condition (media queries cannot read custom properties),
  * and the `env(safe-area-inset-*)` values.
  */
 
@@ -517,4 +519,40 @@
   align-items: center;
   gap: var(--space-0-5);
   flex: 1;
+}
+
+/* -------------------------------------------------------- MatrixBlock */
+
+/* Responsive quadrant grid, decided in CSS (no JS): four stacked labelled
+   sections on a phone, a 2×2 grid from 640px up (the `--content-width`
+   breakpoint). `minmax(0, 1fr)` tracks prevent overflow, so no horizontal
+   scroll. Grid gaps only, no outer margins — a grid child carrying Section's
+   outer margin would double-space against the grid gap. */
+.ui-matrix {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ui-matrix__quadrant {
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+.ui-matrix__label {
+  font-size: var(--space-1);
+  font-weight: 700;
+  margin: 0;
+}
+
+.ui-matrix__items {
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+/* 640px is the documented non-tokenizable media condition (media queries
+   cannot read custom properties; it matches `--content-width`). */
+@media (min-width: 640px) {
+  .ui-matrix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

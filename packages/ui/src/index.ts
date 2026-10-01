@@ -120,6 +120,9 @@ export type { ListShellProps } from './components/list-shell';
 export { EditorChrome } from './components/editor-chrome';
 export type { EditorChromeProps, EditorChromeTagPicker } from './components/editor-chrome';
 
+export { MatrixBlock } from './components/matrix-block';
+export type { MatrixBlockProps, MatrixQuadrant } from './components/matrix-block';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 
