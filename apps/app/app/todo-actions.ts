@@ -24,6 +24,7 @@ import { retainedTagIds } from '@/lib/tags-compose';
 
 function revalidateTodos() {
   revalidatePath('/todos');
+  revalidatePath('/todos/matrix');
   revalidatePath('/todos/trash');
 }
 

@@ -41,6 +41,8 @@ import type { ReactNode } from 'react';
 // ui-blocks — four labelled quadrants in a 2×2 grid of muted panels at every
 // width (smallest phones included). Presentational only: no data, no domain
 // types, no domain copy, no routing.
+export type MatrixTone = 'danger' | 'amber' | 'accent' | 'green';
+
 export interface MatrixQuadrant {
   /** Stable key for the quadrant (app-supplied, e.g. `'urgent-important'`). */
   id: string;
@@ -50,6 +52,8 @@ export interface MatrixQuadrant {
   items: ReactNode;
   /** Rendered in place of `items` when `items` is absent (app-supplied copy). */
   empty?: ReactNode;
+  /** Heading tint for the quadrant. Off by default (unchanged markup). */
+  tone?: MatrixTone;
 }
 
 export interface MatrixBlockProps {
@@ -67,7 +71,13 @@ Rendered structure (one `<section>` per quadrant, in the given order):
 ```tsx
 <div className={cx('ui-matrix', className)}>
   {quadrants.map((quadrant) => (
-    <section key={quadrant.id} className="ui-matrix__quadrant">
+    <section
+      key={quadrant.id}
+      className={cx(
+        'ui-matrix__quadrant',
+        quadrant.tone && `ui-matrix__quadrant--${quadrant.tone}`,
+      )}
+    >
       <h2 className="ui-matrix__label">{quadrant.label}</h2>
       {quadrant.items != null ? (
         <div className="ui-matrix__items">{quadrant.items}</div>
@@ -92,6 +102,9 @@ Semantics and edge cases:
 - Quadrant order is exactly the app's array order — fixed by `groupByQuadrant` (below):
   Urgent & Important, Urgent & Not Important, Not Urgent & Important,
   Not Urgent & Not Important.
+- **Toned headings:** `tone` adds `ui-matrix__quadrant--<tone>` so the quadrant's
+  `<h2>` is tinted (I danger/red, II amber, III accent/blue, IV green). Off by
+  default — an untinted block renders byte-identical markup.
 
 ### App-owned — `apps/app/lib/matrix.ts` (pure domain logic)
 
@@ -101,6 +114,7 @@ rather than parsing ISO in the app (lesson 0003 — one owner for date reads).
 
 ```ts
 import { dueDateLabel, dueDateState } from '@life/ui';
+import type { ListItemTone, MatrixTone } from '@life/ui';
 import type { Todo } from '@life/shared';
 
 /** The four matrix cells; the id is also the quadrant's stable key. */
@@ -110,12 +124,22 @@ export type QuadrantId =
   | 'not-urgent-important'
   | 'not-urgent-not-important';
 
-/** The fixed quadrant order + labels (plain labels, intent L6). */
-export const QUADRANTS: ReadonlyArray<{ id: QuadrantId; label: string }> = [
-  { id: 'urgent-important', label: 'Urgent & Important' },
-  { id: 'urgent-not-important', label: 'Urgent & Not Important' },
-  { id: 'not-urgent-important', label: 'Not Urgent & Important' },
-  { id: 'not-urgent-not-important', label: 'Not Urgent & Not Important' },
+/** The fixed quadrant order + labels + tones (plain labels, intent L6). */
+export const QUADRANTS: ReadonlyArray<{
+  id: QuadrantId;
+  label: string;
+  tone: MatrixTone;
+  rowTone: ListItemTone | null;
+}> = [
+  { id: 'urgent-important', label: 'Urgent & Important', tone: 'danger', rowTone: 'danger' },
+  { id: 'urgent-not-important', label: 'Urgent & Not Important', tone: 'amber', rowTone: 'amber' },
+  { id: 'not-urgent-important', label: 'Not Urgent & Important', tone: 'accent', rowTone: 'accent' },
+  {
+    id: 'not-urgent-not-important',
+    label: 'Not Urgent & Not Important',
+    tone: 'green',
+    rowTone: null,
+  },
 ];
 
 /**
@@ -134,6 +158,8 @@ export function quadrantOf(todo: Pick<Todo, 'effectiveImportant' | 'dueDate'>, t
 export interface QuadrantBucket {
   id: QuadrantId;
   label: string;
+  tone: MatrixTone;
+  rowTone: ListItemTone | null;
   todos: Todo[];
 }
 
@@ -157,9 +183,9 @@ export function quadrantOf(todo: { effectiveImportant: boolean; dueDate: string 
 }
 ```
 
-`groupByQuadrant` buckets with `quadrantOf` and returns `QUADRANTS.map(({ id, label }) =>
-({ id, label, todos: buckets[id] }))` — no re-sort; the service's stable order (due-ascending,
-undated last) is preserved within each quadrant.
+`groupByQuadrant` buckets with `quadrantOf` and returns `QUADRANTS.map(({ id, label, tone,
+rowTone }) => ({ id, label, tone, rowTone, todos: buckets[id] }))` — no re-sort; the
+service's stable order (due-ascending, undated last) is preserved within each quadrant.
 
 Semantics and edge cases:
 
@@ -172,6 +198,10 @@ Semantics and edge cases:
 - A malformed/empty `dueDate` is treated as not urgent (mirrors `dueDateState`'s `'none'`);
   the todo API delivers `YYYY-MM-DD` or `null`.
 - Every quadrant is returned even when empty, so the matrix always shows four labelled cells.
+- Each quadrant carries a `tone` (heading tint) and a `rowTone` (leading-checkbox tint):
+  I `danger`/`danger`, II `amber`/`amber`, III `accent`/`accent`, IV `green`/**`null`**.
+  Quadrant IV's heading is green but its rows are deliberately untinted — the "let it go"
+  cell stays visually calm.
 
 ### Settings `Switch` wrapper — `apps/app/app/settings/matrix-switch.tsx`
 
@@ -293,6 +323,7 @@ export default async function TodosMatrixPage() {
   const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
+    tone: bucket.tone,
     items: bucket.todos.length ? (
       <List>
         {bucket.todos.map((todo) => (
@@ -303,6 +334,7 @@ export default async function TodosMatrixPage() {
             lists={lists}
             availableTags={[]}
             mode="matrix"
+            tone={bucket.rowTone ?? undefined}
           />
         ))}
       </List>
@@ -332,7 +364,11 @@ export default async function TodosMatrixPage() {
 
 - `fill` opts the shell into a full-viewport-height page, so the matrix spans the screen
   height (see `SPEC-ui-list-shell.md`); the phone-sized 2×2 grid fills the short viewport
-  rather than leaving the page half-empty.
+  rather than leaving the page half-empty. The page's height is **definite** — the
+  `fill` rule is `height: 100dvh; overflow: hidden` (not `min-height`) — which is what
+  gives the quadrants a bounded box: `height: 100dvh` → `.ui-list-shell__body` `flex: 1`
+  → `.ui-matrix` equal `1fr` rows → `.ui-matrix__items { overflow-y: auto }`. Without a
+  definite height a quadrant would grow the page instead of scrolling inside itself.
 - The server gate (`notFound()` when the pref is off) makes a disabled matrix a real 404, not
   a dead tab (map D3); the route stays inside the Todos manifest scope (per-route PWA
   identity, lesson 0005) — it is not a new app.
@@ -346,11 +382,31 @@ export default async function TodosMatrixPage() {
   fetch is added for a lens.
 - **Minimal TickTick-style row** (user-requested): the matrix renders each todo through
   `TodoItem` with `mode="matrix"` — a borderless done toggle **leading** the row
-  (left), only the task name plus its `dueDateLabel` (no list name, no note snippet, no
+  (left), only the task name plus its due date (no list name, no note snippet, no
   delete action), and `dense` type. The default `/todos` List row is unchanged: bordered
   trailing tick, trash delete, list name, note snippet. The row still links to
   `/todos/[id]/edit` and carries the same done-toggle accessible label
   (`Mark <title> done` / `not done`), so the frozen selector surface is unchanged.
+- **Row tint + signal date (matrix only).** The matrix page passes each quadrant's
+  `rowTone` to `TodoItem` (`tone`, a `ListItemTone`); `ListItem` tints only the leading
+  checkbox, and IV passes `undefined` so its checkbox is normal. The matrix row's leading
+  checkbox is the square `Checkbox` atom (`SPEC-ui-atoms.md`); the tint still rides on
+  `.ui-list-item--<tone> .ui-icon-btn` (no new matrix-specific checkbox CSS). Matrix rows
+  render the
+  due date through the `DueDate` atom with `tone="signal"` — overdue `--danger` (deep red),
+  any future date `--danger-soft` (lighter red). The default List row ignores `tone` and
+  keeps the muted `dueDateLabel` string (lesson 0003: list dates stay muted).
+- **Dense type:** the matrix row's title and date are 0.7rem (`.ui-list-item--dense*`,
+  owned by `SPEC-ui-blocks.md`).
+- **Overflow:** a quadrant whose content exceeds its box scrolls; the page itself does not.
+- **Declutter on tick (same as the List):** a done row renders struck + muted
+  (`ListItem done`); ticking an open todo lets the row linger ~1s, then it collapses
+  (`.ui-list-item--collapsing`) and unmounts, and an emptied quadrant's list drops out
+  via `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. The matrix never uses the
+  Done filter, so auto-hide is always on here (`TodoItem hideDone` defaults `true`); a
+  row already done on load is not auto-hidden. `revalidateTodos()`
+  (`apps/app/app/todo-actions.ts`) now also revalidates `/todos/matrix`, so a tick in
+  either view refreshes both.
 - Quadrant order is exactly `groupByQuadrant`'s: Urgent & Important, Urgent & Not Important,
   Not Urgent & Important, Not Urgent & Not Important.
 
@@ -469,6 +525,12 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`) — like the TickTick
   reference. The minimal matrix row's dense type is owned by `ListItem`
   (`.ui-list-item--dense*`, `SPEC-ui-blocks.md`); `MatrixBlock` owns none of it.
+- **Tone hooks:** `.ui-matrix__quadrant--danger|amber|accent|green .ui-matrix__label` tint the
+  heading per quadrant (I danger/red, II amber, III accent/blue, IV green). The checkbox tint
+  rides on `ListItem`'s `.ui-list-item--danger|amber|accent .ui-icon-btn` (owned by
+  `SPEC-ui-blocks.md`); no new matrix-specific checkbox CSS. The matrix date colour rides on
+  the `DueDate` atom's `.ui-due-date--signal` (overdue `--danger`, future `--danger-soft`),
+  owned by the atoms stylesheet.
 - **2×2 at every width, unconditionally** (smallest iPhone SE 375px included) — no media
   query, no phone stack. Each quadrant is a muted panel (`background: var(--panel)`,
   `border-radius: var(--radius-lg)`, `padding: var(--space-1)`); separation comes from the
@@ -500,7 +562,7 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
     border-radius: var(--radius-lg);
   }
 
-  .ui-matrix__label { font-size: var(--space-1); font-weight: 700; margin: 0; }
+  .ui-matrix__label { font-size: var(--space-0-7); font-weight: 700; margin: 0; }
   .ui-matrix__items { display: grid; gap: var(--space-0-5); }
 
   /* Empty quadrant: muted and centred in the remaining box height. */
@@ -604,6 +666,11 @@ cookie or path-join code (that is `app-kit-settings`').
 - `quadrantOf` maps all four `(effectiveImportant, isUrgent)` combinations.
 - `groupByQuadrant` returns the four `QUADRANTS` in order, bucketing todos, preserving input
   order within a quadrant, and returning empty buckets as empty arrays.
+- `groupByQuadrant` carries each bucket's `tone`/`rowTone` (`danger`/`danger`,
+  `amber`/`amber`, `accent`/`accent`, `green`/`null`).
+- The matrix route passes each bucket's `tone` to `MatrixBlock` and each row's `rowTone` to
+  `TodoItem` (`undefined` for IV); matrix rows render `DueDate tone="signal"` while the
+  default row keeps the muted label.
 
 **E2E:** not run by this module. The frozen surface changes are documented above; the
 human-owned suite is updated when the user runs it (global protocol §3).

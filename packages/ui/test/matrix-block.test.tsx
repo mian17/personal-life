@@ -74,6 +74,20 @@ describe('MatrixBlock', () => {
     expect(document.querySelector('.ui-matrix button')).toBeNull();
   });
 
+  it('tints a toned quadrant heading and leaves an untinted one unmodified', () => {
+    render(
+      <MatrixBlock
+        quadrants={[
+          { id: 'q1', label: 'One', items: <span>first</span>, tone: 'danger' },
+          { id: 'q2', label: 'Two', items: <span>second</span> },
+        ]}
+      />,
+    );
+    const sections = Array.from(document.querySelectorAll('.ui-matrix__quadrant'));
+    expect(classesOf(sections[0])).toEqual(['ui-matrix__quadrant', 'ui-matrix__quadrant--danger']);
+    expect(classesOf(sections[1])).toEqual(['ui-matrix__quadrant']);
+  });
+
   it('is a 2×2 grid of muted panels at every width, unconditionally (tokens only)', () => {
     // The 2×2 layout is unconditional — there is no phone/media variant.
     const matrix = cssBlock('.ui-matrix');
@@ -99,7 +113,29 @@ describe('MatrixBlock', () => {
     expect(cssBlock('.ui-matrix__label')).toMatch(/white-space:\s*nowrap/);
     expect(cssBlock('.ui-matrix__label')).toMatch(/overflow:\s*hidden/);
     expect(cssBlock('.ui-matrix__label')).toMatch(/text-overflow:\s*ellipsis/);
-    expect(cssBlock('.ui-matrix__items')).toMatch(/display:\s*grid/);
+
+    // Overflowing content scrolls inside the box; the heading stays put.
+    expect(quadrant).toMatch(/max-height:\s*100%/);
+    expect(quadrant).toMatch(/overflow:\s*hidden/);
+    const items = cssBlock('.ui-matrix__items');
+    expect(items).toMatch(/display:\s*grid/);
+    expect(items).toMatch(/flex:\s*1/);
+    expect(items).toMatch(/min-height:\s*0/);
+    expect(items).toMatch(/overflow-y:\s*auto/);
+
+    // Heading tint per quadrant tone (token colours only).
+    expect(cssBlock('.ui-matrix__quadrant--danger .ui-matrix__label')).toMatch(
+      /color:\s*var\(--danger\)/,
+    );
+    expect(cssBlock('.ui-matrix__quadrant--amber .ui-matrix__label')).toMatch(
+      /color:\s*var\(--amber\)/,
+    );
+    expect(cssBlock('.ui-matrix__quadrant--accent .ui-matrix__label')).toMatch(
+      /color:\s*var\(--accent\)/,
+    );
+    expect(cssBlock('.ui-matrix__quadrant--green .ui-matrix__label')).toMatch(
+      /color:\s*var\(--green\)/,
+    );
 
     const empty = cssBlock('.ui-matrix__empty');
     expect(empty).toMatch(/color:\s*var\(--muted\)/);
@@ -109,7 +145,12 @@ describe('MatrixBlock', () => {
     expect(/@media[^{]*640px[^{]*\{[^@]*\.ui-matrix/.test(css)).toBe(false);
 
     // Guard: the matrix declarations resolve through tokens, never raw px/hex.
-    const declarations = `${matrix}${quadrant}${empty}`;
+    const toneRules =
+      cssBlock('.ui-matrix__quadrant--danger .ui-matrix__label') +
+      cssBlock('.ui-matrix__quadrant--amber .ui-matrix__label') +
+      cssBlock('.ui-matrix__quadrant--accent .ui-matrix__label') +
+      cssBlock('.ui-matrix__quadrant--green .ui-matrix__label');
+    const declarations = `${matrix}${quadrant}${items}${toneRules}${empty}`;
     expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
     expect(declarations).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
   });

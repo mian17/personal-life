@@ -19,6 +19,8 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
                                                    //   deleteAction?, dense?,
+                                                   //   tone?="danger|amber|accent",
+                                                   //   done?, collapsing?,
                                                    //   children? (render slots; no domain types)
 <TagFilterNav items: {name, href, active}[]        // .filters pill nav; label? sits BESIDE the pills
                                                    //   (shared .ui-field-label; also the nav's aria-label)
@@ -72,6 +74,13 @@ and the notes app's current pages map onto these one-to-one.
              onDelete: (id: string) => void
              disabled? label? placeholder? createLabel?
              rowExtra?: (list: {id: string; name: string}) => ReactNode />
+<Snackbar message: string                            // transient status toast
+          actionLabel?: string
+          onAction?: () => void
+          onDismiss: () => void
+          duration?: number />                       // default 5000
+<SnackbarProvider>children</SnackbarProvider>       // holds current snackbar; useSnackbar()
+                                                    //   returns { showSnackbar }
 ```
 
 ### Todo-ecosystem additions (T7)
@@ -116,21 +125,92 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
   Save/Add control is `disabled` and no callback fires. `disabled` propagates to every
   control in the block.
 
+### Snackbar (transient status)
+
+A presentation-only toast for a transient confirmation with an optional action
+(TickTick-style undo): **no domain copy is baked in** — the message and action label are
+supplied by the app.
+
+- **`Snackbar`** renders `<div role="status" class="ui-snackbar">` with a
+  `.ui-snackbar__text` span; when `actionLabel` is set it adds an action composed from the
+  `Button` atom (`variant="quiet" size="bare"`), never a raw button. `duration` (default
+  5000ms) auto-dismisses by setting an internal `leaving` state; the action fires
+  `onAction` then immediately leaves. Leaving adds `.ui-snackbar--leaving` and a 200ms
+  timer calls `onDismiss` (matching `--duration-base`). Timers clear on unmount.
+- **`SnackbarProvider` / `useSnackbar`** hold the current snackbar: `showSnackbar(options)`
+  replaces any current one (keyed by `Date.now()`), rendering `{children}` plus the
+  `Snackbar`; `onDismiss` clears it. The context default is a **no-op**, so `useSnackbar()`
+  outside a provider is safe.
+- **Position/presentation:** fixed bottom-left
+  (`left/bottom: calc(var(--space-1) + env(safe-area-inset-*))`), `z-index: 20` (above the
+  fab's 10), max-width clear of the viewport edges. `role="status"` announces the message
+  politely. Styling is token-only: panel/text/border colors, radius/shadow tokens, spacing
+  tokens, and the motion tokens (`--duration-base`, `--ease-standard`) for the enter
+  animation and the fade/slide transition.
+
+### MatrixBlock (Eisenhower quadrants)
+
+Presentational only: `quadrants: MatrixQuadrant[]` where each quadrant is
+`{ id, label, items, empty?, tone? }`; an `items == null` quadrant renders the `empty` slot.
+Each quadrant is a labelled `<section class="ui-matrix__quadrant">` with an
+`<h2 class="ui-matrix__label">` heading. `tone?`
+(`danger | amber | accent | green`, off by default) adds
+`ui-matrix__quadrant--<tone>`, tinting the heading through the matching token colour
+(`--danger` / `--amber` / `--accent` / `--green`); no tone leaves the markup unchanged.
+An overflowing quadrant scrolls inside its box: `.ui-matrix__quadrant` is
+`max-height: 100%; overflow: hidden`, `.ui-matrix__items` is
+`flex: 1; min-height: 0; overflow-y: auto` (the heading stays put). This bounded box
+depends on the `fill` page's definite height: `.ui-page.ui-list-shell--fill` is
+`height: 100dvh; overflow: hidden` (not `min-height`), so the body slot has a definite
+height and an overflowing quadrant scrolls within itself instead of growing the page.
+`ListItem.tone` (above) tints the row's leading done toggle to match a quadrant.
+
 ## CSS ownership (legacy `globals.css` classes owned by blocks)
 
 `List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
 layout — the legacy class rode the row `li`, now carried by `ListItem`), `.note-link`,
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`, and the dense variants `.ui-list-item--dense*` (compact type for a
-small-surface list — the matrix quadrants). `ListItem`'s two optional slots are
+small-surface list — the matrix quadrants). `ListItem`'s optional slots are
 `leading?` (a control rendered before the row body, e.g. a done toggle) and `dense?`
-(compact typography, off by default; adds `.ui-list-item--dense`). The row action slots
+(compact typography, off by default; adds `.ui-list-item--dense`). A dense row is
+top-aligned (`align-items: flex-start` on the row and its link) and exactly its content
+height: it overrides the base two-line `min-height` floor (`min-height: 0`) and uses
+compact padding (`padding: var(--space-0-6) var(--space-0-4)`) with a tighter gap
+(`gap: var(--space-0-5)`), so matrix rows read tight. Its leading dense toggle renders
+the `Checkbox` atom (rounded square, radius `--space-0-2`, a 12×12 border-box square
+(`width/height: var(--space-0-75)`), owned by `SPEC-ui-atoms.md`); the
+control itself is top-aligned with the title
+(`width/height: auto`, `padding: var(--space-0-7) 0`), and its title and date
+share the same small size
+(`font-size: var(--space-0-7)`); the dense title wraps to at most two lines then
+truncates with an ellipsis (`display: -webkit-box; -webkit-line-clamp: 2`), while the
+default List row title stays single-line and the date/sub stays single-line. `tone?`
+(`danger | amber | accent`, off by default; adds `.ui-list-item--<tone>`) tints the row's
+leading icon control via the matching token colour. The tone rules are declared after
+`.ui-list-item--done .ui-icon-btn`, so in a matrix row a completed task keeps its quadrant
+colour (the filled check); only a NON-toned done row turns muted. The row action slots
 (trailing / deleteAction) are vertically
 centred against the row (`align-items: center`), while the row link still stretches
 to full height (`align-self: stretch`) so the tap/hover area is unchanged. The row
 also carries a token-derived `min-height` floor equal to one two-line row (title +
 sub, ~75.6px at the frozen base), so a row with empty `meta`/`snippet` cannot
 collapse.
+
+Declutter states (the completed-todo motion): `done?` adds
+`.ui-list-item--done`, striking and muting the title
+(`.ui-list-item--done .ui-list-item__title { color: var(--muted);
+text-decoration: line-through; }`) and muting row icon buttons
+(`.ui-list-item--done .ui-icon-btn { color: var(--muted); }`). `collapsing?` adds
+`.ui-list-item--collapsing` (`height: 0; min-height: 0; opacity: 0; overflow:
+hidden;`), which animates because the base `.ui-list-item` rule carries
+`transition: height/opacity var(--duration-base) var(--ease-standard)` and
+`interpolate-size: allow-keywords` (progressive `height: auto → 0` collapse;
+engines without `interpolate-size` snap to 0). A group section whose every row
+was removed collapses with it via
+`.ui-section:has(.ui-list):not(:has(.ui-list-item)) { display: none; }` — a
+section with no list is untouched.
+
 `AlertBanner` owns the conflict-banner tree: `.editor-conflict`,
 `.editor-conflict-text`, `.editor-conflict-actions` (its action *buttons* are owned
 by `Button`, see `SPEC-ui-atoms`). Element defaults: bare `h1` → `PageTitle`,

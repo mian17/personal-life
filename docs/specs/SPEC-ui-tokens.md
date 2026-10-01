@@ -62,6 +62,8 @@ Token naming: `--<category>-<qualifier>`, values preserved verbatim from today:
   /* colors — byte-identical to apps/app/app/globals.css */
   --bg: #0f1115; --panel: #181b22; --text: #e8eaf0; --muted: #8b93a7;
   --accent: #5b8cff; --danger: #ff6b6b; --border: #2a2f3a; --on-accent: white;
+  /* new colors — user-approved additions to the frozen token surface */
+  --danger-soft: #ff9e9e; --amber: #f2b64c; --green: #4cc38a;
   /* literals promoted to tokens — values unchanged */
   --radius-md: 10px; --radius-lg: 12px; --radius-pill: 999px;
   --tap-height: 48px; --content-width: 640px;
@@ -70,9 +72,30 @@ Token naming: `--<category>-<qualifier>`, values preserved verbatim from today:
   --font-size: 16px; --leading: 1.5; --fs-editor: 1.05rem;
   --shadow-fab: 0 4px 12px rgba(0, 0, 0, 0.25);
   --font-stack: system-ui, -apple-system, sans-serif;
+  /* motion — new literals promoted to tokens (user-approved) */
+  --duration-fast: 120ms; --duration-base: 200ms; --ease-standard: ease-out;
   color-scheme: light dark;
 }
 ```
+
+Motion tokens (`--duration-fast: 120ms`, `--duration-base: 200ms`,
+`--ease-standard: ease-out`) are new literals promoted to tokens, not values
+migrated from `globals.css` — the user explicitly approved touching this frozen
+surface. They are pinned by `MOTION_TOKENS` in `packages/ui/test/tokens.test.ts`
+and are neither rem nor px, so the frozen length inventories are untouched.
+
+Three color tokens were likewise added to the frozen token surface with explicit user
+approval — `--danger-soft`, `--amber`, and `--green`. They back the `DueDate` atom's
+`signal` tone (overdue = `--danger`, any future date = `--danger-soft`).
+
+| Token | Dark | Light |
+|---|---|---|
+| `--danger-soft` | `#ff9e9e` | `#d97070` |
+| `--amber` | `#f2b64c` | `#b45309` |
+| `--green` | `#4cc38a` | `#15803d` |
+
+They are pinned by `DARK_COLORS` / `LIGHT_COLORS` in
+`packages/ui/test/tokens.test.ts`.
 
 Spacing/dimension tokens cover **exactly** the length literals present in
 `globals.css` (both inventories grep-derived and locked in the token-value test):

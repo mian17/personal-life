@@ -1,4 +1,5 @@
 import { dueDateLabel, dueDateState } from '@life/ui';
+import type { ListItemTone, MatrixTone } from '@life/ui';
 import type { Todo } from '@life/shared';
 
 /**
@@ -15,12 +16,22 @@ export type QuadrantId =
   | 'not-urgent-important'
   | 'not-urgent-not-important';
 
-/** The fixed quadrant order + labels (plain labels, intent L6). */
-export const QUADRANTS: ReadonlyArray<{ id: QuadrantId; label: string }> = [
-  { id: 'urgent-important', label: 'Urgent & Important' },
-  { id: 'urgent-not-important', label: 'Urgent & Not Important' },
-  { id: 'not-urgent-important', label: 'Not Urgent & Important' },
-  { id: 'not-urgent-not-important', label: 'Not Urgent & Not Important' },
+/** The fixed quadrant order + labels + tones (plain labels, intent L6). */
+export const QUADRANTS: ReadonlyArray<{
+  id: QuadrantId;
+  label: string;
+  tone: MatrixTone;
+  rowTone: ListItemTone | null;
+}> = [
+  { id: 'urgent-important', label: 'Urgent & Important', tone: 'danger', rowTone: 'danger' },
+  { id: 'urgent-not-important', label: 'Urgent & Not Important', tone: 'amber', rowTone: 'amber' },
+  { id: 'not-urgent-important', label: 'Not Urgent & Important', tone: 'accent', rowTone: 'accent' },
+  {
+    id: 'not-urgent-not-important',
+    label: 'Not Urgent & Not Important',
+    tone: 'green',
+    rowTone: null,
+  },
 ];
 
 /**
@@ -47,6 +58,8 @@ export function quadrantOf(
 export interface QuadrantBucket {
   id: QuadrantId;
   label: string;
+  tone: MatrixTone;
+  rowTone: ListItemTone | null;
   todos: Todo[];
 }
 
@@ -61,5 +74,11 @@ export function groupByQuadrant(todos: readonly Todo[], today: string): Quadrant
   for (const todo of todos) {
     buckets[quadrantOf(todo, today)].push(todo);
   }
-  return QUADRANTS.map(({ id, label }) => ({ id, label, todos: buckets[id] }));
+  return QUADRANTS.map(({ id, label, tone, rowTone }) => ({
+    id,
+    label,
+    tone,
+    rowTone,
+    todos: buckets[id],
+  }));
 }

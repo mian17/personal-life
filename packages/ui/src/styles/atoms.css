@@ -229,6 +229,45 @@
   border-color: transparent;
 }
 
+/* --------------------------------------------------------- Checkbox */
+
+/* The done-toggle glyph: a rounded square (radius --space-0-2, 0.2rem — the
+   panel-box rounding feel; the box's own --radius-lg would clamp to a circle at
+   this size). Fills with the row's text colour and reveals a --panel check.
+   A 12×12 border-box square (var(--space-0-75) = 0.75rem = 12px at the frozen
+   base); promote to a --checkbox-size var if a second size is ever needed. */
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--space-0-75);
+  height: var(--space-0-75);
+  padding: var(--space-0-15);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--space-0-2);
+  color: inherit;
+}
+
+.ui-checkbox--checked {
+  background: currentColor;
+}
+
+.ui-checkbox__glyph {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--panel);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.ui-checkbox--checked .ui-checkbox__glyph {
+  opacity: 1;
+}
+
 /* ------------------------------------------------ Input / Textarea */
 
 .ui-input,
@@ -392,6 +431,21 @@
 
 .ui-due-pill--today {
   color: var(--accent);
+}
+
+/* ------------------------------------------------- DueDate */
+
+.ui-due-date {
+  color: var(--muted);
+}
+
+.ui-due-date--signal.ui-due-date--overdue {
+  color: var(--danger);
+}
+
+.ui-due-date--signal.ui-due-date--today,
+.ui-due-date--signal.ui-due-date--later {
+  color: var(--danger-soft);
 }
 
 /* ------------------------------------------------------------- Switch */

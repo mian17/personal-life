@@ -99,6 +99,7 @@ describe('/todos/matrix page wiring', () => {
       'Not Urgent & Important',
       'Not Urgent & Not Important',
     ]);
+    expect(quadrants.map((q: any) => q.tone)).toEqual(['danger', 'amber', 'accent', 'green']);
 
     const itemsByQuadrant = Object.fromEntries(
       quadrants.map((q: any) => {
@@ -121,6 +122,20 @@ describe('/todos/matrix page wiring', () => {
         expect(row.props.mode).toBe('matrix');
       }
     }
+  });
+
+  it('tints each matrix row by its quadrant, leaving quadrant IV untinted', async () => {
+    const el = await TodosMatrixPage();
+    const quadrants = el.props.body.props.quadrants;
+    const byId = Object.fromEntries(quadrants.map((q: any) => [q.id, q]));
+
+    const rowTone = (id: string) =>
+      asArray(byId[id].items)[0].props.tone;
+
+    expect(rowTone('urgent-important')).toBe('danger');
+    expect(rowTone('urgent-not-important')).toBe('amber');
+    expect(rowTone('not-urgent-important')).toBe('accent');
+    expect(rowTone('not-urgent-not-important')).toBeUndefined();
   });
 
   it('passes items: null and the empty copy for quadrants with no todos', async () => {

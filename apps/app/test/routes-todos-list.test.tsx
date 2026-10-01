@@ -20,6 +20,7 @@ import { listTodos, listTodoTagUsage, listLists } from '@/lib/todo-api';
 import { listTags, resolveTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
+import { TodoList } from '@/app/todo-list';
 import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
@@ -189,5 +190,17 @@ describe('/todos list page wiring', () => {
     const el = await TodosPage({ searchParams: Promise.resolve({}) });
 
     expect(el.props.tabs).toBeUndefined();
+  });
+
+  it('passes hideDone=true unless the Done filter is active', async () => {
+    const all = await TodosPage({ searchParams: Promise.resolve({}) });
+    expect(all.props.body.type).toBe(TodoList);
+    expect(all.props.body.props.hideDone).toBe(true);
+
+    const open = await TodosPage({ searchParams: Promise.resolve({ done: 'false' }) });
+    expect(open.props.body.props.hideDone).toBe(true);
+
+    const done = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
+    expect(done.props.body.props.hideDone).toBe(false);
   });
 });

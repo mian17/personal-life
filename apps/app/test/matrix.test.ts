@@ -76,6 +76,12 @@ describe('groupByQuadrant', () => {
     expect(grouped.map((b) => b.label)).toEqual(QUADRANTS.map((q) => q.label));
   });
 
+  it('carries each quadrant tone and row tone (IV green heading, untinted row)', () => {
+    const grouped = groupByQuadrant([], TODAY);
+    expect(grouped.map((b) => b.tone)).toEqual(['danger', 'amber', 'accent', 'green']);
+    expect(grouped.map((b) => b.rowTone)).toEqual(['danger', 'amber', 'accent', null]);
+  });
+
   it('buckets todos by quadrant', () => {
     const todos = [
       todo('ui-1', '2026-09-30', true),

@@ -22,6 +22,13 @@ for these without any visible change.
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
             children: ReactNode      // the icon
             variant="default" | "ghost">
+<Checkbox checked?: boolean />       // presentational done-toggle glyph: a rounded square
+                                     //   (radius --space-0-2 — the panel-box rounding feel),
+                                     //   fills with the row's currentColor and reveals a
+                                     //   --panel check; aria-hidden/non-interactive (the
+                                     //   consumer's IconButton is the control); a 12×12
+                                     //   border-box square (`width/height: var(--space-0-75)`
+                                     //   = 0.75rem = 12px)
 <IconLink href label>children</IconLink>  // <a>/<Link> with the 40×40 bordered visual
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
@@ -80,7 +87,10 @@ variant `editor` absorbs `.editor-body`; `LocalTime` / `ConfirmButton` /
 `app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `DueDatePill` (T7, `todo-ui`) is a
 new atom with **no** legacy counterpart: it owns `.ui-due-pill` and its state
 modifiers (`.ui-due-pill--overdue|today`, colours from `--danger`/`--accent`); the
-`none`/`later` states need no extra declaration.
+`none`/`later` states need no extra declaration. `Checkbox` is the presentational
+done-toggle glyph and replaces the lucide `Circle`/`CircleCheck` pair for the matrix done
+toggle only (the default `/todos` List row keeps the circle); it owns `.ui-checkbox` and
+its `--checked`/`__glyph` rules, token-only.
 
 ## Tech Stack
 

@@ -22,6 +22,7 @@ export default async function TodosMatrixPage() {
   const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
+    tone: bucket.tone,
     items: bucket.todos.length ? (
       <List>
         {bucket.todos.map((todo) => (
@@ -32,6 +33,7 @@ export default async function TodosMatrixPage() {
             lists={lists}
             availableTags={[]}
             mode="matrix"
+            tone={bucket.rowTone ?? undefined}
           />
         ))}
       </List>

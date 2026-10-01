@@ -6,6 +6,8 @@ import { cx } from '../lib/cx';
 // width (smallest phones included). Presentational only: no data, no domain
 // types, no domain copy, no routing. An `items == null` quadrant renders the
 // `empty` slot instead.
+export type MatrixTone = 'danger' | 'amber' | 'accent' | 'green';
+
 export interface MatrixQuadrant {
   /** Stable key for the quadrant (app-supplied). */
   id: string;
@@ -15,6 +17,8 @@ export interface MatrixQuadrant {
   items: ReactNode;
   /** Rendered in place of `items` when `items` is absent (app-supplied copy). */
   empty?: ReactNode;
+  /** Heading tint for the quadrant. Off by default (unchanged markup). */
+  tone?: MatrixTone;
 }
 
 export interface MatrixBlockProps {
@@ -28,7 +32,13 @@ export function MatrixBlock({ quadrants, className }: MatrixBlockProps): JSX.Ele
   return (
     <div className={cx('ui-matrix', className)}>
       {quadrants.map((quadrant) => (
-        <section key={quadrant.id} className="ui-matrix__quadrant">
+        <section
+          key={quadrant.id}
+          className={cx(
+            'ui-matrix__quadrant',
+            quadrant.tone && `ui-matrix__quadrant--${quadrant.tone}`,
+          )}
+        >
           <h2 className="ui-matrix__label">{quadrant.label}</h2>
           {quadrant.items != null ? (
             <div className="ui-matrix__items">{quadrant.items}</div>

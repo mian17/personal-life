@@ -154,7 +154,9 @@ describe('ListShell', () => {
     const page = cssBlock('.ui-page.ui-list-shell--fill');
     expect(page).toMatch(/display:\s*flex/);
     expect(page).toMatch(/flex-direction:\s*column/);
-    expect(page).toMatch(/min-height:\s*100dvh/);
+    // Definite height, not min-height: a definite `100dvh` bounds the matrix quadrants.
+    expect(page).toMatch(/(?<!min-)height:\s*100dvh/);
+    expect(page).toMatch(/overflow:\s*hidden/);
 
     const body = cssBlock('.ui-list-shell__body');
     expect(body).toMatch(/flex:\s*1/);

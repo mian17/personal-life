@@ -124,7 +124,7 @@ export default async function TodosPage({
           {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
         </>
       }
-      body={<TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />}
+      body={<TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone={doneFilter !== true} />}
       fabHref="/todos/new"
       fabLabel="New todo"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}

@@ -41,6 +41,28 @@ both apps — so tags feel identical everywhere (I3).
   `#errand` still creates the filter link) — the parsed name goes through the
   registry's create-or-get and the note write carries `tagIds`. The picker is an
   addition to this flow, not a replacement (`SPEC-tags-extraction`).
+- **Done declutter (user-requested):** a done row renders struck + muted
+  (`ListItem done`). Ticking an **open** todo to done on `/todos` or `/todos/matrix`
+  lets the row linger ~1s, then it collapses (`.ui-list-item--collapsing`) and
+  unmounts; an emptied group section then hides via
+  `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. Auto-hide arms **only on a
+  genuine `false→true` tick transition** (`DoneToggle`'s `wasDone` ref): a row that is
+  already done on page load (List **All** filter, Matrix) is **not** auto-hidden — it
+  only shows struck/dimmed. The List **Done** status
+  filter (`?done=true`) disables auto-hide entirely (`TodoList hideDone={false}`), so
+  done rows there stay put — and because auto-hide is off there, **no snackbar appears**
+  in the Done filter. `revalidateTodos()` now also revalidates `/todos/matrix`,
+  so a write from either view refreshes both (stale-matrix fix).
+- **Undo snackbar (user-requested):** the same ~1s hide is paired with a bottom-left
+  `Snackbar` — `Task completed` with an `Undo` action. Pressing Undo clears the local
+  `removed`/`collapsing` state immediately (un-hiding the row and cancelling the pending
+  unmount), then PATCHes `done:false` with **no** `expectedVersion` (the done write bumped
+  the row's version, so a version-checked PATCH would 409 — the undo is unconditional). A
+  `todo.done` reset effect reconciles server state, so when the revalidated row arrives as
+  open it is already restored. The snackbar
+  auto-dismisses after its default 5s. `SnackbarProvider` is mounted for the whole
+  `/todos` segment (`apps/app/app/todos/layout.tsx`) so the List and Matrix views share
+  one provider; `useSnackbar()` has a safe no-op default outside a provider.
 - **Transport config (per kernel contract):** the app's API client gains
   `TAGS_API_URL`/`TODO_API_URL` base URLs; auth uses the kernel's single shared
   `life-api` audience — no per-service audience names appear in the client. Env

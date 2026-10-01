@@ -159,6 +159,37 @@ describe('ListItem', () => {
       expect(fontSize).toMatch(/var\(--space-/);
       expect(fontSize).not.toMatch(/\d+(px|rem)/);
     }
+
+    const denseTitle = denseBlock('.ui-list-item--dense .ui-list-item__title');
+    expect(denseTitle).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(denseTitle).toMatch(/display:\s*-webkit-box/);
+    expect(denseTitle).toMatch(/white-space:\s*normal/);
+
+    expect(denseBlock('.ui-list-item--dense')).toMatch(/min-height:\s*0/);
+    const padding =
+      denseBlock('.ui-list-item--dense .ui-list-item__link').match(/padding:\s*([^;]+);/)?.[1] ?? '';
+    expect(padding).toMatch(/var\(--space-/);
+    expect(padding).not.toMatch(/\d+(px|rem)/);
+  });
+
+  it('adds a tone class for a coloured lens row, and none without a tone', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem tone="danger" title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--danger',
+    ]);
+    unmount();
+
+    render(
+      <ul>
+        <ListItem title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual(['ui-list-item']);
   });
 
   it('merges className instead of replacing it', () => {
@@ -177,5 +208,58 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').getAttribute('data-extra')).toBe('1');
+  });
+
+  it('adds the done class for a completed row', () => {
+    render(
+      <ul>
+        <ListItem done title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--done',
+    ]);
+  });
+
+  it('adds the collapsing class while hiding', () => {
+    render(
+      <ul>
+        <ListItem collapsing title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--collapsing',
+    ]);
+  });
+
+  const blocksCss = () => readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+  const cssBlock = (css: string, selector: string) =>
+    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      [])[1] ?? '';
+
+  it('strikes and mutes the done title through tokens', () => {
+    const block = cssBlock(blocksCss(), '.ui-list-item--done .ui-list-item__title');
+    expect(block).toMatch(/color:\s*var\(--muted\)/);
+    expect(block).toMatch(/text-decoration:\s*line-through/);
+  });
+
+  it('collapses the row to zero height while hiding', () => {
+    const block = cssBlock(blocksCss(), '.ui-list-item--collapsing');
+    expect(block).toMatch(/height:\s*0/);
+    expect(block).toMatch(/min-height:\s*0/);
+  });
+
+  it('transitions the base row through the motion tokens', () => {
+    const block = cssBlock(blocksCss(), '.ui-list-item');
+    expect(block).toMatch(/transition:[^;]*var\(--duration-base\)/);
+    expect(block).toMatch(/transition:[^;]*var\(--ease-standard\)/);
+  });
+
+  it('owns the empty-section rule for an all-removed group', () => {
+    expect(blocksCss()).toMatch(
+      /\.ui-section:has\(\.ui-list\):not\(:has\(\.ui-list-item\)\)\s*\{[^}]*display:\s*none/,
+    );
   });
 });

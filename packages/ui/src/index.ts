@@ -5,6 +5,9 @@ export type { ButtonProps, ButtonSize, ButtonVariant } from './components/button
 export { IconButton } from './components/icon-button';
 export type { IconButtonProps, IconButtonVariant } from './components/icon-button';
 
+export { Checkbox } from './components/checkbox';
+export type { CheckboxProps } from './components/checkbox';
+
 export { Input } from './components/input';
 export type { InputProps } from './components/input';
 
@@ -60,7 +63,7 @@ export { List } from './components/list';
 export type { ListProps } from './components/list';
 
 export { ListItem } from './components/list-item';
-export type { ListItemProps } from './components/list-item';
+export type { ListItemProps, ListItemTone } from './components/list-item';
 
 export { TagFilterNav } from './components/tag-filter-nav';
 export type { TagFilterNavProps, TagFilterItem } from './components/tag-filter-nav';
@@ -105,6 +108,9 @@ export type { TagManagerProps } from './components/tag-manager';
 export { DueDatePill, dueDateState, todayIso } from './components/due-date-pill';
 export type { DueDatePillProps, DueDateState } from './components/due-date-pill';
 
+export { DueDate } from './components/due-date';
+export type { DueDateProps, DueDateTone } from './components/due-date';
+
 export { ListManager } from './components/list-manager';
 export type { ListManagerProps, TodoListOption } from './components/list-manager';
 
@@ -121,7 +127,13 @@ export { EditorChrome } from './components/editor-chrome';
 export type { EditorChromeProps, EditorChromeTagPicker } from './components/editor-chrome';
 
 export { MatrixBlock } from './components/matrix-block';
-export type { MatrixBlockProps, MatrixQuadrant } from './components/matrix-block';
+export type { MatrixBlockProps, MatrixQuadrant, MatrixTone } from './components/matrix-block';
+
+export { Snackbar } from './components/snackbar';
+export type { SnackbarProps } from './components/snackbar';
+
+export { SnackbarProvider, useSnackbar } from './components/snackbar-provider';
+export type { SnackbarApi, SnackbarOptions } from './components/snackbar-provider';
 
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';

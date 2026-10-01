@@ -56,6 +56,9 @@ const DARK_COLORS = {
   '--muted': '#8b93a7',
   '--accent': '#5b8cff',
   '--danger': '#ff6b6b',
+  '--danger-soft': '#ff9e9e',
+  '--amber': '#f2b64c',
+  '--green': '#4cc38a',
   '--border': '#2a2f3a',
   '--on-accent': 'white',
 } as const;
@@ -67,6 +70,9 @@ const LIGHT_COLORS = {
   '--muted': '#5c6577',
   '--accent': '#2f6bff',
   '--danger': '#d64545',
+  '--danger-soft': '#d97070',
+  '--amber': '#b45309',
+  '--green': '#15803d',
   '--border': '#dfe3ea',
 } as const;
 
@@ -86,6 +92,13 @@ const NAMED_TOKENS = {
   '--fs-editor': '1.05rem',
   '--shadow-fab': '0 4px 12px rgba(0, 0, 0, 0.25)',
   '--font-stack': 'system-ui, -apple-system, sans-serif',
+} as const;
+
+/** Motion — new literals promoted to tokens (user-approved). */
+const MOTION_TOKENS = {
+  '--duration-fast': '120ms',
+  '--duration-base': '200ms',
+  '--ease-standard': 'ease-out',
 } as const;
 
 /** Spacing scale — exactly the 20 distinct rem literals in globals.css. */
@@ -147,6 +160,11 @@ describe('tokens.css — frozen token contract', () => {
   it('defines the spacing scale at exactly the frozen rem values', () => {
     const decls = declarations(tokens, ':root');
     expect(decls).toMatchObject(SPACING_REM);
+  });
+
+  it('defines the motion tokens at their approved values', () => {
+    const decls = declarations(tokens, ':root');
+    expect(decls).toMatchObject(MOTION_TOKENS);
   });
 
   it('keeps the four theme selectors with the light/dark/media shape', () => {

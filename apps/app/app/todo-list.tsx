@@ -13,11 +13,13 @@ export function TodoList({
   today,
   lists,
   availableTags,
+  hideDone,
 }: {
   groups: TodoGroup[];
   today: string;
   lists: TodoList[];
   availableTags: TagOption[];
+  hideDone: boolean;
 }) {
   const total = groups.reduce((count, group) => count + group.todos.length, 0);
 
@@ -38,6 +40,7 @@ export function TodoList({
                   today={today}
                   lists={lists}
                   availableTags={availableTags}
+                  hideDone={hideDone}
                 />
               ))}
             </List>

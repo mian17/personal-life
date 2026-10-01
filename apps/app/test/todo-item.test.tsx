@@ -31,10 +31,10 @@ function todo(overrides: Partial<Todo> = {}): Todo {
 
 const lists = [{ id: 'l1', name: 'Groceries' }] as any;
 
-function markup(mode?: 'default' | 'matrix'): string {
+function markup(mode?: 'default' | 'matrix', overrides: Partial<Todo> = {}): string {
   return renderToStaticMarkup(
     <TodoItem
-      todo={todo()}
+      todo={todo(overrides)}
       today={TODAY}
       lists={lists}
       availableTags={[]}
@@ -50,6 +50,15 @@ describe('TodoItem modes', () => {
     expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
     expect(html).toContain('ui-icon-btn--ghost');
     expect(html).toMatch(/<a[^>]*class="ui-list-item__link"[^>]*href="\/todos\/t1\/edit"/);
+  });
+
+  it('matrix: the toggle glyph is the square Checkbox atom, checked when done', () => {
+    expect(markup('matrix')).toContain('ui-checkbox');
+    expect(markup('matrix', { done: true })).toContain('ui-checkbox--checked');
+  });
+
+  it('default: the list row keeps the lucide circle, not the Checkbox atom', () => {
+    expect(markup()).not.toContain('ui-checkbox');
   });
 
   it('matrix: no delete action, no list name, no note — only the due label', () => {
@@ -68,6 +77,19 @@ describe('TodoItem modes', () => {
     expect(html).toContain('href="/todos/t1/edit"');
   });
 
+  it('matrix: the due date renders through DueDate tone="signal"', () => {
+    const html = markup('matrix');
+    expect(html).toContain('ui-due-date');
+    expect(html).toContain('ui-due-date--today');
+    expect(html).toContain('ui-due-date--signal');
+  });
+
+  it('default: the due date stays the plain muted label, not the signal atom', () => {
+    const html = markup();
+    expect(html).not.toContain('ui-due-date');
+    expect(html).toContain('>Today<');
+  });
+
   it('default: bordered trailing toggle, delete action, list name and note kept', () => {
     const html = markup();
     // No leading control: the row body link is the first child.
@@ -81,5 +103,20 @@ describe('TodoItem modes', () => {
     expect(html).toContain('Groceries');
     expect(html).toContain('ui-list-item__snippet');
     expect(html).toContain('a note snippet');
+  });
+
+  it('done: true marks the row struck/muted with ui-list-item--done', () => {
+    const html = markup(undefined, { done: true });
+    expect(html).toContain('ui-list-item--done');
+  });
+
+  it('a not-yet-done row renders neither --done nor --collapsing initially', () => {
+    const html = markup();
+    expect(html).not.toContain('ui-list-item--done');
+    expect(html).not.toContain('ui-list-item--collapsing');
+  });
+
+  it('renders outside a SnackbarProvider without throwing (no-op default)', () => {
+    expect(() => markup()).not.toThrow();
   });
 });

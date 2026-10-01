@@ -28,13 +28,15 @@
  * | SettingsRow    | (new) label + control two-column row; no legacy class |
  * | TabBar / Tab   | (new) navigation row + tab links; no legacy class |
  * | MatrixBlock    | (new) responsive quadrant grid; no legacy class |
+ * | Snackbar       | (new) transient bottom-left status toast; no legacy class |
  *
- * Token policy: all lengths/colors come from tokens.css custom properties,
- * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
- * atoms.css does (`--space-2` = 2rem, `--space-1` = 1rem). Non-tokenizable
- * keywords/units are kept verbatim: `auto`, `flex`, `fixed`, `100dvh`, `10`,
- * `700`, `-0.02em` (no letter-spacing token exists in the frozen token layer),
- * and the `env(safe-area-inset-*)` values.
+ * Token policy: all lengths/colors/durations come from tokens.css custom
+ * properties, matching atoms.css. Note the type sizes reuse the spacing scale
+ * exactly as atoms.css does (`--space-2` = 2rem, `--space-1` = 1rem). Durations
+ * and easing are tokenized (`--duration-fast`, `--duration-base`,
+ * `--ease-standard`). Non-tokenizable keywords/units are kept verbatim: `auto`,
+ * `flex`, `fixed`, `100dvh`, `10`, `700`, `-0.02em` (no letter-spacing token
+ * exists in the frozen token layer), and the `env(safe-area-inset-*)` values.
  */
 
 /* --------------------------------------------------------- PageShell */
@@ -52,7 +54,11 @@
 .ui-page.ui-list-shell--fill {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  /* Exactly the viewport (not min-height): the body then has a definite height,
+     so a quadrant whose items overflow scrolls inside its box instead of growing
+     the page. */
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .ui-list-shell__body {
@@ -207,6 +213,12 @@
     var(--space-0-9) * 2 + var(--space-1) * var(--leading) + var(--space-0-15) +
       var(--space-0-85) * var(--leading)
   );
+  transition:
+    height var(--duration-base) var(--ease-standard),
+    opacity var(--duration-base) var(--ease-standard);
+  /* Progressive collapse of `height: auto → 0`; engines without
+     `interpolate-size` snap to 0 instead of animating. */
+  interpolate-size: allow-keywords;
 }
 
 .ui-list-item__link {
@@ -269,13 +281,73 @@
   text-overflow: ellipsis;
 }
 
-/* Dense rows: compact type for a small-surface list (matrix quadrants). */
+/* Done row: struck + de-emphasized (muted). */
+.ui-list-item--done .ui-list-item__title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.ui-list-item--done .ui-icon-btn {
+  color: var(--muted);
+}
+
+/* Collapsing row: animates to zero height while the consumer hides it. */
+.ui-list-item--collapsing {
+  height: 0;
+  min-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* Dense rows: compact type for a small-surface list (matrix quadrants). The
+   leading done toggle top-aligns with the title at text height; title and date
+   share the same small size. */
+.ui-list-item--dense {
+  align-items: flex-start;
+  /* Override the base two-line floor: a dense row is exactly its content height. */
+  min-height: 0;
+}
+
+.ui-list-item--dense .ui-list-item__link {
+  align-items: flex-start;
+  gap: var(--space-0-5);
+  padding: var(--space-0-6) var(--space-0-4);
+}
+
+.ui-list-item--dense .ui-icon-btn {
+  width: auto;
+  height: auto;
+  padding: var(--space-0-7) 0;
+}
+
 .ui-list-item--dense .ui-list-item__title {
-  font-size: var(--space-0-85);
+  font-size: var(--space-0-7);
+  /* Up to two lines, then ellipsis (TickTick-style). Overrides the base
+     single-line nowrap only for the dense/matrix row. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
 }
 
 .ui-list-item--dense .ui-list-item__sub {
-  font-size: var(--space-0-75);
+  font-size: var(--space-0-7);
+}
+
+/* Row tone: tint the leading done toggle for a coloured lens row (matrix
+   quadrants). These follow `.ui-list-item--done`, so a completed row keeps its
+   quadrant colour (the filled check) rather than turning muted. */
+.ui-list-item--danger .ui-icon-btn {
+  color: var(--danger);
+}
+
+.ui-list-item--amber .ui-icon-btn {
+  color: var(--amber);
+}
+
+.ui-list-item--accent .ui-icon-btn {
+  color: var(--accent);
 }
 
 /* ------------------------------------------------------ TagFilterNav */
@@ -407,6 +479,12 @@
 
 .ui-section__actions {
   margin-left: auto;
+}
+
+/* A group section whose every row was removed (auto-hidden) collapses too;
+   a section with no list is untouched. */
+.ui-section:has(.ui-list):not(:has(.ui-list-item)) {
+  display: none;
 }
 
 /* -------------------------------------------------------- SettingsRow */
@@ -571,12 +649,14 @@
   gap: var(--space-0-5);
   padding: var(--space-1);
   min-height: var(--space-5);
+  max-height: 100%;
+  overflow: hidden;
   background: var(--panel);
   border-radius: var(--radius-lg);
 }
 
 .ui-matrix__label {
-  font-size: var(--space-1);
+  font-size: var(--space-0-7);
   font-weight: 700;
   margin: 0;
   white-space: nowrap;
@@ -584,9 +664,29 @@
   text-overflow: ellipsis;
 }
 
+/* Heading tint per quadrant (app-supplied tone; off by default). */
+.ui-matrix__quadrant--danger .ui-matrix__label {
+  color: var(--danger);
+}
+
+.ui-matrix__quadrant--amber .ui-matrix__label {
+  color: var(--amber);
+}
+
+.ui-matrix__quadrant--accent .ui-matrix__label {
+  color: var(--accent);
+}
+
+.ui-matrix__quadrant--green .ui-matrix__label {
+  color: var(--green);
+}
+
 .ui-matrix__items {
   display: grid;
   gap: var(--space-0-5);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Empty quadrant: muted and centred in the remaining box height. */
@@ -598,4 +698,53 @@
   color: var(--muted);
   font-size: var(--space-0-85);
   text-align: center;
+}
+
+/* -------------------------------------------------------- Snackbar */
+
+/* Transient bottom-left status toast (TickTick-style undo). Sits above the
+   fab (z-index 20 > 10); max-width keeps it clear of the viewport edges. */
+@keyframes ui-snackbar-in {
+  from {
+    transform: translateY(var(--space-1));
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.ui-snackbar {
+  position: fixed;
+  left: calc(var(--space-1) + env(safe-area-inset-left));
+  bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-75);
+  max-width: calc(100vw - var(--space-1) * 2);
+  padding: var(--space-0-6) var(--space-0-75);
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-fab);
+  animation: ui-snackbar-in var(--duration-base) var(--ease-standard);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    opacity var(--duration-base) var(--ease-standard);
+}
+
+.ui-snackbar--leaving {
+  transform: translateY(var(--space-1));
+  opacity: 0;
+}
+
+.ui-snackbar__text {
+  font-size: var(--space-0-9);
+}
+
+.ui-snackbar__action {
+  flex-shrink: 0;
 }
