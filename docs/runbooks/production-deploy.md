@@ -32,6 +32,21 @@ per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `comp
 - [ ] `.env` has these **NAMES** set (values never touch a doc):
       `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`, `IDP_ISSUER`,
       `OIDC_APP_CLIENT_SECRET`, `OIDC_APP_REDIRECT_URI`, `REDIS_URL`.
+- [ ] **`OIDC_AUDIENCE_MAP` must be UPDATED, not just present** — a `.env` carried over
+      from the pre-ecosystem deploy holds the stale `…=note-service` map, and because
+      `.env` beats the compose default (`compose.yaml:147`) the IdP keeps minting
+      `aud: note-service` while every service now requires `life-api`
+      (`compose.yaml:20`, `SPEC-service-kernel.md:81-96`). Symptom: the stack boots
+      clean, then `/notes` renders a repeating `ApiError: API 401 on /api/notes`
+      (the app forwards the session token — `apps/app/lib/client.ts:27,34` — and
+      note-service maps every verification failure to a bare 401 with no log line,
+      `apps/note-service/src/auth/auth.guard.ts:85-88`). Set it to the comma-separated
+      value from `.env.example:43`:
+      `https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api`
+      (separator is a **comma** — `apps/idp/src/oidc/access-token.policy.ts:17,25`).
+      Verify the two sides agree:
+      `docker compose config | grep -E 'OIDC_AUDIENCE_MAP|NOTE_SERVICE_AUDIENCE'`
+      → the map's value for `https://note-service` must equal `NOTE_SERVICE_AUDIENCE`.
 - [ ] **New secrets this lane requires:** `TAGS_MASTER_KEY` and `TODO_MASTER_KEY`, 32-byte
       base64 — `openssl rand -base64 32`, run **once per service** (two distinct values;
       independent custody per MAP M3). Compose fails fast without them
