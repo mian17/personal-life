@@ -18,6 +18,7 @@ todo(
   title     TEXT NOT NULL,           -- enc.v1, AAD life.v1|<sub>|todo|title|<id>
   note      TEXT NULL,               -- enc.v1, AAD life.v1|<sub>|todo|note|<id>
   done      BOOLEAN NOT NULL DEFAULT 0,
+  important BOOLEAN NULL,            -- plaintext metadata, NULL = inherit list default (L6)
   dueDate   DATE NULL,               -- plaintext metadata (sort/filter queries)
   listId    TEXT NULL,               -- FK list.id, ON DELETE SET NULL (detach)
   origin    TEXT NULL,               -- JSON {service,id} — kernel orchestrator seam
@@ -32,6 +33,7 @@ todo_tag(todoId TEXT, tagId INTEGER, PRIMARY KEY(todoId, tagId),
 list(
   id        TEXT PRIMARY KEY,        -- service-generated UUID v4
   name      TEXT NOT NULL,           -- enc.v1, AAD life.v1|<sub>|list|name|<id>
+  importantDefault BOOLEAN NULL,     -- plaintext metadata, NULL = false (L6)
   ownerSub  TEXT NOT NULL,
   version   INTEGER NOT NULL DEFAULT 0,   -- kernel concurrency contract
   createdAt DATETIME NOT NULL
@@ -40,8 +42,11 @@ user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
 ```
 
 - Content fields (`title`, `note`, `list.name`) encrypted at rest; `dueDate`,
-  `done`, timestamps are metadata and stay queryable in SQL (decision: dueDate is
-  operational data, not content; documented here deliberately).
+  `done`, `important`, `list.importantDefault`, timestamps are metadata and stay queryable
+  in SQL (decision: dueDate is operational data, not content; documented here
+  deliberately). The two importance booleans are non-content and therefore **not**
+  `@life/crypto`-wrapped — the documented plaintext exception mirroring `done`
+  (`SPEC-todo-importance.md`).
 - No dual-read (M5). Master key `TODO_MASTER_KEY` (32-byte base64), fail-closed.
 - DB wiring: `DB_PATH` env (default `apps/todo-service/data/todo.db` via `@life/shared`'s `resolveDbPath`
   (note-service's split: the service reads `DB_PATH` inline, scripts resolve their
@@ -62,15 +67,31 @@ can send `expectedVersion` (kernel concurrency contract). The wire types (`Todo`
 `@life/shared` (the `Note`/`CreateNoteInput` precedent) — this module owns them;
 the app consumes, never re-declares (the orchestrator seam is the wire contract).
 
-- `POST /api/todos {title, note?, dueDate?, listId?, tagIds?}` → 201 (version 0).
-- `GET /api/todos?{q, listId, tagId, done, dueBefore, dueAfter}` → cursor page. Cursor payload:
+Importance field contracts (`SPEC-todo-importance.md`, intent L6) — additive, plaintext,
+non-content:
+
+- `Todo` (read DTO) carries `important: boolean | null` (stored override; `null` =
+  inherit) and `effectiveImportant: boolean` (`important ?? list.importantDefault ??
+  false`, computed post-decrypt, never stored).
+- `CreateTodoInput.important?: boolean | null` and
+  `UpdateTodoInput.important?: boolean | null` — omitted = unchanged (PATCH) / inherit
+  (POST); `null` = clear to inherit.
+- `List` (read DTO) carries `importantDefault: boolean | null` (`null` = false); the
+  list create/update request bodies accept optional `importantDefault: boolean | null`
+  (`CreateListDto`/`UpdateListDto`; there is no shared list-input type — `List` is the
+  exported wire shape, mirroring the service DTOs).
+
+- `POST /api/todos {title, note?, dueDate?, listId?, important?, tagIds?}` → 201 (version 0).
+  `important` is `boolean | null`; omitted or `null` stores `null` (inherit the list default).
+- `GET /api/todos?{q, listId, tagId, done, important, dueBefore, dueAfter}` → cursor page. Cursor payload:
   `base64(<dueDate-or-~>|<createdAt>|<id>)` (`~` = undated sentinel).
   Order: dated by `dueDate ASC` (overdue first), undated last, `createdAt DESC`
   tiebreak. `q` matches decrypted `title`+`note` via `likeMatch` (parity contract
   per kernel); `tagId` filters over `todo_tag`; all content filtering happens after
   cache hits (AGENTS.md Contract 2).
 - `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?,
-  listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins) ·
+  important?, listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins;
+  `important: null` clears the override back to inherit) ·
   `DELETE /api/todos/:id` (**soft** delete: sets `deletedAt`).
 - `GET /api/todos/trash?{limit, cursor}` → cursor page of soft-deleted todos,
   ordered `deletedAt DESC, id DESC` (cursor payload `base64(<deletedAt>|<id>)`; same
@@ -85,10 +106,11 @@ the app consumes, never re-declares (the orchestrator seam is the wire contract)
 - Trashed todos are hidden from `GET /api/todos` (list), `GET /api/todos/:id`,
   `PATCH /api/todos/:id`, and `GET /api/todos/tags` (a tag with only trashed todos is
   hidden) — only the trash routes surface them.
-- Lists: `POST /api/lists {name}` · `GET /api/lists` · `PATCH /api/lists/:id
-  {name, expectedVersion?}` (case-insensitive collision within owner → 409; stale
+- Lists: `POST /api/lists {name, importantDefault?}` · `GET /api/lists` · `PATCH /api/lists/:id
+  {name, importantDefault?, expectedVersion?}` (case-insensitive collision within owner → 409; stale
   `expectedVersion` → 409, omit = last-write-wins) · `DELETE /api/lists/:id` —
-  detach semantics: its todos survive with `listId` cleared.
+  detach semantics: its todos survive with `listId` cleared. `importantDefault` is
+  `boolean | null` (`null` = false), additive and not part of list identity.
 - `GET /api/todos/tags` → `[{tagId, count}]` (kernel usage surface; names resolved
   by the app via the registry). **Declare this route before `GET /api/todos/:id`** —
   Nest matches in declaration order and the literal path must not be shadowed.
@@ -103,21 +125,30 @@ the app consumes, never re-declares (the orchestrator seam is the wire contract)
   the hit), trash rows (`todo:trash` — the owner's soft-deleted rows serialized
   exactly as stored, each carrying its `deletedAt` and `tagIds`), list rows
   (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
-  ids + counts, no ciphertext by design).
+  ids + counts, no ciphertext by design). The cached todo rows also carry the
+  plaintext `important: boolean | null` (non-content, alongside `done`) and the
+  cached list rows carry `importantDefault: boolean | null` (`SPEC-todo-importance.md`);
+  content columns (`title`/`note`/`name`) remain `enc.v1.`-only.
 - Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash`.
-  `q`/`tagId`/`listId`/`done`/`due*`/ cursor/limit never enter the key — `listId` and
-  every other filter are applied in memory off `todo:all` after the hit; one entry
-  serves every filter/page variant, and one trash entry serves every trash
-  cursor/limit variant.
+  `q`/`tagId`/`listId`/`done`/`important`/`due*`/ cursor/limit never enter the key —
+  `listId`, `important` (matched against `effectiveImportant`), and every other filter
+  are applied in memory off `todo:all` after the hit; one entry serves every
+  filter/page variant, and one trash entry serves every trash cursor/limit variant.
 - Loader guards: the `todo:all` loader (and the `findOne`/`update`/`todo:tags`
   paths) apply `deletedAt IS NULL`, so a generation bump makes a trashed row vanish
   from the list; the `todo:trash` loader applies `deletedAt IS NOT NULL`.
 - Per-owner generation counter bumped **after** every successful write — including
   the four trash writes (`remove` soft, `restore`, `removePermanent`, `emptyTrash`)
-  on the same `todo:all` counter; a failed mutation never bumps; 60s TTL backstop;
+  on the same `todo:all` counter; a list write that changes `importantDefault` bumps
+  the same counter so every inheriting todo picks up the new default on its next read
+  (computed, never denormalized); a failed mutation never bumps; 60s TTL backstop;
   fail-open on cache errors (direct loader); the fallback path never writes
   plaintext.
-- Decrypt, filter, and paginate after every hit. No plaintext in Redis.
+- Decrypt, filter, and paginate after every hit. The plaintext `important`/
+  `importantDefault` booleans are the documented non-content exception (mirroring
+  `done`); they are stored in the clear in SQL and Redis, while no content plaintext
+  ever enters Redis. The cache suite's ciphertext assertions (content fields
+  `enc.v1.`-only, no known plaintext) are unchanged and still fail on any content leak.
 
 ## Health
 

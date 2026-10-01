@@ -20,6 +20,8 @@ export interface ListShellProps {
   title: string;
   /** Trailing nav actions: icon links + `ThemeToggle`, in render order. */
   navTrailing?: ReactNode;
+  /** Tab navigation (`TabBar`); rendered directly under the page title. */
+  tabs?: ReactNode;
   /** The param-preserving search box (app-kit's `SearchField` wrapper). */
   search?: ReactNode;
   /** Filter rows: `PillGroup` status pills and/or `TagFilterNav`, in render order. */
@@ -43,6 +45,7 @@ Rendered structure, in order:
 <PageShell>
   <NavBar trailing={navTrailing} />
   <PageTitle>{title}</PageTitle>
+  {tabs}
   {search}
   {filters}
   {body}
@@ -50,8 +53,9 @@ Rendered structure, in order:
 </PageShell>
 ```
 
-Optional slots (`navTrailing`, `search`, `filters`) render nothing when omitted, so a
-simpler list page composes the same shell.
+Optional slots (`navTrailing`, `tabs`, `search`, `filters`) render nothing when omitted, so
+a simpler list page composes the same shell. When `tabs` is omitted the render is
+byte-identical to today's pages (no wrapper element is added).
 
 ### Semantics and edge cases
 
@@ -95,9 +99,27 @@ The empty-state decision lives in `apps/app/app/note-list.tsx:8-10` and
   rows/links inside `body` (the app-owned list component).
 
 Preserved but **not** asserted by any test today — the shell must not alter them all the
-same: the todos fab label `New todo`, the todos search label `Search todos`, the
-`navTrailing` links `Manage tags` / `Manage lists` / `Notes` / `Todos`, and the theme toggle
-(whose aria-label is dynamic, `Theme: …`).
+same: the todos fab label `New todo`, the todos search label `Search todos`, and the
+`navTrailing` links `Manage tags` / `Manage lists` / `Notes` / `Todos`.
+
+Frozen-surface change approved by the user (intent L4 / map D7, `SPEC-matrix-ui.md`): the
+theme toggle **leaves `navTrailing`** and its exact former slot is taken by the Settings
+gear — so `navTrailing` now ends with
+`getByLabel('Settings')` → an `IconLink` rendering `<Settings size={20} aria-hidden />`
+(`href` from `app-kit`'s `settingsHref`). This applies to **both** `apps/app/app/notes/page.tsx`
+and `apps/app/app/todos/page.tsx`, which both carried the toggle. The toggle's former dynamic
+`Theme: …` aria-label no longer appears in `navTrailing`; `ThemeToggle` itself is unchanged
+(still `localStorage`-backed) and is now rendered on `/todos/settings` and `/notes/settings`.
+The existing `getByLabel('Trash')` assertion (above) is unaffected; no current test asserted
+the toggle. The same change updates the frozen e2e spec's recorded surface — documented here
+and in `SPEC-todo-ui.md`; the human-owned suite is not edited by agents. The `tabs` slot's
+`List`/`Matrix` links are recorded in `SPEC-ui-tabs.md` / `SPEC-matrix-ui.md` and add no
+assertion to this shell.
+
+The `tabs` slot adds **no frozen assertion** of its own: the tab row is a `TabBar`/`Tab`
+node supplied by the app, and the shell renders it verbatim like every other slot. The
+shell still owns no tab semantics — element order, roles and the aria-labels above are
+unchanged, and omitting `tabs` renders nothing.
 
 ## CSS ownership
 
@@ -161,11 +183,11 @@ Fetching, grouping, href building and the list components stay in `apps/app`.
 
 ## Testing Strategy
 
-Unit tests only (jest, `packages/ui`). Cover: slot render order (title → search → filters
-→ body → fab); omitted optional slots render nothing; `fabLabel` becomes the `FabLink`
-aria-label; `title` becomes the `h1`; `body` passes through unmodified. No URL or fetch
-behavior — that is `app-kit`'s suite. E2E is not run by this module; `segment-port` runs
-the journey unchanged.
+Unit tests only (jest, `packages/ui`). Cover: slot render order (title → tabs → search →
+filters → body → fab); omitted optional slots render nothing; `fabLabel` becomes the
+`FabLink` aria-label; `title` becomes the `h1`; `body` passes through unmodified. No URL or
+fetch behavior — that is `app-kit`'s suite. E2E is not run by this module; `segment-port`
+runs the journey unchanged.
 
 ## Boundaries
 

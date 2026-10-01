@@ -7,12 +7,16 @@ Module id: `app-kit` (map: `docs/specs/MAP-shared-page-blocks.md`). Depends on `
 One workspace package holding the page/route **behavior glue** that the notes and todos
 segments currently duplicate: the filter-href builder, the `tag`-param parser, the
 parameter-preserving search box, the create/edit `load-or-notFound()` helper, the
-route-layout metadata helper, and the shared param types those functions exchange.
+route-layout metadata helper, and the shared param types those functions exchange. It
+additionally owns the Settings surface's behavior glue: the server-readable preference
+cookie (`readPref`/`setPref`) and the app-scoped settings-route helper (`settingsHref`) —
+specified in `SPEC-app-kit-settings.md`.
 
 `app-kit` is **behavior only**. It owns routing/URL glue and Next's `notFound()` flow; it
 owns no markup, no visual language, and no data fetching. Visual primitives stay in
-`@life/ui` (the search box composes `@life/ui`'s `SearchField`; it never reimplements it),
-and the API clients / server actions stay in `apps/app`.
+`@life/ui` (the search box composes `@life/ui`'s `SearchField`; it never reimplements it);
+the domain API clients and data-mutating server actions stay in `apps/app` (the generic
+preference-cookie action is behavior glue and lives here, per `SPEC-app-kit-settings.md`).
 
 Success = `apps/app/app/notes/**` and `apps/app/app/todos/**` each keep zero copies of the
 five patterns below; a third segment gets them from `@life/app-kit` instead of copying a

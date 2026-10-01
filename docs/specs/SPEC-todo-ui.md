@@ -24,7 +24,16 @@ both apps — so tags feel identical everywhere (I3).
   trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
   Trash entry in the toolbar; filters by list, tag, and done state. Data via the
   todo-service API (server actions compose registry + todo calls — BFF composition,
-  MAP M4).
+  MAP M4). The list page also carries the shared `TabBar` (List / Matrix) added by
+  `ui-tabs`, present through `ListShell`'s `tabs` slot only when the matrix opt-in is
+  enabled (`SPEC-matrix-ui.md`).
+- **`/todos/matrix` + `/todos/settings` (matrix-ui):** the Eisenhower matrix lens
+  (server-gated on the `pref_matrix` cookie; groups todos into four quadrants from
+  `effectiveImportant` + a derived urgency) and the Todos settings page (Theme +
+  "Eisenhower matrix" switch). `/todos/settings` is reached from the Settings gear that
+  replaces the theme toggle in `navTrailing`; `/notes/settings` is the Notes counterpart
+  (Theme only). Full contracts live in `SPEC-matrix-ui.md`; this module only records the
+  surface changes those routes make to `/todos` and the nav.
 - **Shared tag UX:** tag picker (attach/detach by `tagId`) and tag manager (create,
   rename, delete) usable from both `/notes` and `/todos`, backed by `tags-service`
   exclusively. Rename/delete in either app reflect everywhere immediately (single
@@ -49,6 +58,26 @@ both apps — so tags feel identical everywhere (I3).
   Never raw HTML for
   interactive elements, never app-side CSS recreating primitives, tokens only.
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
+
+## Frozen e2e surface updates (matrix-ui, user-approved)
+
+The theme-toggle relocation approved in the matrix intent (L4 / map D7) changes the
+recorded surface this spec froze:
+
+- `navTrailing` on `/todos` (and `/notes`) no longer ends with `ThemeToggle`; its former
+  slot is the Settings gear — `getByLabel('Settings')` → `IconLink href={settingsHref('/todos')}`
+  (Notes: `/notes/settings`). The dynamic `Theme: …` label is no longer in the nav; Theme
+  itself is unchanged and now lives on `/todos/settings` and `/notes/settings`.
+- The `/todos` toolbar still renders `Manage tags` / `Manage lists` / `Trash` (unchanged),
+  so the existing `getByLabel('Trash')` assertion is unaffected.
+- New recorded selectors: `/todos` tabs `getByRole('link', { name: 'List' | 'Matrix' })`
+  (Matrix only when the opt-in is on); the settings switch
+  `getByRole('switch', { name: 'Eisenhower matrix' })` on `/todos/settings`.
+
+No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
+not rewritten by this chapter — the surface *record* is what updates (here, in
+`SPEC-ui-list-shell.md` and `SPEC-matrix-ui.md`). The human-owned suite changes only if and
+when the user asks for it.
 
 ## Commands
 
