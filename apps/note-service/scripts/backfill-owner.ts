@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync } from 'fs';
+import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
 import { resolve } from 'path';
 
 /**
@@ -92,66 +92,6 @@ export function resolvePaths(env: Env = process.env): ResolvedPaths {
 function count(db: Database.Database, table: string): number {
   const row = db.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).get() as { c: number };
   return row.c;
-}
-
-function uniqueBackupPath(noteDbPath: string): string {
-  // UTC, millisecond resolution, filename-safe. Collisions (two runs in the same
-  // millisecond) fall through to a numeric suffix rather than ever overwriting.
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  let candidate = `${noteDbPath}.bak-${stamp}`;
-  let n = 1;
-  while (existsSync(candidate)) {
-    candidate = `${noteDbPath}.bak-${stamp}-${n}`;
-    n += 1;
-  }
-  return candidate;
-}
-
-/**
- * Step 1. Take a SQLite-consistent snapshot of the pre-migration state via
- * `VACUUM INTO`, then verify the copy: it exists, opens read-only,
- * `PRAGMA quick_check` passes, and its `note` row count matches the source. Any
- * failure throws — the caller never proceeds to a write.
- *
- * The source is opened read-only so this step provably cannot mutate anything.
- */
-export function snapshotAndVerify(noteDbPath: string): BackupResult {
-  if (!existsSync(noteDbPath)) {
-    throw new Error(`NOTE_DB_PATH does not exist: ${noteDbPath}`);
-  }
-
-  const backupPath = uniqueBackupPath(noteDbPath);
-  const source = new Database(noteDbPath, { readonly: true });
-  let sourceNotes: number;
-  try {
-    sourceNotes = count(source, 'note');
-    // VACUUM INTO refuses an existing target, which is exactly the guarantee we
-    // want; the path was chosen fresh above.
-    source.prepare('VACUUM INTO ?').run(backupPath);
-  } finally {
-    source.close();
-  }
-
-  if (!existsSync(backupPath)) {
-    throw new Error(`backup was not created: ${backupPath}`);
-  }
-
-  const copy = new Database(backupPath, { readonly: true });
-  try {
-    const check = copy.prepare('PRAGMA quick_check').get() as { quick_check: string } | undefined;
-    if (check?.quick_check !== 'ok') {
-      throw new Error(`backup failed PRAGMA quick_check: ${backupPath}`);
-    }
-    const copyNotes = count(copy, 'note');
-    if (copyNotes !== sourceNotes) {
-      throw new Error(
-        `backup note count mismatch: source=${sourceNotes} backup=${copyNotes} (${backupPath})`,
-      );
-    }
-    return { backupPath, verified: true, noteCount: sourceNotes, quickCheck: 'ok' };
-  } finally {
-    copy.close();
-  }
 }
 
 function hasColumn(db: Database.Database, table: string, column: string): boolean {
@@ -421,7 +361,16 @@ function countWhereNull(db: Database.Database, table: string): number {
 /** Run all four steps in order and return the evidence. Throws on any failure. */
 export function runBackfill(env: Env = process.env): RunResult {
   const { noteDbPath, idpDbPath } = resolvePaths(env);
-  const backup = snapshotAndVerify(noteDbPath); // Step 1 — aborts on any failure
+  // Step 1 — aborts on any failure; no write precedes it.
+  const result = snapshotAndVerify(noteDbPath, uniqueSnapshotPath(noteDbPath, 'bak'), {
+    rowCountTables: ['note'],
+  });
+  const backup: BackupResult = {
+    backupPath: result.backupPath,
+    verified: true,
+    noteCount: result.rowCounts.note,
+    quickCheck: 'ok',
+  };
   const schema = applySchema(noteDbPath); // Step 2 — note ALTER + indexes + tag rebuild
   const sub = resolveOldestUser(idpDbPath); // Step 3 — aborts when none
   const stamped = backfillNullOwners(noteDbPath, sub); // Step 4 — UPDATE ... WHERE IS NULL
