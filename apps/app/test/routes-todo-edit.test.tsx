@@ -41,6 +41,8 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     title: 'Buy milk',
     note: 'two litres',
     done: false,
+    important: null,
+    effectiveImportant: false,
     dueDate: '2026-10-02',
     listId: 'l1',
     tagIds: [7],
@@ -56,7 +58,13 @@ describe('/todos/[id]/edit page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedListLists.mockResolvedValue([
-      { id: 'l1', name: 'Groceries', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
+      {
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: null,
+        version: 0,
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
     ] as List[]);
     mockedListTags.mockResolvedValue([
       { id: 7, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
@@ -73,7 +81,13 @@ describe('/todos/[id]/edit page wiring', () => {
     expect(el.type).toBe(TodoEditor);
     expect(el.props.todo).toBe(fixture);
     expect(el.props.lists).toEqual([
-      { id: 'l1', name: 'Groceries', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
+      {
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: null,
+        version: 0,
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
     ]);
     expect(el.props.availableTags).toEqual([{ id: 7, name: 'errand' }]);
   });

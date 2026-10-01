@@ -28,6 +28,8 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     title: 'Buy milk',
     note: null,
     done: false,
+    important: null,
+    effectiveImportant: false,
     dueDate: null,
     listId: null,
     tagIds: [],
@@ -62,7 +64,13 @@ describe('/todos list page wiring', () => {
     });
     mockedUsage.mockResolvedValue([{ tagId: 1, count: 2 }] as TagUsage[]);
     mockedListLists.mockResolvedValue([
-      { id: 'l1', name: 'Groceries', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
+      {
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: null,
+        version: 0,
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
     ] as List[]);
     mockedListTags.mockResolvedValue([
       { id: 1, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },

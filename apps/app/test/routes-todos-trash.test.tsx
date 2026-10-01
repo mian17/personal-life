@@ -31,6 +31,8 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     title: 'Buy milk',
     note: 'from the shop',
     done: false,
+    important: null,
+    effectiveImportant: false,
     dueDate: null,
     listId: null,
     tagIds: [],

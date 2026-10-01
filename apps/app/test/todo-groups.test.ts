@@ -10,6 +10,8 @@ function todo(id: string, dueDate: string | null): Todo {
     title: id,
     note: null,
     done: false,
+    important: null,
+    effectiveImportant: false,
     dueDate,
     listId: null,
     tagIds: [],
