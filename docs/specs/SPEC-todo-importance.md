@@ -74,7 +74,11 @@ effectiveImportant(todo, list) = todo.important ?? list.importantDefault ?? fals
 ## Behavior / API
 
 The wire types are exported from `@life/shared` (the `Todo`/`List` precedent); the app
-consumes, never re-declares. All new fields are additive and optional on the wire.
+consumes, never re-declares. Optionality splits by direction: **request** DTO fields are
+optional (`important?`, `importantDefault?`); **read** DTO fields are always present —
+`effectiveImportant: boolean` is required and `important: boolean | null` /
+`importantDefault: boolean | null` are required-but-nullable (the key is always on the
+wire; `null` is a value, not an omission).
 
 ### Todo
 
@@ -168,6 +172,25 @@ the app/service (the `content-match.ts` / `likeMatch` pattern), never as SQL ove
 encrypted columns. `important` is plaintext, but the ordering and grouping of a matrix view
 still depend on decrypted `title`/`note`, so the whole placement step happens post-decrypt
 off the cached row-sets. No `ORDER BY`/`WHERE` over encrypted columns is introduced.
+
+## Consumer surfaces
+
+This module owns the stored/delivered importance field contracts; the two surfaces that
+let the user set them live on the existing `/todos` UI (`SPEC-todo-ui.md`), and both write
+through the app's existing todo/list actions:
+
+- **List importance-default** — a control on the list manager
+  (`apps/app/app/list-manager-panel.tsx`) writing `list.importantDefault` via the app's list
+  write path (`apps/app/app/todo-actions.ts` `renameListAction` →
+  `apps/app/lib/todo-api.ts` `renameList`, the list PATCH).
+- **Per-todo importance** — a toggle in the todo editor
+  (`apps/app/app/todo-editor.tsx` + `apps/app/app/todo-actions.ts`) writing
+  `todo.important` as an explicit `true`/`false` override; `null` (inherit the list default)
+  remains the value for a todo the user has never overridden.
+
+Both surfaces compose the `Switch` atom (`SPEC-ui-settings.md`) — no raw HTML — and the
+app owns their copy: the frozen accessible names are `Important` (per-todo) and
+`Default important` (list default).
 
 ## Commands
 

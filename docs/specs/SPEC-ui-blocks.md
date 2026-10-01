@@ -69,7 +69,8 @@ and the notes app's current pages map onto these one-to-one.
              onCreate: (name: string) => void
              onRename: (id: string, name: string) => void
              onDelete: (id: string) => void
-             disabled? label? placeholder? createLabel? />
+             disabled? label? placeholder? createLabel?
+             rowExtra?: (list: {id: string; name: string}) => ReactNode />
 ```
 
 ### Todo-ecosystem additions (T7)
@@ -86,6 +87,9 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
   create from a draft input.
 - **`ListManager`** — todo-list management (`Array<{id: string; name: string}>`), the
   same create/rename/delete shape as `TagManager` (the id is a string, not a number).
+  The optional `rowExtra?: (list: {id: string; name: string}) => ReactNode` prop renders
+  the supplied node inside each row; it is a domain-free extension point (the block bakes
+  no copy and knows no domain notion — the app supplies the node).
 
 #### Composition (element by element)
 

@@ -229,6 +229,26 @@ const matrixEnabled = await readPref('matrix'); // @/lib/preferences
 - Off ⇒ `tabs` omitted ⇒ `ListShell` renders no tabs node (byte-identical, map D3).
 - Selectors: links named `List` and (when on) `Matrix`.
 
+### `/todos` importance inputs — list default + per-todo (L6 consumer path)
+
+Importance is manual (intent L6), so the same `/todos` integration also carries the two
+surfaces that set it; without them every `important` stays `null` and the two "Important"
+quadrants are permanently empty. This is `apps/app` wiring only — no new module, no new
+backend, and both controls compose the upstream `Switch` atom (`SPEC-ui-settings.md`); the
+field contracts live in `SPEC-todo-importance.md`.
+
+- **List importance-default** — `apps/app/app/list-manager-panel.tsx` renders a `Switch`
+  (label `Default important`) per list, writing `list.importantDefault` through the existing
+  list action in `apps/app/app/todo-actions.ts`.
+- **Per-todo importance** — `apps/app/app/todo-editor.tsx` renders a `Switch` (label
+  `Important`) seeded from `todo.important ?? todo.effectiveImportant`, writing
+  `todo.important` as an explicit `true`/`false` override through
+  `apps/app/app/todo-actions.ts`; `null` (inherit) remains the value for an un-overridden
+  todo.
+
+The frozen accessible names `Important` and `Default important` are app copy (`Switch`'s
+`label`); no raw HTML, tokens only.
+
 ### `/todos/matrix` (server-gated) — `apps/app/app/todos/matrix/page.tsx`
 
 ```tsx

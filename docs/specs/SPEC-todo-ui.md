@@ -59,6 +59,27 @@ both apps — so tags feel identical everywhere (I3).
   interactive elements, never app-side CSS recreating primitives, tokens only.
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
 
+## Importance input surfaces (matrix-ui, L6)
+
+The locked model (intent L6) is *manual* importance, defaulted by the list and overridable
+per todo — so the `/todos` UI needs two input surfaces, both composing the `Switch` atom
+(`SPEC-ui-settings.md`) with the app owning the copy. Field contracts live in
+`SPEC-todo-importance.md` (`## Consumer surfaces`); this section records where the user
+sets them.
+
+- **List importance-default** — a `Switch` on the list manager
+  (`apps/app/app/list-manager-panel.tsx`), writing `list.importantDefault` through the
+  existing list action (`apps/app/app/todo-actions.ts`). Accessible name (frozen app text):
+  `Default important`.
+- **Per-todo importance** — a `Switch` in the todo editor
+  (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`), writing
+  `todo.important` as an explicit `true`/`false` override; `null` (inherit the list default)
+  remains the value for a todo the user has never overridden. Accessible name (frozen app
+  text): `Important`.
+
+No raw HTML: both controls are the upstream `Switch` atom; the app supplies label, checked
+value and handler. `/todos` otherwise stays a normal list page (map `matrix-ui`).
+
 ## Frozen e2e surface updates (matrix-ui, user-approved)
 
 The theme-toggle relocation approved in the matrix intent (L4 / map D7) changes the
@@ -72,7 +93,9 @@ recorded surface this spec froze:
   so the existing `getByLabel('Trash')` assertion is unaffected.
 - New recorded selectors: `/todos` tabs `getByRole('link', { name: 'List' | 'Matrix' })`
   (Matrix only when the opt-in is on); the settings switch
-  `getByRole('switch', { name: 'Eisenhower matrix' })` on `/todos/settings`.
+  `getByRole('switch', { name: 'Eisenhower matrix' })` on `/todos/settings`; the importance
+  controls `getByRole('switch', { name: 'Important' })` on the todo editor and
+  `getByRole('switch', { name: 'Default important' })` on the list manager.
 
 No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
 not rewritten by this chapter — the surface *record* is what updates (here, in
