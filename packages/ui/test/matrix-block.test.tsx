@@ -76,13 +76,36 @@ describe('MatrixBlock', () => {
   it('stacks one column by default and two at the 640px breakpoint (tokens only)', () => {
     const matrix = cssBlock('.ui-matrix');
     expect(matrix).toMatch(/display:\s*grid/);
-    expect(matrix).toMatch(/gap:\s*var\(--space-1\)/);
-    expect(cssBlock('.ui-matrix__quadrant')).toMatch(/display:\s*grid/);
-    expect(cssBlock('.ui-matrix__quadrant')).toMatch(/gap:\s*var\(--space-0-5\)/);
+    expect(matrix).toMatch(/gap:\s*0/);
+    // No outer frame on the grid itself.
+    expect(matrix).not.toMatch(/border/);
+
+    const quadrant = cssBlock('.ui-matrix__quadrant');
+    expect(quadrant).toMatch(/display:\s*grid/);
+    expect(quadrant).toMatch(/gap:\s*var\(--space-0-5\)/);
+    expect(quadrant).toMatch(/padding:\s*var\(--space-1\)/);
+
+    // Phone (one column): a hairline between consecutive quadrants, never above the first.
+    const stacked = cssBlock('.ui-matrix__quadrant + .ui-matrix__quadrant');
+    expect(stacked).toMatch(/border-top:\s*var\(--border-width\)\s+solid\s+var\(--border\)/);
+
     expect(cssBlock('.ui-matrix__label')).toMatch(/margin:\s*0/);
     expect(cssBlock('.ui-matrix__items')).toMatch(/display:\s*grid/);
 
     const media = css.match(/@media\s*\(min-width:\s*640px\)\s*\{([\s\S]*?)\}\s*\}/)?.[1] ?? '';
     expect(media).toMatch(/\.ui-matrix\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    // 2×2 inner cross: reset the phone rule, then re-add between the rows/columns.
+    expect(media).toMatch(/\.ui-matrix__quadrant \+ \.ui-matrix__quadrant\s*\{[^}]*border-top:\s*0/);
+    expect(media).toMatch(
+      /\.ui-matrix__quadrant:nth-child\(n \+ 3\)\s*\{[^}]*border-top:\s*var\(--border-width\)\s+solid\s+var\(--border\)/,
+    );
+    expect(media).toMatch(
+      /\.ui-matrix__quadrant:nth-child\(odd\)\s*\{[^}]*border-right:\s*var\(--border-width\)\s+solid\s+var\(--border\)/,
+    );
+
+    // Guard: divider declarations resolve through tokens, never raw px/hex.
+    const declarations = `${matrix}${quadrant}${stacked}${media}`;
+    expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
+    expect(declarations).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
   });
 });

@@ -527,15 +527,25 @@
    sections on a phone, a 2×2 grid from 640px up (the `--content-width`
    breakpoint). `minmax(0, 1fr)` tracks prevent overflow, so no horizontal
    scroll. Grid gaps only, no outer margins — a grid child carrying Section's
-   outer margin would double-space against the grid gap. */
+   outer margin would double-space against the grid gap. The quadrants are
+   separated by inner hairline dividers only (never an outer frame): a single
+   rule between consecutive stacked quadrants on a phone, an inner cross in the
+   2×2 layout. */
 .ui-matrix {
   display: grid;
-  gap: var(--space-1);
+  gap: 0;
 }
 
 .ui-matrix__quadrant {
   display: grid;
   gap: var(--space-0-5);
+  padding: var(--space-1);
+}
+
+/* Phone (one column): a hairline between consecutive quadrants, never above
+   the first. */
+.ui-matrix__quadrant + .ui-matrix__quadrant {
+  border-top: var(--border-width) solid var(--border);
 }
 
 .ui-matrix__label {
@@ -554,5 +564,17 @@
 @media (min-width: 640px) {
   .ui-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 2×2: reset the phone rule, then draw the inner cross only (no outer
+     frame). The reset is placed before the `:nth-child` re-adds so the
+     same-specificity desktop cross wins by source order. */
+  .ui-matrix__quadrant + .ui-matrix__quadrant {
+    border-top: 0;
+  }
+  .ui-matrix__quadrant:nth-child(n + 3) {
+    border-top: var(--border-width) solid var(--border);
+  }
+  .ui-matrix__quadrant:nth-child(odd) {
+    border-right: var(--border-width) solid var(--border);
   }
 }

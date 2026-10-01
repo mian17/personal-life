@@ -430,16 +430,31 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   spacing scale for type (as `Section` does) with `margin: 0`; `Stack`-like `gap` only, no
   outer margins (a grid child with `Section`'s outer margin would double-space against the
   grid gap).
+- Quadrants are separated by **inner hairline dividers only** — never an outer frame on
+  `.ui-matrix` or `.ui-matrix__quadrant`. One column (phone) gets a single rule between
+  consecutive stacked quadrants (never above the first); the 2×2 layout gets an inner cross
+  (a rule between the rows and between the columns). Dividers use the `--border-width` /
+  `--border` tokens.
 - Responsive (map D6), decided in CSS, no JS, no horizontal scroll:
 
   ```css
-  .ui-matrix { display: grid; gap: var(--space-1); }
-  .ui-matrix__quadrant { display: grid; gap: var(--space-0-5); }
+  .ui-matrix { display: grid; gap: 0; }
+  .ui-matrix__quadrant { display: grid; gap: var(--space-0-5); padding: var(--space-1); }
+
+  /* Phone (one column): a hairline between consecutive quadrants, never above the first. */
+  .ui-matrix__quadrant + .ui-matrix__quadrant {
+    border-top: var(--border-width) solid var(--border);
+  }
+
   .ui-matrix__label { font-size: var(--space-1); font-weight: 700; margin: 0; }
   .ui-matrix__items { display: grid; gap: var(--space-0-5); }
 
   @media (min-width: 640px) {
     .ui-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* 2×2: reset the phone rule, then draw the inner cross only (no outer frame). */
+    .ui-matrix__quadrant + .ui-matrix__quadrant { border-top: 0; }
+    .ui-matrix__quadrant:nth-child(n + 3) { border-top: var(--border-width) solid var(--border); }
+    .ui-matrix__quadrant:nth-child(odd) { border-right: var(--border-width) solid var(--border); }
   }
   ```
 
