@@ -9,3 +9,5 @@ data/
 .env.development
 .env.development.local
 .playwright-cli/
+backup/
+*.db
