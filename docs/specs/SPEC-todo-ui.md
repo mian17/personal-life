@@ -26,7 +26,12 @@ both apps — so tags feel identical everywhere (I3).
   todo-service API (server actions compose registry + todo calls — BFF composition,
   MAP M4). The list page also carries the shared `TabBar` (List / Matrix) added by
   `ui-tabs`, present through `ListShell`'s `tabs` slot only when the matrix opt-in is
-  enabled (`SPEC-matrix-ui.md`).
+  enabled (`SPEC-matrix-ui.md`). Each List row is one `ListItem variant="todo"`
+  (`size="default"`): a leading borderless square `Checkbox`, a title clamped to two
+  lines, and the signal due date, keeping its List extras (list name, note snippet,
+  trash delete). `TodoItem`'s scale prop is `size?: 'default' | 'dense'`
+  (`'default'` = the List row, `'dense'` = the matrix lens); the two views share one
+  row anatomy at two scales (`SPEC-ui-blocks.md`).
 - **`/todos/matrix` + `/todos/settings` (matrix-ui):** the Eisenhower matrix lens
   (server-gated on the `pref_matrix` cookie; groups todos into four quadrants from
   `effectiveImportant` + a derived urgency) and the Todos settings page (Theme +
@@ -34,6 +39,12 @@ both apps — so tags feel identical everywhere (I3).
   replaces the theme toggle in `navTrailing`; `/notes/settings` is the Notes counterpart
   (Theme only). Full contracts live in `SPEC-matrix-ui.md`; this module only records the
   surface changes those routes make to `/todos` and the nav.
+- **Editor save awaits the write (stale-list fix):** `todo-editor.tsx`'s `save()` awaits
+  its Server Action (`createTodoAction` / `updateTodoAction`, which run
+  `revalidateTodos()`) **before** `router.back()`, so the action's `revalidatePath` lands
+  before the List/Matrix render and they show the new/edited row rather than the stale RSC
+  cache. A failed write does not navigate — the editor stays open for retry — and a
+  `saving` guard blocks a second submission while the first is in flight.
 - **Shared tag UX:** tag picker (attach/detach by `tagId`) and tag manager (create,
   rename, delete) usable from both `/notes` and `/todos`, backed by `tags-service`
   exclusively. Rename/delete in either app reflect everywhere immediately (single

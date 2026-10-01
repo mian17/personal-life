@@ -39,6 +39,7 @@ export function TodoEditor({
   const [dueDate, setDueDate] = useState(todo?.dueDate ?? '');
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
+  const [saving, setSaving] = useState(false);
   // The user's explicit override; `undefined` = untouched (inherit). Not a hook:
   // the seed is derived from the current list so create mode follows its default.
   const [importantOverride, setImportantOverride] = useState<boolean | undefined>(undefined);
@@ -49,32 +50,41 @@ export function TodoEditor({
 
   const canSave = title.trim() !== '';
 
-  function save() {
-    if (!canSave) return;
-    if (editing) {
-      void updateTodoAction(
-        todo.id,
-        {
+  async function save() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      // Await the action's revalidatePath before navigating: the RSC cache must
+      // reflect the write before `router.back()` renders the List/Matrix, or they
+      // show stale rows. A failed write stays on the editor so the user can retry;
+      // the `saving` guard prevents a double write from a second tap.
+      if (editing) {
+        await updateTodoAction(
+          todo.id,
+          {
+            title,
+            note: note.trim() === '' ? null : note,
+            dueDate: dueDate === '' ? null : dueDate,
+            listId,
+            tagIds,
+            ...(importantOverride !== undefined ? { important: importantOverride } : {}),
+          },
+          todo.version,
+        );
+      } else {
+        await createTodoAction({
           title,
-          note: note.trim() === '' ? null : note,
-          dueDate: dueDate === '' ? null : dueDate,
-          listId,
+          note: note.trim() === '' ? undefined : note,
+          dueDate: dueDate === '' ? undefined : dueDate,
+          listId: listId ?? undefined,
           tagIds,
           ...(importantOverride !== undefined ? { important: importantOverride } : {}),
-        },
-        todo.version,
-      );
-    } else {
-      void createTodoAction({
-        title,
-        note: note.trim() === '' ? undefined : note,
-        dueDate: dueDate === '' ? undefined : dueDate,
-        listId: listId ?? undefined,
-        tagIds,
-        ...(importantOverride !== undefined ? { important: importantOverride } : {}),
-      });
+        });
+      }
+      router.back();
+    } catch {
+      setSaving(false);
     }
-    router.back();
   }
 
   return (
@@ -82,7 +92,11 @@ export function TodoEditor({
       back={{ label: 'Back', onBack: () => router.back() }}
       title={editing ? 'Edit Todo' : 'New Todo'}
       actions={
-        <IconButton label={editing ? 'Save todo' : 'Add todo'} onClick={save} disabled={!canSave}>
+        <IconButton
+          label={editing ? 'Save todo' : 'Add todo'}
+          onClick={save}
+          disabled={!canSave || saving}
+        >
           <Check size={20} aria-hidden />
         </IconButton>
       }

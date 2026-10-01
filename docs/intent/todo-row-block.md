@@ -28,7 +28,7 @@ Confirmed by the user 2026-10-02 via interview-me (explicit "yes").
 | # | Decision | Rationale |
 |---|---|---|
 | T1 | One `variant="todo"`; `size` replaces the `dense` boolean. | `dense` is a property of the todo row, not the generic list row; the variant carries the todo anatomy. |
-| T2 | Both sizes use a **leading, borderless (ghost) square `Checkbox`**, top-aligned with the title. | It is a glyph, not a button; a bordered box around a leading checkbox reads wrong. Matches the shipped matrix row. |
+| T2 | Both sizes use a **leading, borderless (ghost) square `Checkbox`**. The default List size vertically centres the checkbox and action slots; the dense matrix size stays top-aligned. | It is a glyph, not a button; a bordered box around a leading checkbox reads wrong. The default row centres against its two-line body, while dense keeps the shipped matrix row's top alignment. |
 | T3 | `size="default"` (List): base type, ~20px checkbox, base padding, **2-line** title clamp. `size="dense"` (Matrix): today's 0.7rem type, 12px checkbox, compact padding, 2-line clamp. | "Same row, just bigger" — the matrix look is the dense scale, not a separate anatomy. |
 | T4 | The List todo row adopts the matrix **signal** due-date colouring (overdue `--danger`, future `--danger-soft`). | Revises lesson 0003's "list dates stay muted" **for todos only**; the two views of one todo should agree. |
 | T5 | `Checkbox` is sized by a `--checkbox-size` custom property (atom default 0.75rem; todo row 1.25rem; dense 0.75rem). | The atom's own recorded upgrade path ("promote to a --checkbox-size var if a second size is ever needed"). |

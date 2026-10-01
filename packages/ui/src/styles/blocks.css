@@ -65,7 +65,9 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: 1fr;
+  /* `minmax(0, 1fr)`, not `1fr`: a bare `1fr` is `minmax(auto, 1fr)`, so a tall
+     child would grow this track instead of scrolling inside it. */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* ----------------------------------------------------------- NavBar */
@@ -299,13 +301,41 @@
   overflow: hidden;
 }
 
-/* Dense rows: compact type for a small-surface list (matrix quadrants). The
-   leading done toggle top-aligns with the title at text height; title and date
-   share the same small size. */
+/* Todo row: leading square checkbox centred against the row, 2-line title.
+   The default size centres the leading checkbox and action slots against the row
+   via the base `align-items: center`; the dense scale below top-aligns them.
+   The dense scale keeps only the compact overrides (source order matters: dense
+   wins the --checkbox-size cascade at equal specificity). */
+.ui-list-item--todo {
+  --checkbox-size: var(--space-1-25); /* 20px normal size */
+}
+
+.ui-list-item--todo .ui-icon-btn {
+  width: auto;
+  height: auto;
+  /* Vertical padding keeps a comfortable tap target; the left inset gives the
+     leading checkbox room from the row edge. */
+  padding: var(--space-0-9) 0 var(--space-0-9) var(--space-0-9);
+}
+
+.ui-list-item--todo .ui-list-item__title {
+  /* Up to two lines, then ellipsis. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+}
+
+/* Dense todo rows: compact scale for a small-surface list (matrix quadrants).
+   The 2-line clamp is inherited from the todo group above; the dense scale alone
+   restores the top-alignment for the row and its link. Only the
+   type/padding/gap/floor overrides live here. */
 .ui-list-item--dense {
   align-items: flex-start;
   /* Override the base two-line floor: a dense row is exactly its content height. */
   min-height: 0;
+  --checkbox-size: var(--space-0-75); /* 12px */
 }
 
 .ui-list-item--dense .ui-list-item__link {
@@ -315,20 +345,11 @@
 }
 
 .ui-list-item--dense .ui-icon-btn {
-  width: auto;
-  height: auto;
   padding: var(--space-0-7) 0;
 }
 
 .ui-list-item--dense .ui-list-item__title {
   font-size: var(--space-0-7);
-  /* Up to two lines, then ellipsis (TickTick-style). Overrides the base
-     single-line nowrap only for the dense/matrix row. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  white-space: normal;
-  overflow: hidden;
 }
 
 .ui-list-item--dense .ui-list-item__sub {
@@ -634,12 +655,14 @@
 
 /* Eisenhower matrix: four labelled quadrants in a 2×2 grid at every width
    (smallest phones included), each a muted panel, separated by the grid gap.
-   `minmax(0, 1fr)` tracks prevent overflow; `grid-auto-rows: 1fr` gives the two
-   rows equal height so empty quadrants match populated ones. */
+   `minmax(0, 1fr)` tracks prevent overflow; `grid-auto-rows: minmax(0, 1fr)`
+   gives the two rows equal height so empty quadrants match populated ones while
+   keeping the tracks bounded — a bare `1fr` is `minmax(auto, 1fr)`, so a tall
+   cell would grow its row and lengthen the matrix instead of scrolling inside. */
 .ui-matrix {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-auto-rows: minmax(0, 1fr);
   gap: var(--space-0-5);
 }
 

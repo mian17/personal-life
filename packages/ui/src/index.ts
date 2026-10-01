@@ -63,7 +63,12 @@ export { List } from './components/list';
 export type { ListProps } from './components/list';
 
 export { ListItem } from './components/list-item';
-export type { ListItemProps, ListItemTone } from './components/list-item';
+export type {
+  ListItemProps,
+  ListItemSize,
+  ListItemTone,
+  ListItemVariant,
+} from './components/list-item';
 
 export { TagFilterNav } from './components/tag-filter-nav';
 export type { TagFilterNavProps, TagFilterItem } from './components/tag-filter-nav';

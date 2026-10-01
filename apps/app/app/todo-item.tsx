@@ -6,7 +6,6 @@ import {
   Button,
   Checkbox,
   DueDate,
-  dueDateLabel,
   IconButton,
   ListItem,
   Pill,
@@ -15,7 +14,7 @@ import {
   type TagOption,
   useSnackbar,
 } from '@life/ui';
-import { Circle, CircleCheck, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
 
 const HIDE_DELAY_MS = 1000;
@@ -23,28 +22,23 @@ const COLLAPSE_MS = 220;
 
 /**
  * The done toggle as a client wrapper so a row the user just ticked can linger
- * ~1s then collapse out. Composes the upstream `IconButton` (frozen label and
- * variant unchanged). `hide` disables the auto-hide (the Done filter keeps rows
- * put). The timer arms only on a `false→true` tick (`wasDone` ref), so a row
- * already done on load (the "All" filter, Matrix) is only struck/dimmed and
- * never auto-hidden; a snackbar Undo cancels the pending unmount and un-hides
- * the row.
+ * ~1s then collapse out. Composes the upstream `IconButton` (frozen label,
+ * always ghost) with the `Checkbox` glyph. `hide` disables the auto-hide (the
+ * Done filter keeps rows put). The timer arms only on a `false→true` tick
+ * (`wasDone` ref), so a row already done on load (the "All" filter, Matrix) is
+ * only struck/dimmed and never auto-hidden; a snackbar Undo cancels the pending
+ * unmount and un-hides the row.
  */
 function DoneToggle({
   done,
   label,
-  variant,
   hide,
-  square,
   onToggle,
   onCollapse,
 }: {
   done: boolean;
   label: string;
-  variant: 'default' | 'ghost';
   hide: boolean;
-  /** Matrix (`square`) glyph: the upstream `Checkbox` atom instead of a lucide circle. */
-  square: boolean;
   onToggle: () => void;
   onCollapse: (value: boolean) => void;
 }) {
@@ -63,46 +57,37 @@ function DoneToggle({
   return (
     <IconButton
       label={label}
-      variant={variant}
+      variant="ghost"
       onClick={() => {
         onCollapse(false);
         onToggle();
       }}
     >
-      {square ? (
-        <Checkbox checked={done} />
-      ) : done ? (
-        <CircleCheck size={20} aria-hidden />
-      ) : (
-        <Circle size={20} aria-hidden />
-      )}
+      <Checkbox checked={done} />
     </IconButton>
   );
 }
 
 /**
- * One todo row: a link to its edit screen (`/todos/[id]/edit`, the same editor
- * as create, in edit mode), a done toggle, and a silent soft delete to trash.
- * Editing lives on the dedicated screen; the row only reads + toggles. All
- * visuals come from `@life/ui`; the due date reads out through `dueDateLabel`
- * (Today / Tomorrow / dd/mm/yyyy, muted).
+ * One todo row at two sizes, from one `ListItem variant="todo"`: a borderless
+ * square checkbox LEADING the row (top-aligned with the title) and the title
+ * clamped to two lines, with the signal due date. The row links to its edit
+ * screen (`/todos/[id]/edit`, the same editor as create, in edit mode).
  *
- * `mode="matrix"` renders the minimal TickTick-style lens row: a borderless
- * done toggle LEADING the row, name + due date only (no list name, no
- * note snippet, no delete action), dense type. The matrix `square` toggle glyph
- * is the `Checkbox` atom (rounded square); the default list row keeps the lucide
- * circle. In matrix mode `tone` tints the
- * leading checkbox and the due date is coloured by tier (`DueDate tone="signal"`
- * — overdue deep red, any future lighter red). The default row is unchanged:
- * its checkbox stays untinted and its date stays the muted `dueDateLabel` string
- * (lesson 0003 — list dates stay muted).
+ * `size="default"` (the `/todos` List) keeps the extras: list name, note
+ * snippet and the trash delete action, at the base type scale (`--checkbox-size`
+ * 1.25rem). `size="dense"` (the Eisenhower matrix) is the minimal lens — name +
+ * signal due date only, compact type, and the same anatomy at 0.75rem. `tone`
+ * tints the leading checkbox for a coloured matrix quadrant; the matrix passes
+ * `DueDate tone="signal"` (overdue deep red, any future lighter red) and the
+ * List row uses it too, so the two views of one todo agree.
  */
 export function TodoItem({
   todo,
   today,
   lists,
   availableTags,
-  mode = 'default',
+  size = 'default',
   tone,
   hideDone = true,
 }: {
@@ -110,7 +95,7 @@ export function TodoItem({
   today: string;
   lists: List[];
   availableTags: TagOption[];
-  mode?: 'default' | 'matrix';
+  size?: 'default' | 'dense';
   tone?: ListItemTone;
   hideDone?: boolean;
 }) {
@@ -161,9 +146,7 @@ export function TodoItem({
     <DoneToggle
       done={todo.done}
       label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-      variant={mode === 'matrix' ? 'ghost' : 'default'}
       hide={hideDone}
-      square={mode === 'matrix'}
       onToggle={() => {
         undoneBySnackbar.current = false;
         void updateTodoAction(todo.id, { done: !todo.done }, todo.version);
@@ -172,20 +155,7 @@ export function TodoItem({
     />
   );
 
-  if (mode === 'matrix') {
-    return (
-      <ListItem
-        href={`/todos/${todo.id}/edit`}
-        title={todo.title}
-        meta={<DueDate dueDate={todo.dueDate} today={today} tone="signal" />}
-        leading={doneToggle}
-        done={todo.done}
-        collapsing={collapsing}
-        dense
-        tone={tone}
-      />
-    );
-  }
+  const isDefault = size === 'default';
 
   return (
     <ListItem
@@ -193,25 +163,30 @@ export function TodoItem({
       title={todo.title}
       meta={
         <>
-          {dueDateLabel(todo.dueDate, today)}
-          {list && <span>{list.name}</span>}
+          <DueDate dueDate={todo.dueDate} today={today} tone="signal" />
+          {isDefault && list && <span>{list.name}</span>}
         </>
       }
-      snippet={todo.note ?? undefined}
-      trailing={doneToggle}
+      snippet={isDefault ? (todo.note ?? undefined) : undefined}
+      leading={doneToggle}
       done={todo.done}
       collapsing={collapsing}
+      variant="todo"
+      size={size}
+      tone={tone}
       deleteAction={
-        <form action={deleteTodoAction.bind(null, todo.id)}>
-          <Button
-            type="submit"
-            variant="danger"
-            size="icon"
-            aria-label={`Delete ${todo.title}`}
-          >
-            <Trash2 size={18} aria-hidden />
-          </Button>
-        </form>
+        isDefault ? (
+          <form action={deleteTodoAction.bind(null, todo.id)}>
+            <Button
+              type="submit"
+              variant="danger"
+              size="icon"
+              aria-label={`Delete ${todo.title}`}
+            >
+              <Trash2 size={18} aria-hidden />
+            </Button>
+          </form>
+        ) : undefined
       }
     >
     </ListItem>

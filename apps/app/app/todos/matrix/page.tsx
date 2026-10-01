@@ -32,7 +32,7 @@ export default async function TodosMatrixPage() {
             today={today}
             lists={lists}
             availableTags={[]}
-            mode="matrix"
+            size="dense"
             tone={bucket.rowTone ?? undefined}
           />
         ))}

@@ -93,8 +93,9 @@ describe('MatrixBlock', () => {
     const matrix = cssBlock('.ui-matrix');
     expect(matrix).toMatch(/display:\s*grid/);
     expect(matrix).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-    // Equal-height rows: the two rows share the same height so empty quadrants match.
-    expect(matrix).toMatch(/grid-auto-rows:\s*1fr/);
+    // Equal-height rows, bounded so overflowing content scrolls instead of
+    // growing the matrix: `minmax(0, 1fr)`, never a bare `1fr` (= minmax(auto,1fr)).
+    expect(matrix).toMatch(/grid-auto-rows:\s*minmax\(0,\s*1fr\)/);
     expect(matrix).toMatch(/gap:\s*var\(--space-0-5\)/);
     // No outer frame on the grid itself.
     expect(matrix).not.toMatch(/border/);

@@ -18,7 +18,9 @@ and the notes app's current pages map onto these one-to-one.
 <EmptyState heading? body: ReactNode />            // .empty block (used twice today)
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
-                                                   //   deleteAction?, dense?,
+                                                   //   deleteAction?,
+                                                   //   variant?="todo",
+                                                   //   size?="default|dense",
                                                    //   tone?="danger|amber|accent",
                                                    //   done?, collapsing?,
                                                    //   children? (render slots; no domain types)
@@ -170,22 +172,26 @@ height and an overflowing quadrant scrolls within itself instead of growing the 
 `List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
 layout — the legacy class rode the row `li`, now carried by `ListItem`), `.note-link`,
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
-`.note-snippet`, and the dense variants `.ui-list-item--dense*` (compact type for a
-small-surface list — the matrix quadrants). `ListItem`'s optional slots are
-`leading?` (a control rendered before the row body, e.g. a done toggle) and `dense?`
-(compact typography, off by default; adds `.ui-list-item--dense`). A dense row is
-top-aligned (`align-items: flex-start` on the row and its link) and exactly its content
-height: it overrides the base two-line `min-height` floor (`min-height: 0`) and uses
-compact padding (`padding: var(--space-0-6) var(--space-0-4)`) with a tighter gap
-(`gap: var(--space-0-5)`), so matrix rows read tight. Its leading dense toggle renders
-the `Checkbox` atom (rounded square, radius `--space-0-2`, a 12×12 border-box square
-(`width/height: var(--space-0-75)`), owned by `SPEC-ui-atoms.md`); the
-control itself is top-aligned with the title
-(`width/height: auto`, `padding: var(--space-0-7) 0`), and its title and date
-share the same small size
-(`font-size: var(--space-0-7)`); the dense title wraps to at most two lines then
-truncates with an ellipsis (`display: -webkit-box; -webkit-line-clamp: 2`), while the
-default List row title stays single-line and the date/sub stays single-line. `tone?`
+`.note-snippet`, and the todo variants `.ui-list-item--todo*` / `.ui-list-item--dense*`.
+`ListItem`'s optional slots are `leading?` (a control rendered before the row body, e.g. a
+done toggle), `variant?="todo"` (todo presentation, off by default; adds
+`.ui-list-item--todo`) and `size?="default|dense"` (the todo row's scale, no effect
+without the variant; `"dense"` adds `.ui-list-item--dense`). The todo variant owns the
+leading anatomy: the DEFAULT size centres the row (the leading checkbox and the action
+slots) through the base `align-items: center`; the leading toggle box is `width/height:
+auto` with a token padding whose left inset (`var(--space-0-9)`) gives the checkbox room
+from the row edge; `--checkbox-size` is 1.25rem (20px) normal; and the title clamps to at
+most two lines then truncates with an ellipsis (`display: -webkit-box;
+-webkit-line-clamp: 2; white-space: normal`). The DENSE scale alone restores
+`align-items: flex-start` on the row and its link (top-aligned), and keeps only the
+compact overrides: `min-height: 0`
+(overriding the base two-line floor), compact link padding
+(`padding: var(--space-0-6) var(--space-0-4)`) with a tighter gap (`gap: var(--space-0-5)`),
+`--checkbox-size` 0.75rem (12px), and title/sub type at `font-size: var(--space-0-7)`.
+The leading done toggle renders the `Checkbox` atom (rounded square, radius
+`--space-0-2`, sized by `--checkbox-size`, owned by `SPEC-ui-atoms.md`). The dense scale
+wins the `--checkbox-size` cascade by source order (`.ui-list-item--dense` follows
+`.ui-list-item--todo`). `tone?`
 (`danger | amber | accent`, off by default; adds `.ui-list-item--<tone>`) tints the row's
 leading icon control via the matching token colour. The tone rules are declared after
 `.ui-list-item--done .ui-icon-btn`, so in a matrix row a completed task keeps its quadrant

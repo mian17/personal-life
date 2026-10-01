@@ -137,15 +137,16 @@ describe('ListItem', () => {
     expect(children[1]).toBe(document.querySelector('.ui-list-item__link'));
   });
 
-  it('adds the dense class and sizes dense title/sub through tokens', () => {
+  it('adds the todo variant with a dense size and sizes dense type through tokens', () => {
     render(
       <ul>
-        <ListItem dense title="Groceries" />
+        <ListItem variant="todo" size="dense" title="Groceries" />
       </ul>,
     );
     expect(classesOf(screen.getByRole('listitem'))).toEqual([
       'ui-list-item',
       'ui-list-item--dense',
+      'ui-list-item--todo',
     ]);
 
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
@@ -160,16 +161,76 @@ describe('ListItem', () => {
       expect(fontSize).not.toMatch(/\d+(px|rem)/);
     }
 
-    const denseTitle = denseBlock('.ui-list-item--dense .ui-list-item__title');
-    expect(denseTitle).toMatch(/-webkit-line-clamp:\s*2/);
-    expect(denseTitle).toMatch(/display:\s*-webkit-box/);
-    expect(denseTitle).toMatch(/white-space:\s*normal/);
-
     expect(denseBlock('.ui-list-item--dense')).toMatch(/min-height:\s*0/);
+    expect(denseBlock('.ui-list-item--dense')).toMatch(
+      /--checkbox-size:\s*var\(--space-0-75\)/,
+    );
     const padding =
       denseBlock('.ui-list-item--dense .ui-list-item__link').match(/padding:\s*([^;]+);/)?.[1] ?? '';
     expect(padding).toMatch(/var\(--space-/);
     expect(padding).not.toMatch(/\d+(px|rem)/);
+  });
+
+  it('puts the 2-line title clamp on the todo variant, not the dense scale', () => {
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    const todoTitle = block('.ui-list-item--todo .ui-list-item__title');
+    expect(todoTitle).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(todoTitle).toMatch(/display:\s*-webkit-box/);
+    expect(todoTitle).toMatch(/white-space:\s*normal/);
+
+    const denseTitle = block('.ui-list-item--dense .ui-list-item__title');
+    expect(denseTitle).not.toMatch(/-webkit-line-clamp/);
+    expect(denseTitle).not.toMatch(/display:\s*-webkit-box/);
+  });
+
+  it('adds the todo variant alone: 20px checkbox, auto-sized leading toggle, token padding', () => {
+    render(
+      <ul>
+        <ListItem variant="todo" title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--todo',
+    ]);
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    expect(block('.ui-list-item--todo')).toMatch(
+      /--checkbox-size:\s*var\(--space-1-25\)/,
+    );
+    /* The default todo row inherits the base centre. */
+    expect(block('.ui-list-item--todo')).not.toMatch(/flex-start/);
+
+    const iconBtn = block('.ui-list-item--todo .ui-icon-btn');
+    expect(iconBtn).toMatch(/width:\s*auto/);
+    expect(iconBtn).toMatch(/height:\s*auto/);
+    /* Four-value all-token shorthand: the left inset is a token size. */
+    expect(iconBtn).toMatch(
+      /padding:\s*var\(--space-[\w-]+\)\s+0\s+var\(--space-[\w-]+\)\s+var\(--space-[\w-]+\)/,
+    );
+    const padding = iconBtn.match(/padding:\s*([^;]+);/)?.[1] ?? '';
+    expect(padding).toMatch(/var\(--space-/);
+    expect(padding).not.toMatch(/\d+(px|rem)/);
+
+    /* The dense (matrix) scale stays top-aligned. */
+    expect(block('.ui-list-item--dense')).toMatch(/align-items:\s*flex-start/);
+  });
+
+  it('treats size="dense" without the todo variant as a no-op', () => {
+    render(
+      <ul>
+        <ListItem size="dense" title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual(['ui-list-item']);
   });
 
   it('adds a tone class for a coloured lens row, and none without a tone', () => {

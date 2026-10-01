@@ -31,38 +31,40 @@ function todo(overrides: Partial<Todo> = {}): Todo {
 
 const lists = [{ id: 'l1', name: 'Groceries' }] as any;
 
-function markup(mode?: 'default' | 'matrix', overrides: Partial<Todo> = {}): string {
+function markup(size?: 'default' | 'dense', overrides: Partial<Todo> = {}): string {
   return renderToStaticMarkup(
     <TodoItem
       todo={todo(overrides)}
       today={TODAY}
       lists={lists}
       availableTags={[]}
-      mode={mode}
+      size={size}
     />,
   );
 }
 
-describe('TodoItem modes', () => {
-  it('matrix: the done toggle LEADS the row, borderless', () => {
-    const html = markup('matrix');
+describe('TodoItem sizes', () => {
+  it('dense: the ghost done toggle LEADS the row and links to the edit screen', () => {
+    const html = markup('dense');
     // First child after the <li> open tag is the toggle button.
     expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
     expect(html).toContain('ui-icon-btn--ghost');
     expect(html).toMatch(/<a[^>]*class="ui-list-item__link"[^>]*href="\/todos\/t1\/edit"/);
   });
 
-  it('matrix: the toggle glyph is the square Checkbox atom, checked when done', () => {
-    expect(markup('matrix')).toContain('ui-checkbox');
-    expect(markup('matrix', { done: true })).toContain('ui-checkbox--checked');
+  it('dense: the toggle glyph is the square Checkbox atom, checked when done', () => {
+    expect(markup('dense')).toContain('ui-checkbox');
+    expect(markup('dense', { done: true })).toContain('ui-checkbox--checked');
   });
 
-  it('default: the list row keeps the lucide circle, not the Checkbox atom', () => {
-    expect(markup()).not.toContain('ui-checkbox');
+  it('dense: adds both the todo and dense classes', () => {
+    const html = markup('dense');
+    expect(html).toContain('ui-list-item--todo');
+    expect(html).toContain('ui-list-item--dense');
   });
 
-  it('matrix: no delete action, no list name, no note — only the due label', () => {
-    const html = markup('matrix');
+  it('dense: no delete action, no list name, no note — only the signal due date', () => {
+    const html = markup('dense');
     expect(html).toContain('>Today<');
     expect(html).not.toContain('ui-btn--danger');
     expect(html).not.toContain('<form');
@@ -71,38 +73,43 @@ describe('TodoItem modes', () => {
     expect(html).not.toContain('a note snippet');
   });
 
-  it('matrix: the row is dense and still links to the edit screen', () => {
-    const html = markup('matrix');
-    expect(html).toContain('ui-list-item--dense');
-    expect(html).toContain('href="/todos/t1/edit"');
-  });
-
-  it('matrix: the due date renders through DueDate tone="signal"', () => {
-    const html = markup('matrix');
+  it('dense: the due date renders through DueDate tone="signal"', () => {
+    const html = markup('dense');
     expect(html).toContain('ui-due-date');
     expect(html).toContain('ui-due-date--today');
     expect(html).toContain('ui-due-date--signal');
   });
 
-  it('default: the due date stays the plain muted label, not the signal atom', () => {
+  it('default: the ghost square Checkbox LEADS the row (no lucide circle)', () => {
     const html = markup();
-    expect(html).not.toContain('ui-due-date');
-    expect(html).toContain('>Today<');
+    expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
+    expect(html).toContain('ui-icon-btn--ghost');
+    expect(html).toContain('ui-checkbox');
+    expect(html).not.toContain('<circle');
+    expect(html).not.toContain('ui-checkbox--checked');
   });
 
-  it('default: bordered trailing toggle, delete action, list name and note kept', () => {
+  it('default: adds the todo class but NOT the dense class', () => {
     const html = markup();
-    // No leading control: the row body link is the first child.
-    expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<a[^>]*class="ui-list-item__link"/);
+    expect(html).toContain('ui-list-item--todo');
     expect(html).not.toContain('ui-list-item--dense');
-    expect(html).not.toMatch(/ui-icon-btn ui-icon-btn--ghost/);
+  });
 
+  it('default: keeps the delete action, list name and note snippet', () => {
+    const html = markup();
     expect(html).toContain('<form');
     expect(html).toMatch(/ui-btn ui-btn--danger/);
     expect(html).toContain('aria-label="Delete Buy milk"');
     expect(html).toContain('Groceries');
     expect(html).toContain('ui-list-item__snippet');
     expect(html).toContain('a note snippet');
+  });
+
+  it('default: the due date also renders through DueDate tone="signal"', () => {
+    const html = markup();
+    expect(html).toContain('ui-due-date');
+    expect(html).toContain('ui-due-date--signal');
+    expect(html).toContain('>Today<');
   });
 
   it('done: true marks the row struck/muted with ui-list-item--done', () => {

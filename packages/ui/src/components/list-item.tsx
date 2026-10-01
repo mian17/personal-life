@@ -3,6 +3,8 @@ import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { cx } from '../lib/cx';
 
 export type ListItemTone = 'danger' | 'amber' | 'accent';
+export type ListItemSize = 'default' | 'dense';
+export type ListItemVariant = 'todo';
 
 export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'> {
   href?: string;
@@ -13,8 +15,10 @@ export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'
   leading?: ReactNode;
   trailing?: ReactNode;
   deleteAction?: ReactNode;
-  /** Compact typography for a small-surface list (matrix quadrants). Off by default. */
-  dense?: boolean;
+  /** Todo presentation (leading square checkbox + 2-line title). Opt-in. */
+  variant?: ListItemVariant;
+  /** Row scale for the todo variant. No effect without variant="todo". Defaults to 'default'. */
+  size?: ListItemSize;
   /** Leading control tint for a coloured lens row (matrix quadrants). Off by default. */
   tone?: ListItemTone;
   /** Done row: struck + de-emphasized (muted). */
@@ -31,7 +35,8 @@ export function ListItem({
   leading,
   trailing,
   deleteAction,
-  dense,
+  variant,
+  size = 'default',
   tone,
   done,
   collapsing,
@@ -61,9 +66,10 @@ export function ListItem({
     <li
       className={cx(
         'ui-list-item',
+        variant === 'todo' && 'ui-list-item--todo',
+        variant === 'todo' && size === 'dense' && 'ui-list-item--dense',
         done && 'ui-list-item--done',
         collapsing && 'ui-list-item--collapsing',
-        dense && 'ui-list-item--dense',
         tone && `ui-list-item--${tone}`,
         className,
       )}

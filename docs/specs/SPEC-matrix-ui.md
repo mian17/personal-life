@@ -333,7 +333,7 @@ export default async function TodosMatrixPage() {
             today={today}
             lists={lists}
             availableTags={[]}
-            mode="matrix"
+            size="dense"
             tone={bucket.rowTone ?? undefined}
           />
         ))}
@@ -366,9 +366,12 @@ export default async function TodosMatrixPage() {
   height (see `SPEC-ui-list-shell.md`); the phone-sized 2×2 grid fills the short viewport
   rather than leaving the page half-empty. The page's height is **definite** — the
   `fill` rule is `height: 100dvh; overflow: hidden` (not `min-height`) — which is what
-  gives the quadrants a bounded box: `height: 100dvh` → `.ui-list-shell__body` `flex: 1`
-  → `.ui-matrix` equal `1fr` rows → `.ui-matrix__items { overflow-y: auto }`. Without a
-  definite height a quadrant would grow the page instead of scrolling inside itself.
+  gives the quadrants a bounded box: `height: 100dvh` → `.ui-list-shell__body`
+  `flex: 1` (row track `minmax(0, 1fr)`) → `.ui-matrix` equal `minmax(0, 1fr)` rows →
+  `.ui-matrix__items { overflow-y: auto }`. Without a definite height a quadrant would grow
+  the page instead of scrolling inside itself; without the bounded (`minmax(0, …)`) track a
+  tall cell would grow its track — a bare `1fr` is `minmax(auto, 1fr)`, which is the exact
+  bug this fixes.
 - The server gate (`notFound()` when the pref is off) makes a disabled matrix a real 404, not
   a dead tab (map D3); the route stays inside the Todos manifest scope (per-route PWA
   identity, lesson 0005) — it is not a new app.
@@ -381,21 +384,24 @@ export default async function TodosMatrixPage() {
   names are not shown on its rows; the row still links to the todo's edit screen. No new
   fetch is added for a lens.
 - **Minimal TickTick-style row** (user-requested): the matrix renders each todo through
-  `TodoItem` with `mode="matrix"` — a borderless done toggle **leading** the row
-  (left), only the task name plus its due date (no list name, no note snippet, no
-  delete action), and `dense` type. The default `/todos` List row is unchanged: bordered
-  trailing tick, trash delete, list name, note snippet. The row still links to
-  `/todos/[id]/edit` and carries the same done-toggle accessible label
-  (`Mark <title> done` / `not done`), so the frozen selector surface is unchanged.
-- **Row tint + signal date (matrix only).** The matrix page passes each quadrant's
+  `TodoItem` with `size="dense"` — one `ListItem variant="todo" size="dense"`: a
+  borderless done toggle **leading** the row (left), the task name plus its signal
+  due date (no list name, no note snippet, no delete action), and dense type. The
+  default `/todos` List row shares the same todo variant (leading checkbox, 2-line
+  title, signal date) and differs only by scale plus its extras (list name, note
+  snippet, trash delete). The row still links to `/todos/[id]/edit` and carries the
+  same done-toggle accessible label (`Mark <title> done` / `not done`), so the frozen
+  selector surface is unchanged.
+- **Row tint + signal date (both sizes).** The matrix page passes each quadrant's
   `rowTone` to `TodoItem` (`tone`, a `ListItemTone`); `ListItem` tints only the leading
-  checkbox, and IV passes `undefined` so its checkbox is normal. The matrix row's leading
+  checkbox, and IV passes `undefined` so its checkbox is normal. The todo row's leading
   checkbox is the square `Checkbox` atom (`SPEC-ui-atoms.md`); the tint still rides on
-  `.ui-list-item--<tone> .ui-icon-btn` (no new matrix-specific checkbox CSS). Matrix rows
+  `.ui-list-item--<tone> .ui-icon-btn` (no new matrix-specific checkbox CSS). Todo rows
   render the
   due date through the `DueDate` atom with `tone="signal"` — overdue `--danger` (deep red),
-  any future date `--danger-soft` (lighter red). The default List row ignores `tone` and
-  keeps the muted `dueDateLabel` string (lesson 0003: list dates stay muted).
+  any future date `--danger-soft` (lighter red); the default List row uses the same signal
+  atom, so the two views of one todo agree (lesson 0003's muted-list rule is revised for
+  todos).
 - **Dense type:** the matrix row's title and date are 0.7rem (`.ui-list-item--dense*`,
   owned by `SPEC-ui-blocks.md`).
 - **Overflow:** a quadrant whose content exceeds its box scrolls; the page itself does not.
@@ -548,7 +554,7 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   .ui-matrix {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: 1fr;
+    grid-auto-rows: minmax(0, 1fr);
     gap: var(--space-0-5);
   }
 
@@ -577,9 +583,12 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   }
   ```
 
-  `grid-auto-rows: 1fr` gives the two rows **equal height**, so an empty quadrant matches a
-  populated one in the same row pair; `1fr` means `minmax(auto, 1fr)`, so content is never
-  clipped. `minmax(0, 1fr)` tracks prevent overflow, so no horizontal scroll.
+  `grid-auto-rows: minmax(0, 1fr)` gives the two rows **equal height**, so an empty
+  quadrant matches a populated one in the same row pair; the `minmax(0, …)` floor keeps the
+  track bounded so overflowing content scrolls instead of growing the matrix. A bare `1fr` is
+  `minmax(auto, 1fr)` — its `auto` minimum lets a tall cell grow the track (the matrix
+  lengthens and the `100dvh` page clips it), so it is never used. `minmax(0, 1fr)` column
+  tracks likewise prevent horizontal overflow.
 - The `/todos`, `/todos/matrix`, `/todos/settings`, `/notes/settings` pages add **no** app
   stylesheet; every class comes from `@life/ui` (`ListShell`, `TabBar`/`Tab`, `ManagerBlock`,
   `SettingsBlock`/`SettingsRow`, `Switch`, `MatrixBlock`).
@@ -669,8 +678,8 @@ cookie or path-join code (that is `app-kit-settings`').
 - `groupByQuadrant` carries each bucket's `tone`/`rowTone` (`danger`/`danger`,
   `amber`/`amber`, `accent`/`accent`, `green`/`null`).
 - The matrix route passes each bucket's `tone` to `MatrixBlock` and each row's `rowTone` to
-  `TodoItem` (`undefined` for IV); matrix rows render `DueDate tone="signal"` while the
-  default row keeps the muted label.
+  `TodoItem` (`undefined` for IV); both the matrix and default rows render
+  `DueDate tone="signal"` (the default row no longer keeps the muted label).
 
 **E2E:** not run by this module. The frozen surface changes are documented above; the
 human-owned suite is updated when the user runs it (global protocol §3).

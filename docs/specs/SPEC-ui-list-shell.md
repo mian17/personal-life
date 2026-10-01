@@ -65,8 +65,10 @@ byte-identical to today's pages (no wrapper element is added).
 - `fill?: boolean` opts into a full-height page: the page column becomes a flex column
   of **definite** viewport height (`height: 100dvh; overflow: hidden`, not `min-height`) and
   the `body` slot grows via the `.ui-list-shell__body` wrapper (`flex: 1`) to fill the
-  remaining space. The definite height is what bounds a full-height child — e.g. a matrix
-  quadrant scrolls inside its box instead of growing the page. Off by default, so other
+  remaining space. Its row track is `minmax(0, 1fr)` (not a bare `1fr`, whose `auto` minimum
+  would let an overflowing child grow the body), so the body is bounded and an overflowing
+  child scrolls inside it. The definite height is what bounds a full-height child — e.g. a
+  matrix quadrant scrolls inside its box instead of growing the page. Off by default, so other
   pages are unchanged; used by `/todos/matrix` so the 2×2 matrix spans the screen height.
 - The shell renders `body` verbatim; empty-state versus list is the app's decision, so the
   block carries no emptiness knowledge and no domain copy.

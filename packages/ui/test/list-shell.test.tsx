@@ -161,6 +161,9 @@ describe('ListShell', () => {
     const body = cssBlock('.ui-list-shell__body');
     expect(body).toMatch(/flex:\s*1/);
     expect(body).toMatch(/min-height:\s*0/);
+    // Bounded row track: a bare `1fr` (= minmax(auto,1fr)) would let an
+    // overflowing child grow the body instead of scrolling inside it.
+    expect(body).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\)/);
 
     // Guard: the fill declarations resolve through tokens/allowed keywords, never raw px/hex/rgb.
     const declarations = `${page}${body}`;

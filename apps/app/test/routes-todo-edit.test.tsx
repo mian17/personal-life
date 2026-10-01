@@ -3,6 +3,7 @@ import type { List, Todo } from '@life/shared';
 import { Pill, PillGroup, Switch, type SwitchProps, type TagOption } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
   notFound: jest.fn(() => {
     const error = new Error('NEXT_NOT_FOUND');
@@ -10,7 +11,7 @@ jest.mock('next/navigation', () => ({
     throw error;
   }),
   useRouter: () => ({
-    back: jest.fn(),
+    back: mockBack,
     forward: jest.fn(),
     refresh: jest.fn(),
     push: jest.fn(),
@@ -182,7 +183,7 @@ function withRealUseState<T>(run: () => T): T {
 interface EditorTree extends ReactElement {
   props: {
     children: EditorField[];
-    actions: ReactElement<{ onClick: () => void; label?: string }>;
+    actions: ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }>;
   };
 }
 
@@ -282,6 +283,81 @@ function findPill(
   return findPill(el.props?.children, name);
 }
 
+describe('TodoEditor save awaits the write before navigating', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function renderEditing() {
+    const harness = stateHarness();
+    const tree = harness.renderTree(todo());
+    return { harness, tree };
+  }
+
+  it('does not navigate back until updateTodoAction resolves', async () => {
+    let resolveAction!: () => void;
+    mockedUpdateTodoAction.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveAction = resolve;
+      }),
+    );
+
+    const { harness, tree } = renderEditing();
+    try {
+      const pending = tree.props.actions.props.onClick();
+
+      // The old fire-and-forget code called `router.back()` in the same tick.
+      expect(mockBack).not.toHaveBeenCalled();
+
+      resolveAction();
+      await pending;
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('does not navigate back when the write fails', async () => {
+    mockedUpdateTodoAction.mockRejectedValue(new Error('boom'));
+
+    const { harness, tree } = renderEditing();
+    try {
+      await tree.props.actions.props.onClick();
+
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('ignores a second save while the first is still in flight', async () => {
+    let resolveAction!: () => void;
+    mockedUpdateTodoAction.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveAction = resolve;
+      }),
+    );
+
+    const { harness, tree } = renderEditing();
+    try {
+      const first = tree.props.actions.props.onClick();
+
+      // Re-render picks up the `saving` state, so the button is disabled and the
+      // handler is a no-op until the in-flight write settles.
+      const second = harness.renderTree(todo());
+      expect(second.props.actions.props.disabled).toBe(true);
+      await second.props.actions.props.onClick();
+
+      resolveAction();
+      await first;
+
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
 describe('TodoEditor important Switch', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -364,7 +440,7 @@ describe('TodoEditor important Switch', () => {
   });
 
   describe('write', () => {
-    it('saves the toggled explicit override through updateTodoAction', () => {
+    it('saves the toggled explicit override through updateTodoAction', async () => {
       const fixture = todo({ important: true, effectiveImportant: true, version: 3 });
       const harness = stateHarness();
       try {
@@ -375,7 +451,7 @@ describe('TodoEditor important Switch', () => {
 
         const second = harness.renderTree(fixture);
         expect(second.props.actions.props.label).toBe('Save todo');
-        second.props.actions.props.onClick();
+        await second.props.actions.props.onClick();
 
         expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
         const [id, patch, version] = mockedUpdateTodoAction.mock.calls[0];
@@ -394,7 +470,7 @@ describe('TodoEditor important Switch', () => {
       }
     });
 
-    it('creates with the toggled explicit override through createTodoAction', () => {
+    it('creates with the toggled explicit override through createTodoAction', async () => {
       const harness = stateHarness();
       try {
         const first = switchOf(harness.renderTree(undefined));
@@ -408,7 +484,7 @@ describe('TodoEditor important Switch', () => {
 
         const second = harness.renderTree(undefined);
         expect(second.props.actions.props.label).toBe('Add todo');
-        second.props.actions.props.onClick();
+        await second.props.actions.props.onClick();
 
         expect(mockedCreateTodoAction).toHaveBeenCalledTimes(1);
         const [input] = mockedCreateTodoAction.mock.calls[0];

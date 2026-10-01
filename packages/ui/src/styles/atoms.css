@@ -234,15 +234,16 @@
 /* The done-toggle glyph: a rounded square (radius --space-0-2, 0.2rem — the
    panel-box rounding feel; the box's own --radius-lg would clamp to a circle at
    this size). Fills with the row's text colour and reveals a --panel check.
-   A 12×12 border-box square (var(--space-0-75) = 0.75rem = 12px at the frozen
-   base); promote to a --checkbox-size var if a second size is ever needed. */
+   Sized by the `--checkbox-size` custom property (default var(--space-0-75) =
+   0.75rem = 12px at the frozen base); the todo row sets 1.25rem (normal) and the
+   dense scale sets 0.75rem. */
 .ui-checkbox {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: var(--space-0-75);
-  height: var(--space-0-75);
+  width: var(--checkbox-size, var(--space-0-75));
+  height: var(--checkbox-size, var(--space-0-75));
   padding: var(--space-0-15);
   border: var(--border-width) solid currentColor;
   border-radius: var(--space-0-2);

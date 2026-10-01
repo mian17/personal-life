@@ -38,7 +38,7 @@ describe('Checkbox', () => {
     const box = block('.ui-checkbox');
     for (const dimension of ['width', 'height']) {
       const value = box.match(new RegExp(`${dimension}:\\s*([^;]+);`))?.[1] ?? '';
-      expect(value).toMatch(/var\(--space-0-75\)/);
+      expect(value).toMatch(/var\(--checkbox-size,\s*var\(--space-0-75\)\)/);
       expect(value).not.toMatch(/var\(--leading\)/);
     }
     expect(box).toMatch(/border-radius:\s*var\(--space-0-2\)/);
