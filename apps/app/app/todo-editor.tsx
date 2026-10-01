@@ -146,7 +146,9 @@ export function TodoEditor({
         </PillGroup>
       )}
 
-      <Switch label="Important" checked={important} onCheckedChange={setImportantOverride} />
+      <PillGroup label="Important" aria-label="Important">
+        <Switch label="Important" checked={important} onCheckedChange={setImportantOverride} />
+      </PillGroup>
     </EditorChrome>
   );
 }

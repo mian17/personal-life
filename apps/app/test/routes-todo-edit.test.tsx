@@ -225,10 +225,35 @@ function stateHarness() {
   return { renderTree, restore: () => spy.mockRestore() };
 }
 
+function findByType(
+  node: unknown,
+  type: unknown,
+  match?: (el: ReactElement<Record<string, unknown>>) => boolean,
+): ReactElement<Record<string, unknown>> | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByType(child, type, match);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  if (node == null || typeof node !== 'object') return undefined;
+  const el = node as ReactElement<Record<string, unknown>>;
+  if (el.type === type && (!match || match(el))) return el;
+  return findByType(el.props?.children, type, match);
+}
+
 function switchOf(tree: EditorTree): ReactElement<SwitchProps> {
-  const found = tree.props.children.find((child) => child.type === Switch);
+  const found = findByType(tree.props.children, Switch);
   if (!found) throw new Error('no Switch rendered in the todo editor');
-  return found as ReactElement<SwitchProps>;
+  return found as unknown as ReactElement<SwitchProps>;
+}
+
+/** The `PillGroup` whose visible label is `Important`. */
+function importantGroup(tree: EditorTree): ReactElement<Record<string, unknown>> {
+  const found = findByType(tree.props.children, PillGroup, (el) => el.props.label === 'Important');
+  if (!found) throw new Error('no PillGroup labelled Important');
+  return found;
 }
 
 /** The `Pill` for a list, found by walking the editor's element tree. */
@@ -284,6 +309,18 @@ describe('TodoEditor important Switch', () => {
         const node = switchOf(harness.renderTree(undefined));
         expect(node.props.label).toBe('Important');
         expect(node.props.checked).toBe(false);
+      } finally {
+        harness.restore();
+      }
+    });
+
+    it('wraps the switch in a PillGroup visibly labelled Important', () => {
+      const harness = stateHarness();
+      try {
+        const group = importantGroup(harness.renderTree(todo()));
+        expect(group.type).toBe(PillGroup);
+        expect(group.props.label).toBe('Important');
+        expect(findByType(group.props.children, Switch)).toBeDefined();
       } finally {
         harness.restore();
       }

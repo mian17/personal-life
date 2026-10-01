@@ -6,6 +6,7 @@ import { listTodos, listLists } from '@/lib/todo-api';
 import { collectTodos } from '@/lib/todo-query';
 import { groupByQuadrant } from '@/lib/matrix';
 import { TodoItem } from '../../todo-item';
+import { TodosNav } from '../../todos-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,7 @@ export default async function TodosMatrixPage() {
   return (
     <ListShell
       title="Todos"
+      navTrailing={<TodosNav />}
       tabs={
         <TabBar aria-label="Todos views">
           <Tab href="/todos">List</Tab>

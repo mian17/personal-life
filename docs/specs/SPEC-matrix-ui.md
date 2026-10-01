@@ -244,8 +244,9 @@ field contracts live in `SPEC-todo-importance.md`.
 - **List importance-default** — `apps/app/app/list-manager-panel.tsx` renders a `Switch`
   (label `Default important`) per list, writing `list.importantDefault` through the existing
   list action in `apps/app/app/todo-actions.ts`.
-- **Per-todo importance** — `apps/app/app/todo-editor.tsx` renders a `Switch` (label
-  `Important`) whose displayed value is the user's explicit override when one has been made,
+- **Per-todo importance** — `apps/app/app/todo-editor.tsx` renders a `Switch` (accessible name
+  `Important`) wrapped in a visible `PillGroup` labelled `Important` (the same field shape as
+  `Due`/`List`), whose displayed value is the user's explicit override when one has been made,
   otherwise a seed: edit mode `todo.important ?? todo.effectiveImportant`, create mode the
   selected list's `importantDefault ?? false`. `important` is written through
   `apps/app/app/todo-actions.ts` **only when the user actually toggles it** (both the
@@ -310,8 +311,9 @@ export default async function TodosMatrixPage() {
   identity, lesson 0005) — it is not a new app.
 - Fetching reuses the existing `apps/app` API clients only (`collectTodos`/`listTodos`,
   `listLists`); grouping is in memory after the service's post-decrypt assembly.
-- Search and filters are omitted on this lens; the fab is kept. `navTrailing` is omitted here
-  (the List tab is the way back to the full shell) — a recorded decision, not an oversight.
+- Search and filters are omitted on this lens; the fab is kept. The nav toolbar is rendered
+  from the shared `apps/app/app/todos-nav.tsx` fragment, so the matrix lens carries the same
+  nav icons as `/todos` (lesson 0014).
 - `availableTags={[]}`: the matrix lens does not fetch the tag registry, so attached-tag
   names are not shown on its rows; the row still links to the todo's edit screen. No new
   fetch is added for a lens.
@@ -439,7 +441,7 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
 
   ```css
   .ui-matrix { display: grid; gap: 0; }
-  .ui-matrix__quadrant { display: grid; gap: var(--space-0-5); padding: var(--space-1); }
+  .ui-matrix__quadrant { display: grid; gap: var(--space-0-5); padding: var(--space-1); min-height: var(--space-5); }
 
   /* Phone (one column): a hairline between consecutive quadrants, never above the first. */
   .ui-matrix__quadrant + .ui-matrix__quadrant {

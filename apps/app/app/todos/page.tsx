@@ -4,9 +4,8 @@ import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
 import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
-import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
+import { filterHref, parseTagId, PreservingSearchBox } from '@life/app-kit';
 import {
-  IconLink,
   ListShell,
   Pill,
   PillGroup,
@@ -15,8 +14,9 @@ import {
   TagFilterNav,
   todayIso,
 } from '@life/ui';
-import { List, Plus, Settings, StickyNote, Tags, Trash2 } from 'lucide-react';
+import { Plus, StickyNote } from 'lucide-react';
 import { readPref } from '@/lib/preferences';
+import { TodosNav } from '../todos-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,22 +79,7 @@ export default async function TodosPage({
   return (
     <ListShell
       title="Todos"
-      navTrailing={
-        <>
-          <IconLink href="/todos/tags" label="Manage tags">
-            <Tags size={20} aria-hidden />
-          </IconLink>
-          <IconLink href="/todos/lists" label="Manage lists">
-            <List size={20} aria-hidden />
-          </IconLink>
-          <IconLink href="/todos/trash" label="Trash">
-            <Trash2 size={20} aria-hidden />
-          </IconLink>
-          <IconLink href={settingsHref('/todos')} label="Settings">
-            <Settings size={20} aria-hidden />
-          </IconLink>
-        </>
-      }
+      navTrailing={<TodosNav />}
       tabs={
         matrixEnabled ? (
           <TabBar aria-label="Todos views">

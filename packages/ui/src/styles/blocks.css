@@ -540,6 +540,7 @@
   display: grid;
   gap: var(--space-0-5);
   padding: var(--space-1);
+  min-height: var(--space-5);
 }
 
 /* Phone (one column): a hairline between consecutive quadrants, never above

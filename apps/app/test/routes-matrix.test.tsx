@@ -14,6 +14,7 @@ jest.mock('next/navigation', () => ({
 import { listTodos, listLists } from '@/lib/todo-api';
 import { readPref } from '@/lib/preferences';
 import TodosMatrixPage from '@/app/todos/matrix/page';
+import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
@@ -132,13 +133,13 @@ describe('/todos/matrix page wiring', () => {
     expect(tabEls[1].props.active).toBe(true);
   });
 
-  it('keeps the fab and omits search/filters/navTrailing', async () => {
+  it('keeps the fab and the todos toolbar, and omits search/filters', async () => {
     const el = await TodosMatrixPage();
 
     expect(el.props.fabHref).toBe('/todos/new');
     expect(el.props.fabLabel).toBe('New todo');
     expect(el.props.search).toBeUndefined();
     expect(el.props.filters).toBeUndefined();
-    expect(el.props.navTrailing).toBeUndefined();
+    expect(el.props.navTrailing.type).toBe(TodosNav);
   });
 });

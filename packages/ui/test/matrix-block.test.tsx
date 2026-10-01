@@ -84,6 +84,7 @@ describe('MatrixBlock', () => {
     expect(quadrant).toMatch(/display:\s*grid/);
     expect(quadrant).toMatch(/gap:\s*var\(--space-0-5\)/);
     expect(quadrant).toMatch(/padding:\s*var\(--space-1\)/);
+    expect(quadrant).toMatch(/min-height:\s*var\(--space-5\)/);
 
     // Phone (one column): a hairline between consecutive quadrants, never above the first.
     const stacked = cssBlock('.ui-matrix__quadrant + .ui-matrix__quadrant');

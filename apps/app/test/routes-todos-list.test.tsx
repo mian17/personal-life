@@ -1,6 +1,7 @@
 import type { List, TagUsage, Todo } from '@life/shared';
 import { PreservingSearchBox } from '@life/app-kit';
-import { IconLink, ListShell, Pill, PillGroup, Tab, TabBar, TagFilterNav, ThemeToggle } from '@life/ui';
+import { ListShell, Pill, PillGroup, Tab, TabBar, TagFilterNav } from '@life/ui';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
   listTodos: jest.fn(),
@@ -19,6 +20,7 @@ import { listTodos, listTodoTagUsage, listLists } from '@/lib/todo-api';
 import { listTags, resolveTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
+import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
 const mockedUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUsage>;
@@ -158,14 +160,13 @@ describe('/todos list page wiring', () => {
   it('keeps the frozen nav link labels the e2e suite depends on', async () => {
     const el = await TodosPage({ searchParams: Promise.resolve({}) });
 
-    const trailing = asArray(el.props.navTrailing);
-    const labels = trailing
-      .filter((child) => child.type === IconLink)
-      .map((child) => child.props.label);
+    expect(el.props.navTrailing.type).toBe(TodosNav);
+    const html = renderToStaticMarkup(<TodosNav />);
+    expect(html).not.toMatch(/Theme:/);
+    const labels = [...html.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
     expect(labels).toEqual(
       expect.arrayContaining(['Manage tags', 'Manage lists', 'Trash', 'Settings']),
     );
-    expect(trailing.some((child) => child.type === ThemeToggle)).toBe(false);
   });
 
   it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {

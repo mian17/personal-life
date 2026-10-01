@@ -72,7 +72,8 @@ sets them.
   existing list action (`apps/app/app/todo-actions.ts`). Accessible name (frozen app text):
   `Default important`.
 - **Per-todo importance** — a `Switch` in the todo editor
-  (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`), displayed
+  (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`) wrapped in a
+  visible `PillGroup` labelled `Important` (field parity with `Due`/`List`), displayed
   from the user's explicit override when one exists, otherwise seeded from
   `todo.important ?? todo.effectiveImportant` (edit) / the selected list's
   `importantDefault ?? false` (create). `todo.important` is written **only when the user
