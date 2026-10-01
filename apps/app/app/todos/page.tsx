@@ -78,9 +78,6 @@ export default async function TodosPage({
       title="Todos"
       navTrailing={
         <>
-          <IconLink href="/notes" label="Notes">
-            <StickyNote size={20} aria-hidden />
-          </IconLink>
           <IconLink href="/todos/tags" label="Manage tags">
             <Tags size={20} aria-hidden />
           </IconLink>

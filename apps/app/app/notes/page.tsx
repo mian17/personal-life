@@ -42,9 +42,6 @@ export default async function NotesPage({
       title="Notes"
       navTrailing={
         <>
-          <IconLink href="/todos" label="Todos">
-            <ListTodo size={20} aria-hidden />
-          </IconLink>
           <IconLink href="/notes/tags" label="Manage tags">
             <Tags size={20} aria-hidden />
           </IconLink>
