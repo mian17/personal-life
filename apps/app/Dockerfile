@@ -15,6 +15,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 COPY packages/crypto/package.json packages/crypto/
 COPY packages/cache/package.json packages/cache/
+COPY packages/app-kit/package.json packages/app-kit/
 COPY apps/tags-service/package.json apps/tags-service/
 COPY apps/todo-service/package.json apps/todo-service/
 RUN npm ci
@@ -22,6 +23,7 @@ RUN npm ci
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/ui ./packages/ui
+COPY packages/app-kit ./packages/app-kit
 COPY apps/app ./apps/app
 
 RUN npm run build -w @life/shared \
@@ -46,6 +48,9 @@ COPY --from=build /repo/packages/shared/dist ./node_modules/@life/shared/dist
 # Same safety net for @life/ui (source-shipped and transpiled into the bundle).
 COPY --from=build /repo/packages/ui/package.json ./node_modules/@life/ui/package.json
 COPY --from=build /repo/packages/ui/src ./node_modules/@life/ui/src
+# Same safety net for @life/app-kit (source-shipped and transpiled into the bundle).
+COPY --from=build /repo/packages/app-kit/package.json ./node_modules/@life/app-kit/package.json
+COPY --from=build /repo/packages/app-kit/src ./node_modules/@life/app-kit/src
 
 EXPOSE 3002
 CMD ["node", "apps/app/server.js"]
