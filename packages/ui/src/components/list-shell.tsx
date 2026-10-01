@@ -10,6 +10,8 @@ export interface ListShellProps {
   title: string;
   /** Trailing nav actions: icon links + `ThemeToggle`, in render order. */
   navTrailing?: ReactNode;
+  /** Tab navigation (`TabBar`); rendered directly under the page title. */
+  tabs?: ReactNode;
   /** The param-preserving search box (app-kit's `SearchField` wrapper). */
   search?: ReactNode;
   /** Filter rows: `PillGroup` status pills and/or `TagFilterNav`, in render order. */
@@ -27,6 +29,7 @@ export interface ListShellProps {
 export function ListShell({
   title,
   navTrailing,
+  tabs,
   search,
   filters,
   body,
@@ -38,6 +41,7 @@ export function ListShell({
     <PageShell>
       <NavBar trailing={navTrailing} />
       <PageTitle>{title}</PageTitle>
+      {tabs}
       {search}
       {filters}
       {body}

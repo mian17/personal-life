@@ -8,11 +8,12 @@ function order(root: Element): string[] {
 }
 
 describe('ListShell', () => {
-  it('renders the fixed slot order: nav → title → search → filters → body → fab', () => {
+  it('renders the fixed slot order: nav → title → tabs → search → filters → body → fab', () => {
     render(
       <ListShell
         title="Notes"
         navTrailing={<span data-testid="nav-trailing" />}
+        tabs={<span data-testid="tabs" />}
         search={<span data-testid="search" />}
         filters={<span data-testid="filters" />}
         body={<span data-testid="body" />}
@@ -26,6 +27,7 @@ describe('ListShell', () => {
     expect(order(document.querySelector('.ui-page')!)).toEqual([
       'nav',
       'h1',
+      'tabs',
       'search',
       'filters',
       'body',
@@ -45,9 +47,16 @@ describe('ListShell', () => {
     );
 
     expect(screen.queryByTestId('nav-trailing')).toBeNull();
+    expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('search')).toBeNull();
     expect(screen.queryByTestId('filters')).toBeNull();
     expect(container.querySelector('.ui-nav-bar__actions')).toBeNull();
+    expect(order(container.querySelector('.ui-page')!)).toEqual([
+      'nav',
+      'h1',
+      'body',
+      'a',
+    ]);
   });
 
   it('renders the title as the page h1', () => {

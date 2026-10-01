@@ -26,6 +26,7 @@
  * | TagManager     | (new) tag registry surface; rows are a local ul, controls are Input/IconButton |
  * | ListManager    | (new) todo-list registry surface; controls are Input/IconButton |
  * | SettingsRow    | (new) label + control two-column row; no legacy class |
+ * | TabBar / Tab   | (new) navigation row + tab links; no legacy class |
  *
  * Token policy: all lengths/colors come from tokens.css custom properties,
  * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
@@ -308,6 +309,34 @@
   margin-top: var(--space-0-5);
   padding-top: var(--space-0-6);
   border-top: var(--border-width) solid var(--border);
+}
+
+/* ---------------------------------------------------- TabBar / Tab */
+
+/* Navigation, not filters: a token-rhythm row of server-rendered links with a
+   baseline rule; the active tab is marked by the accent underline. */
+.ui-tab-bar {
+  display: flex;
+  gap: var(--space-0-5);
+  margin: 0 0 var(--space-1);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.ui-tab {
+  padding: var(--space-0-5) var(--space-0-75);
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: var(--border-width) solid transparent;
+}
+
+.ui-tab--active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.ui-tab:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
 }
 
 /* -------------------------------------------------------- PageActions */
