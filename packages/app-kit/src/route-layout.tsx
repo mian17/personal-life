@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 
 /**
  * The install metadata shared by every route-segment layout: the route's own
- * manifest plus the Apple Home Screen hints (`apple-mobile-web-app-capable` for
- * a standalone launch, `apple-mobile-web-app-title` for the icon name).
+ * manifest, its Home Screen icon, and the Apple Home Screen hints
+ * (`apple-mobile-web-app-capable` for a standalone launch,
+ * `apple-mobile-web-app-title` for the icon name).
  */
-export function routeLayoutMetadata(manifest: string, title: string): Metadata {
+export function routeLayoutMetadata(manifest: string, title: string, icon: string): Metadata {
   return {
     manifest,
+    icons: { icon: '/icon.svg', apple: icon },
     appleWebApp: { capable: true, title, statusBarStyle: 'default' },
   };
 }

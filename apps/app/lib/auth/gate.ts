@@ -22,7 +22,8 @@ const PUBLIC_EXACT = new Set([
   '/favicon.ico',
   '/manifest-notes.json',
   '/manifest-todos.json',
-  '/apple-touch-icon.png',
+  '/icon-notes.png',
+  '/icon-todos.png',
   '/icon.svg',
 ]);
 export function isPublicPath(pathname: string): boolean {

@@ -89,7 +89,8 @@ describe('public paths', () => {
       '/auth/logout',
       '/manifest-notes.json',
       '/manifest-todos.json',
-      '/apple-touch-icon.png',
+      '/icon-notes.png',
+      '/icon-todos.png',
       '/icon.svg',
       '/favicon.ico',
     ]) {

@@ -14,7 +14,7 @@ describe('per-route PWA manifests', () => {
     expect(notes.start_url).toBe('/notes');
     expect(notes.scope).toBe('/notes');
     expect(notes.short_name).toBe('Notes');
-    expect(notes.icons.length).toBeGreaterThanOrEqual(1);
+    expect(notes.icons[0].src).toBe('/icon-notes.png');
   });
 
   it('gives /todos its own identity', () => {
@@ -23,7 +23,7 @@ describe('per-route PWA manifests', () => {
     expect(todos.start_url).toBe('/todos');
     expect(todos.scope).toBe('/todos');
     expect(todos.short_name).toBe('Todos');
-    expect(todos.icons.length).toBeGreaterThanOrEqual(1);
+    expect(todos.icons[0].src).toBe('/icon-todos.png');
   });
 
   it('links each manifest from its route segment layout', () => {

@@ -137,10 +137,10 @@ apps, and an unadorned path (e.g. an error page) declares none.
   (the gate serves them like `/icon.svg`).
 - **Apple install metadata:** each segment layout emits `apple-mobile-web-app-capable`
   (`yes`) and `apple-mobile-web-app-title` ("Notes" / "Todos") via
-  `routeLayoutMetadata(manifest, title)`, so iOS shows a standalone Home Screen web app
-  with a route-specific name. The root layout wires `icons.apple` →
-  `/apple-touch-icon.png` (180×180 PNG, rasterized from `icon.svg`): iOS ignores SVG for
-  the Home Screen, so the PNG is the real icon.
+  `routeLayoutMetadata(manifest, title, icon)`, so iOS shows a standalone Home Screen web
+  app with a route-specific name. iOS ignores SVG for the Home Screen, so each route
+  declares its own PNG `apple-touch-icon` (`/icon-notes.png` / `/icon-todos.png`, 512×512,
+  rasterized from a per-route SVG) and the same PNG as its manifest icon.
 - **Mechanism:** nested `manifest.ts` file-convention routes are **NOT used** — in the
   installed Next.js the `manifest` metadata convention is anchored to the app root, so a
   colocated `app/<segment>/manifest.ts` is not a route. The verified mechanism is a

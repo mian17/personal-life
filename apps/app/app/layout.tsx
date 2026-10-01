@@ -3,7 +3,7 @@ import '@life/ui/styles.css';
 export const metadata = {
   title: 'Personal Life',
   description: 'Personal notes API and UI',
-  icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
+  icons: { icon: '/icon.svg' },
 };
 
 export const viewport = {
