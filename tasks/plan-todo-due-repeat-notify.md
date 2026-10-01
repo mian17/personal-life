@@ -121,7 +121,7 @@ than extracting it from the todo write path.
 
 ### Checkpoint: App UI
 - [ ] `npm run typecheck -w @life/app` exits 0.
-- [ ] `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx` green.
+- [ ] `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts` green.
 - [ ] Contract 1 mechanical greps clean.
 
 ### Phase 9 — Close
@@ -309,7 +309,9 @@ than extracting it from the todo write path.
 [DEFINITION OF DONE]
   - [ ] Every listed signature exists exactly.
   - [ ] `due-time.test.ts` covers: `Asia/Ho_Chi_Minh` fixed offset; `America/New_York` DST
-        boundary; date-only never converted; sort key for a timed value equals its local string.
+        boundary pinned to actual transition instants (local `2026-03-08T02:30` spring-forward and
+        local `2026-11-01T01:30` fall-back); date-only never converted; sort key for a timed value
+        equals its local string.
   - [ ] `recurrence.test.ts` covers: daily; weekdays Fri→Mon; weekly +7; monthly 31st clamp;
         yearly Feb 29→Feb 28; `advanceToOnOrAfter` never returns a past occurrence.
   - [ ] `npm run typecheck -w @life/todo-service` passes with zero errors; no file outside scope.
@@ -341,9 +343,15 @@ than extracting it from the todo write path.
     applies the additive change; there is no migration framework.
   - DTOs: `CreateTodoDto`/`UpdateTodoDto` `dueDate` accepts `ISO_DUE` (`@Matches`), and gain
     `repeat?: TodoRepeat | null` (`@IsOptional() @ValidateIf(v => v !== null) @IsIn(TODO_REPEATS)`),
-    mirroring the existing nullable-field pattern. `reminderScheduledAt` is read-only (never a
-    request field — `forbidNonWhitelisted` rejects it).
+    mirroring the existing nullable-field pattern. In BOTH DTOs the current `@MaxLength(10)` on
+    `dueDate` is dropped (or raised to 16): a timed value `YYYY-MM-DDTHH:mm` is 16 chars and the
+    cap would reject it before `@Matches(ISO_DUE)` is reached. `reminderScheduledAt` is read-only
+    (never a request field — `forbidNonWhitelisted` rejects it).
   - `todos.service.ts`:
+    - `TodosService` reads `process.env.TODO_TIMEZONE` **once at construction** (default
+      `Asia/Ho_Chi_Minh`) into a `private readonly tz: string` field and passes it to every helper
+      (`normalizeDue`, `reminderAt`, `dueSortKey`, the advance path) — one owner for the zone
+      lookup (lesson 0016).
     - `normalizeDue(value: string, tz: string): string` — date-only → itself; timed → the
       canonical instant `localToUtc(value, tz).toISOString()`. `assertDate` is replaced by an
       `ISO_DUE` guard (400 `'dueDate must be YYYY-MM-DD or YYYY-MM-DDTHH:mm'`).
@@ -379,7 +387,8 @@ than extracting it from the todo write path.
 
 [DEFINITION OF DONE]
   - [ ] The entity carries `dueDate` as text plus `repeat`/`reminderScheduledAt` and the index.
-  - [ ] A timed due is stored as a canonical instant; a date-only due is stored verbatim.
+  - [ ] `TodosService` reads `TODO_TIMEZONE` once at construction and every helper receives that
+        single `tz`; a timed due is stored as a canonical instant; a date-only due is stored verbatim.
   - [ ] `repeat` without a resulting due is a 400.
   - [ ] Ticking a recurring todo advances it and keeps it open; a non-recurring tick is unchanged.
   - [ ] `markReminded(sub, id)` is public, clears the reminder, and bumps the generation.
@@ -471,8 +480,9 @@ than extracting it from the todo write path.
     `onModuleDestroy` clears it. If `TODO_VAPID_PUBLIC_KEY`/`TODO_VAPID_PRIVATE_KEY` are unset,
     `sweep()` is a no-op that logs once. **No `@nestjs/schedule`/`node-cron`.**
   - `package.json`: add `"web-push"` (with `@types/web-push` dev dep). The root
-    `package-lock.json` is updated in the same task (the Dockerfile runs `npm ci`). The
-    Dockerfile manifest copy is already glob-inclusive; no Dockerfile edit expected (verify in DoD).
+    `package-lock.json` is updated in the same task (the Dockerfile runs `npm ci`). The Dockerfile
+    lists explicit per-workspace `COPY … package.json` lines rather than a glob; no Dockerfile edit
+    is needed because `apps/todo-service/package.json` is already copied (verify in DoD).
   - Direct-DB sweep is the recorded Contract 2 deviation (D7); it serves no user read. The
     reminder clear goes through `markReminded`, so the cache is invalidated (Contract 2 Rule 1).
 
@@ -654,7 +664,7 @@ than extracting it from the todo write path.
     `<SettingsRow label="Push reminders" description="…" control={<PushToggle />} />`.
   - `public/sw.js` (new, static): `push` → `event.waitUntil(self.registration.showNotification(data.title, { body, data: { url }, icon: '/icon-todos.png', badge: '/icon-todos.png' }))`;
     `notificationclick` → `clients.matchAll` and focus an existing `/todos` window if present,
-    else `clients.openWindow(data.url)`, where the payload's `data.url = '/todos/<id>'`.
+    else `clients.openWindow(data.url)`, where the payload's `data.url = '/todos/<id>/edit'`.
   - No manifest / `viewport.themeColor` change (frozen PWA constants untouched).
 
 [VERIFICATION & TESTING RULES]
@@ -666,7 +676,7 @@ than extracting it from the todo write path.
         (unsupported / not-installed / subscribe) are implemented; the toggle reads browser state
         in an effect (no server-seeded browser values).
   - [ ] `sw.js` displays a notification (with `icon`+`badge`) and routes a click to the todo
-        (`data.url = '/todos/<id>'`, focusing an existing `/todos` window).
+        (`data.url = '/todos/<id>/edit'`, focusing an existing `/todos` window).
   - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` pass; no file outside scope.
 
 ### T12 — App UI tests + mechanical checks (module `todo-due-repeat-notify`)
@@ -770,7 +780,7 @@ than extracting it from the todo write path.
 | iOS ignores push because the app isn't installed | Med | T11 gates on `navigator.standalone` + guidance; recorded in success criteria |
 | Push payload carries the decrypted title to Apple | Med | Recorded decision (D9); never persisted; upgrade path documented |
 | Frozen e2e surface / PWA constants touched | High | T1/T10/T11 add names only; no manifest/themeColor change; no e2e edit |
-| New dependency (`web-push`) breaks the build | Med | T7 adds it to `apps/todo-service/package.json` **and** root `package-lock.json` (Docker `npm ci`), then runs `npm run build -w @life/todo-service`; Dockerfile manifest copy is glob-inclusive |
+| New dependency (`web-push`) breaks the build | Med | T7 adds it to `apps/todo-service/package.json` **and** root `package-lock.json` (Docker `npm ci`), then runs `npm run build -w @life/todo-service`; the Dockerfile's explicit `COPY … package.json` already includes `apps/todo-service/package.json` |
 | A repeat with no due slips through | Med | T5 enforces against the resulting due; T8 asserts the 400 |
 
 ## Open Questions

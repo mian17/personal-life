@@ -105,7 +105,9 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
     - [ ] Every listed signature exists exactly.
-    - [ ] Tests cover fixed-offset + DST zones, date-only untouched, sort key, daily/weekdays/
+    - [ ] Tests cover fixed-offset + DST zones (pinned to actual `America/New_York` transition
+          instants: local `2026-03-08T02:30` spring-forward and local `2026-11-01T01:30` fall-back),
+          date-only untouched, sort key, daily/weekdays/
           weekly/monthly-clamp/yearly-clamp, and no past occurrence.
     - [ ] Typecheck passes; no file outside scope modified.
   - Dependencies: T2. Size: M.
@@ -125,8 +127,12 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [IMPLEMENTATION REQUIREMENTS] `todo.entity.ts`: `dueDate` → `@Column({type:'text'})`,
     `repeat`/`reminderScheduledAt` text columns + `@Index('IDX_todo_reminder_scheduled_at', …)`
     (`synchronize:true`). DTOs accept `ISO_DUE` + optional `repeat` (`@IsIn(TODO_REPEATS)`, nullable
-    pattern); `normalizeDue`, `reminderAt`; create/update store `repeat` + normalized due +
+    pattern) and drop/raise the existing `@MaxLength(10)` on `dueDate` to 16 in BOTH DTOs (a timed
+    `YYYY-MM-DDTHH:mm` is 16 chars); `normalizeDue`, `reminderAt`; create/update store `repeat` + normalized due +
     `reminderScheduledAt`; repeat-requires-due → 400; advance-on-tick for recurring;
+    `TodosService` reads `process.env.TODO_TIMEZONE` once at construction (default
+    `Asia/Ho_Chi_Minh`) into a `private readonly tz` field and passes it to every helper (one owner
+    per rule, lesson 0016);
     `compareTodos`/cursor use `dueSortKey`; `CachedTodoRow` carries `repeat`/`reminderScheduledAt`
     verbatim; ciphertext guards unchanged. Public `markReminded(sub, id)` clears the reminder and
     bumps the generation (the sweep seam; `todos.module.ts` exports `TodosService`).
@@ -188,7 +194,9 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `RemindersModule` with `setInterval(30s)` in `onModuleInit` and clear in `onModuleDestroy`;
     missing VAPID env ⇒ no-op. Env wiring for `TODO_TIMEZONE`/`TODO_VAPID_PUBLIC_KEY`/
     `TODO_VAPID_PRIVATE_KEY`/VAPID subject in both env examples + `compose.yaml`; Redis stays
-    compose-injected only. No scheduler dep. Dockerfile glob-inclusive (verify); root lockfile
+    compose-injected only. No scheduler dep. The Dockerfile lists explicit per-workspace
+    `COPY … package.json` lines (not a glob) and already includes
+    `apps/todo-service/package.json`, so no Dockerfile edit is needed (verify); root lockfile
     updated.
   - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/todo-service` and
     `npm run build -w @life/todo-service`. NO full suites/E2E, max 2.
@@ -265,12 +273,12 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     hide/collapsing gated on `!todo.repeat`. `matrix.ts` `isUrgent` uses `dueDay`/`dueDateState`
     (timed-tomorrow still urgent).
   - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/app` and
-    `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`.
-    NO full suites/E2E, only these files, max 2.
+    `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts`.
+    NO full suites/E2E, only these three files, max 2.
   - [DEFINITION OF DONE]
     - [ ] Editor writes joined date+time + `repeat`; existing Due/Due date selectors unchanged.
     - [ ] Recurring tick doesn't hide/collapse; matrix urgency timed-safe.
-    - [ ] Typecheck + four-file tests pass; no file outside scope modified.
+    - [ ] Typecheck + three-file tests pass; no file outside scope modified.
   - Dependencies: T3, T5. Size: M.
 
 - [ ] T11: App UI settings + service worker — module `todo-due-repeat-notify`
@@ -286,7 +294,7 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `permission='default'`) and reading `navigator`/`Notification.permission` in a `useEffect`
     (no server-seeded browser values → no hydration mismatch), calling the T9 client; `sw.js`
     handles `push` (showNotification with icon+badge and `data.url`) + `notificationclick`
-    (focus an existing `/todos` window else `openWindow(data.url)`, `data.url = '/todos/<id>'`);
+    (focus an existing `/todos` window else `openWindow(data.url)`, `data.url = '/todos/<id>/edit'`);
     no PWA constant change.
   - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` then
     `npm run typecheck -w @life/app`. NO full suites/E2E, max 2.

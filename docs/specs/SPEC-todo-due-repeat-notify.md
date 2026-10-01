@@ -70,7 +70,10 @@ The client submits **local wall-clock**; the process interprets it in its config
 time, but the process should store time that is national"). One timezone owner: the service.
 
 - Service env `TODO_TIMEZONE` (IANA name, default `Asia/Ho_Chi_Minh`) is the national zone.
-  The service is the only party that maps local ⇄ canonical. `TODO_TIMEZONE`,
+  The service is the only party that maps local ⇄ canonical. `TodosService` reads
+  `process.env.TODO_TIMEZONE` **once at construction** into a `private readonly tz` field and
+  passes it to every helper (`normalizeDue`, `reminderAt`, `dueSortKey`, the advance path) —
+  one owner for the zone lookup, never sourced at two call sites (lesson 0016). `TODO_TIMEZONE`,
   `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_PRIVATE_KEY`, and the VAPID subject/contact var are
   documented in `.env.example` / `.env.development.example` and wired into `compose.yaml`'s
   `todo-service` environment; Redis keys remain compose-injected only (never in the env files).
@@ -121,8 +124,10 @@ required-but-nullable.
 - Validation: `repeat` is `@IsOptional() @ValidateIf(v => v !== null) @IsIn(TODO_REPEATS)`;
   `dueDate` is `@IsOptional() @ValidateIf(v => v !== null) @Matches(ISO_DUE)` where
   `ISO_DUE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/` on the **request** (the service then
-  normalizes a timed request to an instant). Read values are always `DATE_ONLY` or
-  `UTC_INSTANT`.
+  normalizes a timed request to an instant). The existing `@MaxLength(10)` on `dueDate` is
+  dropped (or raised to 16) in **both** `create-todo.dto.ts` and `update-todo.dto.ts`: a timed
+  value `YYYY-MM-DDTHH:mm` is 16 chars and the cap would reject it before `@Matches(ISO_DUE)`
+  is reached. Read values are always `DATE_ONLY` or `UTC_INSTANT`.
 - **A repeat requires a due date.** Create/update with `repeat != null` and no resulting
   `dueDate` → 400 (`BadRequestException('repeat requires a dueDate')`).
 - **Reminder rule:** any todo with a `dueDate` gets a reminder (timed → the instant;
@@ -176,7 +181,7 @@ A bounded NestJS module `apps/todo-service/src/reminders/`:
   `SELECT r.* FROM todo r WHERE r.deletedAt IS NULL AND r.done = 0
    AND r.reminderScheduledAt IS NOT NULL AND r.reminderScheduledAt <= :nowIso`
   (lexicographic ISO compare; index-backed). For each due row: build the payload
-  `{ title, body, url: '/todos/<id>' }` (title decrypted in-request), send to the owner's
+  `{ title, body, url: '/todos/<id>/edit' }` (title decrypted in-request), send to the owner's
   `push_subscription` rows via the injected `PushSender`, then call the public `TodosService`
   seam `markReminded(sub, id)`, which clears `reminderScheduledAt` and bumps the owner's
   generation counter after the write. The sweep never writes the todo table directly.
@@ -273,7 +278,8 @@ sibling fields (lesson 0014).
     imports the server-only `lib/todo-api.ts`).
 - **Service worker:** new static `apps/app/public/sw.js` handles `push` (→
   `showNotification` with title/body, `data.url`, icon/badge `icon-todos.png`) and
-  `notificationclick` (focus an existing `/todos` window or `openWindow(data.url)`). No
+  `notificationclick` (focus an existing `/todos` window, else `openWindow(data.url)`, where
+  `data.url = '/todos/<id>/edit'`). No
   bundler, no `next-pwa`.
 - **Frozen e2e surface (additions to the recorded surface in `SPEC-todo-ui.md`):** new
   accessible names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
@@ -298,8 +304,9 @@ Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 ## Testing Strategy
 
 1. **Timezone math (pure):** `localToUtc`/`utcToLocal` round-trip for `Asia/Ho_Chi_Minh`
-   (fixed offset) and `America/New_York` (DST boundary); a date-only value is never
-   converted.
+   (fixed offset) and `America/New_York` pinned to actual transition instants (local
+   `2026-03-08T02:30` spring-forward and local `2026-11-01T01:30` fall-back); a date-only value
+   is never converted.
 2. **Due round-trip:** create with `dueDate:'2026-10-02T09:00'` + `repeat:'weekly'` → read
    returns the UTC instant + `repeat:'weekly'` + a non-null `reminderScheduledAt`; date-only
    create keeps `'YYYY-MM-DD'` and reminder = 09:00 national.
@@ -342,7 +349,8 @@ Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 3. Ticking a repeat advances it to the next occurrence on/after "now" and keeps it open;
    an unticked occurrence stays overdue with no further pings (TickTick, N3).
 4. A dated todo fires exactly one Web Push to the user's iPhone at its due instant (timed)
-   or 09:00 national (date-only), even when the app is closed; tapping opens the todo.
+   or 09:00 national (date-only), even when the app is closed; tapping opens the todo at
+   `/todos/<id>/edit`.
 5. The reminder is a lasting, server-owned row field (`reminderScheduledAt`) the future
    postman can read; the sender is a bounded, replaceable module (lesson 0012).
 6. `SPEC-todo-service.md`, `SPEC-todo-ui.md`, `MAP-todo-ecosystem.md`, and `MAP-redis.md`
