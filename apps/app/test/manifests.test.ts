@@ -8,12 +8,6 @@ const readManifest = (file: string) =>
   JSON.parse(fs.readFileSync(path.join(publicDir, file), 'utf8'));
 
 describe('per-route PWA manifests', () => {
-  it('keeps the root manifest as the default app', () => {
-    const root = readManifest('manifest.json');
-    expect(root.start_url).toBe('/');
-    expect(root.icons.length).toBeGreaterThanOrEqual(1);
-  });
-
   it('gives /notes its own identity', () => {
     const notes = readManifest('manifest-notes.json');
     expect(notes.id).toBe('/notes');

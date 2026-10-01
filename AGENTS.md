@@ -7,7 +7,7 @@
 | `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
 | `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
 | `max-test-runs` | 2 |
-| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md` value table); PWA constants (`public/manifest.json`, `viewport.themeColor`) |
+| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md` value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
 | `lessons` | `docs/lessons/` |
 
@@ -67,7 +67,7 @@ a visual element and Rule 3 applies.
 - Token values: a deliberate theme change updates `packages/ui/test/tokens.test.ts` and
   `SPEC-ui-tokens.md`'s value table in the same commit. Those are tripwires, not
   suggestions.
-- PWA constants (`public/manifest.json`, `viewport.themeColor`) are app-owned and move
+- PWA constants (`public/manifest-*.json`, `viewport.themeColor`) are app-owned and move
   only when the user asks.
 
 ### Mechanical checks (tech lead runs at every review touching UI)

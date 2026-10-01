@@ -20,9 +20,9 @@ const PUBLIC_PREFIXES = ['/auth/'];
 /** Public static assets not worth gating (the app HTML only renders when authed). */
 const PUBLIC_EXACT = new Set([
   '/favicon.ico',
-  '/manifest.json',
   '/manifest-notes.json',
   '/manifest-todos.json',
+  '/apple-touch-icon.png',
   '/icon.svg',
 ]);
 export function isPublicPath(pathname: string): boolean {

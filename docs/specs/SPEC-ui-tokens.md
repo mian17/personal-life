@@ -110,8 +110,8 @@ each token's value); the theme selectors are exactly
 2. Theme behavior is byte-equivalent: same selectors, same attribute contract.
 3. `npm run lint -w packages/ui` passes; the package is consumable via
    `transpilePackages` + jest mapping (verified in `notes-port`).
-4. PWA constants (`manifest.json`, `viewport.themeColor`) stay app-owned and
-   unchanged.
+4. PWA constants (`manifest-notes.json` / `manifest-todos.json`, `viewport.themeColor`)
+   stay app-owned and unchanged.
 
 ## Open Questions
 

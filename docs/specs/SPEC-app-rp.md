@@ -119,19 +119,28 @@ always landing on the default (`/` → `/notes`).
 ## Per-route PWA manifests
 
 Each app route gets its own PWA identity so a PWA saved from a route opens that route.
-The root stays the default app.
+There is no root/default manifest: a manifest is declared only by the routes that are
+apps, and an unadorned path (e.g. an error page) declares none.
 
-- **Root (default app):** `apps/app/public/manifest.json` stays the default
-  (`start_url "/"`, name "Personal Life — Notes").
 - **`/notes`:** serves `apps/app/public/manifest-notes.json` with
   `id` / `start_url` / `scope` all `/notes`.
 - **`/todos`:** serves `apps/app/public/manifest-todos.json` with
   `id` / `start_url` / `scope` all `/todos`.
+- **No root manifest:** `apps/app/public/manifest.json` is removed and the root layout
+  declares no `manifest`. A root manifest with no `scope` defaults to the whole origin,
+  which made every install resolve to the root app (`/` → `/notes`); per the Web App
+  Manifest model the per-route `id` / `scope` / `start_url` alone carry the identity.
 - **Wiring:** the nested route segment links its manifest via `metadata.manifest` in a
-  fragment `layout.tsx` (a `{children}` pass-through with zero visual responsibility),
-  overriding the root layout's link for that segment.
+  fragment `layout.tsx` (a `{children}` pass-through with zero visual responsibility).
+  The root layout declares none, so nothing competes with the per-route link.
 - **Public access:** the manifest files are public — fetchable with no session
-  (the gate serves them like `/manifest.json` and `/icon.svg`).
+  (the gate serves them like `/icon.svg`).
+- **Apple install metadata:** each segment layout emits `apple-mobile-web-app-capable`
+  (`yes`) and `apple-mobile-web-app-title` ("Notes" / "Todos") via
+  `routeLayoutMetadata(manifest, title)`, so iOS shows a standalone Home Screen web app
+  with a route-specific name. The root layout wires `icons.apple` →
+  `/apple-touch-icon.png` (180×180 PNG, rasterized from `icon.svg`): iOS ignores SVG for
+  the Home Screen, so the PNG is the real icon.
 - **Mechanism:** nested `manifest.ts` file-convention routes are **NOT used** — in the
   installed Next.js the `manifest` metadata convention is anchored to the app root, so a
   colocated `app/<segment>/manifest.ts` is not a route. The verified mechanism is a

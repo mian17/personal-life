@@ -2,9 +2,15 @@ import { render } from '@testing-library/react';
 import { RouteLayout, routeLayoutMetadata } from '../src/route-layout';
 
 describe('routeLayoutMetadata', () => {
-  it('returns the { manifest } metadata object', () => {
-    expect(routeLayoutMetadata('/manifest-notes.json')).toEqual({ manifest: '/manifest-notes.json' });
-    expect(routeLayoutMetadata('/manifest-todos.json')).toEqual({ manifest: '/manifest-todos.json' });
+  it('returns the manifest plus Apple Home Screen hints', () => {
+    expect(routeLayoutMetadata('/manifest-notes.json', 'Notes')).toEqual({
+      manifest: '/manifest-notes.json',
+      appleWebApp: { capable: true, title: 'Notes', statusBarStyle: 'default' },
+    });
+    expect(routeLayoutMetadata('/manifest-todos.json', 'Todos')).toEqual({
+      manifest: '/manifest-todos.json',
+      appleWebApp: { capable: true, title: 'Todos', statusBarStyle: 'default' },
+    });
   });
 });
 
