@@ -10,7 +10,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest",
-    "import-tags": "ts-node scripts/import-tags.ts"
+    "import-tags": "ts-node scripts/import-tags.ts",
+    "cleanup-tags": "ts-node scripts/cleanup-tags.ts"
   },
   "dependencies": {
     "@life/cache": "*",
