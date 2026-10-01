@@ -1,4 +1,4 @@
-# 0010 — Fixing the plan is part of handing off to subagents
+# 0010 — Fixing the plan after validating-plans is a subagent handoff
 
 - **Date:** 2026-10-01
 - **Source:** user feedback on the `validating-plans` loop (inline-tag terminator plan)
@@ -8,34 +8,46 @@
 > "save in the lessons learned that fixing the plan based on the validating plan skill is
 > also part of the handing off to subagents"
 
+then, correcting my written version of it:
+
+> "wait what, i told you that fixing plan validator findings must be handed off the
+> subagents to fix them instead of techlead"
+
 ## What it corrected
 
-I ran the `validating-plans` gate as if a FAIL implied the *originating planner subagent*
-must be re-invoked. Round 2 came back with four defects and I sent the whole plan back for
-a subagent rewrite. Round 3 came back with four **one-line** defects — a `grep` with no file
-argument, a grep whose stated output its pattern could never print, a `<same name>`
-placeholder left inside a command, and one sentence contradicting the authoritative
-implementation block. None changed scope, behaviour, or a locked decision. I fixed those
-four in place as Tech Lead and dispatched a **fresh, read-only** validator — no planner
-re-invocation. That is the right default: the repair step lives *inside* the delegation
-loop, and its size is chosen by the defect, not by the fact that a gate failed.
+I read "part of the handing off to subagents" as "the fix lives inside the delegation
+loop", and wrote that up with a carve-out: substantive defects go to a subagent, mechanical
+one-line defects (a `grep` missing its file argument, a placeholder left inside a command,
+a whisper of internal inconsistency) the Tech Lead applies directly. I then fixed four
+such findings myself and dispatched a fresh validator.
+
+That is not the rule — and I had already written it into this file in the wrong shape. The
+rule is simpler and without a size exemption: **fixing what a validator found is itself a
+delegated task.** The validator's findings are handed to a subagent to repair; the Tech
+Lead orchestrates and re-validates, and does not edit the plan with its own hands. I had
+also inverted the point of the earlier feedback the first time round (round 2's four
+defects went to the *planner*, round 3's four went to *me*) — both were the wrong seat.
 
 ## The lesson
 
-- The validation loop is **plan → validate → repair → fresh validate**, and repair is not
-  automatically a subagent handoff. Delegate it when the defect is substantive or changes
-  scope/contracts; apply it directly when it is mechanical (a bad command, a placeholder,
-  an internal inconsistency). Both paths end the same way: a **new** validator, never the
-  one that failed, because no partial pass carries over.
-- The validator stays strictly read-only even when the fix is one character. It never
-  repairs what it found — if it also fixed, "fresh context" would be worthless.
-- Never let "I fixed it" substitute for re-validation. Four green checks after a repair do
-  not mean the repaired artifact is clean; only a fresh full pass does.
-- When re-invoking the planner *is* warranted, say so explicitly with the defect list and
-  the locked decisions to preserve, so the rewrite fixes only what broke instead of
-  re-opening what the previous rounds already settled.
+- The `validating-plans` loop is: **plan → validate (fresh, read-only subagent) →
+  dispatch a repair subagent with the validator's exact findings → validate again
+  (fresh, read-only subagent).** The repair leg is a handoff to a subagent, not a
+  Tech-Lead edit.
+- **There is no "mechanical, so I'll do it myself" exemption.** Diff size is not the
+  boundary. A one-line grep fix is delegated exactly like a scope rewrite. Classifying
+  findings into "small enough for me" and "big enough for a subagent" is the exact drift the
+  rule exists to stop.
+- The repair subagent is given: the findings verbatim with plan line numbers, the locked
+  decisions it must not re-open, the plan as its only writable file, and read-only access to
+  the sources of truth. It fixes only what was found — it does not re-litigate what earlier
+  rounds settled.
+- The validator and the repairer are always **different, fresh** contexts, and the validator
+  never repairs what it found; that separation is what makes "fresh context" mean anything.
+- Keep the Tech Lead in the orchestrator seat (global §1/§4): dispatching, scoping, and
+  re-validating — not authoring the artifact.
 
 ## Applies to
 
-The `validating-plans` gate loop (global protocol §6), the §4/§5 delegation template, and
-any review gate whose failure produces a repair step.
+The `validating-plans` gate loop (global protocol §6) and the §4/§5 delegation template,
+for every plan repair however small.
