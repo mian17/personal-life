@@ -21,7 +21,9 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "db:backup": "npm run db:backup -w @life/db --",
+    "db:restore": "npm run db:restore -w @life/db --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

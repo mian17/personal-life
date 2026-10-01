@@ -63,10 +63,8 @@ per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `comp
 
 ```bash
 docker compose down            # NO -v : -v also removes redis-app-data (sessions)
-mkdir -p backup/$(date +%Y%m%d-%H%M%S)
-cp apps/note-service/data/life.db  backup/<stamp>/life.db
-cp apps/idp/data/*                 backup/<stamp>/   2>/dev/null || true
-# tags.db / todo.db will not exist yet on a master-based stack — that is expected
+npm run db:backup -w @life/db -- --pin
+# back up a subset instead with --only (e.g. --only life,idp)
 ```
 
 - [ ] Backups are **readable** (`sqlite3 life.db 'PRAGMA integrity_check;'` → `ok`).
