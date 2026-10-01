@@ -345,7 +345,8 @@ Case counts are referenced by spec section, never by number (kills count drift).
   Dockerfiles (tags/todo created; app/idp/note-service carry the full workspace
   manifest set + note-service consumes `@life/cache` at runtime), compose services
   for tags/todo (fail-fast `TAGS_MASTER_KEY`/`TODO_MASTER_KEY`, `DB_PATH` volumes,
-  `/health/ready` healthchecks, shared `redis-note`), shared `life-api` audience
+  `/health/ready` healthchecks, tags/todo reusing the existing `redis-note`),
+  shared `life-api` audience
   across compose + `.env.example` + README (config-only; idp tests pin the map
   mechanism, unaffected), Playwright harness brings tags/todo up (stack/config/
   global-setups; frozen assertions untouched), root dev script runs five services,
