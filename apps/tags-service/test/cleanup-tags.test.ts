@@ -173,7 +173,7 @@ function registryRows(
 }
 
 function backupFiles(dir: string): string[] {
-  return readdirSync(dir).filter((name) => name.includes('.pre-import-'));
+  return readdirSync(dir).filter((name) => name.includes('.pre-cleanup-'));
 }
 
 interface Fixture {
@@ -346,7 +346,7 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
     const report = applyCleanup(pathsFor(fx));
 
     expect(report.backupPath).not.toBeNull();
-    expect(report.backupPath).toContain('.pre-import-');
+    expect(report.backupPath).toContain('.pre-cleanup-');
     const backupPath = report.backupPath as string;
     expect(existsSync(backupPath)).toBe(true);
     const copy = open(backupPath, true);

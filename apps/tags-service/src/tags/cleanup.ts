@@ -1,8 +1,8 @@
 import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
 import { resolveDbPath } from '@life/shared';
-import { snapshotAndVerify } from './import';
 
 /**
  * `cleanup-tags` core (`SPEC-tags-service` `## Maintenance scripts`). Operator-run
@@ -15,8 +15,8 @@ import { snapshotAndVerify } from './import';
  * the note DB. Trashed notes/todos count as references (soft-delete is never
  * queried), so restore keeps working.
  *
- * Apply takes the shared verified `VACUUM INTO` snapshot (`snapshotAndVerify`
- * from `import-tags`) before one per-owner-scoped delete transaction; plan opens
+ * Apply takes the shared verified `VACUUM INTO` snapshot (`@life/db`
+ * `snapshotAndVerify`) before one per-owner-scoped delete transaction; plan opens
  * the three DBs read-only and writes nothing. The module never opens a real
  * `apps` data directory path on its own — the caller owns the arguments.
  */
@@ -185,7 +185,10 @@ export function planCleanup(paths: CleanupPaths): CleanupReport {
  */
 export function applyCleanup(paths: CleanupPaths): CleanupReport {
   const { scanned, referenced, orphanRows } = computeOrphans(paths);
-  const backupPath = snapshotAndVerify(paths.tagsDbPath);
+  const backupPath = snapshotAndVerify(
+    paths.tagsDbPath,
+    uniqueSnapshotPath(paths.tagsDbPath, 'pre-cleanup'),
+  ).backupPath;
 
   if (orphanRows.length > 0) {
     const db = new Database(paths.tagsDbPath);

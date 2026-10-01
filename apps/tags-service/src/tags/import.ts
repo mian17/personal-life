@@ -10,6 +10,7 @@ import {
   unwrapDek,
   wrapDek,
 } from '@life/crypto';
+import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
 import { resolveDbPath } from '@life/shared';
 
 /**
@@ -222,19 +223,6 @@ function hasForeignKeyTo(db: Database.Database, table: string, target: string): 
   return rows.some((row) => row.table === target);
 }
 
-function uniqueBackupPath(dbPath: string): string {
-  // UTC, millisecond resolution, filename-safe. Collisions fall through to a
-  // numeric suffix rather than ever overwriting an existing backup.
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  let candidate = `${dbPath}.pre-import-${stamp}`;
-  let n = 1;
-  while (existsSync(candidate)) {
-    candidate = `${dbPath}.pre-import-${stamp}-${n}`;
-    n += 1;
-  }
-  return candidate;
-}
-
 /**
  * Resolve the two DB paths. `NOTE_DB_PATH`/`TAGS_DB_PATH` overrides resolve
  * against `INIT_CWD ?? cwd` (the `backfill-owner` convention); otherwise the
@@ -245,50 +233,6 @@ export function resolvePaths(env: NodeJS.ProcessEnv = process.env): ResolvedPath
     noteDbPath: resolveDbPath('NOTE_DB_PATH', DEFAULT_NOTE_DB_PATH, env),
     tagsDbPath: resolveDbPath('TAGS_DB_PATH', DEFAULT_TAGS_DB_PATH, env),
   };
-}
-
-/**
- * Step 1. `VACUUM INTO` a SQLite-consistent snapshot of the pre-migration state,
- * then verify the copy: it exists, opens, and `PRAGMA quick_check` passes. The
- * source is opened read-only (and checked) so this step provably cannot mutate
- * anything. Any failure throws — the caller never proceeds to a write.
- */
-export function snapshotAndVerify(dbPath: string): string {
-  if (!existsSync(dbPath)) {
-    throw new Error(`database does not exist: ${dbPath}`);
-  }
-
-  const backupPath = uniqueBackupPath(dbPath);
-  const source = new Database(dbPath, { readonly: true });
-  try {
-    const check = source.prepare('PRAGMA quick_check').get() as
-      | { quick_check: string }
-      | undefined;
-    if (check?.quick_check !== 'ok') {
-      throw new Error(`source failed PRAGMA quick_check: ${dbPath}`);
-    }
-    // VACUUM INTO refuses an existing target — exactly the guarantee we want.
-    source.prepare('VACUUM INTO ?').run(backupPath);
-  } finally {
-    source.close();
-  }
-
-  if (!existsSync(backupPath)) {
-    throw new Error(`backup was not created: ${backupPath}`);
-  }
-
-  const copy = new Database(backupPath, { readonly: true });
-  try {
-    const check = copy.prepare('PRAGMA quick_check').get() as
-      | { quick_check: string }
-      | undefined;
-    if (check?.quick_check !== 'ok') {
-      throw new Error(`backup failed PRAGMA quick_check: ${backupPath}`);
-    }
-  } finally {
-    copy.close();
-  }
-  return backupPath;
 }
 
 function ensureRegistrySchema(db: Database.Database): string[] {
@@ -677,8 +621,14 @@ export function applyImport(
   tagsMasterKey: Buffer,
   options: ImportOptions = {},
 ): ImportReport {
-  const noteBackupPath = snapshotAndVerify(noteDbPath); // Step 1 — aborts on failure
-  const tagsBackupPath = existsSync(tagsDbPath) ? snapshotAndVerify(tagsDbPath) : null;
+  // Step 1 — the shared `@life/db` snapshot primitive; aborts on any failure.
+  const noteBackupPath = snapshotAndVerify(
+    noteDbPath,
+    uniqueSnapshotPath(noteDbPath, 'pre-import'),
+  ).backupPath;
+  const tagsBackupPath = existsSync(tagsDbPath)
+    ? snapshotAndVerify(tagsDbPath, uniqueSnapshotPath(tagsDbPath, 'pre-import')).backupPath
+    : null;
   bootstrapRegistrySchema(tagsDbPath); // Step 2 — DDL byte-equivalent to the entities
   const counts = importTags(noteDbPath, tagsDbPath, noteMasterKey, tagsMasterKey, options);
   const surgeryActions = applySurgery(noteDbPath); // Step 5 — last
