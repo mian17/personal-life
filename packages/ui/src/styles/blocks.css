@@ -34,7 +34,6 @@
  * atoms.css does (`--space-2` = 2rem, `--space-1` = 1rem). Non-tokenizable
  * keywords/units are kept verbatim: `auto`, `flex`, `fixed`, `100dvh`, `10`,
  * `700`, `-0.02em` (no letter-spacing token exists in the frozen token layer),
- * the `640px` media condition (media queries cannot read custom properties),
  * and the `env(safe-area-inset-*)` values.
  */
 

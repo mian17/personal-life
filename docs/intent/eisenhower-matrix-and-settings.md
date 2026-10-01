@@ -42,7 +42,7 @@ Confirmed by the user 2026-10-01 via interview-me (explicit "yes").
 | L2 | Tabs are server-rendered LINKs to `/todos` (List, default) and `/todos/matrix` (Matrix); the Matrix route is server-gated. |
 | L3 | Preference storage is a server-readable cookie — the matrix setting gates a route, so it cannot be localStorage. Theme stays on its existing localStorage mechanism (client-only visual): record this split, no theme migration. |
 | L4 | The Settings entry point is a new gear `IconLink` occupying the theme toggle's exact former position in `navTrailing` — in BOTH apps, which both carry the toggle today. Each app therefore gets a settings page: `/todos/settings` (Theme + matrix switch) and `/notes/settings` (Theme only). |
-| L5 | The matrix renders as a 2×2 grid on wide viewports and four stacked labelled sections on a narrow phone — the `MatrixBlock` decides from available width; no horizontal scroll. |
+| L5 | The matrix renders as a 2×2 grid of muted panels at every width, unconditionally (smallest phones included): equal-height rows, empty quadrants show a muted centered empty state; separation from the grid gap, no hairline dividers — no media query, no phone stack. **Revised, user-approved** (the earlier "2×2 on wide / stacked on a narrow phone" was reversed; see `docs/specs/SPEC-matrix-ui.md` :451-462). |
 | L6 | Importance (`todo.important` nullable) defaults from the list (`list.importantDefault`), overridable per todo; urgency derived from `dueDate`; plain quadrant labels; no per-item triage. |
 | L7 | The settings surface is reusable across apps by construction (Contract 1 layering); Todos is the first consumer only. |
 

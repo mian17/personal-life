@@ -1,5 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { ListShell } from '../src/components/list-shell';
+
+const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+
+function cssBlock(selector: string): string {
+  return (
+    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      [])[1] ?? ''
+  );
+}
 
 function order(root: Element): string[] {
   return Array.from(root.children).map((child) =>
@@ -137,5 +148,21 @@ describe('ListShell', () => {
     const wrapper = container.querySelector('.ui-list-shell__body')!;
     expect(wrapper).not.toBeNull();
     expect(wrapper.querySelector('[data-testid="body"]')!.textContent).toBe('nothing here yet');
+  });
+
+  it('the fill CSS makes the page a full-height column and the body grow (tokens only)', () => {
+    const page = cssBlock('.ui-page.ui-list-shell--fill');
+    expect(page).toMatch(/display:\s*flex/);
+    expect(page).toMatch(/flex-direction:\s*column/);
+    expect(page).toMatch(/min-height:\s*100dvh/);
+
+    const body = cssBlock('.ui-list-shell__body');
+    expect(body).toMatch(/flex:\s*1/);
+    expect(body).toMatch(/min-height:\s*0/);
+
+    // Guard: the fill declarations resolve through tokens/allowed keywords, never raw px/hex/rgb.
+    const declarations = `${page}${body}`;
+    expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
+    expect(declarations).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
   });
 });
