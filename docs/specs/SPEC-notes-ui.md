@@ -164,9 +164,15 @@ last-write-wins behavior (still incrementing the version).
   flank the status indicator. Both flush any pending save (creating a non-empty new note),
   then return to `/`. An empty new note returns without creating anything.
 - **Delete:** deletion lives only on the home list rows; the editor has no delete control.
-- **Tags:** tags are edited inline as `#tag` tokens in the body. On save, tags are parsed
-  from the body (`/#([^\s#]+)/g`, trimmed, deduped case-insensitively, max 50 chars each)
-  and written through the existing `tags` array.
+- **Tags:** tags are edited inline as `#tag` tokens in the body. A tag name is a run of
+  Unicode letters/digits/`-`/`_`, trimmed, deduped case-insensitively, max 50 chars each,
+  and written through the existing `tags` array. One parser
+  `/#([\p{L}\p{N}_-]+)(?=[^\p{L}\p{N}_-])/gu` serves both modes:
+  - **Strict** (the autosave parse): a `#token` is recognized only when followed by a
+    character that is not a name character, and end-of-content is not a terminator — a
+    partial token never becomes a tag while typing.
+  - **Final** (when the editor is left: blur, Back/Save, or the page being hidden):
+    end-of-content is a terminator, so a tag left at the very end of the note is committed.
   - Compatibility (approved): tags already stored on a note but not present inline are
     shown as low-emphasis removable chips in the editor so they are not silently lost;
     saved tags = inline hashtags ∪ retained chips. New notes are inline-only.

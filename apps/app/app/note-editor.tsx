@@ -13,9 +13,10 @@ import {
   Textarea,
   type TagOption,
 } from '@life/ui';
-import { parseInlineTags } from '@/lib/inline-tags';
+import { hasUncommittedTrailingTag, parseInlineTags } from '@/lib/inline-tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
+type ParseMode = 'strict' | 'final';
 type FlushResponse = {
   id?: string;
   version?: number;
@@ -38,10 +39,13 @@ function sameIds(a: readonly number[], b: readonly number[]): boolean {
 
 /**
  * The editor's tag state is the attached `tagIds`. Inline `#tag` names are
- * parsed from the body (frozen behavior) and sent alongside the attached ids;
- * the flush route resolves both through the registry's create-or-get and
- * persists `tagIds`. Unresolvable ids (a tag deleted in the other app) come back
- * in the response's `tagIds` as the detached set, and rendering omits them.
+ * parsed from the body (strict grammar: a token is a tag only when a terminator
+ * follows it, so autosave never commits a half-typed token) and sent alongside
+ * the attached ids; the flush route resolves both through the registry's
+ * create-or-get and persists `tagIds`. A final save (blur, Back/Save, pagehide,
+ * Keep mine) parses with `eofTerminates` so a note ending on `#tag` still
+ * commits it. Unresolvable ids (a tag deleted in the other app) come back in
+ * the response's `tagIds` as the detached set, and rendering omits them.
  */
 export function NoteEditor({ note, availableTags }: { note?: Note; availableTags: TagOption[] }) {
   const router = useRouter();
@@ -53,6 +57,7 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
+  const modeRef = useRef<ParseMode>('strict');
   const idRef = useRef<string | null>(note?.id ?? null);
   const bodyRef = useRef(note?.body ?? '');
   const selectedRef = useRef<number[]>(note?.tagIds ?? []);
@@ -84,10 +89,23 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
     setStatus('conflict');
   }, []);
 
-  const save = useCallback((): Promise<boolean> => {
+  const save = useCallback((mode: ParseMode = 'strict'): Promise<boolean> => {
+    // A final save upgrades the drain's parse and forces a send when the body is
+    // clean but ends on a tag the strict parse would not commit (D14). Runs before
+    // the `running`/`dirtyRef` guards, so it applies whether we start or join a drain.
+    if (mode === 'final') {
+      modeRef.current = 'final';
+      if (hasUncommittedTrailingTag(bodyRef.current)) dirtyRef.current = true;
+    }
     const running = drainRef.current;
     if (running) return running;
-    if (conflictRef.current) return Promise.resolve(false);
+    if (conflictRef.current) {
+      // No drain runs on this path to consume a 'final' upgrade: reset it so the
+      // next strict autosave cannot parse with eofTerminates and commit a
+      // half-typed trailing token. Safe because `running` was null above.
+      modeRef.current = 'strict';
+      return Promise.resolve(false);
+    }
     const drain = (async (): Promise<boolean> => {
       for (;;) {
         if (!dirtyRef.current) return true;
@@ -119,7 +137,9 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               body: nextBody,
-              inlineTagNames: parseInlineTags(nextBody),
+              inlineTagNames: parseInlineTags(nextBody, {
+                eofTerminates: modeRef.current === 'final',
+              }),
               tagIds: nextTagIds,
               ...(id === null ? {} : { expectedVersion: versionRef.current }),
             }),
@@ -190,34 +210,46 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
     drainRef.current = drain;
     void drain.finally(() => {
       if (drainRef.current === drain) drainRef.current = null;
+      modeRef.current = 'strict';
     });
     return drain;
   }, [enterConflict]);
 
-  const flush = useCallback(async (): Promise<boolean> => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    return save();
-  }, [save]);
+  const flush = useCallback(
+    async (mode: ParseMode = 'strict'): Promise<boolean> => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      return save(mode);
+    },
+    [save],
+  );
 
   // Client-side navigation does not fire pagehide, so leaving flushes the
   // pending debounced save (creating a non-empty new note) before navigating home.
   const leave = useCallback(async () => {
-    const ok = await flush();
+    const ok = await flush('final');
     if (ok) router.push('/notes');
   }, [flush, router]);
 
   // Server Actions do not survive navigation, so a pending edit is sent via a
   // keepalive fetch that the browser finishes after the page is gone.
-  const flushKeepalive = useCallback((allowCreate: boolean) => {
+  const flushKeepalive = useCallback((allowCreate: boolean, mode: ParseMode) => {
     // Hidden-but-alive (tab switch, app background): a new note must not be
     // created here, because idRef and the URL stay null/'/notes/new'. Returning
     // to type would then POST again and duplicate it.
     if (idRef.current === null && !allowCreate) return;
     const nextBody = bodyRef.current;
     const nextTagIds = selectedRef.current;
+    // Final mode commits a trailing tag a clean body would otherwise never send
+    // (D14) — before the `!dirtyRef.current` guards below.
+    if (mode === 'final' && hasUncommittedTrailingTag(nextBody)) dirtyRef.current = true;
+    // A drain already running re-reads modeRef on its next iteration; upgrade it so
+    // that iteration parses final too (the in-flight request already left strict).
+    // Gated on a live drain so the flag is only ever set where it will be consumed
+    // and reset in that drain's finally — never leaks to a later strict autosave.
+    if (mode === 'final' && drainRef.current) modeRef.current = 'final';
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -235,7 +267,7 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
         expectedVersion?: number;
       } = {
         body: nextBody,
-        inlineTagNames: parseInlineTags(nextBody),
+        inlineTagNames: parseInlineTags(nextBody, { eofTerminates: mode === 'final' }),
         tagIds: nextTagIds,
       };
       // Best-effort concurrency guard: a stale keepalive PATCH must not clobber
@@ -326,7 +358,7 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
     dirtyRef.current = true;
     sentRef.current = null;
     setStatus('saving');
-    void save();
+    void save('final');
   }, [save]);
 
   useEffect(() => {
@@ -343,10 +375,10 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
 
   useEffect(() => {
     function onPageHide() {
-      flushKeepalive(true);
+      flushKeepalive(true, 'final');
     }
     function onVisibility() {
-      if (document.visibilityState === 'hidden') flushKeepalive(false);
+      if (document.visibilityState === 'hidden') flushKeepalive(false, 'final');
     }
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
@@ -414,7 +446,7 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
           bodyRef.current = e.target.value;
           schedule();
         }}
-        onBlur={() => void flush()}
+        onBlur={() => void flush('final')}
       />
     </EditorChrome>
   );
