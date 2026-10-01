@@ -49,6 +49,9 @@ corrected to list all five instances.
   add-time is what stops "one instance per service" from quietly becoming "whatever was
   already running".
 
+See **0012** for the process-level cause: why the earlier decision was silently
+overwritten and why per-chapter validation could not catch it.
+
 ## Applies to
 
 `docs/specs/MAP-*.md` capability maps and `compose.yaml` whenever a service or its
