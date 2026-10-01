@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "jest"
+    "test:unit": "jest",
+    "db:backup": "ts-node scripts/backup.ts"
   },
   "dependencies": {
     "@life/shared": "*",
