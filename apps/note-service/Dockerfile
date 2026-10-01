@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Build context is the repo root so the npm workspace (including @life/shared) is available.
+# Build context is the repo root so the npm workspace (including @life/shared and
+# @life/db) is available.
 FROM node:22-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update \
@@ -15,6 +16,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 COPY packages/crypto/package.json packages/crypto/
 COPY packages/cache/package.json packages/cache/
+COPY packages/db/package.json packages/db/
 COPY apps/tags-service/package.json apps/tags-service/
 COPY apps/todo-service/package.json apps/todo-service/
 RUN npm ci
@@ -23,9 +25,11 @@ COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/crypto ./packages/crypto
 COPY packages/cache ./packages/cache
+COPY packages/db ./packages/db
 COPY apps/note-service ./apps/note-service
 
 RUN npm run build -w @life/shared \
+  && npm run build -w @life/db \
   && npm run build -w @life/crypto \
   && npm run build -w @life/cache \
   && npm run build -w @life/note-service \
@@ -45,6 +49,8 @@ COPY --from=build /repo/packages/crypto/package.json ./packages/crypto/package.j
 COPY --from=build /repo/packages/crypto/dist ./packages/crypto/dist
 COPY --from=build /repo/packages/cache/package.json ./packages/cache/package.json
 COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
+COPY --from=build /repo/packages/db/package.json ./packages/db/package.json
+COPY --from=build /repo/packages/db/dist ./packages/db/dist
 COPY --from=build /repo/apps/note-service/package.json ./package.json
 COPY --from=build /repo/apps/note-service/dist ./dist
 
