@@ -54,7 +54,8 @@
     },
     "moduleNameMapper": {
       "^next/navigation$": "<rootDir>/test/stubs/next-navigation.tsx",
-      "^next/headers$": "<rootDir>/test/stubs/next-headers.ts"
+      "^next/headers$": "<rootDir>/test/stubs/next-headers.ts",
+      "^next/cache$": "<rootDir>/test/stubs/next-cache.ts"
     },
     "testEnvironment": "jsdom"
   }
