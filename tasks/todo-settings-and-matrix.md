@@ -214,7 +214,10 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
   - Acceptance: `settings-route` suite passes (`/todos` and `/notes` joins; trailing-slash
     route yields no `//settings`); the barrel exports the six names and no extra surface;
     `grep -rnE "matrix|/todos|/notes|<IconLink|Switch" packages/app-kit/src` finds no concrete
-    key, route literal, or markup.
+    key, route literal, or markup **in code**; documentation-comment examples (the spec's own
+    `'matrix'`/`pref_matrix`/`Switch` illustrations and the pre-existing `types.ts` /
+    `preserving-search-box.tsx` route examples) are the documented exemption, mirroring the
+    repo's UI-grep convention.
   - Verify: `npm run typecheck -w @life/app-kit` && `npm run test:unit -w @life/app-kit -- test/settings-route.test.ts`
   - Dependencies: T9. Size: S.
 - [ ] T12: `matrix-ui` — app wire-type conformance — module `matrix-ui`
@@ -411,7 +414,8 @@ Workspace names verified: `@life/ui`, `@life/app-kit`, `@life/todo-service`, `@l
   `enc.v1.`-only, `effectiveImportant` computed post-decrypt, `@life/todo-service` typecheck
   clean.
 - After T11 (app-kit): typecheck clean, suites green, `readPref` never throws, no concrete key
-  or markup in the package.
+  or markup in code in the package (documentation-comment examples exempt, per Success
+  Criterion 5).
 - After T18 (UI integration): all four routes render from `@life/ui`/`@life/app-kit`, opt-in
   off ⇒ no tabs node and a 404 matrix, the two L6 importance inputs (`Important` /
   `Default important`) are wired, Contract 1 greps green, `apps/app` typecheck clean.

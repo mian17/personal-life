@@ -238,7 +238,10 @@ No E2E here. The page wiring that consumes these lives in `matrix-ui`.
 3. `setPref` is a `'use server'` action that writes the cookie and revalidates the app.
 4. `settingsHref` yields the app-scoped settings path for both `/todos` and `/notes`.
 5. `grep -rnE "matrix|/todos|/notes|<IconLink|Switch" packages/app-kit/src` finds no
-   concrete key, route literal, or markup.
+   concrete key, route literal, or markup **in code**; documentation-comment examples (the
+   spec's own `'matrix'`/`pref_matrix`/`Switch` illustrations and the pre-existing
+   `types.ts` / `preserving-search-box.tsx` route examples) are the documented exemption,
+   mirroring the repo's UI-grep convention.
 6. Theme still reads/writes localStorage in `ThemeToggle` and `apps/app/app/layout.tsx`;
    nothing here migrated it.
 7. `npm run typecheck -w packages/app-kit` is clean and

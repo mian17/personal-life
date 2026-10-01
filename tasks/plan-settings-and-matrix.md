@@ -150,7 +150,10 @@ from `effectiveImportant` + urgency derived from `dueDate`.
 
 - [ ] `npm run typecheck -w @life/app-kit` clean and its suites green; `readPref` never
   throws; `grep -rnE "matrix|/todos|/notes|<IconLink|Switch" packages/app-kit/src` finds no
-  concrete key, route literal, or markup
+  concrete key, route literal, or markup **in code**; documentation-comment examples (the
+  spec's own `'matrix'`/`pref_matrix`/`Switch` illustrations and the pre-existing
+  `types.ts` / `preserving-search-box.tsx` route examples) are the documented exemption,
+  mirroring the repo's UI-grep convention
 
 ### Phase 4 — `matrix-ui` integration (`apps/app`)
 

@@ -7,3 +7,7 @@ export type { LoadOrNotFoundOptions } from './load-or-not-found';
 export { RouteLayout, routeLayoutMetadata } from './route-layout';
 export { PreservingSearchBox } from './preserving-search-box';
 export type { PreservingSearchBoxProps } from './preserving-search-box';
+export type { PrefKey } from './types';
+export { prefCookieName, parsePrefValue, readPref } from './preferences';
+export { setPref } from './preference-action';
+export { settingsHref } from './settings-route';
