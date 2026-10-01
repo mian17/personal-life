@@ -71,8 +71,11 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [IMPLEMENTATION REQUIREMENTS] New low-level `date-parts.ts` exports `todayIso`, `dueDay`
     (`value` → local `YYYY-MM-DD`; date-only: own parts, no `Date`; timed: local getters) and
     `datePart`; `format-date.ts` and `due-date-pill.tsx` both import from it (breaks the
-    `format-date → due-date-pill` cycle); `index.ts` re-exports `todayIso` **and `dueDay`**
-    from the new module.
+    `format-date → due-date-pill` cycle); `due-date-pill.tsx` **re-exports** `todayIso`
+    (`export { todayIso } from '../lib/date-parts';`) so `due-date.tsx` (imports `dueDateState`
+    + `todayIso`) and `format-date.test.ts` (imports `todayIso` from `../src/components/due-date-pill`)
+    keep working unchanged — `due-date.tsx` is not in scope; `index.ts` re-exports `todayIso`
+    **and `dueDay`**.
     `dueDateLabel` adds `Today/Tomorrow/dd-mm-yyyy HH:mm` for timed; `dueDateState` compares
     `dueDay` (day-granular); `dueDate.tsx` unchanged. Update the two tests for timed values +
     date-only non-regression.
@@ -81,7 +84,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `npm run typecheck -w @life/ui`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
     - [ ] `dueDay` is the single day-derivation helper; `todayIso` stays exported from `@life/ui`
-          via `date-parts.ts`.
+          (via `due-date-pill.tsx`'s re-export of `date-parts.ts`) so its existing importers
+          (`due-date.tsx`, `format-date.test.ts`) compile unchanged.
     - [ ] Date-only behavior unchanged; timed behavior as specified.
     - [ ] `npm run typecheck -w @life/ui` passes; no file outside scope modified.
   - Dependencies: T1. Size: S.
@@ -221,7 +225,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: timed round-trip + reminder present; date-only
     09:00; repeat-requires-due 400; daily-missed advance; weekdays Fri→Mon; monthly clamp;
     non-recurring done; clear-due clears reminder; `dueSortKey` order. Reminders: fake `PushSender`,
-    exactly-once, clear + bump, 404/410 delete, no-VAPID no-op, done/trashed skip. Push endpoints:
+    exactly-once, clear + bump, 404/410 delete, no-VAPID no-op, done/trashed skip; zero
+    `getThrough`/read-through reads during a `sweep()` (direct-DB deviation, spec Testing #8). Push endpoints:
     key returned; subscribe upserts by endpoint (no duplicate row); delete idempotent; another `sub`
     cannot read/affect the caller's subscriptions. Cache: `todo:all`/`todo:trash` carry both
     fields, `enc.v1.`-only, sweep-clear bump. No production edit to pass.

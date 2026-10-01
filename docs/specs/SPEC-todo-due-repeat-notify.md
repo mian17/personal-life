@@ -1,8 +1,9 @@
 # Spec: todo-due-repeat-notify (time + recurrence + push reminders)
 
 Module id: `todo-due-repeat-notify` (see `MAP-todo-ecosystem.md`). Backend capability of
-`apps/todo-service` + UI of `apps/app`, plus one bounded new backend module
-(`reminders`) inside `todo-service`. No new process.
+`apps/todo-service` + UI of `apps/app`, plus **two bounded, replaceable new backend modules**
+inside `todo-service`: `push` (Web Push subscription/key storage) and `reminders` (the
+sweep + sender). No new process.
 
 Traces to intent: `docs/intent/todo-due-repeat-notify.md` (locked decisions N1–N5).
 Contracts: `AGENTS.md` Contract 1 (Shared UI) and Contract 2 (BE → cache → DB),
@@ -17,8 +18,9 @@ labels / page chrome), 0015 (size the process).
 A todo's `dueDate` becomes optionally **timed** and optionally **repeating**, and a dated
 todo can deliver a **Web Push reminder to the user's iPhone** even when the app is closed.
 The todo row remains the single source of the "this wants attention at <instant>" letter the
-future centralized postman will read. Todo owns the sender for now, as a **separate bounded
-module**, so the future postman replaces it rather than extracting it from the todo write
+future centralized postman will read. Todo owns the sender for now, as two **separate bounded
+modules** — `push` (subscription/key storage) and `reminders` (the sweep/sender) — so the
+future postman replaces them rather than extracting them from the todo write
 path (lesson 0012).
 
 ## Data model
@@ -255,8 +257,12 @@ sibling fields (lesson 0014).
     **local calendar day** `YYYY-MM-DD` from either a date-only string (read the parts directly
     — no `Date`) or a UTC instant (local parts via `Date`), and the leading-date `datePart`
     helper. `format-date.ts` and `due-date-pill.tsx` both import from it (this breaks the
-    existing `format-date → due-date-pill` import cycle); `index.ts` re-exports `todayIso`
-    **and `dueDay`** from the new module so the public surface is preserved. `dueDay` is used by
+    existing `format-date → due-date-pill` import cycle); `due-date-pill.tsx` **re-exports**
+    `todayIso` (`export { todayIso } from '../lib/date-parts';`) so its existing consumers —
+    `due-date.tsx` (imports `dueDateState` + `todayIso`) and `packages/ui/test/format-date.test.ts`
+    (imports `todayIso` from `../src/components/due-date-pill`) — keep working unchanged
+    (`due-date.tsx` stays out of scope); `index.ts` keeps re-exporting `todayIso` **and `dueDay`**
+    from the new module so the public surface is preserved. `dueDay` is used by
     `dueDateState`, `dueDateLabel`, `groupTodos`, and matrix `isUrgent`.
   - `dueDateLabel(value, today?)` → `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only (unchanged)
     and `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value.
@@ -323,7 +329,8 @@ Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
    delete idempotent; another `sub` cannot read/affect the caller's subscriptions.
 8. **Cache:** `todo:all`/`todo:trash` values carry `repeat`/`reminderScheduledAt`; content
    fields remain `enc.v1.`-only; generation bumps on write and on sweep-clear; the direct-DB
-   sweep deviation is asserted (no cache read in the sweep path).
+   sweep deviation is asserted — a `sweep()` call performs **zero** read-through
+   (`getThrough`) reads, and only the `markReminded` generation bump touches the cache.
 9. **UI:** the editor payload joins date+time and carries `repeat`; the row renders the time
    and repeat label; a recurring tick does not hide the row; the settings push toggle
    branches (unsupported / not-installed / subscribe); mechanical Contract 1 checks green.

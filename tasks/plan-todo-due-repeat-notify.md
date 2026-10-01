@@ -160,7 +160,9 @@ than extracting it from the todo write path.
     time/repeat display, the no-hide-on-recurring-tick rule, the settings `Reminders` block +
     `PushToggle` + `sw.js`, and the frozen-surface additions (new names only).
   - MAP-todo-ecosystem.md: the `todo-due-repeat-notify` module row already exists — reconcile its
-    responsibility text with this spec; no new module. MAP-redis.md: record that `redis-todo`
+    responsibility text with this spec, naming **both** bounded backend modules (`push` for
+    subscription/key storage; `reminders` for the sweep/sender) and keeping the "bounded and
+    replaceable" framing; no new module *id*. MAP-redis.md: record that `redis-todo`
     ownership is unchanged (the sweep still invalidates via the existing generation counter; no
     new Redis instance or module).
   - No spec text may claim a second notification service, a scheduler dependency, or occurrence
@@ -235,8 +237,13 @@ than extracting it from the todo write path.
     `./due-date-pill`; adding `dueDay` (used by `due-date-pill.tsx`) would create a cycle.
     Add `packages/ui/src/lib/date-parts.ts` (new, low level) exporting `todayIso`,
     `dueDay`, and the leading-`YYYY-MM-DD` `datePart` helper. `format-date.ts` and
-    `due-date-pill.tsx` both import from it; `index.ts` re-exports `todayIso` **and `dueDay`**
-    from the new module, so the public surface is preserved (and `dueDay` is consumable by the app).
+    `due-date-pill.tsx` both import from it. `due-date-pill.tsx` **re-exports** `todayIso`
+    (`export { todayIso } from '../lib/date-parts';`) so its existing consumers —
+    `due-date.tsx` (which imports both `dueDateState` and `todayIso`) and
+    `packages/ui/test/format-date.test.ts` (`import { todayIso } from '../src/components/due-date-pill'`)
+    — keep working unchanged; `due-date.tsx` is **not** in scope. `index.ts` keeps re-exporting
+    `todayIso` (`from './components/due-date-pill'` or the new module) **and `dueDay`** from the
+    new module, so the public surface is preserved (and `dueDay` is consumable by the app).
   - `date-parts.ts`: `export function dueDay(value: string | null | undefined): string` →
     the local calendar day `YYYY-MM-DD`; date-only (`^\d{4}-\d{2}-\d{2}$`) returns its own parts
     (no `Date`); a timed instant returns its **local** parts via `new Date(value)` (local getters).
@@ -260,7 +267,8 @@ than extracting it from the todo write path.
 
 [DEFINITION OF DONE]
   - [ ] `dueDay` is exported and is the single day-derivation helper; `todayIso` stays exported
-        from `@life/ui` via `date-parts.ts`.
+        from `@life/ui` (via `due-date-pill.tsx`'s re-export of `date-parts.ts`) and its existing
+        importers (`due-date.tsx`, `format-date.test.ts`) compile unchanged.
   - [ ] Date-only behavior is unchanged (existing tests still pass).
   - [ ] Timed `dueDateLabel`/`dueDateState` behave as specified.
   - [ ] `npm run typecheck -w @life/ui` passes with zero errors; no file outside scope modified.
@@ -525,6 +533,9 @@ than extracting it from the todo write path.
   - `reminders.e2e-spec.ts`: inject a fake `PushSender`; a due row fires exactly once, the fake
     receives one payload, `reminderScheduledAt` is cleared, and the generation bumps; a
     `404`/`410` deletes that subscription; no VAPID env ⇒ no-op; a `done`/trashed row is skipped.
+    **Direct-DB deviation (spec Testing #8):** spy/capture the cache and assert **zero**
+    read-through reads (`getThrough`) occur during a `sweep()` call — the sweep path reads the
+    DB directly, bypassing the cache, and only the `markReminded` generation bump touches it.
   - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; subscribe upserts by endpoint for the
     caller's `sub` (no duplicate row on repeat subscribe); delete is idempotent (unknown endpoint
     still 200); another `sub` cannot read or affect the caller's subscriptions.
