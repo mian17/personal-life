@@ -19,20 +19,48 @@ import { deleteTodoAction, updateTodoAction } from './todo-actions';
  * Editing lives on the dedicated screen; the row only reads + toggles. All
  * visuals come from `@life/ui`; the due date reads out through `dueDateLabel`
  * (Today / Tomorrow / dd/mm/yyyy, muted).
+ *
+ * `mode="matrix"` renders the minimal TickTick-style lens row: a borderless
+ * done toggle LEADING the row, name + due-date label only (no list name, no
+ * note snippet, no delete action), dense type. The default row is unchanged.
  */
 export function TodoItem({
   todo,
   today,
   lists,
   availableTags,
+  mode = 'default',
 }: {
   todo: Todo;
   today: string;
   lists: List[];
   availableTags: TagOption[];
+  mode?: 'default' | 'matrix';
 }) {
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
+
+  const doneToggle = (
+    <IconButton
+      label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
+      variant={mode === 'matrix' ? 'ghost' : 'default'}
+      onClick={() => void updateTodoAction(todo.id, { done: !todo.done }, todo.version)}
+    >
+      {todo.done ? <CircleCheck size={20} aria-hidden /> : <Circle size={20} aria-hidden />}
+    </IconButton>
+  );
+
+  if (mode === 'matrix') {
+    return (
+      <ListItem
+        href={`/todos/${todo.id}/edit`}
+        title={todo.title}
+        meta={dueDateLabel(todo.dueDate, today)}
+        leading={doneToggle}
+        dense
+      />
+    );
+  }
 
   return (
     <ListItem
@@ -45,14 +73,7 @@ export function TodoItem({
         </>
       }
       snippet={todo.note ?? undefined}
-      trailing={
-        <IconButton
-          label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-          onClick={() => void updateTodoAction(todo.id, { done: !todo.done }, todo.version)}
-        >
-          {todo.done ? <CircleCheck size={20} aria-hidden /> : <Circle size={20} aria-hidden />}
-        </IconButton>
-      }
+      trailing={doneToggle}
       deleteAction={
         <form action={deleteTodoAction.bind(null, todo.id)}>
           <Button

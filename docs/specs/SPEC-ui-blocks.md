@@ -17,7 +17,8 @@ and the notes app's current pages map onto these one-to-one.
 <PageTitle>children</PageTitle>                    // <h1>
 <EmptyState heading? body: ReactNode />            // .empty block (used twice today)
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
-                                                   //   snippet, trailing, deleteAction?,
+                                                   //   snippet, leading?, trailing,
+                                                   //   deleteAction?, dense?,
                                                    //   children? (render slots; no domain types)
 <TagFilterNav items: {name, href, active}[]        // .filters pill nav; label? sits BESIDE the pills
                                                    //   (shared .ui-field-label; also the nav's aria-label)
@@ -120,7 +121,11 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 `List`/`ListItem` own the row internals: `.notes`, `.note` (surface **and** row
 layout — the legacy class rode the row `li`, now carried by `ListItem`), `.note-link`,
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
-`.note-snippet`. The row action slots (trailing / deleteAction) are vertically
+`.note-snippet`, and the dense variants `.ui-list-item--dense*` (compact type for a
+small-surface list — the matrix quadrants). `ListItem`'s two optional slots are
+`leading?` (a control rendered before the row body, e.g. a done toggle) and `dense?`
+(compact typography, off by default; adds `.ui-list-item--dense`). The row action slots
+(trailing / deleteAction) are vertically
 centred against the row (`align-items: center`), while the row link still stretches
 to full height (`align-self: stretch`) so the tap/hover area is unchanged. The row
 also carries a token-derived `min-height` floor equal to one two-line row (title +

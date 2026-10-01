@@ -34,7 +34,7 @@ Confirmed by the user 2026-10-01 via interview-me (explicit "yes").
   `todos/page.tsx` carry the theme toggle today, so relocating it requires a
   `/notes/settings` page too; Notes hosts the Theme row only (no matrix switch).
 
-## Locked decisions (spec-time, fleshed out in the map `D1…D7`)
+## Locked decisions (spec-time, fleshed out in the map `D1…D8`)
 
 | # | Decision |
 |---|---|
@@ -42,11 +42,12 @@ Confirmed by the user 2026-10-01 via interview-me (explicit "yes").
 | L2 | Tabs are server-rendered LINKs to `/todos` (List, default) and `/todos/matrix` (Matrix); the Matrix route is server-gated. |
 | L3 | Preference storage is a server-readable cookie — the matrix setting gates a route, so it cannot be localStorage. Theme stays on its existing localStorage mechanism (client-only visual): record this split, no theme migration. |
 | L4 | The Settings entry point is a new gear `IconLink` occupying the theme toggle's exact former position in `navTrailing` — in BOTH apps, which both carry the toggle today. Each app therefore gets a settings page: `/todos/settings` (Theme + matrix switch) and `/notes/settings` (Theme only). |
-| L5 | The matrix renders as a 2×2 grid of muted panels at every width, unconditionally (smallest phones included): equal-height rows, empty quadrants show a muted centered empty state; separation from the grid gap, no hairline dividers — no media query, no phone stack. **Revised, user-approved** (the earlier "2×2 on wide / stacked on a narrow phone" was reversed; see `docs/specs/SPEC-matrix-ui.md` :451-462). |
+| L5 | The matrix renders as a 2×2 grid of muted panels at every width, unconditionally (smallest phones included): equal-height rows, empty quadrants show a muted centered empty state; separation from the grid gap, no hairline dividers — no media query, no phone stack. **Revised, user-approved** (the earlier "2×2 on wide / stacked on a narrow phone" was reversed; see `docs/specs/SPEC-matrix-ui.md` :480-483). |
 | L6 | Importance (`todo.important` nullable) defaults from the list (`list.importantDefault`), overridable per todo; urgency derived from `dueDate`; plain quadrant labels; no per-item triage. |
 | L7 | The settings surface is reusable across apps by construction (Contract 1 layering); Todos is the first consumer only. |
+| L8 | The matrix lens renders a minimal TickTick-style row — a borderless done toggle LEADING the row (left), task name + due-date label only (no list name, no note snippet, no delete action) in dense type — and its quadrant headings stay on one line, truncating with `…`. The default `/todos` List row is unchanged (bordered trailing tick, delete, list name, snippet). **User-requested** (the matrix should read like the TickTick reference on the phone). Upstream `ListItem` gains `leading?`/`dense?`; see `docs/specs/SPEC-matrix-ui.md` and map D8. |
 
 ## Capability map
 
 Phase-0 module decomposition, build order, and the cross-cutting design decisions
-(`D1…D7`) live in `docs/specs/MAP-settings-and-matrix.md`.
+(`D1…D8`) live in `docs/specs/MAP-settings-and-matrix.md`.

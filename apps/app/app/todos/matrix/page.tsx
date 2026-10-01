@@ -25,7 +25,14 @@ export default async function TodosMatrixPage() {
     items: bucket.todos.length ? (
       <List>
         {bucket.todos.map((todo) => (
-          <TodoItem key={todo.id} todo={todo} today={today} lists={lists} availableTags={[]} />
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            today={today}
+            lists={lists}
+            availableTags={[]}
+            mode="matrix"
+          />
         ))}
       </List>
     ) : null,

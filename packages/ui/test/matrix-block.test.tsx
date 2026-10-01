@@ -96,6 +96,9 @@ describe('MatrixBlock', () => {
     expect(quadrant).toMatch(/border-radius:\s*var\(--radius-lg\)/);
 
     expect(cssBlock('.ui-matrix__label')).toMatch(/margin:\s*0/);
+    expect(cssBlock('.ui-matrix__label')).toMatch(/white-space:\s*nowrap/);
+    expect(cssBlock('.ui-matrix__label')).toMatch(/overflow:\s*hidden/);
+    expect(cssBlock('.ui-matrix__label')).toMatch(/text-overflow:\s*ellipsis/);
     expect(cssBlock('.ui-matrix__items')).toMatch(/display:\s*grid/);
 
     const empty = cssBlock('.ui-matrix__empty');

@@ -7,8 +7,12 @@ export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'
   title: ReactNode;
   meta?: ReactNode;
   snippet?: ReactNode;
+  /** Left-hand control rendered before the row body (e.g. a done toggle). */
+  leading?: ReactNode;
   trailing?: ReactNode;
   deleteAction?: ReactNode;
+  /** Compact typography for a small-surface list (matrix quadrants). Off by default. */
+  dense?: boolean;
 }
 
 export function ListItem({
@@ -16,8 +20,10 @@ export function ListItem({
   title,
   meta,
   snippet,
+  leading,
   trailing,
   deleteAction,
+  dense,
   className,
   children,
   ...rest
@@ -41,7 +47,8 @@ export function ListItem({
   );
 
   return (
-    <li className={cx('ui-list-item', className)} {...rest}>
+    <li className={cx('ui-list-item', dense && 'ui-list-item--dense', className)} {...rest}>
+      {leading}
       {href != null ? (
         <Link href={href} className="ui-list-item__link">
           {body}

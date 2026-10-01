@@ -121,6 +121,46 @@ describe('ListItem', () => {
     expect(block('.ui-list-item__link')).toMatch(/align-self:\s*stretch/);
   });
 
+  it('renders leading as the first child, before the row body', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/notes/1"
+          title="Groceries"
+          leading={<button data-testid="leading">done</button>}
+        />
+      </ul>,
+    );
+    const li = screen.getByRole('listitem');
+    const children = Array.from(li.children);
+    expect(children[0]).toBe(screen.getByTestId('leading'));
+    expect(children[1]).toBe(document.querySelector('.ui-list-item__link'));
+  });
+
+  it('adds the dense class and sizes dense title/sub through tokens', () => {
+    render(
+      <ul>
+        <ListItem dense title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--dense',
+    ]);
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const denseBlock = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    for (const part of ['title', 'sub']) {
+      const block = denseBlock(`.ui-list-item--dense .ui-list-item__${part}`);
+      const fontSize = block.match(/font-size:\s*([^;]+);/)?.[1] ?? '';
+      expect(fontSize).toMatch(/var\(--space-/);
+      expect(fontSize).not.toMatch(/\d+(px|rem)/);
+    }
+  });
+
   it('merges className instead of replacing it', () => {
     render(
       <ul>

@@ -115,6 +115,12 @@ describe('/todos/matrix page wiring', () => {
       'not-urgent-important': ['ni-1'],
       'not-urgent-not-important': ['nn-1'],
     });
+
+    for (const q of quadrants) {
+      for (const row of asArray(q.items)) {
+        expect(row.props.mode).toBe('matrix');
+      }
+    }
   });
 
   it('passes items: null and the empty copy for quadrants with no todos', async () => {

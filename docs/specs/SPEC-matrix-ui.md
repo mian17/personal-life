@@ -2,7 +2,7 @@
 
 Module id: `matrix-ui` (map: `docs/specs/MAP-settings-and-matrix.md`, the terminal module in
 the build order). Traces to intent `docs/intent/eisenhower-matrix-and-settings.md`
-(decisions L1–L7 / D1–D7).
+(decisions L1–L8 / D1–D8).
 
 Depends on (integrates, never forks): `ui-settings` (`SPEC-ui-settings.md`),
 `ui-tabs` (`SPEC-ui-tabs.md`), `app-kit-settings` (`SPEC-app-kit-settings.md`),
@@ -296,7 +296,14 @@ export default async function TodosMatrixPage() {
     items: bucket.todos.length ? (
       <List>
         {bucket.todos.map((todo) => (
-          <TodoItem key={todo.id} todo={todo} today={today} lists={lists} availableTags={[]} />
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            today={today}
+            lists={lists}
+            availableTags={[]}
+            mode="matrix"
+          />
         ))}
       </List>
     ) : null,
@@ -337,6 +344,13 @@ export default async function TodosMatrixPage() {
 - `availableTags={[]}`: the matrix lens does not fetch the tag registry, so attached-tag
   names are not shown on its rows; the row still links to the todo's edit screen. No new
   fetch is added for a lens.
+- **Minimal TickTick-style row** (user-requested): the matrix renders each todo through
+  `TodoItem` with `mode="matrix"` — a borderless done toggle **leading** the row
+  (left), only the task name plus its `dueDateLabel` (no list name, no note snippet, no
+  delete action), and `dense` type. The default `/todos` List row is unchanged: bordered
+  trailing tick, trash delete, list name, note snippet. The row still links to
+  `/todos/[id]/edit` and carries the same done-toggle accessible label
+  (`Mark <title> done` / `not done`), so the frozen selector surface is unchanged.
 - Quadrant order is exactly `groupByQuadrant`'s: Urgent & Important, Urgent & Not Important,
   Not Urgent & Important, Not Urgent & Not Important.
 
@@ -451,7 +465,10 @@ Documentation updates in this change: `SPEC-ui-list-shell.md`'s *Frozen e2e surf
   `.ui-matrix__label`, `.ui-matrix__items`, `.ui-matrix__empty` in `blocks.css` — tokens only.
   Labels reuse the spacing scale for type (as `Section` does) with `margin: 0`; `Stack`-like
   `gap` only, no outer margins (a grid child with `Section`'s outer margin would double-space
-  against the grid gap).
+  against the grid gap). A quadrant heading stays on **one line**, truncating with `…`
+  (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`) — like the TickTick
+  reference. The minimal matrix row's dense type is owned by `ListItem`
+  (`.ui-list-item--dense*`, `SPEC-ui-blocks.md`); `MatrixBlock` owns none of it.
 - **2×2 at every width, unconditionally** (smallest iPhone SE 375px included) — no media
   query, no phone stack. Each quadrant is a muted panel (`background: var(--panel)`,
   `border-radius: var(--radius-lg)`, `padding: var(--space-1)`); separation comes from the
