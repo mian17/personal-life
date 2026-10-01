@@ -47,7 +47,10 @@ push_subscription(
 
 - `dueDate` keeps its single-column shape. A **date-only** value stays the naive
   `YYYY-MM-DD` and never round-trips through `Date` (lesson 0003 unchanged). A **timed**
-  value is a canonical UTC instant (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+  value is a canonical UTC instant (`YYYY-MM-DDTHH:mm:ss.sssZ`). The entity
+  (`apps/todo-service/src/todos/todo.entity.ts`) changes `dueDate` from `type: 'date'` to
+  `type: 'text'` (SQLite stores the ISO text) and gains the `repeat`/`reminderScheduledAt`
+  text columns; `synchronize: true` applies the additive change (no migration framework).
 - `repeat` is a **plaintext, non-content enum** (like `done`/`important`/`dueDate`) — no
   `@life/crypto` envelope, no AAD. It carries no user text.
 - `reminderScheduledAt` is a plaintext instant — non-content, like `dueDate`. It **is** the
@@ -67,7 +70,10 @@ The client submits **local wall-clock**; the process interprets it in its config
 time, but the process should store time that is national"). One timezone owner: the service.
 
 - Service env `TODO_TIMEZONE` (IANA name, default `Asia/Ho_Chi_Minh`) is the national zone.
-  The service is the only party that maps local ⇄ canonical.
+  The service is the only party that maps local ⇄ canonical. `TODO_TIMEZONE`,
+  `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_PRIVATE_KEY`, and the VAPID subject/contact var are
+  documented in `.env.example` / `.env.development.example` and wired into `compose.yaml`'s
+  `todo-service` environment; Redis keys remain compose-injected only (never in the env files).
 - **Timed due, request:** `dueDate = 'YYYY-MM-DDTHH:mm'` (the browser `datetime-local`
   value, no zone). The service converts local → UTC in `TODO_TIMEZONE` and stores the
   instant.
@@ -106,7 +112,9 @@ required-but-nullable.
 | `repeat` | `TodoRepeat \| null` | optional; omitted/`null` ⇒ none | optional; omitted ⇒ unchanged; `null` ⇒ clears the repeat |
 | `reminderScheduledAt` (read only) | `string \| null` | — | — (server-computed) |
 
-- `export type TodoRepeat = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';`
+- `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;`
+  and `export type TodoRepeat = (typeof TODO_REPEATS)[number];` (the array is the single source;
+  the DTO validates with `@IsIn(TODO_REPEATS)`).
 - Read DTO `Todo` gains `repeat: TodoRepeat | null` and
   `reminderScheduledAt: string | null` (the exact stored instant). Both are present on
   every todo read (`POST`, `GET /api/todos`, `GET /api/todos/:id`, `PATCH`, `POST /:id/restore`).
@@ -169,8 +177,9 @@ A bounded NestJS module `apps/todo-service/src/reminders/`:
    AND r.reminderScheduledAt IS NOT NULL AND r.reminderScheduledAt <= :nowIso`
   (lexicographic ISO compare; index-backed). For each due row: build the payload
   `{ title, body, url: '/todos/<id>' }` (title decrypted in-request), send to the owner's
-  `push_subscription` rows via the injected `PushSender`, then set
-  `reminderScheduledAt = null` and bump the owner's generation counter.
+  `push_subscription` rows via the injected `PushSender`, then call the public `TodosService`
+  seam `markReminded(sub, id)`, which clears `reminderScheduledAt` and bumps the owner's
+  generation counter after the write. The sweep never writes the todo table directly.
 - `PushSender` interface: `send(sub, payload) => Promise<{ statusCode: number }>`. Production
   implementation wraps the `web-push` package; a **test fake** records calls. A `404`/`410`
   from the push service deletes that subscription (expired) and continues.
@@ -224,16 +233,25 @@ sibling fields (lesson 0014).
     `dueDate = 'YYYY-MM-DDTHH:mm'` (or the date alone) for the write; the service normalizes.
   - New `PillGroup label="Repeat"` composed of `Pill as="button" size="chip"` options
     (`None`/`Daily`/`Weekly`/`Monthly`/`Yearly`/`Weekdays`) — **reuses the existing `Pill`
-    + `PillGroup` primitives; no new upstream atom.** `None` ⇒ `repeat: null`.
-  - A repeat with no due shows the field but the save is blocked (or auto-sets a due) — the
-    service is the authority (400 otherwise); the editor surfaces the error and stays open.
+    + `PillGroup` primitives; no new upstream atom.** `None` ⇒ `repeat: null`. The option
+    labels come from the app-owned `repeatLabel(repeat)` helper
+    (`apps/app/lib/todo-repeat-label.ts`) — `@life/ui` has no `@life/shared` dependency, so the
+    label mapping stays in the app.
+  - A repeat with no due shows the field but the save is **blocked** until a due date exists
+    (mirroring the service's 400); there is no implicit/auto due date — the editor surfaces the
+    server error by staying open.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
-  the shared formatter when timed; a repeat todo shows its repeat label in the row meta.
+  the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat)` in the row
+  meta.
   Ticking a `repeat` todo must **not** hide/collapse the row (it advances instead) — the
   `DoneToggle` `hide`/`collapsing` behavior is gated on `!todo.repeat`.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
-  - `dueDay(value)` → the **local calendar day** `YYYY-MM-DD` from either a date-only string
-    (read the parts directly — no `Date`) or a UTC instant (local parts via `Date`). Used by
+  - New low-level `packages/ui/src/lib/date-parts.ts` owns `todayIso`, `dueDay(value)` → the
+    **local calendar day** `YYYY-MM-DD` from either a date-only string (read the parts directly
+    — no `Date`) or a UTC instant (local parts via `Date`), and the leading-date `datePart`
+    helper. `format-date.ts` and `due-date-pill.tsx` both import from it (this breaks the
+    existing `format-date → due-date-pill` import cycle); `index.ts` re-exports `todayIso`
+    **and `dueDay`** from the new module so the public surface is preserved. `dueDay` is used by
     `dueDateState`, `dueDateLabel`, `groupTodos`, and matrix `isUrgent`.
   - `dueDateLabel(value, today?)` → `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only (unchanged)
     and `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value.
@@ -242,12 +260,17 @@ sibling fields (lesson 0014).
     TickTick and keeps grouping stable.
 - **Settings (`apps/app/app/todos/settings/page.tsx`):** a new `SettingsBlock title="Reminders"`
   with `SettingsRow label="Push reminders"` and a client `PushToggle`:
+  - The toggle renders client defaults (`supported=false`, `installed=false`,
+    `permission='default'`) and reads `navigator` / `Notification.permission` in a `useEffect`;
+    browser values are **not** server-seeded (avoids a hydration mismatch).
   - Unsupported browser → explanatory text, no control.
   - iPhone not installed to Home Screen (`!navigator.standalone`) → guidance to add the app
     to the Home Screen (iOS Web Push requires it).
   - Otherwise a `Switch` that requests `Notification` permission, registers
     `apps/app/public/sw.js`, subscribes via `pushManager.subscribe`, and calls a server
     action that upserts the subscription; disabling unsubscribes and calls the delete action.
+    The VAPID public key is read through the `getPushKeyAction` server action (the client never
+    imports the server-only `lib/todo-api.ts`).
 - **Service worker:** new static `apps/app/public/sw.js` handles `push` (→
   `showNotification` with title/body, `data.url`, icon/badge `icon-todos.png`) and
   `notificationclick` (focus an existing `/todos` window or `openWindow(data.url)`). No
@@ -266,8 +289,9 @@ Typecheck: npm run typecheck -w @life/shared && npm run typecheck -w @life/todo-
            npm run typecheck -w @life/ui && npm run typecheck -w @life/app
 Test:      npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts
            npm run test:unit -w @life/todo-service -- test/reminders.e2e-spec.ts
+           npm run test:unit -w @life/todo-service -- test/push.e2e-spec.ts
            npm run test:unit -w @life/ui -- test/format-date.test.ts
-           npm run test:unit -w @life/app  -- test/todo-item.test.tsx
+           npm run test:unit -w @life/app  -- test/todo-item.test.tsx test/push-toggle.test.tsx
 Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 ```
 

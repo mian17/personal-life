@@ -3,7 +3,8 @@
 Branch: `feat/todo-due-repeat-notify` (`master` stays untouched; never merged without the
 user's explicit request). Module id: `todo-due-repeat-notify` (see `MAP-todo-ecosystem.md`).
 Spec (owner, referenced by every task): `docs/specs/SPEC-todo-due-repeat-notify.md`.
-Specs amended in this chapter: `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`.
+Specs/maps amended in this chapter: `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`,
+`docs/specs/MAP-todo-ecosystem.md`, `docs/specs/MAP-redis.md`.
 Ledger: `tasks/todo-todo-due-repeat-notify.md`.
 Governing intent: `docs/intent/todo-due-repeat-notify.md` (N1–N5).
 Prior decisions read before planning (lesson 0012): `docs/intent/redis-shared-state.md` dec. 3,
@@ -87,7 +88,7 @@ than extracting it from the todo write path.
 
 ### Phase 4 — Todo service
 - [ ] T5: due normalization + repeat validation + reminder computation + advance-on-tick +
-      DTOs + `CachedTodoRow`.
+      entity columns/index + DTOs + `CachedTodoRow` + `markReminded` seam.
 
 ### Checkpoint: Service
 - [ ] `npm run typecheck -w @life/todo-service` exits 0.
@@ -105,7 +106,7 @@ than extracting it from the todo write path.
 - [ ] T8: due/repeat/reminder/advance behavior suite + reminders sweep suite + cache additions.
 
 ### Checkpoint: Backend tests
-- [ ] `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/todo-cache.e2e-spec.ts` green.
+- [ ] `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts` green.
 
 ### Phase 7 — BFF
 - [ ] T9: push key/subscribe/unsubscribe client + server actions + `push-client.ts`.
@@ -120,7 +121,7 @@ than extracting it from the todo write path.
 
 ### Checkpoint: App UI
 - [ ] `npm run typecheck -w @life/app` exits 0.
-- [ ] `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts` green.
+- [ ] `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx` green.
 - [ ] Contract 1 mechanical greps clean.
 
 ### Phase 9 — Close
@@ -136,16 +137,17 @@ than extracting it from the todo write path.
   `SPEC-todo-ui.md` before any code changes.
 
 [SCOPE & REPOSITORY CONTEXT]
-  - Allowed files to edit/create: `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`.
+  - Allowed files to edit/create: `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`,
+    `docs/specs/MAP-todo-ecosystem.md`, `docs/specs/MAP-redis.md`.
   - Reference files (read-only): `docs/specs/SPEC-todo-due-repeat-notify.md` (the module spec),
-    `docs/specs/MAP-todo-ecosystem.md`, `docs/specs/MAP-redis.md`,
-    `docs/intent/todo-due-repeat-notify.md`.
+    `docs/intent/todo-due-repeat-notify.md`, `docs/intent/redis-shared-state.md` (decision 3).
   - Strictly prohibited files: every file not listed above (no code, no tests).
 
 [IMPLEMENTATION REQUIREMENTS]
   - SPEC-todo-service.md data model: extend the `todo(...)` block with
     `repeat TEXT NULL` and `reminderScheduledAt TEXT NULL`; note `dueDate` now holds either
-    `YYYY-MM-DD` or a canonical `…Z` instant; add the `push_subscription` table.
+    `YYYY-MM-DD` or a canonical `…Z` instant; add the `push_subscription` table; record the
+    `IDX_todo_reminder_scheduled_at` index and the entity column changes (T5 owns the entity).
   - SPEC-todo-service.md Behavior/API: add the `repeat`/`reminderScheduledAt` fields to the DTO
     contract; add the due-time normalization + `repeat requires dueDate` rule; add the
     advance-on-tick rule; add the `/api/push/key`, `/api/push/subscribe` (POST/DELETE) routes.
@@ -157,6 +159,10 @@ than extracting it from the todo write path.
   - SPEC-todo-ui.md `/todos` bullet + UI contract: add the editor `Time`/`Repeat` fields, the row
     time/repeat display, the no-hide-on-recurring-tick rule, the settings `Reminders` block +
     `PushToggle` + `sw.js`, and the frozen-surface additions (new names only).
+  - MAP-todo-ecosystem.md: the `todo-due-repeat-notify` module row already exists — reconcile its
+    responsibility text with this spec; no new module. MAP-redis.md: record that `redis-todo`
+    ownership is unchanged (the sweep still invalidates via the existing generation counter; no
+    new Redis instance or module).
   - No spec text may claim a second notification service, a scheduler dependency, or occurrence
     history.
 
@@ -171,6 +177,7 @@ than extracting it from the todo write path.
   - [ ] Code meets all implementation requirements.
   - [ ] No files outside the allowed scope were modified.
   - [ ] Both grep verifications return non-empty.
+  - [ ] MAP-todo-ecosystem row reconciled; MAP-redis records `redis-todo` ownership unchanged.
   - [ ] No placeholder or contradictory "v2/deferred recurrence" text remains.
 
 ### T2 — Shared wire types (module `todo-due-repeat-notify`)
@@ -187,7 +194,8 @@ than extracting it from the todo write path.
   - Strictly prohibited files: every file not listed above (no service, no entity, no UI).
 
 [IMPLEMENTATION REQUIREMENTS]
-  - Export `export type TodoRepeat = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';`.
+  - Export `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;`
+    and `export type TodoRepeat = (typeof TODO_REPEATS)[number];`.
   - `interface Todo`: add `repeat: TodoRepeat | null;` and `reminderScheduledAt: string | null;`
     (required-but-nullable, like `deletedAt`/`important`).
   - `interface CreateTodoInput`: add `repeat?: TodoRepeat | null;` (optional).
@@ -200,8 +208,8 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `TodoRepeat`, the three `repeat` fields, `reminderScheduledAt`, and `PushSubscribeInput`
-        exist exactly as specified.
+  - [ ] `TODO_REPEATS`, `TodoRepeat`, the three `repeat` fields, `reminderScheduledAt`, and
+        `PushSubscribeInput` exist exactly as specified.
   - [ ] `npm run typecheck -w @life/shared` passes with zero errors.
   - [ ] No files outside the allowed scope were modified.
 
@@ -212,9 +220,10 @@ than extracting it from the todo write path.
   the row render a timed due correctly without app-side parsing.
 
 [SCOPE & REPOSITORY CONTEXT]
-  - Allowed files to edit/create: `packages/ui/src/lib/format-date.ts`,
-    `packages/ui/src/components/due-date-pill.tsx`, `packages/ui/src/index.ts`,
-    `packages/ui/test/format-date.test.ts`, `packages/ui/test/due-date-pill.test.tsx`.
+  - Allowed files to edit/create: `packages/ui/src/lib/date-parts.ts` (new),
+    `packages/ui/src/lib/format-date.ts`, `packages/ui/src/components/due-date-pill.tsx`,
+    `packages/ui/src/index.ts`, `packages/ui/test/format-date.test.ts`,
+    `packages/ui/test/due-date-pill.test.tsx`.
   - Reference files (read-only): `packages/ui/src/components/due-date.tsx` (calls
     `dueDateLabel`; unchanged), `packages/ui/src/lib/cx.ts`, `docs/lessons/0003-*.md`.
   - Strictly prohibited files: every file not listed above (no app code, no service).
@@ -222,17 +231,23 @@ than extracting it from the todo write path.
 [IMPLEMENTATION REQUIREMENTS]
   - Primitive reuse plan (Contract 1): no new visual primitive; this is the existing
     `formatDate`/`dueDateLabel`/`dueDateState`/`todayIso` surface only.
-  - `format-date.ts`: add and export
-    `export function dueDay(value: string | null | undefined): string` →
+  - **Import-cycle fix:** `format-date.ts` currently imports `todayIso` from
+    `./due-date-pill`; adding `dueDay` (used by `due-date-pill.tsx`) would create a cycle.
+    Add `packages/ui/src/lib/date-parts.ts` (new, low level) exporting `todayIso`,
+    `dueDay`, and the leading-`YYYY-MM-DD` `datePart` helper. `format-date.ts` and
+    `due-date-pill.tsx` both import from it; `index.ts` re-exports `todayIso` **and `dueDay`**
+    from the new module, so the public surface is preserved (and `dueDay` is consumable by the app).
+  - `date-parts.ts`: `export function dueDay(value: string | null | undefined): string` →
     the local calendar day `YYYY-MM-DD`; date-only (`^\d{4}-\d{2}-\d{2}$`) returns its own parts
     (no `Date`); a timed instant returns its **local** parts via `new Date(value)` (local getters).
-    Missing/malformed → `''`.
-  - `format-date.ts`: `dueDateLabel(value, today?)` keeps `No date`/`Today`/`Tomorrow`/`dd/mm/yyyy`
-    for date-only and adds `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed
-    value (time via local `HH:mm`, zero-padded). Comparison is by `dueDay`.
+    Missing/malformed → `''`. `todayIso` and `datePart` move here unchanged.
+  - `format-date.ts`: keeps `formatDate`/`dueDateLabel`; `dueDateLabel(value, today?)` keeps
+    `No date`/`Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and adds
+    `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value (time via local
+    `HH:mm`, zero-padded). Comparison is by `dueDay`.
   - `due-date-pill.tsx`: `dueDateState(value, today)` derives `overdue`/`today`/`later` by
     comparing `dueDay(value)` to `today` (day-granular, so a timed todo due earlier today is
-    `today`, not `overdue`). Export `dueDay` from `index.ts`.
+    `today`, not `overdue`). `todayIso` is re-exported through `index.ts` (preserved).
   - `dueDate.tsx` is unchanged (it already delegates to `dueDateLabel`).
   - Update the two UI tests to cover: a timed value today → `dueDateState 'today'` and label
     `Today HH:mm`; a timed value tomorrow → `Tomorrow HH:mm`; a date-only value is byte-identical
@@ -244,7 +259,8 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; only these two named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `dueDay` is exported and is the single day-derivation helper.
+  - [ ] `dueDay` is exported and is the single day-derivation helper; `todayIso` stays exported
+        from `@life/ui` via `date-parts.ts`.
   - [ ] Date-only behavior is unchanged (existing tests still pass).
   - [ ] Timed `dueDateLabel`/`dueDateState` behave as specified.
   - [ ] `npm run typecheck -w @life/ui` passes with zero errors; no file outside scope modified.
@@ -309,16 +325,22 @@ than extracting it from the todo write path.
   - Allowed files to edit/create: `apps/todo-service/src/todos/todos.service.ts`,
     `apps/todo-service/src/todos/todos.controller.ts`,
     `apps/todo-service/src/todos/dto/create-todo.dto.ts`,
-    `apps/todo-service/src/todos/dto/update-todo.dto.ts`.
+    `apps/todo-service/src/todos/dto/update-todo.dto.ts`,
+    `apps/todo-service/src/todos/todo.entity.ts`.
   - Reference files (read-only): `apps/todo-service/src/todos/due-time.ts`,
-    `apps/todo-service/src/todos/recurrence.ts`, `apps/todo-service/src/todos/todo.entity.ts`,
-    `packages/shared/src/index.ts`, `apps/todo-service/src/cache/todo-cache.ts`.
-  - Strictly prohibited files: every file not listed above (no entity, no push/reminders module,
-    no tests).
+    `apps/todo-service/src/todos/recurrence.ts`, `packages/shared/src/index.ts`
+    (`TODO_REPEATS`/`TodoRepeat`), `apps/todo-service/src/cache/todo-cache.ts`.
+  - Strictly prohibited files: every file not listed above (no push/reminders module, no tests).
 
 [IMPLEMENTATION REQUIREMENTS]
+  - Entity (`todo.entity.ts`, owned here): change `dueDate` from `@Column({ type: 'date' })` to
+    `@Column({ type: 'text', nullable: true })` (SQLite stores the ISO text), add
+    `@Column({ type: 'text', nullable: true }) repeat: TodoRepeat | null;`, add
+    `@Column({ type: 'text', nullable: true }) reminderScheduledAt: string | null;`, and
+    `@Index('IDX_todo_reminder_scheduled_at', ['reminderScheduledAt'])`. `synchronize: true`
+    applies the additive change; there is no migration framework.
   - DTOs: `CreateTodoDto`/`UpdateTodoDto` `dueDate` accepts `ISO_DUE` (`@Matches`), and gain
-    `repeat?: TodoRepeat | null` (`@IsOptional() @ValidateIf(v => v !== null) @IsIn([...])`),
+    `repeat?: TodoRepeat | null` (`@IsOptional() @ValidateIf(v => v !== null) @IsIn(TODO_REPEATS)`),
     mirroring the existing nullable-field pattern. `reminderScheduledAt` is read-only (never a
     request field — `forbidNonWhitelisted` rejects it).
   - `todos.service.ts`:
@@ -337,6 +359,10 @@ than extracting it from the todo write path.
       set done; compute `next = advanceToOnOrAfter(<local due>, repeat, <nowLocal in tz>)`,
       re-normalize to the canonical instant, set `dueDate`, `reminderScheduledAt = reminderAt(next)`,
       keep `done=false`, bump `version` once. A non-recurring `done:true` is unchanged.
+    - **Sweep seam (public, unconditional):** `markReminded(sub: string, id: string): Promise<void>`
+      on `TodosService` clears the todo's `reminderScheduledAt` and bumps the owner's generation
+      counter (after the write). T7's sweep calls this seam — the sweep never writes the todo
+      table directly and never imports the repository.
     - `compareTodos` and the cursor (`encodeCursor`/`decodeCursor`/`afterCursor`) use
       `dueSortKey(dto.dueDate, tz)` (D3) instead of the raw `dueDate`; `OrderedTodo.due` becomes
       the sort key. Cursor payload shape stays `base64(<due sort key>|<createdAt>|<id>)`.
@@ -344,15 +370,19 @@ than extracting it from the todo write path.
       `toCachedTodoRow`/`decodeCachedTodoRow` pass them through verbatim. Ciphertext guards
       unchanged.
   - Controller: no new todo route; the push routes are T6. Route declaration order unchanged.
+  - `todos.module.ts` must export `TodosService` so T7 can inject the `markReminded` seam.
+    (The module file is in T7's allowed set for that export.)
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run typecheck -w @life/todo-service`.
   - Strict constraints: NO full suites, NO E2E (behavior tests are T8); max test executions: 2.
 
 [DEFINITION OF DONE]
+  - [ ] The entity carries `dueDate` as text plus `repeat`/`reminderScheduledAt` and the index.
   - [ ] A timed due is stored as a canonical instant; a date-only due is stored verbatim.
   - [ ] `repeat` without a resulting due is a 400.
   - [ ] Ticking a recurring todo advances it and keeps it open; a non-recurring tick is unchanged.
+  - [ ] `markReminded(sub, id)` is public, clears the reminder, and bumps the generation.
   - [ ] `CachedTodoRow` carries `repeat`/`reminderScheduledAt`; the ciphertext guards are untouched.
   - [ ] Ordering/cursor use `dueSortKey`; `npm run typecheck -w @life/todo-service` passes; no
         file outside scope modified.
@@ -407,15 +437,18 @@ than extracting it from the todo write path.
   - Allowed files to edit/create: `apps/todo-service/src/reminders/reminder.service.ts` (new),
     `apps/todo-service/src/reminders/push-sender.ts` (new),
     `apps/todo-service/src/reminders/reminders.module.ts` (new),
-    `apps/todo-service/src/todos/todos.module.ts` (export the todo repository or a thin
-    `markReminded` seam for the sweep, if required by wiring),
-    `apps/todo-service/package.json` (add `web-push`),
+    `apps/todo-service/src/todos/todos.module.ts` (export `TodosService` so the sweep can inject
+    the T5 `markReminded` seam),
+    `apps/todo-service/package.json` (add `web-push` + `@types/web-push`),
+    `package-lock.json` (root; updated for the `web-push` dep — the Dockerfile runs `npm ci`),
+    `.env.example`, `.env.development.example`, `compose.yaml` (add `TODO_TIMEZONE`,
+    `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_PRIVATE_KEY`, and the VAPID subject/contact var),
     `apps/todo-service/src/app.module.ts` (register `RemindersModule`).
   - Reference files (read-only): `apps/todo-service/src/todos/todos.service.ts` (key decryption +
-    generation bump), `apps/todo-service/src/push/push.service.ts`,
+    generation bump + the `markReminded` seam), `apps/todo-service/src/push/push.service.ts`,
     `apps/todo-service/src/keys/keys.service.ts`, `packages/cache/src/index.ts`.
-  - Strictly prohibited files: every file not listed above (no todo CRUD logic changes beyond the
-    `markReminded` seam; no tests).
+  - Strictly prohibited files: every file not listed above (no tests; the todo CRUD logic beyond
+    T5's `markReminded` seam is not touched).
 
 [IMPLEMENTATION REQUIREMENTS]
   - `PushSender` interface: `send(sub: string, payload: { title: string; body: string; url: string }): Promise<{ statusCode: number }>`.
@@ -424,16 +457,24 @@ than extracting it from the todo write path.
   - `ReminderService.sweep(): Promise<number>` — one DB query
     `todo.deletedAt IS NULL AND todo.done = 0 AND todo.reminderScheduledAt IS NOT NULL AND todo.reminderScheduledAt <= nowIso`
     (repository find with `LessThanOrEqual`); for each due row: decrypt `title` in-request, build
-    the payload, `PushSender.send` to every subscription of the owner, then set
-    `reminderScheduledAt = null` and bump the owner's generation counter. Returns the fired count.
-    A `404`/`410` deletes that subscription and continues.
+    the payload, `PushSender.send` to every subscription of the owner, then call the T5
+    `TodosService.markReminded(sub, id)` seam (which clears `reminderScheduledAt` and bumps the
+    owner's generation counter after the write). Returns the fired count. A `404`/`410` deletes
+    that subscription and continues. The sweep never writes the todo table directly.
+  - Env wiring: `TODO_TIMEZONE` (IANA name, default `Asia/Ho_Chi_Minh`), `TODO_VAPID_PUBLIC_KEY`,
+    `TODO_VAPID_PRIVATE_KEY`, and the VAPID subject/contact var (e.g. `TODO_VAPID_SUBJECT`) are
+    added to `.env.example`, `.env.development.example`, and `compose.yaml` (service environment).
+    The repo rule holds: Redis keys stay compose-injected only — no `REDIS_URL` enters the env
+    files.
   - `RemindersModule` provides `ReminderService`, the `REMINDER_PUSH_SENDER` token bound to
     `WebPushSender`; `onModuleInit` sets `this.timer = setInterval(() => void this.sweep(), 30_000)`,
     `onModuleDestroy` clears it. If `TODO_VAPID_PUBLIC_KEY`/`TODO_VAPID_PRIVATE_KEY` are unset,
     `sweep()` is a no-op that logs once. **No `@nestjs/schedule`/`node-cron`.**
-  - `package.json`: add `"web-push"` (with `@types/web-push` dev dep). Dockerfile manifest copy is
-    already glob-inclusive; no Dockerfile edit expected (verify in DoD).
-  - Direct-DB sweep is the recorded Contract 2 deviation (D7); it serves no user read.
+  - `package.json`: add `"web-push"` (with `@types/web-push` dev dep). The root
+    `package-lock.json` is updated in the same task (the Dockerfile runs `npm ci`). The
+    Dockerfile manifest copy is already glob-inclusive; no Dockerfile edit expected (verify in DoD).
+  - Direct-DB sweep is the recorded Contract 2 deviation (D7); it serves no user read. The
+    reminder clear goes through `markReminded`, so the cache is invalidated (Contract 2 Rule 1).
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run typecheck -w @life/todo-service` and
@@ -441,9 +482,11 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; typecheck + build only; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `sweep()` fires once per due row, clears `reminderScheduledAt`, bumps the generation, and
-        skips `done`/trashed/null-reminder rows.
+  - [ ] `sweep()` fires once per due row, calls `markReminded` (clears + bumps), and skips
+        `done`/trashed/null-reminder rows.
   - [ ] Missing VAPID env ⇒ no-op (no crash).
+  - [ ] The four env vars are documented/wired in both env examples and `compose.yaml`; Redis stays
+        compose-injected only; `package-lock.json` is updated.
   - [ ] `npm run typecheck -w @life/todo-service` and `npm run build -w @life/todo-service` pass;
         no file outside scope modified.
 
@@ -455,6 +498,7 @@ than extracting it from the todo write path.
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/todo-service/test/todos-due-repeat.e2e-spec.ts` (new),
     `apps/todo-service/test/reminders.e2e-spec.ts` (new),
+    `apps/todo-service/test/push.e2e-spec.ts` (new),
     `apps/todo-service/test/todo-cache.e2e-spec.ts`.
   - Reference files (read-only): `apps/todo-service/test/todo-harness.ts`,
     `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/setup-env.ts`,
@@ -471,19 +515,22 @@ than extracting it from the todo write path.
   - `reminders.e2e-spec.ts`: inject a fake `PushSender`; a due row fires exactly once, the fake
     receives one payload, `reminderScheduledAt` is cleared, and the generation bumps; a
     `404`/`410` deletes that subscription; no VAPID env ⇒ no-op; a `done`/trashed row is skipped.
+  - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; subscribe upserts by endpoint for the
+    caller's `sub` (no duplicate row on repeat subscribe); delete is idempotent (unknown endpoint
+    still 200); another `sub` cannot read or affect the caller's subscriptions.
   - `todo-cache.e2e-spec.ts`: the `todo:all`/`todo:trash` serialized values carry
     `repeat`/`reminderScheduledAt`; content fields remain `enc.v1.`-only and the no-known-plaintext
     assertions still pass; the invalidation table gains the sweep-clear bump.
   - No production file may be edited to make a test pass.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/todo-cache.e2e-spec.ts`
+  - Permitted test command: `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`.
-  - Strict constraints: NO full suites, NO E2E; only these three named files; max test executions: 2.
+  - Strict constraints: NO full suites, NO E2E; only these four named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The three suites cover every behavior above.
-  - [ ] The prescribed three-file test command passes.
+  - [ ] The four suites cover every behavior above.
+  - [ ] The prescribed four-file test command passes.
   - [ ] `npm run typecheck -w @life/todo-service` passes with zero errors.
   - [ ] No file outside scope modified.
 
@@ -505,11 +552,13 @@ than extracting it from the todo write path.
     `subscribePush(input: PushSubscribeInput): Promise<{ ok: true }>` (`POST /api/push/subscribe`),
     `unsubscribePush(endpoint: string): Promise<{ ok: true }>` (`DELETE /api/push/subscribe`).
     Reuse `callService`; re-declare no type.
-  - `app/todo-actions.ts`: add `subscribePushAction(input: PushSubscribeInput)` and
-    `unsubscribePushAction(endpoint: string)` (each calls its T9 BFF function; no `revalidatePath`
-    needed — subscriptions are not rendered todo data).
+  - `app/todo-actions.ts`: add `getPushKeyAction(): Promise<{ publicKey: string }>` (calls the
+    server-only `lib/todo-api.ts` `getPushKey`), `subscribePushAction(input: PushSubscribeInput)`
+    and `unsubscribePushAction(endpoint: string)` (each calls its T9 BFF function; no
+    `revalidatePath` needed for unsubscribe/subscribe — subscriptions are not rendered todo data).
   - `lib/push-client.ts` (new, `'use client'`): `subscribeToPush(): Promise<{ ok: boolean; reason?: string }>`
-    — registers `/sw.js`, reads the VAPID key via a server action, calls
+    — registers `/sw.js`, reads the VAPID key via the `getPushKeyAction` server action (the client
+    must not import the server-only `lib/todo-api.ts`), calls
     `pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })`, then
     `subscribePushAction`; `unsubscribeFromPush()` unsubscribes and calls `unsubscribePushAction`.
     Returns explicit reasons for `unsupported` / `not-installed` / `denied`.
@@ -519,8 +568,10 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; build + typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The three BFF functions and two actions exist with the exact paths/methods.
-  - [ ] `push-client.ts` handles unsupported/not-installed/denied without throwing.
+  - [ ] The three BFF functions, `getPushKeyAction`, and two push actions exist with the exact
+        paths/methods.
+  - [ ] `push-client.ts` reads the key through the server action (never imports `lib/todo-api.ts`)
+        and handles unsupported/not-installed/denied without throwing.
   - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` pass; no file outside scope.
 
 ### T10 — App UI editor + row (module `todo-due-repeat-notify`)
@@ -531,7 +582,8 @@ than extracting it from the todo write path.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/app/app/todo-editor.tsx`,
-    `apps/app/app/todo-item.tsx`, `apps/app/lib/matrix.ts`.
+    `apps/app/app/todo-item.tsx`, `apps/app/lib/matrix.ts`,
+    `apps/app/lib/todo-repeat-label.ts` (new; app copy).
   - Reference files (read-only): `packages/ui/src/index.ts` (`Input`, `PillGroup`, `Pill`,
     `Switch`, `dueDay`, `dueDateLabel`, `dueDateState`), `apps/app/lib/todo-groups.ts`,
     `docs/specs/SPEC-todo-ui.md`.
@@ -543,14 +595,21 @@ than extracting it from the todo write path.
     `Pill as="button" size="chip"` (Repeat options: None/Daily/Weekly/Monthly/Yearly/Weekdays),
     `PillGroup` + `Input type="date"` (Due, unchanged), `DueDate` (row). No raw `<select>`/styled
     `<div>`; no `next/link`; app copy only.
+  - **Repeat label helper (app copy):** add `apps/app/lib/todo-repeat-label.ts` exporting
+    `repeatLabel(repeat: TodoRepeat | null): string | null` (null → null; else the human label,
+    e.g. `daily` → `Daily`, `weekdays` → `Weekdays`). It is app-owned because `@life/ui` has no
+    `@life/shared` dependency — do not put it in `@life/ui`. Consumed by the row and the editor
+    option labels.
   - `todo-editor.tsx`: add `dueTime` state seeded from a timed due; `PillGroup label="Time"`
     (`Input type="time" aria-label="Due time"`); `PillGroup label="Repeat"` with the six options
     (`aria-pressed`, active); the save payload joins date+time into `dueDate = 'YYYY-MM-DDTHH:mm'`
     (or the date alone when no time) and carries `repeat` (null for None). The `PillGroup label="Due"`/
-    `Input type="date" aria-label="Due date"` is unchanged. A repeat with no due blocks save
-    (or auto-sets today) and surfaces the server error by staying open.
+    `Input type="date" aria-label="Due date"` is unchanged. **A repeat with no due shows the
+    field but blocks save** until a due date exists (mirroring the server's 400) — no auto-set of
+    today; the editor surfaces the server error by staying open.
   - `todo-item.tsx`: the row shows the time/repeat via the `@life/ui` helpers (e.g. the existing
-    `DueDate` for the timed label, plus the repeat label in the row `meta`). The `DoneToggle`
+    `DueDate` for the timed label, plus the `repeatLabel` from `apps/app/lib/todo-repeat-label.ts`
+    in the row `meta`). The `DoneToggle`
     `hide`/`collapsing` behavior is gated on `!todo.repeat`, so ticking a recurring todo does not
     hide the row.
   - `lib/matrix.ts`: `isUrgent` replaces `dueDateLabel(...) === 'Tomorrow'` with a `dueDay`
@@ -584,14 +643,18 @@ than extracting it from the todo write path.
 [IMPLEMENTATION REQUIREMENTS]
   - Primitive reuse plan (Contract 1): `SettingsBlock`/`SettingsRow` + `Switch` only; the
     `PushToggle` is a client component (the `MatrixSwitch` precedent). No raw HTML.
-  - `push-toggle.tsx`: server-seeds `installed` (`navigator.standalone` — client), `supported`
-    (`'serviceWorker' in navigator && 'PushManager' in window`), `permission`; renders the
-    `Switch` (`label="Push reminders"`) and calls `subscribeToPush`/`unsubscribeFromPush`; shows
-    guidance text when unsupported (no control) or not installed (add to Home Screen).
+  - `push-toggle.tsx`: render client defaults `supported = false`, `installed = false`,
+    `permission = 'default'` and read `navigator` / `Notification.permission` in a `useEffect`
+    (`supported` = `'serviceWorker' in navigator && 'PushManager' in window`; `installed` =
+    `navigator.standalone`) — do **not** server-seed browser values (avoids a hydration
+    mismatch). Renders the `Switch` (`label="Push reminders"`) and calls
+    `subscribeToPush`/`unsubscribeFromPush`; shows guidance text when unsupported (no control)
+    or not installed (add to Home Screen).
   - `todos/settings/page.tsx`: add `<SettingsBlock title="Reminders">` with
     `<SettingsRow label="Push reminders" description="…" control={<PushToggle />} />`.
-  - `public/sw.js` (new, static): `push` → `event.waitUntil(self.registration.showNotification(data.title, { body, data: { url }, icon: '/icon-todos.png' }))`;
-    `notificationclick` → `clients.matchAll` focus `/todos` or `clients.openWindow(data.url)`.
+  - `public/sw.js` (new, static): `push` → `event.waitUntil(self.registration.showNotification(data.title, { body, data: { url }, icon: '/icon-todos.png', badge: '/icon-todos.png' }))`;
+    `notificationclick` → `clients.matchAll` and focus an existing `/todos` window if present,
+    else `clients.openWindow(data.url)`, where the payload's `data.url = '/todos/<id>'`.
   - No manifest / `viewport.themeColor` change (frozen PWA constants untouched).
 
 [VERIFICATION & TESTING RULES]
@@ -600,8 +663,10 @@ than extracting it from the todo write path.
 
 [DEFINITION OF DONE]
   - [ ] The settings page renders the `Reminders` block with the push toggle; the three states
-        (unsupported / not-installed / subscribe) are implemented.
-  - [ ] `sw.js` displays a notification and routes a click to the todo.
+        (unsupported / not-installed / subscribe) are implemented; the toggle reads browser state
+        in an effect (no server-seeded browser values).
+  - [ ] `sw.js` displays a notification (with `icon`+`badge`) and routes a click to the todo
+        (`data.url = '/todos/<id>'`, focusing an existing `/todos` window).
   - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` pass; no file outside scope.
 
 ### T12 — App UI tests + mechanical checks (module `todo-due-repeat-notify`)
@@ -612,29 +677,36 @@ than extracting it from the todo write path.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/app/test/todo-item.test.tsx`,
-    `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`.
+    `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
+    `apps/app/test/push-toggle.test.tsx` (new).
   - Reference files (read-only): `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
-    `apps/app/lib/matrix.ts`, `packages/ui/src/index.ts`, `AGENTS.md` (Contract 1 checks).
+    `apps/app/app/push-toggle.tsx`, `apps/app/lib/matrix.ts`,
+    `packages/ui/src/lib/date-parts.ts`, `packages/ui/src/index.ts`,
+    `AGENTS.md` (Contract 1 checks).
   - Strictly prohibited files: every production source file (a failing test re-opens T10/T11).
 
 [IMPLEMENTATION REQUIREMENTS]
   - `routes-todo-edit.test.tsx`: the save payload joins date+time into `dueDate` and carries
     `repeat`; `PillGroup label="Time"`/`"Repeat"` render; a repeat-with-no-due save stays open.
-  - `todo-item.test.tsx`: the row renders a timed label and a repeat label; a recurring tick does
+  - `todo-item.test.tsx`: the row renders a timed label and a `repeatLabel`; a recurring tick does
     not set the `collapsing`/`hide` state.
   - `matrix.test.ts`: `isUrgent` is true for a timed value due today and a timed value due
     tomorrow; unchanged for date-only.
+  - `push-toggle.test.tsx` (new): the three push-toggle branches — unsupported (no `PushManager`)
+    renders guidance and no control; not-installed (`!navigator.standalone`) renders the add-to-
+    Home-Screen guidance; supported+installed renders the `Switch` and the subscribe path calls
+    `subscribeToPush`.
   - Mechanical checks (Contract 1, run in this task's verification):
     `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps/app --include='*.tsx'`
     → only the documented exemptions; `grep -rn "next/link" apps/app --include='*.tsx'` → zero.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts`
+  - Permitted test command: `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
     and `npm run typecheck -w @life/app`.
-  - Strict constraints: NO full suites, NO E2E; only these three named files; max test executions: 2.
+  - Strict constraints: NO full suites, NO E2E; only these four named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The three suites cover the listed cases and pass.
+  - [ ] The four suites cover the listed cases and pass.
   - [ ] The two mechanical greps are clean.
   - [ ] `npm run typecheck -w @life/app` passes; no file outside scope modified.
 
@@ -655,11 +727,11 @@ than extracting it from the todo write path.
   - Step 1 — suite gate first, exact commands:
     `npm run build -w @life/shared`;
     `npm run typecheck -w @life/todo-service`;
-    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/todo-cache.e2e-spec.ts`;
+    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`;
     `npm run typecheck -w @life/ui`;
     `npm run test:unit -w @life/ui -- test/format-date.test.ts test/due-date-pill.test.tsx`;
     `npm run typecheck -w @life/app`;
-    `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts`.
+    `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`.
     Iterate fix → re-run until all are green.
   - Step 2 — fire five parallel lane subagents (read-only; the QA lane runs the Step 1 commands),
     each returning exactly
@@ -694,11 +766,11 @@ than extracting it from the todo write path.
 | A timed due sorts by the UTC day, not the local day | Med | D3 `dueSortKey`; T5 uses it for order + cursor; T8 asserts it |
 | Cached row leaks content after adding fields | High | Guards unchanged (`isCiphertextTodoRow*`); T8 asserts `enc.v1.`-only |
 | Sweep sends duplicate or missed pings | High | Clear-on-fire + generation bump; T8 asserts exactly-once and skip of done/trashed |
-| Sweep bypasses the cache (Contract 2 deviation) | Med | Recorded (D7) in spec + plan; system-side only, no user read |
+| Sweep bypasses the cache (Contract 2 deviation) | Med | Recorded (D7) in spec + plan; system-side only, no user read; the clear goes through T5 `markReminded` so the owner generation still bumps |
 | iOS ignores push because the app isn't installed | Med | T11 gates on `navigator.standalone` + guidance; recorded in success criteria |
 | Push payload carries the decrypted title to Apple | Med | Recorded decision (D9); never persisted; upgrade path documented |
 | Frozen e2e surface / PWA constants touched | High | T1/T10/T11 add names only; no manifest/themeColor change; no e2e edit |
-| New dependency (`web-push`) breaks the build | Med | T7 runs `npm run build -w @life/todo-service`; Dockerfile manifest copy is glob-inclusive |
+| New dependency (`web-push`) breaks the build | Med | T7 adds it to `apps/todo-service/package.json` **and** root `package-lock.json` (Docker `npm ci`), then runs `npm run build -w @life/todo-service`; Dockerfile manifest copy is glob-inclusive |
 | A repeat with no due slips through | Med | T5 enforces against the resulting due; T8 asserts the 400 |
 
 ## Open Questions
