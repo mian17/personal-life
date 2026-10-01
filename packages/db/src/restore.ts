@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { connect } from 'net';
-import { basename, dirname, join, resolve } from 'path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'path';
 import type { DatabaseName } from './paths';
 import { resolvePaths, selectPaths } from './paths';
 import { snapshotAndVerify, verifyDatabase } from './snapshot';
@@ -122,10 +122,15 @@ export async function runRestore(options: {
   const env = options.env ?? process.env;
   const probe = options.probe ?? defaultProbe;
   const cwd = env.INIT_CWD ?? process.cwd();
+  const backupRoot = resolve(cwd, 'backup');
 
   const fromDir = resolve(cwd, options.from);
   if (!existsSync(fromDir) || !statSync(fromDir).isDirectory()) {
     throw new RestoreError(`snapshot directory does not exist: ${fromDir}`);
+  }
+  const rel = relative(backupRoot, fromDir);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new RestoreError(`snapshot directory must be under ${backupRoot}: ${fromDir}`);
   }
 
   const resolved = resolvePaths(env);
@@ -143,6 +148,9 @@ export async function runRestore(options: {
   for (const entry of chosen) {
     const snapshot = join(fromDir, entry.file);
     if (!existsSync(snapshot)) throw new RestoreError(`snapshot file does not exist: ${snapshot}`);
+    if (resolve(snapshot) === resolve(entry.source)) {
+      throw new RestoreError(`snapshot resolves to the live target: ${snapshot}`);
+    }
   }
   for (const entry of chosen) {
     verifyDatabase(join(fromDir, entry.file));
@@ -157,7 +165,6 @@ export async function runRestore(options: {
 
   const at = options.now ? options.now() : new Date();
   const stamp = at.toISOString().replace(/[:.]/g, '-');
-  const backupRoot = resolve(cwd, 'backup');
   const preRestoreDir = join(backupRoot, `pre-restore-${stamp}`);
 
   const replaced: RestoreResult['replaced'] = [];

@@ -285,3 +285,61 @@ describe('db:restore safety', () => {
     expect(countOf(fx.targets.life)).toBe(5);
   });
 });
+
+describe('db:restore --from containment', () => {
+  it('refuses an absolute --from outside backup/ and writes nothing', async () => {
+    const fx = makeRestoreFixture();
+    seed(fx.targets.life, 1);
+    const before = readFileSync(fx.targets.life);
+
+    const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(await main(['--from', join(fx.root, 'apps', 'note-service', 'data')], envFor(fx), down)).toBe(1);
+    } finally {
+      err.mockRestore();
+    }
+
+    expect(readFileSync(fx.targets.life)).toEqual(before);
+    expect(countOf(fx.targets.life)).toBe(1);
+    expect(existsSync(join(fx.backupRoot, `pre-restore-${STAMP}`))).toBe(false);
+  });
+
+  it('refuses a .. traversal --from that escapes backup/ and writes nothing', async () => {
+    const fx = makeRestoreFixture();
+    seed(fx.targets.life, 1);
+    const before = readFileSync(fx.targets.life);
+
+    const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(
+        await main(['--from', 'backup/../apps/note-service/data'], envFor(fx), down),
+      ).toBe(1);
+    } finally {
+      err.mockRestore();
+    }
+
+    expect(readFileSync(fx.targets.life)).toEqual(before);
+    expect(countOf(fx.targets.life)).toBe(1);
+    expect(existsSync(join(fx.backupRoot, `pre-restore-${STAMP}`))).toBe(false);
+  });
+
+  it('refuses a snapshot that resolves to the live target and writes nothing', async () => {
+    const fx = makeRestoreFixture();
+    seed(fx.targets.life, 1);
+    seed(snapshotPath(fx, 'life'), 5);
+    const before = readFileSync(fx.targets.life);
+    // The live target points inside backup/, so the chosen snapshot is the live file itself.
+    const env: NodeJS.ProcessEnv = { INIT_CWD: fx.root, NOTE_DB_PATH: snapshotPath(fx, 'life') };
+
+    const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(await main(['--from', SNAPSHOT_DIR], env, down)).toBe(1);
+    } finally {
+      err.mockRestore();
+    }
+
+    expect(readFileSync(fx.targets.life)).toEqual(before);
+    expect(countOf(fx.targets.life)).toBe(1);
+    expect(existsSync(join(fx.backupRoot, `pre-restore-${STAMP}`))).toBe(false);
+  });
+});
