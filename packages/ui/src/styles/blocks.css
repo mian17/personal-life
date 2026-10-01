@@ -25,6 +25,7 @@
  * | TagPicker      | (new) tag attach/detach surface; the chips are Pill's, the create input Input's |
  * | TagManager     | (new) tag registry surface; rows are a local ul, controls are Input/IconButton |
  * | ListManager    | (new) todo-list registry surface; controls are Input/IconButton |
+ * | SettingsRow    | (new) label + control two-column row; no legacy class |
  *
  * Token policy: all lengths/colors come from tokens.css custom properties,
  * matching atoms.css. Note the type sizes reuse the spacing scale exactly as
@@ -344,6 +345,41 @@
 
 .ui-section__actions {
   margin-left: auto;
+}
+
+/* -------------------------------------------------------- SettingsRow */
+
+/* One setting: label (+ optional muted description) left, the caller's control
+   right. Wraps on narrow widths so a wide control drops below the text. */
+.ui-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0-5);
+}
+
+.ui-settings-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-15);
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-settings-row__label {
+  min-width: 0;
+}
+
+.ui-settings-row__desc {
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+.ui-settings-row__control {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 /* -------------------------------------------------------------- Stack */

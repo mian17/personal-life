@@ -87,6 +87,12 @@ export type { StackGap, StackProps } from './components/stack';
 export { Section } from './components/section';
 export type { SectionHeadingLevel, SectionProps } from './components/section';
 
+export { SettingsRow } from './components/settings-row';
+export type { SettingsRowProps } from './components/settings-row';
+
+export { SettingsBlock } from './components/settings-block';
+export type { SettingsBlockProps } from './components/settings-block';
+
 export { TagPicker } from './components/tag-picker';
 export type { TagOption, TagPickerProps } from './components/tag-picker';
 
