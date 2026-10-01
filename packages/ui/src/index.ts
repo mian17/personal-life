@@ -29,6 +29,9 @@ export type { ConfirmButtonProps } from './components/confirm-button';
 export { ThemeToggle } from './components/theme-toggle';
 export type { ThemeToggleProps } from './components/theme-toggle';
 
+export { Switch } from './components/switch';
+export type { SwitchProps } from './components/switch';
+
 export { IconLink } from './components/icon-link';
 export type { IconLinkProps } from './components/icon-link';
 

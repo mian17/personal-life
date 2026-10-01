@@ -45,6 +45,9 @@
  * DueDatePill (new — no legacy counterpart): a due-date read-out with the
  * /todos grouping semantics; overdue/today borrow the danger/accent colours.
  *
+ * Switch (new — no legacy counterpart): a controlled boolean switch; the
+ * track and thumb are drawn by `.ui-switch` (one element + its `::after`).
+ *
  * Card / StatusText / IconLink (batch B)
  * | component  | legacy class(es)                                          |
  * |------------|-----------------------------------------------------------|
@@ -390,3 +393,50 @@
 .ui-due-pill--today {
   color: var(--accent);
 }
+
+/* ------------------------------------------------------------- Switch */
+
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: calc(var(--space-1) + var(--space-0-4) + var(--space-1-25));
+  height: calc(var(--space-1) + var(--space-0-4));
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  cursor: pointer;
+}
+
+.ui-switch::after {
+  content: '';
+  position: absolute;
+  top: var(--space-0-2);
+  left: var(--space-0-2);
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+}
+
+.ui-switch:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-switch--on {
+  background: var(--accent);
+}
+
+.ui-switch--on::after {
+  background: var(--on-accent);
+  transform: translateX(var(--space-1-25));
+}
+
+.ui-switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
