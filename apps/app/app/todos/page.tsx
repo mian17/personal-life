@@ -4,17 +4,19 @@ import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
 import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
-import { filterHref, parseTagId, PreservingSearchBox } from '@life/app-kit';
+import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
 import {
   IconLink,
   ListShell,
   Pill,
   PillGroup,
+  Tab,
+  TabBar,
   TagFilterNav,
-  ThemeToggle,
   todayIso,
 } from '@life/ui';
-import { List, Plus, StickyNote, Tags, Trash2 } from 'lucide-react';
+import { List, Plus, Settings, StickyNote, Tags, Trash2 } from 'lucide-react';
+import { readPref } from '@/lib/preferences';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,7 @@ export default async function TodosPage({
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
   const today = todayIso();
   const groups = groupTodos(todos, today);
+  const matrixEnabled = await readPref('matrix');
 
   const tagFilterItems = [
     ...(tagId !== undefined
@@ -87,8 +90,20 @@ export default async function TodosPage({
           <IconLink href="/todos/trash" label="Trash">
             <Trash2 size={20} aria-hidden />
           </IconLink>
-          <ThemeToggle />
+          <IconLink href={settingsHref('/todos')} label="Settings">
+            <Settings size={20} aria-hidden />
+          </IconLink>
         </>
+      }
+      tabs={
+        matrixEnabled ? (
+          <TabBar aria-label="Todos views">
+            <Tab href="/todos" active>
+              List
+            </Tab>
+            <Tab href="/todos/matrix">Matrix</Tab>
+          </TabBar>
+        ) : undefined
       }
       search={<PreservingSearchBox path="/todos" q={q} params={{ list, tag, done }} label="Search todos" />}
       filters={

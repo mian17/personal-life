@@ -1,6 +1,6 @@
 import type { List, TagUsage, Todo } from '@life/shared';
 import { PreservingSearchBox } from '@life/app-kit';
-import { IconLink, ListShell, Pill, PillGroup, TagFilterNav } from '@life/ui';
+import { IconLink, ListShell, Pill, PillGroup, Tab, TabBar, TagFilterNav, ThemeToggle } from '@life/ui';
 
 jest.mock('@/lib/todo-api', () => ({
   listTodos: jest.fn(),
@@ -11,9 +11,13 @@ jest.mock('@/lib/tags-api', () => ({
   listTags: jest.fn(),
   resolveTags: jest.fn(),
 }));
+// The barrel re-exports the server-only `readPref` (next/headers); mock it so the
+// server module never loads under jest.
+jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
 
 import { listTodos, listTodoTagUsage, listLists } from '@/lib/todo-api';
 import { listTags, resolveTags } from '@/lib/tags-api';
+import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
@@ -21,6 +25,7 @@ const mockedUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUs
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
 const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
 const mockedResolveTags = resolveTags as jest.MockedFunction<typeof resolveTags>;
+const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
 
 function todo(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -76,6 +81,7 @@ describe('/todos list page wiring', () => {
       { id: 1, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
     ]);
     mockedResolveTags.mockResolvedValue([{ id: 1, name: 'errand' }]);
+    mockedReadPref.mockResolvedValue(false);
   });
 
   it('renders ListShell titled Todos with the frozen fab label', async () => {
@@ -152,11 +158,35 @@ describe('/todos list page wiring', () => {
   it('keeps the frozen nav link labels the e2e suite depends on', async () => {
     const el = await TodosPage({ searchParams: Promise.resolve({}) });
 
-    const labels = asArray(el.props.navTrailing)
+    const trailing = asArray(el.props.navTrailing);
+    const labels = trailing
       .filter((child) => child.type === IconLink)
       .map((child) => child.props.label);
     expect(labels).toEqual(
-      expect.arrayContaining(['Notes', 'Manage tags', 'Manage lists', 'Trash']),
+      expect.arrayContaining(['Manage tags', 'Manage lists', 'Trash', 'Settings']),
     );
+    expect(trailing.some((child) => child.type === ThemeToggle)).toBe(false);
+  });
+
+  it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {
+    mockedReadPref.mockResolvedValue(true);
+    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+
+    const tabs = el.props.tabs;
+    expect(tabs.type).toBe(TabBar);
+    expect(tabs.props['aria-label']).toBe('Todos views');
+    const tabEls = asArray(tabs);
+    expect(tabEls.map((t) => t.props.children)).toEqual(['List', 'Matrix']);
+    expect(tabEls[0].type).toBe(Tab);
+    expect(tabEls[0].props.href).toBe('/todos');
+    expect(tabEls[0].props.active).toBe(true);
+    expect(tabEls[1].props.href).toBe('/todos/matrix');
+    expect(tabEls[1].props.active).toBeFalsy();
+  });
+
+  it('renders no tabs node when the opt-in is off', async () => {
+    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+
+    expect(el.props.tabs).toBeUndefined();
   });
 });
