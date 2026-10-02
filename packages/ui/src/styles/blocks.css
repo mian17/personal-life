@@ -468,7 +468,6 @@
 
 .ui-tab {
   padding: var(--space-0-5) var(--space-0-75);
-  border-radius: var(--radius-md);
   color: var(--muted);
   text-decoration: none;
   border-bottom: var(--border-width) solid transparent;
