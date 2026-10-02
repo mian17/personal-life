@@ -12,8 +12,9 @@ its own spec (`SPEC-<module-id>.md`) in this directory. Plan/tasks live in
 | `todo-service` | Standalone todo service (`apps/todo-service`): todos (title, optional note, done, dueDate), todo-local lists, TagRefs, `origin` links. Own key custody, `@life/crypto` at rest, Contract 2 cache, kernel contracts. | `service-kernel`, `tags-service` |
 | `todo-ui` | Route move `/` → `/notes` (+ redirect), new `/todos` UI, shared tag picker/manager UX wired to the registry from both apps. All visuals composed from `@life/ui` (spec-first upstream for anything new). | `todo-service`, `tags-extraction` |
 | `todo-due-repeat-notify` | Extends `todo-service`/`todo-ui`: an optional **time** on the due (local input → canonical UTC instant via `TODO_TIMEZONE`), an optional **repeat** (daily/weekdays/weekly/monthly/yearly, anchored on the due date, advance-on-tick with no scheduler), and a todo-owned **Web Push reminder** delivered by two bounded, replaceable backend modules inside `todo-service` — `push` (subscription/key storage) and `reminders` (the sweep + `PushSender`) — with the lasting plaintext `reminderScheduledAt` row field as the reminder record ("the letter"). | `todo-service`, `todo-ui`, `service-kernel` |
+| `todo-custom-repeat` | Extends `todo-due-repeat-notify`: a **custom weekly** repeat on a chosen weekday set (e.g. every Thu + Fri) — a `custom` value on the `repeat` enum plus an additive plaintext `repeatDays` column (ISO weekdays), advance-on-tick matching the set, and an editor `Custom…` option opening a **modal** (`Dialog` block on native `<dialog>`) with a Frequency dropdown and a Mon–Sun multi-select. The due stays the first occurrence. | `todo-due-repeat-notify`, `todo-ui`, `service-kernel` |
 
-Build order: `service-kernel` → `tags-service` → (`tags-extraction` ∥ `todo-service`) → `todo-ui` → `todo-due-repeat-notify`.
+Build order: `service-kernel` → `tags-service` → (`tags-extraction` ∥ `todo-service`) → `todo-ui` → `todo-due-repeat-notify` → `todo-custom-repeat`.
 
 ## Cross-cutting design decisions (recorded per global protocol §8)
 
