@@ -98,7 +98,7 @@ function nextCustomDay(local: Local, days: ReadonlySet<number>): string {
   frequency/pattern column additively; existing `custom` rows are weekly by definition.)
 - **Read DTO `Todo`** gains `repeatDays: number[] | null` (required-but-nullable, like
   `important`). **Create/Update inputs** gain `repeatDays?: number[] | null`.
-- **Validation (DTO):** `repeatDays` is `@IsOptional() @IsArray() @ArrayNotEmpty() @IsIn([1,2,3,4,5,6,7], { each: true })`. `repeat` validation (`@IsIn(TODO_REPEATS)`) now
+- **Validation (DTO):** `repeatDays` is `@IsOptional() @ValidateIf((_, v) => v !== null) @IsArray() @ArrayNotEmpty() @IsIn(TODO_REPEAT_DAYS, { each: true })`. `repeat` validation (`@IsIn(TODO_REPEATS)`) now
   accepts `'custom'`.
 - **Invariants (service, both create and update, against the resulting state):**
   1. `repeat === 'custom'` ⟺ `repeatDays` is a non-empty set. `custom` with no days → 400
@@ -165,8 +165,10 @@ export interface DialogProps {
 - `'use client'`. On `open` change, call the native `showModal()` / `close()` via a ref
   effect; the element's `close` event maps to `onOpenChange(false)` (Escape/backdrop).
 - The close affordance is an `IconButton` (`X`, label `Close`) — no raw `<button>`.
-- Tokens only: `.ui-dialog` surface (`--panel`, `--radius-lg`), `.ui-dialog::backdrop`,
-  padding/gap from `--space-*`. No new token.
+- Tokens only: `.ui-dialog` surface (`--panel`, `--radius-lg`), padding/gap from `--space-*`.
+  The native `<dialog>`'s platform-default backdrop is used; `.ui-dialog::backdrop` is **not**
+  styled (a backdrop colour would need a literal outside `tokens.css`, and no backdrop colour
+  token exists — `tokens.css` stays untouched). No new token.
 - Registered in `MAP-ui-primitives.md`; recorded in `SPEC-ui-blocks.md`.
 
 ### Recurrence builder (`apps/app/app/recurrence-dialog.tsx`, app behavior)

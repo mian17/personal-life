@@ -88,7 +88,7 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 ### Checkpoint: Service
 - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/todo-service` exits 0.
-- [ ] `npm run test:unit -w @life/todo-service -- test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts` green.
+- [ ] `npm run test:unit -w @life/todo-service -- test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts` green.
 
 ### Phase 6 — App
 - [ ] T8: `repeatLabel` custom branch + `recurrence-dialog.tsx` + `todo-editor.tsx` wiring.
@@ -119,7 +119,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 [IMPLEMENTATION REQUIREMENTS]
   - `SPEC-todo-service.md`: the storage table gains the `repeatDays TEXT NULL` column
     (`CSV of ISO weekdays 1..7`, null = not custom); `repeat` enum gains `'custom'`; the DTO
-    section records `repeatDays?: number[] | null` (`@IsArray @ArrayNotEmpty @IsIn(1..7 each)`);
+    section records `repeatDays?: number[] | null` (exactly
+    `@IsOptional() @ValidateIf((_, v) => v !== null) @IsArray() @ArrayNotEmpty() @IsIn(TODO_REPEAT_DAYS, { each: true })`,
+    matching T6);
     the invariants section records `custom ⟺ non-empty days` (400 otherwise) and that any
     non-custom repeat stores `repeatDays = null`; the advance section records the BYDAY step.
     The `## Cache Rules` section records `CachedTodoRow` gaining `repeatDays` (key unchanged).
@@ -150,7 +152,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/shared/src/index.ts`,
-    `packages/shared/test/index.test.ts` (new, if absent), and the eight app test files whose
+    `packages/shared/test/index.test.ts` (created — the file does not exist today), and the eight
+    app test files whose
     `Todo` object literals gain `repeatDays: null` (the same migration pattern as
     `todo-due-repeat-notify` T2): `apps/app/test/todo-item.test.tsx`,
     `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
@@ -197,7 +200,7 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/lib/date-parts.ts`,
-    `packages/ui/test/format-date.test.ts` (append cases).
+    `packages/ui/src/index.ts` (barrel export), `packages/ui/test/format-date.test.ts` (append cases).
   - Reference files (read-only): `packages/ui/src/lib/format-date.ts` (long weekday owner),
     `docs/intent/todo-custom-repeat.md`.
   - Strictly prohibited files: every other file.
@@ -211,8 +214,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - `export function weekdayShort(iso: string): string` — `WEEKDAY_SHORT[isoWeekday(iso)-1]`,
     `''` when `isoWeekday` is `0`.
   - Reuse the existing `datePart`/`isRealDate` guards (`format-date.ts` precedent); place the
-    helpers in `date-parts.ts` beside the other ISO-string owners. Export both from the package
-    barrel only if the app needs them (`isoWeekday`, `WEEKDAY_SHORT` do; T8 imports them).
+    helpers in `date-parts.ts` beside the other ISO-string owners. Export `isoWeekday` and
+    `WEEKDAY_SHORT` from the package barrel (`packages/ui/src/index.ts`) — T8 imports them.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run typecheck -w @life/ui` then
@@ -222,8 +225,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 [DEFINITION OF DONE]
   - [ ] `isoWeekday('2026-10-05')` is `1` (Monday); `'2026-10-08'` is `4` (Thursday).
   - [ ] `weekdayShort('2026-10-08')` is `'Thu'`; malformed input is `''`.
-  - [ ] Helpers are exported from `@life/ui`; `npm run typecheck -w @life/ui` passes; no file
-        outside scope.
+  - [ ] Helpers are exported from `@life/ui` (`packages/ui/src/index.ts`); `npm run typecheck -w
+        @life/ui` passes; no file outside scope.
 
 ### T4 — `Dialog` block (module `todo-custom-repeat`)
 
@@ -254,9 +257,16 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `.ui-dialog__head` with `.ui-dialog__title` and an `IconButton` (`X`, label `Close`) that
     calls `onOpenChange(false)`; a `.ui-dialog__body` for `children`; an optional
     `.ui-dialog__footer` for `footer`.
-  - A `useEffect` on `open`: `open ? el.showModal() : el.close()`; attach a `close` listener on
-    the element mapping to `onOpenChange(false)` (covers Escape and backdrop). Guard against the
-    `close` event re-entrancy (only call when currently `open`).
+  - A client-only `useEffect` on `open` calls the native methods normally and unguarded —
+    `open ? el.showModal() : el.close()`; attach a `close` listener on the element mapping to
+    `onOpenChange(false)` (covers Escape and backdrop). Guard against the `close` event
+    re-entrancy (only call when currently `open`). jsdom 20 (`testEnvironment: "jsdom"`,
+    `packages/ui/package.json`) does not implement `showModal`/`close`, so the component never
+    feature-detects them; the test owns the shim (next bullet).
+  - `dialog.test.tsx` installs the jsdom shim: in a `beforeEach` (or setup block in the spec file)
+    assign `HTMLDialogElement.prototype.showModal = jest.fn()` and
+    `HTMLDialogElement.prototype.close = jest.fn()` (cast to satisfy TS), then assert against
+    those mocks rather than the element's native open state.
   - CSS in `blocks.css` (tokens only, NO new token — token values are a frozen human-owned
     surface, `AGENTS.md` frozen-surfaces): `.ui-dialog` (`--panel`, `--radius-lg`, padding from
     `--space-*`, `border`), `.ui-dialog__head`/`__title`/`__body`/`__footer` layout via tokens.
@@ -272,9 +282,11 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [DEFINITION OF DONE]
   - [ ] `Dialog` matches the contract; no internal open state.
-  - [ ] `dialog.test.tsx` covers: closed → `showModal` not called; `open` → `showModal` called;
-        a `close` event calls `onOpenChange(false)`; the `Close` `IconButton` calls it too;
-        footer renders when provided.
+  - [ ] `dialog.test.tsx` owns the jsdom shim (`showModal`/`close` jest mocks installed in the
+        spec's setup) and covers: closed → `showModal` not called; `open` → `showModal` called;
+        the `Close` `IconButton` → `onOpenChange(false)`; dispatching the element's `close` event
+        → `onOpenChange(false)`; footer renders when provided. The T4 checkpoint command
+        (`test/format-date.test.ts test/dialog.test.tsx`) is green under this shim.
   - [ ] `tokens.css` and `packages/ui/test/tokens.test.ts` are untouched (frozen surface preserved).
   - [ ] No raw hex/rgb/px in `blocks.css`; no `::backdrop` colour override; `npm run typecheck -w @life/ui`
         passes; no file outside scope.
@@ -297,8 +309,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `iso(p)` is in `days` (≤ 7 steps; if `days` is null/empty, return `local` unchanged — the
     service never lets that state persist). `iso(y,m,d)` = the existing UTC `weekday` mapped
     `0(Sun)→7`.
-  - `advanceToOnOrAfter(local, repeat, days = null, nowLocal): string` — loops `nextOccurrence`
-    with `days` while `candidate < nowLocal`.
+  - `advanceToOnOrAfter(local, repeat, nowLocal, days = null): string` — `days` is appended
+    LAST for backward compatibility, so the existing 3-arg calls in `recurrence.test.ts` stay
+    valid; loops `nextOccurrence` with `days` while `candidate < nowLocal`.
   - Add the CSV owners:
     - `export function formatRepeatDays(days: number[] | null): string | null` — sorted unique
       `'4,5'`, or `null` for null/empty.
@@ -349,7 +362,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
       days clears days; a days change without repeat keeps the repeat), then run the same
       `normalizeRepeat` against the resulting pair. Clearing the due sets `repeat = null` **and**
       `repeatDays = null`. The existing repeat-requires-due 400 is unchanged.
-    - Advance-on-tick: pass the parsed days to `advanceToOnOrAfter(local, repeat, parseRepeatDays(todo.repeatDays), nowLocal)`.
+    - Advance-on-tick: pass the parsed days as the trailing arg to
+      `advanceToOnOrAfter(local, repeat, nowLocal, parseRepeatDays(todo.repeatDays))`.
     - `CachedTodoRow` gains `repeatDays: number[] | null`; `toCachedTodoRow` maps
       `parseRepeatDays(todo.repeatDays)`; `decodeCachedTodoRow` passes it through; the read DTO
       in `decodeCachedTodoRow` carries `repeatDays`.
@@ -376,12 +390,22 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/todo-service/test/todos-custom-repeat.e2e-spec.ts` (new),
     `apps/todo-service/test/todo-cache.e2e-spec.ts` (append a `repeatDays` assertion),
-    `apps/todo-service/test/todos.e2e-spec.ts` (append a custom fixture if a literal list needs it).
+    `apps/todo-service/test/todos.e2e-spec.ts` (update the exact DTO key-set array),
+    `apps/todo-service/test/ownership.e2e-spec.ts` (update the exact DTO key-set array).
   - Reference files (read-only): `apps/todo-service/src/todos/todos.service.ts`,
     `apps/todo-service/test/todos-due-repeat.e2e-spec.ts` (pattern).
   - Strictly prohibited files: every other file.
 
 [IMPLEMENTATION REQUIREMENTS]
+  - Required key-set edits (adding the required `repeatDays` key to the read DTO) in both
+    exact-key-set suites:
+    - `todos.e2e-spec.ts` `'creates a todo with version 0 and the exact DTO key set'`
+      (~lines 108–124): insert `'repeatDays',` into the `Object.keys(created.body).sort()` array
+      (between `'repeat'` and `'tagIds'`).
+    - `ownership.e2e-spec.ts` `'serializes no owner field in the TodoDto (list and get)'`
+      (~lines 214–230): insert `'repeatDays',` into the `todoKeys` array (between `'repeat'` and
+      `'tagIds'`), which both `expect(Object.keys(...).sort()).toEqual(todoKeys)` assertions
+      (~lines 240, 248) then cover.
   - New suite covers: create with `repeat:'custom', repeatDays:[4,5]` round-trips `repeatDays:[4,5]`;
     update sets/clears days; `custom` with no days → 400 `'custom repeat requires repeatDays'`;
     a non-custom repeat with days normalizes days to `null`; clearing the due clears repeat + days;
@@ -392,13 +416,15 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run build -w @life/shared` then
-    `npm run test:unit -w @life/todo-service -- test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts`.
+    `npm run test:unit -w @life/todo-service -- test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`.
   - Strict constraints: NO full suites, NO E2E; only these named files; max test executions: 2.
 
 [DEFINITION OF DONE]
   - [ ] Every behavior above has a passing test.
   - [ ] `todo-cache.e2e-spec.ts` asserts `repeatDays` presence and the ciphertext invariant.
-  - [ ] The three named suites pass; no file outside scope.
+  - [ ] Both exact-key-set arrays (`todos.e2e-spec.ts`, `ownership.e2e-spec.ts`) include
+        `repeatDays`.
+  - [ ] The four named suites pass; no file outside scope.
 
 ### T8 — App label + dialog + editor wiring (module `todo-custom-repeat`)
 
@@ -408,7 +434,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/app/lib/todo-repeat-label.ts`,
-    `apps/app/app/recurrence-dialog.tsx` (new), `apps/app/app/todo-editor.tsx`.
+    `apps/app/app/recurrence-dialog.tsx` (new), `apps/app/app/todo-editor.tsx`,
+    `apps/app/app/todo-item.tsx` (updated `repeatLabel` call).
   - Reference files (read-only): `packages/ui/src/components/dialog.tsx` (T4),
     `packages/ui/src/lib/date-parts.ts` (T3), `packages/ui/src/components/select.tsx`,
     `packages/ui/src/components/pill.tsx`, `apps/app/app/todo-actions.ts`.
@@ -416,16 +443,19 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [IMPLEMENTATION REQUIREMENTS]
   - `repeatLabel(repeat, dueDate?, repeatDays?)`: `custom` → `Custom (Thu, Fri)` — the days
-    sorted ISO Mon→Sun and mapped through `@life/ui` `weekdayShort(WEEKDAY_SHORT[i-1])` (never
-    `toLocale*`); empty days → bare `Custom`. The other repeats are unchanged.
+    sorted ISO Mon→Sun and mapped directly through `@life/ui` `WEEKDAY_SHORT[i-1]` (the short
+    label for ISO weekday `i`; never `toLocale*`). `weekdayShort(iso)` (T3) is only for turning a
+    date into its short name and is not used here; empty days → bare `Custom`. The other repeats
+    are unchanged.
   - `recurrence-dialog.tsx` (`'use client'`), props
-    `{ open, onOpenChange, value: number[], onConfirm(days: number[]) }`:
+    `{ open, onOpenChange, dueDate: string, value: number[], onConfirm(days: number[]) }`:
     - `Dialog` titled `Custom repeat`.
     - `Select` aria-label `Frequency`, one option `Weekly` (value `'weekly'`), value fixed to
       `'weekly'` (the extension seam; no other option yet).
     - Seven `Pill as="button" size="chip"` toggles labelled `Mon`…`Sun` (from `WEEKDAY_SHORT`),
-      `active` = selected, `aria-pressed`; local draft state seeded from `value` when opened.
-      Wrapped in a visible `PillGroup label="Days"`.
+      `active` = selected, `aria-pressed`; local draft state seeded when opened from the committed
+      `value` when non-empty, else `[isoWeekday(dueDate)]` when `dueDate` is a valid date, else
+      `[]` (C3). Wrapped in a visible `PillGroup label="Days"`.
     - Footer: `Button variant="ghost"` `Cancel` (→ `onOpenChange(false)`) and `Button` `Confirm`
       (primary, disabled while the draft is empty) → `onConfirm(draft)` then `onOpenChange(false)`.
   - `todo-editor.tsx`:
@@ -437,9 +467,13 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
       `'custom'` → `setRecurrenceOpen(true)` **without** calling `setRepeat` (the controlled
       Select snaps back to the committed value).
     - Render `<RecurrenceDialog open={recurrenceOpen} onOpenChange={setRecurrenceOpen}
-      value={repeatDays} onConfirm={(days) => { setRepeat('custom'); setRepeatDays(days); }} />`.
+      dueDate={dueDate} value={repeatDays} onConfirm={(days) => { setRepeat('custom');
+      setRepeatDays(days); }} />`.
     - `onDueDateChange('')` cascade also resets `repeatDays` to `[]` and closes the dialog.
     - Save payload: `repeat`, and `repeatDays: repeat === 'custom' ? repeatDays : undefined`.
+  - `todo-item.tsx`: the row caller updates to
+    `repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays)` so a custom row renders the concrete
+    days instead of a bare `Custom`.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run build -w @life/shared` then `npm run typecheck -w @life/app`.
@@ -452,6 +486,7 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - [ ] Picking `Custom…` opens the modal and does not change the committed repeat; Confirm sets
     `repeat:'custom'` + days; Cancel/Escape is a no-op; the due-clear cascade resets days.
   - [ ] The save payload omits `repeatDays` for non-custom repeats.
+  - [ ] `todo-item.tsx` calls `repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays)`.
   - [ ] `npm run typecheck -w @life/app` passes; no file outside scope.
 
 ### T9 — App tests + mechanical checks (module `todo-custom-repeat`)
@@ -460,7 +495,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   Prove the app wiring at the element-tree boundary and run the UI mechanical checks.
 
 [SCOPE & REPOSITORY CONTEXT]
-  - Allowed files to edit/create: `apps/app/test/todo-repeat-label.test.ts` (new),
+  - Allowed files to edit/create: `apps/app/test/todo-repeat-label.test.ts` (append custom cases —
+    the file already exists with passing canned-repeat cases),
     `apps/app/test/routes-todo-edit.test.tsx` (append custom cases),
     `apps/app/test/routes-todo-edit.test.tsx` helpers.
   - Reference files (read-only): `apps/app/test/routes-todo-edit.test.tsx` (existing harness),
@@ -468,8 +504,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - Strictly prohibited files: every other file.
 
 [IMPLEMENTATION REQUIREMENTS]
-  - `todo-repeat-label.test.ts`: `custom` with `[4,5]` → `'Custom (Thu, Fri)'` (Tue is `[2]`);
-    unsorted input `[5,4]` sorts; `[]`/null days → `'Custom'`; the canned repeats are unchanged.
+  - Extend the existing `todo-repeat-label.test.ts` suite (it already has passing canned-repeat
+    cases): add `custom` with `[4,5]` → `'Custom (Thu, Fri)'` (Tue is `[2]`); unsorted input
+    `[5,4]` sorts; `[]`/null days → `'Custom'`; the canned repeats stay unchanged.
   - Editor suite (existing `stateHarness` + `findByType` pattern): the Repeat `Select` includes a
     `'custom'` option; its `onChange('custom')` does NOT change `select.props.value` for the
     committed repeat (still whatever was committed / `''`) but the tree now contains a
