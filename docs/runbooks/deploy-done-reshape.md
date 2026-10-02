@@ -138,9 +138,10 @@ Regressions this delta can touch (shared `@life/ui` + the todo row):
 - **Done reshape** — went the small-UI-fix path (lesson 0015): targeted `npm run typecheck`
   (`@life/app`, `@life/ui`) plus the scoped jest suites (`todo-item`, `list-item`,
   `todo-groups`, `routes-matrix`, `matrix`, `routes-todos-list`), and the Contract-1
-  mechanical greps (raw HTML / `next/link` / raw colors). **Not** a five-lane gate. No
-  E2E suite was modified by the reshape — `journey.suite.ts:160` is stale for the `/todos`
-  heading rename and stays human-owned.
+  mechanical greps (raw HTML / `next/link` / raw colors). **Not** a five-lane gate. The
+  reshape itself modified no E2E suite; the `/todos` heading rename left
+  `journey.suite.ts:160` stale at deploy time and it was later synced to `Today` with
+  explicit approval (`0de75df`, frozen selector surface).
 
 ## Hard lines
 

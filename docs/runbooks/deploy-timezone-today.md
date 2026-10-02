@@ -5,6 +5,8 @@ This delta is `apps/app` + `packages/ui` + one `compose.yaml` env line.
 
 Read this **with** `docs/runbooks/deploy-done-reshape.md` (the reshape, `5157bf1..df7f58b`) and
 `docs/runbooks/deploy-completion-custom-repeat.md` (the backend chapters, `8cc6b98..5157bf1`).
+A later slice on this branch (`2469ad4..f86e32e`, Done ordering + quadrant tint + debounced
+toggles) is in `docs/runbooks/deploy-todos-ux-refinements.md`; deploy that after this one.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist, not authority to run
 it. Do **not** merge to `master` unless asked explicitly.
