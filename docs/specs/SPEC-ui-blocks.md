@@ -117,9 +117,13 @@ export interface DialogProps {
 }
 ```
 
-- `'use client'`. A ref effect on `open` calls the native `showModal()` / `close()`; the
-  element's `close` event maps to `onOpenChange(false)` (Escape/backdrop). `jsdom` does not
-  implement `showModal`/`close`, so the test owns the shim.
+- `'use client'`. A ref effect on `open` calls the native `showModal()` / `close()`; a `close`
+  listener maps the native `close` event to `onOpenChange(false)` — that is the **Escape** path.
+  **Backdrop** is a separate explicit `onClick` handler on the `<dialog>`: it calls
+  `onOpenChange(false)` only when `e.target` is the dialog element itself (child/keyboard-activated
+  clicks are excluded by that check) *and* the pointer is outside the dialog's bounding box.
+  A native `<dialog>` does not emit `close` on a backdrop click, so it cannot be part of that
+  path. `jsdom` does not implement `showModal`/`close`, so the test owns the shim.
 - The close affordance is an `IconButton` (`X`, label `Close`) — no raw `<button>`.
 - Tokens only: `.ui-dialog` surface (`--panel`, `--radius-lg`), padding/gap from `--space-*`.
   `tokens.css` is untouched; `.ui-dialog::backdrop` is **not** styled (the native default
@@ -166,7 +170,7 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 | view affordances (in the `Menu` panel) | `IconButton label="Rename tag <name>"` (`Pencil`) + `IconButton label="Delete tag <name>"` (`CircleX`) |
 | inline edit | `Input` (`aria-label="Rename tag <name>"`) + `IconButton` `Save` (`Check`) + `IconButton` `Cancel` (`X`) |
 | `Dialog` root | native `<dialog class="ui-dialog">` (platform element — exempt plumbing) |
-| `Dialog` head | `.ui-dialog__head` (structural glue) + title span `.ui-dialog__title` + `IconButton` (`X`, label `Close`) |
+| `Dialog` head | `.ui-dialog__head` (structural glue) + title `<h2>` `.ui-dialog__title` + `IconButton` (`X`, label `Close`) |
 | `Dialog` body | `.ui-dialog__body` (structural glue, holds `children`) |
 | `Dialog` footer (when `footer` set) | `.ui-dialog__footer` (structural glue, holds `footer`) |
 

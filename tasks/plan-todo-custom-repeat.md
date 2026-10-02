@@ -283,8 +283,12 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `.ui-dialog__footer` for `footer`.
   - A client-only `useEffect` on `open` calls the native methods normally and unguarded —
     `open ? el.showModal() : el.close()`; attach a `close` listener on the element mapping to
-    `onOpenChange(false)` (covers Escape and backdrop). Guard against the `close` event
-    re-entrancy (only call when currently `open`). jsdom 20 (`testEnvironment: "jsdom"`,
+    `onOpenChange(false)` — the **Escape** path only (guard the `close` event re-entrancy, calling
+    only when currently `open`). **Backdrop** is an explicit `onClick` on the `<dialog>` itself:
+    it calls `onOpenChange(false)` only when `e.target` is the dialog element (so bubbled child
+    clicks, including keyboard-activated controls, are excluded) *and* the clientX/Y lies outside
+    the element's `getBoundingClientRect()` — a native `<dialog>` does not emit `close` on a
+    backdrop click, so that event alone never covers it. jsdom 20 (`testEnvironment: "jsdom"`,
     `packages/ui/package.json`) does not implement `showModal`/`close`, so the component never
     feature-detects them; the test owns the shim (next bullet).
   - `dialog.test.tsx` installs the jsdom shim: in a `beforeEach` (or setup block in the spec file)

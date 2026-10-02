@@ -14,9 +14,9 @@ stacked on the verified `feat/todo-completion-history` chapter).
 | `npm run typecheck -w @life/todo-service` | pass |
 | `npm run typecheck -w @life/app` | pass |
 | `npm run test:unit -w @life/shared -- test/index.test.ts` | pass — 1 suite, 2 tests |
-| `npm run test:unit -w @life/ui -- test/format-date.test.ts test/dialog.test.tsx` | pass — 2 suites, 35 tests |
-| `npm run test:unit -w @life/todo-service -- test/recurrence.test.ts test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts` | pass — 5 suites, 93 tests |
-| `npm run test:unit -w @life/app -- test/todo-repeat-label.test.ts test/routes-todo-edit.test.tsx` | pass — 2 suites, 37 tests |
+| `npm run test:unit -w @life/ui -- test/format-date.test.ts test/dialog.test.tsx` | pass — 2 suites, 39 tests (`dialog.test.tsx`: 9 cases, incl. accessible-name, backdrop-outside, and keyboard-bubbled-child-click regressions) |
+| `npm run test:unit -w @life/todo-service -- test/recurrence.test.ts test/todos-custom-repeat.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts` | pass — 5 suites, 94 tests (`recurrence.test.ts` incl. the `terminates on an empty day set` regression) |
+| `npm run test:unit -w @life/app -- test/todo-repeat-label.test.ts test/routes-todo-edit.test.tsx` | pass — 2 suites, 38 tests |
 | Contract 1 grep — raw HTML controls in `apps` | zero hits outside test files |
 | Contract 1 grep — `next/link` in `apps` | zero hits |
 | Contract 1 grep — raw colors in `.css` | only `packages/ui/src/styles/tokens.css` (generated `.next/**` ignored) |
@@ -25,11 +25,20 @@ stacked on the verified `feat/todo-completion-history` chapter).
 
 ## Blast radius
 
-`git diff --name-only 860e187..HEAD` returns the plan's explicit-path list (36 files):
-the 5 amended specs, `@life/shared` (+test), the `@life/ui` Dialog/date-parts/blocks/barrel
-(+tests), the todo-service recurrence/entity/DTO/service (+4 suites), the app label/dialog/editor/
-item (+2 suites), the 9 exact key-set literal migrations the `repeatDays` wire key forced, and the
-plan itself. No out-of-scope edit; working tree clean at review time. `tokens.css`,
+`git diff --name-only 860e187..HEAD` returns 39 changed paths, matching the plan's explicit-path
+list: the four amended specs/maps (`SPEC-todo-service.md`, `SPEC-todo-ui.md`, `SPEC-ui-blocks.md`,
+`MAP-ui-primitives.md`), the `@life/shared` `index.ts` (+test), the `@life/ui`
+Dialog/date-parts/blocks/barrel (+tests), the todo-service source (+4 amended suites, plus the new
+`todos-custom-repeat.e2e-spec.ts`), the app source and tests (label/dialog/editor/item plus the nine
+key-set literal migrations the `repeatDays` wire key forced), the plan, the ledger, and this report.
+
+The owner spec `docs/specs/SPEC-todo-custom-repeat.md` and the chapter's fifth amended spec,
+`docs/specs/SPEC-todo-due-repeat-notify.md` (the enum owner), are **not** among these 39: both
+predate the reviewed range. The latter's `'custom'` enum delta was applied at the base commit
+`860e187` (a plan-repair commit, outside the `860e187..HEAD` reviewed range). Both are nonetheless
+part of the chapter's spec amendments (plan T1).
+
+No out-of-scope edit; working tree clean at review time. `tokens.css`,
 `tokens.test.ts`, the PWA manifests, `viewport.themeColor`, the e2e selector surface, and every
 `playwright*.config.ts` are untouched (frozen surfaces respected).
 
@@ -41,7 +50,7 @@ plan itself. No out-of-scope edit; working tree clean at review time. `tokens.cs
 | 2 | Editor renders `Custom (Thu, Fri)` and seeds the modal from committed/due days | `todo-repeat-label.test.ts`; `routes-todo-edit.test.tsx`; `recurrence-dialog.tsx` seeding effect | pass |
 | 3 | Tick records a completion for the pre-advance due, advances to the next chosen weekday, re-arms reminder, `done:false` | `update()` `dataSource.transaction` advance branch (`writeCompletion` + set-aware `advanceToOnOrAfter`); `todos-custom-repeat.e2e-spec.ts` asserts exactly one `todo_completion` row | pass |
 | 4 | `custom` without days → 400; non-custom stores `repeatDays=null`; clearing due clears both | `normalizeRepeat`; `todos-custom-repeat.e2e-spec.ts` | pass |
-| 5 | `Dialog` renders in the native top layer, closes on Escape/backdrop | native `<dialog>` + `close` listener; `dialog.test.tsx` (5 cases) | pass |
+| 5 | `Dialog` renders in the native top layer, closes on Escape and an outside-backdrop click | native `<dialog>`; Escape via the element's `close` event, backdrop via the `<dialog>` `onClick` (target-is-dialog + outside-bounding-box guard); `dialog.test.tsx` (9 cases) | pass |
 | 6 | No raw HTML in app UI; tokens only; cache carries no plaintext | Contract 1 greps; `todo-cache.e2e-spec.ts` `enc.v1.` assertion | pass |
 
 ## Deviations from the plan (with rationale)
@@ -49,8 +58,9 @@ plan itself. No out-of-scope edit; working tree clean at review time. `tokens.cs
 - **`todos.e2e-spec.ts` / `ownership.e2e-spec.ts` exact key-set arrays** — the read DTO gained the
   required `repeatDays` key (16 total); both literal `Object.keys` assertions were updated in T7, as
   the plan's T7 scope recorded.
-- **9 app test literals migrated in T1** — `Todo` now requires `repeatDays: null`; the plan's T1
-  recorded and scoped these mechanical edits (mirrors the completion-history migration).
+- **9 app test literals migrated in T2** — `Todo` now requires `repeatDays: null`; the locked
+  plan's T2 scope includes these nine app test files (T1 is docs-only), a mechanical migration
+  mirroring the completion-history one.
 - **T9 helper widening** — `routes-todo-edit.test.tsx`'s local `EditorField` interface gained
   `value?`/`options?` to read the `Select` props; test-only, within scope.
 

@@ -167,7 +167,11 @@ export interface DialogProps {
 ```
 
 - `'use client'`. On `open` change, call the native `showModal()` / `close()` via a ref
-  effect; the element's `close` event maps to `onOpenChange(false)` (Escape/backdrop).
+  effect. Two separate close paths: Escape is handled by the native `close` event →
+  `onOpenChange(false)`; the backdrop is an explicit `onClick` handler on the `<dialog>`
+  that calls `onOpenChange(false)` only when `e.target` is the dialog itself **and** the
+  pointer lies outside its bounding box — that guard excludes keyboard-generated clicks
+  (zero coordinates, inside the box) and clicks bubbled up from child content.
 - The close affordance is an `IconButton` (`X`, label `Close`) — no raw `<button>`.
 - Tokens only: `.ui-dialog` surface (`--panel`, `--radius-lg`), padding/gap from `--space-*`.
   The native `<dialog>`'s platform-default backdrop is used; `.ui-dialog::backdrop` is **not**
@@ -226,8 +230,10 @@ picker and the label: `WEEKDAY_SHORT` (`Mon`…`Sun`, ISO 1..7) and `weekdayShor
   both; the tick records a completion for the pre-advance due then jumps to the next chosen
   day and keeps `done: false`; cache values carry `repeatDays` and no plaintext (ciphertext
   assertion).
-- **packages/ui:** `Dialog` opens (`showModal`), closes on `close` event → `onOpenChange`,
-  close button, tokens-only; weekday helper unit tests.
+- **packages/ui:** `Dialog` opens (`showModal`), closes on **Escape** (the element's `close`
+  event → `onOpenChange`), closes on a **backdrop-outside** click (dialog `onClick`,
+  target-is-dialog + outside-bounding-box), and does **not** close on a keyboard-generated
+  click bubbled from a child control; close button, tokens-only; weekday helper unit tests.
 - **apps/app:** editor shows `Custom…`; choosing it opens the modal without committing;
   Confirm sets the payload `repeat: 'custom'` + days; Cancel is a no-op; the label renders
   `Custom (Thu, Fri)`; due-clear cascade resets days.
