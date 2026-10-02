@@ -22,11 +22,15 @@ function setup(disabled = false) {
   return { onCreate, onRename, onDelete };
 }
 
+const openMenu = (name: string) =>
+  fireEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+
 describe('ListManager', () => {
   it('lists every todo list with a rename and delete affordance', () => {
     setup();
     expect(screen.getByText('Groceries')).toBeTruthy();
     expect(screen.getByText('Work')).toBeTruthy();
+    openMenu('Groceries');
     expect(screen.getByRole('button', { name: 'Rename list Groceries' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete list Groceries' })).toBeTruthy();
   });
@@ -49,7 +53,9 @@ describe('ListManager', () => {
 
   it('renames a list by string id and exits edit on save', () => {
     const { onRename } = setup();
+    openMenu('Groceries');
     fireEvent.click(screen.getByRole('button', { name: 'Rename list Groceries' }));
+    expect(screen.queryByRole('menu')).toBeNull();
     const input = screen.getByLabelText('Rename list Groceries') as HTMLInputElement;
     expect(input.value).toBe('Groceries');
     fireEvent.change(input, { target: { value: 'Market' } });
@@ -60,6 +66,7 @@ describe('ListManager', () => {
 
   it('never renames to an empty or whitespace-only name', () => {
     const { onRename } = setup();
+    openMenu('Work');
     fireEvent.click(screen.getByRole('button', { name: 'Rename list Work' }));
     fireEvent.change(screen.getByLabelText('Rename list Work'), { target: { value: '   ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -69,16 +76,19 @@ describe('ListManager', () => {
 
   it('cancels an inline rename without calling onRename', () => {
     const { onRename } = setup();
+    openMenu('Work');
     fireEvent.click(screen.getByRole('button', { name: 'Rename list Work' }));
     fireEvent.change(screen.getByLabelText('Rename list Work'), { target: { value: 'Job' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onRename).not.toHaveBeenCalled();
   });
 
-  it('deletes by string id', () => {
+  it('deletes by string id and closes the menu', () => {
     const { onDelete } = setup();
+    openMenu('Work');
     fireEvent.click(screen.getByRole('button', { name: 'Delete list Work' }));
     expect(onDelete).toHaveBeenCalledWith('l2');
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('passes a long list name through verbatim (trimmed)', () => {
@@ -90,16 +100,13 @@ describe('ListManager', () => {
     expect(onCreate).toHaveBeenCalledWith('z'.repeat(300));
   });
 
-  it('honours the disabled flag on every control', () => {
+  it('honours the disabled flag on the trigger', () => {
     setup(true);
     expect((screen.getByRole('button', { name: 'Add list' }) as HTMLButtonElement).disabled).toBe(
       true,
     );
     expect(
-      (screen.getByRole('button', { name: 'Rename list Work' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Delete list Work' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Actions for Work' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 
@@ -127,14 +134,16 @@ describe('ListManager', () => {
         rowExtra={rowExtra}
       />,
     );
-    expect(rowExtra).toHaveBeenCalledTimes(2);
-    expect(rowExtra).toHaveBeenCalledWith(LISTS[0]);
-    expect(rowExtra).toHaveBeenCalledWith(LISTS[1]);
     const rows = document.querySelectorAll('.ui-list-manager__row');
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toContain('Groceries');
-    expect(rows[0].textContent).toContain('extra-l1');
     expect(rows[1].textContent).toContain('Work');
+    expect(rowExtra).toHaveBeenCalledTimes(2);
+    expect(rowExtra).toHaveBeenCalledWith(LISTS[0]);
+    expect(rowExtra).toHaveBeenCalledWith(LISTS[1]);
+    openMenu('Groceries');
+    expect(rows[0].textContent).toContain('extra-l1');
+    openMenu('Work');
     expect(rows[1].textContent).toContain('extra-l2');
   });
 
@@ -143,8 +152,10 @@ describe('ListManager', () => {
     expect(screen.getByText('Groceries')).toBeTruthy();
     expect(screen.getByText('Work')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add list' })).toBeTruthy();
+    openMenu('Groceries');
     expect(screen.getByRole('button', { name: 'Rename list Groceries' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete list Groceries' })).toBeTruthy();
+    openMenu('Work');
     expect(screen.getByRole('button', { name: 'Rename list Work' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete list Work' })).toBeTruthy();
   });

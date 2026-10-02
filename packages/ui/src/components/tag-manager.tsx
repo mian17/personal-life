@@ -6,6 +6,7 @@ import { Check, CircleX, Pencil, Plus, X } from 'lucide-react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
 import { IconButton } from './icon-button';
+import { Menu } from './menu';
 import type { TagOption } from './tag-picker';
 
 export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
@@ -34,6 +35,7 @@ export function TagManager({
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [openId, setOpenId] = useState<number | null>(null);
   const canCreate = draft.trim() !== '';
 
   const create = () => {
@@ -109,23 +111,34 @@ export function TagManager({
                 </IconButton>
               </div>
             ) : (
-              <>
-                <span className="ui-tag-manager__name">{tag.name}</span>
+              <Menu
+                label={`Actions for ${tag.name}`}
+                summary={<span className="ui-tag-manager__name">{tag.name}</span>}
+                open={openId === tag.id}
+                onOpenChange={(next) => setOpenId(next ? tag.id : null)}
+                disabled={disabled}
+              >
                 <IconButton
                   label={`Rename tag ${tag.name}`}
                   disabled={disabled}
-                  onClick={() => startEdit(tag)}
+                  onClick={() => {
+                    startEdit(tag);
+                    setOpenId(null);
+                  }}
                 >
                   <Pencil size={16} aria-hidden />
                 </IconButton>
                 <IconButton
                   label={`Delete tag ${tag.name}`}
                   disabled={disabled}
-                  onClick={() => onDelete(tag.id)}
+                  onClick={() => {
+                    onDelete(tag.id);
+                    setOpenId(null);
+                  }}
                 >
                   <CircleX size={16} aria-hidden />
                 </IconButton>
-              </>
+              </Menu>
             )}
           </li>
         ))}

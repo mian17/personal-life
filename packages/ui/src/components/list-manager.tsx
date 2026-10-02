@@ -6,6 +6,7 @@ import { Check, CircleX, Pencil, Plus, X } from 'lucide-react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
 import { IconButton } from './icon-button';
+import { Menu } from './menu';
 
 export interface TodoListOption {
   id: string;
@@ -40,6 +41,7 @@ export function ListManager({
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
   const canCreate = draft.trim() !== '';
 
   const create = () => {
@@ -115,25 +117,36 @@ export function ListManager({
                 </IconButton>
               </div>
             ) : (
-              <>
-                <span className="ui-list-manager__name">{list.name}</span>
+              <Menu
+                label={`Actions for ${list.name}`}
+                summary={<span className="ui-list-manager__name">{list.name}</span>}
+                open={openId === list.id}
+                onOpenChange={(next) => setOpenId(next ? list.id : null)}
+                disabled={disabled}
+              >
+                {rowExtra?.(list)}
                 <IconButton
                   label={`Rename list ${list.name}`}
                   disabled={disabled}
-                  onClick={() => startEdit(list)}
+                  onClick={() => {
+                    startEdit(list);
+                    setOpenId(null);
+                  }}
                 >
                   <Pencil size={16} aria-hidden />
                 </IconButton>
                 <IconButton
                   label={`Delete list ${list.name}`}
                   disabled={disabled}
-                  onClick={() => onDelete(list.id)}
+                  onClick={() => {
+                    onDelete(list.id);
+                    setOpenId(null);
+                  }}
                 >
                   <CircleX size={16} aria-hidden />
                 </IconButton>
-              </>
+              </Menu>
             )}
-            {rowExtra?.(list)}
           </li>
         ))}
       </ul>

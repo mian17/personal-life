@@ -83,6 +83,13 @@ same: the `PageTitle` heading text (`Tags` / `Lists`) and every manager control'
 `Delete list <name>`). Those labels are owned by `ui-blocks`' `TagManager`/`ListManager`
 and are preserved because the slot renders them unchanged.
 
+**User-approved surface change (per-row menu):** the Rename/Delete controls are no longer
+always visible per row; they are revealed through the row's `⋯` disclosure, whose trigger
+is labelled `Actions for <name>` (`aria-haspopup="menu"`). Their labels are unchanged
+(`Rename tag <name>`, `Delete tag <name>`, `Rename list <name>`, `Delete list <name>`), so
+the recorded surface grows the `Actions for <name>` trigger and keeps every existing
+manager-control label byte-identical.
+
 ## CSS ownership
 
 The block composes existing blocks only: `PageShell` (`.ui-page`), `NavBar`

@@ -110,6 +110,9 @@ sets them.
   existing list action (`apps/app/app/todo-actions.ts`). Wrapped in a visible `SettingsRow`
   whose label is `Important by default` (a bare `Switch` carries only an `aria-label`, so the
   row needs on-screen text — lesson 0014). Accessible name (frozen app text): `Default important`.
+  The row is rendered inside each list row's per-row `Menu` panel (the app supplies it via
+  `ListManager`'s `rowExtra`), so it is revealed with the Rename/Delete actions rather than
+  always visible; the label and switch accessible name are unchanged.
 - **Per-todo importance** — a `Switch` in the todo editor
   (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`) wrapped in a
   visible `PillGroup` labelled `Important` (field parity with `Due`/`List`), displayed

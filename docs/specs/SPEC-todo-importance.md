@@ -197,7 +197,10 @@ Both surfaces compose the `Switch` atom (`SPEC-ui-settings.md`) — no raw HTML 
 app owns their copy: the frozen accessible names are `Important` (per-todo) and
 `Default important` (list default). The list surface is wrapped in a visible `SettingsRow`
 labelled `Important by default` (the `Switch` atom has no visible text of its own), so the
-control reads as the list's importance default on screen.
+control reads as the list's importance default on screen. The row lives inside the list
+row's per-row `Menu` panel (passed through `ListManager`'s `rowExtra`), so it is revealed
+with that row's management actions; the visible label and the switch's accessible name are
+unchanged.
 
 ## Commands
 

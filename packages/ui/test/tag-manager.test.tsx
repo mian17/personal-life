@@ -23,11 +23,15 @@ function setup(disabled = false) {
   return { onCreate, onRename, onDelete };
 }
 
+const openMenu = (name: string) =>
+  fireEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+
 describe('TagManager', () => {
   it('lists every tag with a rename and delete affordance', () => {
     setup();
     expect(screen.getByText('errand')).toBeTruthy();
     expect(screen.getByText('home')).toBeTruthy();
+    openMenu('errand');
     expect(screen.getByRole('button', { name: 'Rename tag errand' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete tag errand' })).toBeTruthy();
   });
@@ -50,7 +54,9 @@ describe('TagManager', () => {
 
   it('renames a tag through inline edit and exits edit on save', () => {
     const { onRename } = setup();
+    openMenu('errand');
     fireEvent.click(screen.getByRole('button', { name: 'Rename tag errand' }));
+    expect(screen.queryByRole('menu')).toBeNull();
     const input = screen.getByLabelText('Rename tag errand') as HTMLInputElement;
     expect(input.value).toBe('errand');
     fireEvent.change(input, { target: { value: 'errands' } });
@@ -61,6 +67,7 @@ describe('TagManager', () => {
 
   it('saves an inline rename on Enter', () => {
     const { onRename } = setup();
+    openMenu('home');
     fireEvent.click(screen.getByRole('button', { name: 'Rename tag home' }));
     const input = screen.getByLabelText('Rename tag home');
     fireEvent.change(input, { target: { value: 'house' } });
@@ -70,6 +77,7 @@ describe('TagManager', () => {
 
   it('never renames to an empty or whitespace-only name and keeps editing', () => {
     const { onRename } = setup();
+    openMenu('errand');
     fireEvent.click(screen.getByRole('button', { name: 'Rename tag errand' }));
     const input = screen.getByLabelText('Rename tag errand') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '   ' } });
@@ -80,6 +88,7 @@ describe('TagManager', () => {
 
   it('cancels an inline rename without calling onRename', () => {
     const { onRename } = setup();
+    openMenu('errand');
     fireEvent.click(screen.getByRole('button', { name: 'Rename tag errand' }));
     fireEvent.change(screen.getByLabelText('Rename tag errand'), { target: { value: 'other' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -87,14 +96,17 @@ describe('TagManager', () => {
     expect(screen.queryByRole('textbox', { name: 'Rename tag errand' })).toBeNull();
   });
 
-  it('deletes by id through the labelled affordance', () => {
+  it('deletes by id through the labelled affordance and closes the menu', () => {
     const { onDelete } = setup();
+    openMenu('home');
     fireEvent.click(screen.getByRole('button', { name: 'Delete tag home' }));
     expect(onDelete).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('passes a long rename through verbatim (trimmed)', () => {
     const { onRename } = setup();
+    openMenu('errand');
     fireEvent.click(screen.getByRole('button', { name: 'Rename tag errand' }));
     fireEvent.change(screen.getByLabelText('Rename tag errand'), {
       target: { value: `  ${'y'.repeat(300)}  ` },
@@ -103,16 +115,13 @@ describe('TagManager', () => {
     expect(onRename).toHaveBeenCalledWith(1, 'y'.repeat(300));
   });
 
-  it('honours the disabled flag on every control', () => {
+  it('honours the disabled flag on the trigger', () => {
     setup(true);
     expect((screen.getByRole('button', { name: 'Add tag' }) as HTMLButtonElement).disabled).toBe(
       true,
     );
     expect(
-      (screen.getByRole('button', { name: 'Rename tag errand' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Delete tag errand' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Actions for errand' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 

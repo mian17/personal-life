@@ -123,6 +123,9 @@ export type { DueDateProps, DueDateTone } from './components/due-date';
 export { ListManager } from './components/list-manager';
 export type { ListManagerProps, TodoListOption } from './components/list-manager';
 
+export { Menu } from './components/menu';
+export type { MenuProps } from './components/menu';
+
 export { TrashBlock } from './components/trash-block';
 export type { TrashBlockItem, TrashBlockProps, TrashFormAction } from './components/trash-block';
 

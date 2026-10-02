@@ -76,6 +76,14 @@ and the notes app's current pages map onto these one-to-one.
              onDelete: (id: string) => void
              disabled? label? placeholder? createLabel?
              rowExtra?: (list: {id: string; name: string}) => ReactNode />
+<Menu label: string                                  // per-row disclosure: controlled (no internal
+      summary: ReactNode                             //   open state), inline panel (never absolute/
+      open: boolean                                  //   fixed, no portal — `.ui-card { overflow:
+      onOpenChange: (open: boolean) => void          //   hidden }` would clip a floating layer)
+      children: ReactNode                            //   summary + `⋯` trigger (`MoreVertical`,
+      disabled? className? />                        //   aria-haspopup="menu", aria-expanded);
+                                                     //   when open: `role="menu"` panel, closes on
+                                                     //   Escape / outside pointerdown
 <Snackbar message: string                            // transient status toast
           actionLabel?: string
           onAction?: () => void
@@ -100,8 +108,16 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 - **`ListManager`** — todo-list management (`Array<{id: string; name: string}>`), the
   same create/rename/delete shape as `TagManager` (the id is a string, not a number).
   The optional `rowExtra?: (list: {id: string; name: string}) => ReactNode` prop renders
-  the supplied node inside each row; it is a domain-free extension point (the block bakes
-  no copy and knows no domain notion — the app supplies the node).
+  the supplied node inside each row's `Menu` panel; it is a domain-free extension point
+  (the block bakes no copy and knows no domain notion — the app supplies the node).
+- **`Menu`** — the shared per-row disclosure both managers compose. Always draws the
+  row `summary` (the entity name) plus a `⋯` `IconButton` trigger labelled by `label`
+  (`aria-haspopup="menu"`, `aria-expanded`); the action controls live in the inline
+  `role="menu"` panel revealed when `open`. **Controlled** — the block stores no open
+  state; the owner passes `open` and `onOpenChange` (fired by the trigger toggle, Escape,
+  and an outside `pointerdown`). The panel is intentionally INLINE, not a floating layer:
+  the managers sit inside `Card`, whose `.ui-card { overflow: hidden }` would clip an
+  absolutely/fixed-positioned panel.
 
 #### Composition (element by element)
 
@@ -112,8 +128,10 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 | `TagPicker` create | `Input` (`aria-label`/`placeholder`) + `IconButton` (`Plus`, `createLabel`) |
 | `TagManager` / `ListManager` root | block container `.ui-tag-manager` / `.ui-list-manager` (structural glue) |
 | create row | `Input` + `IconButton` (`Plus`) |
-| rows | `ul`/`li` (`.ui-*-manager__row`) with a name `span` |
-| view affordances | `IconButton label="Rename tag <name>"` (`Pencil`) + `IconButton label="Delete tag <name>"` (`CircleX`) |
+| rows | `ul`/`li` (`.ui-*-manager__row`); non-editing row is one `Menu` |
+| row summary | `Menu` `summary` = the name `span` (`.ui-*-manager__name`), full row width |
+| row disclosure trigger | `Menu` `⋯` (`MoreVertical`), label `Actions for <name>`, `aria-haspopup="menu"` |
+| view affordances (in the `Menu` panel) | `IconButton label="Rename tag <name>"` (`Pencil`) + `IconButton label="Delete tag <name>"` (`CircleX`) |
 | inline edit | `Input` (`aria-label="Rename tag <name>"`) + `IconButton` `Save` (`Check`) + `IconButton` `Cancel` (`X`) |
 
 #### Accessibility
@@ -122,10 +140,14 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
   `aria-pressed`; the whole picker is a `role="group"` with an `aria-label`.
 - Icon-only actions carry verbatim `aria-label`s (`Rename tag <name>`,
   `Delete tag <name>`, `Rename list <name>`, `Delete list <name>`, `Save`, `Cancel`);
-  create inputs are labelled by `placeholder`, and Enter submits a draft or an edit.
+  the `Menu` trigger is labelled `Actions for <name>` and exposes
+  `aria-haspopup="menu"` / `aria-expanded`. Opening a row's menu reveals its
+  Rename/Delete controls; picking Rename/Delete closes the menu. Escape and an outside
+  `pointerdown` close it too. Create inputs are labelled by `placeholder`, and Enter
+  submits a draft or an edit.
 - `onCreate`/`onRename` fire only on a non-blank trimmed name; with a blank name the
   Save/Add control is `disabled` and no callback fires. `disabled` propagates to every
-  control in the block.
+  control in the block, including the `Menu` trigger and its panel controls.
 
 ### Snackbar (transient status)
 
