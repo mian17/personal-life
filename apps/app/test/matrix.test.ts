@@ -1,4 +1,5 @@
 import type { Todo } from '@life/shared';
+import { dueDateState } from '@life/ui';
 import { groupByQuadrant, isUrgent, quadrantOf, QUADRANTS } from '@/lib/matrix';
 
 const TODAY = '2026-10-01';
@@ -12,6 +13,8 @@ function todo(id: string, dueDate: string | null, effectiveImportant: boolean): 
     important: null,
     effectiveImportant,
     dueDate,
+    repeat: null,
+    reminderScheduledAt: null,
     listId: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -29,6 +32,18 @@ describe('isUrgent', () => {
 
   it('treats a malformed date as not urgent', () => {
     expect(isUrgent('not-a-date', TODAY)).toBe(false);
+    expect(dueDateState('not-a-date', TODAY)).toBe('none');
+  });
+
+  it('is urgent for a timed value due today and a timed value due tomorrow', () => {
+    expect(isUrgent('2026-10-01T09:30', TODAY)).toBe(true);
+    expect(isUrgent('2026-10-02T09:30', TODAY)).toBe(true);
+  });
+
+  it('leaves a date-only due date on the same day-granular rule', () => {
+    expect(isUrgent('2026-10-01', TODAY)).toBe(true);
+    expect(isUrgent('2026-10-02', TODAY)).toBe(true);
+    expect(isUrgent('2026-10-03', TODAY)).toBe(false);
   });
 
   it('is urgent for overdue, today, and tomorrow', () => {

@@ -49,6 +49,9 @@ export interface NotePage {
 export const NOTE_BODY_MAX = 20000;
 export const TAG_NAME_MAX = 50;
 
+export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;
+export type TodoRepeat = (typeof TODO_REPEATS)[number];
+
 /**
  * The todo domain wire contract (`SPEC-todo-service`), owned by
  * `apps/todo-service` and consumed by clients (`apps/app`, T8) — the app never
@@ -75,6 +78,8 @@ export interface Todo {
   important: boolean | null;
   effectiveImportant: boolean;
   dueDate: string | null;
+  repeat: TodoRepeat | null;
+  reminderScheduledAt: string | null;
   listId: string | null;
   tagIds: number[];
   createdAt: string;
@@ -87,6 +92,7 @@ export interface CreateTodoInput {
   title: string;
   note?: string;
   dueDate?: string;
+  repeat?: TodoRepeat | null;
   listId?: string;
   /** `null` (or omitted) = inherit the list default. */
   important?: boolean | null;
@@ -102,6 +108,8 @@ export interface UpdateTodoInput {
   important?: boolean | null;
   /** `null` clears the due date; omitting leaves it unchanged. */
   dueDate?: string | null;
+  /** `null` clears the repeat; omitting leaves it unchanged. */
+  repeat?: TodoRepeat | null;
   /** `null` detaches the list; omitting leaves it unchanged. */
   listId?: string | null;
   /** A `tagIds` write REPLACES the association set (kernel detach semantics). */
@@ -130,3 +138,8 @@ export interface List {
 export const TODO_TITLE_MAX = 500;
 export const TODO_NOTE_MAX = 20000;
 export const TODO_LIST_NAME_MAX = 100;
+
+export interface PushSubscribeInput {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}

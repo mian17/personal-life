@@ -2,16 +2,19 @@ import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   ValidateIf,
 } from 'class-validator';
-import { TODO_TITLE_MAX, TODO_NOTE_MAX } from '@life/shared';
-import { DATE_ONLY } from './create-todo.dto';
+import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS } from '@life/shared';
+import type { TodoRepeat } from '@life/shared';
+import { ISO_DUE } from '../due-time';
 
 /**
  * PATCH body. An omitted field is left unchanged (last-write-wins). For the
@@ -39,8 +42,13 @@ export class UpdateTodoDto {
   @IsOptional()
   @ValidateIf((_o, value) => value !== null)
   @IsString()
-  @MaxLength(10)
+  @Matches(ISO_DUE)
   dueDate?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsIn(TODO_REPEATS)
+  repeat?: TodoRepeat | null;
 
   /** `null` = clear the override back to inherit (`SPEC-todo-importance`). */
   @IsOptional()

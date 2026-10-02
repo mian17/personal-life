@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { List, Todo } from '@life/shared';
-import { Pill, PillGroup, Switch, type SwitchProps, type TagOption } from '@life/ui';
+import { Input, Pill, PillGroup, Switch, type SwitchProps, type TagOption } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockBack = jest.fn();
@@ -54,6 +54,8 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     important: null,
     effectiveImportant: false,
     dueDate: '2026-10-02',
+    repeat: null,
+    reminderScheduledAt: null,
     listId: 'l1',
     tagIds: [7],
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -255,6 +257,24 @@ function importantGroup(tree: EditorTree): ReactElement<Record<string, unknown>>
   const found = findByType(tree.props.children, PillGroup, (el) => el.props.label === 'Important');
   if (!found) throw new Error('no PillGroup labelled Important');
   return found;
+}
+
+/** The `PillGroup` whose visible label is `label`. */
+function pillGroup(tree: EditorTree, label: string): ReactElement<Record<string, unknown>> {
+  const found = findByType(tree.props.children, PillGroup, (el) => el.props.label === label);
+  if (!found) throw new Error(`no PillGroup labelled ${label}`);
+  return found;
+}
+
+/** The field (`Input`) selected by its accessible name. */
+function inputByLabel(tree: EditorTree, label: string): EditorField {
+  const found = findByType(
+    tree.props.children,
+    Input,
+    (el) => el.props['aria-label'] === label,
+  );
+  if (!found) throw new Error(`no Input labelled ${label}`);
+  return found as unknown as EditorField;
 }
 
 /** The `Pill` for a list, found by walking the editor's element tree. */
@@ -461,6 +481,7 @@ describe('TodoEditor important Switch', () => {
           title: 'Buy milk',
           note: 'two litres',
           dueDate: '2026-10-02',
+          repeat: null,
           listId: 'l1',
           tagIds: [7],
           important: false,
@@ -492,6 +513,7 @@ describe('TodoEditor important Switch', () => {
           title: 'New task',
           note: undefined,
           dueDate: undefined,
+          repeat: null,
           listId: undefined,
           tagIds: [],
           important: true,
@@ -536,6 +558,75 @@ describe('TodoEditor important Switch', () => {
         harness.restore();
       }
     });
+  });
+});
+
+describe('TodoEditor Time and Repeat fields', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('renders PillGroups visibly labelled Time and Repeat', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(todo());
+
+      expect(pillGroup(tree, 'Time').type).toBe(PillGroup);
+      expect(inputByLabel(tree, 'Due time').props['aria-label']).toBe('Due time');
+
+      const repeat = pillGroup(tree, 'Repeat');
+      expect(repeat.type).toBe(PillGroup);
+      expect(findByType(repeat.props.children, Input)).toBeUndefined();
+      expect(findByType(repeat.props.children, Pill, (p) => p.props.children === 'None')).toBeDefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('joins date + time into dueDate and carries repeat in the save payload', async () => {
+    const fixture = todo({ dueDate: null, repeat: null, version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      inputByLabel(first, 'Due date').props.onChange!({ target: { value: '2026-10-05' } });
+
+      const second = harness.renderTree(fixture);
+      inputByLabel(second, 'Due time').props.onChange!({ target: { value: '09:30' } });
+
+      const third = harness.renderTree(fixture);
+      findPill(third.props.children, 'Weekly')!.props.onClick();
+      expect(findByType(third.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
+
+      const fourth = harness.renderTree(fixture);
+      expect(fourth.props.actions.props.label).toBe('Save todo');
+      await fourth.props.actions.props.onClick();
+
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.dueDate).toBe('2026-10-05T09:30');
+      expect(patch.repeat).toBe('weekly');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a repeat with no due date keeps save disabled and stays open', () => {
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(undefined);
+      inputByLabel(first, 'Todo title').props.onChange!({ target: { value: 'Recurring task' } });
+
+      const second = harness.renderTree(undefined);
+      findPill(second.props.children, 'Daily')!.props.onClick();
+
+      const third = harness.renderTree(undefined);
+      expect(third.props.actions.props.disabled).toBe(true);
+      third.props.actions.props.onClick();
+
+      expect(mockedCreateTodoAction).not.toHaveBeenCalled();
+      expect(mockedUpdateTodoAction).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
   });
 });
 

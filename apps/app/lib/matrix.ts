@@ -1,4 +1,4 @@
-import { dueDateLabel, dueDateState } from '@life/ui';
+import { dueDay, dueDateLabel, dueDateState } from '@life/ui';
 import type { ListItemTone, MatrixTone } from '@life/ui';
 import type { Todo } from '@life/shared';
 
@@ -37,10 +37,17 @@ export const QUADRANTS: ReadonlyArray<{
 /**
  * Urgency is derived from `dueDate`, never stored. True iff `dueDate` lands on
  * an overdue day, today, or tomorrow; missing/empty/malformed is not urgent.
+ *
+ * Day-granular and timed-safe (lesson 0003): `dueDay` first normalizes a timed
+ * instant to its local calendar day, so `dueDateState` classifies a timed value
+ * correctly and the `Tomorrow` check compares the day — a `Tomorrow 09:00`
+ * timed value is still urgent. No app-side ISO parsing.
  */
 export function isUrgent(dueDate: string | null, today: string): boolean {
   const state = dueDateState(dueDate, today); // 'overdue' | 'today' | 'later' | 'none'
-  return state === 'overdue' || state === 'today' || dueDateLabel(dueDate, today) === 'Tomorrow';
+  if (state === 'overdue' || state === 'today') return true;
+  const day = dueDay(dueDate);
+  return day !== '' && dueDateLabel(day, today) === 'Tomorrow';
 }
 
 /** The quadrant a todo falls in: (`effectiveImportant`, `isUrgent`). */

@@ -1,4 +1,6 @@
-import type { Todo } from '@life/shared';
+import type { ReactElement } from 'react';
+import type { List, Todo } from '@life/shared';
+import type { TagOption } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('../app/todo-actions', () => ({
@@ -19,6 +21,8 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     important: null,
     effectiveImportant: false,
     dueDate: TODAY,
+    repeat: null,
+    reminderScheduledAt: null,
     listId: 'l1',
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -41,6 +45,107 @@ function markup(size?: 'default' | 'dense', overrides: Partial<Todo> = {}): stri
       size={size}
     />,
   );
+}
+
+// The compiled component reads `useState`/`useEffect`/`useContext` off the raw
+// `react` module exports at call time, so spying there intercepts it; the
+// `import * as React` namespace is a frozen copy and cannot be.
+const ReactModule = jest.requireActual<typeof import('react')>('react');
+const realUseState = ReactModule.useState;
+
+/** `TodoItem`'s element tree, the props surface a node test can drive. */
+interface ItemTree extends ReactElement {
+  props: {
+    todo: Todo;
+    lists: List[];
+    availableTags: TagOption[];
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * `apps/app` runs with `testEnvironment: "node"`, so `TodoItem`'s state is
+ * observed through the element tree: a direct call runs only the item's hooks
+ * and a stubbed `useState` lets a re-render pick up a value changed through a
+ * setter captured from the previous tree. `useContext` is stubbed through the
+ * same live-module read so no `SnackbarProvider` is needed; `useEffect` is a
+ * no-op (node env) so the pending-collapse timer never fires here.
+ */
+function stateHarness() {
+  let store: unknown[] = [];
+  const stateSpy = jest.spyOn(ReactModule, 'useState');
+  const ctxSpy = jest.spyOn(ReactModule, 'useContext');
+  const refSpy = jest
+    .spyOn(ReactModule, 'useRef')
+    .mockImplementation(((initial: unknown) => ({ current: initial })) as typeof ReactModule.useRef);
+  const effectSpy = jest
+    .spyOn(ReactModule, 'useEffect')
+    .mockImplementation((() => {}) as typeof ReactModule.useEffect);
+
+  function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
+    let index = 0;
+    stateSpy.mockImplementation(((initial: unknown) => {
+      const i = index++;
+      if (i >= store.length) {
+        store[i] =
+          typeof initial === 'function' ? (initial as () => unknown)() : initial;
+      }
+      const set = (next: unknown) => {
+        store[i] =
+          typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
+      };
+      return [store[i], set];
+    }) as typeof realUseState);
+    ctxSpy.mockImplementation((() => ({ showSnackbar: () => {} })) as unknown as typeof ReactModule.useContext);
+    return TodoItem({
+      todo: todo(options?.overrides),
+      today: TODAY,
+      lists,
+      availableTags: [],
+      size: options?.size,
+    }) as unknown as ItemTree;
+  }
+
+  return {
+    renderTree,
+    restore: () => {
+      stateSpy.mockRestore();
+      ctxSpy.mockRestore();
+      refSpy.mockRestore();
+      effectSpy.mockRestore();
+    },
+  };
+}
+
+/** Depth-first search for the first element of `type` (optionally matching). */
+function findNode(
+  node: unknown,
+  type: unknown,
+  match?: (el: ReactElement<Record<string, unknown>>) => boolean,
+): any {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findNode(child, type, match);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  if (node == null || typeof node !== 'object') return undefined;
+  const el = node as ReactElement<Record<string, unknown>>;
+  if ((type === undefined || el.type === type) && (!match || match(el))) return el;
+  return findNode((el.props as Record<string, unknown>)?.children, type, match);
+}
+
+/** `TodoItem`'s done toggle is the leading element carrying the "Mark … " label. */
+function doneToggle(tree: ItemTree): any {
+  const found = findNode(
+    tree.props.leading,
+    undefined,
+    (el) => typeof (el.props as Record<string, unknown>).label === 'string' &&
+      String((el.props as Record<string, unknown>).label).startsWith('Mark '),
+  );
+  if (!found) throw new Error('no done toggle rendered in the todo item');
+  return found;
 }
 
 describe('TodoItem sizes', () => {
@@ -125,5 +230,56 @@ describe('TodoItem sizes', () => {
 
   it('renders outside a SnackbarProvider without throwing (no-op default)', () => {
     expect(() => markup()).not.toThrow();
+  });
+});
+
+describe('TodoItem timed and repeat meta', () => {
+  it('renders a timed due label with its local time suffix', () => {
+    const html = markup(undefined, { dueDate: '2026-10-01T09:30' });
+    expect(html).toContain('>Today 09:30<');
+  });
+
+  it('renders the repeatLabel when the todo recurs', () => {
+    const html = markup(undefined, { repeat: 'weekly' });
+    expect(html).toContain('>Weekly<');
+  });
+
+  it('renders no repeat text for a non-recurring todo', () => {
+    expect(markup()).not.toContain('>Daily<');
+    expect(markup()).not.toContain('>Weekly<');
+  });
+});
+
+describe('TodoItem collapsing gate', () => {
+  it('non-recurring: the done toggle may hide and a collapse marks the row collapsing', () => {
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree();
+      const toggle = doneToggle(first);
+      expect(toggle.props.hide).toBe(true);
+
+      toggle.props.onCollapse(true);
+
+      const second = harness.renderTree();
+      expect(second.props.collapsing).toBe(true);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('recurring: the done toggle never hides and a collapse cannot mark the row collapsing', () => {
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree({ overrides: { repeat: 'daily' } });
+      const toggle = doneToggle(first);
+      expect(toggle.props.hide).toBe(false);
+
+      toggle.props.onCollapse(true);
+
+      const second = harness.renderTree({ overrides: { repeat: 'daily' } });
+      expect(second.props.collapsing).toBe(false);
+    } finally {
+      harness.restore();
+    }
   });
 });

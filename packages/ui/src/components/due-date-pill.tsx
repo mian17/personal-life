@@ -1,25 +1,23 @@
 import type { ComponentPropsWithRef } from 'react';
+import { dueDay, todayIso } from '../lib/date-parts';
 import { cx } from '../lib/cx';
+
+export { todayIso } from '../lib/date-parts';
 
 export type DueDateState = 'overdue' | 'today' | 'later' | 'none';
 
-/** Local calendar date as `YYYY-MM-DD` (the ISO shape the todo API uses). */
-export function todayIso(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 /**
- * Grouping semantics for `/todos`: a due date before `today` is overdue, the
+ * Grouping semantics for `/todos`: a due day before `today` is overdue, the
  * same day is today, anything after is later; no date is its own group.
- * ISO `YYYY-MM-DD` strings compare correctly as plain strings.
+ * Comparison is day-granular via `dueDay`, so a timed todo due earlier today is
+ * `today`, not `overdue`. A missing or malformed value is `none` — it must
+ * never fall into `overdue`.
  */
 export function dueDateState(dueDate: string | null | undefined, today: string): DueDateState {
-  if (dueDate == null || dueDate === '') return 'none';
-  if (dueDate < today) return 'overdue';
-  if (dueDate === today) return 'today';
+  const day = dueDay(dueDate);
+  if (day === '') return 'none';
+  if (day < today) return 'overdue';
+  if (day === today) return 'today';
   return 'later';
 }
 

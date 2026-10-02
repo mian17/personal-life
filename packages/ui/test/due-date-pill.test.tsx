@@ -63,6 +63,20 @@ describe('DueDatePill', () => {
     expect(rootOf().getAttribute('data-state')).toBe('today');
   });
 
+  it('derives today for a timed value earlier today (day-granular)', () => {
+    const timed = new Date(2026, 8, 28, 8, 0).toISOString();
+    render(<DueDatePill dueDate={timed} today="2026-09-28" />);
+    expect(rootOf().getAttribute('data-state')).toBe('today');
+  });
+
+  it('derives none for a malformed value, never overdue', () => {
+    render(<DueDatePill dueDate="not-a-date" today="2026-09-28" />);
+    const root = rootOf();
+    expect(root.getAttribute('data-state')).toBe('none');
+    expect(root.classList.contains('ui-due-pill--overdue')).toBe(false);
+    expect(root.querySelector('time')).toBeNull();
+  });
+
   it('merges className instead of replacing it', () => {
     render(<DueDatePill dueDate="2026-10-01" today="2026-09-28" className="legacy-hook" />);
     expect(rootOf().classList.contains('legacy-hook')).toBe(true);
@@ -81,6 +95,8 @@ describe('dueDateState', () => {
   it.each([
     [null, 'none'],
     ['', 'none'],
+    ['not-a-date', 'none'],
+    ['2026-02-31', 'none'],
     ['2026-09-27', 'overdue'],
     ['2026-09-28', 'today'],
     ['2026-09-29', 'later'],

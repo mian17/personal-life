@@ -192,6 +192,63 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(entry.value).not.toContain(NOTE);
   });
 
+  it('todo rows carry the plaintext repeat/reminderScheduledAt while content stays ciphertext-only', async () => {
+    const TITLE = 'TOPSECRET-DUE-REPEAT-TITLE';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, { title: TITLE, dueDate: '2026-10-02', repeat: 'daily' });
+    client.values.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.todos.findAll(SUB, {});
+
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:all`)!;
+    expect(entry).toBeDefined();
+    // The new non-content metadata rides the cached row verbatim (SPEC Cache Rules).
+    expect(entry.value).toContain('"dueDate":"2026-10-02"');
+    expect(entry.value).toContain('"repeat":"daily"');
+    expect(entry.value).toContain('"reminderScheduledAt":"');
+    // Content columns are unchanged: `enc.v1.`-only, no plaintext leak.
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(TITLE);
+  });
+
+  it('trash rows also carry repeat/reminderScheduledAt as ciphertext rows', async () => {
+    const TITLE = 'TOPSECRET-TRASH-REPEAT-TITLE';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const t = await h.todos.create(SUB, { title: TITLE, dueDate: '2026-10-02', repeat: 'weekly' });
+    await h.todos.remove(SUB, t.id);
+    // Drop the write bump so the trash key pins at v0 for the assertion.
+    client.store.delete(generationKey(SUB));
+    client.values.length = 0;
+
+    await h.todos.findTrash(SUB, {});
+
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v0:trash`)!;
+    expect(entry).toBeDefined();
+    expect(entry.value).toContain('"repeat":"weekly"');
+    expect(entry.value).toContain('"reminderScheduledAt":"');
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(TITLE);
+  });
+
+  it('the sweep-clear seam markReminded bumps the owner generation after the write', async () => {
+    const client = new FakeRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    const created = await h.todos.create(SUB, { title: 'sweep-clear', dueDate: '2026-10-02' });
+    expect(created.reminderScheduledAt).not.toBeNull();
+
+    client.incrCalls.length = 0;
+    await h.todos.markReminded(SUB, created.id);
+
+    expect(client.incrCalls).toEqual([generationKey(SUB)]);
+    const reread = await h.todos.findOne(SUB, created.id);
+    expect(reread.reminderScheduledAt).toBeNull();
+    // Clearing a fired reminder is not a domain write: version is untouched.
+    expect(reread.version).toBe(0);
+  });
+
   it('list rows carry the plaintext importantDefault boolean while name stays ciphertext-only', async () => {
     const LIST = 'TOPSECRET-IMP-LIST-NAME';
     const client = new CapturingRedisClient();

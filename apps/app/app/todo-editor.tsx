@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { List, Todo } from '@life/shared';
+import { TODO_REPEATS, type List, type Todo, type TodoRepeat } from '@life/shared';
 import {
   EditorChrome,
   IconButton,
@@ -11,10 +11,13 @@ import {
   PillGroup,
   Switch,
   Textarea,
+  dueDay,
+  localTimePart,
   type TagOption,
 } from '@life/ui';
 import { Check } from 'lucide-react';
 import { createTodoAction, updateTodoAction } from './todo-actions';
+import { repeatLabel } from '@/lib/todo-repeat-label';
 
 /**
  * The todo editor screen, shared by create (`/todos/new`) and edit
@@ -36,7 +39,13 @@ export function TodoEditor({
   const editing = todo != null;
   const [title, setTitle] = useState(todo?.title ?? '');
   const [note, setNote] = useState(todo?.note ?? '');
-  const [dueDate, setDueDate] = useState(todo?.dueDate ?? '');
+  // The date input is date-only; a timed due's local day comes from the single
+  // `@life/ui` owner `dueDay`, not the raw instant (no app-side parsing).
+  const [dueDate, setDueDate] = useState(dueDay(todo?.dueDate));
+  // Seeded from the single `@life/ui` owner of the timed local time part;
+  // date-only/missing → '' (no app-side `new Date(...)`, lesson 0016).
+  const [dueTime, setDueTime] = useState(localTimePart(todo?.dueDate));
+  const [repeat, setRepeat] = useState<TodoRepeat | null>(todo?.repeat ?? null);
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
   const [saving, setSaving] = useState(false);
@@ -48,11 +57,15 @@ export function TodoEditor({
     : (lists.find((list) => list.id === listId)?.importantDefault ?? false);
   const important = importantOverride ?? seedImportant;
 
-  const canSave = title.trim() !== '';
+  // A repeat requires a due date (mirrors the service's 400): the field shows
+  // but blocks save; no implicit due is inserted.
+  const canSave = title.trim() !== '' && !(repeat != null && dueDate === '');
 
   async function save() {
     if (!canSave || saving) return;
     setSaving(true);
+    // Join the calendar day and optional time; no date ⇒ date-only stays null.
+    const due = dueDate === '' ? null : dueTime === '' ? dueDate : `${dueDate}T${dueTime}`;
     try {
       // Await the action's revalidatePath before navigating: the RSC cache must
       // reflect the write before `router.back()` renders the List/Matrix, or they
@@ -64,7 +77,8 @@ export function TodoEditor({
           {
             title,
             note: note.trim() === '' ? null : note,
-            dueDate: dueDate === '' ? null : dueDate,
+            dueDate: due,
+            repeat,
             listId,
             tagIds,
             ...(importantOverride !== undefined ? { important: importantOverride } : {}),
@@ -75,7 +89,8 @@ export function TodoEditor({
         await createTodoAction({
           title,
           note: note.trim() === '' ? undefined : note,
-          dueDate: dueDate === '' ? undefined : dueDate,
+          dueDate: due ?? undefined,
+          repeat,
           listId: listId ?? undefined,
           tagIds,
           ...(importantOverride !== undefined ? { important: importantOverride } : {}),
@@ -132,6 +147,39 @@ export function TodoEditor({
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
         />
+      </PillGroup>
+
+      <PillGroup label="Time" aria-label="Time">
+        <Input
+          type="time"
+          aria-label="Due time"
+          value={dueTime}
+          onChange={(e) => setDueTime(e.target.value)}
+        />
+      </PillGroup>
+
+      <PillGroup label="Repeat" aria-label="Repeat">
+        <Pill
+          as="button"
+          size="chip"
+          active={repeat === null}
+          aria-pressed={repeat === null}
+          onClick={() => setRepeat(null)}
+        >
+          None
+        </Pill>
+        {TODO_REPEATS.map((value) => (
+          <Pill
+            key={value}
+            as="button"
+            size="chip"
+            active={repeat === value}
+            aria-pressed={repeat === value}
+            onClick={() => setRepeat(value)}
+          >
+            {repeatLabel(value)}
+          </Pill>
+        ))}
       </PillGroup>
 
       {lists.length > 0 && (

@@ -19,7 +19,10 @@ todo(
   note      TEXT NULL,               -- enc.v1, AAD life.v1|<sub>|todo|note|<id>
   done      BOOLEAN NOT NULL DEFAULT 0,
   important BOOLEAN NULL,            -- plaintext metadata, NULL = inherit list default (L6)
-  dueDate   DATE NULL,               -- plaintext metadata (sort/filter queries)
+  dueDate   TEXT NULL,               -- 'YYYY-MM-DD' (date-only) or canonical UTC
+                                     -- instant '…Z' (timed); plaintext metadata
+  repeat    TEXT NULL,               -- null | daily | weekdays | weekly | monthly | yearly
+  reminderScheduledAt TEXT NULL,     -- canonical UTC instant of the current reminder; null = none
   listId    TEXT NULL,               -- FK list.id, ON DELETE SET NULL (detach)
   origin    TEXT NULL,               -- JSON {service,id} — kernel orchestrator seam
   ownerSub  TEXT NOT NULL,
@@ -39,7 +42,30 @@ list(
   createdAt DATETIME NOT NULL
 )
 user_keys(sub, wrappedDek, kekVersion, createdAt)   -- own key custody (M3)
+push_subscription(
+  id        TEXT PRIMARY KEY,        -- service-generated UUID v4
+  ownerSub  TEXT NOT NULL,
+  endpoint  TEXT NOT NULL,           -- push service URL (Web Push endpoint)
+  p256dh    TEXT NOT NULL,           -- subscription public key (base64url)
+  auth      TEXT NOT NULL,           -- subscription auth secret (base64url)
+  createdAt DATETIME NOT NULL,
+  UNIQUE (ownerSub, endpoint)        -- per-owner uniqueness; endpoint is not globally unique
+)
 ```
+
+- `dueDate` now holds **either** a date-only `YYYY-MM-DD` **or** a canonical UTC instant
+  (`YYYY-MM-DDTHH:mm:ss.sssZ`) — the entity column changes from `type: 'date'` to
+  `type: 'text'` and gains `repeat`/`reminderScheduledAt` text columns
+  (`SPEC-todo-due-repeat-notify.md`; the entity change is T5's). A date-only value stays
+  naive and never round-trips through `Date` (lesson 0003). Index
+  `IDX_todo_reminder_scheduled_at` on `reminderScheduledAt` backs the reminder sweep
+  predicate. `synchronize: true` applies the additive columns (no migration framework).
+- `repeat` and `reminderScheduledAt` are **plaintext, non-content** metadata (like
+  `done`/`important`/`dueDate`): no `@life/crypto` envelope, no AAD, no user text.
+  `reminderScheduledAt` is the lasting reminder record ("the letter"); no separate
+  notification table is introduced. `push_subscription` stores **delivery capability
+  only** (endpoint + keys), owner-scoped, never returned in a todo response, never
+  cached; uniqueness is the composite `(ownerSub, endpoint)`, never the endpoint alone.
 
 - Content fields (`title`, `note`, `list.name`) encrypted at rest; `dueDate`,
   `done`, `important`, `list.importantDefault`, timestamps are metadata and stay queryable
@@ -81,15 +107,58 @@ non-content:
   (`CreateListDto`/`UpdateListDto`; there is no shared list-input type — `List` is the
   exported wire shape, mirroring the service DTOs).
 
-- `POST /api/todos {title, note?, dueDate?, listId?, important?, tagIds?}` → 201 (version 0).
+Due-time / recurrence / reminder field contracts (`SPEC-todo-due-repeat-notify.md`) —
+additive, plaintext, non-content. Optionality splits by direction: request fields optional,
+read fields required-but-nullable:
+
+- `Todo` (read DTO) carries `repeat: TodoRepeat | null` and
+  `reminderScheduledAt: string | null`, present on every read (`POST`, `GET /api/todos`,
+  `GET /api/todos/:id`, `PATCH`, `POST /:id/restore`).
+  `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;`
+  and `export type TodoRepeat = (typeof TODO_REPEATS)[number];` — the array is the single
+  source; the DTO validates with `@IsIn(TODO_REPEATS)` (owner: `@life/shared`).
+- `CreateTodoInput.dueDate?: string | null` and `UpdateTodoInput.dueDate?: string | null`;
+  `repeat?: TodoRepeat | null` on both. Update: omitted = unchanged; `null` on `dueDate`
+  clears the due **and** the reminder; `null` on `repeat` clears the repeat.
+- Request `dueDate` is a date-only `YYYY-MM-DD` or a local-timed `YYYY-MM-DDTHH:mm`
+  (`datetime-local`, no zone); the service normalizes a timed request to the canonical UTC
+  instant in `TODO_TIMEZONE` (below) before storing. Validation is
+  `@IsOptional() @ValidateIf(v => v !== null) @Matches(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/)`;
+  the existing `@MaxLength(10)` is dropped (or raised to 16) in **both** `create-todo.dto.ts`
+  and `update-todo.dto.ts` so a 16-char timed value reaches `@Matches`. `repeat` is
+  `@IsOptional() @ValidateIf(v => v !== null) @IsIn(TODO_REPEATS)`. Read values are always
+  date-only or UTC instant.
+- **Timezone:** the client submits local wall-clock; the service is the single zone owner.
+  `TODO_TIMEZONE` (IANA, default `Asia/Ho_Chi_Minh`) is read once at construction; the
+  conversion helpers (`zoneOffsetMs`, `localToUtc`, `utcToLocal`) are pure
+  (`Intl.DateTimeFormat` only, no new dependency); a date-only value is never converted.
+- **Reminder rule:** any todo with a `dueDate` gets a reminder — timed → the due instant;
+  date-only → `dueDate` at **09:00** in `TODO_TIMEZONE` (N5). No due ⇒
+  `reminderScheduledAt = null`. A **done** todo keeps its stored reminder until
+  ticked/cleared; the sweep skips `done` rows.
+- **A repeat requires a due date.** Create/update with `repeat != null` and no resulting
+  `dueDate` → 400 (`BadRequestException('repeat requires a dueDate')`).
+- **Advance-on-tick (N2/N3, no scheduler):** `PATCH /api/todos/:id { done: true }` where the
+  todo has `repeat` does **not** mark it done — it advances to the next occurrence on/after
+  "now" in the `TODO_TIMEZONE` local calendar (daily +1d; weekdays next Mon–Fri; weekly +7d;
+  monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28), skipping
+  candidates before now, clears `done`, re-derives `reminderScheduledAt`, and returns the
+  advanced row. `version` bumps once; the generation counter bumps after the write. A
+  non-recurring `done: true` is unchanged. Ticking a recurring todo hides nothing (no undo
+  snackbar — UI). Trash/restore semantics are unchanged.
+
+- `POST /api/todos {title, note?, dueDate?, repeat?, listId?, important?, tagIds?}` → 201 (version 0).
   `important` is `boolean | null`; omitted or `null` stores `null` (inherit the list default).
-- `GET /api/todos?{q, listId, tagId, done, important, dueBefore, dueAfter}` → cursor page. Cursor payload:
-  `base64(<dueDate-or-~>|<createdAt>|<id>)` (`~` = undated sentinel).
-  Order: dated by `dueDate ASC` (overdue first), undated last, `createdAt DESC`
-  tiebreak. `q` matches decrypted `title`+`note` via `likeMatch` (parity contract
+- `GET /api/todos?{q, listId, tagId, done, important, dueBefore, dueAfter}` → cursor page.
+  Cursor payload: `base64(<due sort key>|<createdAt>|<id>)` (`~` = undated sentinel).
+  Order: dated by the **local** sort key `dueSortKey(value, tz)` ASC (overdue first),
+  undated (`~`) last, `createdAt DESC` tiebreak. `dueSortKey` is `null` ⇒ `~`, date-only ⇒
+  its `YYYY-MM-DD`, timed ⇒ its **local** `YYYY-MM-DDTHH:mm` in `TODO_TIMEZONE` (not the
+  stored UTC day); `repeat`/`reminderScheduledAt` never enter the key.
+  `q` matches decrypted `title`+`note` via `likeMatch` (parity contract
   per kernel); `tagId` filters over `todo_tag`; all content filtering happens after
   cache hits (AGENTS.md Contract 2).
-- `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?,
+- `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?, repeat?,
   important?, listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins;
   `important: null` clears the override back to inherit) ·
   `DELETE /api/todos/:id` (**soft** delete: sets `deletedAt`).
@@ -118,6 +187,45 @@ non-content:
   the `tagIds` each write carries — updates replace the set (and `todo_tag` rows
   cascade on todo delete); the BFF omits unresolvable ids when rendering.
 
+### Push subscription endpoints (`push` module)
+
+All owner-scoped, guarded by the auth guard `sub`. The `/api/push/*` family is distinct from
+`/api/todos/*`; declare it so it never collides with a `:id`. `POST` binds to a decorated
+DTO class (`PushSubscribeDto`, mirroring the shared `PushSubscribeInput`): the global
+`ValidationPipe({ whitelist, transform, forbidNonWhitelisted })` cannot validate an erased
+TypeScript interface.
+
+- `GET /api/push/key` → `{ publicKey: string }` — the VAPID public key (config only, not the DB).
+- `POST /api/push/subscribe { endpoint, keys: { p256dh, auth } }` → `{ ok: true }` — upsert
+  scoped by `(sub, endpoint)` (a repeat subscription refreshes its keys rather than
+  duplicating); a caller can never overwrite another owner's row.
+- `DELETE /api/push/subscribe { endpoint }` → `{ ok: true }` — removes the caller's
+  subscription (idempotent; unknown endpoint still 200).
+
+### Reminder delivery (`reminders` module)
+
+A bounded NestJS module `apps/todo-service/src/reminders/` (the only sender; no
+`@nestjs/schedule`/`node-cron`):
+
+- `ReminderService.sweep()` runs **one** system-side DB query
+  (`SELECT r.* FROM todo r WHERE r.deletedAt IS NULL AND r.done = 0
+  AND r.reminderScheduledAt IS NOT NULL AND r.reminderScheduledAt <= :nowIso`,
+  lexicographic ISO compare, index-backed), builds `{ title, body, url: '/todos/<id>/edit' }`
+  with the title decrypted in-request, sends via the injected `PushSender` to the owner's
+  `push_subscription` rows, then calls the public `TodosService` seam `markReminded(sub, id)`
+  which clears `reminderScheduledAt` and bumps the owner's generation counter after the
+  write. The sweep never writes the todo table directly.
+- `PushSender` interface: `send(sub, endpoint, payload) => Promise<{ endpoint; statusCode }>`;
+  production wraps `web-push`, a test fake records calls. A `404`/`410` deletes **that**
+  subscription and continues.
+- Scheduling: `onModuleInit` registers `setInterval(() => void this.sweep(), 30_000)`;
+  `onModuleDestroy` clears it; `sweep()` is public so tests call it without timers.
+- **Fail-safe:** if `TODO_VAPID_PUBLIC_KEY`/`TODO_VAPID_PRIVATE_KEY` are unset, the module
+  starts but `sweep()` is a no-op that logs once (dev/test never crash).
+- **One ping per occurrence:** firing clears `reminderScheduledAt`; only a tick or an edit
+  re-arms it (N3). The payload carries the decrypted title (decision: useful notification;
+  transits the platform push service; never persisted).
+
 ## Cache Rules (AGENTS.md Contract 2)
 
 - Cached shapes: serialized **ciphertext** todo rows (`todo:all` — the owner's full
@@ -128,6 +236,8 @@ non-content:
   ids + counts, no ciphertext by design). The cached todo rows also carry the
   plaintext `important: boolean | null` (non-content, alongside `done`) and the
   cached list rows carry `importantDefault: boolean | null` (`SPEC-todo-importance.md`);
+  the cached todo rows also carry the plaintext `repeat: TodoRepeat | null` and
+  `reminderScheduledAt: string | null` (non-content, `SPEC-todo-due-repeat-notify.md`);
   content columns (`title`/`note`/`name`) remain `enc.v1.`-only.
 - Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash`.
   `q`/`tagId`/`listId`/`done`/`important`/`due*`/ cursor/limit never enter the key —
@@ -149,6 +259,18 @@ non-content:
   `done`); they are stored in the clear in SQL and Redis, while no content plaintext
   ever enters Redis. The cache suite's ciphertext assertions (content fields
   `enc.v1.`-only, no known plaintext) are unchanged and still fail on any content leak.
+  `repeat`/`reminderScheduledAt` extend the same plaintext exception; `repeat`/`reminderScheduledAt`
+  never enter the cache key.
+- **`push_subscription` is outside the cache:** it is delivery capability, read directly
+  (config + subscribe/unsubscribe writes), never a request-path read-through shape and
+  never cached. `GET /api/push/key` reads config, not the DB.
+- **Deviation — the reminder sweep reads the DB directly (recorded, per Contract 2 Rule 4):**
+  the sweep is a system-side maintenance scan across owners, not a user request-path read.
+  The per-owner read-through cache is stale/fail-open and cannot be the source of truth for
+  time-triggered delivery, so the sweep queries the DB directly and is the one documented
+  exception to "the DB sits behind the cache". It never serves a user read; its write
+  (`markReminded` clearing a fired reminder) invalidates the owner's cache via the existing
+  generation counter.
 
 ## Health
 
@@ -185,20 +307,31 @@ Build:     npm run build -w @life/todo-service
    with the same `createdAt`, tags, and `version`; permanent delete removes it (and
    its `todo_tag` rows) and 404s on a second call; `DELETE /api/todos/trash` empties
    the caller's trash and returns a `count`; trash/restore never bump `version`.
+10. Due-time / recurrence / push: timezone math round-trips (fixed-offset and DST zones;
+    date-only never converted); a timed due normalizes to a UTC instant and a date-only
+    value survives verbatim; reminder = due instant (timed) / 09:00 national (date-only);
+    a repeat without a due → 400; advance-on-tick lands on the next occurrence on/after
+    now (`daily`/`weekdays`/`monthly` clamp/`yearly` Feb 29) with `done:false`, version+1;
+    the sweep fires once, clears `reminderScheduledAt`, re-arms only on tick/edit, and
+    deletes a subscription on `404`/`410`; push endpoints reject a malformed body and
+    scope by `(sub, endpoint)`; list order/cursor use the local `dueSortKey`.
 
 ## Boundaries
 
 - Always: kernel contracts as written; content encrypted; cache values
   ciphertext-only.
-- Ask first: adding fields beyond the I2 MVP (recurrence/subtasks/priorities are v2
-  and need their own intent; trash was moved out of this list by the user-authorised
-  full soft-delete scope).
+- Ask first: adding fields beyond the I2 MVP plus the accepted due-time / recurrence
+  chapter (recurrence, scheduled reminders, due time — `SPEC-todo-due-repeat-notify.md`);
+  subtasks/priorities are still v2 and need their own intent; trash was moved out of this
+  list by the user-authorised full soft-delete scope.
 - Never: store tag names (M1); plaintext in cache or logs; SQL content matching over
   encrypted columns.
 
 ## Success Criteria
 
-1. `apps/todo-service` boots with `TODO_MASTER_KEY`; all nine test groups green.
+1. `apps/todo-service` boots with `TODO_MASTER_KEY`; all ten test groups green.
 2. A todo created with tags + a list round-trips through cache and cold paths
-   identically.
-3. `SPEC-todo-ui` can build `/todos` entirely against these contracts.
+   identically; a timed/repeating due and its `reminderScheduledAt` do too, with content
+   still ciphertext-only, and list order/cursor keyed on the local `dueSortKey`.
+3. A dated todo fires exactly one Web Push at its reminder instant; the sender is a
+   bounded, replaceable module and `SPEC-todo-ui` can build `/todos` against these contracts.

@@ -1,14 +1,18 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { TODO_TITLE_MAX, TODO_NOTE_MAX } from '@life/shared';
+import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS } from '@life/shared';
+import type { TodoRepeat } from '@life/shared';
+import { ISO_DUE } from '../due-time';
 
 /** `YYYY-MM-DD` — the wire form of the plaintext `dueDate` metadata column. */
 export const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -26,8 +30,13 @@ export class CreateTodoDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(10)
+  @Matches(ISO_DUE)
   dueDate?: string;
+
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsIn(TODO_REPEATS)
+  repeat?: TodoRepeat | null;
 
   @IsOptional()
   @IsString()

@@ -20,7 +20,8 @@ both apps — so tags feel identical everywhere (I3).
   paths — the explicitly approved changes; no selector/text/role in the frozen e2e
   surface changes.
 - **`/todos`:** grouped `Overdue` / `Today` / `Later` / `No date`; done toggle;
-  create (composer/FAB); inline edit title, note, due date, list; **soft delete to
+  create (composer/FAB); inline edit title, note, due date + optional **time**, optional
+  **repeat**, list; **soft delete to
   trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
   Trash entry in the toolbar; filters by list, tag, and done state. Data via the
   todo-service API (server actions compose registry + todo calls — BFF composition,
@@ -90,6 +91,9 @@ both apps — so tags feel identical everywhere (I3).
   registry), **`DueDatePill`** (due-date display/grouping), **`ListManager`** (create/rename/delete todo lists).
   Never raw HTML for
   interactive elements, never app-side CSS recreating primitives, tokens only.
+- The due-time / repeat / reminder chapter adds **no** new upstream primitive: it reuses
+  `PillGroup`, `Pill`, `Switch`, `SettingsBlock`, `SettingsRow`, and the existing `Input`
+  via the editor's `Time`/`Repeat` pills (`SPEC-todo-due-repeat-notify.md`).
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
 
 ## Importance input surfaces (matrix-ui, L6)
@@ -117,6 +121,46 @@ sets them.
 No raw HTML: both controls are the upstream `Switch` atom; the app supplies label, checked
 value and handler. `/todos` otherwise stays a normal list page (map `matrix-ui`).
 
+## Due time / repeat / push-reminder surfaces (todo-due-repeat-notify)
+
+All composition is from `@life/ui` (no raw HTML, tokens only); new visible labels match
+sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-notify.md`.
+
+- **Editor (`apps/app/app/todo-editor.tsx`):** `PillGroup label="Due"` keeps the frozen
+  `Input type="date"` (`aria-label="Due date"`). New `PillGroup label="Time"` wraps an
+  `Input type="time"` (`aria-label="Due time"`) — empty ⇒ date-only, present ⇒ timed; its
+  `dueTime` state is seeded from a timed due via the single `@life/ui` owner
+  `localTimePart(todo.dueDate)` (empty otherwise — no app-side `new Date(...)`). New
+  `PillGroup label="Repeat"` of `Pill as="button" size="chip"` options
+  (`None`/`Daily`/`Weekly`/`Monthly`/`Yearly`/`Weekdays`), reusing the existing
+  `Pill`/`PillGroup` primitives; `None` ⇒ `repeat: null`. Labels come from the app-owned
+  `repeatLabel(repeat)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
+  `@life/shared` dependency). A repeat with no due blocks the save (mirroring the service's
+  400); no implicit due date is inserted — the editor stays open on the server error.
+- **Row (`apps/app/app/todo-item.tsx`):** the due read-out renders the time when timed
+  (via the shared formatter), and a repeat todo shows `repeatLabel(todo.repeat)` in the row
+  meta. Ticking a `repeat` todo **does not** hide/collapse the row (it advances) — the
+  `DoneToggle` `hide`/`collapsing` behavior is gated on `!todo.repeat`.
+- **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
+  `dueDateLabel(value, today?)` renders `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and
+  `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value; a
+  missing/malformed value renders `No date`. Day-granular row state (`dueDateState`) keeps a
+  timed todo due earlier today as `Today` — the reminder is the time-precise signal.
+- **Settings (`apps/app/app/todos/settings/page.tsx`):** a new `SettingsBlock
+  title="Reminders"` with `SettingsRow label="Push reminders"` and a client `PushToggle`:
+  renders client defaults and reads `navigator`/`Notification.permission` in a `useEffect`
+  (no server-seeded browser values); unsupported browser → explanatory text, no control;
+  iPhone not installed to Home Screen (`!navigator.standalone`) → guidance to add it; else a
+  `Switch` that requests permission, registers `apps/app/public/sw.js`, subscribes via
+  `pushManager.subscribe`, and calls a server action to upsert the subscription (disabling
+  unsubscribes and calls the delete action). The VAPID public key comes through the
+  `getPushKeyAction` server action (the client never imports the server-only
+  `lib/todo-api.ts`).
+- **Service worker:** new static `apps/app/public/sw.js` handles `push` (→
+  `showNotification` with title/body, `data.url`, icon/badge `icon-todos.png`) and
+  `notificationclick` (focus an existing `/todos` window, else `openWindow(data.url)` with
+  `data.url = '/todos/<id>/edit'`). No bundler, no `next-pwa`.
+
 ## Frozen e2e surface updates (matrix-ui, user-approved)
 
 The theme-toggle relocation approved in the matrix intent (L4 / map D7) changes the
@@ -133,6 +177,12 @@ recorded surface this spec froze:
   `getByRole('switch', { name: 'Eisenhower matrix' })` on `/todos/settings`; the importance
   controls `getByRole('switch', { name: 'Important' })` on the todo editor and
   `getByRole('switch', { name: 'Default important' })` on the list manager.
+- **Due time / repeat / reminders additions (todo-due-repeat-notify):** new accessible
+  names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
+  (`getByRole('button', { name: 'Weekly' })`, the push `switch`). **No existing
+  name/role/aria-label changes** (`Due`, `Due date`, `List`, `Important`, `Save todo`,
+  `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`, `Manage lists` all stay).
+  Recorded as surface additions only; the human-owned suite changes only if the user asks.
 
 No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
 not rewritten by this chapter — the surface *record* is what updates (here, in
@@ -152,7 +202,10 @@ Build:     npm run build -w @life/app
 
 1. jest suites for app logic (server actions composition: registry create-or-get →
    todo create with `tagIds`; name resolution batching).
-2. `@life/ui` primitive tests for any upstream additions (spec-first).
+2. `@life/ui` primitive tests for any upstream additions (spec-first); app tests cover
+   the repeat label, the editor date+time+repeat payload, the recurring no-hide rule, and
+   the push toggle's unsupported / not-installed / subscribe branches
+   (`SPEC-todo-due-repeat-notify.md`).
 3. Playwright: human-owned, frozen — only the I5 navigation URL updates land in
    this chapter; agents write no new e2e specs and run no e2e (AGENTS.md testing policy —
   global protocol §3).

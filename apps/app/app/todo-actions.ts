@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { CreateTodoInput, UpdateTodoInput } from '@life/shared';
+import type { CreateTodoInput, PushSubscribeInput, UpdateTodoInput } from '@life/shared';
 import {
   createTodo,
   deleteTodo,
@@ -12,6 +12,9 @@ import {
   restoreTodo,
   deleteTodoPermanently,
   emptyTodoTrash,
+  getPushKey,
+  subscribePush,
+  unsubscribePush,
 } from '@/lib/todo-api';
 import { retainedTagIds } from '@/lib/tags-compose';
 
@@ -85,4 +88,17 @@ export async function renameListAction(
 export async function deleteListAction(id: string) {
   await deleteList(id);
   revalidateTodos();
+}
+
+/** Reads the VAPID key server-side; the browser client never imports `lib/todo-api.ts`. */
+export async function getPushKeyAction(): Promise<{ publicKey: string }> {
+  return getPushKey();
+}
+
+export async function subscribePushAction(input: PushSubscribeInput): Promise<{ ok: true }> {
+  return subscribePush(input);
+}
+
+export async function unsubscribePushAction(endpoint: string): Promise<{ ok: true }> {
+  return unsubscribePush(endpoint);
 }

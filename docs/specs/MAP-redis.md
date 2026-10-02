@@ -22,6 +22,12 @@ services. `redis-deploy` is compose + env + test-harness only. Each service read
 one env var (`REDIS_URL`), pointing at its own Redis instance; unset means today's
 behavior (in-memory / direct-DB), which is how dev and e2e stay Redis-free.
 
+`todo-due-repeat-notify` note: `redis-todo` ownership is **unchanged** — the reminder
+sweep still bumps the existing per-owner generation counter (through `TodosService`'s
+`markReminded` seam) and adds no second Redis instance or cache module; the sweep's own
+due-row query reads the DB directly (documented deviation, `SPEC-todo-service.md`), and
+`push_subscription` is never cached.
+
 Build-order constraint: nothing may merge that changes behavior with `REDIS_URL` unset —
 the daily driver and the existing suites (app 74 unit / 21 e2e specs, idp 81, note 25)
 must stay green untouched. Data hard line: `apps/note-service/data/life.db` never changes.

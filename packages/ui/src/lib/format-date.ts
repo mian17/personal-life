@@ -1,4 +1,4 @@
-import { todayIso } from '../components/due-date-pill';
+import { datePart, dueDay, isRealDate, localTimePart, todayIso } from './date-parts';
 
 /**
  * Shared date formatting. Every frontend date read-out renders `dd/mm/yyyy`;
@@ -6,22 +6,6 @@ import { todayIso } from '../components/due-date-pill';
  * timezone can never shift the day (`2026-10-01T00:00:00Z` stays 01/10/2026 in
  * UTC-8 instead of becoming 30/09/2026).
  */
-const DATE_PART = /^(\d{4})-(\d{2})-(\d{2})/;
-
-/** Leading `YYYY-MM-DD` of an ISO string, or `''` when there is none. */
-function datePart(iso: string): string {
-  const match = DATE_PART.exec(iso);
-  return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
-}
-
-/** True when `YYYY-MM-DD` names a real calendar day (rejects 2026-02-31). */
-function isRealDate(part: string): boolean {
-  const [year, month, day] = part.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-  );
-}
 
 /**
  * `dd/mm/yyyy` (zero-padded day/month, full year) from an ISO date or datetime.
@@ -41,17 +25,21 @@ function addDay(part: string): string {
 }
 
 /**
- * Todo due-date read-out: `No date` / `Today` / `Tomorrow`, otherwise
- * `formatDate(dueDate)`. `today` (`YYYY-MM-DD`) is injectable for deterministic
+ * Todo due-date read-out. Date-only: `No date` / `Today` / `Tomorrow`, otherwise
+ * `dd/mm/yyyy`. Timed: the same relative text or date with a local `HH:mm`
+ * suffix (`Today 09:30`). `today` (`YYYY-MM-DD`) is injectable for deterministic
  * tests, mirroring `DueDatePill`'s prop; it defaults to the local calendar day.
  */
 export function dueDateLabel(dueDate: string | null, today?: string): string {
   if (dueDate == null || dueDate === '') return 'No date';
-  const day = datePart(dueDate);
-  const base = datePart(today ?? todayIso());
-  if (day !== '' && isRealDate(base)) {
-    if (day === base) return 'Today';
-    if (day === addDay(base)) return 'Tomorrow';
+  const day = dueDay(dueDate);
+  if (day === '') return '';
+  const base = dueDay(today ?? todayIso());
+  const time = localTimePart(dueDate);
+  const suffix = time === '' ? '' : ` ${time}`;
+  if (base !== '') {
+    if (day === base) return `Today${suffix}`;
+    if (day === addDay(base)) return `Tomorrow${suffix}`;
   }
-  return formatDate(dueDate);
+  return `${formatDate(day)}${suffix}`;
 }

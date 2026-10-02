@@ -2,6 +2,7 @@ import 'server-only';
 import type {
   CreateTodoInput,
   List,
+  PushSubscribeInput,
   TagUsage,
   Todo,
   TodoPage,
@@ -110,4 +111,25 @@ export function renameList(
 /** `DELETE /api/lists/:id` — detach semantics; its todos survive with `listId` cleared. */
 export function deleteList(id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/lists/${id}`, { method: 'DELETE' });
+}
+
+/** `GET /api/push/key` — the VAPID public key the browser subscribes with. */
+export function getPushKey(): Promise<{ publicKey: string }> {
+  return call<{ publicKey: string }>('/api/push/key');
+}
+
+/** `POST /api/push/subscribe` — upsert the caller's push subscription. */
+export function subscribePush(input: PushSubscribeInput): Promise<{ ok: true }> {
+  return call<{ ok: true }>('/api/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** `DELETE /api/push/subscribe` — idempotent removal by endpoint. */
+export function unsubscribePush(endpoint: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>('/api/push/subscribe', {
+    method: 'DELETE',
+    body: JSON.stringify({ endpoint }),
+  });
 }

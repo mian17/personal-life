@@ -17,5 +17,7 @@ import { TodosService } from './todos.service';
   imports: [TypeOrmModule.forFeature([Todo, TodoTag]), KeysModule, TodoCacheModule, ListsModule],
   controllers: [TodosController],
   providers: [TodosService],
+  // Exported so the reminders sweep can inject the `markReminded` clear seam.
+  exports: [TodosService],
 })
 export class TodosModule {}

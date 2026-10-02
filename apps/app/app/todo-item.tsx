@@ -16,6 +16,7 @@ import {
 } from '@life/ui';
 import { Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
+import { repeatLabel } from '@/lib/todo-repeat-label';
 
 const HIDE_DELAY_MS = 1000;
 const COLLAPSE_MS = 220;
@@ -123,6 +124,7 @@ export function TodoItem({
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
+  const repeat = repeatLabel(todo.repeat);
 
   const handleCollapse = (value: boolean) => {
     if (value) {
@@ -146,7 +148,9 @@ export function TodoItem({
     <DoneToggle
       done={todo.done}
       label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-      hide={hideDone}
+      // A recurring tick ADVANCES the todo rather than completing it, so the
+      // row must not auto-hide/collapse; the hide/collapsing path is gated off.
+      hide={hideDone && todo.repeat == null}
       onToggle={() => {
         undoneBySnackbar.current = false;
         void updateTodoAction(todo.id, { done: !todo.done }, todo.version);
@@ -164,13 +168,14 @@ export function TodoItem({
       meta={
         <>
           <DueDate dueDate={todo.dueDate} today={today} tone="signal" />
+          {repeat && <span>{repeat}</span>}
           {isDefault && list && <span>{list.name}</span>}
         </>
       }
       snippet={isDefault ? (todo.note ?? undefined) : undefined}
       leading={doneToggle}
       done={todo.done}
-      collapsing={collapsing}
+      collapsing={todo.repeat == null && collapsing}
       variant="todo"
       size={size}
       tone={tone}

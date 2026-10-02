@@ -99,6 +99,12 @@ services:
       # Content-encryption master key (own custody, MAP M3). Fail-fast here;
       # the service also refuses to boot without it.
       TODO_MASTER_KEY: ${TODO_MASTER_KEY:?TODO_MASTER_KEY is required (openssl rand -base64 32)}
+      # Reminder sweep (todo-due-repeat-notify). The VAPID pair is optional:
+      # unset keeps the sweep off (it logs once) so the service still boots.
+      TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
+      TODO_VAPID_PUBLIC_KEY: ${TODO_VAPID_PUBLIC_KEY:-}
+      TODO_VAPID_PRIVATE_KEY: ${TODO_VAPID_PRIVATE_KEY:-}
+      TODO_VAPID_SUBJECT: ${TODO_VAPID_SUBJECT:-mailto:admin@example.com}
       REDIS_URL: redis://redis-todo:6379
     volumes:
       - ./apps/todo-service/data:/data

@@ -13,6 +13,8 @@ function todo(id: string, dueDate: string | null): Todo {
     important: null,
     effectiveImportant: false,
     dueDate,
+    repeat: null,
+    reminderScheduledAt: null,
     listId: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',

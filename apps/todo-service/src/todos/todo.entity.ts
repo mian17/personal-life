@@ -1,4 +1,5 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import type { TodoRepeat } from '@life/shared';
 import { List } from '../lists/list.entity';
 import { TodoTag } from './todo-tag.entity';
 
@@ -20,6 +21,7 @@ import { TodoTag } from './todo-tag.entity';
  */
 @Entity('todo')
 @Index('IDX_todo_owner_sub', ['ownerSub'])
+@Index('IDX_todo_reminder_scheduled_at', ['reminderScheduledAt'])
 export class Todo {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -43,9 +45,21 @@ export class Todo {
   @Column({ type: 'boolean', nullable: true })
   important: boolean | null;
 
-  /** Plaintext metadata: `YYYY-MM-DD` (service reads/writes it as a string). */
-  @Column({ type: 'date', nullable: true })
+  /**
+   * Plaintext metadata: either `YYYY-MM-DD` (date-only) or a canonical
+   * `…Z` UTC instant (timed). Stored as `TEXT` so both shapes round-trip as
+   * strings and the date-only value never passes through `Date` (lesson 0003).
+   */
+  @Column({ type: 'text', nullable: true })
   dueDate: string | null;
+
+  /** Plaintext metadata: recurrence rule (`SPEC-todo-service`). `NULL` = one-off. */
+  @Column({ type: 'text', nullable: true })
+  repeat: TodoRepeat | null;
+
+  /** Plaintext metadata: server-computed UTC instant the next push fires at. */
+  @Column({ type: 'text', nullable: true })
+  reminderScheduledAt: string | null;
 
   @Column({ type: 'text', nullable: true })
   listId: string | null;

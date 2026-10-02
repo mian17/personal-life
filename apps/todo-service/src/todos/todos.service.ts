@@ -11,13 +11,14 @@ import { randomUUID } from 'crypto';
 import { IsNull, Not, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
-import type { TagUsage, Todo as TodoDto, TodoPage } from '@life/shared';
+import type { TagUsage, Todo as TodoDto, TodoPage, TodoRepeat } from '@life/shared';
 import { Todo } from './todo.entity';
 import { TodoTag } from './todo-tag.entity';
+import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
+import { advanceToOnOrAfter } from './recurrence';
 import { KeysService } from '../keys/keys.service';
 import { ListsService } from '../lists/lists.service';
 import { TODO_ALL, TODO_CACHE, TODO_TAGS, TODO_TRASH, TodosCache } from '../cache/todo-cache';
-import { DATE_ONLY } from './dto/create-todo.dto';
 
 /**
  * Deduplicate the `tagIds` a write carries, preserving first-seen order then
@@ -66,6 +67,8 @@ interface CachedTodoRow {
   done: boolean;
   important: boolean | null;
   dueDate: string | null;
+  repeat: TodoRepeat | null;
+  reminderScheduledAt: string | null;
   listId: string | null;
   origin: string | null;
   version: number;
@@ -84,6 +87,8 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
     done: todo.done,
     important: todo.important,
     dueDate: todo.dueDate,
+    repeat: todo.repeat,
+    reminderScheduledAt: todo.reminderScheduledAt,
     listId: todo.listId,
     origin: todo.origin,
     version: todo.version,
@@ -141,21 +146,22 @@ function decodeTagUsage(raw: unknown): TagUsage[] {
 /** A hydrated, decrypted todo plus its stable ordering key. */
 interface OrderedTodo {
   dto: TodoDto;
-  /** `dueDate` or `~` for undated — the first cursor component. */
+  /** The `dueSortKey(dueDate, tz)` value or `~` for undated — the first cursor component. */
   due: string;
 }
 
 /**
  * The domain order (`SPEC-todo-service` Behaviour): due-dated ascending (overdue
  * first), undated last, `createdAt DESC` tie-break, `id DESC` as the final
- * deterministic tie-break. `dueDate` is `YYYY-MM-DD` and `createdAt` is ISO, so
- * both compare correctly as strings.
+ * deterministic tie-break. The dated component is the **local** `dueSortKey`
+ * (`~` = undated), so a timed due sorts by the user's local day, not the UTC
+ * day; `createdAt` is ISO, so it compares correctly as a string.
  */
 function compareTodos(a: OrderedTodo, b: OrderedTodo): number {
-  const aDated = a.dto.dueDate !== null;
-  const bDated = b.dto.dueDate !== null;
-  if (aDated && bDated && a.dto.dueDate !== b.dto.dueDate) {
-    return a.dto.dueDate! < b.dto.dueDate! ? -1 : 1;
+  const aDated = a.due !== '~';
+  const bDated = b.due !== '~';
+  if (aDated && bDated && a.due !== b.due) {
+    return a.due < b.due ? -1 : 1;
   }
   if (aDated !== bDated) return aDated ? -1 : 1;
   if (a.dto.createdAt !== b.dto.createdAt) {
@@ -177,19 +183,19 @@ function encodeCursor(item: OrderedTodo): string {
 
 /** True when `item` falls strictly after the cursor in the domain order. */
 function afterCursor(item: OrderedTodo, cursor: { due: string; createdAt: string; id: string }): boolean {
-  const { dto } = item;
+  const { dto, due } = item;
   if (cursor.due === '~') {
     // Cursor is in the undated group: only undated rows can follow.
-    if (dto.dueDate !== null) return false;
+    if (due !== '~') return false;
     return (
       dto.createdAt < cursor.createdAt ||
       (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
     );
   }
   // Cursor is dated: undated rows always follow.
-  if (dto.dueDate === null) return true;
-  if (dto.dueDate > cursor.due) return true;
-  if (dto.dueDate < cursor.due) return false;
+  if (due === '~') return true;
+  if (due > cursor.due) return true;
+  if (due < cursor.due) return false;
   return (
     dto.createdAt < cursor.createdAt ||
     (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
@@ -226,6 +232,12 @@ function afterTrashCursor(
 @Injectable()
 export class TodosService {
   private readonly logger = new Logger(TodosService.name);
+
+  /**
+   * The national IANA zone every local ⇄ UTC helper is resolved against, read
+   * **once** at construction (lesson 0016: one owner for the zone lookup).
+   */
+  private readonly tz: string = process.env.TODO_TIMEZONE ?? 'Asia/Ho_Chi_Minh';
 
   constructor(
     @InjectRepository(Todo) private readonly todos: Repository<Todo>,
@@ -277,6 +289,8 @@ export class TodosService {
       important: row.important,
       effectiveImportant,
       dueDate: row.dueDate,
+      repeat: row.repeat,
+      reminderScheduledAt: row.reminderScheduledAt,
       listId: row.listId,
       tagIds: [...row.tagIds],
       createdAt: row.createdAt,
@@ -332,9 +346,31 @@ export class TodosService {
     return this.effectiveImportant(row, await this.listDefaults(sub, [row]));
   }
 
-  /** `['YYYY-MM-DD']` guard for the DTO's length-only check. */
-  private assertDate(value: string): void {
-    if (!DATE_ONLY.test(value)) throw new BadRequestException('dueDate must be YYYY-MM-DD');
+  /**
+   * Guard + normalize a due value (400 otherwise): a date-only value is stored
+   * verbatim (never through `Date`, lesson 0003); a timed local
+   * `YYYY-MM-DDTHH:mm` becomes its canonical UTC instant.
+   */
+  private normalizeDue(value: string, tz: string): string {
+    if (!ISO_DUE.test(value)) {
+      throw new BadRequestException('dueDate must be YYYY-MM-DD or YYYY-MM-DDTHH:mm');
+    }
+    return value.includes('T') ? localToUtc(value, tz).toISOString() : value;
+  }
+
+  /**
+   * The server-computed UTC instant a push reminder fires at: timed → the due
+   * instant, date-only → 09:00 national (N5/D5). One owner for the rule
+   * (lesson 0016); the stored value is re-localized with `dueSortKey` first.
+   */
+  private reminderAt(normalizedDue: string | null, tz: string): string | null {
+    if (normalizedDue === null) return null;
+    return localToUtc(reminderLocal(dueSortKey(normalizedDue, tz)), tz).toISOString();
+  }
+
+  /** The configured zone's current wall-clock, same shape the recurrence helpers compare. */
+  private nowLocal(): string {
+    return dueSortKey(new Date().toISOString(), this.tz);
   }
 
   /** The owner's full ciphertext row-set — the one cached `todo:all` entry. */
@@ -364,12 +400,17 @@ export class TodosService {
       title: string;
       note?: string;
       dueDate?: string;
+      repeat?: TodoRepeat | null;
       listId?: string;
       important?: boolean | null;
       tagIds?: number[];
     },
   ): Promise<TodoDto> {
-    if (input.dueDate !== undefined) this.assertDate(input.dueDate);
+    const dueDate = input.dueDate == null ? null : this.normalizeDue(input.dueDate, this.tz);
+    const repeat = input.repeat ?? null;
+    if (repeat !== null && dueDate === null) {
+      throw new BadRequestException('repeat requires a dueDate');
+    }
     if (input.listId !== undefined) await this.lists.assertOwnedList(sub, input.listId);
 
     const id = randomUUID();
@@ -384,7 +425,9 @@ export class TodosService {
       done: false,
       // Omitted or `null` both store `null` (inherit the list default).
       important: input.important ?? null,
-      dueDate: input.dueDate ?? null,
+      dueDate,
+      repeat,
+      reminderScheduledAt: this.reminderAt(dueDate, this.tz),
       listId: input.listId ?? null,
       origin: null,
       ownerSub: sub,
@@ -458,7 +501,7 @@ export class TodosService {
 
     const ordered: OrderedTodo[] = filtered.map((dto) => ({
       dto,
-      due: dto.dueDate ?? '~',
+      due: dueSortKey(dto.dueDate, this.tz),
     }));
     ordered.sort(compareTodos);
 
@@ -551,6 +594,11 @@ export class TodosService {
    * resets `important` to inherit; a `tagIds` write REPLACES the association
    * set; a stale `expectedVersion` is 409. Foreign/missing ids are a
    * byte-identical 404.
+   *
+   * A due patch is normalized (timed → canonical instant) and the reminder is
+   * recomputed whenever the due or the repeat changes. Clearing the due clears
+   * both the repeat and the reminder. Ticking a recurring todo advances it to
+   * the next occurrence on/after now instead of closing it (N2/N3).
    */
   async update(
     sub: string,
@@ -561,12 +609,12 @@ export class TodosService {
       done?: boolean;
       important?: boolean | null;
       dueDate?: string | null;
+      repeat?: TodoRepeat | null;
       listId?: string | null;
       tagIds?: number[];
       expectedVersion?: number;
     },
   ): Promise<TodoDto> {
-    if (patch.dueDate !== undefined && patch.dueDate !== null) this.assertDate(patch.dueDate);
     if (patch.listId !== undefined && patch.listId !== null) {
       await this.lists.assertOwnedList(sub, patch.listId);
     }
@@ -587,11 +635,42 @@ export class TodosService {
     if (patch.note !== undefined) {
       todo.note = patch.note === null ? null : encryptField(dek, patch.note, todoNoteAad(sub, id));
     }
-    if (patch.done !== undefined) todo.done = patch.done;
     // Explicit `null` clears the override back to inherit.
     if (patch.important !== undefined) todo.important = patch.important;
-    if (patch.dueDate !== undefined) todo.dueDate = patch.dueDate;
     if (patch.listId !== undefined) todo.listId = patch.listId;
+
+    // Resolve the resulting due/repeat before the invariant, normalizing a timed
+    // due. Clearing the due clears the repeat and the reminder.
+    const dueChanged = patch.dueDate !== undefined;
+    const repeatChanged = patch.repeat !== undefined;
+    if (patch.dueDate !== undefined) {
+      todo.dueDate = patch.dueDate === null ? null : this.normalizeDue(patch.dueDate, this.tz);
+      if (patch.dueDate === null) todo.repeat = null;
+    }
+    if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
+
+    // Advance-on-tick: a recurring tick moves the todo to its next occurrence
+    // and keeps it open; a non-recurring `done:true` is unchanged.
+    const advance = patch.done === true && todo.repeat !== null && todo.dueDate !== null;
+    if (advance) {
+      const local = dueSortKey(todo.dueDate, this.tz);
+      const next = advanceToOnOrAfter(local, todo.repeat!, this.nowLocal());
+      todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
+      todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+      todo.done = false;
+    } else {
+      if (patch.done !== undefined) todo.done = patch.done;
+    }
+
+    // The repeat-requires-due invariant holds against the resulting due.
+    if (todo.repeat !== null && todo.dueDate === null) {
+      throw new BadRequestException('repeat requires a dueDate');
+    }
+    // Recompute the reminder when the due or the repeat moved it (the advance
+    // path set it above).
+    if (!advance && (dueChanged || repeatChanged)) {
+      todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+    }
 
     let currentIds: number[];
     if (patch.tagIds !== undefined) {
@@ -666,6 +745,19 @@ export class TodosService {
     const result = await this.todos.delete({ ownerSub: sub, deletedAt: Not(IsNull()) });
     await this.cache.bumpGeneration(sub);
     return { count: result.affected ?? 0 };
+  }
+
+  /**
+   * The reminders sweep's clear seam (`SPEC-todo-service`, D7). The sweep holds
+   * its own read-only repository handle and never **writes** the todo table; it
+   * calls this method to clear a fired reminder, so the owner's cache is
+   * invalidated through the existing generation counter (Contract 2 Rule 1).
+   * Unconditional and idempotent: a row whose reminder is already null is left
+   * as-is, and the bump still runs after the write.
+   */
+  async markReminded(sub: string, id: string): Promise<void> {
+    await this.todos.update({ id, ownerSub: sub }, { reminderScheduledAt: null });
+    await this.cache.bumpGeneration(sub);
   }
 
   /**
