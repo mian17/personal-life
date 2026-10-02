@@ -17,6 +17,7 @@ import {
 } from '@life/ui';
 import { Check } from 'lucide-react';
 import { createTodoAction, updateTodoAction } from './todo-actions';
+import { RecurrenceDialog } from './recurrence-dialog';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 
 /**
@@ -46,6 +47,8 @@ export function TodoEditor({
   // date-only/missing → '' (no app-side `new Date(...)`, lesson 0016).
   const [dueTime, setDueTime] = useState(localTimePart(todo?.dueDate));
   const [repeat, setRepeat] = useState<TodoRepeat | null>(todo?.repeat ?? null);
+  const [repeatDays, setRepeatDays] = useState<number[]>(todo?.repeatDays ?? []);
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
   const [saving, setSaving] = useState(false);
@@ -69,6 +72,8 @@ export function TodoEditor({
     if (value === '') {
       setDueTime('');
       setRepeat(null);
+      setRepeatDays([]);
+      setRecurrenceOpen(false);
     }
   }
 
@@ -90,6 +95,7 @@ export function TodoEditor({
             note: note.trim() === '' ? null : note,
             dueDate: due,
             repeat,
+            repeatDays: repeat === 'custom' ? repeatDays : undefined,
             listId,
             tagIds,
             ...(importantOverride !== undefined ? { important: importantOverride } : {}),
@@ -102,6 +108,7 @@ export function TodoEditor({
           note: note.trim() === '' ? undefined : note,
           dueDate: due ?? undefined,
           repeat,
+          repeatDays: repeat === 'custom' ? repeatDays : undefined,
           listId: listId ?? undefined,
           tagIds,
           ...(importantOverride !== undefined ? { important: importantOverride } : {}),
@@ -176,14 +183,40 @@ export function TodoEditor({
           <Select
             aria-label="Repeat"
             value={repeat ?? ''}
-            onChange={(e) => setRepeat((e.target.value || null) as TodoRepeat | null)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === 'custom') {
+                setRecurrenceOpen(true);
+                return;
+              }
+              setRepeat((value || null) as TodoRepeat | null);
+              setRepeatDays([]);
+            }}
             options={[
               { value: '', label: 'None' },
-              ...TODO_REPEATS.map((value) => ({ value, label: repeatLabel(value, dueDate)! })),
+              ...TODO_REPEATS.filter((value) => value !== 'custom').map((value) => ({
+                value,
+                label: repeatLabel(value, dueDate)!,
+              })),
+              {
+                value: 'custom',
+                label: repeat === 'custom' ? repeatLabel('custom', dueDate, repeatDays)! : 'Custom…',
+              },
             ]}
           />
         </PillGroup>
       )}
+
+      <RecurrenceDialog
+        open={recurrenceOpen}
+        onOpenChange={setRecurrenceOpen}
+        dueDate={dueDate}
+        value={repeatDays}
+        onConfirm={(days) => {
+          setRepeat('custom');
+          setRepeatDays(days);
+        }}
+      />
 
       {lists.length > 0 && (
         <PillGroup label="List" aria-label="List">

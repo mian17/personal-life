@@ -124,7 +124,7 @@ export function TodoItem({
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
-  const repeat = repeatLabel(todo.repeat, todo.dueDate);
+  const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
 
   const handleCollapse = (value: boolean) => {
     if (value) {

@@ -1,5 +1,5 @@
 import type { TodoRepeat } from '@life/shared';
-import { dueDay, formatDayMonth, formatWeekday } from '@life/ui';
+import { WEEKDAY_SHORT, dueDay, formatDayMonth, formatWeekday } from '@life/ui';
 
 /**
  * The one owner of the repeat → human-label mapping (lesson 0016): the row meta
@@ -8,7 +8,8 @@ import { dueDay, formatDayMonth, formatWeekday } from '@life/ui';
  * upstream. The parenthetical is derived from the todo's due date through the
  * shared `@life/ui` formatters (`dueDay`, `formatWeekday`, `formatDayMonth`) —
  * never a locale API — and a missing/malformed due falls back to the bare base
- * label rather than an empty `Weekly ()`.
+ * label rather than an empty `Weekly ()`. A custom repeat reads its concrete
+ * ISO weekday set through `WEEKDAY_SHORT` instead (never `toLocale*`).
  */
 const BASE_LABELS: Record<TodoRepeat, string> = {
   daily: 'Daily',
@@ -35,10 +36,20 @@ function ordinal(n: number): string {
   }
 }
 
-export function repeatLabel(repeat: TodoRepeat | null, dueDate?: string | null): string | null {
+export function repeatLabel(
+  repeat: TodoRepeat | null,
+  dueDate?: string | null,
+  repeatDays?: number[] | null,
+): string | null {
   if (repeat == null) return null;
   const base = BASE_LABELS[repeat];
   if (repeat === 'daily' || repeat === 'weekdays') return base;
+
+  if (repeat === 'custom') {
+    if (!repeatDays || repeatDays.length === 0) return base;
+    const days = [...repeatDays].sort((a, b) => a - b).map((day) => WEEKDAY_SHORT[day - 1]);
+    return `${base} (${days.join(', ')})`;
+  }
 
   const day = dueDay(dueDate);
   if (day === '') return base;
