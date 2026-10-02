@@ -13,10 +13,12 @@ jest.mock('@/lib/tags-api', () => ({
 // The barrel re-exports the server-only `readPref` (next/headers); mock it so the
 // server module never loads under jest.
 jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
+jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 
 import { listTodos, listLists, listTodoCompletions } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
+import { getToday } from '@/lib/today';
 import TodosPage from '@/app/todos/page';
 import { TodoList } from '@/app/todo-list';
 import { TodosNav } from '@/app/todos-nav';
@@ -28,6 +30,7 @@ const mockedListTodoCompletions = listTodoCompletions as jest.MockedFunction<
 >;
 const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
+const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 
 function todo(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -90,6 +93,7 @@ describe('/todos list page wiring', () => {
     ]);
     mockedListTodoCompletions.mockResolvedValue({ completions: [], nextCursor: null });
     mockedReadPref.mockResolvedValue(false);
+    mockedGetToday.mockResolvedValue(todayIso());
   });
 
   it('renders ListShell titled Today with the frozen fab label', async () => {

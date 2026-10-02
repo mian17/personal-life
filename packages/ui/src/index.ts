@@ -114,7 +114,7 @@ export { TagManager } from './components/tag-manager';
 export type { TagManagerProps } from './components/tag-manager';
 
 export { DueDatePill, dueDateState, todayIso } from './components/due-date-pill';
-export { dueDay, isoWeekday, localTimePart, weekdayShort, WEEKDAY_SHORT } from './lib/date-parts';
+export { dueDay, isoWeekday, localTimePart, todayIsoInZone, weekdayShort, WEEKDAY_SHORT } from './lib/date-parts';
 export type { DueDatePillProps, DueDateState } from './components/due-date-pill';
 
 export { DueDate } from './components/due-date';

@@ -190,6 +190,14 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value; a
   missing/malformed value renders `No date`. Day-granular row state (`dueDateState`) keeps a
   timed todo due earlier today as `Today` — the reminder is the time-precise signal.
+- **"Today" owner (lesson 0019):** the request day is `apps/app/lib/today.ts`'s
+  `getToday()` — it reads the browser's IANA zone from the `tz` cookie (set by the
+  `<TimeZoneSync>` client component in the root layout) and derives the day with
+  `todayIsoInZone`; a missing/invalid cookie falls back to the app's `TODO_TIMEZONE`,
+  and a read outside request scope (unit tests) falls back to host `todayIso()`.
+  `/todos` and `/todos/matrix` consume it and never call `todayIso()` directly; the
+  app service env `TODO_TIMEZONE` must match the backend's `TODO_TIMEZONE` so the
+  first SSR request agrees with storage.
 - **Settings (`apps/app/app/todos/settings/page.tsx`):** a new `SettingsBlock
   title="Reminders"` with `SettingsRow label="Push reminders"` and a client `PushToggle`:
   renders client defaults and reads `navigator`/`Notification.permission` in a `useEffect`

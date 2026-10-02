@@ -1,4 +1,5 @@
 import '@life/ui/styles.css';
+import { TimeZoneSync } from './time-zone-sync';
 
 export const metadata = {
   title: 'Personal Life',
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <TimeZoneSync />
         {children}
       </body>
     </html>

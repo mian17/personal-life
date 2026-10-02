@@ -67,6 +67,9 @@ for these without any visible change.
              emptyLabel?: string />  //   overdue | today | later | none. Pure display —
                                      //   the derivation is the exported pure helpers
                                      //   `dueDateState(dueDate, today)` / `todayIso()`.
+                                     //   Zone-aware "today" is the caller's job via
+                                     //   `todayIsoInZone(zone)`: the server's `getToday()`
+                                     //   feeds it from the client's tz (lesson 0019).
                                      //   Renders <time dateTime> for dated states; the
                                      //   empty state renders `emptyLabel` with no <time>.
 ```

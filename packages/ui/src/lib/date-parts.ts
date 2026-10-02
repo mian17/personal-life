@@ -16,6 +16,24 @@ export function todayIso(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * The calendar day `YYYY-MM-DD` that `date` falls on in `timeZone`: the
+ * user's zone's "today", not the host's (lesson 0019). Answers "which day is
+ * now in this zone" via native Intl parts — it is not the stored-date
+ * formatting path (lesson 0003). May throw on an invalid zone; callers
+ * sanitise before calling.
+ */
+export function todayIsoInZone(timeZone: string, date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 /** Leading `YYYY-MM-DD` of an ISO string, or `''` when there is none. */
 export function datePart(iso: string): string {
   const match = DATE_PART.exec(iso);

@@ -193,6 +193,9 @@ services:
       # call dies inside the app container.
       TAGS_API_URL: http://tags-service:3004
       TODO_API_URL: http://todo-service:3005
+      # The app's fallback "today" zone, before the browser's `tz` cookie lands.
+      # Must match the backend's TODO_TIMEZONE so SSR today agrees with storage.
+      TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
       # OIDC relying-party config (values from .env). The issuer must be the
       # browser-reachable URL; the app validates at boot and fails loudly.
       IDP_ISSUER: ${IDP_ISSUER:-}

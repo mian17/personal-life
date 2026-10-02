@@ -106,6 +106,12 @@ Edge cases: a date-only due is **never** converted (stays naive). A DST-zone `TO
 is correct via the two-pass resolve; the user's zone is fixed-offset. `TODO_TIMEZONE` and the
 deployment `TZ` should match so SSR "today" agrees with storage.
 
+SSR "today" is zone-aware on the app/BFF side too: `apps/app/lib/today.ts` derives the day
+from the browser's `tz` cookie (set by `<TimeZoneSync>`) via `todayIsoInZone`, and falls back
+to the `app` service's own `TODO_TIMEZONE` — wired in `compose.yaml` with the same
+`${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}` expression as this service — before the cookie lands
+(lesson 0019).
+
 ## Behavior / API (kernel contracts apply)
 
 Wire types live in `@life/shared` (the `Todo` precedent); the app consumes, never

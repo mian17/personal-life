@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
-import { ListShell, List, MatrixBlock, Tab, TabBar, todayIso } from '@life/ui';
+import { ListShell, List, MatrixBlock, Tab, TabBar } from '@life/ui';
 import { Plus } from 'lucide-react';
 import { readPref } from '@/lib/preferences';
+import { getToday } from '@/lib/today';
 import { listTodos, listLists } from '@/lib/todo-api';
 import { collectTodos } from '@/lib/todo-query';
 import { groupByQuadrant } from '@/lib/matrix';
@@ -17,7 +18,7 @@ export default async function TodosMatrixPage() {
     collectTodos((cursor) => listTodos({ cursor })),
     listLists(),
   ]);
-  const today = todayIso();
+  const today = await getToday();
 
   const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,

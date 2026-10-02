@@ -7,10 +7,10 @@ import {
   ListShell,
   Tab,
   TabBar,
-  todayIso,
 } from '@life/ui';
 import { Plus } from 'lucide-react';
 import { readPref } from '@/lib/preferences';
+import { getToday } from '@/lib/today';
 import { TodosNav } from '../todos-nav';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export default async function TodosPage() {
     collectTodoCompletions((cursor) => listTodoCompletions({ cursor })),
   ]);
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
-  const today = todayIso();
+  const today = await getToday();
   const groups = groupTodos(todos, today, completions);
   const matrixEnabled = await readPref('matrix');
 

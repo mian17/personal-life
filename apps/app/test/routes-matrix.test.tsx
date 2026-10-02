@@ -2,6 +2,7 @@ import type { List, Todo } from '@life/shared';
 import { List as UiList, ListShell, MatrixBlock, Tab, TabBar, todayIso } from '@life/ui';
 
 jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
+jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 jest.mock('@/lib/todo-api', () => ({ listTodos: jest.fn(), listLists: jest.fn() }));
 // `notFound()` throws in a real request; keep next/headers (readPref) and the router
 // out of the node env while making the gate observable.
@@ -13,12 +14,14 @@ jest.mock('next/navigation', () => ({
 
 import { listTodos, listLists } from '@/lib/todo-api';
 import { readPref } from '@/lib/preferences';
+import { getToday } from '@/lib/today';
 import TodosMatrixPage from '@/app/todos/matrix/page';
 import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
+const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 
 const TODAY = todayIso();
 
@@ -71,6 +74,7 @@ describe('/todos/matrix page wiring', () => {
       },
     ] as List[]);
     mockedReadPref.mockResolvedValue(true);
+    mockedGetToday.mockResolvedValue(TODAY);
   });
 
   it('returns notFound when the opt-in is off', async () => {
