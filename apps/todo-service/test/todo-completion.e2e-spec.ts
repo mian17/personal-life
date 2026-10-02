@@ -136,6 +136,29 @@ describe('Todo completion log (tick/undo rules)', () => {
     expect(log).toHaveLength(1);
     expect(log[0].occurrence).toBe('2026-10-02');
     expect(updated.done).toBe(true);
+
+    const undone = await h.todos.update(SUB, created.id, { done: false });
+
+    // The unified rule deletes the newest row and restores its occurrence.
+    expect(await rows(created.id)).toHaveLength(0);
+    expect(undone.done).toBe(false);
+    expect(undone.dueDate).toBe('2026-10-02');
+  });
+
+  it('undo after the due is edited deletes the newest recorded occurrence and reverts the due to it', async () => {
+    const created = await h.todos.create(SUB, { title: 'edited after tick', dueDate: '2026-10-02' });
+    await h.todos.update(SUB, created.id, { done: true });
+    // Editing the due after the tick: the old occurrence-scoped rule matched
+    // nothing here; the unified rule deletes the newest row whatever it recorded.
+    await h.todos.update(SUB, created.id, { dueDate: '2026-11-01' });
+
+    const undone = await h.todos.update(SUB, created.id, { done: false });
+
+    expect(await rows(created.id)).toHaveLength(0);
+    expect(undone.done).toBe(false);
+    // The due reverts from the edit to the originally completed occurrence.
+    expect(undone.dueDate).toBe('2026-10-02');
+    expect(undone.reminderScheduledAt).toBe(reminderAt('2026-10-02'));
   });
 
   it("due-less one-off records occurrence '~' and its Undo deletes that row", async () => {
@@ -170,11 +193,15 @@ describe('Todo completion log (tick/undo rules)', () => {
     // Clear the repeat and tick as a one-off on a distinct due, then undo it.
     await h.todos.update(SUB, created.id, { dueDate: '2020-02-01', repeat: null });
     await h.todos.update(SUB, created.id, { done: true });
-    await h.todos.update(SUB, created.id, { done: false });
+    const undone = await h.todos.update(SUB, created.id, { done: false });
 
+    // The unified rule deletes the NEWEST row (the one-off's 2020-02-01) and
+    // restores that row's recorded occurrence as the due; earlier rows survive.
     const log = await rows(created.id);
     expect(log.map((r) => r.occurrence)).toEqual(before);
     expect(log.some((r) => r.occurrence === '2020-02-01')).toBe(false);
+    expect(undone.dueDate).toBe('2020-02-01');
+    expect(undone.done).toBe(false);
   });
 
   it('a double tick is a no-op insert (one row; the UNIQUE guard)', async () => {

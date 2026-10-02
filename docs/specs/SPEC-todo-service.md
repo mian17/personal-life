@@ -186,11 +186,13 @@ read fields required-but-nullable:
   idempotency key: a repeat tick for an already-recorded occurrence inserts nothing. **The
   sweep is unchanged (open rows only) and no reopen path exists** — the repeating tick never
   sets `done = true`, so there is nothing to reopen. A **non-recurring** `done: true` still
-  marks done and (new) records `occurrence = D ?? '~'`; `done: false` on a one-off deletes
-  **only that occurrence's** row (any other rows are preserved). `done: false` on a
-  **repeating** todo undoes the last tick: it deletes that occurrence's latest
-  `todo_completion` row and restores the due it recorded (re-arming the reminder); with no
-  dated row it is a no-op. Ticking a recurring todo hides nothing (no auto-hide; the Undo
+  marks done and (new) records `occurrence = D ?? '~'`. `done: false` is one rule for
+  every todo shape: it deletes this todo's **newest** `todo_completion` row and, when that
+  row's occurrence is a real date, restores it verbatim as the due and re-arms the reminder
+  (the `'~'` sentinel leaves the due untouched; earlier rows are preserved; no row is a
+  no-op). Because it deletes the newest row whatever it recorded, undoing a tick after the
+  due was edited reverts the due from the edited value to the originally completed
+  occurrence. Ticking a recurring todo hides nothing (no auto-hide; the Undo
   snackbar wording is owned by `SPEC-todo-ui.md`). Trash/restore semantics are unchanged.
 
 - `POST /api/todos {title, note?, dueDate?, repeat?, repeatDays?, listId?, important?, tagIds?}` → 201 (version 0).

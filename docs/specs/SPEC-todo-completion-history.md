@@ -210,23 +210,26 @@ Let `D = todo.dueDate` (already normalized) and `repeat = todo.repeat`.
    - `occurrence = D ?? '~'`.
    - In one transaction: guarded-insert the completion row; set `todo.done = true`,
      `todo.version += 1`, `todo.updatedAt = now`; `manager.save(todo)`.
-3. **Un-complete (Undo)** — `patch.done === false`, `repeat === null`:
-   - In one transaction: `manager.getRepository(TodoCompletion).delete({ ownerSub: sub, todoId: id,
-     occurrence: D ?? '~' })` — **only** the row for the occurrence being un-completed
-     (invariant: at most one row per `(todoId, occurrence)`). Other rows — e.g. prior
-     repeating occurrences recorded before the repeat was cleared — are **preserved**; set
-     `todo.done = false`, `todo.version += 1`, `todo.updatedAt = now`; `manager.save(todo)`.
-4. **Un-complete on a repeating todo** — `patch.done === false`, `repeat !== null`,
-   `D !== null`: undoes the most recent **tick**. In one transaction:
-   `manager.getRepository(TodoCompletion).findOne({ where: { ownerSub: sub, todoId: id },
-   order: { completedAt: 'DESC' } })`. If that row exists and its `occurrence !== '~'`,
-   `repo.delete({ id: last.id, ownerSub: sub })` and set `todo.dueDate = last.occurrence`
-   — `occurrence` is stored in the persisted dual shape (date-only `YYYY-MM-DD`, or a
-   canonical UTC instant for a timed due), so assigning it back verbatim restores exactly
-   the pre-tick due — plus `todo.reminderScheduledAt = reminderAt(todo.dueDate, tz)`
-   (re-armed). If no dated row exists, `dueDate`/`reminderScheduledAt` are left unchanged
-   (a safe no-op). `todo.done` is set to `false`; the existing version/updatedAt bump
-   stands. This is *not* "log untouched": earlier occurrence rows are still preserved.
+3. **Un-complete (Undo)** — `patch.done === false`: the one rule for every todo
+   shape. In one transaction: `manager.getRepository(TodoCompletion).findOne({
+   where: { ownerSub: sub, todoId: id }, order: { completedAt: 'DESC' } })` loads
+   this todo's **newest** log row, then `repo.delete({ id: last.id, ownerSub: sub })`.
+   When that row's `occurrence !== '~'` (a real date — one-off or repeating alike),
+   set `todo.dueDate = last.occurrence` verbatim (`occurrence` is stored in the
+   persisted dual shape — date-only `YYYY-MM-DD` or a canonical UTC instant — so
+   assigning it back restores exactly the recorded due) plus
+   `todo.reminderScheduledAt = reminderAt(todo.dueDate, tz)` (re-armed); when it is
+   `'~'` (undated one-off), leave `dueDate`/`reminderScheduledAt` unchanged. If no
+   row exists, change nothing except `todo.done = false` (a safe no-op). Earlier
+   rows are always preserved — only the newest is ever deleted. Set `todo.done =
+   false`, `todo.version += 1`, `todo.updatedAt = now`; `manager.save(todo)`. Due
+   edited between tick and undo: the newest row is deleted whatever it recorded and
+   its recorded occurrence is restored as the due, so the todo visibly reverts from
+   the edited value to the originally completed occurrence (reminder re-armed).
+4. **Un-complete on a repeating todo** — no separate rule: §3's newest-row undo
+   applies unchanged. A repeating undo deletes the newest row, restores its dated
+   occurrence as the due and re-arms the reminder; earlier occurrence rows are still
+   preserved.
 
 After the transaction commits, `await this.cache.bumpGeneration(sub)` runs exactly once
 (pre-mutation reads die; a thrown transaction never bumps). The tag-association handling and
@@ -332,7 +335,8 @@ keep `todo.done` semantics for todos; only the **Done** status pill switches sou
 | Element | Composed from |
 |---|---|
 | Done-view body root | `List` (existing block; no new visual language) |
-| completion row | `ListItem` (`href`, `title`, `meta`; **no** `leading`, **no** `deleteAction`, no `variant`) |
+| completion row | `ListItem` (`href`, `title`, `meta`; **no** `leading`, no `deleteAction`, no `variant`; the task's **newest** completion carries a `trailing` undo control — older rows carry none) |
+| undo control (newest row per task) | `<form action={undoTodoCompletionAction.bind(null, todoId)}>` (in `todo-actions.ts`, mirroring `deleteTodoAction`) wrapping `Button` (`type="submit"`, `size="icon"`, class `done-undo`, `aria-label` `` `Undo completion of ${title}` ``) + the `Undo2` glyph from `lucide-react` (`size={18}`, `aria-hidden`), passed via `ListItem`'s `trailing` slot |
 | completed-date meta | the `@life/ui` date owner: `dueDateLabel(completedAt, today)` (dd/mm/yyyy, `Today`/`Tomorrow` + local `HH:mm`) in a `span` |
 | list-name meta | a `span` (same meta row as `todo-item.tsx` renders) |
 | empty state | `EmptyState` (`heading="No completed todos"`, `body="Completed tasks appear here."`) |
@@ -351,7 +355,10 @@ primitives). No raw `<a>`/`<button>` is introduced — `ListItem` owns the `next
   maps to `<List>{completions.map((c) => <ListItem key={c.id} href={`/todos/${c.todoId}/edit`}
   title={c.title} meta={<><span>{dueDateLabel(c.completedAt, today)}</span>
   {c.listName && <span>{c.listName}</span>}</>} />)}</List>`; empty input → `EmptyState`.
-  **No done-toggle** is rendered; the log is read-only (no per-row delete, no Undo here).
+  **No done-toggle** is rendered and there is no per-row delete. The newest completion row
+  per task renders a `trailing` undo control (the `undoTodoCompletionAction` form — the log
+  arrives newest-first, so the first row per `todoId` is that task's most recent completion);
+  older rows of the same task stay read-only.
 - `apps/app/lib/todo-api.ts`: add `listTodoCompletions(opts: { limit?: number; cursor?: string } = {}): Promise<TodoCompletionPage>`
   (`GET /api/todos/completions` with the `limit`/`cursor` params). `apps/app/lib/todo-query.ts`:
   add `collectTodoCompletions(fetchPage, maxItems = 1000)` mirroring `collectTodos`, so the
@@ -375,6 +382,10 @@ one-off tick keeps today's snackbar/Undo unchanged. No `DoneToggle` edit.
 - `/todos?done=true` completion rows are `ListItem` links whose accessible name is the todo
   **title** (`/todos/<todoId>/edit`). The Done-view empty state is `EmptyState` with heading
   `No completed todos`.
+- Each task's **newest** completion row adds an undo control: role `button`, accessible name
+  `` `Undo completion of ${title}` `` (icon-only — the `aria-label` is its accessible name),
+  and the class hook `button.done-undo` (mirroring `button.trash-delete`). Occurrence-scoped
+  undo on older rows is deliberately absent (v1 scope: undo the latest occurrence per task).
 - No existing name/role/aria-label changes (`Done`, `All`, `Open`, `Status`, the row
   `href`s all stay). Recorded as surface **additions** only; the human-owned Playwright
   suite changes only if the user asks.

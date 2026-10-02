@@ -55,6 +55,17 @@ export async function deleteTodoAction(id: string) {
   revalidateTodos();
 }
 
+/**
+ * Undo the Done view's newest completion row for a todo. No `expectedVersion`:
+ * the completion row carries no todo version and the original done write already
+ * bumped it, so a version-checked PATCH would 409 (same reasoning as the snackbar
+ * Undo). The service deletes the newest row and reopens the todo.
+ */
+export async function undoTodoCompletionAction(todoId: string): Promise<void> {
+  await updateTodo(todoId, { done: false });
+  revalidateTodos();
+}
+
 export async function restoreTodoAction(id: string) {
   await restoreTodo(id);
   revalidateTodos();

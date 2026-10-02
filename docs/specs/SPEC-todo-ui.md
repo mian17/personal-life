@@ -238,8 +238,10 @@ recorded surface this spec froze:
   **completion log** instead of the todo list (`SPEC-todo-completion-history.md` C6).
   Completion rows are `ListItem` links whose accessible name is the todo **title**
   (`/todos/<todoId>/edit`); the empty state is `EmptyState` with heading
-  `No completed todos`. **No done-toggle is rendered** (the log is read-only — no per-row
-  delete, no Undo). No existing name/role/aria-label changes: `Done`/`All`/`Open`/`Status`
+  `No completed todos`. **No done-toggle is rendered** and there is no per-row delete: the
+  newest completion row per task renders the `trailing` undo control (role `button`,
+  accessible name `` `Undo completion of ${title}` ``, class hook `button.done-undo`);
+  older rows stay read-only. No existing name/role/aria-label changes: `Done`/`All`/`Open`/`Status`
   and every row `href` all stay. Recorded as surface additions only; the human-owned suite
   changes only if the user asks.
 - **Custom repeat additions (todo-custom-repeat):** the new accessible names `Custom repeat`

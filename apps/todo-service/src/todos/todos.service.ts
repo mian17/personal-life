@@ -819,11 +819,12 @@ export class TodosService {
    * recomputed whenever the due or the repeat changes. Clearing the due clears
    * both the repeat and the reminder. Ticking a recurring todo records a
    * completion for the pre-advance due `D` and advances strictly past it, to the
-   * next occurrence on/after now, remaining open (`done: false`); `done: false`
-   * on a recurring todo undoes the last tick — it deletes that occurrence's log
-   * row and restores `D`. A non-recurring `done: true` logs
-   * `occurrence = D ?? '~'` and closes it, `done: false` deletes only that
-   * occurrence's log row (N2/N3).
+   * next occurrence on/after now, remaining open (`done: false`). A
+   * non-recurring `done: true` logs `occurrence = D ?? '~'` and closes it.
+   * `done: false` undoes the latest completion for any todo shape: it deletes
+   * that todo's newest log row and, when that row's occurrence is a real date,
+   * restores it as the due (verbatim — the persisted dual shape) and re-arms the
+   * reminder; the `'~'` sentinel leaves the due untouched (N2/N3).
    */
   async update(
     sub: string,
@@ -938,26 +939,23 @@ export class TodosService {
               const occurrence = todo.dueDate ?? '~';
               await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
               todo.done = true;
-            } else if (todo.repeat !== null && todo.dueDate !== null) {
-              // Repeat-tick undo: delete the most recent dated occurrence's log row
-              // and restore the due it recorded. `occurrence` is stored in the
-              // persisted dual shape, so assigning it back is the exact pre-tick due.
+            } else {
+              // Undo (one rule for every todo shape): delete the newest log row.
+              // A dated `occurrence` is stored in the persisted dual shape, so
+              // assigning it back verbatim is the exact completed due; the `'~'`
+              // sentinel leaves the due untouched. No row means `done` is the only change.
               const repo = manager.getRepository(TodoCompletion);
               const last = await repo.findOne({
                 where: { ownerSub: sub, todoId: id },
                 order: { completedAt: 'DESC' },
               });
-              if (last && last.occurrence !== '~') {
+              if (last) {
                 await repo.delete({ id: last.id, ownerSub: sub });
-                todo.dueDate = last.occurrence;
-                todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+                if (last.occurrence !== '~') {
+                  todo.dueDate = last.occurrence;
+                  todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+                }
               }
-              todo.done = false;
-            } else {
-              // Un-complete one-off: drop only that occurrence's log row.
-              await manager
-                .getRepository(TodoCompletion)
-                .delete({ ownerSub: sub, todoId: id, occurrence: todo.dueDate ?? '~' });
               todo.done = false;
             }
             return manager.save(todo);

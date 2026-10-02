@@ -8,6 +8,9 @@ jest.mock('@/lib/todo-api', () => ({
   listLists: jest.fn(),
   listTodoCompletions: jest.fn(),
 }));
+jest.mock('@/app/todo-actions', () => ({
+  undoTodoCompletionAction: jest.fn(),
+}));
 jest.mock('@/lib/tags-api', () => ({
   listTags: jest.fn(),
   resolveTags: jest.fn(),
@@ -171,6 +174,34 @@ describe('/todos Done-view wiring', () => {
     expect(html).toContain('Walk dog');
     expect(html).toContain('25/09/2025');
     expect(html).toContain('Errands');
+  });
+
+  it('renders exactly one undo control per todoId, on that todo’s newest row', async () => {
+    const el = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
+    const body = el.props.body;
+    const rows = asArray(
+      TodoCompletionList({ completions: body.props.completions, today: body.props.today }),
+    );
+
+    // t1 appears newest-first: rows[0] (c3, 27/09) is newest, rows[2] (c1, 15/01) older.
+    expect(rows[0].props.trailing).toBeDefined();
+    expect(rows[2].props.trailing).toBeUndefined();
+    // t2 has one occurrence, so it is its own newest.
+    expect(rows[1].props.trailing).toBeDefined();
+
+    const action = rows[0].props.trailing;
+    expect(action.type).toBe('form');
+    expect(action.props.action).toEqual(expect.any(Function));
+    const control = asArray(action)[0];
+    expect(control.props['aria-label']).toBe('Undo completion of Buy milk');
+    expect(control.props.className).toBe('done-undo');
+
+    const html = renderToStaticMarkup(body);
+    expect(html.match(/<button/g) ?? []).toHaveLength(2);
+    expect(html.match(/aria-label="Undo completion of Buy milk"/g) ?? []).toHaveLength(1);
+    expect(html).toContain('aria-label="Undo completion of Walk dog"');
+    // The existing meta is unchanged.
+    expect(html).toContain('25/09/2025');
   });
 
   it('renders EmptyState heading "No completed todos" for an empty log', async () => {
