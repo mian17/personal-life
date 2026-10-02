@@ -14,6 +14,9 @@ export type { InputProps } from './components/input';
 export { Textarea } from './components/textarea';
 export type { TextareaProps, TextareaVariant } from './components/textarea';
 
+export { Select } from './components/select';
+export type { SelectOption, SelectProps } from './components/select';
+
 export { Pill } from './components/pill';
 export type { PillButtonType, PillProps, PillSize, PillTag } from './components/pill';
 

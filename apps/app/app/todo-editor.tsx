@@ -7,8 +7,8 @@ import {
   EditorChrome,
   IconButton,
   Input,
-  Pill,
   PillGroup,
+  Select,
   Switch,
   Textarea,
   dueDay,
@@ -173,53 +173,29 @@ export function TodoEditor({
 
       {dueDate !== '' && (
         <PillGroup label="Repeat" aria-label="Repeat">
-          <Pill
-            as="button"
-            size="chip"
-            active={repeat === null}
-            aria-pressed={repeat === null}
-            onClick={() => setRepeat(null)}
-          >
-            None
-          </Pill>
-          {TODO_REPEATS.map((value) => (
-            <Pill
-              key={value}
-              as="button"
-              size="chip"
-              active={repeat === value}
-              aria-pressed={repeat === value}
-              onClick={() => setRepeat(value)}
-            >
-              {repeatLabel(value, dueDate)}
-            </Pill>
-          ))}
+          <Select
+            aria-label="Repeat"
+            value={repeat ?? ''}
+            onChange={(e) => setRepeat((e.target.value || null) as TodoRepeat | null)}
+            options={[
+              { value: '', label: 'None' },
+              ...TODO_REPEATS.map((value) => ({ value, label: repeatLabel(value, dueDate)! })),
+            ]}
+          />
         </PillGroup>
       )}
 
       {lists.length > 0 && (
         <PillGroup label="List" aria-label="List">
-          <Pill
-            as="button"
-            size="chip"
-            active={listId === null}
-            aria-pressed={listId === null}
-            onClick={() => setListId(null)}
-          >
-            No list
-          </Pill>
-          {lists.map((list) => (
-            <Pill
-              key={list.id}
-              as="button"
-              size="chip"
-              active={listId === list.id}
-              aria-pressed={listId === list.id}
-              onClick={() => setListId(list.id)}
-            >
-              {list.name}
-            </Pill>
-          ))}
+          <Select
+            aria-label="List"
+            value={listId ?? ''}
+            onChange={(e) => setListId(e.target.value || null)}
+            options={[
+              { value: '', label: 'No list' },
+              ...lists.map((list) => ({ value: list.id, label: list.name })),
+            ]}
+          />
         </PillGroup>
       )}
 

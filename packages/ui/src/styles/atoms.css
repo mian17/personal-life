@@ -298,6 +298,23 @@
   font-size: var(--fs-editor);
 }
 
+/* ------------------------------------------------------------- Select */
+
+/* Native <select>, the same field shell as .ui-input (panel, --radius-md,
+   --border) plus a pointer cursor. Single-select by construction; the atom
+   renders its own <option>s. */
+.ui-select {
+  width: 100%;
+  padding: var(--space-0-75);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ------------------------------------------------------------- Pill */
 
 .ui-pill {

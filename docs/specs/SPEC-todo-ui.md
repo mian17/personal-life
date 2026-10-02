@@ -91,9 +91,10 @@ both apps — so tags feel identical everywhere (I3).
   registry), **`DueDatePill`** (due-date display/grouping), **`ListManager`** (create/rename/delete todo lists).
   Never raw HTML for
   interactive elements, never app-side CSS recreating primitives, tokens only.
-- The due-time / repeat / reminder chapter adds **no** new upstream primitive: it reuses
-  `PillGroup`, `Pill`, `Switch`, `SettingsBlock`, `SettingsRow`, and the existing `Input`
-  via the editor's `Time`/`Repeat` pills (`SPEC-todo-due-repeat-notify.md`).
+- The due-time / repeat / reminder chapter adds one new upstream primitive: the **`Select`**
+  atom (native `<select>`, single-select) used for the editor's Repeat and List controls; it
+  otherwise reuses `PillGroup`, `Switch`, `SettingsBlock`, `SettingsRow`, and the existing `Input`
+  (`SPEC-todo-due-repeat-notify.md`).
 - `@life/ui/styles.css` stays imported exactly once in the root layout.
 
 ## Importance input surfaces (matrix-ui, L6)
@@ -132,10 +133,10 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `dueTime` state is seeded from a timed due via the single `@life/ui` owner
   `localTimePart(todo.dueDate)` (empty otherwise — no app-side `new Date(...)`). The Time field
   is shown only once a due date exists (a time without a day is meaningless). New
-  `PillGroup label="Repeat"` of `Pill as="button" size="chip"` options
+  `PillGroup label="Repeat"` wrapping the new `@life/ui` `Select` atom (native `<select>`,
+  single-select by construction) with options
   (`None`/`Daily`/`Every Weekday (Mon - Fri)`/`Weekly (<Weekday>)`/
-  `Monthly (The <nth> day)`/`Yearly (<day> <Mon>)`), reusing the existing
-  `Pill`/`PillGroup` primitives; `None` ⇒ `repeat: null`. Labels come from the app-owned
+  `Monthly (The <nth> day)`/`Yearly (<day> <Mon>)`); `None` ⇒ `repeat: null`. Labels come from the app-owned
   `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
   `@life/shared` dependency), composing the shared `@life/ui` `formatWeekday`/`formatDayMonth`
   helpers (day number via `dueDay`), never `toLocale*`. The Repeat field is hidden until a due
@@ -189,10 +190,10 @@ recorded surface this spec froze:
   controls `getByRole('switch', { name: 'Important' })` on the todo editor and
   `getByRole('switch', { name: 'Default important' })` on the list manager.
 - **Due time / repeat / reminders additions (todo-due-repeat-notify):** new accessible
-  names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
-  (`getByRole('button', { name: 'Weekly (<Weekday>)' })` — the repeat option's accessible name
-  is the due-derived self-describing label, so a suite should match the `Weekly` prefix — the
-  push `switch`). **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
+  names `Due time`, `Time`, `Repeat`, `List`, `Reminders`, `Push reminders`; the Repeat and
+  List fields are now `combobox` controls (`getByRole('combobox', { name: 'Repeat' | 'List' })`
+  with `option`s) rather than button chips — a **user-approved control change** — and the
+  push `switch`. **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
   `Important`, `Save todo`, `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`,
   `Manage lists` all stay) — the one exception is the user-approved change to the `Weekly`
   repeat option's **visible text** (and thus its accessible name), recorded above. Recorded as

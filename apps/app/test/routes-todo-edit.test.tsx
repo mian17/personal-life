@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { List, Todo } from '@life/shared';
-import { Input, Pill, PillGroup, Switch, type SwitchProps, type TagOption } from '@life/ui';
+import { Input, PillGroup, Select, Switch, type SwitchProps, type TagOption } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockBack = jest.fn();
@@ -277,30 +277,15 @@ function inputByLabel(tree: EditorTree, label: string): EditorField {
   return found as unknown as EditorField;
 }
 
-/** The `Pill` for a list, found by walking the editor's element tree. */
-function listPill(tree: EditorTree, name: string): ReactElement<{ onClick: () => void }> {
-  const found = findPill(tree, name);
-  if (!found) throw new Error(`no list Pill named ${name}`);
-  return found;
-}
-
-function findPill(
-  node: unknown,
-  name: string,
-): ReactElement<{ onClick: () => void }> | undefined {
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      const hit = findPill(child, name);
-      if (hit) return hit;
-    }
-    return undefined;
-  }
-  if (node == null || typeof node !== 'object') return undefined;
-  const el = node as ReactElement<Record<string, unknown>>;
-  if (el.type === Pill && el.props.children === name) {
-    return el as unknown as ReactElement<{ onClick: () => void }>;
-  }
-  return findPill(el.props?.children, name);
+/** The field (`Select`) selected by its accessible name. */
+function selectByLabel(tree: EditorTree, label: string): EditorField {
+  const found = findByType(
+    tree.props.children,
+    Select,
+    (el) => el.props['aria-label'] === label,
+  );
+  if (!found) throw new Error(`no Select labelled ${label}`);
+  return found as unknown as EditorField;
 }
 
 describe('TodoEditor save awaits the write before navigating', () => {
@@ -428,7 +413,7 @@ describe('TodoEditor important Switch', () => {
         const first = harness.renderTree(undefined);
         expect(switchOf(first).props.checked).toBe(false);
 
-        listPill(first, 'Work').props.onClick();
+        selectByLabel(first, 'List').props.onChange!({ target: { value: 'l2' } });
 
         const second = harness.renderTree(undefined);
         const node = switchOf(second);
@@ -574,8 +559,12 @@ describe('TodoEditor Time and Repeat fields', () => {
 
       const repeat = pillGroup(tree, 'Repeat');
       expect(repeat.type).toBe(PillGroup);
-      expect(findByType(repeat.props.children, Input)).toBeUndefined();
-      expect(findByType(repeat.props.children, Pill, (p) => p.props.children === 'None')).toBeDefined();
+      const select = findByType(repeat.props.children, Select);
+      expect(select).toBeDefined();
+      expect((select!.props.options as Array<{ value: string; label: string }>)[0]).toEqual({
+        value: '',
+        label: 'None',
+      });
     } finally {
       harness.restore();
     }
@@ -631,7 +620,7 @@ describe('TodoEditor Time and Repeat fields', () => {
       inputByLabel(second, 'Due time').props.onChange!({ target: { value: '09:30' } });
 
       const third = harness.renderTree(fixture);
-      findPill(third.props.children, 'Weekly (Monday)')!.props.onClick();
+      selectByLabel(third, 'Repeat').props.onChange!({ target: { value: 'weekly' } });
       expect(findByType(third.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
 
       const fourth = harness.renderTree(fixture);

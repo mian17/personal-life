@@ -273,19 +273,21 @@ sibling fields (lesson 0014).
     app-side `new Date(...)` re-derives the local time (Contract 1 Rule 3 / lesson 0016). The editor
     joins them into
     `dueDate = 'YYYY-MM-DDTHH:mm'` (or the date alone) for the write; the service normalizes.
-  - New `PillGroup label="Repeat"` composed of `Pill as="button" size="chip"` options
-    (`None` / `Daily` / `Every Weekday (Mon - Fri)` / `Weekly (<Weekday>)` /
-    `Monthly (The <nth> day)` / `Yearly (<day> <Mon>)`) — **reuses the existing `Pill`
-    + `PillGroup` primitives; no new upstream atom.** `None` ⇒ `repeat: null`. The option
-    labels are **self-describing**: the parenthetical is derived from the todo's due date
+  - New `PillGroup label="Repeat"` wrapping a `Select` (`aria-label="Repeat"`) whose options
+    are `None` plus the five repeats (`Daily` / `Every Weekday (Mon - Fri)` / `Weekly (<Weekday>)` /
+    `Monthly (The <nth> day)` / `Yearly (<day> <Mon>)`) — **one new `@life/ui` `Select` atom**
+    (native `<select>`, single-select by construction), then `PillGroup` for the visible label.
+    `None` (empty value) ⇒ `repeat: null`. The option labels are **self-describing**: the
+    parenthetical is derived from the todo's due date
     (English long weekday, ordinal day, or `<day> <Mon>`) so the user can see what a repeat
-    means at a glance, and the pills update live as the due date changes. Labels come from the
+    means at a glance, and the options update live as the due date changes. Labels come from the
     app-owned `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts`) —
     `@life/ui` has no `@life/shared` dependency, so the label mapping stays in the app; the
     derived parts come from the shared `@life/ui` formatters (`formatWeekday`/`formatDayMonth`,
     the day number via `dueDay`), never `toLocale*`. A missing/malformed due falls back to the
-    bare base label (`Weekly`, not `Weekly ()`). **User-approved visible-text change** to this
-    chapter's previously recorded option labels; there is one owner of the mapping (lesson 0016).
+    bare base label (`Weekly`, not `Weekly ()`). **User-approved control change** (chips → a
+    single-select dropdown) to this chapter's previously recorded Repeat field; there is one
+    owner of the label mapping (lesson 0016).
   - The Repeat field is **hidden until a due date is set** (a repeat is meaningless without one),
     so the service's 400 can't be reached from the UI; no implicit/auto due date is inserted.
   - **Prerequisite disclosure + clear cascade:** `Time` and `Repeat` are both children of the due
@@ -355,10 +357,9 @@ sibling fields (lesson 0014).
   `data.url = '/todos/<id>/edit'`). No
   bundler, no `next-pwa`.
 - **Frozen e2e surface (additions to the recorded surface in `SPEC-todo-ui.md`):** new
-  accessible names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
-  (`getByRole('button', { name: 'Weekly (<Weekday>)' })` — the repeat option's accessible
-  name is the self-describing label, so a suite should match the `Weekly` prefix — the push
-  `switch`). **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
+  accessible names `Due time`, `Time`, `Repeat`, `List`, `Reminders`, `Push reminders`; the
+  Repeat and List fields are `combobox` controls with `option`s (user-approved control change
+  from button chips), and the push `switch`. **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
   `Important`, `Save todo`, `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`,
   `Manage lists` all stay). The `Weekly` repeat option's visible text changed to a
   due-derived label (user-approved surface change, recorded in `SPEC-todo-ui.md`). Recorded as
@@ -439,8 +440,8 @@ in the plan/ledger; every `npm run typecheck -w @life/todo-service` and
 - Always: content columns encrypted; cache values ciphertext-only for content; a repeat
   requires a due; the client submits local, the service stores canonical; UI from `@life/ui`.
 - Ask first: any change to an existing frozen selector/name; any new upstream visual
-  primitive (this spec reuses `PillGroup`/`Pill`/`Switch`); a custom per-todo reminder time
-  (this spec uses the fixed due-time / 09:00 rule).
+  primitive (this spec reuses `PillGroup`/`Switch` and adds the `Select` atom); a custom
+  per-todo reminder time (this spec uses the fixed due-time / 09:00 rule).
 - Never: store tag/title/note plaintext in Redis or logs; put `repeat`/`reminderScheduledAt`
   in the cache key; add a second notification service (the bounded todo `reminders` module is
   the only sender); merge to `master` without the user's explicit request.
