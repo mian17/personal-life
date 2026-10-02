@@ -328,11 +328,14 @@ Kernel contracts apply. All routes are owner-scoped and guarded by the auth guar
 ## UI (Contract 1, `@life/ui` only)
 
 > **App Done-section note (2026-10-02):** the `/todos` list no longer renders this
-> completion log, and the `?done=true` Done view is retired. The app's **Done**
-> section now renders done `todo` rows via `TodoItem` (struck + muted, no trash,
-> tap the checkmark to reopen); `SPEC-todo-ui.md` owns that surface. The backend
-> contract above — the append-only log, `GET /api/todos/completions`, and the
-> server undo rule — is unchanged; the log-UI passages below are superseded.
+> completion log wholesale, and the `?done=true` Done view is retired. The app's
+> **Done** section now renders done `todo` rows via `TodoItem` (struck + muted, no
+> trash, tap the checkmark to reopen) **and** surfaces the latest logged completion
+> per repeating todo as a plain read-only row (completed date + list name, no strike,
+> no toggle) while that todo's next occurrence stays open; `SPEC-todo-ui.md` owns that
+> surface. The backend contract above — the append-only log, `GET
+> /api/todos/completions`, and the server undo rule — is unchanged; the log-UI
+> passages below are superseded.
 
 `/todos?done=true` renders the **completion log** instead of the todo list. `All`/`Open`
 keep `todo.done` semantics for todos; only the **Done** status pill switches source.

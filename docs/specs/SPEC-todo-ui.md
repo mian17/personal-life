@@ -62,7 +62,11 @@ both apps — so tags feel identical everywhere (I3).
   (`DoneToggle` with a filled `Checkbox`); tapping its checkmark sends the existing
   `done:false` toggle (with version) and the row moves back to Today/Overdue on
   revalidate. Done rows carry no trash `deleteAction` (`TodoItem` gates it on
-  `todo.done`). Open todos due **later** or with no date appear in no section until
+  `todo.done`). The Done section also surfaces a repeating todo's latest logged
+  completion — the occurrence that was ticked — as a plain read-only
+  `CompletionItem` (`ListItem` href/title/meta only: the completion date and list
+  name, newest-first from the log, no strike and no toggle), while the todo's next
+  occurrence stays open in Overdue/Today. Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
   wins over its due bucket). Ticking an **open, non-recurring** todo strikes and
   mutes its row **immediately** — `TodoItem` flips a local optimistic
@@ -78,9 +82,10 @@ both apps — so tags feel identical everywhere (I3).
   collapse; a ticked row is never hidden or unmounted by the client, and the
   lingering row stays fully interactive (its Undo reverses the strike
   immediately). A
-  repeating tick never strikes optimistically (the server advances it and keeps
-  `done` false): it goes straight to the immediate version-checked write.
-  `revalidateTodos()`
+  repeating tick strikes optimistically too, through the same
+  `completeTodoAction` path: the write records the occurrence and advances the due
+  while keeping `done` false, so when the advance bumps `todo.version` the strike
+  self-clears and the next occurrence renders open. `revalidateTodos()`
   now also revalidates `/todos/matrix`, so a write from either view refreshes both
   (stale-matrix fix).
 - **Undo snackbar (user-requested):** a tick to done shows a bottom-left
@@ -259,8 +264,12 @@ recorded surface this spec froze:
   renders one `TodoItem` per done todo — the same row anatomy as Overdue/Today
   (`ListItem variant="todo" done` + the leading `DoneToggle`) — with no trash control;
   tapping the filled checkmark sends `done:false` and the row moves back to
-  Today/Overdue on revalidate. The backend completion log and the server undo rule are
-  unchanged
+  Today/Overdue on revalidate. It also surfaces, newest-first, a repeating todo's
+  latest logged completion as a plain read-only `CompletionItem` (`ListItem`
+  href/title/meta only — completed date + list name, no strike and no toggle); a
+  repeating todo's next occurrence stays open in Overdue/Today. Both row kinds are
+  produced by `groupTodos` (one owner of the merge/dedupe rule). The backend completion
+  log and the server undo rule are unchanged
   (`SPEC-todo-completion-history.md`); only the app's Done surface changed.
 - **Today page chrome (user-approved surface change):** the `/todos` heading is now
   `Today`. The `Search todos` search box, the `Status` / `All` / `Open` pills and the

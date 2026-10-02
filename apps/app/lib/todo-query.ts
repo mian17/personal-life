@@ -1,4 +1,4 @@
-import type { Todo } from '@life/shared';
+import type { Todo, TodoCompletion, TodoCompletionPage } from '@life/shared';
 import { dueDateState, type DueDateState } from '@life/ui';
 
 /**
@@ -11,6 +11,11 @@ import { dueDateState, type DueDateState } from '@life/ui';
 export type TodoPageFetcher = (
   cursor?: string,
 ) => Promise<{ todos: Todo[]; nextCursor: string | null }>;
+
+/** A page fetcher for the completion log (cursor in, page out). */
+export type CompletionPageFetcher = (
+  cursor?: string,
+) => Promise<{ completions: TodoCompletion[]; nextCursor: string | null }>;
 
 /**
  * Follow the service cursor until exhausted (or `maxItems`, a safety bound for a
@@ -25,6 +30,26 @@ export async function collectTodos(
   for (;;) {
     const page = await fetchPage(cursor);
     collected.push(...page.todos);
+    if (collected.length >= maxItems || !page.nextCursor) {
+      return collected.slice(0, maxItems);
+    }
+    cursor = page.nextCursor;
+  }
+}
+
+/**
+ * Follow the completion-log cursor until exhausted (or `maxItems`). The service
+ * returns newest-first globally, so the collected order is newest-first too.
+ */
+export async function collectTodoCompletions(
+  fetchPage: CompletionPageFetcher,
+  maxItems = 1000,
+): Promise<TodoCompletion[]> {
+  const collected: TodoCompletion[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchPage(cursor);
+    collected.push(...page.completions);
     if (collected.length >= maxItems || !page.nextCursor) {
       return collected.slice(0, maxItems);
     }

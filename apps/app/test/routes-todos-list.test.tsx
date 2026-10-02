@@ -1,10 +1,11 @@
-import type { List, Todo } from '@life/shared';
-import { ListShell, Tab, TabBar } from '@life/ui';
+import type { List, Todo, TodoCompletion } from '@life/shared';
+import { dueDateLabel, ListShell, Tab, TabBar, todayIso } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
   listTodos: jest.fn(),
   listLists: jest.fn(),
+  listTodoCompletions: jest.fn(),
 }));
 jest.mock('@/lib/tags-api', () => ({
   listTags: jest.fn(),
@@ -13,7 +14,7 @@ jest.mock('@/lib/tags-api', () => ({
 // server module never loads under jest.
 jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
 
-import { listTodos, listLists } from '@/lib/todo-api';
+import { listTodos, listLists, listTodoCompletions } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
@@ -22,6 +23,9 @@ import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
+const mockedListTodoCompletions = listTodoCompletions as jest.MockedFunction<
+  typeof listTodoCompletions
+>;
 const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
 
@@ -52,6 +56,19 @@ function asArray(node: { props: { children: unknown } }): any[] {
   return Array.isArray(kids) ? kids : [kids];
 }
 
+function completion(overrides: Partial<TodoCompletion> = {}): TodoCompletion {
+  return {
+    id: 'c1',
+    todoId: 't1',
+    occurrence: '2026-10-01',
+    completedAt: '2026-10-02T09:30:00.000Z',
+    title: 'Buy milk',
+    listId: null,
+    listName: null,
+    ...overrides,
+  };
+}
+
 describe('/todos list page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -71,6 +88,7 @@ describe('/todos list page wiring', () => {
     mockedListTags.mockResolvedValue([
       { id: 1, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
     ]);
+    mockedListTodoCompletions.mockResolvedValue({ completions: [], nextCursor: null });
     mockedReadPref.mockResolvedValue(false);
   });
 
@@ -149,5 +167,31 @@ describe('/todos list page wiring', () => {
     expect(html).toContain('ui-checkbox--checked');
     expect(html).not.toContain('ui-btn--danger');
     expect(html).not.toContain('aria-label="Delete Pay rent"');
+  });
+
+  it("surfaces a repeating todo's completed occurrence in Done while the next occurrence stays open", async () => {
+    const completedAt = '2026-10-02T09:30:00.000Z';
+    mockedListTodos.mockResolvedValue({
+      todos: [todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: '2026-01-01' })],
+      nextCursor: null,
+    });
+    mockedListTodoCompletions.mockResolvedValue({
+      completions: [completion({ id: 'c1', todoId: 'rep', title: 'Water plants', completedAt })],
+      nextCursor: null,
+    });
+
+    const el = await TodosPage();
+    const html = renderToStaticMarkup(el.props.body);
+
+    // The completed occurrence renders as a PLAIN row: title + completion date,
+    // with no strike/done variant anywhere (the only todo present is open).
+    expect(html).toContain('Water plants');
+    expect(html).toContain(dueDateLabel(completedAt, todayIso()));
+    expect(html).not.toContain('ui-list-item--done');
+
+    // The live repeating todo keeps its next occurrence open: its toggle offers
+    // to mark it done, and nothing renders it as already done.
+    expect(html).toContain('Mark Water plants done');
+    expect(html).not.toContain('Mark Water plants not done');
   });
 });

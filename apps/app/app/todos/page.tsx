@@ -1,7 +1,7 @@
-import { listTodos, listLists } from '@/lib/todo-api';
+import { listTodos, listLists, listTodoCompletions } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
 import { groupTodos } from '@/lib/todo-groups';
-import { collectTodos } from '@/lib/todo-query';
+import { collectTodos, collectTodoCompletions } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
 import {
   ListShell,
@@ -16,14 +16,15 @@ import { TodosNav } from '../todos-nav';
 export const dynamic = 'force-dynamic';
 
 export default async function TodosPage() {
-  const [lists, registry, todos] = await Promise.all([
+  const [lists, registry, todos, completions] = await Promise.all([
     listLists(),
     listTags(),
     collectTodos((cursor) => listTodos({ cursor })),
+    collectTodoCompletions((cursor) => listTodoCompletions({ cursor })),
   ]);
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
   const today = todayIso();
-  const groups = groupTodos(todos, today);
+  const groups = groupTodos(todos, today, completions);
   const matrixEnabled = await readPref('matrix');
 
   return (

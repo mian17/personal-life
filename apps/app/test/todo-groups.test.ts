@@ -1,4 +1,4 @@
-import type { Todo } from '@life/shared';
+import type { Todo, TodoCompletion } from '@life/shared';
 import { groupTodos, TODO_GROUPS } from '@/lib/todo-groups';
 import { dueStateOf } from '@/lib/todo-query';
 
@@ -22,6 +22,18 @@ function todo(id: string, dueDate: string | null, done = false): Todo {
     updatedAt: '2026-09-01T00:00:00.000Z',
     deletedAt: null,
     version: 0,
+  };
+}
+
+function completion(id: string, todoId: string, completedAt = '2026-10-02T10:00:00.000Z'): TodoCompletion {
+  return {
+    id,
+    todoId,
+    occurrence: '2026-09-28',
+    completedAt,
+    title: id,
+    listId: null,
+    listName: null,
   };
 }
 
@@ -83,5 +95,27 @@ describe('groupTodos', () => {
         expect(dueStateOf(item, TODAY)).toBe(group.key);
       }
     }
+  });
+
+  it("surfaces only an open repeating todo's latest completion in Done", () => {
+    const repeating = todo('rep', '2026-10-05');
+    const completions = [
+      completion('c2', 'rep', '2026-10-02T10:00:00.000Z'),
+      completion('c1', 'rep', '2026-10-01T10:00:00.000Z'),
+    ];
+    const done = groupTodos([repeating], TODAY, completions).find((g) => g.key === 'done')!;
+    expect(done.todos.map((t) => t.id)).toEqual([]);
+    expect(done.completions!.map((c) => c.id)).toEqual(['c2']);
+  });
+
+  it("skips a done todo's completion (its struck row already shows it)", () => {
+    const grouped = groupTodos([todo('d', '2026-09-01', true)], TODAY, [completion('c1', 'd')]);
+    const done = grouped.find((g) => g.key === 'done')!;
+    expect(done.completions).toEqual([]);
+  });
+
+  it('defaults done completions to an empty array', () => {
+    const done = groupTodos([todo('d', '2026-09-01', true)], TODAY).find((g) => g.key === 'done')!;
+    expect(done.completions).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import type { Todo } from '@life/shared';
+import type { Todo, TodoCompletion } from '@life/shared';
 import { dueDateState } from '@life/ui';
 
 /**
@@ -22,9 +22,15 @@ export interface TodoGroup {
   key: TodoGroupKey;
   label: string;
   todos: Todo[];
+  /** Done only: the latest logged completion per repeating todo (plain rows). */
+  completions?: TodoCompletion[];
 }
 
-export function groupTodos(todos: readonly Todo[], today: string): TodoGroup[] {
+export function groupTodos(
+  todos: readonly Todo[],
+  today: string,
+  completions: readonly TodoCompletion[] = [],
+): TodoGroup[] {
   const buckets: Record<TodoGroupKey, Todo[]> = {
     overdue: [],
     today: [],
@@ -38,5 +44,26 @@ export function groupTodos(todos: readonly Todo[], today: string): TodoGroup[] {
     const state = dueDateState(todo.dueDate, today);
     if (state === 'overdue' || state === 'today') buckets[state].push(todo);
   }
-  return TODO_GROUPS.map(({ key, label }) => ({ key, label, todos: buckets[key] }));
+
+  // The completed occurrence of a repeating todo: a live (open) todo whose
+  // completion log has an entry. A done one-off is already shown as a struck
+  // `TodoItem`, so its completion is skipped; a completion whose todo is not in
+  // this fetch (deleted/filtered) is skipped too. One entry per todo — the log
+  // is newest-first globally, so the first match is the latest occurrence.
+  const doneIds = new Set(buckets.done.map((todo) => todo.id));
+  const activeIds = new Set(todos.map((todo) => todo.id));
+  const seen = new Set<string>();
+  const doneCompletions: TodoCompletion[] = [];
+  for (const completion of completions) {
+    const { todoId } = completion;
+    if (doneIds.has(todoId) || !activeIds.has(todoId) || seen.has(todoId)) continue;
+    seen.add(todoId);
+    doneCompletions.push(completion);
+  }
+
+  return TODO_GROUPS.map(({ key, label }) =>
+    key === 'done'
+      ? { key, label, todos: buckets.done, completions: doneCompletions }
+      : { key, label, todos: buckets[key] },
+  );
 }

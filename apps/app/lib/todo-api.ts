@@ -5,6 +5,7 @@ import type {
   PushSubscribeInput,
   TagUsage,
   Todo,
+  TodoCompletionPage,
   TodoPage,
   UpdateTodoInput,
 } from '@life/shared';
@@ -52,6 +53,17 @@ export function getTodo(id: string): Promise<Todo> {
  */
 export function listTodoTagUsage(): Promise<TagUsage[]> {
   return call<TagUsage[]>('/api/todos/tags');
+}
+
+/** `GET /api/todos/completions` — cursor page of the completion log, newest-first. */
+export function listTodoCompletions(
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<TodoCompletionPage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
+  const qs = params.toString();
+  return call<TodoCompletionPage>(`/api/todos/completions${qs ? `?${qs}` : ''}`);
 }
 
 export function createTodo(input: CreateTodoInput): Promise<Todo> {
