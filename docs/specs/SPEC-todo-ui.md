@@ -67,7 +67,13 @@ both apps — so tags feel identical everywhere (I3).
   (`ListItem variant="todo" done`: muted + struck) whose filled `DoneToggle` is
   selected so the tap undoes the occurrence, showing the due date the tick
   satisfied and the list name (one row per todo, latest occurrence), while the
-  todo's next occurrence stays open in Overdue/Today. Open todos due **later** or with no date appear in no section until
+  todo's next occurrence stays open in Overdue/Today. The **Done** section is
+  ordered by tick time, newest first: every Done row — the derived repeating
+  occurrence and a done one-off alike — sorts by its latest logged completion's
+  `completedAt` DESC, tie-broken by that completion's `id` DESC to mirror the
+  service's `completedAt DESC, id DESC` log order. A Done row with no logged
+  completion (legacy data predating the log) sinks below every timed row,
+  keeping its service order. Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
   wins over its due bucket). Ticking an **open, non-recurring** todo strikes and
   mutes its row **immediately** — `TodoItem` flips a local optimistic

@@ -337,7 +337,10 @@ Kernel contracts apply. All routes are owner-scoped and guarded by the auth guar
 > trash, tap the checkmark to reopen) **and** surfaces the latest logged completion
 > per repeating todo as a plain read-only row (due date the tick satisfied +
 > list name, no strike, no toggle) while that todo's next occurrence stays open; `SPEC-todo-ui.md` owns that
-> surface. The backend contract above — the append-only log, `GET
+> surface. The Done section is ordered by tick time, newest first: every Done row
+> sorts by its latest logged completion's `completedAt` DESC, tie-broken by that
+> completion's `id` DESC, and a row with no logged completion sinks below every
+> timed row. The backend contract above — the append-only log, `GET
 > /api/todos/completions`, and the server undo rule — is unchanged; the log-UI
 > passages below are superseded.
 

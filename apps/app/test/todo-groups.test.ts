@@ -132,4 +132,56 @@ describe('groupTodos', () => {
     )!;
     expect(noLog.todos.map((t) => t.id)).toEqual(['d']);
   });
+
+  it('orders Done by latest completion (tick) time, interleaving occurrences and one-offs', () => {
+    const todos = [
+      todo('one-off-old', '2026-09-01', true),
+      todo('rep', '2026-10-05'),
+      todo('one-off-new', '2026-09-02', true),
+    ];
+    const completions = [
+      completion('c1', 'one-off-old', '2026-10-01T10:00:00.000Z'),
+      completion('c2', 'rep', '2026-10-02T10:00:00.000Z'),
+      completion('c3', 'one-off-new', '2026-10-03T10:00:00.000Z'),
+    ];
+    const done = groupTodos(todos, TODAY, completions).find((g) => g.key === 'done')!;
+    expect(done.todos.map((t) => t.id)).toEqual(['one-off-new', 'rep', 'one-off-old']);
+  });
+
+  it('breaks equal tick-time ties by id DESC', () => {
+    const at = '2026-10-02T10:00:00.000Z';
+    const todos = [todo('a', null, true), todo('b', null, true)];
+    const completions = [completion('c1', 'a', at), completion('c2', 'b', at)];
+    const done = groupTodos(todos, TODAY, completions).find((g) => g.key === 'done')!;
+    expect(done.todos.map((t) => t.id)).toEqual(['b', 'a']);
+  });
+
+  it('sinks Done rows with no logged completion below every timed row, in service order', () => {
+    const todos = [
+      todo('legacy-1', '2026-09-01', true),
+      todo('legacy-2', '2026-09-02', true),
+      todo('timed', '2026-09-03', true),
+    ];
+    const completions = [completion('c1', 'timed', '2026-10-02T10:00:00.000Z')];
+    const done = groupTodos(todos, TODAY, completions).find((g) => g.key === 'done')!;
+    expect(done.todos.map((t) => t.id)).toEqual(['timed', 'legacy-1', 'legacy-2']);
+  });
+
+  it('leaves Overdue and Today grouping and service order untouched by Done ordering', () => {
+    const todos = [
+      todo('overdue-2', '2026-09-01'),
+      todo('today-1', '2026-09-28'),
+      todo('overdue-1', '2026-09-02'),
+      todo('done-1', null, true),
+    ];
+    const completions = [completion('c1', 'done-1', '2026-10-02T10:00:00.000Z')];
+    const byKey = Object.fromEntries(
+      groupTodos(todos, TODAY, completions).map((g) => [g.key, g.todos.map((t) => t.id)]),
+    );
+    expect(byKey).toEqual({
+      overdue: ['overdue-2', 'overdue-1'],
+      today: ['today-1'],
+      done: ['done-1'],
+    });
+  });
 });
