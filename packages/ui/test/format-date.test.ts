@@ -1,5 +1,5 @@
 import { todayIso } from '../src/components/due-date-pill';
-import { dueDay, localTimePart } from '../src/lib/date-parts';
+import { WEEKDAY_SHORT, dueDay, isoWeekday, localTimePart, weekdayShort } from '../src/lib/date-parts';
 import { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from '../src/lib/format-date';
 
 describe('formatDate', () => {
@@ -150,5 +150,31 @@ describe('localTimePart', () => {
     expect(localTimePart(null)).toBe('');
     expect(localTimePart('')).toBe('');
     expect(localTimePart('not a date')).toBe('');
+  });
+});
+
+describe('isoWeekday / weekdayShort', () => {
+  it('maps ISO weekdays with Monday as 1 and Sunday as 7', () => {
+    expect(isoWeekday('2026-10-05')).toBe(1);
+    expect(isoWeekday('2026-10-08')).toBe(4);
+    expect(isoWeekday('2026-10-11')).toBe(7);
+  });
+
+  it('resolves the same weekday from an ISO datetime', () => {
+    expect(isoWeekday('2026-10-08T09:00')).toBe(4);
+  });
+
+  it('returns the short weekday name', () => {
+    expect(weekdayShort('2026-10-08')).toBe('Thu');
+  });
+
+  it('renders empty or malformed input as empty and weekday 0', () => {
+    expect(weekdayShort('')).toBe('');
+    expect(weekdayShort('nope')).toBe('');
+    expect(isoWeekday('nope')).toBe(0);
+  });
+
+  it('exposes WEEKDAY_SHORT indexed by ISO weekday − 1', () => {
+    expect(WEEKDAY_SHORT).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   });
 });

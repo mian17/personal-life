@@ -44,6 +44,27 @@ export function dueDay(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? '' : todayIso(date);
 }
 
+/** Short English weekday names indexed by ISO weekday − 1 (ISO 1 = Monday). */
+export const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+/**
+ * ISO weekday `1..7` (ISO 1 = Monday, 7 = Sunday) of an ISO date or datetime,
+ * read from the written calendar parts. Empty/malformed → `0`.
+ */
+export function isoWeekday(iso: string): number {
+  const part = datePart(iso);
+  if (part === '' || !isRealDate(part)) return 0;
+  const [year, month, day] = part.split('-').map(Number);
+  const utcDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return utcDay === 0 ? 7 : utcDay;
+}
+
+/** Short English weekday (`Thu`) of an ISO date or datetime; `''` when malformed. */
+export function weekdayShort(iso: string): string {
+  const wd = isoWeekday(iso);
+  return wd === 0 ? '' : WEEKDAY_SHORT[wd - 1];
+}
+
 /**
  * The local `HH:mm` (zero-padded) of a timed value; `''` for a date-only,
  * missing or malformed value. The single owner of the timed local time part.
