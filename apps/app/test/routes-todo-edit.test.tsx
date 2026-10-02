@@ -581,15 +581,40 @@ describe('TodoEditor Time and Repeat fields', () => {
     }
   });
 
-  it('hides the Repeat field until a due date is set', () => {
+  it('reveals Time and Repeat once a due date is set', () => {
     const harness = stateHarness();
     try {
       const none = harness.renderTree(todo({ dueDate: null }));
+      expect(findByType(none.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeUndefined();
       expect(findByType(none.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
 
       inputByLabel(none, 'Due date').props.onChange!({ target: { value: '2026-10-05' } });
       const withDue = harness.renderTree(todo({ dueDate: null }));
+      expect(findByType(withDue.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeDefined();
       expect(findByType(withDue.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('clearing the due date drops Time and Repeat so nothing orphaned can be saved', async () => {
+    const fixture = todo({ dueDate: '2026-10-05T09:30', repeat: 'weekly', version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      expect(pillGroup(first, 'Time').type).toBe(PillGroup);
+      expect(pillGroup(first, 'Repeat').type).toBe(PillGroup);
+
+      inputByLabel(first, 'Due date').props.onChange!({ target: { value: '' } });
+      const cleared = harness.renderTree(fixture);
+      expect(findByType(cleared.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeUndefined();
+      expect(findByType(cleared.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
+
+      await cleared.props.actions.props.onClick();
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.dueDate).toBeNull();
+      expect(patch.repeat).toBeNull();
     } finally {
       harness.restore();
     }

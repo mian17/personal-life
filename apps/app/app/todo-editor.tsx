@@ -62,6 +62,16 @@ export function TodoEditor({
   // enough to save.
   const canSave = title.trim() !== '';
 
+  // Clearing the due date drops the fields that depend on it (Time, Repeat) so no
+  // orphaned time/repeat can survive or be saved; they reappear when a date is set.
+  function onDueDateChange(value: string) {
+    setDueDate(value);
+    if (value === '') {
+      setDueTime('');
+      setRepeat(null);
+    }
+  }
+
   async function save() {
     if (!canSave || saving) return;
     setSaving(true);
@@ -146,18 +156,20 @@ export function TodoEditor({
           type="date"
           aria-label="Due date"
           value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
+          onChange={(e) => onDueDateChange(e.target.value)}
         />
       </PillGroup>
 
-      <PillGroup label="Time" aria-label="Time">
-        <Input
-          type="time"
-          aria-label="Due time"
-          value={dueTime}
-          onChange={(e) => setDueTime(e.target.value)}
-        />
-      </PillGroup>
+      {dueDate !== '' && (
+        <PillGroup label="Time" aria-label="Time">
+          <Input
+            type="time"
+            aria-label="Due time"
+            value={dueTime}
+            onChange={(e) => setDueTime(e.target.value)}
+          />
+        </PillGroup>
+      )}
 
       {dueDate !== '' && (
         <PillGroup label="Repeat" aria-label="Repeat">

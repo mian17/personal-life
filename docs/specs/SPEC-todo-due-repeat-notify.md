@@ -266,7 +266,9 @@ sibling fields (lesson 0014).
 - **Editor (`apps/app/app/todo-editor.tsx`):**
   - `PillGroup label="Due"` keeps the frozen `Input type="date"` (`aria-label="Due date"`).
   - New `PillGroup label="Time"` wraps an `Input type="time"` (`aria-label="Due time"`) —
-    empty ⇒ date-only; present ⇒ timed. The editor's `dueTime` state is seeded from a timed due
+    **shown only once a due date exists** (a time with no day is meaningless); it is hidden
+    whenever the due date is empty. Empty ⇒ date-only; present ⇒ timed. The editor's `dueTime`
+    state is seeded from a timed due
     via the single `@life/ui` owner `localTimePart(todo.dueDate)` (date-only/missing → `''`), so no
     app-side `new Date(...)` re-derives the local time (Contract 1 Rule 3 / lesson 0016). The editor
     joins them into
@@ -286,6 +288,11 @@ sibling fields (lesson 0014).
     chapter's previously recorded option labels; there is one owner of the mapping (lesson 0016).
   - The Repeat field is **hidden until a due date is set** (a repeat is meaningless without one),
     so the service's 400 can't be reached from the UI; no implicit/auto due date is inserted.
+  - **Prerequisite disclosure + clear cascade:** `Time` and `Repeat` are both children of the due
+    date — they appear together once one is set and disappear when it is cleared. Clearing the due
+    date also resets the dependent state (Time → `''`, Repeat → `None`) in the same handler, so an
+    orphaned time or repeat can never survive or be saved. The independent fields (Note, List,
+    Tags, Important) stay always visible — this is a prerequisite ladder, not a general reveal.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
   the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
   in the row meta (the same self-describing label as the editor).

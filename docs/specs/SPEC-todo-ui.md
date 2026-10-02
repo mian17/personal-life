@@ -130,7 +130,8 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `Input type="date"` (`aria-label="Due date"`). New `PillGroup label="Time"` wraps an
   `Input type="time"` (`aria-label="Due time"`) — empty ⇒ date-only, present ⇒ timed; its
   `dueTime` state is seeded from a timed due via the single `@life/ui` owner
-  `localTimePart(todo.dueDate)` (empty otherwise — no app-side `new Date(...)`). New
+  `localTimePart(todo.dueDate)` (empty otherwise — no app-side `new Date(...)`). The Time field
+  is shown only once a due date exists (a time without a day is meaningless). New
   `PillGroup label="Repeat"` of `Pill as="button" size="chip"` options
   (`None`/`Daily`/`Every Weekday (Mon - Fri)`/`Weekly (<Weekday>)`/
   `Monthly (The <nth> day)`/`Yearly (<day> <Mon>)`), reusing the existing
@@ -138,7 +139,9 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
   `@life/shared` dependency), composing the shared `@life/ui` `formatWeekday`/`formatDayMonth`
   helpers (day number via `dueDay`), never `toLocale*`. The Repeat field is hidden until a due
-  date is set, so a repeat-with-no-due can't be submitted (no implicit due date is inserted and
+  date is set, and the Time field is hidden until a due date is set too — both are children of the
+  due date and share its clear cascade (clearing the date resets Time → `''` and Repeat → `None`),
+  so a repeat-with-no-due can't be submitted (no implicit due date is inserted and
   the service's 400 is unreachable from the UI).
   **User-approved visible-text change (self-describing repeat labels):** the parenthetical is
   derived from the todo's due date so the user sees what a repeat means at a glance, and the
