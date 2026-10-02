@@ -1,7 +1,7 @@
 'use client';
 
 import type { List } from '@life/shared';
-import { ListManager, Switch } from '@life/ui';
+import { ListManager, SettingsRow, Switch } from '@life/ui';
 import { createListAction, deleteListAction, renameListAction } from './todo-actions';
 
 /**
@@ -21,11 +21,16 @@ export function ListManagerPanel({ lists }: { lists: List[] }) {
       rowExtra={(option) => {
         const list = lists.find((candidate) => candidate.id === option.id);
         return (
-          <Switch
-            label="Default important"
-            checked={list?.importantDefault ?? false}
-            onCheckedChange={(next) =>
-              void renameListAction(option.id, option.name, next, list?.version)
+          <SettingsRow
+            label="Important by default"
+            control={
+              <Switch
+                label="Default important"
+                checked={list?.importantDefault ?? false}
+                onCheckedChange={(next) =>
+                  void renameListAction(option.id, option.name, next, list?.version)
+                }
+              />
             }
           />
         );

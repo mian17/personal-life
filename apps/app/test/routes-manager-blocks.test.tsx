@@ -1,5 +1,5 @@
 import type { List } from '@life/shared';
-import { ManagerBlock, Switch } from '@life/ui';
+import { ManagerBlock, SettingsRow, Switch } from '@life/ui';
 
 jest.mock('@/app/todo-actions', () => ({
   createListAction: jest.fn(),
@@ -73,19 +73,22 @@ describe('ListManagerPanel importance-default Switch', () => {
     const lists = [list({ importantDefault: importantDefault as boolean | null })];
     const node = rowExtraFor(lists, 'l1');
 
-    expect(node.type).toBe(Switch);
-    expect(node.props.label).toBe('Default important');
-    expect(node.props.checked).toBe(expected);
+    expect(node.type).toBe(SettingsRow);
+    expect(node.props.label).toBe('Important by default');
+    const control = node.props.control;
+    expect(control.type).toBe(Switch);
+    expect(control.props.label).toBe('Default important');
+    expect(control.props.checked).toBe(expected);
   });
 
   it('sends the next value and the list version through renameListAction', () => {
     const lists = [list({ importantDefault: true, version: 7 })];
     const node = rowExtraFor(lists, 'l1');
 
-    node.props.onCheckedChange(false);
+    node.props.control.props.onCheckedChange(false);
     expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', false, 7);
 
-    node.props.onCheckedChange(true);
+    node.props.control.props.onCheckedChange(true);
     expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', true, 7);
   });
 

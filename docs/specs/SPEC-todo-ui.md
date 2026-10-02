@@ -107,8 +107,9 @@ sets them.
 
 - **List importance-default** — a `Switch` on the list manager
   (`apps/app/app/list-manager-panel.tsx`), writing `list.importantDefault` through the
-  existing list action (`apps/app/app/todo-actions.ts`). Accessible name (frozen app text):
-  `Default important`.
+  existing list action (`apps/app/app/todo-actions.ts`). Wrapped in a visible `SettingsRow`
+  whose label is `Important by default` (a bare `Switch` carries only an `aria-label`, so the
+  row needs on-screen text — lesson 0014). Accessible name (frozen app text): `Default important`.
 - **Per-todo importance** — a `Switch` in the todo editor
   (`apps/app/app/todo-editor.tsx`, wired through `apps/app/app/todo-actions.ts`) wrapped in a
   visible `PillGroup` labelled `Important` (field parity with `Due`/`List`), displayed
