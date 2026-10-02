@@ -6,6 +6,8 @@ This delta is **`apps/app` + `packages/ui` only** — no backend, no schema, no 
 Read this **with** `docs/runbooks/deploy-completion-custom-repeat.md`, which documents the
 backend chapters (`todo_completion` table, `GET /api/todos/completions`, `repeatDays`,
 custom repeat) in `8cc6b98..5157bf1`. Nothing in that backend part changes here.
+A later slice on this branch (`df7f58b..2469ad4`, client-timezone "today" + a `compose.yaml`
+env line on `app`) is in `docs/runbooks/deploy-timezone-today.md`; deploy that after this one.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
 authority to run it. Do **not** merge to `master` unless asked explicitly — building the
