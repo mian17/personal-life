@@ -29,16 +29,20 @@ export default async function TodosPage({
   const { q, list, tag, done } = await searchParams;
   const tagId = parseTagId(tag);
   const doneFilter = done === 'true' ? true : done === 'false' ? false : undefined;
+  const isDone = doneFilter === true;
 
   const filters: TodoFilters = { q, listId: list, tagId, done: doneFilter };
-  const [usage, lists, registry] = await Promise.all([
+  const [usage, lists, registry, completions, todos] = await Promise.all([
     listTodoTagUsage(),
     listLists(),
     listTags(),
+    isDone ? collectTodoCompletions((cursor) => listTodoCompletions({ cursor })) : Promise.resolve([]),
+    isDone ? Promise.resolve([]) : collectTodos((cursor) => listTodos({ ...filters, cursor })),
   ]);
   const namedTags = await resolveTagUsage(usage);
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
   const today = todayIso();
+  const groups = groupTodos(todos, today);
   const matrixEnabled = await readPref('matrix');
 
   const tagFilterItems = [
@@ -124,19 +128,10 @@ export default async function TodosPage({
         </>
       }
       body={
-        doneFilter === true ? (
-          <TodoCompletionList
-            completions={await collectTodoCompletions((cursor) => listTodoCompletions({ cursor }))}
-            today={today}
-          />
+        isDone ? (
+          <TodoCompletionList completions={completions} today={today} />
         ) : (
-          <TodoList
-            groups={groupTodos(await collectTodos((cursor) => listTodos({ ...filters, cursor })), today)}
-            today={today}
-            lists={lists}
-            availableTags={availableTags}
-            hideDone
-          />
+          <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone />
         )
       }
       fabHref="/todos/new"

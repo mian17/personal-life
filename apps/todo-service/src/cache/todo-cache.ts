@@ -58,7 +58,7 @@ export class TodosCache {
     this.inner = createCache({ service: SERVICE, client });
   }
 
-  /** Read-through one of the owner's three entries; `loader` returns stored rows. */
+  /** Read-through one of the owner's four entries; `loader` returns stored rows. */
   async getThrough<T>(
     sub: string,
     rest: string,

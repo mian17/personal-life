@@ -769,7 +769,7 @@ export class TodosService {
 
   /**
    * `GET /api/todos/:id` — served from the one cached `todo:all` row-set (the
-   * spec enumerates exactly three todo cache shapes; the id is a filter, so no
+   * spec enumerates exactly four todo cache shapes; the id is a filter, so no
    * id ever enters the key space). Decrypt, then slice by id in memory after the
    * hit. A foreign or missing id is a byte-identical 404 — the `rawRows` loader
    * guards `deletedAt IS NULL`, so a trashed id reads as absent.
