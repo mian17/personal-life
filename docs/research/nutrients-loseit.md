@@ -85,6 +85,46 @@ Reading notes (recorded, not invented):
 Not present in the pasted list: added sugars, net carbs, Vitamin D, Vitamin E, Vitamin K,
 pantothenic acid (B5), selenium, copper, manganese, iodine.
 
+### 0.1 Agreed units (locked with the user)
+
+The list states units only for the six minerals (`0mg`) and caffeine (`Omg`). The remaining
+units were proposed and explicitly agreed by the user. Nothing else in this doc overrides
+this table.
+
+| # | Field (as pasted) | Unit | Unit source |
+|---|---|---|---|
+| 1 | Calories | kcal | proposed (name implies it) |
+| 2 | Fat | g | proposed |
+| 3 | Monounsaturated Fat | g | proposed |
+| 4 | Polyunsaturated Fat | g | proposed |
+| 5 | Saturated Fat | g | proposed |
+| 6 | Trans Fat | g | proposed |
+| 7 | Cholesterol | mg | proposed |
+| 8 | Sodium | mg | proposed |
+| 9 | Carbohydrates | g | proposed |
+| 10 | Fiber | g | proposed |
+| 11 | Sugar | g | proposed |
+| 12 | Protein | g | proposed |
+| 13 | Vitamin A | mcg | proposed |
+| 14 | Vitamin C | mg | proposed |
+| 15 | Thiamin (B1) | mg | proposed |
+| 16 | Riboflavin (B2) | mg | proposed |
+| 17 | Niacin (B3) | mg | proposed |
+| 18 | Folate (B9) | mcg | **changed by user** (was mg) |
+| 19 | Vitamin B6 | mg | proposed |
+| 20 | Vitamin B12 | mcg | **changed by user** (was mg) |
+| 21 | Calcium | mg | pasted: `0mg` |
+| 22 | Iron | mg | pasted: `0mg` |
+| 23 | Magnesium | mg | pasted: `0mg` |
+| 24 | Phosphorus | mg | pasted: `0mg` |
+| 25 | Potassium | mg | pasted: `0mg` |
+| 26 | Zinc | mg | pasted: `0mg` |
+| 27 | Caffeine | mg | pasted: `Omg` (= 0mg) |
+| 28 | Water (day-level companion) | ml | not in pasted list; app-level |
+
+Storage is **absolute mass** in the unit above (not `%DV`); `%DV` is a display derivation.
+Spelling: ASCII `mcg`, not `µg`.
+
 ## Source-access note (read first)
 
 Most official Lose It! surfaces and third-party aggregators returned HTTP 403 to the
