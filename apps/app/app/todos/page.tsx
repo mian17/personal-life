@@ -1,9 +1,10 @@
-import { listTodoTagUsage, listTodos, listLists, type TodoFilters } from '@/lib/todo-api';
+import { listTodoTagUsage, listTodos, listLists, listTodoCompletions, type TodoFilters } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
-import { collectTodos } from '@/lib/todo-query';
+import { collectTodos, collectTodoCompletions } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
+import { TodoCompletionList } from '../todo-completion-list';
 import { filterHref, parseTagId, PreservingSearchBox } from '@life/app-kit';
 import {
   ListShell,
@@ -30,8 +31,7 @@ export default async function TodosPage({
   const doneFilter = done === 'true' ? true : done === 'false' ? false : undefined;
 
   const filters: TodoFilters = { q, listId: list, tagId, done: doneFilter };
-  const [todos, usage, lists, registry] = await Promise.all([
-    collectTodos((cursor) => listTodos({ ...filters, cursor })),
+  const [usage, lists, registry] = await Promise.all([
     listTodoTagUsage(),
     listLists(),
     listTags(),
@@ -39,7 +39,6 @@ export default async function TodosPage({
   const namedTags = await resolveTagUsage(usage);
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
   const today = todayIso();
-  const groups = groupTodos(todos, today);
   const matrixEnabled = await readPref('matrix');
 
   const tagFilterItems = [
@@ -124,7 +123,22 @@ export default async function TodosPage({
           {lists.length > 0 && <TagFilterNav label="Lists" items={listFilterItems} />}
         </>
       }
-      body={<TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone={doneFilter !== true} />}
+      body={
+        doneFilter === true ? (
+          <TodoCompletionList
+            completions={await collectTodoCompletions((cursor) => listTodoCompletions({ cursor }))}
+            today={today}
+          />
+        ) : (
+          <TodoList
+            groups={groupTodos(await collectTodos((cursor) => listTodos({ ...filters, cursor })), today)}
+            today={today}
+            lists={lists}
+            availableTags={availableTags}
+            hideDone
+          />
+        )
+      }
       fabHref="/todos/new"
       fabLabel="New todo"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}

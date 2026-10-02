@@ -1,4 +1,4 @@
-import type { Todo } from '@life/shared';
+import type { Todo, TodoCompletion } from '@life/shared';
 import { dueDateState, type DueDateState } from '@life/ui';
 
 /**
@@ -25,6 +25,28 @@ export async function collectTodos(
   for (;;) {
     const page = await fetchPage(cursor);
     collected.push(...page.todos);
+    if (collected.length >= maxItems || !page.nextCursor) {
+      return collected.slice(0, maxItems);
+    }
+    cursor = page.nextCursor;
+  }
+}
+
+/** A completion-page fetcher (cursor in, page out). */
+export type CompletionPageFetcher = (
+  cursor?: string,
+) => Promise<{ completions: TodoCompletion[]; nextCursor: string | null }>;
+
+/** Follow the completions cursor until exhausted (or `maxItems`). Mirrors `collectTodos`. */
+export async function collectTodoCompletions(
+  fetchPage: CompletionPageFetcher,
+  maxItems = 1000,
+): Promise<TodoCompletion[]> {
+  const collected: TodoCompletion[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchPage(cursor);
+    collected.push(...page.completions);
     if (collected.length >= maxItems || !page.nextCursor) {
       return collected.slice(0, maxItems);
     }
