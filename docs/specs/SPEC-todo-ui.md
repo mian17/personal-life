@@ -137,9 +137,9 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `Pill`/`PillGroup` primitives; `None` ⇒ `repeat: null`. Labels come from the app-owned
   `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
   `@life/shared` dependency), composing the shared `@life/ui` `formatWeekday`/`formatDayMonth`
-  helpers (day number via `dueDay`), never `toLocale*`. A repeat with no due blocks the save
-  (mirroring the service's
-  400); no implicit due date is inserted — the editor stays open on the server error.
+  helpers (day number via `dueDay`), never `toLocale*`. The Repeat field is hidden until a due
+  date is set, so a repeat-with-no-due can't be submitted (no implicit due date is inserted and
+  the service's 400 is unreachable from the UI).
   **User-approved visible-text change (self-describing repeat labels):** the parenthetical is
   derived from the todo's due date so the user sees what a repeat means at a glance, and the
   pills update live as the due date changes; a missing/malformed due falls back to the bare base

@@ -284,9 +284,8 @@ sibling fields (lesson 0014).
     the day number via `dueDay`), never `toLocale*`. A missing/malformed due falls back to the
     bare base label (`Weekly`, not `Weekly ()`). **User-approved visible-text change** to this
     chapter's previously recorded option labels; there is one owner of the mapping (lesson 0016).
-  - A repeat with no due shows the field but the save is **blocked** until a due date exists
-    (mirroring the service's 400); there is no implicit/auto due date — the editor surfaces the
-    server error by staying open.
+  - The Repeat field is **hidden until a due date is set** (a repeat is meaningless without one),
+    so the service's 400 can't be reached from the UI; no implicit/auto due date is inserted.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
   the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
   in the row meta (the same self-describing label as the editor).

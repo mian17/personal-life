@@ -567,7 +567,7 @@ describe('TodoEditor Time and Repeat fields', () => {
   it('renders PillGroups visibly labelled Time and Repeat', () => {
     const harness = stateHarness();
     try {
-      const tree = harness.renderTree(todo());
+      const tree = harness.renderTree(todo({ dueDate: '2026-10-05' }));
 
       expect(pillGroup(tree, 'Time').type).toBe(PillGroup);
       expect(inputByLabel(tree, 'Due time').props['aria-label']).toBe('Due time');
@@ -576,6 +576,20 @@ describe('TodoEditor Time and Repeat fields', () => {
       expect(repeat.type).toBe(PillGroup);
       expect(findByType(repeat.props.children, Input)).toBeUndefined();
       expect(findByType(repeat.props.children, Pill, (p) => p.props.children === 'None')).toBeDefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('hides the Repeat field until a due date is set', () => {
+    const harness = stateHarness();
+    try {
+      const none = harness.renderTree(todo({ dueDate: null }));
+      expect(findByType(none.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
+
+      inputByLabel(none, 'Due date').props.onChange!({ target: { value: '2026-10-05' } });
+      const withDue = harness.renderTree(todo({ dueDate: null }));
+      expect(findByType(withDue.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
     } finally {
       harness.restore();
     }
@@ -608,22 +622,24 @@ describe('TodoEditor Time and Repeat fields', () => {
     }
   });
 
-  it('a repeat with no due date keeps save disabled and stays open', () => {
+  it('a repeat with no due date is unreachable, so a title alone saves', async () => {
+    const titleOnly = todo({ dueDate: null, repeat: null, version: 3 });
     const harness = stateHarness();
     try {
-      const first = harness.renderTree(undefined);
-      inputByLabel(first, 'Todo title').props.onChange!({ target: { value: 'Recurring task' } });
+      const first = harness.renderTree(titleOnly);
+      // No due ⇒ no Repeat field, so the repeat-requires-due state cannot be reached.
+      expect(findByType(first.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
+      expect(first.props.actions.props.disabled).toBe(false);
 
-      const second = harness.renderTree(undefined);
-      findPill(second.props.children, 'Daily')!.props.onClick();
+      inputByLabel(first, 'Todo title').props.onChange!({ target: { value: 'Plain task' } });
+      const second = harness.renderTree(titleOnly);
+      expect(second.props.actions.props.disabled).toBe(false);
+      await second.props.actions.props.onClick();
 
-      const third = harness.renderTree(undefined);
-      expect(third.props.actions.props.disabled).toBe(true);
-      third.props.actions.props.onClick();
-
-      expect(mockedCreateTodoAction).not.toHaveBeenCalled();
-      expect(mockedUpdateTodoAction).not.toHaveBeenCalled();
-      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.dueDate).toBeNull();
+      expect(patch.repeat).toBeNull();
     } finally {
       harness.restore();
     }

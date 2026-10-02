@@ -57,9 +57,10 @@ export function TodoEditor({
     : (lists.find((list) => list.id === listId)?.importantDefault ?? false);
   const important = importantOverride ?? seedImportant;
 
-  // A repeat requires a due date (mirrors the service's 400): the field shows
-  // but blocks save; no implicit due is inserted.
-  const canSave = title.trim() !== '' && !(repeat != null && dueDate === '');
+  // A repeat requires a due date, so the field only appears once one is set —
+  // the invariant can't be violated. With no repeat field reachable, a title is
+  // enough to save.
+  const canSave = title.trim() !== '';
 
   async function save() {
     if (!canSave || saving) return;
@@ -158,29 +159,31 @@ export function TodoEditor({
         />
       </PillGroup>
 
-      <PillGroup label="Repeat" aria-label="Repeat">
-        <Pill
-          as="button"
-          size="chip"
-          active={repeat === null}
-          aria-pressed={repeat === null}
-          onClick={() => setRepeat(null)}
-        >
-          None
-        </Pill>
-        {TODO_REPEATS.map((value) => (
+      {dueDate !== '' && (
+        <PillGroup label="Repeat" aria-label="Repeat">
           <Pill
-            key={value}
             as="button"
             size="chip"
-            active={repeat === value}
-            aria-pressed={repeat === value}
-            onClick={() => setRepeat(value)}
+            active={repeat === null}
+            aria-pressed={repeat === null}
+            onClick={() => setRepeat(null)}
           >
-            {repeatLabel(value, dueDate)}
+            None
           </Pill>
-        ))}
-      </PillGroup>
+          {TODO_REPEATS.map((value) => (
+            <Pill
+              key={value}
+              as="button"
+              size="chip"
+              active={repeat === value}
+              aria-pressed={repeat === value}
+              onClick={() => setRepeat(value)}
+            >
+              {repeatLabel(value, dueDate)}
+            </Pill>
+          ))}
+        </PillGroup>
+      )}
 
       {lists.length > 0 && (
         <PillGroup label="List" aria-label="List">
