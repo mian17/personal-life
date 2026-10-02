@@ -19,8 +19,7 @@ export default async function TodosMatrixPage() {
   ]);
   const today = todayIso();
 
-  const openTodos = todos.filter((todo) => !todo.done);
-  const quadrants = groupByQuadrant(openTodos, today).map((bucket) => ({
+  const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
     tone: bucket.tone,

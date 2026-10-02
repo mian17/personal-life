@@ -70,7 +70,13 @@ export interface QuadrantBucket {
   todos: Todo[];
 }
 
-/** Group the given todos into the four quadrants, `QUADRANTS` order, in memory. */
+/**
+ * Group the given todos into the four quadrants, `QUADRANTS` order, in memory.
+ *
+ * Single owner of the open-only rule: the matrix is a planning view, so done todos are
+ * skipped here (completed tasks live in the Done section on `/todos`) and the page just
+ * calls this.
+ */
 export function groupByQuadrant(todos: readonly Todo[], today: string): QuadrantBucket[] {
   const buckets: Record<QuadrantId, Todo[]> = {
     'urgent-important': [],
@@ -79,6 +85,7 @@ export function groupByQuadrant(todos: readonly Todo[], today: string): Quadrant
     'not-urgent-not-important': [],
   };
   for (const todo of todos) {
+    if (todo.done) continue;
     buckets[quadrantOf(todo, today)].push(todo);
   }
   return QUADRANTS.map(({ id, label, tone, rowTone }) => ({

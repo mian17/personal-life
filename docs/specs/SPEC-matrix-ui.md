@@ -405,9 +405,10 @@ export default async function TodosMatrixPage() {
 - **Dense type:** the matrix row's title and date are 0.7rem (`.ui-list-item--dense*`,
   owned by `SPEC-ui-blocks.md`).
 - **Overflow:** a quadrant whose content exceeds its box scrolls; the page itself does not.
-- **Matrix renders only open todos:** the page filters `todo.done === false`
-  before `groupByQuadrant`, so a done todo is never placed in a quadrant (done
-  tasks live in the Done section on `/todos`). Ticking an open todo in the matrix
+- **Matrix renders only open todos:** `groupByQuadrant` (`apps/app/lib/matrix.ts`) is the
+  single owner of the rule — it skips done todos, so a done todo is never placed in a quadrant
+  (done tasks live in the Done section on `/todos`) and the page just calls it. Ticking an
+  open todo in the matrix
   strikes its row immediately (optimistic `completed` in `TodoItem`, delivered by
   `ListItem done` — no `@life/ui` change) while `completeTodoAction` writes, then
   lingers ~700ms before `revalidateTodos()` (which includes `/todos/matrix`);

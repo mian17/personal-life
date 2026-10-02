@@ -4,12 +4,17 @@ import { groupByQuadrant, isUrgent, quadrantOf, QUADRANTS } from '@/lib/matrix';
 
 const TODAY = '2026-10-01';
 
-function todo(id: string, dueDate: string | null, effectiveImportant: boolean): Todo {
+function todo(
+  id: string,
+  dueDate: string | null,
+  effectiveImportant: boolean,
+  done = false,
+): Todo {
   return {
     id,
     title: id,
     note: null,
-    done: false,
+    done,
     important: null,
     effectiveImportant,
     dueDate,
@@ -115,6 +120,20 @@ describe('groupByQuadrant', () => {
       'not-urgent-important': ['ni-1', 'ui-2'],
       'not-urgent-not-important': ['nn-1'],
     });
+  });
+
+  it('places no done todo in any quadrant', () => {
+    const todos = [
+      todo('ui-open', '2026-09-30', true),
+      todo('nn-open', null, false),
+      todo('ui-done', '2026-09-30', true, true),
+      todo('nn-done', null, false, true),
+    ];
+    const grouped = groupByQuadrant(todos, TODAY);
+    const allIds = grouped.flatMap((b) => b.todos.map((t) => t.id));
+    expect(allIds).toEqual(['ui-open', 'nn-open']);
+    expect(allIds).not.toContain('ui-done');
+    expect(allIds).not.toContain('nn-done');
   });
 
   it('preserves input order within a quadrant', () => {
