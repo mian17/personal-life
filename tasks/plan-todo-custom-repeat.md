@@ -155,14 +155,16 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/shared/src/index.ts`,
-    `packages/shared/test/index.test.ts` (created — the file does not exist today), and the eight
+    `packages/shared/test/index.test.ts` (created — the file does not exist today), and the nine
     app test files whose
     `Todo` object literals gain `repeatDays: null` (the same migration pattern as
     `todo-due-repeat-notify` T2): `apps/app/test/todo-item.test.tsx`,
     `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
     `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
     `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
-    `apps/app/test/routes-todos-trash.test.tsx`.
+    `apps/app/test/routes-todos-trash.test.tsx`,
+    `apps/app/test/routes-todos-completions.test.tsx` (created by `todo-completion-history`,
+    commit `60a1812`).
   - Reference files (read-only): `docs/specs/SPEC-todo-custom-repeat.md`,
     `docs/specs/SPEC-todo-service.md`.
   - Strictly prohibited files: every other file (the service tests use `h.todos.create(...)`, not
@@ -178,8 +180,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     comment: `null`/omitted = no custom days; present only meaningful when `repeat === 'custom'`.
   - No runtime helpers in this package beyond the constants (parsing/formatting is T5's service
     concern and T8's label concern).
-  - **App literal migration:** each of the eight named app test files' `Todo` object literal gains
-    `repeatDays: null` so `npm run typecheck -w @life/app` stays green. No app production code
+  - **App literal migration:** each of the nine named app test files' `Todo` object literal gains
+    `repeatDays: null` (in `routes-todos-completions.test.tsx` beside `repeat: null` in the
+    `todo()` factory) so `npm run typecheck -w @life/app` stays green. No app production code
     constructs a `Todo` literal (verified), so only tests change.
 
 [VERIFICATION & TESTING RULES]
@@ -191,7 +194,7 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - [ ] `TODO_REPEATS` includes `'custom'`; `TODO_REPEAT_DAYS` is exported.
   - [ ] `Todo.repeatDays`, `CreateTodoInput.repeatDays`, `UpdateTodoInput.repeatDays` exist with
         the exact types above.
-  - [ ] All eight app test files carry `repeatDays: null` in their `Todo` literal.
+  - [ ] All nine app test files carry `repeatDays: null` in their `Todo` literal.
   - [ ] `npm run typecheck -w @life/shared` and `npm run typecheck -w @life/app` pass with zero
         errors; no file outside scope.
 
@@ -356,10 +359,13 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `@IsOptional() @ValidateIf((_, v) => v !== null) @IsArray() @ArrayNotEmpty() @IsIn(TODO_REPEAT_DAYS, { each: true }) repeatDays?: number[] | null;`.
     `repeat`'s `@IsIn(TODO_REPEATS)` now admits `'custom'` automatically (T2).
   - `todos.service.ts`:
+    - New private helper on `TodosService`:
+      `private normalizeRepeat(repeat: TodoRepeat | null, days: number[] | null): number[] | null`
+      — throws `BadRequestException('custom repeat requires repeatDays')` when `repeat === 'custom'`
+      and `days` is null/empty; returns `null` for any non-custom repeat (a provided set is
+      normalized away); otherwise returns the non-empty `days`.
     - `create(input)`: resolve `const days = this.normalizeRepeat(input.repeat ?? null, input.repeatDays ?? null)`;
-      store `repeat`, `repeatDays: formatRepeatDays(days)`. `normalizeRepeat` throws
-      `BadRequestException('custom repeat requires repeatDays')` when `repeat === 'custom'` and
-      days is empty; returns `null` days for any non-custom repeat.
+      store `repeat`, `repeatDays: formatRepeatDays(days)`.
     - `update(patch)`: after resolving the resulting `dueDate`/`repeat`, apply `patch.repeatDays`
       when `patch.repeat !== undefined || patch.repeatDays !== undefined` (a repeat change without
       days clears days; a days change without repeat keeps the repeat), then run the same

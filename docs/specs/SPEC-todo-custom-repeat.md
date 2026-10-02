@@ -19,9 +19,10 @@ sets a weekly rule on the chosen day(s); the field then reads the concrete days
 
 Success looks like: the user edits a todo due Mon Oct 5, picks Repeat → `Custom…`, opens
 the modal (Thursday pre-ticked from the due), ticks Fri, Confirms; the field reads
-`Custom (Thu, Fri)`; ticking the todo advances it to Thu Oct 8 (the next chosen weekday),
-then Oct 9, then Oct 15 …; each occurrence fires its push reminder. The due date itself
-was never moved — it stays the first occurrence.
+`Custom (Thu, Fri)`; ticking the todo records a completion for the pre-advance due **then**
+advances it to Thu Oct 8 (the next chosen weekday), keeping `done: false`, then Oct 9, then
+Oct 15 …; each occurrence fires its push reminder. The due date itself was never moved — it
+stays the first occurrence.
 
 User: the single account owner, in the todos app editor (shared `@life/ui` surface).
 
@@ -253,8 +254,9 @@ picker and the label: `WEEKDAY_SHORT` (`Mon`…`Sun`, ISO 1..7) and `weekdayShor
    identically (create and update).
 2. The editor renders `Custom (Thu, Fri)` for that todo and opens the modal seeded with the
    committed/custom days.
-3. Ticking the custom todo advances its `dueDate` to the next chosen weekday on/after now,
-   in `TODO_TIMEZONE`, preserving time-of-day, and recomputes `reminderScheduledAt`.
+3. Ticking the custom todo records a completion for the pre-advance due, then advances its
+   `dueDate` to the next chosen weekday on/after now, in `TODO_TIMEZONE`, preserving
+   time-of-day, recomputes `reminderScheduledAt`, and keeps `done: false`.
 4. `custom` without days is a 400; any non-custom repeat stores `repeatDays = null`;
    clearing the due clears both.
 5. The `Dialog` block renders nothing outside the top layer when closed, traps focus when
