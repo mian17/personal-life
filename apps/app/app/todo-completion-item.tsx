@@ -7,6 +7,12 @@ import { dueDateLabel, ListItem } from '@life/ui';
  * strike is reserved for live done-todo rows (`TodoItem`); this row is a
  * read-only record of the occurrence that was ticked, while the repeating
  * todo's next occurrence stays open in Overdue/Today.
+ *
+ * The row shows the DUE date the tick satisfied (`occurrence`), not the
+ * completion/click timestamp (`completedAt`). `groupTodos` keeps only
+ * completions whose todo still exists and repeats, so every row here carries a
+ * real dated `occurrence` — never the `'~'` undated-one-off sentinel — and no
+ * sentinel handling is needed.
  */
 export function CompletionItem({
   completion,
@@ -21,7 +27,7 @@ export function CompletionItem({
       title={completion.title}
       meta={
         <>
-          <span>{dueDateLabel(completion.completedAt, today)}</span>
+          <span>{dueDateLabel(completion.occurrence, today)}</span>
           {completion.listName && <span>{completion.listName}</span>}
         </>
       }

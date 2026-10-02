@@ -4,13 +4,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { CompletionItem } from '../app/todo-completion-item';
 
 const TODAY = '2026-10-02';
+const OCCURRENCE = '2026-10-01';
 const COMPLETED_AT = '2026-10-02T09:30:00.000Z';
 
 function completion(overrides: Partial<TodoCompletion> = {}): TodoCompletion {
   return {
     id: 'c1',
     todoId: 't1',
-    occurrence: '2026-10-01',
+    occurrence: OCCURRENCE,
     completedAt: COMPLETED_AT,
     title: 'Water plants',
     listId: 'l1',
@@ -25,7 +26,8 @@ describe('CompletionItem', () => {
 
     expect(html).toContain('Water plants');
     expect(html).toContain('href="/todos/t1/edit"');
-    expect(html).toContain(dueDateLabel(COMPLETED_AT, TODAY));
+    expect(html).toContain(dueDateLabel(OCCURRENCE, TODAY));
+    expect(html).not.toContain(dueDateLabel(COMPLETED_AT, TODAY));
     expect(html).toContain('Home');
   });
 

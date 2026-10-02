@@ -34,12 +34,13 @@ appends one row and closes the todo; Undo removes that row and reopens it. Undoi
 A double tick can
 never double-record (`UNIQUE (todoId, occurrence)`).
 
-The Done row renders **only** the completion date (`dueDateLabel(completedAt, today)`), never
-the `occurrence` value — the "completed-date meta" anatomy below is authoritative. A todo
-completed before its due (e.g. scheduled for tomorrow, ticked today) therefore shows "Today":
-that is *when it was completed*, not a mis-recorded occurrence — `occurrence` still holds the
-scheduled day. Keep it this way: on 02-Oct-2026 the user reviewed the alternatives (show
-`occurrence` instead, or both) and chose the completion date alone.
+The Done row renders the **due date the tick satisfied**
+(`dueDateLabel(occurrence, today)`), **not** the completion timestamp
+(`completedAt`). A todo completed before its due (e.g. scheduled for tomorrow,
+ticked today) therefore shows tomorrow's date — the occurrence that was
+completed — while `completedAt` still records the click instant. **Revised by
+the user on 2026-10-02** (the earlier decision locked the completion date alone;
+the user reviewed both options and chose the satisfied due date).
 
 User: the single account owner, in the todos app (shared `@life/ui` surface).
 
@@ -331,8 +332,8 @@ Kernel contracts apply. All routes are owner-scoped and guarded by the auth guar
 > completion log wholesale, and the `?done=true` Done view is retired. The app's
 > **Done** section now renders done `todo` rows via `TodoItem` (struck + muted, no
 > trash, tap the checkmark to reopen) **and** surfaces the latest logged completion
-> per repeating todo as a plain read-only row (completed date + list name, no strike,
-> no toggle) while that todo's next occurrence stays open; `SPEC-todo-ui.md` owns that
+> per repeating todo as a plain read-only row (due date the tick satisfied +
+> list name, no strike, no toggle) while that todo's next occurrence stays open; `SPEC-todo-ui.md` owns that
 > surface. The backend contract above — the append-only log, `GET
 > /api/todos/completions`, and the server undo rule — is unchanged; the log-UI
 > passages below are superseded.

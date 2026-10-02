@@ -170,23 +170,28 @@ describe('/todos list page wiring', () => {
   });
 
   it("surfaces a repeating todo's completed occurrence in Done while the next occurrence stays open", async () => {
+    const occurrence = '2026-10-01';
     const completedAt = '2026-10-02T09:30:00.000Z';
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: '2026-01-01' })],
       nextCursor: null,
     });
     mockedListTodoCompletions.mockResolvedValue({
-      completions: [completion({ id: 'c1', todoId: 'rep', title: 'Water plants', completedAt })],
+      completions: [
+        completion({ id: 'c1', todoId: 'rep', title: 'Water plants', occurrence, completedAt }),
+      ],
       nextCursor: null,
     });
 
     const el = await TodosPage();
     const html = renderToStaticMarkup(el.props.body);
 
-    // The completed occurrence renders as a PLAIN row: title + completion date,
-    // with no strike/done variant anywhere (the only todo present is open).
+    // The completed occurrence renders as a PLAIN row: title + the DUE date the
+    // tick satisfied, with no strike/done variant anywhere (the only todo present
+    // is open).
     expect(html).toContain('Water plants');
-    expect(html).toContain(dueDateLabel(completedAt, todayIso()));
+    expect(html).toContain(dueDateLabel(occurrence, todayIso()));
+    expect(html).not.toContain(dueDateLabel(completedAt, todayIso()));
     expect(html).not.toContain('ui-list-item--done');
 
     // The live repeating todo keeps its next occurrence open: its toggle offers

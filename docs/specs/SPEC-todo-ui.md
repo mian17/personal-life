@@ -64,8 +64,8 @@ both apps — so tags feel identical everywhere (I3).
   revalidate. Done rows carry no trash `deleteAction` (`TodoItem` gates it on
   `todo.done`). The Done section also surfaces a repeating todo's latest logged
   completion — the occurrence that was ticked — as a plain read-only
-  `CompletionItem` (`ListItem` href/title/meta only: the completion date and list
-  name, newest-first from the log, no strike and no toggle), while the todo's next
+  `CompletionItem` (`ListItem` href/title/meta only: the due date the tick
+  satisfied and list name, newest-first from the log, no strike and no toggle), while the todo's next
   occurrence stays open in Overdue/Today. Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
   wins over its due bucket). Ticking an **open, non-recurring** todo strikes and
@@ -266,7 +266,7 @@ recorded surface this spec froze:
   tapping the filled checkmark sends `done:false` and the row moves back to
   Today/Overdue on revalidate. It also surfaces, newest-first, a repeating todo's
   latest logged completion as a plain read-only `CompletionItem` (`ListItem`
-  href/title/meta only — completed date + list name, no strike and no toggle); a
+  href/title/meta only — due date the tick satisfied + list name, no strike and no toggle); a
   repeating todo's next occurrence stays open in Overdue/Today. Both row kinds are
   produced by `groupTodos` (one owner of the merge/dedupe rule). The backend completion
   log and the server undo rule are unchanged
