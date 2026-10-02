@@ -312,6 +312,13 @@
   color: var(--muted);
 }
 
+/* A completed row is muted throughout: its signal due date drops the red too, so
+   a done row reads the same at both todo sizes (default and dense). Declared
+   after the `--signal` due-date rules in atoms.css, so it wins the tie. */
+.ui-list-item--done .ui-due-date {
+  color: var(--muted);
+}
+
 /* Collapsing row: animates to zero height while the consumer hides it. */
 .ui-list-item--collapsing {
   height: 0;

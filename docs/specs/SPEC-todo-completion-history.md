@@ -23,7 +23,9 @@ new tick contract).
 Split the todo row into a **definition** (title, note, list, due, repeat rule, current
 next-due) and an **append-only occurrence log** (`todo_completion`). Completing a todo
 appends one occurrence row for the due that was satisfied; the definition row is
-unchanged except for its flag/advance. The **Done** view reads the log, not `todo.done`.
+unchanged except for its flag/advance. The **Done** view shows every done todo
+**and**, for each open repeating todo, its latest logged occurrence — both as the
+same `TodoItem` (muted + struck), never a separate completion component.
 
 Success looks like: a repeating todo due Mon Oct 5 is ticked on Mon Oct 5 → one completion
 row is appended (`occurrence = 2026-10-05`), the todo advances to Mon Oct 12 and stays
@@ -34,9 +36,10 @@ appends one row and closes the todo; Undo removes that row and reopens it. Undoi
 A double tick can
 never double-record (`UNIQUE (todoId, occurrence)`).
 
-The Done row renders the **due date the tick satisfied**
-(`dueDateLabel(occurrence, today)`), **not** the completion timestamp
-(`completedAt`). A todo completed before its due (e.g. scheduled for tomorrow,
+The Done row renders through the same `TodoItem` as every other Done row
+(`ListItem variant="todo" done`: muted + struck, filled toggle) and shows the
+**due date the tick satisfied** (`dueDateLabel(occurrence, today)`), **not** the
+completion timestamp (`completedAt`). A todo completed before its due (e.g. scheduled for tomorrow,
 ticked today) therefore shows tomorrow's date — the occurrence that was
 completed — while `completedAt` still records the click instant. **Revised by
 the user on 2026-10-02** (the earlier decision locked the completion date alone;

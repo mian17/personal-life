@@ -169,7 +169,7 @@ describe('/todos list page wiring', () => {
     expect(html).not.toContain('aria-label="Delete Pay rent"');
   });
 
-  it("surfaces a repeating todo's completed occurrence in Done while the next occurrence stays open", async () => {
+  it("renders a repeating todo's completed occurrence as a done TodoItem while the next occurrence stays open", async () => {
     const occurrence = '2026-10-01';
     const completedAt = '2026-10-02T09:30:00.000Z';
     mockedListTodos.mockResolvedValue({
@@ -186,17 +186,17 @@ describe('/todos list page wiring', () => {
     const el = await TodosPage();
     const html = renderToStaticMarkup(el.props.body);
 
-    // The completed occurrence renders as a PLAIN row: title + the DUE date the
-    // tick satisfied, with no strike/done variant anywhere (the only todo present
-    // is open).
+    // The completed occurrence is a done row through the SAME TodoItem as every
+    // other Done row: muted/struck, its ticked toggle offers undo, and its meta
+    // shows the DUE date the tick satisfied (never the click timestamp).
     expect(html).toContain('Water plants');
+    expect(html).toContain('ui-list-item--done');
+    expect(html).toContain('ui-checkbox--checked');
+    expect(html).toContain('Mark Water plants not done');
     expect(html).toContain(dueDateLabel(occurrence, todayIso()));
     expect(html).not.toContain(dueDateLabel(completedAt, todayIso()));
-    expect(html).not.toContain('ui-list-item--done');
 
-    // The live repeating todo keeps its next occurrence open: its toggle offers
-    // to mark it done, and nothing renders it as already done.
+    // The live repeating todo keeps its next occurrence open, also a TodoItem.
     expect(html).toContain('Mark Water plants done');
-    expect(html).not.toContain('Mark Water plants not done');
   });
 });

@@ -314,6 +314,30 @@ describe('ListItem', () => {
     }
   });
 
+  it('applies one done treatment at both todo sizes, muting the signal due date too', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem variant="todo" done title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toContain('ui-list-item--done');
+    unmount();
+
+    render(
+      <ul>
+        <ListItem variant="todo" size="dense" done title="Groceries" />
+      </ul>,
+    );
+    const classes = classesOf(screen.getByRole('listitem'));
+    expect(classes).toContain('ui-list-item--done');
+    expect(classes).toContain('ui-list-item--dense');
+
+    // The done rules key off `--done`, never a size, so default and dense share
+    // one treatment — and it mutes the signal due date as well as the title.
+    const css = blocksCss();
+    expect(cssBlock(css, '.ui-list-item--done .ui-due-date')).toMatch(/color:\s*var\(--muted\)/);
+  });
+
   it('collapses the row to zero height while hiding', () => {
     const block = cssBlock(blocksCss(), '.ui-list-item--collapsing');
     expect(block).toMatch(/height:\s*0/);

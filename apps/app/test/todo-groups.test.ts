@@ -97,25 +97,39 @@ describe('groupTodos', () => {
     }
   });
 
-  it("surfaces only an open repeating todo's latest completion in Done", () => {
+  it("makes an open repeating todo's latest completion a done Todo row in Done", () => {
     const repeating = todo('rep', '2026-10-05');
     const completions = [
       completion('c2', 'rep', '2026-10-02T10:00:00.000Z'),
       completion('c1', 'rep', '2026-10-01T10:00:00.000Z'),
     ];
     const done = groupTodos([repeating], TODAY, completions).find((g) => g.key === 'done')!;
-    expect(done.todos.map((t) => t.id)).toEqual([]);
-    expect(done.completions!.map((c) => c.id)).toEqual(['c2']);
+    // One row per todo (the latest occurrence): the live row spread to a done
+    // occurrence, so it renders through the same `TodoItem` as every Done row.
+    expect(done.todos.map((t) => t.id)).toEqual(['rep']);
+    expect(done.todos[0]).toMatchObject({
+      id: 'rep',
+      done: true,
+      dueDate: '2026-09-28', // the satisfied occurrence, not the live next due
+      version: 0, // the live version, so the row's un-tick stays version-checked
+    });
   });
 
-  it("skips a done todo's completion (its struck row already shows it)", () => {
+  it("skips a done todo's completion (its own struck row is already there)", () => {
     const grouped = groupTodos([todo('d', '2026-09-01', true)], TODAY, [completion('c1', 'd')]);
     const done = grouped.find((g) => g.key === 'done')!;
-    expect(done.completions).toEqual([]);
+    expect(done.todos.map((t) => t.id)).toEqual(['d']);
   });
 
-  it('defaults done completions to an empty array', () => {
-    const done = groupTodos([todo('d', '2026-09-01', true)], TODAY).find((g) => g.key === 'done')!;
-    expect(done.completions).toEqual([]);
+  it('ignores a completion with no matching live todo, and defaults to no completions', () => {
+    const withStray = groupTodos([], TODAY, [completion('c1', 'gone')]).find(
+      (g) => g.key === 'done',
+    )!;
+    expect(withStray.todos).toEqual([]);
+
+    const noLog = groupTodos([todo('d', '2026-09-01', true)], TODAY).find(
+      (g) => g.key === 'done',
+    )!;
+    expect(noLog.todos.map((t) => t.id)).toEqual(['d']);
   });
 });

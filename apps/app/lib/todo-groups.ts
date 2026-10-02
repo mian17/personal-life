@@ -8,6 +8,13 @@ import { dueDateState } from '@life/ui';
  * `later` and undated todos stay hidden until they come due. Service order
  * within a group is preserved (the todo-service already returns due-ascending
  * with undated last), so grouping never re-sorts.
+ *
+ * A repeating todo's latest logged completion is a done occurrence with no
+ * `Todo` row of its own (the live row advanced and stayed open). Done therefore
+ * carries a derived `Todo` for it — the live row spread with `done: true` and
+ * the satisfied `occurrence` as its due date — so every Done row renders through
+ * the same `TodoItem` / `ListItem variant="todo"` (one row type, muted + struck),
+ * never a bespoke completion component.
  */
 
 export type TodoGroupKey = 'overdue' | 'today' | 'done';
@@ -22,8 +29,6 @@ export interface TodoGroup {
   key: TodoGroupKey;
   label: string;
   todos: Todo[];
-  /** Done only: the latest logged completion per repeating todo (plain rows). */
-  completions?: TodoCompletion[];
 }
 
 export function groupTodos(
@@ -46,24 +51,25 @@ export function groupTodos(
   }
 
   // The completed occurrence of a repeating todo: a live (open) todo whose
-  // completion log has an entry. A done one-off is already shown as a struck
-  // `TodoItem`, so its completion is skipped; a completion whose todo is not in
-  // this fetch (deleted/filtered) is skipped too. One entry per todo — the log
-  // is newest-first globally, so the first match is the latest occurrence.
-  const doneIds = new Set(buckets.done.map((todo) => todo.id));
-  const activeIds = new Set(todos.map((todo) => todo.id));
+  // completion log has an entry. It is rendered as a done row — the live todo
+  // spread with `done: true` and the satisfied `occurrence` as its due date — so
+  // Done is one row type (`TodoItem`). A done one-off already has its own struck
+  // row, so its completion is skipped; a completion whose todo is not in this
+  // fetch (deleted/filtered) is skipped too. One row per todo — the log is
+  // newest-first globally, so the first match is the latest occurrence.
+  const liveById = new Map(todos.map((todo) => [todo.id, todo]));
   const seen = new Set<string>();
-  const doneCompletions: TodoCompletion[] = [];
+  const doneOccurrences: Todo[] = [];
   for (const completion of completions) {
-    const { todoId } = completion;
-    if (doneIds.has(todoId) || !activeIds.has(todoId) || seen.has(todoId)) continue;
-    seen.add(todoId);
-    doneCompletions.push(completion);
+    const live = liveById.get(completion.todoId);
+    if (!live || live.done || seen.has(completion.todoId)) continue;
+    seen.add(completion.todoId);
+    doneOccurrences.push({ ...live, done: true, dueDate: completion.occurrence });
   }
 
   return TODO_GROUPS.map(({ key, label }) =>
     key === 'done'
-      ? { key, label, todos: buckets.done, completions: doneCompletions }
+      ? { key, label, todos: [...doneOccurrences, ...buckets.done] }
       : { key, label, todos: buckets[key] },
   );
 }
