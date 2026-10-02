@@ -132,15 +132,23 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `dueTime` state is seeded from a timed due via the single `@life/ui` owner
   `localTimePart(todo.dueDate)` (empty otherwise — no app-side `new Date(...)`). New
   `PillGroup label="Repeat"` of `Pill as="button" size="chip"` options
-  (`None`/`Daily`/`Weekly`/`Monthly`/`Yearly`/`Weekdays`), reusing the existing
+  (`None`/`Daily`/`Every Weekday (Mon - Fri)`/`Weekly (<Weekday>)`/
+  `Monthly (The <nth> day)`/`Yearly (<day> <Mon>)`), reusing the existing
   `Pill`/`PillGroup` primitives; `None` ⇒ `repeat: null`. Labels come from the app-owned
-  `repeatLabel(repeat)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
-  `@life/shared` dependency). A repeat with no due blocks the save (mirroring the service's
+  `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts` — `@life/ui` has no
+  `@life/shared` dependency), composing the shared `@life/ui` `formatWeekday`/`formatDayMonth`
+  helpers (day number via `dueDay`), never `toLocale*`. A repeat with no due blocks the save
+  (mirroring the service's
   400); no implicit due date is inserted — the editor stays open on the server error.
+  **User-approved visible-text change (self-describing repeat labels):** the parenthetical is
+  derived from the todo's due date so the user sees what a repeat means at a glance, and the
+  pills update live as the due date changes; a missing/malformed due falls back to the bare base
+  label.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out renders the time when timed
-  (via the shared formatter), and a repeat todo shows `repeatLabel(todo.repeat)` in the row
-  meta. Ticking a `repeat` todo **does not** hide/collapse the row (it advances) — the
-  `DoneToggle` `hide`/`collapsing` behavior is gated on `!todo.repeat`.
+  (via the shared formatter), and a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
+  in the row meta (the same self-describing label as the editor). Ticking a `repeat` todo
+  **does not** hide/collapse the row (it advances) — the `DoneToggle` `hide`/`collapsing`
+  behavior is gated on `!todo.repeat`.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   `dueDateLabel(value, today?)` renders `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and
   `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value; a
@@ -179,10 +187,13 @@ recorded surface this spec froze:
   `getByRole('switch', { name: 'Default important' })` on the list manager.
 - **Due time / repeat / reminders additions (todo-due-repeat-notify):** new accessible
   names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
-  (`getByRole('button', { name: 'Weekly' })`, the push `switch`). **No existing
-  name/role/aria-label changes** (`Due`, `Due date`, `List`, `Important`, `Save todo`,
-  `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`, `Manage lists` all stay).
-  Recorded as surface additions only; the human-owned suite changes only if the user asks.
+  (`getByRole('button', { name: 'Weekly (<Weekday>)' })` — the repeat option's accessible name
+  is the due-derived self-describing label, so a suite should match the `Weekly` prefix — the
+  push `switch`). **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
+  `Important`, `Save todo`, `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`,
+  `Manage lists` all stay) — the one exception is the user-approved change to the `Weekly`
+  repeat option's **visible text** (and thus its accessible name), recorded above. Recorded as
+  surface additions only; the human-owned suite changes only if the user asks.
 
 No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
 not rewritten by this chapter — the surface *record* is what updates (here, in

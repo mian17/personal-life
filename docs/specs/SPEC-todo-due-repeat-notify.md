@@ -272,17 +272,24 @@ sibling fields (lesson 0014).
     joins them into
     `dueDate = 'YYYY-MM-DDTHH:mm'` (or the date alone) for the write; the service normalizes.
   - New `PillGroup label="Repeat"` composed of `Pill as="button" size="chip"` options
-    (`None`/`Daily`/`Weekly`/`Monthly`/`Yearly`/`Weekdays`) — **reuses the existing `Pill`
+    (`None` / `Daily` / `Every Weekday (Mon - Fri)` / `Weekly (<Weekday>)` /
+    `Monthly (The <nth> day)` / `Yearly (<day> <Mon>)`) — **reuses the existing `Pill`
     + `PillGroup` primitives; no new upstream atom.** `None` ⇒ `repeat: null`. The option
-    labels come from the app-owned `repeatLabel(repeat)` helper
-    (`apps/app/lib/todo-repeat-label.ts`) — `@life/ui` has no `@life/shared` dependency, so the
-    label mapping stays in the app.
+    labels are **self-describing**: the parenthetical is derived from the todo's due date
+    (English long weekday, ordinal day, or `<day> <Mon>`) so the user can see what a repeat
+    means at a glance, and the pills update live as the due date changes. Labels come from the
+    app-owned `repeatLabel(repeat, dueDate)` helper (`apps/app/lib/todo-repeat-label.ts`) —
+    `@life/ui` has no `@life/shared` dependency, so the label mapping stays in the app; the
+    derived parts come from the shared `@life/ui` formatters (`formatWeekday`/`formatDayMonth`,
+    the day number via `dueDay`), never `toLocale*`. A missing/malformed due falls back to the
+    bare base label (`Weekly`, not `Weekly ()`). **User-approved visible-text change** to this
+    chapter's previously recorded option labels; there is one owner of the mapping (lesson 0016).
   - A repeat with no due shows the field but the save is **blocked** until a due date exists
     (mirroring the service's 400); there is no implicit/auto due date — the editor surfaces the
     server error by staying open.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
-  the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat)` in the row
-  meta.
+  the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
+  in the row meta (the same self-describing label as the editor).
   Ticking a `repeat` todo must **not** hide/collapse the row (it advances instead) — the
   `DoneToggle` `hide`/`collapsing` behavior is gated on `!todo.repeat`.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
@@ -312,6 +319,14 @@ sibling fields (lesson 0014).
     never classified `overdue`/`today`/`later`. This preserves the frozen
     `isUrgent('not-a-date', today) === false` behavior (`apps/app/lib/matrix.ts` delegates to
     `dueDateState`); the refactor must not flip a malformed date to `overdue`.
+  - New pure helpers `formatWeekday(value)` → English long weekday (`Thursday`) and
+    `formatDayMonth(value)` → `<day> <Mon>` (`1 Oct`) join `formatDate`/`dueDateLabel` in the
+    same owner (`packages/ui/src/lib/format-date.ts`). Both read the calendar parts from the
+    ISO string via `datePart`/`isRealDate` and compute the weekday with
+    `Date.UTC(y, m-1, d).getUTCDay()`, so no host timezone or `toLocale*` drifts them; empty or
+    malformed input → `''`. They exist because the app's repeat-label mapping needs the weekday
+    and day-month parts and `@life/ui` owns all date formatting (lesson 0003) — the app composes
+    them rather than formatting locally.
   - Row state stays **day-granular** (a timed todo due earlier today still reads `Today` and
     groups in `Today`; the reminder is the time-precise signal). Recorded decision: matches
     TickTick and keeps grouping stable.
@@ -335,10 +350,14 @@ sibling fields (lesson 0014).
   bundler, no `next-pwa`.
 - **Frozen e2e surface (additions to the recorded surface in `SPEC-todo-ui.md`):** new
   accessible names `Due time`, `Time`, `Repeat`, `Reminders`, `Push reminders`; new roles
-  (`getByRole('button', { name: 'Weekly' })`, the push `switch`). **No existing name/role/
-  aria-label changes** (`Due`, `Due date`, `List`, `Important`, `Save todo`, `Add todo`,
-  `Mark … done`, `Delete …`, `Trash`, `Manage tags`, `Manage lists` all stay). Recorded as
-  surface additions, gated at review per AGENTS.md frozen-surface rule.
+  (`getByRole('button', { name: 'Weekly (<Weekday>)' })` — the repeat option's accessible
+  name is the self-describing label, so a suite should match the `Weekly` prefix — the push
+  `switch`). **No existing name/role/aria-label changes** (`Due`, `Due date`, `List`,
+  `Important`, `Save todo`, `Add todo`, `Mark … done`, `Delete …`, `Trash`, `Manage tags`,
+  `Manage lists` all stay). The `Weekly` repeat option's visible text changed to a
+  due-derived label (user-approved surface change, recorded in `SPEC-todo-ui.md`). Recorded as
+  surface additions, gated at review per AGENTS.md frozen-surface rule; the Playwright suite
+  itself stays untouched.
 
 ## Commands
 

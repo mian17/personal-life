@@ -1,6 +1,6 @@
 import { todayIso } from '../src/components/due-date-pill';
 import { dueDay, localTimePart } from '../src/lib/date-parts';
-import { dueDateLabel, formatDate } from '../src/lib/format-date';
+import { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from '../src/lib/format-date';
 
 describe('formatDate', () => {
   it('renders dd/mm/yyyy with the full year', () => {
@@ -36,6 +36,43 @@ describe('formatDate', () => {
     );
     // ...while the helper reads the calendar parts as written.
     expect(formatDate(iso)).toBe('01/10/2026');
+  });
+});
+
+describe('formatWeekday', () => {
+  it('renders the English long weekday read from the ISO parts', () => {
+    expect(formatWeekday('2026-10-01')).toBe('Thursday');
+    expect(formatWeekday('2026-10-05')).toBe('Monday');
+    expect(formatWeekday('2026-10-04')).toBe('Sunday');
+  });
+
+  it('takes the written date part of an ISO datetime without timezone drift', () => {
+    expect(formatWeekday('2026-10-01T00:00:00.000Z')).toBe('Thursday');
+    expect(formatWeekday('2026-12-31T23:59:59.999+02:00')).toBe('Thursday');
+  });
+
+  it('renders empty or malformed input as an empty string', () => {
+    expect(formatWeekday('')).toBe('');
+    expect(formatWeekday('not a date')).toBe('');
+    expect(formatWeekday('2026-02-31')).toBe('');
+  });
+});
+
+describe('formatDayMonth', () => {
+  it('renders the unpadded day number and the 3-letter month', () => {
+    expect(formatDayMonth('2026-10-01')).toBe('1 Oct');
+    expect(formatDayMonth('2026-12-31')).toBe('31 Dec');
+    expect(formatDayMonth('2026-01-05')).toBe('5 Jan');
+  });
+
+  it('takes the written date part of an ISO datetime', () => {
+    expect(formatDayMonth('2026-09-27T12:34:56.000Z')).toBe('27 Sep');
+  });
+
+  it('renders empty or malformed input as an empty string', () => {
+    expect(formatDayMonth('')).toBe('');
+    expect(formatDayMonth('not a date')).toBe('');
+    expect(formatDayMonth('2026-02-31')).toBe('');
   });
 });
 

@@ -144,4 +144,4 @@ export type { SnackbarApi, SnackbarOptions } from './components/snackbar-provide
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 
-export { dueDateLabel, formatDate } from './lib/format-date';
+export { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from './lib/format-date';

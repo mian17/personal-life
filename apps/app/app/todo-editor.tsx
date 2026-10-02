@@ -177,7 +177,7 @@ export function TodoEditor({
             aria-pressed={repeat === value}
             onClick={() => setRepeat(value)}
           >
-            {repeatLabel(value)}
+            {repeatLabel(value, dueDate)}
           </Pill>
         ))}
       </PillGroup>

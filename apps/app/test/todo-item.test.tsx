@@ -241,12 +241,12 @@ describe('TodoItem timed and repeat meta', () => {
 
   it('renders the repeatLabel when the todo recurs', () => {
     const html = markup(undefined, { repeat: 'weekly' });
-    expect(html).toContain('>Weekly<');
+    expect(html).toContain('>Weekly (Thursday)<');
   });
 
   it('renders no repeat text for a non-recurring todo', () => {
     expect(markup()).not.toContain('>Daily<');
-    expect(markup()).not.toContain('>Weekly<');
+    expect(markup()).not.toContain('>Weekly (Thursday)<');
   });
 });
 

@@ -592,7 +592,7 @@ describe('TodoEditor Time and Repeat fields', () => {
       inputByLabel(second, 'Due time').props.onChange!({ target: { value: '09:30' } });
 
       const third = harness.renderTree(fixture);
-      findPill(third.props.children, 'Weekly')!.props.onClick();
+      findPill(third.props.children, 'Weekly (Monday)')!.props.onClick();
       expect(findByType(third.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
 
       const fourth = harness.renderTree(fixture);
