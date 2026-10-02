@@ -27,10 +27,17 @@ unchanged except for its flag/advance. The **Done** view reads the log, not `tod
 
 Success looks like: a repeating todo due Mon Oct 5 is ticked on Mon Oct 5 → one completion
 row is appended (`occurrence = 2026-10-05`), the todo advances to Mon Oct 12 and stays
-**open**, and `/todos?done=true` lists the Oct 5 occurrence with its real completion date
-while `/todos` (Open) still shows the Oct 12 instance. A one-off tick appends one row and
-closes the todo; Undo removes that row and reopens it. A double tick can never
-double-record (`UNIQUE (todoId, occurrence)`).
+**open**, and `/todos?done=true` lists a row *for* the Oct 5 occurrence, labeled with its real
+completion date, while `/todos` (Open) still shows the Oct 12 instance. A one-off tick
+appends one row and closes the todo; Undo removes that row and reopens it. A double tick can
+never double-record (`UNIQUE (todoId, occurrence)`).
+
+The Done row renders **only** the completion date (`dueDateLabel(completedAt, today)`), never
+the `occurrence` value — the "completed-date meta" anatomy below is authoritative. A todo
+completed before its due (e.g. scheduled for tomorrow, ticked today) therefore shows "Today":
+that is *when it was completed*, not a mis-recorded occurrence — `occurrence` still holds the
+scheduled day. Keep it this way: on 02-Oct-2026 the user reviewed the alternatives (show
+`occurrence` instead, or both) and chose the completion date alone.
 
 User: the single account owner, in the todos app (shared `@life/ui` surface).
 
