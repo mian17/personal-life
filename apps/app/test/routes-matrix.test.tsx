@@ -122,7 +122,7 @@ describe('/todos/matrix page wiring', () => {
 
     for (const q of quadrants) {
       for (const row of asArray(q.items)) {
-        expect(row.props.mode).toBe('matrix');
+        expect(row.props.size).toBe('dense');
       }
     }
   });
@@ -158,6 +158,25 @@ describe('/todos/matrix page wiring', () => {
     }
   });
 
+  it('excludes done todos from every quadrant', async () => {
+    mockedListTodos.mockResolvedValue({
+      todos: [
+        todo({ id: 'open-1', dueDate: TODAY, effectiveImportant: true }),
+        todo({ id: 'done-1', title: 'Done task', done: true, dueDate: TODAY, effectiveImportant: true }),
+      ],
+      nextCursor: null,
+    });
+
+    const el = await TodosMatrixPage();
+    const quadrants = el.props.body.props.quadrants;
+    const ids = quadrants.flatMap((q: any) =>
+      q.items ? asArray(q.items).map((row: any) => row.props.todo.id) : [],
+    );
+
+    expect(ids).toContain('open-1');
+    expect(ids).not.toContain('done-1');
+  });
+
   it('marks Matrix active and List not active', async () => {
     const el = await TodosMatrixPage();
 
@@ -165,7 +184,7 @@ describe('/todos/matrix page wiring', () => {
     expect(tabs.type).toBe(TabBar);
     expect(tabs.props['aria-label']).toBe('Todos views');
     const tabEls = asArray(tabs);
-    expect(tabEls.map((t) => t.props.children)).toEqual(['List', 'Matrix']);
+    expect(tabEls.map((t) => t.props.children)).toEqual(['Today', 'Matrix']);
     expect(tabEls[0].type).toBe(Tab);
     expect(tabEls[0].props.href).toBe('/todos');
     expect(tabEls[0].props.active).toBeFalsy();

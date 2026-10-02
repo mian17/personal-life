@@ -312,9 +312,10 @@ sibling fields (lesson 0014).
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
   the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
   in the row meta (the same self-describing label as the editor).
-  A tick never hides the row: a non-recurring tick to done moves the revalidated
-  row to the Done section on `/todos` (staying struck in its quadrant on
-  `/todos/matrix`), and a repeating tick advances and stays open.
+  A tick never hides the row client-side: a non-recurring tick to done moves the
+  revalidated row to the Done section on `/todos` and drops it from the
+  `/todos/matrix` table (the matrix renders only open todos); a repeating tick
+  advances and stays open.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   - New low-level `packages/ui/src/lib/date-parts.ts` owns `todayIso`, `dueDay(value)` → the
     **local calendar day** `YYYY-MM-DD` from either a date-only string (read the parts directly

@@ -28,7 +28,7 @@ both apps — so tags feel identical everywhere (I3).
   trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
   Trash entry in the toolbar. Data via the
   todo-service API (server actions compose registry + todo calls — BFF composition,
-  MAP M4). The list page also carries the shared `TabBar` (List / Matrix) added by
+  MAP M4). The list page also carries the shared `TabBar` (Today / Matrix) added by
   `ui-tabs`, present through `ListShell`'s `tabs` slot only when the matrix opt-in is
   enabled (`SPEC-matrix-ui.md`). Each List row is one `ListItem variant="todo"`
   (`size="default"`): a leading borderless square `Checkbox`, a title clamped to two
@@ -66,9 +66,10 @@ both apps — so tags feel identical everywhere (I3).
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
   wins over its due bucket). Ticking an **open** todo to done keeps its row
   visible (struck + muted via `ListItem done`): on `/todos` the revalidated row
-  moves to the **Done** section, and on `/todos/matrix` it stays struck in its
-  quadrant. There is no auto-hide, no linger and no collapse — a ticked row is
-  never hidden or unmounted by the client. A repeating tick advances and stays
+  moves to the **Done** section, and on `/todos/matrix` the revalidated table
+  drops the done row (the matrix renders only open todos). There is no
+  client-side auto-hide, linger or collapse — a ticked row is never hidden or
+  unmounted by the client. A repeating tick advances and stays
   open (its `done` never becomes true). `revalidateTodos()`
   now also revalidates `/todos/matrix`, so a write from either view refreshes both
   (stale-matrix fix).
@@ -164,9 +165,10 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out renders the time when timed
   (via the shared formatter), and a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
   in the row meta (the same self-describing label as the editor).
-  A tick never hides the row: a non-recurring tick to done moves the revalidated
-  row to the Done section on `/todos` (staying struck in its quadrant on
-  `/todos/matrix`), and a repeating tick advances and stays open.
+  A tick never hides the row client-side: a non-recurring tick to done moves the
+  revalidated row to the Done section on `/todos` and drops it from the
+  `/todos/matrix` table (the matrix renders only open todos); a repeating tick
+  advances and stays open.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   `dueDateLabel(value, today?)` renders `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and
   `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value; a
@@ -225,7 +227,10 @@ recorded surface this spec froze:
   itself is unchanged and now lives on `/todos/settings` and `/notes/settings`.
 - The `/todos` toolbar still renders `Manage tags` / `Manage lists` / `Trash` (unchanged),
   so the existing `getByLabel('Trash')` assertion is unaffected.
-- New recorded selectors: `/todos` tabs `getByRole('link', { name: 'List' | 'Matrix' })`
+- User-approved visible-text change: the `/todos` default tab is named `Today`
+  (was `List`) on both `/todos` and `/todos/matrix`; `SPEC-matrix-ui.md`'s frozen
+  selector table follows (`Today tab`).
+- New recorded selectors: `/todos` tabs `getByRole('link', { name: 'Today' | 'Matrix' })`
   (Matrix only when the opt-in is on); the settings switch
   `getByRole('switch', { name: 'Eisenhower matrix' })` on `/todos/settings`; the importance
   controls `getByRole('switch', { name: 'Important' })` on the todo editor and

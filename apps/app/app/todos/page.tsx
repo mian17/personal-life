@@ -34,7 +34,7 @@ export default async function TodosPage() {
         matrixEnabled ? (
           <TabBar aria-label="Todos views">
             <Tab href="/todos" active>
-              List
+              Today
             </Tab>
             <Tab href="/todos/matrix">Matrix</Tab>
           </TabBar>

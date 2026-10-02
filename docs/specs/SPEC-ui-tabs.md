@@ -10,7 +10,7 @@ belong to `ui-blocks`. This module also adds a `tabs?` slot to `ListShell`
 
 A tab navigation row: a `TabBar` (`<nav aria-label>`) wrapping ordered `Tab` links, plus a
 `tabs?` slot on `ListShell` positioned directly under `PageTitle`. Success = a list page
-shows server-rendered tab links (List / Matrix) with the active tab marked, no client JS
+shows server-rendered tab links (Today / Matrix) with the active tab marked, no client JS
 required to switch, and the `ListShell` byte-identical when `tabs` is omitted.
 
 `TabBar`/`Tab` is a genuinely **new** component — navigation, **not** filters — so it does
@@ -111,7 +111,7 @@ extra element). `SPEC-ui-list-shell.md` documents the slot, order and omitted-ca
 | Element | Composed from |
 |---|---|
 | Tab row (landmark) | `TabBar aria-label="Todos views"` |
-| List tab (default) | `Tab href="/todos" active` → `List` |
+| Today tab (default) | `Tab href="/todos" active` → `Today` |
 | Matrix tab (only when enabled) | `Tab href="/todos/matrix"` → `Matrix` |
 | Shell slot | `ListShell tabs={<TabBar …>…</TabBar>}` |
 
@@ -160,7 +160,7 @@ Server-rendered links; the app decides which tabs exist:
   title="Todos"
   tabs={
     <TabBar aria-label="Todos views">
-      <Tab href="/todos" active>List</Tab>
+      <Tab href="/todos" active>Today</Tab>
       {matrixEnabled && <Tab href="/todos/matrix">Matrix</Tab>}
     </TabBar>
   }
@@ -203,7 +203,7 @@ No routing behavior is asserted (the app owns hrefs). E2E is not run by this mod
 ## Success Criteria
 
 1. `/todos` renders its TabBar from `TabBar`/`Tab`; the Matrix tab is present only when the
-   app passes it (server-gated route), and List is the default `active` tab.
+   app passes it (server-gated route), and Today is the default `active` tab.
 2. `Tab` renders a `next/link` `Link`; `active` reproduces `aria-current="page"`.
 3. `ListShell` slot order is `PageTitle → tabs → search → filters → body → FabLink`, and
    omitting `tabs` renders nothing (today's pages byte-identical).

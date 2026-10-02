@@ -19,7 +19,8 @@ export default async function TodosMatrixPage() {
   ]);
   const today = todayIso();
 
-  const quadrants = groupByQuadrant(todos, today).map((bucket) => ({
+  const openTodos = todos.filter((todo) => !todo.done);
+  const quadrants = groupByQuadrant(openTodos, today).map((bucket) => ({
     id: bucket.id,
     label: bucket.label,
     tone: bucket.tone,
@@ -47,7 +48,7 @@ export default async function TodosMatrixPage() {
       navTrailing={<TodosNav />}
       tabs={
         <TabBar aria-label="Todos views">
-          <Tab href="/todos">List</Tab>
+          <Tab href="/todos">Today</Tab>
           <Tab href="/todos/matrix" active>
             Matrix
           </Tab>

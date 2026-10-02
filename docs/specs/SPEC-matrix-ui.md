@@ -261,7 +261,7 @@ const matrixEnabled = await readPref('matrix'); // @/lib/preferences
   </>}
   tabs={matrixEnabled ? (
     <TabBar aria-label="Todos views">
-      <Tab href="/todos" active>List</Tab>
+      <Tab href="/todos" active>Today</Tab>
       <Tab href="/todos/matrix">Matrix</Tab>
     </TabBar>
   ) : undefined}
@@ -270,7 +270,7 @@ const matrixEnabled = await readPref('matrix'); // @/lib/preferences
 ```
 
 - Off ⇒ `tabs` omitted ⇒ `ListShell` renders no tabs node (byte-identical, map D3).
-- Selectors: links named `List` and (when on) `Matrix`.
+- Selectors: links named `Today` and (when on) `Matrix`.
 
 ### `/todos` importance inputs — list default + per-todo (L6 consumer path)
 
@@ -348,7 +348,7 @@ export default async function TodosMatrixPage() {
       navTrailing={<TodosNav />}
       tabs={
         <TabBar aria-label="Todos views">
-          <Tab href="/todos">List</Tab>
+          <Tab href="/todos">Today</Tab>
           <Tab href="/todos/matrix" active>Matrix</Tab>
         </TabBar>
       }
@@ -405,10 +405,11 @@ export default async function TodosMatrixPage() {
 - **Dense type:** the matrix row's title and date are 0.7rem (`.ui-list-item--dense*`,
   owned by `SPEC-ui-blocks.md`).
 - **Overflow:** a quadrant whose content exceeds its box scrolls; the page itself does not.
-- **No declutter on tick (same as the List):** a done row renders struck + muted
-  (`ListItem done`); ticking an open todo keeps its row visible — on `/todos`
-  the revalidated row moves to the Done section, and on `/todos/matrix` it stays
-  struck in its quadrant. The row is never hidden, collapsed, or unmounted.
+- **Matrix renders only open todos:** the page filters `todo.done === false`
+  before `groupByQuadrant`, so a done todo is never placed in a quadrant (done
+  tasks live in the Done section on `/todos`). Ticking an open todo in the matrix
+  revalidates (`revalidateTodos()` includes `/todos/matrix`), so the row leaves
+  its box.
   An emptied quadrant's list drops out
   via `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. `revalidateTodos()`
   (`apps/app/app/todo-actions.ts`) now also revalidates `/todos/matrix`, so a tick in
@@ -512,7 +513,7 @@ list-shell spec and `SPEC-todo-ui.md` — while the human-owned suite is not edi
 | Surface | Selector | Where |
 |---|---|---|
 | Settings gear | `getByLabel('Settings')` | `navTrailing` on `/notes` **and** `/todos` (replaces the theme toggle's former slot) |
-| List tab | `getByRole('link', { name: 'List' })` | `/todos` TabBar (and `/todos/matrix`) |
+| Today tab | `getByRole('link', { name: 'Today' })` | `/todos` TabBar (and `/todos/matrix`) |
 | Matrix tab | `getByRole('link', { name: 'Matrix' })` | `/todos` TabBar (present only when the pref is on) |
 | Matrix switch | `getByRole('switch', { name: 'Eisenhower matrix' })` | `/todos/settings` (`Switch` from `label`) |
 | Theme toggle | (former dynamic `Theme: …` label) **no longer in `navTrailing`** | moved to `/todos/settings` + `/notes/settings` |

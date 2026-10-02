@@ -127,7 +127,7 @@ and `apps/app/app/todos/page.tsx`, which both carried the toggle. The toggle's f
 The existing `getByLabel('Trash')` assertion (above) is unaffected; no current test asserted
 the toggle. The same change updates the frozen e2e spec's recorded surface — documented here
 and in `SPEC-todo-ui.md`; the human-owned suite is not edited by agents. The `tabs` slot's
-`List`/`Matrix` links are recorded in `SPEC-ui-tabs.md` / `SPEC-matrix-ui.md` and add no
+`Today`/`Matrix` links are recorded in `SPEC-ui-tabs.md` / `SPEC-matrix-ui.md` and add no
 assertion to this shell.
 
 The `tabs` slot adds **no frozen assertion** of its own: the tab row is a `TabBar`/`Tab`

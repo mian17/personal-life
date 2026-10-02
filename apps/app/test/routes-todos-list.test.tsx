@@ -116,7 +116,7 @@ describe('/todos list page wiring', () => {
     expect(tabs.type).toBe(TabBar);
     expect(tabs.props['aria-label']).toBe('Todos views');
     const tabEls = asArray(tabs);
-    expect(tabEls.map((t) => t.props.children)).toEqual(['List', 'Matrix']);
+    expect(tabEls.map((t) => t.props.children)).toEqual(['Today', 'Matrix']);
     expect(tabEls[0].type).toBe(Tab);
     expect(tabEls[0].props.href).toBe('/todos');
     expect(tabEls[0].props.active).toBe(true);
