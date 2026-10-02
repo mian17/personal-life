@@ -84,14 +84,15 @@ than extracting it from the todo write path.
 - [ ] T4: `due-time.ts` (local ⇄ UTC, sort key) + `recurrence.ts` (advance) with unit tests.
 
 ### Checkpoint: Core math
-- [ ] `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts` green.
+- [ ] `npm run build -w @life/shared` then `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts` green.
+- [ ] `npm run typecheck -w @life/todo-service` (after the shared build) exits 0.
 
 ### Phase 4 — Todo service
 - [ ] T5: due normalization + repeat validation + reminder computation + advance-on-tick +
       entity columns/index + DTOs + `CachedTodoRow` + `markReminded` seam.
 
 ### Checkpoint: Service
-- [ ] `npm run typecheck -w @life/todo-service` exits 0.
+- [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/todo-service` exits 0.
 
 ### Phase 5 — Push + reminders modules
 - [ ] T6: `push` subscription module (entity + service + controller + module + registration).
@@ -99,14 +100,15 @@ than extracting it from the todo write path.
       registration).
 
 ### Checkpoint: Modules
-- [ ] `npm run typecheck -w @life/todo-service` exits 0.
+- [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/todo-service` exits 0.
 - [ ] `npm run build -w @life/todo-service` exits 0.
 
 ### Phase 6 — Backend tests
-- [ ] T8: due/repeat/reminder/advance behavior suite + reminders sweep suite + cache additions.
+- [ ] T8: due/repeat/reminder/advance behavior suite + reminders sweep suite + cache additions +
+      the two existing DTO-shape suites.
 
 ### Checkpoint: Backend tests
-- [ ] `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts` green.
+- [ ] `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts` green.
 
 ### Phase 7 — BFF
 - [ ] T9: push key/subscribe/unsubscribe client + server actions + `push-client.ts`.
@@ -207,6 +209,11 @@ than extracting it from the todo write path.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run typecheck -w @life/shared`.
+  - **Shared-build precondition (stated once here; referenced by T4–T8):** every consumer
+    resolves `@life/shared` through `node_modules` to `packages/shared/dist/index.d.ts`
+    (`packages/shared/package.json` `"types"`). `npm run typecheck -w @life/shared` never emits
+    `dist`, so run `npm run build -w @life/shared` before any downstream
+    `npm run typecheck -w @life/todo-service` (T4–T8); T9–T13 repeat it in their own commands.
   - Strict constraints: NO full suites, NO E2E; typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
@@ -310,7 +317,8 @@ than extracting it from the todo write path.
   - No `@nestjs/schedule`, `node-cron`, `date-fns`, or `luxon`. Only `Intl`.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts`
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts`
     and `npm run typecheck -w @life/todo-service`.
   - Strict constraints: NO full suites, NO E2E; only these two named files; max test executions: 2.
 
@@ -390,7 +398,8 @@ than extracting it from the todo write path.
     (The module file is in T7's allowed set for that export.)
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/todo-service`.
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run typecheck -w @life/todo-service`.
   - Strict constraints: NO full suites, NO E2E (behavior tests are T8); max test executions: 2.
 
 [DEFINITION OF DONE]
@@ -436,7 +445,8 @@ than extracting it from the todo write path.
   - `push_subscription` is not cached (Contract 2: outside the cache; delivery capability only).
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/todo-service`.
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run typecheck -w @life/todo-service`.
   - Strict constraints: NO full suites, NO E2E; typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
@@ -495,8 +505,8 @@ than extracting it from the todo write path.
     reminder clear goes through `markReminded`, so the cache is invalidated (Contract 2 Rule 1).
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/todo-service` and
-    `npm run build -w @life/todo-service`.
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run typecheck -w @life/todo-service` and `npm run build -w @life/todo-service`.
   - Strict constraints: NO full suites, NO E2E; typecheck + build only; max test executions: 2.
 
 [DEFINITION OF DONE]
@@ -517,10 +527,11 @@ than extracting it from the todo write path.
   - Allowed files to edit/create: `apps/todo-service/test/todos-due-repeat.e2e-spec.ts` (new),
     `apps/todo-service/test/reminders.e2e-spec.ts` (new),
     `apps/todo-service/test/push.e2e-spec.ts` (new),
-    `apps/todo-service/test/todo-cache.e2e-spec.ts`.
+    `apps/todo-service/test/todo-cache.e2e-spec.ts`,
+    `apps/todo-service/test/todos.e2e-spec.ts` (existing DTO-shape key list),
+    `apps/todo-service/test/ownership.e2e-spec.ts` (existing `todoKeys` list, asserted twice).
   - Reference files (read-only): `apps/todo-service/test/todo-harness.ts`,
-    `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/setup-env.ts`,
-    `apps/todo-service/test/todos.e2e-spec.ts`.
+    `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/setup-env.ts`.
   - Strictly prohibited files: every production source file (a failing gate re-opens T5/T6/T7).
 
 [IMPLEMENTATION REQUIREMENTS]
@@ -542,16 +553,21 @@ than extracting it from the todo write path.
   - `todo-cache.e2e-spec.ts`: the `todo:all`/`todo:trash` serialized values carry
     `repeat`/`reminderScheduledAt`; content fields remain `enc.v1.`-only and the no-known-plaintext
     assertions still pass; the invalidation table gains the sweep-clear bump.
+  - **Existing DTO-shape assertions (the two new read fields):** `todos.e2e-spec.ts`'s
+    `Object.keys(created.body).sort()` list and `ownership.e2e-spec.ts`'s `todoKeys` array
+    (asserted twice) gain `repeat` and `reminderScheduledAt`.
   - No production file may be edited to make a test pass.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`.
-  - Strict constraints: NO full suites, NO E2E; only these four named files; max test executions: 2.
+  - Strict constraints: NO full suites, NO E2E; only these named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The four suites cover every behavior above.
-  - [ ] The prescribed four-file test command passes.
+  - [ ] The four new suites cover every behavior above; the two existing suites' key lists
+        include `repeat`/`reminderScheduledAt`.
+  - [ ] The prescribed six-file test command passes.
   - [ ] `npm run typecheck -w @life/todo-service` passes with zero errors.
   - [ ] No file outside scope modified.
 
@@ -699,7 +715,12 @@ than extracting it from the todo write path.
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/app/test/todo-item.test.tsx`,
     `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
-    `apps/app/test/push-toggle.test.tsx` (new).
+    `apps/app/test/push-toggle.test.tsx` (new),
+    and the five existing app fixtures whose `todo(...)` helper literals gain the two required
+    `Todo` fields — `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
+    `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
+    `apps/app/test/routes-todos-trash.test.tsx` (each `todo(...)` helper gains `repeat: null`
+    and `reminderScheduledAt: null`; no other fixture change).
   - Reference files (read-only): `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
     `apps/app/app/push-toggle.tsx`, `apps/app/lib/matrix.ts`,
     `packages/ui/src/lib/date-parts.ts`, `packages/ui/src/index.ts`,
@@ -717,6 +738,9 @@ than extracting it from the todo write path.
     renders guidance and no control; not-installed (`!navigator.standalone`) renders the add-to-
     Home-Screen guidance; supported+installed renders the `Switch` and the subscribe path calls
     `subscribeToPush`.
+  - **Existing fixtures (`Todo` gains two required read fields):** every `todo(...)` helper in the
+    five app fixture files listed in scope gains `repeat: null` and `reminderScheduledAt: null`
+    so `npm run typecheck -w @life/app` compiles; no behavior assertions change.
   - Mechanical checks (Contract 1, run in this task's verification):
     `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps/app --include='*.tsx'`
     → only the documented exemptions; `grep -rn "next/link" apps/app --include='*.tsx'` → zero.
@@ -724,10 +748,13 @@ than extracting it from the todo write path.
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
     and `npm run typecheck -w @life/app`.
-  - Strict constraints: NO full suites, NO E2E; only these four named files; max test executions: 2.
+  - Strict constraints: NO full suites, NO E2E; only the four named test files run; the five
+    fixture files are touched only to add the two required literal fields (typecheck covers them);
+    max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The four suites cover the listed cases and pass.
+  - [ ] The four suites cover the listed cases and pass; the five existing fixture helpers carry
+        `repeat: null`/`reminderScheduledAt: null` and typecheck.
   - [ ] The two mechanical greps are clean.
   - [ ] `npm run typecheck -w @life/app` passes; no file outside scope modified.
 
@@ -748,7 +775,7 @@ than extracting it from the todo write path.
   - Step 1 — suite gate first, exact commands:
     `npm run build -w @life/shared`;
     `npm run typecheck -w @life/todo-service`;
-    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`;
+    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`;
     `npm run typecheck -w @life/ui`;
     `npm run test:unit -w @life/ui -- test/format-date.test.ts test/due-date-pill.test.tsx`;
     `npm run typecheck -w @life/app`;
@@ -766,7 +793,39 @@ than extracting it from the todo write path.
     5. Plan conformance (the diff vs the plan and the three specs).
   - Step 3 — fail-closed: a crashed, missing, or empty lane verdict is a failure. Any failed lane
     → fix blockers → re-run ONLY the failed lanes → repeat until every lane returns PASS.
-  - Step 4 — commit only on N/N PASS, staged by explicit paths (never `git add -A`).
+  - Step 4 — commit only on N/N PASS, staged by explicit paths (never `git add -A`). The
+    chapter's explicit paths:
+    - shared/UI: `packages/shared/src/index.ts`; `packages/ui/src/lib/date-parts.ts`,
+      `packages/ui/src/lib/format-date.ts`, `packages/ui/src/components/due-date-pill.tsx`,
+      `packages/ui/src/index.ts`; `packages/ui/test/format-date.test.ts`,
+      `packages/ui/test/due-date-pill.test.tsx`.
+    - todo-service source: `apps/todo-service/src/todos/due-time.ts`, `recurrence.ts`,
+      `todos.service.ts`, `todos.controller.ts`, `todos.module.ts`,
+      `dto/create-todo.dto.ts`, `dto/update-todo.dto.ts`, `todo.entity.ts`;
+      `apps/todo-service/src/push/push-subscription.entity.ts`, `push.service.ts`,
+      `push.controller.ts`, `push.module.ts`; `apps/todo-service/src/reminders/reminder.service.ts`,
+      `push-sender.ts`, `reminders.module.ts`; `apps/todo-service/src/app.module.ts`;
+      `apps/todo-service/package.json`.
+    - todo-service tests: `apps/todo-service/test/due-time.test.ts`, `recurrence.test.ts`,
+      `todos-due-repeat.e2e-spec.ts`, `reminders.e2e-spec.ts`, `push.e2e-spec.ts`,
+      `todo-cache.e2e-spec.ts`, `todos.e2e-spec.ts`, `ownership.e2e-spec.ts`.
+    - app source: `apps/app/lib/todo-api.ts`, `apps/app/lib/push-client.ts`,
+      `apps/app/lib/matrix.ts`, `apps/app/lib/todo-repeat-label.ts`, `apps/app/app/todo-actions.ts`,
+      `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
+      `apps/app/app/todos/settings/page.tsx`, `apps/app/app/push-toggle.tsx`,
+      `apps/app/public/sw.js`.
+    - app tests: `apps/app/test/todo-item.test.tsx`, `routes-todo-edit.test.tsx`, `matrix.test.ts`,
+      `push-toggle.test.tsx`, `todo-groups.test.ts`, `todo-query.test.ts`,
+      `routes-todos-list.test.tsx`, `routes-matrix.test.tsx`, `routes-todos-trash.test.tsx`.
+    - infra: `.env.example`, `.env.development.example`, `compose.yaml`, `package-lock.json`.
+    - spec/plan/ledger: `docs/specs/SPEC-todo-due-repeat-notify.md`,
+      `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`,
+      `docs/specs/MAP-todo-ecosystem.md`, `docs/specs/MAP-redis.md`,
+      `tasks/plan-todo-due-repeat-notify.md`, `tasks/todo-todo-due-repeat-notify.md`.
+    Commit message convention (matches the repo log, Conventional Commits, e.g.
+    `feat(todos): due time, recurrence, and Web Push reminders`):
+    `<type>(<scope>): <subject>` — use `feat(todos)` for the chapter's implementation commit and
+    `docs:` for the plan/spec repairs; never stage with a glob.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test commands: the Step 1 commands (QA lane), within the repo profile.

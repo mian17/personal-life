@@ -51,8 +51,11 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `repeat: TodoRepeat|null` + `reminderScheduledAt: string|null`; `CreateTodoInput`
     and `UpdateTodoInput` gain `repeat?: TodoRepeat|null`; add
     `export interface PushSubscribeInput { endpoint: string; keys: { p256dh: string; auth: string } }`.
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/shared`. NO full
-    suites/E2E, max 2.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/shared`. **Shared-build
+    precondition (stated once; referenced by T4–T8):** consumers resolve `@life/shared` via
+    `packages/shared` `"types": "dist/index.d.ts"`, and `typecheck` never emits `dist`, so run
+    `npm run build -w @life/shared` before any `npm run typecheck -w @life/todo-service`;
+    T9–T13 repeat it. NO full suites/E2E, max 2.
   - [DEFINITION OF DONE]
     - [ ] `TODO_REPEATS` + all listed types exist exactly as specified.
     - [ ] `npm run typecheck -w @life/shared` passes with zero errors.
@@ -104,7 +107,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `utcToLocal`, `dueSortKey`, `reminderLocal`. `recurrence.ts`: `nextOccurrence` (one step,
     shape-preserving, monthly/yearly clamp, weekdays skip) and `advanceToOnOrAfter`. Only `Intl`
     (no `@nestjs/schedule`/`node-cron`/`date-fns`/`luxon`).
-  - [VERIFICATION & TESTING RULES] Permitted:
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
+    shared-build precondition) then
     `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts` and
     `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
@@ -140,7 +144,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `compareTodos`/cursor use `dueSortKey`; `CachedTodoRow` carries `repeat`/`reminderScheduledAt`
     verbatim; ciphertext guards unchanged. Public `markReminded(sub, id)` clears the reminder and
     bumps the generation (the sweep seam; `todos.module.ts` exports `TodosService`).
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/todo-service`.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
+    shared-build precondition) then `npm run typecheck -w @life/todo-service`.
     NO full suites/E2E (behavior is T8), max 2.
   - [DEFINITION OF DONE]
     - [ ] Entity carries text `dueDate` + `repeat`/`reminderScheduledAt` + index; timed→instant,
@@ -167,7 +172,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `PushService` (`getPublicKey`, `subscribe` upsert-by-endpoint, `unsubscribe` idempotent,
     `listFor`); `PushController` `GET key`, `POST/DELETE subscribe`; `PushModule` registered;
     `push_subscription` outside the cache.
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/todo-service`.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
+    shared-build precondition) then `npm run typecheck -w @life/todo-service`.
     NO full suites/E2E, max 2.
   - [DEFINITION OF DONE]
     - [ ] The three routes exist with the exact paths/methods; subscribe upserts by endpoint.
@@ -202,7 +208,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `COPY … package.json` lines (not a glob) and already includes
     `apps/todo-service/package.json`, so no Dockerfile edit is needed (verify); root lockfile
     updated.
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/todo-service` and
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
+    shared-build precondition) then `npm run typecheck -w @life/todo-service` and
     `npm run build -w @life/todo-service`. NO full suites/E2E, max 2.
   - [DEFINITION OF DONE]
     - [ ] `sweep()` fires once per due row, calls `markReminded` (clear + bump), skips
@@ -218,9 +225,11 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     - Allowed: `apps/todo-service/test/todos-due-repeat.e2e-spec.ts` (new),
       `apps/todo-service/test/reminders.e2e-spec.ts` (new),
       `apps/todo-service/test/push.e2e-spec.ts` (new),
-      `apps/todo-service/test/todo-cache.e2e-spec.ts`.
+      `apps/todo-service/test/todo-cache.e2e-spec.ts`,
+      `apps/todo-service/test/todos.e2e-spec.ts` (existing DTO key list),
+      `apps/todo-service/test/ownership.e2e-spec.ts` (existing `todoKeys`, asserted twice).
     - Reference (read-only): `apps/todo-service/test/todo-harness.ts`,
-      `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/todos.e2e-spec.ts`.
+      `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/setup-env.ts`.
     - Strictly prohibited: every production source file (a failing gate re-opens T5/T6/T7).
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: timed round-trip + reminder present; date-only
     09:00; repeat-requires-due 400; daily-missed advance; weekdays Fri→Mon; monthly clamp;
@@ -229,13 +238,16 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `getThrough`/read-through reads during a `sweep()` (direct-DB deviation, spec Testing #8). Push endpoints:
     key returned; subscribe upserts by endpoint (no duplicate row); delete idempotent; another `sub`
     cannot read/affect the caller's subscriptions. Cache: `todo:all`/`todo:trash` carry both
-    fields, `enc.v1.`-only, sweep-clear bump. No production edit to pass.
-  - [VERIFICATION & TESTING RULES] Permitted:
-    `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`
+    fields, `enc.v1.`-only, sweep-clear bump. The two existing DTO-shape suites
+    (`todos.e2e-spec.ts` key list, `ownership.e2e-spec.ts` `todoKeys` twice) gain
+    `repeat`/`reminderScheduledAt`. No production edit to pass.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
+    shared-build precondition) then
+    `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] The four suites cover every case above.
-    - [ ] The prescribed four-file command passes; typecheck passes.
+    - [ ] The four new suites cover every case above; the two existing key lists carry both fields.
+    - [ ] The prescribed six-file command passes; typecheck passes.
     - [ ] No file outside scope modified.
   - Dependencies: T7. Size: M.
 
@@ -313,19 +325,25 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [TASK OBJECTIVE] Add/update the UI regression tests and run the Contract 1 mechanical checks.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed: `apps/app/test/todo-item.test.tsx`, `apps/app/test/routes-todo-edit.test.tsx`,
-      `apps/app/test/matrix.test.ts`, `apps/app/test/push-toggle.test.tsx` (new).
+      `apps/app/test/matrix.test.ts`, `apps/app/test/push-toggle.test.tsx` (new), and the five
+      existing fixtures whose `todo(...)` helpers gain `repeat: null`/`reminderScheduledAt: null`:
+      `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
+      `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
+      `apps/app/test/routes-todos-trash.test.tsx`.
     - Reference (read-only): `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
       `apps/app/app/push-toggle.tsx`, `apps/app/lib/matrix.ts`, `packages/ui/src/index.ts`,
       `AGENTS.md` (Contract 1 checks).
     - Strictly prohibited: every production source file (a failing test re-opens T10/T11).
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: editor payload join+repeat; row timed/repeat
     label + no-hide recurring tick; `isUrgent` timed today/tomorrow; push-toggle branches
-    (unsupported / not-installed / subscribe); the two Contract 1 greps clean.
+    (unsupported / not-installed / subscribe); the two Contract 1 greps clean; the five existing
+    `todo(...)` fixtures gain the two required fields.
   - [VERIFICATION & TESTING RULES] Permitted:
     `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
-    and `npm run typecheck -w @life/app`. NO full suites/E2E, only these files, max 2.
+    and `npm run typecheck -w @life/app`. NO full suites/E2E; only the four named test files run,
+    the five fixture files add only the two literals (typecheck covers them), max 2.
   - [DEFINITION OF DONE]
-    - [ ] The four suites cover the listed cases and pass; the two greps are clean.
+    - [ ] The four suites cover the listed cases and pass; the five fixtures typecheck; the two greps are clean.
     - [ ] Typecheck passes; no file outside scope modified.
   - Dependencies: T10, T11. Size: S.
 
@@ -339,7 +357,7 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     - Strictly prohibited: everything (this task changes nothing).
   - [IMPLEMENTATION REQUIREMENTS] Suite gate first, exact commands:
     `npm run build -w @life/shared`; `npm run typecheck -w @life/todo-service`;
-    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts`;
+    `npm run test:unit -w @life/todo-service -- test/due-time.test.ts test/recurrence.test.ts test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`;
     `npm run typecheck -w @life/ui`;
     `npm run test:unit -w @life/ui -- test/format-date.test.ts test/due-date-pill.test.tsx`;
     `npm run typecheck -w @life/app`;
@@ -348,7 +366,10 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `{lane, verdict: PASS|PASS_WITH_NITS|FAIL, blockers: [{file, issue, severity}]}`:
     correctness/domain, code quality, security, QA, plan conformance. Fail-closed; any failed lane
     → fix blockers → re-run ONLY the failed lanes → repeat until N/N. Commit only on N/N, staged by
-    explicit paths.
+    explicit paths (never `git add -A`): the chapter's shared/UI files, todo-service source + tests,
+    app source + tests (including the five fixtures), infra (`package-lock.json`, both env examples,
+    `compose.yaml`), and the spec/plan/ledger files — the exact path list is in the plan T13 Step 4.
+    Commit convention: Conventional Commits, e.g. `feat(todos): due time, recurrence, and Web Push reminders`.
   - [VERIFICATION & TESTING RULES] Permitted: the suite-gate commands (QA lane only). NO full
     suites/E2E, max 2 per iteration. Evidence = per-round lane reports.
   - [DEFINITION OF DONE]

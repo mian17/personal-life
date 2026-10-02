@@ -263,7 +263,8 @@ sibling fields (lesson 0014).
     (imports `todayIso` from `../src/components/due-date-pill`) — keep working unchanged
     (`due-date.tsx` stays out of scope); `index.ts` keeps re-exporting `todayIso` **and `dueDay`**
     from the new module so the public surface is preserved. `dueDay` is used by
-    `dueDateState`, `dueDateLabel`, `groupTodos`, and matrix `isUrgent`.
+    `dueDateState`, `dueDateLabel`, and matrix `isUrgent`; grouping consumes it transitively
+    (`groupTodos` → `dueDateState` → `dueDay`, `apps/app/lib/todo-groups.ts` stays out of scope).
   - `dueDateLabel(value, today?)` → `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only (unchanged)
     and `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value.
   - Row state stays **day-granular** (a timed todo due earlier today still reads `Today` and
@@ -297,15 +298,21 @@ sibling fields (lesson 0014).
 ## Commands
 
 ```
+Precondition: npm run build -w @life/shared   # consumers resolve "types": "dist/index.d.ts";
+                                              # typecheck never emits dist — build once first
 Typecheck: npm run typecheck -w @life/shared && npm run typecheck -w @life/todo-service
            npm run typecheck -w @life/ui && npm run typecheck -w @life/app
 Test:      npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts
            npm run test:unit -w @life/todo-service -- test/reminders.e2e-spec.ts
            npm run test:unit -w @life/todo-service -- test/push.e2e-spec.ts
+           npm run test:unit -w @life/todo-service -- test/todos.e2e-spec.ts test/ownership.e2e-spec.ts
            npm run test:unit -w @life/ui -- test/format-date.test.ts
            npm run test:unit -w @life/app  -- test/todo-item.test.tsx test/push-toggle.test.tsx
 Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 ```
+
+The `npm run build -w @life/shared` precondition is stated here once and referenced by T4–T8
+in the plan/ledger; every `npm run typecheck -w @life/todo-service` runs after it.
 
 ## Testing Strategy
 
@@ -334,6 +341,12 @@ Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 9. **UI:** the editor payload joins date+time and carries `repeat`; the row renders the time
    and repeat label; a recurring tick does not hide the row; the settings push toggle
    branches (unsupported / not-installed / subscribe); mechanical Contract 1 checks green.
+10. **Existing-suite reconciliation:** `todos.e2e-spec.ts`'s `Object.keys(created.body).sort()`
+    list and `ownership.e2e-spec.ts`'s `todoKeys` (asserted twice) gain `repeat` and
+    `reminderScheduledAt`; the five existing app fixtures (`todo-groups.test.ts`,
+    `todo-query.test.ts`, `routes-todos-list.test.tsx`, `routes-matrix.test.tsx`,
+    `routes-todos-trash.test.tsx`) add `repeat: null`/`reminderScheduledAt: null` to their
+    `todo(...)` helpers so `npm run typecheck -w @life/app` compiles.
 
 ## Boundaries
 
