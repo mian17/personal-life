@@ -6,6 +6,7 @@ import { ListsModule } from './lists/lists.module';
 import { TodosModule } from './todos/todos.module';
 import { Todo } from './todos/todo.entity';
 import { TodoTag } from './todos/todo-tag.entity';
+import { TodoCompletion } from './todos/todo-completion.entity';
 import { UserKeys } from './keys/user-keys.entity';
 import { KeysModule } from './keys/keys.module';
 import { HealthModule } from './health/health.module';
@@ -20,7 +21,7 @@ import { RemindersModule } from './reminders/reminders.module';
       // `DB_PATH` is read inline; scripts resolve their own vars via
       // `@life/shared`'s `resolveDbPath` (note-service's split).
       database: process.env.DB_PATH ?? join(process.cwd(), 'data', 'todo.db'),
-      entities: [Todo, TodoTag, List, UserKeys, PushSubscription],
+      entities: [Todo, TodoTag, TodoCompletion, List, UserKeys, PushSubscription],
       synchronize: true,
     }),
     TodosModule,

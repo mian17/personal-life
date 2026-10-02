@@ -12,13 +12,14 @@ import {
  * todo-service's adapter over the generic read-through cache (`@life/cache`,
  * `SPEC-service-kernel` "Shared primitives"). Generation-counter mechanics,
  * fail-open, stale-guard, TTL, and the ciphertext-value discipline live in the
- * shared package; this module only pins the `todo` namespace and the three
+ * shared package; this module only pins the `todo` namespace and the four
  * `<rest>` values this service ever uses.
  *
  * Key shapes (`SPEC-todo-service` Cache Rules): `todo:<sub>:v<gen>:all` (the
  * owner's full serialized **ciphertext** todo row-set, each row carrying its
- * `tagIds`), `todo:<sub>:v<gen>:lists` (list rows), and
- * `todo:<sub>:v<gen>:tags` (tag-usage metadata: ids + counts only). One `all`
+ * `tagIds`), `todo:<sub>:v<gen>:lists` (list rows),
+ * `todo:<sub>:v<gen>:tags` (tag-usage metadata: ids + counts only), and
+ * `todo:<sub>:v<gen>:completions` (the completion log row-set). One `all`
  * entry serves every filter/page variant (`q`/`tagId`/`listId`/`done`/`due*`/
  * cursor/limit never enter the key). The counter key is `todo:gen:<sub>` (shared
  * Redis, disjoint from `note:`/`tags:`).
@@ -34,11 +35,12 @@ export type { CacheClient, CacheHitOptions, CacheSetOptions };
 /** The namespace prefix every todo key (and counter) carries on shared Redis. */
 const SERVICE = 'todo';
 
-/** `<rest>` values: the owner's todo row-set, its lists, and its tag usage. */
+/** `<rest>` values: the owner's todo row-set, its lists, tag usage, and completions. */
 export const TODO_ALL = 'all';
 export const TODO_LISTS = 'lists';
 export const TODO_TAGS = 'tags';
 export const TODO_TRASH = 'trash';
+export const TODO_COMPLETIONS = 'completions';
 
 /** The per-user counter every one of that user's read keys embeds; bumped per write. */
 export function generationKey(sub: string): string {

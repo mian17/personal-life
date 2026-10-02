@@ -13,6 +13,7 @@ import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypt
 import { likeMatch } from '@life/shared';
 import type { TagUsage, Todo as TodoDto, TodoPage, TodoRepeat } from '@life/shared';
 import { Todo } from './todo.entity';
+import { TodoCompletion } from './todo-completion.entity';
 import { TodoTag } from './todo-tag.entity';
 import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
 import { advanceToOnOrAfter } from './recurrence';
@@ -120,6 +121,40 @@ function decodeCiphertextTodoRowList(raw: unknown): CachedTodoRow[] {
     throw new Error('cache entry is not ciphertext');
   }
   return raw;
+}
+
+/** The completion log's cached row shape — rows as persisted, no content column. */
+interface CachedCompletionRow {
+  id: string;
+  todoId: string;
+  occurrence: string;
+  completedAt: string;
+}
+
+function isCompletionRow(row: CachedCompletionRow): boolean {
+  return (
+    typeof row?.id === 'string' &&
+    typeof row?.todoId === 'string' &&
+    typeof row?.occurrence === 'string' &&
+    typeof row?.completedAt === 'string'
+  );
+}
+
+function decodeCompletionRows(raw: unknown): CachedCompletionRow[] {
+  if (!Array.isArray(raw) || !raw.every(isCompletionRow)) {
+    throw new Error('cache entry is not completion rows');
+  }
+  return raw;
+}
+
+/** Serialize a completion entity into its cached row form (no content column). */
+function toCachedCompletionRow(completion: TodoCompletion): CachedCompletionRow {
+  return {
+    id: completion.id,
+    todoId: completion.todoId,
+    occurrence: completion.occurrence,
+    completedAt: completion.completedAt,
+  };
 }
 
 /**

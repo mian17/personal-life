@@ -5,6 +5,7 @@ import { TodoCacheModule } from '../cache/todo-cache.module';
 import { ListsModule } from '../lists/lists.module';
 import { Todo } from './todo.entity';
 import { TodoTag } from './todo-tag.entity';
+import { TodoCompletion } from './todo-completion.entity';
 import { TodosController } from './todos.controller';
 import { TodosService } from './todos.service';
 
@@ -14,7 +15,12 @@ import { TodosService } from './todos.service';
  * write (a foreign id must be a byte-identical 404, not a raw FK failure).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Todo, TodoTag]), KeysModule, TodoCacheModule, ListsModule],
+  imports: [
+    TypeOrmModule.forFeature([Todo, TodoTag, TodoCompletion]),
+    KeysModule,
+    TodoCacheModule,
+    ListsModule,
+  ],
   controllers: [TodosController],
   providers: [TodosService],
   // Exported so the reminders sweep can inject the `markReminded` clear seam.
