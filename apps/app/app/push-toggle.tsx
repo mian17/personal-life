@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { StatusText, Switch } from '@life/ui';
-import { subscribeToPush, unsubscribeFromPush } from '@/lib/push-client';
+import { hasPushSubscription, subscribeToPush, unsubscribeFromPush } from '@/lib/push-client';
 
 declare global {
   interface Navigator {
@@ -28,6 +28,10 @@ export function PushToggle() {
     setSupported('serviceWorker' in navigator && 'PushManager' in window);
     setInstalled(Boolean(navigator.standalone));
     if (typeof Notification !== 'undefined') setPermission(Notification.permission);
+    // Seed the switch from the device's actual subscription so it survives remounts.
+    void hasPushSubscription().then((subscribed) => {
+      if (subscribed) setOn(true);
+    });
   }, []);
 
   async function toggle(next: boolean) {

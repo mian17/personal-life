@@ -4,13 +4,15 @@ import { StatusText, Switch } from '@life/ui';
 jest.mock('@/lib/push-client', () => ({
   subscribeToPush: jest.fn(),
   unsubscribeFromPush: jest.fn(),
+  hasPushSubscription: jest.fn(),
 }));
 
-import { subscribeToPush, unsubscribeFromPush } from '@/lib/push-client';
+import { hasPushSubscription, subscribeToPush, unsubscribeFromPush } from '@/lib/push-client';
 import { PushToggle } from '@/app/push-toggle';
 
 const mockedSubscribe = subscribeToPush as jest.MockedFunction<typeof subscribeToPush>;
 const mockedUnsubscribe = unsubscribeFromPush as jest.MockedFunction<typeof unsubscribeFromPush>;
+const mockedHas = hasPushSubscription as jest.MockedFunction<typeof hasPushSubscription>;
 
 // The compiled component reads hooks off the raw `react` module exports at call
 // time, so spying there intercepts it (the `import * as React` namespace is a
@@ -106,6 +108,10 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+beforeEach(() => {
+  mockedHas.mockResolvedValue(false);
+});
+
 describe('PushToggle branches', () => {
   it('unsupported (no PushManager): renders guidance and no control', () => {
     setEnv({ push: false, standalone: true });
@@ -145,6 +151,8 @@ describe('PushToggle branches', () => {
 
       expect(mockedSubscribe).toHaveBeenCalledTimes(1);
       expect(mockedUnsubscribe).not.toHaveBeenCalled();
+      // The toggle seeds its state from the device's existing subscription.
+      expect(mockedHas).toHaveBeenCalled();
     } finally {
       harness.restore();
     }

@@ -19,6 +19,17 @@ function urlBase64ToUint8Array(base64: string) {
   return bytes;
 }
 
+/** Whether this device already holds an active push subscription (drives the toggle's initial state). */
+export async function hasPushSubscription(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/sw.js');
+    return Boolean(await registration?.pushManager.getSubscription());
+  } catch {
+    return false;
+  }
+}
+
 export async function subscribeToPush(): Promise<PushResult> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return { ok: false, reason: 'unsupported' };
