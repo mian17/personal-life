@@ -16,8 +16,9 @@ the Custom modal also carries a Frequency dropdown, weekly-only for now).
 - Why now: the canned repeats are fixed; a fixed-calendar "every Thu + Fri" commitment has
   no representation today. This is a fixed-calendar need, not a catch-up habit.
 - Success: pick Custom → modal opens pre-ticked with the due date's weekday → tick Thu +
-  Fri → Confirm → the field reads `Custom (Thu, Fri)`; ticking the todo advances it to the
-  next chosen weekday; its push reminder fires per occurrence.
+  Fri → Confirm → the field reads `Custom (Thu, Fri)`; ticking the todo records a completion
+  for the pre-advance due then advances it to the next chosen weekday; its push reminder
+  fires per occurrence.
 - Constraint:
   - **v1 weekly-only.** The Frequency dropdown exists but lists only *Weekly*; the stored
     rule must be structured (frequency + weekday set) so monthly patterns are added later
@@ -33,9 +34,10 @@ the Custom modal also carries a Frequency dropdown, weekly-only for now).
   - Reuse existing primitives (`Select`, `Pill`/`PillGroup`, `Button`); add only the new
     upstream `Dialog` block. UI from `@life/ui` only (Contract 1); the service keeps the
     BE → cache → DB layering and cache contract (Contract 2).
-  - Advance stays **advance-on-tick** to the next occurrence on/after now (N2/N3 of
-    `todo-due-repeat-notify`), now matching the chosen weekday set instead of a single
-    weekday.
+  - The tick **records a completion for the pre-advance due then advances** to the next
+    occurrence on/after now (N2/N3 of `todo-due-repeat-notify`, whose advance-only wording is
+    superseded on the completion point by `todo-completion-history`), now matching the chosen
+    weekday set instead of a single weekday; `done` stays false.
 - Out of scope: monthly/interval patterns ("first Monday", "every 2 weeks"), raw RRULE
   editing, completion-based repeat, per-day reminder times, repeat end dates,
   per-occurrence history, and any change to how the existing non-custom repeats behave.

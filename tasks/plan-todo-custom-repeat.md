@@ -20,7 +20,8 @@ executed until a `validating-plans` subagent returns PLAN VALIDATED (§6). The f
 The todo Repeat field gains a **`Custom…`** option that opens a **modal** for a **weekly**
 rule on a chosen weekday set (e.g. every Thu + Fri). The change is additive end to end: the
 existing flat `repeat` enum gains a `custom` value; a new plaintext `repeatDays` column holds
-the ISO weekday set; the advance-on-tick engine matches the set; a new `Dialog` block renders
+the ISO weekday set; the tick engine records a completion for the pre-advance due then
+advances to the set's next chosen day (`done` stays false); a new `Dialog` block renders
 the modal. The due date remains the first occurrence (no snapping), and the frequency
 dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
@@ -37,7 +38,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   weekday vocabulary lives in `@life/ui` (`date-parts.ts`). No `toLocale*` (lesson 0003).
 - D4: **The rule is a set, stated once** — `nextOccurrence(local, repeat, days)` steps one
   calendar day until the ISO weekday is in `days` (≤ 7 steps), preserving time-of-day and the
-  date-only/timed shape. Canned repeats ignore `days`. Advance stays **advance-on-tick** (N2/N3).
+  date-only/timed shape. Canned repeats ignore `days`. The tick records a completion for the
+  pre-advance due then advances (`done` stays false); N2/N3, the completion half amended by
+  `todo-completion-history`.
 - D5: **Native `<dialog>`** — the modal is a new `Dialog` block on the platform element:
   backdrop + top-layer (cannot be clipped by `.ui-card { overflow: hidden }`) + Escape + focus
   trapping for free. No portal library, no new dependency.
@@ -364,6 +367,17 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
       `repeatDays = null`. The existing repeat-requires-due 400 is unchanged.
     - Advance-on-tick: pass the parsed days as the trailing arg to
       `advanceToOnOrAfter(local, repeat, nowLocal, parseRepeatDays(todo.repeatDays))`.
+    - **Integration into the completion transaction (critical):** `update()`'s `done` branch is
+      now a single `this.dataSource.transaction` carrying the three completion rules landed by
+      `todo-completion-history` (T5 of that plan; the current code at the `update()` `done`
+      branch). The custom advance logic must be integrated **into that existing transaction
+      branch** — replace the internal `advanceToOnOrAfter(local, todo.repeat!, this.nowLocal())`
+      call with the set-aware form passing `parseRepeatDays(todo.repeatDays)` as the trailing
+      arg — while **preserving** the `writeCompletion(manager, sub, id, occurrence, …)` call for
+      the pre-advance due, the `reminderScheduledAt` recompute, and `todo.done = false`. It must
+      **not** reintroduce the old linear `this.todos.save(todo)` path for a `done` patch and
+      must **not** drop the completion write. The one-off tick, un-complete one-off, and
+      un-complete-repeating branches are untouched.
     - `CachedTodoRow` gains `repeatDays: number[] | null`; `toCachedTodoRow` maps
       `parseRepeatDays(todo.repeatDays)`; `decodeCachedTodoRow` passes it through; the read DTO
       in `decodeCachedTodoRow` carries `repeatDays`.
@@ -378,7 +392,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - [ ] Entity carries `repeatDays` text column; DTOs validate the day array.
   - [ ] `custom` with no days is a 400; any non-custom repeat stores `repeatDays = null`;
         clearing the due clears both; the repeat-requires-due rule still holds.
-  - [ ] A custom tick advances to the next chosen day (via `advanceToOnOrAfter` with the parsed set).
+  - [ ] A custom tick records a completion for the pre-advance due inside the existing
+        `dataSource.transaction` branch, then advances to the next chosen day (via
+        `advanceToOnOrAfter` with the parsed set), keeping `done: false`.
   - [ ] `CachedTodoRow` and the read DTO carry `repeatDays`; the cache key is unchanged.
   - [ ] `npm run typecheck -w @life/todo-service` passes; no file outside scope.
 
@@ -409,7 +425,10 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - New suite covers: create with `repeat:'custom', repeatDays:[4,5]` round-trips `repeatDays:[4,5]`;
     update sets/clears days; `custom` with no days → 400 `'custom repeat requires repeatDays'`;
     a non-custom repeat with days normalizes days to `null`; clearing the due clears repeat + days;
-    advance-on-tick jumps a Thu+Fri todo to the next chosen day and recomputes `reminderScheduledAt`;
+    the tick records a completion for the pre-advance due then jumps a Thu+Fri todo to the next
+    chosen day and recomputes `reminderScheduledAt`; the same tick **records exactly one
+    `todo_completion` row for the pre-advance due** (assert via the harness `dataSource`) and
+    keeps `done:false`;
     the repeat-requires-due 400 still fires for `custom`.
   - Cache assertion: a stored custom todo's cached row carries `repeatDays` and the serialized
     values still contain `enc.v1.` with no known plaintext (the existing ciphertext test pattern).

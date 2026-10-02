@@ -4,9 +4,9 @@ Module id: `todo-custom-repeat` (map: `docs/specs/MAP-todo-ecosystem.md`). Backe
 capability of the todo ecosystem. Traces to intent: `docs/intent/todo-custom-repeat.md`
 (locked decisions C1–C6).
 
-Extends two existing modules: `todo-due-repeat-notify` (the `repeat` field, the
-advance-on-tick engine, the reminder record) and `todo-ui` (the editor's Repeat field). It
-does not change how any existing canned repeat behaves.
+Extends two existing modules: `todo-due-repeat-notify` (the `repeat` field, the tick engine
+that **records a completion then advances**, the reminder record) and `todo-ui` (the editor's
+Repeat field). It does not change how any existing canned repeat behaves.
 
 ## Objective
 
@@ -124,9 +124,12 @@ preserved.
   the first occurrence, per C2).
 - `advanceToOnOrAfter(local, rule, nowLocal)` loops `nextOccurrence` as today; custom
   converges within a small number of steps.
-- Advance stays **advance-on-tick** (N2/N3): ticking a recurring todo moves it to the next
-  occurrence on/after now, clears `done`, recomputes `reminderScheduledAt`; no scheduler, no
-  occurrence history. Reminder derivation (`reminderAt`) is unchanged.
+- The tick **records a completion for the pre-advance due, then advances** (N2/N3, the tick
+  contract amended by `SPEC-todo-completion-history.md` C4): ticking a recurring todo records a
+  `todo_completion` row for the pre-advance due (owned by `todo-completion-history`), **then**
+  moves it to the next chosen day matching the set on/after now, **keeping `done: false`**,
+  and recomputes `reminderScheduledAt`; no scheduler. Reminder derivation (`reminderAt`) is
+  unchanged.
 
 ## Cache Rules (Contract 2)
 
@@ -219,8 +222,9 @@ picker and the label: `WEEKDAY_SHORT` (`Mon`…`Sun`, ISO 1..7) and `weekdayShor
   convergence; time-of-day preserved; `advanceToOnOrAfter` converges; date-only and timed.
 - **todo-service (e2e-spec):** create/update with `custom` + days round-trips `repeatDays`;
   `custom` without days → 400; non-custom with days normalizes to null; clearing due clears
-  both; advance-on-tick jumps to the next chosen day; cache values carry `repeatDays` and no
-  plaintext (ciphertext assertion).
+  both; the tick records a completion for the pre-advance due then jumps to the next chosen
+  day and keeps `done: false`; cache values carry `repeatDays` and no plaintext (ciphertext
+  assertion).
 - **packages/ui:** `Dialog` opens (`showModal`), closes on `close` event → `onOpenChange`,
   close button, tokens-only; weekday helper unit tests.
 - **apps/app:** editor shows `Custom…`; choosing it opens the modal without committing;
