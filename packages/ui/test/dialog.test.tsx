@@ -51,6 +51,57 @@ describe('Dialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('names the dialog with its visible title', () => {
+    setup({ open: true });
+    const dialog = document.querySelector('dialog')!;
+    const labelledBy = dialog.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    const title = document.getElementById(labelledBy!)!;
+    expect(title).toBe(document.querySelector('.ui-dialog__title'));
+    expect(title.textContent).toBe('Custom repeat');
+  });
+
+  it('fires onOpenChange(false) on a backdrop click outside the dialog box', () => {
+    const { onOpenChange } = setup({ open: true });
+    // jsdom's getBoundingClientRect() is all zeros; anything non-zero is "outside".
+    fireEvent.click(document.querySelector('dialog')!, { clientX: 500, clientY: 500 });
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('does not close on a click inside the dialog box', () => {
+    const { onOpenChange } = setup({ open: true });
+    fireEvent.click(document.querySelector('dialog')!, { clientX: 0, clientY: 0 });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('does not close when a child control click bubbles up (keyboard activation)', () => {
+    const onOpenChange = jest.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange} title="Custom repeat">
+        <button type="button">Mon</button>
+      </Dialog>,
+    );
+    const dialog = document.querySelector('dialog')!;
+    // jsdom's default all-zero rect would read 0,0 as "inside"; a real centered
+    // box is non-zero, so emulate it to expose the rect-only bug.
+    jest.spyOn(dialog, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 500,
+      top: 100,
+      bottom: 400,
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 300,
+      toJSON: () => ({}),
+    } as DOMRect);
+    // Keyboard Enter/Space on a child dispatches with target = the child and
+    // clientX/clientY 0, which a rect-only check reads as "outside" in jsdom.
+    fireEvent.click(screen.getByRole('button', { name: 'Mon', hidden: true }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('renders the footer when provided', () => {
     setup({ footer: <span data-testid="footer" /> });
     expect(screen.getByTestId('footer')).toBeTruthy();

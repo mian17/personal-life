@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cx } from '../lib/cx';
@@ -17,6 +17,17 @@ export interface DialogProps {
 
 export function Dialog({ open, onOpenChange, title, children, footer, className }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  function handleBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
+    const el = ref.current;
+    if (!el) return;
+    if (e.target !== el) return; // clicks on child content (incl. keyboard-activated controls)
+    const rect = el.getBoundingClientRect();
+    const outside =
+      e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom;
+    if (outside) onOpenChange(false);
+  }
 
   useEffect(() => {
     const el = ref.current;
@@ -39,9 +50,16 @@ export function Dialog({ open, onOpenChange, title, children, footer, className 
   }, [open, onOpenChange]);
 
   return (
-    <dialog ref={ref} className={cx('ui-dialog', className)}>
+    <dialog
+      ref={ref}
+      className={cx('ui-dialog', className)}
+      aria-labelledby={titleId}
+      onClick={handleBackdropClick}
+    >
       <div className="ui-dialog__head">
-        <h2 className="ui-dialog__title">{title}</h2>
+        <h2 className="ui-dialog__title" id={titleId}>
+          {title}
+        </h2>
         <IconButton label="Close" onClick={() => onOpenChange(false)}>
           <X size={20} aria-hidden />
         </IconButton>

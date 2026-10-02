@@ -762,5 +762,37 @@ describe('TodoEditor custom repeat', () => {
       harness.restore();
     }
   });
+
+  it('Cancel is a no-op: closing the dialog without confirming commits nothing', async () => {
+    const fixture = todo({ dueDate: '2026-10-01', repeat: null, version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      expect(selectByLabel(first, 'Repeat').props.value).toBe('');
+      selectByLabel(first, 'Repeat').props.onChange!({ target: { value: 'custom' } });
+
+      const opened = harness.renderTree(fixture);
+      // Opening is uncommitted: the controlled Select still shows the saved value.
+      expect(selectByLabel(opened, 'Repeat').props.value).toBe('');
+      const dialog = findByType(opened.props.children, RecurrenceDialog);
+      expect(dialog?.props.open).toBe(true);
+
+      // Cancel/Escape/backdrop all funnel to onOpenChange(false) with no onConfirm.
+      (dialog!.props.onOpenChange as (open: boolean) => void)(false);
+
+      const cancelled = harness.renderTree(fixture);
+      expect(findByType(cancelled.props.children, RecurrenceDialog)?.props.open).toBe(false);
+      expect(selectByLabel(cancelled, 'Repeat').props.value).toBe('');
+
+      await cancelled.props.actions.props.onClick();
+
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.repeat).toBeNull();
+      expect(patch.repeatDays).toBeUndefined();
+    } finally {
+      harness.restore();
+    }
+  });
 });
 

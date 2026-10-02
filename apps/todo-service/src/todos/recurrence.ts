@@ -113,6 +113,9 @@ function normalize(p: Local): string {
  * Advance `local` by `repeat` until the candidate is on or after `nowLocal`
  * (same-shape string compare). Never returns a past occurrence. `days` is the
  * custom weekday set; it is trailing for backward compatibility.
+ *
+ * A step that cannot make progress (e.g. `custom` with no day set) returns
+ * the candidate immediately instead of spinning.
  */
 export function advanceToOnOrAfter(
   local: string,
@@ -121,7 +124,11 @@ export function advanceToOnOrAfter(
   days: number[] | null = null,
 ): string {
   let candidate = local;
-  while (candidate < nowLocal) candidate = nextOccurrence(candidate, repeat, days);
+  while (candidate < nowLocal) {
+    const next = nextOccurrence(candidate, repeat, days);
+    if (next === candidate) return candidate; // no step possible (custom with no day set)
+    candidate = next;
+  }
   return candidate;
 }
 

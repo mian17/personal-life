@@ -113,6 +113,17 @@ describe('recurrence: custom BYDAY set', () => {
     expect(advanceToOnOrAfter('2026-10-01', 'custom', '2026-10-09', [4, 5])).toBe('2026-10-09');
     expect(advanceToOnOrAfter('2026-10-02', 'custom', '2026-10-02', [4, 5])).toBe('2026-10-02');
   });
+
+  it('terminates on an empty day set, returning the input unchanged', () => {
+    // Regression: an empty set makes nextOccurrence a no-op; without the
+    // no-progress guard this loop would spin forever.
+    expect(advanceToOnOrAfter('2026-10-08T09:00', 'custom', '2026-10-20T09:00', null)).toBe(
+      '2026-10-08T09:00',
+    );
+    expect(advanceToOnOrAfter('2026-10-08T09:00', 'custom', '2026-10-20T09:00', [])).toBe(
+      '2026-10-08T09:00',
+    );
+  });
 });
 
 describe('recurrence: repeatDays CSV owners', () => {
