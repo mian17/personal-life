@@ -5,12 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 jest.mock('../app/todo-actions', () => ({
   updateTodoAction: jest.fn(),
   deleteTodoAction: jest.fn(),
+  completeTodoAction: jest.fn(),
 }));
 
 import { TodoItem } from '../app/todo-item';
-import { updateTodoAction } from '../app/todo-actions';
+import { completeTodoAction, updateTodoAction } from '../app/todo-actions';
 
 const updateMock = updateTodoAction as jest.Mock;
+const completeMock = completeTodoAction as jest.Mock;
 
 const TODAY = '2026-10-01';
 
@@ -59,16 +61,26 @@ const ReactModule = jest.requireActual<typeof import('react')>('react');
 type ItemTree = ReactElement<Record<string, unknown>>;
 
 /**
- * `TodoItem` holds no local state; a direct call runs only its `useSnackbar`
- * hook, so the harness stubs `useContext` through the live-module read to
- * capture `showSnackbar` — no `SnackbarProvider` needed. Markup assertions that
- * do not care about the snackbar go through `markup()` instead.
+ * `TodoItem` runs `useSnackbar` plus one `useState` for the optimistic done
+ * state; a direct call is outside React, so the harness stubs both through the
+ * live-module read: `useContext` captures `showSnackbar`, `useState` returns a
+ * harness-owned `completed` flag the test can read/reset. Markup assertions that
+ * do not care about either go through `markup()` instead.
  */
 function snackbarHarness() {
   const showSnackbar = jest.fn();
+  let completed = false;
   const ctxSpy = jest
     .spyOn(ReactModule, 'useContext')
     .mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
+  const stateSpy = jest
+    .spyOn(ReactModule, 'useState')
+    .mockImplementation((() => [
+      completed,
+      (value: boolean) => {
+        completed = value;
+      },
+    ]) as unknown as typeof ReactModule.useState);
 
   function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
     return TodoItem({
@@ -83,7 +95,16 @@ function snackbarHarness() {
   return {
     renderTree,
     showSnackbar,
-    restore: () => ctxSpy.mockRestore(),
+    get completed() {
+      return completed;
+    },
+    setCompleted: (value: boolean) => {
+      completed = value;
+    },
+    restore: () => {
+      ctxSpy.mockRestore();
+      stateSpy.mockRestore();
+    },
   };
 }
 
@@ -221,20 +242,32 @@ describe('TodoItem timed and repeat meta', () => {
 });
 
 describe('TodoItem tick keeps the row visible', () => {
-  it('non-recurring: a tick to done fires the version-checked write and shows the snackbar', () => {
+  it('non-recurring: a tick to done strikes optimistically, writes through completeTodoAction, and shows the snackbar', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
+    completeMock.mockClear();
     try {
       const first = harness.renderTree();
+      expect(harness.completed).toBe(false);
       doneToggle(first).props.onToggle();
 
-      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: true }, 0);
+      // The row strikes optimistically (client strike, checked above via state)
+      // and the write fires at once through the linger action, still version-checked.
+      expect(harness.completed).toBe(true);
+      expect(completeMock).toHaveBeenNthCalledWith(1, 't1', 0);
+      expect(updateMock).not.toHaveBeenCalled();
 
       expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
       const snackbar = harness.showSnackbar.mock.calls[0][0];
       expect(snackbar.message).toBe('Task completed');
       expect(snackbar.actionLabel).toBe('Undo');
       expect(snackbar.onAction).toBeInstanceOf(Function);
+
+      // Undo resets the optimistic strike and reverses server-side unconditionally.
+      snackbar.onAction();
+      expect(harness.completed).toBe(false);
+      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false });
+      expect(updateMock.mock.calls[0]).toEqual(['t1', { done: false }]);
     } finally {
       harness.restore();
     }
@@ -247,6 +280,7 @@ describe('TodoItem tick keeps the row visible', () => {
   it('repeating: keeps the row rendered, shows the snackbar, and undoes unconditionally', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
+    completeMock.mockClear();
     try {
       const first = harness.renderTree({ overrides: { repeat: 'daily' } });
       const toggle = doneToggle(first);
@@ -255,6 +289,10 @@ describe('TodoItem tick keeps the row visible', () => {
 
       // The advance write fires immediately, still version-checked.
       expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: true }, 0);
+      // A repeating row stays open server-side, so there is no optimistic strike
+      // and the linger action is not used.
+      expect(completeMock).not.toHaveBeenCalled();
+      expect(harness.completed).toBe(false);
 
       // Snackbar appears immediately, with the one-off copy and action.
       expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
@@ -271,6 +309,7 @@ describe('TodoItem tick keeps the row visible', () => {
       snackbar.onAction();
       expect(updateMock).toHaveBeenNthCalledWith(2, 't1', { done: false });
       expect(updateMock.mock.calls[1]).toEqual(['t1', { done: false }]);
+      expect(harness.completed).toBe(false);
     } finally {
       harness.restore();
     }
@@ -279,6 +318,7 @@ describe('TodoItem tick keeps the row visible', () => {
   it('does not show a snackbar when clicking an already-done repeating row (the click undoes)', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
+    completeMock.mockClear();
     try {
       const first = harness.renderTree({
         overrides: { repeat: 'daily', done: true },
@@ -288,9 +328,11 @@ describe('TodoItem tick keeps the row visible', () => {
 
       // The click un-ticks the row; the write is still version-checked.
       expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false }, 0);
+      expect(completeMock).not.toHaveBeenCalled();
 
       // No snackbar: an un-tick is not a completion, so there is nothing to undo.
       expect(harness.showSnackbar).not.toHaveBeenCalled();
+      expect(harness.completed).toBe(false);
     } finally {
       harness.restore();
     }

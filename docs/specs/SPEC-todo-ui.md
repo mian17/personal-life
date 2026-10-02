@@ -64,13 +64,23 @@ both apps — so tags feel identical everywhere (I3).
   revalidate. Done rows carry no trash `deleteAction` (`TodoItem` gates it on
   `todo.done`). Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
-  wins over its due bucket). Ticking an **open** todo to done keeps its row
-  visible (struck + muted via `ListItem done`): on `/todos` the revalidated row
-  moves to the **Done** section, and on `/todos/matrix` the revalidated table
-  drops the done row (the matrix renders only open todos). There is no
-  client-side auto-hide, linger or collapse — a ticked row is never hidden or
-  unmounted by the client. A repeating tick advances and stays
-  open (its `done` never becomes true). `revalidateTodos()`
+  wins over its due bucket). Ticking an **open, non-recurring** todo strikes and
+  mutes its row **immediately** — `TodoItem` flips a local optimistic
+  `completed` state and passes the derived `done = todo.done || completed` to
+  `ListItem done` and the `DoneToggle` label — while `completeTodoAction`
+  (`apps/app/app/todo-actions.ts`) writes `done: true` immediately
+  (version-checked, no data-loss window) and only then lingers
+  (`COMPLETE_LINGER_MS`, 700ms) before `revalidateTodos()`, the Apple Reminders
+  settle: strike in place, then let the revalidation relocate the row. So on
+  `/todos` the revalidated row moves to the **Done** section, and on
+  `/todos/matrix` the revalidated table (which excludes done todos) removes it.
+  The linger sits between the write and the refresh — not an animation and not a
+  collapse; a ticked row is never hidden or unmounted by the client, and the
+  lingering row stays fully interactive (its Undo reverses the strike
+  immediately). A
+  repeating tick never strikes optimistically (the server advances it and keeps
+  `done` false): it goes straight to the immediate version-checked write.
+  `revalidateTodos()`
   now also revalidates `/todos/matrix`, so a write from either view refreshes both
   (stale-matrix fix).
 - **Undo snackbar (user-requested):** a tick to done shows a bottom-left

@@ -408,8 +408,11 @@ export default async function TodosMatrixPage() {
 - **Matrix renders only open todos:** the page filters `todo.done === false`
   before `groupByQuadrant`, so a done todo is never placed in a quadrant (done
   tasks live in the Done section on `/todos`). Ticking an open todo in the matrix
-  revalidates (`revalidateTodos()` includes `/todos/matrix`), so the row leaves
-  its box.
+  strikes its row immediately (optimistic `completed` in `TodoItem`, delivered by
+  `ListItem done` — no `@life/ui` change) while `completeTodoAction` writes, then
+  lingers ~700ms before `revalidateTodos()` (which includes `/todos/matrix`);
+  the revalidated table — which excludes done todos — then removes the row,
+  leaving its box.
   An emptied quadrant's list drops out
   via `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. `revalidateTodos()`
   (`apps/app/app/todo-actions.ts`) now also revalidates `/todos/matrix`, so a tick in

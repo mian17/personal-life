@@ -14,7 +14,8 @@ import {
   useSnackbar,
 } from '@life/ui';
 import { Trash2 } from 'lucide-react';
-import { deleteTodoAction, updateTodoAction } from './todo-actions';
+import { useState } from 'react';
+import { completeTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 
 /**
@@ -60,6 +61,11 @@ export function TodoItem({
   tone?: ListItemTone;
 }) {
   const { showSnackbar } = useSnackbar();
+  // Optimistic completion: the row strikes/mutes in place at tick time and is
+  // relocated by `completeTodoAction`'s delayed revalidation. Never set for a
+  // repeating todo — its server state stays open after the advance.
+  const [completed, setCompleted] = useState(false);
+  const done = todo.done || completed;
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
@@ -67,20 +73,31 @@ export function TodoItem({
 
   const doneToggle = (
     <DoneToggle
-      done={todo.done}
-      label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
+      done={done}
+      label={done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
       onToggle={() => {
-        void updateTodoAction(todo.id, { done: !todo.done }, todo.version);
         if (!todo.done) {
+          if (todo.repeat) {
+            // Repeating rows stay open (the server advances them) — never
+            // optimistically strike them; the write is immediate and version-checked.
+            void updateTodoAction(todo.id, { done: true }, todo.version);
+          } else {
+            setCompleted(true);
+            void completeTodoAction(todo.id, todo.version);
+          }
           showSnackbar({
             message: 'Task completed',
             actionLabel: 'Undo',
             onAction: () => {
               // No expectedVersion: the done write bumped the row's version, so a
               // version-checked PATCH would 409. This is an unconditional undo.
+              setCompleted(false);
               void updateTodoAction(todo.id, { done: false });
             },
           });
+        } else {
+          setCompleted(false);
+          void updateTodoAction(todo.id, { done: false }, todo.version);
         }
       }}
     />
@@ -101,12 +118,12 @@ export function TodoItem({
       }
       snippet={isDefault ? (todo.note ?? undefined) : undefined}
       leading={doneToggle}
-      done={todo.done}
+      done={done}
       variant="todo"
       size={size}
       tone={tone}
       deleteAction={
-        isDefault && !todo.done ? (
+        isDefault && !done ? (
           <form action={deleteTodoAction.bind(null, todo.id)}>
             <Button
               type="submit"

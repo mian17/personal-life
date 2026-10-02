@@ -31,6 +31,22 @@ function revalidateTodos() {
   revalidatePath('/todos/trash');
 }
 
+/**
+ * Apple Reminders linger: the ticked row strikes in place optimistically, then
+ * the revalidation relocates it (Done on `/todos`, dropped on `/todos/matrix`).
+ */
+const COMPLETE_LINGER_MS = 700;
+
+export async function completeTodoAction(id: string, expectedVersion?: number) {
+  // Write first (no data-loss window); the linger only delays the list refresh.
+  await updateTodo(id, {
+    done: true,
+    ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+  });
+  await new Promise((resolve) => setTimeout(resolve, COMPLETE_LINGER_MS));
+  revalidateTodos();
+}
+
 export async function createTodoAction(input: CreateTodoInput) {
   const tagIds = input.tagIds ? await retainedTagIds(input.tagIds) : undefined;
   await createTodo({ ...input, ...(tagIds ? { tagIds } : {}) });
