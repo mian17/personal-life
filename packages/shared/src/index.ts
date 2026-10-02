@@ -122,6 +122,22 @@ export interface TodoPage {
   nextCursor: string | null;
 }
 
+/** One appended completion occurrence (`SPEC-todo-completion-history`, C2/C6/C7). */
+export interface TodoCompletion {
+  id: string;
+  todoId: string;                       // link to the live definition (edit screen)
+  occurrence: string;                   // the satisfied due, or '~' (undated one-off)
+  completedAt: string;                  // canonical UTC instant of the tick
+  title: string;                        // DECRYPTED, joined at read time (C7 — never a snapshot)
+  listId: string | null;                // the todo's list at read time
+  listName: string | null;              // DECRYPTED list name; null when unlisted
+}
+
+export interface TodoCompletionPage {
+  completions: TodoCompletion[];
+  nextCursor: string | null;
+}
+
 /**
  * A todo-local list (`SPEC-todo-service`); `version` is the OCC counter.
  * `importantDefault` is the list's importance default (`null` = false), used as

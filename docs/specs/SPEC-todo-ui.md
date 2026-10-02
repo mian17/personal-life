@@ -202,6 +202,14 @@ recorded surface this spec froze:
   `Manage lists` all stay) — the one exception is the user-approved change to the `Weekly`
   repeat option's **visible text** (and thus its accessible name), recorded above. Recorded as
   surface additions only; the human-owned suite changes only if the user asks.
+- **Done-view additions (todo-completion-history):** `/todos?done=true` renders the
+  **completion log** instead of the todo list (`SPEC-todo-completion-history.md` C6).
+  Completion rows are `ListItem` links whose accessible name is the todo **title**
+  (`/todos/<todoId>/edit`); the empty state is `EmptyState` with heading
+  `No completed todos`. **No done-toggle is rendered** (the log is read-only — no per-row
+  delete, no Undo). No existing name/role/aria-label changes: `Done`/`All`/`Open`/`Status`
+  and every row `href` all stay. Recorded as surface additions only; the human-owned suite
+  changes only if the user asks.
 
 No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
 not rewritten by this chapter — the surface *record* is what updates (here, in

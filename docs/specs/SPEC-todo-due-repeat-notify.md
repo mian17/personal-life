@@ -159,9 +159,10 @@ stored `dueDate`:
 
 ### Recurrence advance (advance-on-tick, N2/N3 — no scheduler)
 
-On `PATCH /api/todos/:id { done: true }` **where the todo has `repeat`**, the service does
-**not** mark it done. It advances the todo to its **next occurrence on/after "now"**, clears
-`done`, recomputes `reminderScheduledAt`, and returns the advanced row:
+On `PATCH /api/todos/:id { done: true }` **where the todo has `repeat`**, the service
+**records a completion and** advances. It advances the todo to its **next occurrence
+on/after "now"**, keeps `done` `false`, recomputes `reminderScheduledAt`, and returns the
+advanced row:
 
 1. Compute the next occurrence in `TODO_TIMEZONE` local calendar from the current due:
    - `daily`: +1 day.
@@ -175,10 +176,14 @@ On `PATCH /api/todos/:id { done: true }` **where the todo has `repeat`**, the se
    due.
 4. `reminderScheduledAt` = the new occurrence's reminder (timed → candidate instant; date-only
    → candidate at 09:00 national).
-5. `done` stays `false`; `version` bumps once; the generation counter bumps after the write.
+5. **Record the completion** for the **pre-advance** due (`occurrence = D`, where `D` is the
+   due the tick satisfied) into `todo_completion`, then set `done` to **`false`** (the row
+   stays open); `version` bumps once; the generation counter bumps after the write. The
+   guarded insert and `UNIQUE (todoId, occurrence)` make a repeated tick a no-op
+   (`SPEC-todo-completion-history.md` C3/C4).
 
 - A **non-recurring** todo's `done: true` is unchanged (marks done; row hides via the UI).
-- Ticking a recurring todo is an advance, not a completion — the row **does not** hide and
+- A repeating tick will **record a completion and** advance — the row **does not** hide and
   no undo snackbar is shown (UI section).
 - Trash/restore semantics are unchanged; a recurring todo with a past occurrence and no tick
   simply stays **overdue** until ticked, with its stored reminder already fired (N3).
@@ -207,7 +212,10 @@ A bounded NestJS module `apps/todo-service/src/reminders/`:
 - `ReminderService.sweep()` — **one** system-side DB query:
   `SELECT r.* FROM todo r WHERE r.deletedAt IS NULL AND r.done = 0
    AND r.reminderScheduledAt IS NOT NULL AND r.reminderScheduledAt <= :nowIso`
-  (lexicographic ISO compare; index-backed). For each due row: build the payload
+  (lexicographic ISO compare; index-backed). The sweep keeps `done = 0` (open rows
+  only); **no reopen path exists** — a repeating tick records a completion and advances
+  without setting `done = true`, so there is nothing to reopen
+  (`SPEC-todo-completion-history.md` C4). For each due row: build the payload
   `{ title, body, url: '/todos/<id>/edit' }` (title decrypted in-request), send to the owner's
   `push_subscription` rows via the injected `PushSender`, then call the public `TodosService`
   seam `markReminded(sub, id)`, which clears `reminderScheduledAt` and bumps the owner's

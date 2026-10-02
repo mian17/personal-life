@@ -33,6 +33,16 @@ todo(
 )
 todo_tag(todoId TEXT, tagId INTEGER, PRIMARY KEY(todoId, tagId),
          FOREIGN KEY(todoId) REFERENCES todo(id) ON DELETE CASCADE)  -- TagRefs, no names
+todo_completion(                   -- append-only completion log (SPEC-todo-completion-history)
+  id          TEXT PRIMARY KEY,    -- service-generated UUID v4
+  ownerSub    TEXT NOT NULL,
+  todoId      TEXT NOT NULL,       -- FK todo.id, ON DELETE CASCADE (permanent delete cascades)
+  occurrence  TEXT NOT NULL,       -- the satisfied due: 'YYYY-MM-DD' or canonical UTC instant, or '~'
+  completedAt TEXT NOT NULL,       -- canonical UTC instant of the tick
+  UNIQUE (todoId, occurrence)      -- idempotency key: at most one row per (todoId, occurrence)
+)
+-- IDX_todo_completion_owner_completed (ownerSub, completedAt): paginated read
+-- IDX_todo_completion_todo (todoId, completedAt): per-todo delete / history
 list(
   id        TEXT PRIMARY KEY,        -- service-generated UUID v4
   name      TEXT NOT NULL,           -- enc.v1, AAD life.v1|<sub>|list|name|<id>
@@ -83,6 +93,12 @@ push_subscription(
   `deletedAt`) and the todo stays recoverable from `GET /api/todos/trash`. Trash and
   restore verbs never change `version` (only `update` bumps the OCC counter). No
   separate trash table, no scheduled purge (mirrors `SPEC-notes.md`).
+- `todo_completion` (append-only; `SPEC-todo-completion-history.md`) is **plaintext
+  metadata**: `occurrence` is the dual due shape or the undated `'~'` sentinel, and the
+  table has **no content column and no `enc.v1.` envelope** — `title`/`list.name` are
+  never copied into it (C7). A **permanent delete** (`removePermanent`/`emptyTrash`)
+  hard-deletes the todo and the FK **cascades** the log; **soft delete preserves** it
+  (history survives restore, hidden from Done while trashed).
 
 ## Behavior / API (kernel contracts apply)
 
@@ -138,14 +154,23 @@ read fields required-but-nullable:
   ticked/cleared; the sweep skips `done` rows.
 - **A repeat requires a due date.** Create/update with `repeat != null` and no resulting
   `dueDate` → 400 (`BadRequestException('repeat requires a dueDate')`).
-- **Advance-on-tick (N2/N3, no scheduler):** `PATCH /api/todos/:id { done: true }` where the
-  todo has `repeat` does **not** mark it done — it advances to the next occurrence on/after
-  "now" in the `TODO_TIMEZONE` local calendar (daily +1d; weekdays next Mon–Fri; weekly +7d;
-  monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28), skipping
-  candidates before now, clears `done`, re-derives `reminderScheduledAt`, and returns the
-  advanced row. `version` bumps once; the generation counter bumps after the write. A
-  non-recurring `done: true` is unchanged. Ticking a recurring todo hides nothing (no undo
-  snackbar — UI). Trash/restore semantics are unchanged.
+- **Advance-on-tick records a completion (N2/N3, no scheduler; amended by
+  `SPEC-todo-completion-history.md` C4, lesson 0017):** `PATCH /api/todos/:id { done: true }`
+  where the todo has `repeat` **records a completion and** advances. Let `D = todo.dueDate`
+  (normalized, pre-advance). In one `DataSource` transaction: guarded-insert one
+  `todo_completion` row with `occurrence = D` (the pre-advance due, in its stored shape) and
+  `completedAt = new Date().toISOString()`, then advance the todo to its next occurrence
+  on/after "now" in the `TODO_TIMEZONE` local calendar (daily +1d; weekdays next Mon–Fri;
+  weekly +7d; monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28),
+  skipping candidates before now, re-derive `reminderScheduledAt`, and return the advanced
+  row. `done` stays **`false`** — the row advances and remains open. `version` bumps once;
+  the generation counter bumps after the write. **`UNIQUE (todoId, occurrence)`** is the
+  idempotency key: a repeat tick for an already-recorded occurrence inserts nothing. **The
+  sweep is unchanged (open rows only) and no reopen path exists** — the repeating tick never
+  sets `done = true`, so there is nothing to reopen. A **non-recurring** `done: true` still
+  marks done and (new) records `occurrence = D ?? '~'`; `done: false` on a one-off deletes
+  **only that occurrence's** row (any other rows are preserved). Ticking a recurring todo
+  hides nothing (no undo snackbar — UI). Trash/restore semantics are unchanged.
 
 - `POST /api/todos {title, note?, dueDate?, repeat?, listId?, important?, tagIds?}` → 201 (version 0).
   `important` is `boolean | null`; omitted or `null` stores `null` (inherit the list default).
@@ -169,9 +194,17 @@ read fields required-but-nullable:
 - `POST /api/todos/:id/restore` → clears `deletedAt`, preserving `createdAt`, tags,
   and `version` · `DELETE /api/todos/:id/permanent` → hard-deletes a trashed todo
   (404 if it is not in trash; a failed mutation never bumps the generation).
+- `GET /api/todos/completions?{limit, cursor}` → `TodoCompletionPage` (newest first,
+  `completedAt DESC, id DESC`; default `limit 50`, capped 200; cursor payload
+  `base64(<completedAt>|<id>)`). Reuses `ListTodosQuery` (only `limit`/`cursor` are read),
+  exactly as `GET /api/todos/trash` does — no new query DTO. `title`/`listName` are
+  **decrypted in the request path** (joined from the existing `todo:all`/`todo:lists`
+  row-sets); there is **no snapshot column**. Read through the completions cache
+  (`SPEC-todo-completion-history.md`).
 - **Declare the static `trash` routes before the `:id` routes** (`GET`/`DELETE
   /api/todos/trash` before `GET /api/todos/:id`) so `/trash` is not parsed as an id
-  (kernel route-ordering clause, notes precedent).
+  (kernel route-ordering clause, notes precedent). The literal `completions` route is
+  likewise declared **before** `@Get(':id')`.
 - Trashed todos are hidden from `GET /api/todos` (list), `GET /api/todos/:id`,
   `PATCH /api/todos/:id`, and `GET /api/todos/tags` (a tag with only trashed todos is
   hidden) — only the trash routes surface them.
@@ -233,27 +266,41 @@ A bounded NestJS module `apps/todo-service/src/reminders/` (the only sender; no
   the hit), trash rows (`todo:trash` — the owner's soft-deleted rows serialized
   exactly as stored, each carrying its `deletedAt` and `tagIds`), list rows
   (`todo:lists`), and tag-usage rows (`todo:tags`, metadata-only:
-  ids + counts, no ciphertext by design). The cached todo rows also carry the
+  ids + counts, no ciphertext by design), and completion rows
+  (`todo:completions` — `CachedCompletionRow { id, todoId, occurrence, completedAt }`,
+  serialized rows as persisted; the log has **no content column**, so this shape carries
+  **no `enc.v1.` assertion** — there is no content to guard). The cached todo rows also
+  carry the
   plaintext `important: boolean | null` (non-content, alongside `done`) and the
   cached list rows carry `importantDefault: boolean | null` (`SPEC-todo-importance.md`);
   the cached todo rows also carry the plaintext `repeat: TodoRepeat | null` and
   `reminderScheduledAt: string | null` (non-content, `SPEC-todo-due-repeat-notify.md`);
   content columns (`title`/`note`/`name`) remain `enc.v1.`-only.
-- Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash`.
-  `q`/`tagId`/`listId`/`done`/`important`/`due*`/ cursor/limit never enter the key —
+- Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash` and
+  the completion log's `todo:<sub>:v<gen>:completions` (`TODO_COMPLETIONS` rest).
+  `q`/`tagId`/`listId`/`done`/`important`/`due*`/cursor/limit never enter the key —
   `listId`, `important` (matched against `effectiveImportant`), and every other filter
   are applied in memory off `todo:all` after the hit; one entry serves every
-  filter/page variant, and one trash entry serves every trash cursor/limit variant.
+  filter/page variant, one trash entry serves every trash cursor/limit variant, and one
+  completions entry serves every completion `limit`/`cursor` variant.
+- **Completions loader (Contract 2 Rule 1):** the DB is reached only through the loader
+  inside `getThrough` —
+  `SELECT * FROM todo_completion WHERE ownerSub = :sub ORDER BY completedAt DESC, id DESC`
+  (index-backed by `IDX_todo_completion_owner_completed`). A malformed hit fails open to
+  the loader. Per-owner isolation is the `<sub>` segment.
 - Loader guards: the `todo:all` loader (and the `findOne`/`update`/`todo:tags`
   paths) apply `deletedAt IS NULL`, so a generation bump makes a trashed row vanish
   from the list; the `todo:trash` loader applies `deletedAt IS NOT NULL`.
 - Per-owner generation counter bumped **after** every successful write — including
   the four trash writes (`remove` soft, `restore`, `removePermanent`, `emptyTrash`)
-  on the same `todo:all` counter; a list write that changes `importantDefault` bumps
+  on the same `todo:all` counter; every successful tick and un-complete (which add or
+  remove completion rows) bumps the same counter; a list write that changes
+  `importantDefault` bumps
   the same counter so every inheriting todo picks up the new default on its next read
   (computed, never denormalized); a failed mutation never bumps; 60s TTL backstop;
   fail-open on cache errors (direct loader); the fallback path never writes
-  plaintext.
+  plaintext. Soft delete/restore bump the counter too (existing), keeping the
+  completions join to the active-todo set consistent.
 - Decrypt, filter, and paginate after every hit. The plaintext `important`/
   `importantDefault` booleans are the documented non-content exception (mirroring
   `done`); they are stored in the clear in SQL and Redis, while no content plaintext
