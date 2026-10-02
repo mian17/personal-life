@@ -1,10 +1,9 @@
-import { listTodoTagUsage, listTodos, listLists, listTodoCompletions, type TodoFilters } from '@/lib/todo-api';
+import { listTodoTagUsage, listTodos, listLists, type TodoFilters } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { groupTodos } from '@/lib/todo-groups';
-import { collectTodos, collectTodoCompletions } from '@/lib/todo-query';
+import { collectTodos } from '@/lib/todo-query';
 import { TodoList } from '../todo-list';
-import { TodoCompletionList } from '../todo-completion-list';
 import { filterHref, parseTagId, PreservingSearchBox } from '@life/app-kit';
 import {
   ListShell,
@@ -29,15 +28,13 @@ export default async function TodosPage({
   const { q, list, tag, done } = await searchParams;
   const tagId = parseTagId(tag);
   const doneFilter = done === 'true' ? true : done === 'false' ? false : undefined;
-  const isDone = doneFilter === true;
 
   const filters: TodoFilters = { q, listId: list, tagId, done: doneFilter };
-  const [usage, lists, registry, completions, todos] = await Promise.all([
+  const [usage, lists, registry, todos] = await Promise.all([
     listTodoTagUsage(),
     listLists(),
     listTags(),
-    isDone ? collectTodoCompletions((cursor) => listTodoCompletions({ cursor })) : Promise.resolve([]),
-    isDone ? Promise.resolve([]) : collectTodos((cursor) => listTodos({ ...filters, cursor })),
+    collectTodos((cursor) => listTodos({ ...filters, cursor })),
   ]);
   const namedTags = await resolveTagUsage(usage);
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
@@ -113,14 +110,6 @@ export default async function TodosPage({
             >
               Open
             </Pill>
-            <Pill
-              as="a"
-              size="filter"
-              href={filterHref({ path: '/todos', current: { q, list, tag }, overrides: { done: 'true' } })}
-              active={doneFilter === true}
-            >
-              Done
-            </Pill>
           </PillGroup>
 
           {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
@@ -128,11 +117,7 @@ export default async function TodosPage({
         </>
       }
       body={
-        isDone ? (
-          <TodoCompletionList completions={completions} today={today} />
-        ) : (
-          <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone />
-        )
+        <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone />
       }
       fabHref="/todos/new"
       fabLabel="New todo"

@@ -5,7 +5,6 @@ import type {
   PushSubscribeInput,
   TagUsage,
   Todo,
-  TodoCompletionPage,
   TodoPage,
   UpdateTodoInput,
 } from '@life/shared';
@@ -65,17 +64,6 @@ export function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo> {
 
 export function deleteTodo(id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/todos/${id}`, { method: 'DELETE' });
-}
-
-/** `GET /api/todos/completions` — cursor page of the owner's completion log. */
-export function listTodoCompletions(
-  opts: { limit?: number; cursor?: string } = {},
-): Promise<TodoCompletionPage> {
-  const params = new URLSearchParams();
-  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
-  if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
-  const qs = params.toString();
-  return call<TodoCompletionPage>(`/api/todos/completions${qs ? `?${qs}` : ''}`);
 }
 
 /** `GET /api/todos/trash` — cursor page of the owner's soft-deleted todos. */

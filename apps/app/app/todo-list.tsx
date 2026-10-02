@@ -4,9 +4,9 @@ import type { TodoGroup } from '@/lib/todo-groups';
 import { TodoItem } from './todo-item';
 
 /**
- * The grouped `/todos` list: Overdue / Today / Later / No date, each rendered
- * only when non-empty (a per-group empty state is noise while another group has
- * content). Order within a group is the service's stable order.
+ * The grouped `/todos` list: Overdue / Today / Done, each rendered only when
+ * non-empty (a per-group empty state is noise while another group has content).
+ * Order within a group is the service's stable order.
  */
 export function TodoList({
   groups,

@@ -115,7 +115,9 @@ New behavior (the two chapters):
 - [ ] `/todos` → tick a **repeating** todo → the occurrence lands in the **Done** list *and*
       the row still shows the **next** occurrence (`done` stays open). This is the
       Apple-Reminders flow (lesson 0017); advance-only is a regression.
-- [ ] `/todos?done=true` → the Done view renders the completion log (title + time).
+- [ ] `/todos` → the **Done** section lists each completed task once (struck + muted)
+      with no trash control; tap its filled left checkmark → the task reopens in
+      Today/Overdue.
 - [ ] Unticking a one-off removes only that row.
 - [ ] Tick a repeating todo → a `Task completed` / `Undo` snackbar appears (repeating fires it
       **immediately**, one-off after its ~1s linger) and the row **stays put**. The due
@@ -124,10 +126,9 @@ New behavior (the two chapters):
       the same one (that jam was bug `1e42756`).
 - [ ] Press **Undo** on that snackbar → the occurrence's row vanishes from the **Done** list,
       the due rolls back to it, the reminder re-arms, and the row is still open.
-- [ ] Let the snackbar expire, then open **Done** → each task's **newest** completion row
-      carries an icon-only **Undo** control (`aria-label` "Undo completion of …") and older
-      rows carry none. Press it → that row vanishes and the task reopens at that occurrence.
-      Tick a task again → a new row appears with the control; pressing it walks back one step.
+- [ ] Let the snackbar expire, then scroll to the **Done** section → the completed task
+      appears as a struck/muted row; tap its filled left checkmark → it reopens (moves to
+      Today/Overdue) and leaves Done.
 - [ ] Repeat field → `Custom…` → modal opens titled **Custom repeat** with the due date's
       weekday pre-ticked; tick a second day → **Confirm** → the row reads
       `Custom (Thu, Fri)`.

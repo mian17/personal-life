@@ -19,7 +19,8 @@ both apps — so tags feel identical everywhere (I3).
   covers its `waitForURL` updates). Playwright navigation URLs update to the new
   paths — the explicitly approved changes; no selector/text/role in the frozen e2e
   surface changes.
-- **`/todos`:** grouped `Overdue` / `Today` / `Later` / `No date`; done toggle;
+- **`/todos`:** grouped `Overdue` / `Today` / `Done` (a done todo is always in Done;
+  open later/undated todos stay hidden until due); done toggle;
   create (composer/FAB); inline edit title, note, due date + optional **time**, optional
   **repeat**, list; **soft delete to
   trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
@@ -53,18 +54,23 @@ both apps — so tags feel identical everywhere (I3).
   `#errand` still creates the filter link) — the parsed name goes through the
   registry's create-or-get and the note write carries `tagIds`. The picker is an
   addition to this flow, not a replacement (`SPEC-tags-extraction`).
-- **Done declutter (user-requested):** a done row renders struck + muted
-  (`ListItem done`). Ticking an **open** todo to done on `/todos` or `/todos/matrix`
-  lets the row linger ~1s, then it collapses (`.ui-list-item--collapsing`) and
-  unmounts; an emptied group section then hides via
+- **Done declutter (user-requested):** the `/todos` list renders exactly three
+  sections — **Overdue → Today → Done**. A done row renders struck + muted
+  (`ListItem done`) under the **Done** heading and is a normal `TodoItem`
+  (`DoneToggle` with a filled `Checkbox`); tapping its checkmark sends the existing
+  `done:false` toggle (with version) and the row moves back to Today/Overdue on
+  revalidate. Done rows carry no trash `deleteAction` (`TodoItem` gates it on
+  `todo.done`). Open todos due **later** or with no date appear in no section until
+  they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
+  wins over its due bucket). Ticking an **open** todo to done on `/todos` or
+  `/todos/matrix` lets the row linger ~1s, then it collapses
+  (`.ui-list-item--collapsing`) and unmounts; an emptied group section then hides via
   `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. Auto-hide arms **only on a
   genuine `false→true` tick transition** (`DoneToggle`'s `wasDone` ref): a row that is
-  already done on page load (List **All** filter, Matrix) is **not** auto-hidden — it
-  only shows struck/dimmed. The List **Done** status
-  filter (`?done=true`) disables auto-hide entirely (`TodoList hideDone={false}`), so
-  done rows there stay put — and because auto-hide is off there, **no snackbar appears**
-  in the Done filter. `revalidateTodos()` now also revalidates `/todos/matrix`,
-  so a write from either view refreshes both (stale-matrix fix).
+  already done on page load (the Done section, Matrix) is **not** auto-hidden — it
+  only shows struck/dimmed, and tapping its checkmark reopens it. `revalidateTodos()`
+  now also revalidates `/todos/matrix`, so a write from either view refreshes both
+  (stale-matrix fix).
 - **Undo snackbar (user-requested):** the same ~1s hide is paired with a bottom-left
   `Snackbar` — `Task completed` with an `Undo` action. Pressing Undo clears the local
   `removed`/`collapsing` state immediately (un-hiding the row and cancelling the pending
@@ -234,16 +240,16 @@ recorded surface this spec froze:
   `Manage lists` all stay) — the one exception is the user-approved change to the `Weekly`
   repeat option's **visible text** (and thus its accessible name), recorded above. Recorded as
   surface additions only; the human-owned suite changes only if the user asks.
-- **Done-view additions (todo-completion-history):** `/todos?done=true` renders the
-  **completion log** instead of the todo list (`SPEC-todo-completion-history.md` C6).
-  Completion rows are `ListItem` links whose accessible name is the todo **title**
-  (`/todos/<todoId>/edit`); the empty state is `EmptyState` with heading
-  `No completed todos`. **No done-toggle is rendered** and there is no per-row delete: the
-  newest completion row per task renders the `trailing` undo control (role `button`,
-  accessible name `` `Undo completion of ${title}` ``, class hook `button.done-undo`);
-  older rows stay read-only. No existing name/role/aria-label changes: `Done`/`All`/`Open`/`Status`
-  and every row `href` all stay. Recorded as surface additions only; the human-owned suite
-  changes only if the user asks.
+- **Done section (todo-completion-history):** `/todos` no longer has a Done status
+  pill and no longer swaps in the completion log for `?done=true`. The **Done** group
+  renders one `TodoItem` per done todo — the same row anatomy as Overdue/Today
+  (`ListItem variant="todo" done` + the leading `DoneToggle`) — with no trash control;
+  tapping the filled checkmark sends `done:false` and the row moves back to
+  Today/Overdue on revalidate. Status pills are `All` / `Open` only. The backend
+  completion log and the server undo rule are unchanged
+  (`SPEC-todo-completion-history.md`); only the app's Done surface changed. No existing
+  name/role/aria-label changes (`All`, `Open`, `Status`, the row `href`s all stay).
+  Recorded as a surface change; the human-owned suite changes only if the user asks.
 - **Custom repeat additions (todo-custom-repeat):** the new accessible names `Custom repeat`
   (the modal title), `Frequency`, `Days`, the seven day labels `Mon`…`Sun`, `Confirm`,
   `Cancel`, and `Close` (the modal's close `IconButton`). The Repeat `Select` remains the

@@ -4,12 +4,12 @@ import { dueStateOf } from '@/lib/todo-query';
 
 const TODAY = '2026-09-28';
 
-function todo(id: string, dueDate: string | null): Todo {
+function todo(id: string, dueDate: string | null, done = false): Todo {
   return {
     id,
     title: id,
     note: null,
-    done: false,
+    done,
     important: null,
     effectiveImportant: false,
     dueDate,
@@ -26,11 +26,11 @@ function todo(id: string, dueDate: string | null): Todo {
 }
 
 describe('groupTodos', () => {
-  it('always returns the four groups in spec order', () => {
-    expect(TODO_GROUPS.map((g) => g.label)).toEqual(['Overdue', 'Today', 'Later', 'No date']);
+  it('always returns the three groups in spec order', () => {
+    expect(TODO_GROUPS.map((g) => g.label)).toEqual(['Overdue', 'Today', 'Done']);
   });
 
-  it('buckets by the DueDatePill state derivation', () => {
+  it('buckets open todos by the DueDatePill state derivation and hides later/none', () => {
     const todos = [
       todo('overdue-1', '2026-09-01'),
       todo('today-1', '2026-09-28'),
@@ -43,8 +43,23 @@ describe('groupTodos', () => {
     expect(byKey).toEqual({
       overdue: ['overdue-1', 'overdue-2'],
       today: ['today-1'],
-      later: ['later-1'],
-      none: ['none-1'],
+      done: [],
+    });
+  });
+
+  it('done wins: a done todo lands in Done regardless of due date', () => {
+    const todos = [
+      todo('done-overdue', '2026-09-01', true),
+      todo('done-later', '2026-10-05', true),
+      todo('done-undated', null, true),
+      todo('open-today', '2026-09-28'),
+    ];
+    const grouped = groupTodos(todos, TODAY);
+    const byKey = Object.fromEntries(grouped.map((g) => [g.key, g.todos.map((t) => t.id)]));
+    expect(byKey).toEqual({
+      overdue: [],
+      today: ['open-today'],
+      done: ['done-overdue', 'done-later', 'done-undated'],
     });
   });
 
@@ -56,14 +71,15 @@ describe('groupTodos', () => {
 
   it('returns empty buckets for an empty list', () => {
     const grouped = groupTodos([], TODAY);
-    expect(grouped).toHaveLength(4);
+    expect(grouped).toHaveLength(3);
     expect(grouped.every((g) => g.todos.length === 0)).toBe(true);
   });
 
-  it('agrees with dueDateState on every bucket', () => {
-    const todos = [todo('x', '2026-09-27'), todo('y', '2026-09-29'), todo('z', null)];
+  it('agrees with dueDateState on every open bucket', () => {
+    const todos = [todo('x', '2026-09-27'), todo('y', '2026-09-28')];
     for (const group of groupTodos(todos, TODAY)) {
       for (const item of group.todos) {
+        if (group.key === 'done') continue;
         expect(dueStateOf(item, TODAY)).toBe(group.key);
       }
     }

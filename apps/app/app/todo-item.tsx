@@ -187,7 +187,7 @@ export function TodoItem({
       size={size}
       tone={tone}
       deleteAction={
-        isDefault ? (
+        isDefault && !todo.done ? (
           <form action={deleteTodoAction.bind(null, todo.id)}>
             <Button
               type="submit"

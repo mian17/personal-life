@@ -7,7 +7,6 @@ jest.mock('@/lib/todo-api', () => ({
   listTodos: jest.fn(),
   listTodoTagUsage: jest.fn(),
   listLists: jest.fn(),
-  listTodoCompletions: jest.fn(),
 }));
 jest.mock('@/lib/tags-api', () => ({
   listTags: jest.fn(),
@@ -17,18 +16,16 @@ jest.mock('@/lib/tags-api', () => ({
 // server module never loads under jest.
 jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
 
-import { listTodos, listTodoTagUsage, listLists, listTodoCompletions } from '@/lib/todo-api';
+import { listTodos, listTodoTagUsage, listLists } from '@/lib/todo-api';
 import { listTags, resolveTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
 import { TodoList } from '@/app/todo-list';
-import { TodoCompletionList } from '@/app/todo-completion-list';
 import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
 const mockedUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUsage>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
-const mockedListCompletions = listTodoCompletions as jest.MockedFunction<typeof listTodoCompletions>;
 const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
 const mockedResolveTags = resolveTags as jest.MockedFunction<typeof resolveTags>;
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
@@ -91,7 +88,6 @@ describe('/todos list page wiring', () => {
     ]);
     mockedResolveTags.mockResolvedValue([{ id: 1, name: 'errand' }]);
     mockedReadPref.mockResolvedValue(false);
-    mockedListCompletions.mockResolvedValue({ completions: [], nextCursor: null });
   });
 
   it('renders ListShell titled Todos with the frozen fab label', async () => {
@@ -131,7 +127,7 @@ describe('/todos list page wiring', () => {
     });
   });
 
-  it('renders the status pills with the active one matching the done param', async () => {
+  it('renders only the All/Open status pills (the Done view is a section, not a pill)', async () => {
     const el = await TodosPage({
       searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
     });
@@ -139,14 +135,12 @@ describe('/todos list page wiring', () => {
     const status = find(el.props.filters, PillGroup, 'Status');
     expect(status.type).toBe(PillGroup);
     const pills = asArray(status);
-    expect(pills.map((p) => p.props.children)).toEqual(['All', 'Open', 'Done']);
+    expect(pills.map((p) => p.props.children)).toEqual(['All', 'Open']);
     expect(pills[0].type).toBe(Pill);
     expect(pills[0].props.active).toBe(false);
     expect(pills[1].props.active).toBe(true);
-    expect(pills[2].props.active).toBe(false);
     expect(pills[0].props.href).toContain('q=milk');
     expect(pills[1].props.href).toContain('done=false');
-    expect(pills[2].props.href).toContain('done=true');
   });
 
   it('hands the tag and list filters to TagFilterNav, preserving the current params', async () => {
@@ -199,7 +193,7 @@ describe('/todos list page wiring', () => {
     expect(el.props.tabs).toBeUndefined();
   });
 
-  it('renders TodoList with hideDone for All/Open and TodoCompletionList for Done', async () => {
+  it('always renders TodoList with hideDone — no Done-view body swap', async () => {
     const all = await TodosPage({ searchParams: Promise.resolve({}) });
     expect(all.props.body.type).toBe(TodoList);
     expect(all.props.body.props.hideDone).toBe(true);
@@ -208,10 +202,23 @@ describe('/todos list page wiring', () => {
     expect(open.props.body.type).toBe(TodoList);
     expect(open.props.body.props.hideDone).toBe(true);
 
-    // The Done filter swaps the body source (completion log); there is no
-    // hideDone prop on that branch. Detailed Done-view coverage lives in
-    // routes-todos-completions.test.tsx.
-    const done = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
-    expect(done.props.body.type).toBe(TodoCompletionList);
+    // `?done=true` no longer swaps the body: the Done section lives inside TodoList.
+    const doneParam = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
+    expect(doneParam.props.body.type).toBe(TodoList);
+    expect(doneParam.props.body.props.hideDone).toBe(true);
+  });
+
+  it('renders a done todo as a struck row with no trash control', async () => {
+    mockedListTodos.mockResolvedValue({
+      todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],
+      nextCursor: null,
+    });
+    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+
+    const html = renderToStaticMarkup(el.props.body);
+    expect(html).toContain('ui-list-item--done');
+    expect(html).toContain('ui-checkbox--checked');
+    expect(html).not.toContain('ui-btn--danger');
+    expect(html).not.toContain('aria-label="Delete Pay rent"');
   });
 });
