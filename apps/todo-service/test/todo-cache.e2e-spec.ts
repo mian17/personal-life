@@ -213,6 +213,31 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(entry.value).not.toContain(TITLE);
   });
 
+  it('todo rows carry the custom repeatDays set while content stays ciphertext-only', async () => {
+    const TITLE = 'TOPSECRET-CUSTOM-TITLE';
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    await h.todos.create(SUB, {
+      title: TITLE,
+      dueDate: '2026-10-08',
+      repeat: 'custom',
+      repeatDays: [4, 5],
+    });
+    client.values.length = 0;
+    const gen = currentGen(client, SUB);
+
+    await h.todos.findAll(SUB, {});
+
+    const entry = client.values.find((v) => v.key === `todo:${SUB}:v${gen}:all`)!;
+    expect(entry).toBeDefined();
+    // The weekday set rides the cached row as non-content metadata (SPEC Cache Rules).
+    expect(entry.value).toContain('"repeat":"custom"');
+    expect(entry.value).toContain('"repeatDays":[4,5]');
+    // Content columns are unchanged: `enc.v1.`-only, no plaintext leak.
+    expect(entry.value).toContain(ENC_PREFIX);
+    expect(entry.value).not.toContain(TITLE);
+  });
+
   it('trash rows also carry repeat/reminderScheduledAt as ciphertext rows', async () => {
     const TITLE = 'TOPSECRET-TRASH-REPEAT-TITLE';
     const client = new CapturingRedisClient();

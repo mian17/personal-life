@@ -117,6 +117,7 @@ describe('Todos API (e2e)', () => {
         'note',
         'reminderScheduledAt',
         'repeat',
+        'repeatDays',
         'tagIds',
         'title',
         'updatedAt',
