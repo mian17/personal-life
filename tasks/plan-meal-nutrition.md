@@ -27,7 +27,9 @@ Read before implementing; the plan follows each rather than re-deciding it:
 | Content encrypted at rest | `docs/intent/data-privacy.md` | content fields are `enc.v1.` with byte-exact AAD |
 | Per-service DEK custody under a master key | `SPEC-notes-at-rest.md` | `MEAL_MASTER_KEY` + the `keys/` module shape |
 | BFF is the only caller of a service | `personal-life-api.md`, `apps/app/lib/*` | `lib/meal-api.ts` server-only; browser never reaches meal-service |
-| Audience mapping | `.env.development.example`, `.env.example` | add `https://meal-service=life-api` to the `OIDC_AUDIENCE_MAP` in both (the tracked `.env.example` is the production template the IdP reads at `compose.yaml:153`) |
+| Audience mapping | `.env.development.example`, `.env.example` | add `https://meal-service=life-api` to the `OIDC_AUDIENCE_MAP` in both (the tracked `.env.example` is the production template the IdP reads at `compose.yaml:153`); there is exactly one app-side audience (`life-api`, `lib/client.ts`) — no second audience config exists |
+| PWA identity per top-level route | lesson 0005; `apps/app/app/{notes,todos}/layout.tsx` | the meals group mounts its own layout reusing the app's **existing** `/manifest-todos.json` + `/icon-todos.png` constants; **no `public/manifest-meals.json`** (frozen surface, user unavailable) — Task 16 owns it |
+| Photo → suggestion → editor | `SPEC-meal-capture-ui.md`, intent "photo front door" | one endpoint path `POST /api/estimates/photo` (Task 13) and one call site (Task 17's `actions.ts`); the suggestion becomes the editor's draft, the explicit failure shape opens it empty |
 | "Today" is the client's zone | lesson 0019 | client resolves the day via the existing shared owner `apps/app/lib/today.ts` (`getToday()`); service never uses its own clock |
 | Dates render through the shared helper | lesson 0003 | no ad-hoc date formatting in the meals UI |
 | One owner per rule | lesson 0016, Contract 1/2 | single owner named per rule below |
@@ -179,8 +181,10 @@ Rules with exactly one owner in this chapter (lesson 0016):
 - [ ] **Task 8: foods catalog** — *Medium*
   - `food.entity.ts`, `serving.entity.ts` (per-serving `NutrientVector`), `dto/`,
     `foods.service.ts` (owner-scoped; `ownerSub` from `@Principal()`; **food-name search `q`**),
-    `foods.controller.ts`, `foods.module.ts`, `foods-cache.ts` (adapter over `@life/cache`,
-    namespace `meal`).
+    `foods.controller.ts` (`@Controller('api/foods')` — the repo's `api/<noun>` convention, as
+    `notes.controller.ts`/`todos.controller.ts`: `GET /api/foods?q=`, `POST /api/foods`,
+    `GET /api/foods/:id`, `PATCH /api/foods/:id`, `DELETE /api/foods/:id`), `foods.module.ts`,
+    `foods-cache.ts` (adapter over `@life/cache`, namespace `meal`).
   - `test/ownership.e2e-spec.ts` is the single owner of the cross-entity owner-isolation proof
     (`SPEC-meal-service.md` Success Criterion 1): this task starts it for food and target, and
     Tasks 9 and 11 extend it for entry and saved meal.
@@ -202,7 +206,10 @@ Rules with exactly one owner in this chapter (lesson 0016):
   - `entry.entity.ts` (ownerSub index, `version`, `deletedAt`, date + meal group + food +
     quantity + **confirmed snapshot vector**), `dto/`, `entries.service.ts` (write → DB →
     `bumpGeneration`; read via `getThrough`; meal-group filter applied post-decrypt in memory),
-    `entries.controller.ts`, `entries.module.ts`, `entries-cache.ts`.
+    `entries.controller.ts` (`@Controller('api/entries')` — the repo's `api/<noun>` convention, as
+    `notes.controller.ts`/`todos.controller.ts`: `POST /api/entries`, `GET /api/entries?date=`,
+    `GET /api/entries/:id`, `PATCH /api/entries/:id`, `DELETE /api/entries/:id`),
+    `entries.module.ts`, `entries-cache.ts`.
   - Acceptance: an entry stores the scaled, confirmed `NutrientVector` as a snapshot and
     editing the source food afterwards leaves the entry's stored vector unchanged (spec Testing
     Strategy "Entry snapshot immutability — editing a food must not rewrite history", asserted
@@ -228,7 +235,13 @@ Rules with exactly one owner in this chapter (lesson 0016):
   - Files: `apps/meal-service/test/{fake-redis.ts,entries-cache.e2e-spec.ts}`, `docs/specs/MAP-redis.md`
 
 - [ ] **Task 11: saved meals (frozen snapshots)** — *Medium*
-  - `saved-meal.entity.ts`, `saved-meal-item.entity.ts`, `dto/`, service/controller/module/cache.
+  - `saved-meal.entity.ts`, `saved-meal-item.entity.ts`, `dto/`, `saved-meals.service.ts`,
+    `saved-meals.controller.ts` (`@Controller('api/saved-meals')` — the repo's `api/<noun>`
+    convention, as `notes.controller.ts`/`todos.controller.ts`: `POST /api/saved-meals` (save the
+    corrected snapshot), `GET /api/saved-meals` (list — the route Task 18's list reads),
+    `GET /api/saved-meals/:id` (read one — the route the BFF re-log composes from)),
+    `saved-meals.module.ts`, `saved-meals-cache.ts`. Re-log is BFF composition (read the snapshot,
+    then `POST /api/entries`), never a fresh Gemini guess.
   - Acceptance: saving copies the corrected values; editing the source food afterwards does not
     change the saved meal; re-logging from a saved meal does not call Gemini; user B cannot read,
     mutate, or delete user A's saved meal (`test/ownership.e2e-spec.ts` extended).
@@ -261,7 +274,12 @@ Rules with exactly one owner in this chapter (lesson 0016):
   - Files: `apps/meal-service/src/photo/gemini.client.ts`, `test/{gemini.client.test.ts,fake-gemini.ts}`, `docs/specs/MAP-meal-nutrition.md` (Decision log entry — ADR-style decisions live in the map's Decision log; there is no `adr-*` file convention in this repo)
 
 - [ ] **Task 13: photo endpoint** — *Small*
-  - `dto/estimate-photo.dto.ts`, `photo.service.ts`, `photo.controller.ts`, `photo.module.ts`.
+  - `dto/estimate-photo.dto.ts`, `photo.service.ts`, `photo.controller.ts`
+    (`@Controller('api/estimates')` — the repo's `api/<noun>` convention, as
+    `notes.controller.ts`/`todos.controller.ts`: `POST /api/estimates/photo`, the ONE path string
+    Task 17's server action posts to), `photo.module.ts`. The client posts the image bytes plus the
+    optional hint string (`SPEC-meal-capture-ui.md` §Code Style: a hint, if present, is sent as
+    steering input — never a correction).
   - Acceptance: returns a suggestion or an explicit failure and **never writes an entry**;
     image bytes are not persisted or logged; estimate responses are not cached.
   - Verify: `npm run test:unit -w apps/meal-service -- test/photo.e2e-spec.ts`
@@ -330,30 +348,52 @@ Rules with exactly one owner in this chapter (lesson 0016):
   - `app/(meals)/meals/page.tsx` + `[date]/…`: total/target/remaining, meal groups, the three
     doors, empty state. Primitives only (`PageShell`, `PageTitle`, `Card`, `List`/`ListItem`,
     `EmptyState`, `FabLink`/`IconLink`, `StatusText`, and Task 15's upload atom for the photo door).
-  - Acceptance: total is the sum of confirmed entries; three doors all reachable; the photo door
-    composes Task 15's atom (no raw `<input type="file">`); zero raw elements; no app-local CSS;
-    dates rendered via the shared helper.
-  - Verify: `npm run typecheck -w apps/app`; `npm run test:unit -w apps/app -- test/meal-day-view.test.tsx`
-  - Files: `apps/app/app/(meals)/meals/{page.tsx,[date]/page.tsx}`, `apps/app/test/meal-day-view.test.tsx`
+    This task also owns the meals mount identity: `apps/app/app/(meals)/meals/layout.tsx` mirrors
+    `apps/app/app/todos/layout.tsx` file-for-file — `RouteLayout` +
+    `routeLayoutMetadata('/manifest-todos.json', 'Todos', '/icon-todos.png')` with a
+    `SnackbarProvider` — reusing the app's **existing** manifest/icon constants. Per the locked
+    decision above, **no new `public/manifest-meals.json`** is created (frozen surface; the user is
+    unavailable, so the existing identity is reused).
+  - Acceptance: total is the sum of confirmed entries; three doors all reachable (photo →
+    `/meals/entry/new?door=photo`, manual → `/meals/entry/new`, saved → `/meals/saved`; the upload
+    atom itself is composed on Task 17's editor page, which the photo door opens); zero raw
+    elements; no app-local CSS;
+    dates rendered via the shared helper; the meals mount carries the existing manifest/icon
+    constants and the `SnackbarProvider`, with no frozen surface changed.
+  - Verify: `npm run typecheck -w apps/app`; `npm run test:unit -w apps/app -- test/meal-day-view.test.tsx`;
+    `grep -rnE "<(button|input|textarea)\b" 'apps/app/app/(meals)/meals/page.tsx' 'apps/app/app/(meals)/meals/[date]/page.tsx'` prints no lines (exit 1 is the expected outcome: the upload atom lives on Task 17's editor page, not here)
+  - Files: `apps/app/app/(meals)/meals/{layout.tsx,page.tsx,[date]/page.tsx}`, `apps/app/test/meal-day-view.test.tsx`
   - Dependencies: Task 14, Task 15.
 
 - [ ] **Task 17: review-correct editor** — *Medium*
   - `entry/[id]/…` + server actions: edit portions, delete/re-add items, save; corrected values
-    are the ones persisted. Includes the **save-as-meal control** — a "Save as meal" action on
+    are the ones persisted. This task owns the **photo door's POST → pre-opened flow** (the BFF
+    side): a client-side editor component mounts Task 15's upload `FilePicker` for the image plus
+    an **optional hint `Textarea`** (`SPEC-meal-capture-ui.md` §Code Style: hint is steering input,
+    never a correction), and the server action reads both from the form data, then posts the bytes
+    (+ hint) to Task 13's one path string `POST /api/estimates/photo` — a single call site through
+    `lib/meal-api.ts`, no second client, and the hint `Textarea` never doubles as the editor's
+    correction field. Success branch: the returned suggestion becomes the editor's starting item
+    values, ready to correct-then-save. Failure branch (explicit "could not read" shape, non-2xx,
+    timeout): the editor opens in **manual mode — pre-opened and empty**, with no fabricated
+    numbers. Includes the **save-as-meal control** — a "Save as meal" action on
     the review editor that posts the current corrected item set to Task 11's
-    saved-meal endpoint (`POST /saved-meals`), making the intent's "correct once, re-log in one
+    `POST /api/saved-meals`, making the intent's "correct once, re-log in one
     tap" flow real (the snapshot is created from the editor, not invented). The control is
     composed from `@life/ui` primitives (a `Button`/`Pill` variant), never a raw `<button>`.
-  - Acceptance: a corrected portion changes the day total; cropping/removing an item works; a
+  - Acceptance: a corrected portion changes the day total; cropping/removing an item works; the
+    photo upload + optional hint posts to `POST /api/estimates/photo` (the one path string Task 13
+    owns); a
     failed photo opens manual entry with an empty meal and **no fabricated numbers**; an
     estimated-but-unknown value renders the model's explicit "unknown" affordance — an em dash
     (`—`) from the `@life/nutrition` formatter — and **never a fabricated `0`**
     (`SPEC-meal-capture-ui.md` §Code Style, intent "must never invent numbers"); **clicking
-    "Save as meal" calls Task 11's save endpoint and creates a saved meal whose items match the
+    "Save as meal" calls `POST /api/saved-meals` and creates a saved meal whose items match the
     corrected snapshot** — the fixture Task 18 lists and Task 20's "saved meal re-logs the
     snapshot" assertion consumes.
-  - Verify: `npm run test:unit -w apps/app -- test/meal-editor.test.tsx`
-  - Files: `apps/app/app/(meals)/meals/{entry/[id]/page.tsx,actions.ts}`, `apps/app/test/meal-editor.test.tsx`
+  - Verify: `npm run test:unit -w apps/app -- test/meal-editor.test.tsx`; `grep -n "api/estimates/photo" apps/app/lib/meal-api.ts` prints the shared path string and exits 0
+  - Files: `apps/app/app/(meals)/meals/entry/[id]/{page.tsx,actions.ts}`, `apps/app/lib/meal-api.ts` (Task 14 creates it; this task adds the photo-estimate + save-as-meal calls), `apps/app/test/meal-editor.test.tsx`
+  - Dependencies: Task 11 (`POST /api/saved-meals`), Task 13 (`POST /api/estimates/photo`), Task 15 (upload atom), Task 16 (group layout).
 
 - [ ] **Task 18: saved meals UI** — *Small*
   - `saved/…`: list + one-tap re-log.
@@ -372,14 +412,27 @@ Rules with exactly one owner in this chapter (lesson 0016):
     doors reachable; photo failure → manual entry with no invented numbers; correct-then-save
     persists the corrected vector; saved meal re-logs the snapshot (the saved-meal fixture is
     created via Task 17's "Save as meal" control, then re-logged in one tap); day total equals
-    the sum of confirmed entries.
+    the sum of confirmed entries. This task also wires the harness so it actually runs
+    `meal-service` (all real, runnable): `apps/app/test/e2e/config.ts` gains a `mealPort` in
+    `testPorts()` (`E2E_MEAL_PORT ?? 3106`) and in `devPorts()` (`E2E_DEV_MEAL_PORT ?? 3206`);
+    `apps/app/test/e2e/stack.ts` gains `StackConfig.mealPort`, a `mealEnv(cfg)` mirroring
+    `todoEnv` (harness-scoped `DB_PATH` under the stack state dir, `MEAL_MASTER_KEY` from the
+    shared harness constant), the `await build('apps/meal-service')` + spawn block, the `/health`
+    wait, and a `MEAL_API_URL` line in `appEnv`. **Both stacks, one task.** Both `global-setup.ts`
+    and `global-setup.dev.ts` destructure and pass `mealPort` through their existing `cfg`; the
+    two spec readers (`testPorts()`/`devPorts()` call sites) keep working unchanged; the three
+    non-meal environments keep working unchanged (no existing harness surface is renamed).
   - Acceptance: the spec passes as a single-spec run with the `-g` filter naming that block's
-    exact title (`meals day view`); no frozen selector was changed.
-  - Verify: `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/meals.spec.ts -g "meals day view"`
-  - Files: `apps/app/test/e2e/meals.spec.ts`
+    exact title (`meals day view`); no frozen selector was changed; the single-spec run reaches
+    `meal-service` through the stack-supplied `MEAL_API_URL` (no loopback fallback).
+  - Verify: `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/meals.spec.ts -g "meals day view"`; `grep -n "mealPort" apps/app/test/e2e/config.ts apps/app/test/e2e/stack.ts` and `grep -n "MEAL_API_URL" apps/app/test/e2e/stack.ts` print the wiring lines and exit 0
+  - Files: `apps/app/test/e2e/meals.spec.ts`, `apps/app/test/e2e/config.ts`, `apps/app/test/e2e/stack.ts`
+  - Dependencies: Task 5 (boots the binary this stack spawns), Task 14 (BFF the spec drives).
 
 ### Checkpoint: UI
 - [ ] Contract 1 mechanical greps return zero hits in meals code
+- [ ] The harness boots `meal-service` before the app: `testPorts()`/`devPorts()` carry `mealPort`,
+      `stack.ts`'s `mealEnv` spawns it and `appEnv` sets `MEAL_API_URL` (Task 20's wiring)
 - [ ] Single-spec E2E passes
 
 ### Phase 6: Wiring and docs
@@ -411,8 +464,23 @@ Rules with exactly one owner in this chapter (lesson 0016):
     3. the dedicated `redis-meal` instance (image `redis:8-alpine`, `--save "" --appendonly no
        --maxmemory 64mb --maxmemory-policy allkeys-lru`, `life` network, `redis-cli ping`
        healthcheck, `restart: unless-stopped`) — one instance per service (lesson 0011).
-    4. an `OIDC_AUDIENCE_MAP` entry `https://meal-service=life-api` in both the IdP block and
-       the app WIF config, and in the tracked `.env.example` / `.env.development.example`.
+    4. an `OIDC_AUDIENCE_MAP` entry `https://meal-service=life-api` in the two places this
+       entry actually lives — the `compose.yaml:153` IdP `OIDC_AUDIENCE_MAP` default and the
+       tracked env templates (`.env.example:43` and `.env.development.example:83`). There is no
+       third, app-side audience config to edit (`grep -rni wif` returns zero hits; the app uses
+       the single `OIDC_APP_RESOURCE: ${OIDC_APP_RESOURCE:-https://note-service}` line).
+  - Two further **stale enumerations** move with the sixth instance (both files already in this
+    task's Files): `compose.yaml`'s Redis-section comment (`compose.yaml:227-231`, "One instance
+    per service (app, idp, note, tags, todo)") gains `meal`; `.env.example`'s Redis comment
+    (`:83-85`, which enumerates `redis://redis-{app,idp,note,tags,todo}:6379`) gains
+    `redis://redis-meal:6379`. A five-instance list beside a sixth instance is the stale map
+    lesson 0011 was written about.
+  - The per-service master-key enumerations gain the meal key too: `.env.example:63-66` (already
+    `# TAGS_MASTER_KEY=` / `# TODO_MASTER_KEY=` under the `openssl rand -base64 32` comment) gains
+    `# MEAL_MASTER_KEY=`, and `.env.development.example:28-29` gains the same commented line.
+    `.env.example` is the production template the fail-fast
+    `MEAL_MASTER_KEY: ${MEAL_MASTER_KEY:?...}` in item 1 reads from; without the documented line
+    the operator cannot know the key exists.
   - `REDIS_URL` is the repo's one per-service env-var name (`MAP-redis.md:21`), not a
     `MEAL_`-prefixed variant; at most it may appear **commented** in `.env.development.example`
     as a prod-only knob, mirroring the commented `NOTE_MASTER_KEY` there. In production it is
@@ -424,12 +492,17 @@ Rules with exactly one owner in this chapter (lesson 0016):
     `https://meal-service` to `life-api`; `.env.development.example` lists `MEAL_API_URL`,
     `MEAL_MASTER_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE`, and the audience map,
     with **no uncommented `REDIS_URL`**; `.env.example`'s `OIDC_AUDIENCE_MAP` includes
-    `https://meal-service=life-api`.
+    `https://meal-service=life-api`; **no five-instance Redis list survives** — `compose.yaml`'s
+    Redis-section comment and `.env.example`'s Redis comment both name `redis-meal` (six
+    instances) — and both master-key blocks carry `# MEAL_MASTER_KEY=` beside the
+    `openssl rand -base64 32` comment.
   - Verify: `npm run typecheck`; automated wiring greps — `grep -n "meal-service" compose.yaml`,
     `grep -n "dockerfile: apps/meal-service/Dockerfile" compose.yaml`,
     `grep -n "redis-meal" compose.yaml`, `grep -n "MEAL_API_URL" compose.yaml`,
-    `grep -n "GEMINI_API_BASE" .env.development.example`, and
-    `grep -n "meal-service=life-api" .env.example` each print the expected lines and exit 0;
+    `grep -n "GEMINI_API_BASE" .env.development.example`,
+    `grep -n "meal-service=life-api" .env.example`,
+    `grep -n "redis-meal" .env.example`, and
+    `grep -n "MEAL_MASTER_KEY=" .env.example .env.development.example` each print the expected lines and exit 0;
     `grep -nE "^[^#]*REDIS_URL" .env.development.example` prints no lines (exit 1 — expected:
     dev/e2e stays Redis-free). Manual follow-up (not automatic): `npm run dev` from the repo
     root starts meal-service on `:3106` alongside the other services — run by the human, not a
