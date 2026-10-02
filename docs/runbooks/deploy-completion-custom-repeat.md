@@ -119,8 +119,8 @@ New behavior (the two chapters):
       with no trash control; tap its filled left checkmark → the task reopens in
       Today/Overdue.
 - [ ] Unticking a one-off removes only that row.
-- [ ] Tick a repeating todo → a `Task completed` / `Undo` snackbar appears (repeating fires it
-      **immediately**, one-off after its ~1s linger) and the row **stays put**. The due
+- [ ] Tick a todo → a `Task completed` / `Undo` snackbar appears
+      **immediately** (both shapes) and the row **stays put**. The due
       advances **strictly past** the occurrence it just consumed — including a *future-due*
       row in **Later**: a second tick must record a **different** occurrence, never jam on
       the same one (that jam was bug `1e42756`).

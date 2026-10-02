@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import type { List, Todo } from '@life/shared';
 import {
   Button,
@@ -18,52 +17,14 @@ import { Trash2 } from 'lucide-react';
 import { deleteTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 
-const HIDE_DELAY_MS = 1000;
-const COLLAPSE_MS = 220;
-
 /**
- * The done toggle as a client wrapper so a row the user just ticked can linger
- * ~1s then collapse out. Composes the upstream `IconButton` (frozen label,
- * always ghost) with the `Checkbox` glyph. `hide` disables the auto-hide (the
- * Done filter keeps rows put). The timer arms only on a `false→true` tick
- * (`wasDone` ref), so a row already done on load (the "All" filter, Matrix) is
- * only struck/dimmed and never auto-hidden; a snackbar Undo cancels the pending
- * unmount and un-hides the row.
+ * The done toggle as a client wrapper: composes the upstream `IconButton`
+ * (frozen label, always ghost) with the `Checkbox` glyph. Ticking a row is a
+ * plain toggle — the row never hides or collapses.
  */
-function DoneToggle({
-  done,
-  label,
-  hide,
-  onToggle,
-  onCollapse,
-}: {
-  done: boolean;
-  label: string;
-  hide: boolean;
-  onToggle: () => void;
-  onCollapse: (value: boolean) => void;
-}) {
-  const wasDone = useRef(done);
-  const onCollapseRef = useRef(onCollapse);
-  onCollapseRef.current = onCollapse;
-
-  useEffect(() => {
-    const justDone = !wasDone.current && done;
-    wasDone.current = done;
-    if (!hide || !justDone) return;
-    const timer = setTimeout(() => onCollapseRef.current(true), HIDE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [hide, done]);
-
+function DoneToggle({ done, label, onToggle }: { done: boolean; label: string; onToggle: () => void }) {
   return (
-    <IconButton
-      label={label}
-      variant="ghost"
-      onClick={() => {
-        onCollapse(false);
-        onToggle();
-      }}
-    >
+    <IconButton label={label} variant="ghost" onClick={onToggle}>
       <Checkbox checked={done} />
     </IconButton>
   );
@@ -90,7 +51,6 @@ export function TodoItem({
   availableTags,
   size = 'default',
   tone,
-  hideDone = true,
 }: {
   todo: Todo;
   today: string;
@@ -98,71 +58,31 @@ export function TodoItem({
   availableTags: TagOption[];
   size?: 'default' | 'dense';
   tone?: ListItemTone;
-  hideDone?: boolean;
 }) {
-  const [collapsing, setCollapsing] = useState(false);
-  const [removed, setRemoved] = useState(false);
   const { showSnackbar } = useSnackbar();
-  const undoneBySnackbar = useRef(false);
-
-  useEffect(() => {
-    if (!collapsing) return;
-    const timer = setTimeout(() => {
-      if (!undoneBySnackbar.current) setRemoved(true);
-    }, COLLAPSE_MS);
-    return () => clearTimeout(timer);
-  }, [collapsing]);
-
-  useEffect(() => {
-    if (todo.done) return;
-    setRemoved(false);
-    setCollapsing(false);
-    undoneBySnackbar.current = false;
-  }, [todo.done]);
-
-  if (removed) return null;
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
 
-  const handleCollapse = (value: boolean) => {
-    if (value) {
-      showSnackbar({
-        message: 'Task completed',
-        actionLabel: 'Undo',
-        onAction: () => {
-          undoneBySnackbar.current = true;
-          setRemoved(false);
-          setCollapsing(false);
-          // No expectedVersion: the done write bumped the row's version, so a
-          // version-checked PATCH would 409. This is an unconditional undo.
-          void updateTodoAction(todo.id, { done: false });
-        },
-      });
-    }
-    if (todo.repeat == null) setCollapsing(value);
-  };
-
   const doneToggle = (
     <DoneToggle
       done={todo.done}
       label={todo.done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-      // A recurring tick ADVANCES the todo rather than completing it, so the
-      // row must not auto-hide/collapse; the hide/collapsing path is gated off.
-      hide={hideDone && todo.repeat == null}
       onToggle={() => {
-        undoneBySnackbar.current = false;
         void updateTodoAction(todo.id, { done: !todo.done }, todo.version);
-        // A repeating tick advances rather than completes, so the row never
-        // collapses — but the user still deserves the same Undo affordance.
-        // Only a tick TO done (`!todo.done`) gets it: an already-done repeating
-        // row sends `done: false` (an undo), which must not fire "Task
-        // completed" or an Undo that has nothing to reverse. `handleCollapse`
-        // only sets `collapsing` when `repeat == null`, so nothing collapses.
-        if (todo.repeat != null && !todo.done) handleCollapse(true);
+        if (!todo.done) {
+          showSnackbar({
+            message: 'Task completed',
+            actionLabel: 'Undo',
+            onAction: () => {
+              // No expectedVersion: the done write bumped the row's version, so a
+              // version-checked PATCH would 409. This is an unconditional undo.
+              void updateTodoAction(todo.id, { done: false });
+            },
+          });
+        }
       }}
-      onCollapse={handleCollapse}
     />
   );
 
@@ -182,7 +102,6 @@ export function TodoItem({
       snippet={isDefault ? (todo.note ?? undefined) : undefined}
       leading={doneToggle}
       done={todo.done}
-      collapsing={todo.repeat == null && collapsing}
       variant="todo"
       size={size}
       tone={tone}

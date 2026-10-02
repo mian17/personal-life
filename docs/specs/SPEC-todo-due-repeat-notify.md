@@ -184,7 +184,8 @@ advanced row:
    guarded insert and `UNIQUE (todoId, occurrence)` make a repeated tick a no-op
    (`SPEC-todo-completion-history.md` C3/C4).
 
-- A **non-recurring** todo's `done: true` is unchanged (marks done; row hides via the UI).
+- A **non-recurring** todo's `done: true` is unchanged (marks done; the row stays
+  visible and the revalidated row moves to the Done section on `/todos`).
 - A repeating tick will **record a completion and** advance — the row **does not** hide
   (no auto-hide). `PATCH { done: false }` on that row undoes the latest tick: it deletes that
   occurrence's completion row, restores the due and re-arms the reminder — see
@@ -311,8 +312,9 @@ sibling fields (lesson 0014).
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out (`DueDate`) renders the time via
   the shared formatter when timed; a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
   in the row meta (the same self-describing label as the editor).
-  Ticking a `repeat` todo must **not** hide/collapse the row (it advances instead) — the
-  `DoneToggle` `hide`/`collapsing` behavior is gated on `!todo.repeat`.
+  A tick never hides the row: a non-recurring tick to done moves the revalidated
+  row to the Done section on `/todos` (staying struck in its quadrant on
+  `/todos/matrix`), and a repeating tick advances and stays open.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   - New low-level `packages/ui/src/lib/date-parts.ts` owns `todayIso`, `dueDay(value)` → the
     **local calendar day** `YYYY-MM-DD` from either a date-only string (read the parts directly

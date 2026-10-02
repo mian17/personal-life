@@ -62,29 +62,25 @@ both apps — so tags feel identical everywhere (I3).
   revalidate. Done rows carry no trash `deleteAction` (`TodoItem` gates it on
   `todo.done`). Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
-  wins over its due bucket). Ticking an **open** todo to done on `/todos` or
-  `/todos/matrix` lets the row linger ~1s, then it collapses
-  (`.ui-list-item--collapsing`) and unmounts; an emptied group section then hides via
-  `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. Auto-hide arms **only on a
-  genuine `false→true` tick transition** (`DoneToggle`'s `wasDone` ref): a row that is
-  already done on page load (the Done section, Matrix) is **not** auto-hidden — it
-  only shows struck/dimmed, and tapping its checkmark reopens it. `revalidateTodos()`
+  wins over its due bucket). Ticking an **open** todo to done keeps its row
+  visible (struck + muted via `ListItem done`): on `/todos` the revalidated row
+  moves to the **Done** section, and on `/todos/matrix` it stays struck in its
+  quadrant. There is no auto-hide, no linger and no collapse — a ticked row is
+  never hidden or unmounted by the client. A repeating tick advances and stays
+  open (its `done` never becomes true). `revalidateTodos()`
   now also revalidates `/todos/matrix`, so a write from either view refreshes both
   (stale-matrix fix).
-- **Undo snackbar (user-requested):** the same ~1s hide is paired with a bottom-left
-  `Snackbar` — `Task completed` with an `Undo` action. Pressing Undo clears the local
-  `removed`/`collapsing` state immediately (un-hiding the row and cancelling the pending
-  unmount), then PATCHes `done:false` with **no** `expectedVersion` (the done write bumped
-  the row's version, so a version-checked PATCH would 409 — the undo is unconditional). A
-  `todo.done` reset effect reconciles server state, so when the revalidated row arrives as
-  open it is already restored. The snackbar
-  auto-dismisses after its default 5s. `SnackbarProvider` is mounted for the whole
-  `/todos` segment (`apps/app/app/todos/layout.tsx`) so the List and Matrix views share
-  one provider; `useSnackbar()` has a safe no-op default outside a provider.
-  **A repeating tick shows the same snackbar too:** because a repeat tick advances the
-  todo, its row stays put (auto-hide stays off for repeating rows — the `collapsing`
-  state is gated on `todo.repeat == null`), but the `Task completed` / `Undo` affordance
-  appears immediately so the user can reverse the advance. The server-side advance/undo
+- **Undo snackbar (user-requested):** a tick to done shows a bottom-left
+  `Snackbar` immediately — `Task completed` with an `Undo` action — for both shapes
+  (non-recurring and repeating). Pressing Undo PATCHes `done:false` with **no**
+  `expectedVersion` (the done write bumped
+  the row's version, so a version-checked PATCH would 409 — the undo is
+  unconditional). The snackbar auto-dismisses after its default 5s.
+  `SnackbarProvider` is mounted for the whole
+  `/todos` segment (`apps/app/app/todos/layout.tsx`) so the List and Matrix views
+  share one provider; `useSnackbar()` has a safe no-op default outside a provider.
+  On a repeating tick the server still records that occurrence's completion and
+  advances the row; Undo reverses the advance. The server-side advance/undo
   rules are owned by `SPEC-todo-completion-history.md`.
 - **Transport config (per kernel contract):** the app's API client gains
   `TAGS_API_URL`/`TODO_API_URL` base URLs; auth uses the kernel's single shared
@@ -165,9 +161,10 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   label.
 - **Row (`apps/app/app/todo-item.tsx`):** the due read-out renders the time when timed
   (via the shared formatter), and a repeat todo shows `repeatLabel(todo.repeat, todo.dueDate)`
-  in the row meta (the same self-describing label as the editor). Ticking a `repeat` todo
-  **does not** hide/collapse the row (it advances) — the `DoneToggle` `hide`/`collapsing`
-  behavior is gated on `!todo.repeat`.
+  in the row meta (the same self-describing label as the editor).
+  A tick never hides the row: a non-recurring tick to done moves the revalidated
+  row to the Done section on `/todos` (staying struck in its quadrant on
+  `/todos/matrix`), and a repeating tick advances and stays open.
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   `dueDateLabel(value, today?)` renders `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and
   `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value; a

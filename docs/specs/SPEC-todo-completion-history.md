@@ -377,12 +377,12 @@ primitives). No raw `<a>`/`<button>` is introduced — `ListItem` owns the `next
 
 ### `DoneToggle` end state (`todo-item.tsx`)
 
-The pre-change gate is the correct end state: `hide={hideDone && todo.repeat == null}` and
-`collapsing={todo.repeat == null && collapsing}` **stay**. A repeating tick advances and
-stays open, so a repeating row still **does not auto-hide** — but it **does** show the Undo
+The auto-hide was removed: the tick is a plain toggle and the row never hides,
+collapses, or unmounts. A repeating tick advances and
+stays open, and it **does** show the Undo
 snackbar: `PATCH { done: false }` undoes the latest repeat tick (Completion rules §4), which
 deletes that occurrence's row and restores the due. `SPEC-todo-ui.md` owns the UI wording; a
-one-off tick keeps today's snackbar/Undo unchanged. No `DoneToggle` edit.
+one-off tick moves to the Done section on `/todos` with the snackbar/Undo unchanged.
 
 ### Frozen selector-surface record (conceptually; the `SPEC-todo-ui.md` edit is plan T1)
 

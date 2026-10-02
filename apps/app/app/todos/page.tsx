@@ -117,7 +117,7 @@ export default async function TodosPage({
         </>
       }
       body={
-        <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} hideDone />
+        <TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />
       }
       fabHref="/todos/new"
       fabLabel="New todo"

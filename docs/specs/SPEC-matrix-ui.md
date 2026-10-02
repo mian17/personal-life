@@ -405,12 +405,12 @@ export default async function TodosMatrixPage() {
 - **Dense type:** the matrix row's title and date are 0.7rem (`.ui-list-item--dense*`,
   owned by `SPEC-ui-blocks.md`).
 - **Overflow:** a quadrant whose content exceeds its box scrolls; the page itself does not.
-- **Declutter on tick (same as the List):** a done row renders struck + muted
-  (`ListItem done`); ticking an open todo lets the row linger ~1s, then it collapses
-  (`.ui-list-item--collapsing`) and unmounts, and an emptied quadrant's list drops out
-  via `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. The matrix never uses the
-  Done filter, so auto-hide is always on here (`TodoItem hideDone` defaults `true`); a
-  row already done on load is not auto-hidden. `revalidateTodos()`
+- **No declutter on tick (same as the List):** a done row renders struck + muted
+  (`ListItem done`); ticking an open todo keeps its row visible — on `/todos`
+  the revalidated row moves to the Done section, and on `/todos/matrix` it stays
+  struck in its quadrant. The row is never hidden, collapsed, or unmounted.
+  An emptied quadrant's list drops out
+  via `.ui-section:has(.ui-list):not(:has(.ui-list-item))`. `revalidateTodos()`
   (`apps/app/app/todo-actions.ts`) now also revalidates `/todos/matrix`, so a tick in
   either view refreshes both.
 - Quadrant order is exactly `groupByQuadrant`'s: Urgent & Important, Urgent & Not Important,

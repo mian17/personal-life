@@ -193,19 +193,19 @@ describe('/todos list page wiring', () => {
     expect(el.props.tabs).toBeUndefined();
   });
 
-  it('always renders TodoList with hideDone — no Done-view body swap', async () => {
+  it('always renders TodoList as the body — no Done-view body swap', async () => {
     const all = await TodosPage({ searchParams: Promise.resolve({}) });
     expect(all.props.body.type).toBe(TodoList);
-    expect(all.props.body.props.hideDone).toBe(true);
+    expect(all.props.body.props.hideDone).toBeUndefined();
 
     const open = await TodosPage({ searchParams: Promise.resolve({ done: 'false' }) });
     expect(open.props.body.type).toBe(TodoList);
-    expect(open.props.body.props.hideDone).toBe(true);
+    expect(open.props.body.props.hideDone).toBeUndefined();
 
     // `?done=true` no longer swaps the body: the Done section lives inside TodoList.
     const doneParam = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
     expect(doneParam.props.body.type).toBe(TodoList);
-    expect(doneParam.props.body.props.hideDone).toBe(true);
+    expect(doneParam.props.body.props.hideDone).toBeUndefined();
   });
 
   it('renders a done todo as a struck row with no trash control', async () => {
