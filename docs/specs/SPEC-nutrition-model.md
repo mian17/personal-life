@@ -128,8 +128,9 @@ tested rather than assumed.
    quantity (tested at 0×, 0.5×, 2×).
 3. `sum(vectors)` is exactly additive and returns a complete vector for an empty input
    (all zeroes).
-4. `format` renders the unit and, for the eight `%DV`-eligible micronutrients, a `%DV` derived
-   from the reference table — with a test proving `scale`/`sum` output never contains `%DV`.
+4. `format` renders the unit and, for the `%DV`-eligible micronutrients (every vitamin and
+   mineral row in the 27 — 14 of them — per the FDA Daily Values), a `%DV` derived from the
+   reference table — with a test proving `scale`/`sum` output never contains `%DV`.
 5. `npm run typecheck -w @life/nutrition` passes with zero errors; `npm run test:unit -w
    @life/nutrition` passes.
 

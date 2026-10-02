@@ -2,3 +2,5 @@
 export * from './nutrients';
 export * from './food';
 export * from './scale';
+export * from './sum';
+export * from './format';
