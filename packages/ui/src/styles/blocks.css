@@ -242,6 +242,22 @@
   display: flex;
 }
 
+/* Row delete action: a compact icon button instead of the default 48px tap
+   square — same inner padding on all sides, a small right inset so the glyph
+   does not sit flush to the row edge, and a highlight rounded to the row radius
+   (`--radius-lg`) so the tap/focus ring follows the row corner. The leading
+   checkbox (`IconButton`, not in a form) is untouched. */
+.ui-list-item form .ui-btn--icon {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: var(--space-0-5);
+  margin-right: var(--space-0-5);
+  border-radius: var(--radius-lg);
+  -webkit-tap-highlight-color: transparent;
+}
+
 .ui-list-item__text {
   display: flex;
   flex-direction: column;
