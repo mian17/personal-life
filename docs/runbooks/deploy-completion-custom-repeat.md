@@ -1,5 +1,9 @@
 # Production runbook — todo-completion-history + todo-custom-repeat
 
+> **App tip superseded:** the branch tip has moved past `5157bf1`; the app-side Done
+> reshape (`5157bf1..df7f58b`) is documented in `docs/runbooks/deploy-done-reshape.md`. The
+> backend chapters below are unchanged — deploy at `df7f58b` rather than `5157bf1`.
+
 Scope: **two chapters** — `8cc6b98..<branch tip>` on `feat/todo-custom-repeat`
 (`d288927` when this runbook was written, 64 files; the tip may be later). Both chapters are
 five-lane **N/N PASS** (`tasks/five-lane-todo-completion-history.md`,
