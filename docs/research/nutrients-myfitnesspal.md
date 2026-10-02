@@ -328,6 +328,33 @@ Reachable sources are thin here; the Help Center pricing/feature pages were 403.
 - The exact **percentage of foods** with each micronutrient populated is **UNVERIFIED** —
   no reachable source gives coverage stats.
 
+## 7b. Cross-app contrast — Lose It! (first-party user enumeration)
+
+The user enumerated Lose It!'s tracked-nutrient set directly from the app (see
+`docs/research/nutrients-loseit.md` `## 0`, the highest-confidence source for that app).
+The differences from MyFitnessPal's fixed 17-field set are the design-relevant part:
+
+| Nutrient group | MyFitnessPal | Lose It! (first-party) |
+|---|---|---|
+| Fat breakdown | saturated, polyunsaturated, monounsaturated, trans | same four |
+| Carb breakdown | fiber, sugar, **added sugars, net carbs** | fiber, sugar only |
+| Cholesterol | yes (mg) | yes |
+| Sodium | yes (mg) | yes |
+| Potassium | yes (mg), in the mineral block | yes (mg), in the mineral block |
+| Vitamins | **Vitamin A, Vitamin C only** | **A, C, B1 (thiamin), B2 (riboflavin), B3 (niacin), B6, B9 (folate), B12** |
+| Minerals | **calcium, iron only** (stored as %DV, not mg) | **calcium, iron, magnesium, phosphorus, potassium, zinc** (all mg) |
+| Caffeine | not tracked | tracked (mg) |
+| Water | yes (day-level, ml) | yes (day-level, per store listing) |
+
+Two takeaways for our own nutrient model:
+
+1. **MyFitnessPal is the narrower model**: 17 fixed fields, four of them vitamins/minerals,
+   and its calcium/iron/vitamin A/vitamin C are **%DV**, not absolute mass. Lose It! goes
+   wider on vitamins (8) and minerals (6) and states minerals in **mg**.
+2. **Neither app tracks added sugars + net carbs *and* the wider micro set** — MFP has the
+   carb subdivisions, Lose It! has the wider micros. A model covering both is a superset of
+   either, which is cheap to store and expensive to backfill later.
+
 ## 8. Field naming / units table
 
 Field names are the exact MyFitnessPal API keys as revealed by the reverse-engineered

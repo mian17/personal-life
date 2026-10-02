@@ -2,7 +2,88 @@
 
 Research date: 2026-10-02.
 
-**Summary:** Lose It! publicly advertises calorie/macro tracking (calories, protein, carbs, fat, fiber, sugar) as free-tier and "vitamins, minerals, and other health goals" plus a long list of non-food metrics (blood pressure, glucose, cholesterol, sleep, etc.) as Premium; the exact per-nutrient field list and units are **not published** on any reachable source, so most micronutrient specifics below are UNVERIFIED.
+**Summary:** Lose It! publicly advertises calorie/macro tracking (calories, protein, carbs, fat, fiber, sugar) as free-tier and "vitamins, minerals, and other health goals" plus a long list of non-food metrics (blood pressure, glucose, cholesterol, sleep, etc.) as Premium. The **exact per-nutrient field list is now known from a first-party source** (the user's own enumeration of the app's tracked-nutrient screens, quoted verbatim in `## 0` below); everything not covered by that enumeration remains UNVERIFIED against the public web.
+
+## 0. First-party field list (user-provided — highest confidence)
+
+The user enumerated Lose It!'s tracked-nutrient set directly from the app. Quoted verbatim
+below; this supersedes the public-web gaps in sections 1–3 and 8 where the two disagree.
+
+```
+Nutritions to track
+
+Calories
+Fat
+Monounsaturated Fat
+Polyunsaturated Fat
+Saturated Fat
+Trans Fat
+Cholesterol
+Sodium
+Carbohydrates
+Fiber
+Sugar
+Protein
+Vitamins
+Vitamin A
+Vitamin C
+Thiamin (B1)
+Riboflavin (B2)
+Niacin (B3)
+Folate (B9)
+Vitamin B6
+Vitamin B12
+Minerals
+Calcium
+Iron
+Minerals
+
+Calcium
+0mg
+Iron
+0mg
+Magnesium
+0mg
+Phosphorus
+0mg
+Potassium
+0mg
+Zinc
+0mg
+Caffeine
+Omg
+```
+
+Reading notes (recorded, not invented):
+
+- The pasted text contains a **duplicated `Minerals` header** and repeats `Calcium`/`Iron`
+  with `0mg` in a second block. Treated as a single nutrient set (a list/settings screen
+  followed by a food-detail screen), not two different sets.
+- **Units** are stated explicitly for the six minerals only, all as **mg** (`0mg`):
+  calcium, iron, magnesium, phosphorus, potassium, zinc. **Caffeine** is stated as `Omg`
+  (almost certainly `0mg` with an OCR-style zero/letter-O slip).
+- Units for vitamins are **not stated** in the pasted text and remain UNVERIFIED (the app
+  commonly uses %DV; MFP stores calcium/iron as %DV while Lose It! states mg — the two apps
+  disagree on representation, so this is a genuine cross-app difference, not a typo).
+- **No sodium/potassium-as-macro distinction**: sodium appears in the fat/cholesterol block,
+  potassium appears under minerals.
+
+**Field-level summary from this source:**
+
+| Group | Fields | Unit (from this source) |
+|---|---|---|
+| Energy | Calories | not stated (kcal implied) |
+| Macros | Fat, Carbohydrates, Protein | not stated (g implied) |
+| Fat breakdown | Monounsaturated, Polyunsaturated, Saturated, Trans fat | not stated (g implied) |
+| Sterol | Cholesterol | not stated (mg implied) |
+| Mineral/macro | Sodium | not stated (mg implied) |
+| Carb breakdown | Fiber, Sugar | not stated (g implied) |
+| Vitamins | Vitamin A, Vitamin C, Thiamin (B1), Riboflavin (B2), Niacin (B3), Folate (B9), Vitamin B6, Vitamin B12 | not stated |
+| Minerals | Calcium, Iron, Magnesium, Phosphorus, Potassium, Zinc | mg |
+| Other | Caffeine | mg |
+
+Not present in the pasted list: added sugars, net carbs, Vitamin D, Vitamin E, Vitamin K,
+pantothenic acid (B5), selenium, copper, manganese, iodine.
 
 ## Source-access note (read first)
 
@@ -32,6 +113,8 @@ center or the app itself, neither reachable here.
 ---
 
 ## 1. Core macros tracked per food / per day
+
+> Superseded where they disagree by the first-party list in `## 0`. Web-sourced detail follows.
 
 The reachable sources name these nutrient fields explicitly:
 
@@ -243,6 +326,12 @@ No exact field-name strings (e.g. an API key or UI label) for any nutrient were 
 from the reachable sources. **UNVERIFIED (guessed):** the app almost certainly has an
 internal schema of named nutrient fields, but nothing in the reachable public sources
 exposes those identifiers.
+
+**Superseded by `## 0` (first-party):** the app's actual tracked-nutrient set — including
+the full vitamin list (A, C, B1, B2, B3, B6, B9, B12), the full mineral list (calcium, iron,
+magnesium, phosphorus, potassium, zinc all in mg), and caffeine — is known from the user's
+own enumeration. Rows marked UNVERIFIED above for saturated/trans fat, cholesterol, sodium,
+potassium, calcium, and iron are resolved by that list.
 
 ---
 
