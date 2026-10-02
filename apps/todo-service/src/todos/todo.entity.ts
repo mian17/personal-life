@@ -57,6 +57,14 @@ export class Todo {
   @Column({ type: 'text', nullable: true })
   repeat: TodoRepeat | null;
 
+  /**
+   * Plaintext metadata: custom recurrence weekday set as a CSV of ISO weekdays
+   * (`'4,5'`), or `NULL` for a canned repeat/one-off. Non-content, never
+   * encrypted, never in the cache key (`SPEC-todo-custom-repeat`, D1/D2).
+   */
+  @Column({ type: 'text', nullable: true })
+  repeatDays: string | null;
+
   /** Plaintext metadata: server-computed UTC instant the next push fires at. */
   @Column({ type: 'text', nullable: true })
   reminderScheduledAt: string | null;

@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsIn,
@@ -12,7 +13,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS } from '@life/shared';
+import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS, TODO_REPEAT_DAYS } from '@life/shared';
 import type { TodoRepeat } from '@life/shared';
 import { ISO_DUE } from '../due-time';
 
@@ -49,6 +50,14 @@ export class UpdateTodoDto {
   @ValidateIf((_o, value) => value !== null)
   @IsIn(TODO_REPEATS)
   repeat?: TodoRepeat | null;
+
+  /** Custom weekday set (ISO 1..7); meaningful only when `repeat === 'custom'`. */
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null)
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsIn(TODO_REPEAT_DAYS, { each: true })
+  repeatDays?: number[] | null;
 
   /** `null` = clear the override back to inherit (`SPEC-todo-importance`). */
   @IsOptional()

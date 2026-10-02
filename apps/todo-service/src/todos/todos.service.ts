@@ -23,7 +23,7 @@ import { Todo } from './todo.entity';
 import { TodoCompletion } from './todo-completion.entity';
 import { TodoTag } from './todo-tag.entity';
 import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
-import { advanceToOnOrAfter } from './recurrence';
+import { advanceToOnOrAfter, formatRepeatDays, parseRepeatDays } from './recurrence';
 import { KeysService } from '../keys/keys.service';
 import { ListsService } from '../lists/lists.service';
 import {
@@ -83,6 +83,7 @@ interface CachedTodoRow {
   important: boolean | null;
   dueDate: string | null;
   repeat: TodoRepeat | null;
+  repeatDays: number[] | null;
   reminderScheduledAt: string | null;
   listId: string | null;
   origin: string | null;
@@ -103,6 +104,7 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
     important: todo.important,
     dueDate: todo.dueDate,
     repeat: todo.repeat,
+    repeatDays: parseRepeatDays(todo.repeatDays),
     reminderScheduledAt: todo.reminderScheduledAt,
     listId: todo.listId,
     origin: todo.origin,
@@ -379,6 +381,7 @@ export class TodosService {
       effectiveImportant,
       dueDate: row.dueDate,
       repeat: row.repeat,
+      repeatDays: row.repeatDays,
       reminderScheduledAt: row.reminderScheduledAt,
       listId: row.listId,
       tagIds: [...row.tagIds],
@@ -445,6 +448,21 @@ export class TodosService {
       throw new BadRequestException('dueDate must be YYYY-MM-DD or YYYY-MM-DDTHH:mm');
     }
     return value.includes('T') ? localToUtc(value, tz).toISOString() : value;
+  }
+
+  /**
+   * Enforce the custom-repeat invariant: `custom` requires a non-empty weekday
+   * set; any non-custom repeat normalizes the set away to `null`
+   * (`SPEC-todo-custom-repeat` D7). One owner for the rule.
+   */
+  private normalizeRepeat(repeat: TodoRepeat | null, days: number[] | null): number[] | null {
+    if (repeat === 'custom') {
+      if (!days || days.length === 0) {
+        throw new BadRequestException('custom repeat requires repeatDays');
+      }
+      return days;
+    }
+    return null;
   }
 
   /**
@@ -519,6 +537,7 @@ export class TodosService {
       note?: string;
       dueDate?: string;
       repeat?: TodoRepeat | null;
+      repeatDays?: number[] | null;
       listId?: string;
       important?: boolean | null;
       tagIds?: number[];
@@ -529,6 +548,7 @@ export class TodosService {
     if (repeat !== null && dueDate === null) {
       throw new BadRequestException('repeat requires a dueDate');
     }
+    const days = this.normalizeRepeat(repeat, input.repeatDays ?? null);
     if (input.listId !== undefined) await this.lists.assertOwnedList(sub, input.listId);
 
     const id = randomUUID();
@@ -545,6 +565,7 @@ export class TodosService {
       important: input.important ?? null,
       dueDate,
       repeat,
+      repeatDays: formatRepeatDays(days),
       reminderScheduledAt: this.reminderAt(dueDate, this.tz),
       listId: input.listId ?? null,
       origin: null,
@@ -807,6 +828,7 @@ export class TodosService {
       important?: boolean | null;
       dueDate?: string | null;
       repeat?: TodoRepeat | null;
+      repeatDays?: number[] | null;
       listId?: string | null;
       tagIds?: number[];
       expectedVersion?: number;
@@ -837,14 +859,22 @@ export class TodosService {
     if (patch.listId !== undefined) todo.listId = patch.listId;
 
     // Resolve the resulting due/repeat before the invariant, normalizing a timed
-    // due. Clearing the due clears the repeat and the reminder.
+    // due. Clearing the due clears the repeat, the custom day set and the reminder.
     const dueChanged = patch.dueDate !== undefined;
-    const repeatChanged = patch.repeat !== undefined;
+    const repeatChanged = patch.repeat !== undefined || patch.repeatDays !== undefined;
     if (patch.dueDate !== undefined) {
       todo.dueDate = patch.dueDate === null ? null : this.normalizeDue(patch.dueDate, this.tz);
-      if (patch.dueDate === null) todo.repeat = null;
+      if (patch.dueDate === null) {
+        todo.repeat = null;
+        todo.repeatDays = null;
+      }
     }
     if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
+    // A repeat-day write applies to the resulting repeat: a repeat change without
+    // days clears days, a days change without repeat keeps the committed repeat.
+    if (repeatChanged) {
+      todo.repeatDays = formatRepeatDays(this.normalizeRepeat(todo.repeat, patch.repeatDays ?? null));
+    }
 
     // Advance-on-tick: a recurring tick moves the todo to its next occurrence
     // and keeps it open; a non-recurring `done:true` closes it. The mutation
@@ -887,7 +917,12 @@ export class TodosService {
               // Log the pre-advance due before overwriting it (occurrence = D).
               const occurrence = todo.dueDate!;
               const local = dueSortKey(todo.dueDate!, this.tz);
-              const next = advanceToOnOrAfter(local, todo.repeat!, this.nowLocal());
+              const next = advanceToOnOrAfter(
+                local,
+                todo.repeat!,
+                this.nowLocal(),
+                parseRepeatDays(todo.repeatDays),
+              );
               await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
               todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
               todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
