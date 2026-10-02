@@ -25,8 +25,10 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [IMPLEMENTATION REQUIREMENTS] `repeat`/`reminderScheduledAt` columns + `push_subscription`
     table + `IDX_todo_reminder_scheduled_at`; `dueDate` holds date-only or canonical instant; DTO
     fields + repeat-requires-due + advance-on-tick; `/api/push/key` + `/api/push/subscribe` routes;
-    Cache Rules gain the two plaintext fields and the recorded sweep deviation; spec gains the new
-    testing group; recurrence leaves the "v2" Ask-first list; SPEC-todo-ui names the editor
+    ordering/cursor amended from `dueDate ASC` to the local `dueSortKey` (order + cursor
+    `base64(<due sort key>|<createdAt>|<id>)`); Cache Rules gain the two plaintext fields and the
+    recorded sweep deviation; spec gains the new testing group; recurrence leaves the "v2"
+    Ask-first list; SPEC-todo-ui names the editor
     `Time`/`Repeat`, the row display, no-hide-on-recurring-tick, and the settings Reminders block +
     `sw.js`; MAP-todo-ecosystem row reconciled; MAP-redis records `redis-todo` ownership unchanged.
   - [VERIFICATION & TESTING RULES] Permitted: none (docs task). Verify
@@ -266,7 +268,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     receives `(sub, endpoint, payload)`, exactly-once, clear + bump, a 404/410 (with its
     `endpoint`) deletes that subscription, no-VAPID no-op, done/trashed skip; zero
     `getThrough`/read-through reads during a `sweep()` (direct-DB deviation, spec Testing #8). Push
-    endpoints: key returned; subscribe upserts scoped by `(sub, endpoint)` (no duplicate row);
+    endpoints: key returned; a malformed/extra-key `POST /api/push/subscribe` body → 400
+    (`PushSubscribeDto` rejection); subscribe upserts scoped by `(sub, endpoint)` (no duplicate row);
     delete idempotent; another `sub` cannot read/affect the caller's subscriptions (nor overwrite
     a foreign row via a shared endpoint). Cache: `todo:all`/`todo:trash` carry both fields,
     `enc.v1.`-only, sweep-clear bump. The two existing DTO-shape suites: `todos.e2e-spec.ts`'s
@@ -278,7 +281,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] The three new suites and the three existing suites cover every case above; both existing
+    - [ ] The three new suites and the three existing suites cover every case above (including the
+          malformed/extra-key `POST /api/push/subscribe` → 400); both existing
           key lists are the full 15-key set.
     - [ ] The prescribed six-file command passes; typecheck passes.
     - [ ] No file outside scope modified.

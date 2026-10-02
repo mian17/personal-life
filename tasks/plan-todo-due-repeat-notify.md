@@ -154,6 +154,12 @@ than extracting it from the todo write path.
   - SPEC-todo-service.md Behavior/API: add the `repeat`/`reminderScheduledAt` fields to the DTO
     contract; add the due-time normalization + `repeat requires dueDate` rule; add the
     advance-on-tick rule; add the `/api/push/key`, `/api/push/subscribe` (POST/DELETE) routes.
+  - SPEC-todo-service.md ordering/cursor amendment: replace the documented order
+    `dueDate ASC` and cursor `base64(<dueDate-or-~>|<createdAt>|<id>)` (current lines 87-88)
+    with the `dueSortKey` form — order by the **local** sort key (`null`→`~`, date-only→its
+    date, timed→its local `YYYY-MM-DDTHH:mm`), undated last, `createdAt DESC` tiebreak, and
+    cursor shape `base64(<due sort key>|<createdAt>|<id>)` — matching the module spec's
+    "Ordering / cursor" subsection. `repeat`/`reminderScheduledAt` never enter the key.
   - SPEC-todo-service.md Cache Rules (Contract 2 Rule 4): add `repeat`/`reminderScheduledAt` to
     the cached row shapes; state `push_subscription` is outside the cache; record the sweep's
     direct-DB deviation verbatim from the module spec.
@@ -220,7 +226,7 @@ than extracting it from the todo write path.
     includes `**/*.ts`/`**/*.tsx` (only `test/e2e/**` is excluded), so `npm run typecheck -w @life/app`
     compiles these fixtures; `ts-jest` (under `tsconfig.test.json`) also type-checks them. Without
     this migration the shared `Todo` change breaks the first `npm run typecheck -w @life/app`
-    (`T9`), before T10/T11/T12 ever run.
+    (`T2`'s own DoD run), before T10/T11/T12 ever run.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run typecheck -w @life/shared` and, after the app literals are
@@ -604,7 +610,9 @@ than extracting it from the todo write path.
     read-through reads (`getThrough`) occur during a `sweep()` call — the sweep path reads the
     DB directly through its own repository handle, bypassing the cache, and only the
     `markReminded` generation bump touches it.
-  - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; subscribe upserts scoped by
+  - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; a malformed/extra-key
+    `POST /api/push/subscribe` body → 400 (the `PushSubscribeDto` rejection path, mirroring the
+    existing `dueDate` malformed-DTO assertion); subscribe upserts scoped by
     `(sub, endpoint)` for the caller (no duplicate row on repeat subscribe); delete is idempotent
     (unknown endpoint still 200); another `sub` cannot read or affect the caller's subscriptions,
     **and cannot overwrite the caller's row via a shared endpoint** (composite uniqueness).
@@ -626,8 +634,9 @@ than extracting it from the todo write path.
 
 [DEFINITION OF DONE]
   - [ ] The **three new suites** (`todos-due-repeat`, `reminders`, `push`) and the **three
-        existing suites** (`todo-cache`, `todos`, `ownership`) cover every behavior above; both
-        existing DTO-shape key lists are the full 15-key set (with `repeat`/
+        existing suites** (`todo-cache`, `todos`, `ownership`) cover every behavior above —
+        including the `push.e2e-spec.ts` malformed/extra-key `POST /api/push/subscribe` → 400;
+        both existing DTO-shape key lists are the full 15-key set (with `repeat`/
         `reminderScheduledAt`).
   - [ ] The prescribed six-file test command passes.
   - [ ] `npm run typecheck -w @life/todo-service` passes with zero errors.

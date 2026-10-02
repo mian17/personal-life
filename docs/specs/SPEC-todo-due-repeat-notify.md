@@ -139,6 +139,24 @@ required-but-nullable.
   date-only → 09:00 national). No due ⇒ `reminderScheduledAt = null`. A **done** todo keeps
   its stored reminder until ticked/cleared; the sweep skips `done` rows.
 
+### Ordering / cursor (amends `SPEC-todo-service.md`)
+
+The list ordering is keyed on the **local** sort key `dueSortKey(value, tz)` (D3), not the raw
+stored `dueDate`:
+
+- **Key composition:** `dueSortKey(value, tz)` → `null` ⇒ `'~'`; date-only ⇒ its `YYYY-MM-DD`;
+  timed ⇒ its **local** `YYYY-MM-DDTHH:mm` in `TODO_TIMEZONE` (not the stored UTC day).
+  `repeat`/`reminderScheduledAt` never enter the key (D3).
+- **Order:** dated by `dueSortKey ASC` (overdue first), undated (`'~'`) last, `createdAt DESC`
+  tiebreak — the existing clause shape, now with **local-day** semantics, so a timed due sorts
+  by the user's local day.
+- **Cursor:** the payload shape stays `base64(<due sort key>|<createdAt>|<id>)`; the first
+  segment is the `dueSortKey` (for a timed due, the local minute string) rather than the raw
+  stored `dueDate`. `compareTodos`, `encodeCursor`, `decodeCursor`, and `afterCursor` all use
+  it (T5).
+- This amends `SPEC-todo-service.md`'s existing order/cursor clause (T1) from `dueDate ASC` /
+  `base64(<dueDate-or-~>|<createdAt>|<id>)` to the `dueSortKey` form above.
+
 ### Recurrence advance (advance-on-tick, N2/N3 — no scheduler)
 
 On `PATCH /api/todos/:id { done: true }` **where the todo has `repeat`**, the service does
@@ -352,7 +370,9 @@ in the plan/ledger; every `npm run typecheck -w @life/todo-service` and
    is never converted.
 2. **Due round-trip:** create with `dueDate:'2026-10-02T09:00'` + `repeat:'weekly'` → read
    returns the UTC instant + `repeat:'weekly'` + a non-null `reminderScheduledAt`; date-only
-   create keeps `'YYYY-MM-DD'` and reminder = 09:00 national.
+   create keeps `'YYYY-MM-DD'` and reminder = 09:00 national. List order and cursor use
+   `dueSortKey` (a timed due sorts by its **local** day, not the stored UTC day) and the
+   cursor payload keeps the `base64(<due sort key>|<createdAt>|<id>)` shape.
 3. **Advance-on-tick:** `daily` missed 5 days, ticked today → next occurrence on/after now,
    `done:false`, version+1; `weekdays` from Fri → Mon; `monthly` on the 31st clamps in a
    30-day month; `yearly` Feb 29 → Feb 28; non-recurring `done:true` is unchanged.
@@ -362,7 +382,8 @@ in the plan/ledger; every `npm run typecheck -w @life/todo-service` and
 6. **Sweep:** a due row fires once, calls the fake `PushSender` once, clears
    `reminderScheduledAt`, and re-arms only after an edit/tick; a `404`/`410` deletes that
    subscription; no VAPID env ⇒ no-op.
-7. **Push endpoints:** key returned; the `PushSubscribeDto` rejects a malformed body; subscribe
+7. **Push endpoints:** key returned; the `PushSubscribeDto` rejects a malformed/extra-key body
+   (→ 400); subscribe
    upserts scoped by `(sub, endpoint)` (no duplicate row); delete idempotent; another `sub`
    cannot read/affect the caller's subscriptions (nor overwrite a foreign row via a shared
    endpoint — composite uniqueness).
@@ -402,7 +423,10 @@ in the plan/ledger; every `npm run typecheck -w @life/todo-service` and
 ## Success Criteria
 
 1. A todo can carry a date-only or timed due plus a repeat rule; all three round-trip
-   through `redis-todo` as plaintext metadata with content still ciphertext-only.
+   through `redis-todo` as plaintext metadata with content still ciphertext-only. List
+   ordering and the cursor are keyed on `dueSortKey` (a timed due sorts by its **local**
+   day, not the stored UTC day), and the cursor shape stays
+   `base64(<due sort key>|<createdAt>|<id>)`.
 2. `TODO_TIMEZONE` local input is normalized to a canonical UTC instant; the user's local
    display matches what they typed; the date-only path never round-trips through `Date`
    (lesson 0003 intact).
