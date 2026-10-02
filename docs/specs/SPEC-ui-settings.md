@@ -122,6 +122,12 @@ component.
 - `Switch` does not own form submission: `name` is passed through to the `<button>`, and
   persistence (a server-readable cookie per the intent's D1) is the app's job, not the
   atom's.
+- The atom stays presentational; every app-owned switch debounces its own write. The
+  settings `MatrixSwitch` and the list-panel `ImportantDefaultSwitch`
+  (`apps/app/app/list-manager-panel.tsx`) both coalesce rapid toggles through the
+  shared `useDebouncedCallback`, persisting once on settle and sending nothing when
+  toggled back to the server value (flush on unmount). This is app behavior, not an
+  atom concern — no `Switch` prop changes.
 - `SettingsRow` renders `control` verbatim in the right column; the block owns only the
   two-column layout and the muted description, never the control's behavior.
 - `SettingsBlock` with no `title` renders no heading row (`Section` already omits it).

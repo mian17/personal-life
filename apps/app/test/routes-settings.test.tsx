@@ -13,13 +13,61 @@ jest.mock('@/lib/preferences', () => ({
   setPref: jest.fn(),
 }));
 
+jest.mock('@life/app-kit/preference-action', () => ({
+  setPref: jest.fn(),
+}));
+
 import { ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle } from '@life/ui';
 import { readPref } from '@/lib/preferences';
+import { setPref } from '@life/app-kit/preference-action';
 import { MatrixSwitch } from '@/app/settings/matrix-switch';
+import { TOGGLE_DEBOUNCE_MS } from '@/lib/use-debounced-callback';
 import TodosSettingsPage from '@/app/todos/settings/page';
 import NotesSettingsPage from '@/app/notes/settings/page';
 
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
+
+// `MatrixSwitch` reads its hooks off the raw `react` module exports at call time,
+// so spying there intercepts a direct call (outside React, `testEnvironment: node`).
+const ReactModule = jest.requireActual<typeof import('react')>('react');
+
+/** Run `fn` with `useState`/`useRef`/`useEffect` stubbed; the state and refs are
+ *  internal to one call, which is all the switch's change handler needs. */
+function withHooks<T>(run: () => T): T {
+  const refs: Array<{ current: any }> = [];
+  const state: any[] = [];
+  let refIndex = 0;
+  let stateIndex = 0;
+  const effects: Array<() => void> = [];
+  const stateSpy = jest.spyOn(ReactModule, 'useState').mockImplementation((((initial: any) => {
+    const slot = stateIndex++;
+    if (slot >= state.length) {
+      state[slot] = typeof initial === 'function' ? initial() : initial;
+    }
+    return [
+      state[slot],
+      (next: any) => {
+        state[slot] = typeof next === 'function' ? next(state[slot]) : next;
+      },
+    ];
+  }) as unknown) as typeof ReactModule.useState);
+  const refSpy = jest.spyOn(ReactModule, 'useRef').mockImplementation(((initial: any) => {
+    const slot = refIndex++;
+    if (!refs[slot]) refs[slot] = { current: initial };
+    return refs[slot];
+  }) as unknown as typeof ReactModule.useRef);
+  const effectSpy = jest.spyOn(ReactModule, 'useEffect').mockImplementation(((fn: () => void | (() => void)) => {
+    const cleanup = fn();
+    if (typeof cleanup === 'function') effects.push(cleanup);
+  }) as unknown as typeof ReactModule.useEffect);
+  try {
+    return run();
+  } finally {
+    stateSpy.mockRestore();
+    refSpy.mockRestore();
+    effectSpy.mockRestore();
+  }
+}
 
 /** React children normalized to an array (single child or list). */
 function childList(node: any): any[] {
@@ -132,5 +180,41 @@ describe('MatrixSwitch client boundary', () => {
 
   it('reads preferences through the mocked app barrel, not the real next/headers module', () => {
     expect(jest.isMockFunction(readPref)).toBe(true);
+  });
+});
+
+describe('MatrixSwitch debounce', () => {
+  const mockedSetPref = setPref as jest.MockedFunction<typeof setPref>;
+
+  beforeEach(() => {
+    mockedSetPref.mockClear();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('coalesces rapid toggles into one setPref after the settle window', () => {
+    const control = withHooks(() => MatrixSwitch({ checked: false }));
+
+    control.props.onCheckedChange(true);
+    control.props.onCheckedChange(false);
+    control.props.onCheckedChange(true);
+
+    expect(mockedSetPref).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+    expect(mockedSetPref).toHaveBeenCalledTimes(1);
+    expect(mockedSetPref).toHaveBeenCalledWith('matrix', true);
+  });
+
+  it('sends nothing when toggled back to the seeded value', () => {
+    const control = withHooks(() => MatrixSwitch({ checked: true }));
+
+    control.props.onCheckedChange(false);
+    control.props.onCheckedChange(true);
+
+    jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+    expect(mockedSetPref).not.toHaveBeenCalled();
   });
 });

@@ -409,8 +409,11 @@ export default async function TodosMatrixPage() {
   single owner of the rule — it skips done todos, so a done todo is never placed in a quadrant
   (done tasks live in the Done section on `/todos`) and the page just calls it. Ticking an
   open todo in the matrix
-  strikes its row immediately (optimistic `completed` in `TodoItem`, delivered by
-  `ListItem done` — no `@life/ui` change) while `completeTodoAction` writes, then
+  strikes its row immediately (the shared `TodoItem`'s version-anchored optimistic
+  `intent`, delivered by
+  `ListItem done` — no `@life/ui` change) and shares the same debounced write as the
+  `/todos` row (`useDebouncedCallback`: write on settle, none on a return to origin,
+  flush on unmount — no per-surface code); on settle `completeTodoAction` writes, then
   lingers ~700ms before `revalidateTodos()` (which includes `/todos/matrix`);
   the revalidated table — which excludes done todos — then removes the row,
   leaving its box.

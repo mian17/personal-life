@@ -10,6 +10,7 @@ jest.mock('../app/todo-actions', () => ({
 
 import { TodoItem } from '../app/todo-item';
 import { completeTodoAction, updateTodoAction } from '../app/todo-actions';
+import { TOGGLE_DEBOUNCE_MS } from '../lib/use-debounced-callback';
 
 const updateMock = updateTodoAction as jest.Mock;
 const completeMock = completeTodoAction as jest.Mock;
@@ -61,30 +62,49 @@ const ReactModule = jest.requireActual<typeof import('react')>('react');
 type ItemTree = ReactElement<Record<string, unknown>>;
 
 /**
- * `TodoItem` runs `useSnackbar` plus one `useState` for the version-anchored
- * optimistic done state; a direct call is outside React, so the harness stubs
- * both through the live-module read: `useContext` captures `showSnackbar`,
- * `useState` returns a harness-owned `completedVersion` anchor the test can
- * read/reset. Markup assertions that do not care about either go through
- * `markup()` instead.
+ * `TodoItem` now runs `useSnackbar` (`useContext`), one `useState` holding the
+ * version-anchored optimistic intent, a `useRef` baseline, and the shared debounce
+ * hook (`useRef`/`useEffect`). A direct call is outside React, so the harness stubs
+ * each hook through the live-module read: `useContext` captures `showSnackbar`,
+ * `useState` returns a harness-owned intent the test can read, position-keyed
+ * `useRef`s persist across renders, and `useEffect` captures the debounce cleanup
+ * so `unmount()` can flush a pending write. Markup assertions that do not care
+ * about state go through `markup()` instead.
  */
 function snackbarHarness() {
   const showSnackbar = jest.fn();
-  let completedVersion: number | null = null;
+  let intent: { version: number; done: boolean } | null = null;
   let renderedVersion = 0;
+  let refIndex = 0;
+  const refs: Array<{ current: any }> = [];
+  const effects: Array<() => void | (() => void)> = [];
   const ctxSpy = jest
     .spyOn(ReactModule, 'useContext')
     .mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
   const stateSpy = jest
     .spyOn(ReactModule, 'useState')
     .mockImplementation((() => [
-      completedVersion,
-      (value: number | null) => {
-        completedVersion = value;
+      intent,
+      (value: typeof intent) => {
+        intent = value;
       },
     ]) as unknown as typeof ReactModule.useState);
+  const refSpy = jest
+    .spyOn(ReactModule, 'useRef')
+    .mockImplementation(((initial: unknown) => {
+      const slot = refIndex++;
+      if (!refs[slot]) refs[slot] = { current: initial };
+      return refs[slot];
+    }) as unknown as typeof ReactModule.useRef);
+  const effectSpy = jest
+    .spyOn(ReactModule, 'useEffect')
+    .mockImplementation(((fn: () => void | (() => void)) => {
+      effects.push(fn);
+    }) as unknown as typeof ReactModule.useEffect);
 
   function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
+    refIndex = 0;
+    effects.length = 0;
     renderedVersion = todo(options?.overrides).version;
     return TodoItem({
       todo: todo(options?.overrides),
@@ -98,19 +118,24 @@ function snackbarHarness() {
   return {
     renderTree,
     showSnackbar,
-    get completedVersion() {
-      return completedVersion;
+    get intent() {
+      return intent;
     },
     get completed() {
-      // Mirror `TodoItem`'s computed `completed` for the row last rendered.
-      return completedVersion !== null && completedVersion === renderedVersion;
+      // Mirror `TodoItem`'s version-anchored `done` for the row last rendered.
+      return intent !== null && intent.version === renderedVersion ? intent.done : false;
     },
-    setCompleted: (value: number | null) => {
-      completedVersion = value;
+    unmount: () => {
+      for (const fn of effects.splice(0)) {
+        const cleanup = fn();
+        if (typeof cleanup === 'function') cleanup();
+      }
     },
     restore: () => {
       ctxSpy.mockRestore();
       stateSpy.mockRestore();
+      refSpy.mockRestore();
+      effectSpy.mockRestore();
     },
   };
 }
@@ -249,7 +274,10 @@ describe('TodoItem timed and repeat meta', () => {
 });
 
 describe('TodoItem tick keeps the row visible', () => {
-  it('non-recurring: a tick to done strikes optimistically, writes through completeTodoAction, and shows the snackbar', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('non-recurring: a tick strikes on the same press, then writes + shows the snackbar after the settle window', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
     completeMock.mockClear();
@@ -258,9 +286,13 @@ describe('TodoItem tick keeps the row visible', () => {
       expect(harness.completed).toBe(false);
       doneToggle(first).props.onToggle();
 
-      // The row strikes optimistically (client strike, checked above via state)
-      // and the write fires at once through the linger action, still version-checked.
+      // The row strikes optimistically on the SAME press; the write waits.
       expect(harness.completed).toBe(true);
+      expect(completeMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
       expect(completeMock).toHaveBeenNthCalledWith(1, 't1', 0);
       expect(updateMock).not.toHaveBeenCalled();
 
@@ -273,6 +305,7 @@ describe('TodoItem tick keeps the row visible', () => {
       // Undo resets the optimistic strike and reverses server-side unconditionally.
       snackbar.onAction();
       expect(harness.completed).toBe(false);
+      expect(harness.intent).toBeNull();
       expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false });
       expect(updateMock.mock.calls[0]).toEqual(['t1', { done: false }]);
     } finally {
@@ -284,7 +317,7 @@ describe('TodoItem tick keeps the row visible', () => {
     expect(markup(undefined, { done: true })).not.toContain('ui-list-item--collapsing');
   });
 
-  it('repeating: a tick strikes optimistically through completeTodoAction, shows the snackbar, and undoes unconditionally', () => {
+  it('repeating: a tick strikes on the same press, then writes through completeTodoAction and undoes unconditionally', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
     completeMock.mockClear();
@@ -294,13 +327,16 @@ describe('TodoItem tick keeps the row visible', () => {
 
       toggle.props.onToggle();
 
-      // Same path as a non-recurring tick: strike optimistically, then write
-      // through the linger action, still version-checked.
+      // Same path as a non-recurring tick: strike optimistically, then write.
       expect(harness.completed).toBe(true);
+      expect(completeMock).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
       expect(completeMock).toHaveBeenNthCalledWith(1, 't1', 0);
       expect(updateMock).not.toHaveBeenCalled();
 
-      // Snackbar appears immediately, with the one-off copy and action.
+      // Snackbar appears when the tick settles, with the one-off copy and action.
       expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
       const snackbar = harness.showSnackbar.mock.calls[0][0];
       expect(snackbar.message).toBe('Task completed');
@@ -315,7 +351,7 @@ describe('TodoItem tick keeps the row visible', () => {
       // expectedVersion.
       snackbar.onAction();
       expect(harness.completed).toBe(false);
-      expect(harness.completedVersion).toBeNull();
+      expect(harness.intent).toBeNull();
       expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false });
       expect(updateMock.mock.calls[0]).toEqual(['t1', { done: false }]);
     } finally {
@@ -330,7 +366,7 @@ describe('TodoItem tick keeps the row visible', () => {
     try {
       const first = harness.renderTree({ overrides: { repeat: 'daily' } });
       doneToggle(first).props.onToggle();
-      expect(harness.completedVersion).toBe(0);
+      expect(harness.intent).toEqual({ version: 0, done: true });
 
       // Still on the ticked version: the row renders struck.
       const struck = harness.renderTree({ overrides: { repeat: 'daily' } });
@@ -356,6 +392,7 @@ describe('TodoItem tick keeps the row visible', () => {
       });
 
       doneToggle(first).props.onToggle();
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
 
       // The click un-ticks the row; the write is still version-checked.
       expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false }, 0);
@@ -364,6 +401,72 @@ describe('TodoItem tick keeps the row visible', () => {
       // No snackbar: an un-tick is not a completion, so there is nothing to undo.
       expect(harness.showSnackbar).not.toHaveBeenCalled();
       expect(harness.completed).toBe(false);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it.each([
+    ['non-recurring', undefined],
+    ['repeating', 'daily'],
+  ] as const)('coalesces a burst of presses into one write, reflecting the final state (%s)', (_label, repeat) => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      // on → off → on: only the final (done) request is sent, once.
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
+
+      expect(completeMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+      expect(completeMock).toHaveBeenCalledTimes(1);
+      expect(completeMock).toHaveBeenCalledWith('t1', 0);
+      expect(updateMock).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it.each([
+    ['non-recurring', undefined],
+    ['repeating', 'daily'],
+  ] as const)('sends nothing when a press is reversed back to the origin within the window (%s)', (_label, repeat) => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle(); // on
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle(); // back off
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+      expect(completeMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(harness.showSnackbar).not.toHaveBeenCalled();
+      expect(harness.completed).toBe(false);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('flushes a pending write when the row unmounts before the settle window', () => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      doneToggle(harness.renderTree()).props.onToggle();
+      expect(completeMock).not.toHaveBeenCalled();
+
+      // Unmount before the timer fires: the pending complete write is flushed, not lost.
+      harness.unmount();
+
+      expect(completeMock).toHaveBeenCalledTimes(1);
+      expect(completeMock).toHaveBeenCalledWith('t1', 0);
     } finally {
       harness.restore();
     }

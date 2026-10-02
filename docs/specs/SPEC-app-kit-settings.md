@@ -142,6 +142,12 @@ reference in a client bundle).
   would break the server-side read.
 - Writes `pref_<name>` = `value ? 'on' : 'off'` with the attributes above, then
   `revalidatePath('/', 'layout')`.
+- The action is a plain setter; the calling switch owns debouncing. The settings
+  `MatrixSwitch` (`apps/app/app/settings/matrix-switch.tsx`) coalesces rapid toggles
+  through the shared `useDebouncedCallback` and calls `setPref('matrix', next)` only
+  once the user settles (a return to the seeded value sends nothing, and a pending
+  write is flushed on unmount), so one gesture burst yields one cookie write + one
+  revalidation.
 
 **`settingsHref` / the nav entry**
 - Pure string join; `path`-free and markup-free. The Settings `IconLink` entry is

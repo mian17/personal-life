@@ -2,7 +2,45 @@
 
 import type { List } from '@life/shared';
 import { ListManager, SettingsRow, Switch } from '@life/ui';
+import { useRef, useState } from 'react';
 import { createListAction, deleteListAction, renameListAction } from './todo-actions';
+import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
+
+/**
+ * Per-list "Important by default" switch: flips optimistically, then persists the
+ * settled value once (rapid toggles coalesce; a toggle back to the server value
+ * sends nothing).
+ */
+export function ImportantDefaultSwitch({
+  id,
+  name,
+  importantDefault,
+  version,
+}: {
+  id: string;
+  name: string;
+  importantDefault: boolean | null;
+  version?: number;
+}) {
+  const [on, setOn] = useState(importantDefault ?? false);
+  const persisted = useRef(importantDefault ?? false);
+  const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);
+
+  return (
+    <Switch
+      label="Default important"
+      checked={on}
+      onCheckedChange={(next) => {
+        setOn(next);
+        debouncedFlush(() => {
+          if (next === persisted.current) return;
+          persisted.current = next;
+          void renameListAction(id, name, next, version);
+        });
+      }}
+    />
+  );
+}
 
 /**
  * The todo-local list management surface (`ListManager` upstream primitive),
@@ -24,12 +62,11 @@ export function ListManagerPanel({ lists }: { lists: List[] }) {
           <SettingsRow
             label="Important by default"
             control={
-              <Switch
-                label="Default important"
-                checked={list?.importantDefault ?? false}
-                onCheckedChange={(next) =>
-                  void renameListAction(option.id, option.name, next, list?.version)
-                }
+              <ImportantDefaultSwitch
+                id={option.id}
+                name={option.name}
+                importantDefault={list?.importantDefault ?? null}
+                version={list?.version}
               />
             }
           />

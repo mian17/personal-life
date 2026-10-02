@@ -14,9 +14,10 @@ import {
   useSnackbar,
 } from '@life/ui';
 import { Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { completeTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
+import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
 
 /**
  * The done toggle as a client wrapper: composes the upstream `IconButton`
@@ -61,47 +62,59 @@ export function TodoItem({
   tone?: ListItemTone;
 }) {
   const { showSnackbar } = useSnackbar();
-  // Optimistic completion: the row strikes/mutes in place at tick time and is
-  // relocated by `completeTodoAction`'s delayed revalidation. The anchor IS set
-  // for a repeating tick too: the write goes through `completeTodoAction`, which
-  // records the occurrence and advances the due while keeping `done: false`, so
-  // when the delayed revalidation arrives the row's bumped `todo.version` no
-  // longer matches `completedVersion` and the (open) next occurrence renders
-  // un-struck — no effect needed to reset it.
-  const [completedVersion, setCompletedVersion] = useState<number | null>(null);
-  const completed = completedVersion !== null && completedVersion === todo.version;
-  const done = todo.done || completed;
+  // Optimistic, version-anchored completion: the row strikes/mutes in place on the
+  // SAME press, but the server write is debounced — a burst of toggles coalesces
+  // into one request once the user settles. `baseline` holds the done state the
+  // server was last told within this version window, so toggling back to it sends
+  // nothing. The anchor is set for a repeating tick too: the write goes through
+  // `completeTodoAction`, which records the occurrence and advances the due while
+  // keeping `done: false`, so when the delayed revalidation bumps `todo.version`
+  // the anchor no longer matches and the (open) next occurrence renders un-struck.
+  const [intent, setIntent] = useState<{ version: number; done: boolean } | null>(null);
+  const baseline = useRef({ version: todo.version, done: todo.done });
+  const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);
+  const done = intent && intent.version === todo.version ? intent.done : todo.done;
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
+
+  function flush(next: boolean, id: string, version: number, serverDone: boolean) {
+    // A new server version starts a fresh baseline: the row the server returned.
+    if (baseline.current.version !== version) {
+      baseline.current = { version, done: serverDone };
+    }
+    if (next === baseline.current.done) {
+      setIntent(null);
+      return;
+    }
+    baseline.current = { version, done: next };
+    if (next) {
+      void completeTodoAction(id, version);
+      showSnackbar({
+        message: 'Task completed',
+        actionLabel: 'Undo',
+        onAction: () => {
+          // No expectedVersion: the done write bumped the row's version, so a
+          // version-checked PATCH would 409. This is an unconditional undo.
+          baseline.current = { version, done: false };
+          setIntent(null);
+          void updateTodoAction(id, { done: false });
+        },
+      });
+    } else {
+      void updateTodoAction(id, { done: false }, version);
+    }
+  }
 
   const doneToggle = (
     <DoneToggle
       done={done}
       label={done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
       onToggle={() => {
-        if (!todo.done) {
-          // One path for every open todo, repeating or not: record this
-          // occurrence through `completeTodoAction` (which keeps a repeating
-          // row's server state open) and strike it optimistically here. The
-          // repeating advance bumps `todo.version`, self-clearing the anchor.
-          setCompletedVersion(todo.version);
-          void completeTodoAction(todo.id, todo.version);
-          showSnackbar({
-            message: 'Task completed',
-            actionLabel: 'Undo',
-            onAction: () => {
-              // No expectedVersion: the done write bumped the row's version, so a
-              // version-checked PATCH would 409. This is an unconditional undo.
-              setCompletedVersion(null);
-              void updateTodoAction(todo.id, { done: false });
-            },
-          });
-        } else {
-          setCompletedVersion(null);
-          void updateTodoAction(todo.id, { done: false }, todo.version);
-        }
+        const next = !done;
+        setIntent({ version: todo.version, done: next });
+        debouncedFlush(() => flush(next, todo.id, todo.version, todo.done));
       }}
     />
   );

@@ -76,11 +76,17 @@ both apps — so tags feel identical everywhere (I3).
   keeping its service order. Open todos due **later** or with no date appear in no section until
   they come due (`groupTodos` keeps only `overdue`/`today` for open rows; a done row
   wins over its due bucket). Ticking an **open, non-recurring** todo strikes and
-  mutes its row **immediately** — `TodoItem` flips a local optimistic
-  `completed` state and passes the derived `done = todo.done || completed` to
-  `ListItem done` and the `DoneToggle` label — while `completeTodoAction`
-  (`apps/app/app/todo-actions.ts`) writes `done: true` immediately
-  (version-checked, no data-loss window) and only then lingers
+  mutes its row **immediately** — `TodoItem` holds version-anchored optimistic
+  `intent = { version, done }` and passes the derived
+  `done = intent.version === todo.version ? intent.done : todo.done` to
+  `ListItem done` and the `DoneToggle` label — while the server write is
+  **debounced** through the shared `useDebouncedCallback(delayMs = 500)`
+  (`apps/app/lib/use-debounced-callback.ts`): each press replaces the pending
+  action and restarts the timer, so a burst of toggles coalesces into exactly one
+  request once the user stops; a toggle back to the row's server state sends
+  nothing, and a still-pending write is flushed (not dropped) on unmount. On
+  settle `completeTodoAction` (`apps/app/app/todo-actions.ts`) writes `done: true`
+  (version-checked) and only then lingers
   (`COMPLETE_LINGER_MS`, 700ms) before `revalidateTodos()`, the Apple Reminders
   settle: strike in place, then let the revalidation relocate the row. So on
   `/todos` the revalidated row moves to the **Done** section, and on
@@ -96,7 +102,8 @@ both apps — so tags feel identical everywhere (I3).
   now also revalidates `/todos/matrix`, so a write from either view refreshes both
   (stale-matrix fix).
 - **Undo snackbar (user-requested):** a tick to done shows a bottom-left
-  `Snackbar` immediately — `Task completed` with an `Undo` action — for both shapes
+  `Snackbar` once the debounced write settles — `Task completed` with an `Undo`
+  action — for both shapes
   (non-recurring and repeating). Pressing Undo PATCHes `done:false` with **no**
   `expectedVersion` (the done write bumped
   the row's version, so a version-checked PATCH would 409 — the undo is

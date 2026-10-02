@@ -8,7 +8,8 @@ jest.mock('@/app/todo-actions', () => ({
 }));
 
 import { renameListAction } from '@/app/todo-actions';
-import { ListManagerPanel } from '@/app/list-manager-panel';
+import { ImportantDefaultSwitch, ListManagerPanel } from '@/app/list-manager-panel';
+import { TOGGLE_DEBOUNCE_MS } from '@/lib/use-debounced-callback';
 import { TagManagerSection } from '@/app/tag-manager-section';
 import { ListManagerSection } from '@/app/list-manager-section';
 import NotesTagsPage from '@/app/notes/tags/page';
@@ -16,6 +17,55 @@ import TodosTagsPage from '@/app/todos/tags/page';
 import TodosListsPage from '@/app/todos/lists/page';
 
 const mockedRenameListAction = renameListAction as jest.MockedFunction<typeof renameListAction>;
+
+// `ImportantDefaultSwitch` reads its hooks off the raw `react` module exports at
+// call time, so spying there intercepts a direct call. `useRef`s are position-keyed
+// and persist across renders; `useEffect` is captured so `unmount()` can flush a
+// pending write. Timers are faked to drive the shared debounce.
+const ReactModule = jest.requireActual<typeof import('react')>('react');
+
+function hookHarness() {
+  let refIndex = 0;
+  let stateIndex = 0;
+  const refs: Array<{ current: any }> = [];
+  const state: Array<{ value: any }> = [];
+  const effects: Array<() => void> = [];
+  const stateSpy = jest.spyOn(ReactModule, 'useState').mockImplementation((((initial: any) => {
+    const slot = stateIndex++;
+    if (slot >= state.length) {
+      state[slot] = { value: typeof initial === 'function' ? initial() : initial };
+    }
+    return [
+      state[slot].value,
+      (next: any) => {
+        state[slot].value = typeof next === 'function' ? next(state[slot].value) : next;
+      },
+    ];
+  }) as unknown) as typeof ReactModule.useState);
+  const refSpy = jest.spyOn(ReactModule, 'useRef').mockImplementation(((initial: any) => {
+    const slot = refIndex++;
+    if (!refs[slot]) refs[slot] = { current: initial };
+    return refs[slot];
+  }) as unknown as typeof ReactModule.useRef);
+  const effectSpy = jest.spyOn(ReactModule, 'useEffect').mockImplementation(((fn: () => void | (() => void)) => {
+    const cleanup = fn();
+    if (typeof cleanup === 'function') effects.push(cleanup);
+  }) as unknown as typeof ReactModule.useEffect);
+  return {
+    begin() {
+      refIndex = 0;
+      stateIndex = 0;
+    },
+    unmount() {
+      for (const cleanup of effects.splice(0)) cleanup();
+    },
+    restore() {
+      stateSpy.mockRestore();
+      refSpy.mockRestore();
+      effectSpy.mockRestore();
+    },
+  };
+}
 
 function list(overrides: Partial<List> = {}): List {
   return {
@@ -69,27 +119,103 @@ describe('ListManagerPanel importance-default Switch', () => {
     [true, true],
     [false, false],
     [null, false],
-  ])('checks the Switch from importantDefault %p → %p', (importantDefault, expected) => {
+  ])('wraps an Important by default SettingsRow whose switch is checked %p → %p', (importantDefault, expected) => {
     const lists = [list({ importantDefault: importantDefault as boolean | null })];
     const node = rowExtraFor(lists, 'l1');
 
     expect(node.type).toBe(SettingsRow);
     expect(node.props.label).toBe('Important by default');
-    const control = node.props.control;
-    expect(control.type).toBe(Switch);
-    expect(control.props.label).toBe('Default important');
-    expect(control.props.checked).toBe(expected);
+    expect(node.props.control.type).toBe(ImportantDefaultSwitch);
+
+    const harness = hookHarness();
+    try {
+      harness.begin();
+      const control = ImportantDefaultSwitch({
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: importantDefault as boolean | null,
+      });
+      expect(control.type).toBe(Switch);
+      expect(control.props.label).toBe('Default important');
+      expect(control.props.checked).toBe(expected);
+    } finally {
+      harness.restore();
+    }
   });
 
-  it('sends the next value and the list version through renameListAction', () => {
-    const lists = [list({ importantDefault: true, version: 7 })];
-    const node = rowExtraFor(lists, 'l1');
+  it('sends the settled value and the list version through renameListAction', () => {
+    jest.useFakeTimers();
+    const harness = hookHarness();
+    try {
+      harness.begin();
+      const control = ImportantDefaultSwitch({
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: true,
+        version: 7,
+      });
 
-    node.props.control.props.onCheckedChange(false);
-    expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', false, 7);
+      control.props.onCheckedChange(false);
+      expect(mockedRenameListAction).not.toHaveBeenCalled();
 
-    node.props.control.props.onCheckedChange(true);
-    expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', true, 7);
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+      expect(mockedRenameListAction).toHaveBeenCalledTimes(1);
+      expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', false, 7);
+    } finally {
+      harness.restore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('coalesces rapid toggles into one renameListAction with the final value', () => {
+    jest.useFakeTimers();
+    const harness = hookHarness();
+    try {
+      harness.begin();
+      const control = ImportantDefaultSwitch({
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: false,
+        version: 7,
+      });
+
+      control.props.onCheckedChange(true);
+      control.props.onCheckedChange(false);
+      control.props.onCheckedChange(true);
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+      expect(mockedRenameListAction).toHaveBeenCalledTimes(1);
+      expect(mockedRenameListAction).toHaveBeenCalledWith('l1', 'Groceries', true, 7);
+    } finally {
+      harness.restore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('sends nothing when toggled back to the seeded value', () => {
+    jest.useFakeTimers();
+    const harness = hookHarness();
+    try {
+      harness.begin();
+      const control = ImportantDefaultSwitch({
+        id: 'l1',
+        name: 'Groceries',
+        importantDefault: true,
+        version: 7,
+      });
+
+      control.props.onCheckedChange(false);
+      control.props.onCheckedChange(true);
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+
+      expect(mockedRenameListAction).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+      jest.useRealTimers();
+    }
   });
 
   it('renames with the list current default and version', () => {
