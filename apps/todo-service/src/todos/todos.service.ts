@@ -23,7 +23,12 @@ import { Todo } from './todo.entity';
 import { TodoCompletion } from './todo-completion.entity';
 import { TodoTag } from './todo-tag.entity';
 import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
-import { advanceToOnOrAfter, formatRepeatDays, parseRepeatDays } from './recurrence';
+import {
+  advanceToOnOrAfter,
+  formatRepeatDays,
+  nextOccurrence,
+  parseRepeatDays,
+} from './recurrence';
 import { KeysService } from '../keys/keys.service';
 import { ListsService } from '../lists/lists.service';
 import {
@@ -813,9 +818,11 @@ export class TodosService {
    * A due patch is normalized (timed → canonical instant) and the reminder is
    * recomputed whenever the due or the repeat changes. Clearing the due clears
    * both the repeat and the reminder. Ticking a recurring todo records a
-   * completion for the pre-advance due `D` and advances to the next occurrence
-   * on/after now, remaining open (`done: false`); a non-recurring `done: true`
-   * logs `occurrence = D ?? '~'` and closes it, `done: false` deletes only that
+   * completion for the pre-advance due `D` and advances strictly past it, to the
+   * next occurrence on/after now, remaining open (`done: false`); `done: false`
+   * on a recurring todo undoes the last tick — it deletes that occurrence's log
+   * row and restores `D`. A non-recurring `done: true` logs
+   * `occurrence = D ?? '~'` and closes it, `done: false` deletes only that
    * occurrence's log row (N2/N3).
    */
   async update(
@@ -916,13 +923,12 @@ export class TodosService {
             if (advance) {
               // Log the pre-advance due before overwriting it (occurrence = D).
               const occurrence = todo.dueDate!;
+              const days = parseRepeatDays(todo.repeatDays);
               const local = dueSortKey(todo.dueDate!, this.tz);
-              const next = advanceToOnOrAfter(
-                local,
-                todo.repeat!,
-                this.nowLocal(),
-                parseRepeatDays(todo.repeatDays),
-              );
+              // Step strictly past the ticked occurrence first, then roll forward
+              // to on/after now — a future-due repeat must not jam on its own due.
+              const stepped = nextOccurrence(local, todo.repeat!, days);
+              const next = advanceToOnOrAfter(stepped, todo.repeat!, this.nowLocal(), days);
               await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
               todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
               todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
@@ -932,14 +938,28 @@ export class TodosService {
               const occurrence = todo.dueDate ?? '~';
               await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
               todo.done = true;
-            } else if (todo.repeat === null) {
+            } else if (todo.repeat !== null && todo.dueDate !== null) {
+              // Repeat-tick undo: delete the most recent dated occurrence's log row
+              // and restore the due it recorded. `occurrence` is stored in the
+              // persisted dual shape, so assigning it back is the exact pre-tick due.
+              const repo = manager.getRepository(TodoCompletion);
+              const last = await repo.findOne({
+                where: { ownerSub: sub, todoId: id },
+                order: { completedAt: 'DESC' },
+              });
+              if (last && last.occurrence !== '~') {
+                await repo.delete({ id: last.id, ownerSub: sub });
+                todo.dueDate = last.occurrence;
+                todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+              }
+              todo.done = false;
+            } else {
               // Un-complete one-off: drop only that occurrence's log row.
               await manager
                 .getRepository(TodoCompletion)
                 .delete({ ownerSub: sub, todoId: id, occurrence: todo.dueDate ?? '~' });
               todo.done = false;
             }
-            // Un-complete repeating: the log is untouched; `done` is already false.
             return manager.save(todo);
           });
     // Bump AFTER the save/commit — a 409 above never bumps, a thrown

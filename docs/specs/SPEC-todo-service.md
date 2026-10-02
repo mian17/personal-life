@@ -174,8 +174,10 @@ read fields required-but-nullable:
   where the todo has `repeat` **records a completion and** advances. Let `D = todo.dueDate`
   (normalized, pre-advance). In one `DataSource` transaction: guarded-insert one
   `todo_completion` row with `occurrence = D` (the pre-advance due, in its stored shape) and
-  `completedAt = new Date().toISOString()`, then advance the todo to its next occurrence
-  on/after "now" in the `TODO_TIMEZONE` local calendar (daily +1d; weekdays next Mon–Fri;
+  `completedAt = new Date().toISOString()`, then advance the todo: step strictly past `D`
+  (`nextOccurrence`, one `repeat` step, so the due can never jam on the just-completed
+  occurrence) and roll forward to on/after "now" in the `TODO_TIMEZONE` local calendar
+  (daily +1d; weekdays next Mon–Fri;
   weekly +7d; monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28;
   custom next day whose ISO weekday is in `repeatDays`, ≤ 7 steps, time-of-day preserved),
   skipping candidates before now, re-derive `reminderScheduledAt`, and return the advanced
@@ -185,8 +187,11 @@ read fields required-but-nullable:
   sweep is unchanged (open rows only) and no reopen path exists** — the repeating tick never
   sets `done = true`, so there is nothing to reopen. A **non-recurring** `done: true` still
   marks done and (new) records `occurrence = D ?? '~'`; `done: false` on a one-off deletes
-  **only that occurrence's** row (any other rows are preserved). Ticking a recurring todo
-  hides nothing (no undo snackbar — UI). Trash/restore semantics are unchanged.
+  **only that occurrence's** row (any other rows are preserved). `done: false` on a
+  **repeating** todo undoes the last tick: it deletes that occurrence's latest
+  `todo_completion` row and restores the due it recorded (re-arming the reminder); with no
+  dated row it is a no-op. Ticking a recurring todo hides nothing (no auto-hide; the Undo
+  snackbar wording is owned by `SPEC-todo-ui.md`). Trash/restore semantics are unchanged.
 
 - `POST /api/todos {title, note?, dueDate?, repeat?, repeatDays?, listId?, important?, tagIds?}` → 201 (version 0).
   `important` is `boolean | null`; omitted or `null` stores `null` (inherit the list default).
@@ -375,8 +380,11 @@ Build:     npm run build -w @life/todo-service
 10. Due-time / recurrence / push: timezone math round-trips (fixed-offset and DST zones;
     date-only never converted); a timed due normalizes to a UTC instant and a date-only
     value survives verbatim; reminder = due instant (timed) / 09:00 national (date-only);
-    a repeat without a due → 400; advance-on-tick lands on the next occurrence on/after
+    a repeat without a due → 400; advance-on-tick steps strictly past the ticked occurrence
+    then lands on the next occurrence on/after
     now (`daily`/`weekdays`/`monthly` clamp/`yearly` Feb 29) with `done:false`, version+1;
+    `done:false` on a repeating todo deletes that occurrence's log row, restores the due and
+    re-arms the reminder;
     the sweep fires once, clears `reminderScheduledAt`, re-arms only on tick/edit, and
     deletes a subscription on `404`/`410`; push endpoints reject a malformed body and
     scope by `(sub, endpoint)`; list order/cursor use the local `dueSortKey`.

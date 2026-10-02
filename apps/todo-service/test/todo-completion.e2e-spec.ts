@@ -38,6 +38,10 @@ describe('Todo completion log (tick/undo rules)', () => {
   const reminderAt = (due: string) =>
     localToUtc(reminderLocal(dueSortKey(due, TZ)), TZ).toISOString();
 
+  /** The service TZ's calendar date `offsetDays` from now. */
+  const localDay = (offsetDays: number) =>
+    dueSortKey(new Date(Date.now() + offsetDays * 86_400_000).toISOString(), TZ).slice(0, 10);
+
   it('repeating tick appends the pre-advance due, advances the due, re-arms the reminder, keeps done false', async () => {
     const created = await h.todos.create(SUB, {
       title: 'repeat me',
@@ -56,6 +60,71 @@ describe('Todo completion log (tick/undo rules)', () => {
     expect(updated.dueDate! >= dueSortKey(new Date().toISOString(), TZ)).toBe(true);
     // The reminder is re-armed for the advanced due.
     expect(updated.reminderScheduledAt).toBe(reminderAt(updated.dueDate!));
+  });
+
+  it('a future-dated repeating tick advances strictly past the ticked occurrence', async () => {
+    const tomorrow = localDay(1);
+    const created = await h.todos.create(SUB, {
+      title: 'tomorrow repeat',
+      dueDate: tomorrow,
+      repeat: 'daily',
+    });
+
+    const first = await h.todos.update(SUB, created.id, { done: true });
+
+    const afterFirst = await rows(created.id);
+    expect(afterFirst).toHaveLength(1);
+    expect(afterFirst[0].occurrence).toBe(tomorrow);
+    expect(first.done).toBe(false);
+    // Strictly past the just-completed occurrence, never jammed on it.
+    expect(first.dueDate).toBe(localDay(2));
+
+    const second = await h.todos.update(SUB, created.id, { done: true });
+
+    const afterSecond = await rows(created.id);
+    expect(afterSecond).toHaveLength(2);
+    expect(new Set(afterSecond.map((r) => r.occurrence))).toEqual(
+      new Set([localDay(1), localDay(2)]),
+    );
+    expect(second.dueDate).toBe(localDay(3));
+    expect(second.done).toBe(false);
+  });
+
+  it('repeat tick undo deletes that occurrence row, restores the due and re-arms the reminder', async () => {
+    const tomorrow = localDay(1);
+    const created = await h.todos.create(SUB, {
+      title: 'repeat undo',
+      dueDate: tomorrow,
+      repeat: 'daily',
+    });
+
+    const ticked = await h.todos.update(SUB, created.id, { done: true });
+    expect(ticked.dueDate).toBe(localDay(2));
+    expect((await rows(created.id)).map((r) => r.occurrence)).toEqual([tomorrow]);
+
+    const undone = await h.todos.update(SUB, created.id, { done: false });
+
+    expect(await rows(created.id)).toHaveLength(0);
+    expect(undone.dueDate).toBe(tomorrow);
+    expect(undone.reminderScheduledAt).toBe(reminderAt(tomorrow));
+    expect(undone.done).toBe(false);
+  });
+
+  it('repeat tick undo with no completion row leaves the due unchanged', async () => {
+    const tomorrow = localDay(1);
+    const created = await h.todos.create(SUB, {
+      title: 'repeat undo no-op',
+      dueDate: tomorrow,
+      repeat: 'daily',
+    });
+    const originalReminder = created.reminderScheduledAt;
+
+    const undone = await h.todos.update(SUB, created.id, { done: false });
+
+    expect(undone.dueDate).toBe(tomorrow);
+    expect(undone.reminderScheduledAt).toBe(originalReminder);
+    expect(undone.done).toBe(false);
+    expect(await rows(created.id)).toHaveLength(0);
   });
 
   it('one-off tick appends occurrence = dueDate and closes the todo', async () => {

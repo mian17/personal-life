@@ -9,6 +9,9 @@ jest.mock('../app/todo-actions', () => ({
 }));
 
 import { TodoItem } from '../app/todo-item';
+import { updateTodoAction } from '../app/todo-actions';
+
+const updateMock = updateTodoAction as jest.Mock;
 
 const TODAY = '2026-10-01';
 
@@ -69,11 +72,14 @@ interface ItemTree extends ReactElement {
  * observed through the element tree: a direct call runs only the item's hooks
  * and a stubbed `useState` lets a re-render pick up a value changed through a
  * setter captured from the previous tree. `useContext` is stubbed through the
- * same live-module read so no `SnackbarProvider` is needed; `useEffect` is a
- * no-op (node env) so the pending-collapse timer never fires here.
+ * same live-module read so no `SnackbarProvider` is needed; `useEffect` is
+ * captured instead of scheduled, so a test runs it explicitly (`runEffects`)
+ * and only then lets fake timers fire the pending-collapse timer.
  */
 function stateHarness() {
   let store: unknown[] = [];
+  const effects: Array<() => void> = [];
+  const showSnackbar = jest.fn();
   const stateSpy = jest.spyOn(ReactModule, 'useState');
   const ctxSpy = jest.spyOn(ReactModule, 'useContext');
   const refSpy = jest
@@ -81,10 +87,13 @@ function stateHarness() {
     .mockImplementation(((initial: unknown) => ({ current: initial })) as typeof ReactModule.useRef);
   const effectSpy = jest
     .spyOn(ReactModule, 'useEffect')
-    .mockImplementation((() => {}) as typeof ReactModule.useEffect);
+    .mockImplementation(((callback: () => void) => {
+      effects.push(callback);
+    }) as typeof ReactModule.useEffect);
 
   function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
     let index = 0;
+    effects.length = 0;
     stateSpy.mockImplementation(((initial: unknown) => {
       const i = index++;
       if (i >= store.length) {
@@ -97,7 +106,7 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as typeof realUseState);
-    ctxSpy.mockImplementation((() => ({ showSnackbar: () => {} })) as unknown as typeof ReactModule.useContext);
+    ctxSpy.mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
     return TodoItem({
       todo: todo(options?.overrides),
       today: TODAY,
@@ -109,6 +118,9 @@ function stateHarness() {
 
   return {
     renderTree,
+    showSnackbar,
+    /** Runs the effects registered by the last `renderTree` (commit order irrelevant here). */
+    runEffects: () => effects.forEach((effect) => effect()),
     restore: () => {
       stateSpy.mockRestore();
       ctxSpy.mockRestore();
@@ -279,6 +291,71 @@ describe('TodoItem collapsing gate', () => {
 
       const second = harness.renderTree({ overrides: { repeat: 'daily' } });
       expect(second.props.collapsing).toBe(false);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('TodoItem repeating tick snackbar', () => {
+  it('shows Task completed / Undo, keeps the row mounted, and undoes unconditionally', () => {
+    const harness = stateHarness();
+    updateMock.mockClear();
+    jest.useFakeTimers();
+    try {
+      const first = harness.renderTree({ overrides: { repeat: 'daily' } });
+      const toggle = doneToggle(first);
+      expect(toggle.props.hide).toBe(false);
+
+      toggle.props.onToggle();
+
+      // The advance write fires immediately, still version-checked.
+      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: true }, 0);
+
+      // Snackbar appears immediately, with the one-off copy and action.
+      expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
+      const snackbar = harness.showSnackbar.mock.calls[0][0];
+      expect(snackbar.message).toBe('Task completed');
+      expect(snackbar.actionLabel).toBe('Undo');
+
+      // Simulate the revalidated row arriving done, then let every timer fire.
+      harness.renderTree({ overrides: { repeat: 'daily', done: true } });
+      harness.runEffects();
+      jest.advanceTimersByTime(5000);
+
+      // The row never collapses and so never reaches its `removed` unmount.
+      const after = harness.renderTree({ overrides: { repeat: 'daily', done: true } });
+      expect(after).not.toBeNull();
+      expect(doneToggle(after).props.done).toBe(true);
+      expect(after.props.collapsing).toBe(false);
+
+      // Undo reverses server-side with no expectedVersion.
+      snackbar.onAction();
+      expect(updateMock).toHaveBeenNthCalledWith(2, 't1', { done: false });
+      expect(updateMock.mock.calls[1]).toEqual(['t1', { done: false }]);
+    } finally {
+      jest.useRealTimers();
+      harness.restore();
+    }
+  });
+
+  it('does not show a snackbar when clicking an already-done repeating row (the click undoes)', () => {
+    const harness = stateHarness();
+    updateMock.mockClear();
+    try {
+      const first = harness.renderTree({
+        overrides: { repeat: 'daily', done: true },
+      });
+      const toggle = doneToggle(first);
+      expect(toggle.props.hide).toBe(false);
+
+      toggle.props.onToggle();
+
+      // The click un-ticks the row; the write is still version-checked.
+      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false }, 0);
+
+      // No snackbar: an un-tick is not a completion, so there is nothing to undo.
+      expect(harness.showSnackbar).not.toHaveBeenCalled();
     } finally {
       harness.restore();
     }

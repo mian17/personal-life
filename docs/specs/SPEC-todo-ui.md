@@ -75,6 +75,11 @@ both apps — so tags feel identical everywhere (I3).
   auto-dismisses after its default 5s. `SnackbarProvider` is mounted for the whole
   `/todos` segment (`apps/app/app/todos/layout.tsx`) so the List and Matrix views share
   one provider; `useSnackbar()` has a safe no-op default outside a provider.
+  **A repeating tick shows the same snackbar too:** because a repeat tick advances the
+  todo, its row stays put (auto-hide stays off for repeating rows — the `collapsing`
+  state is gated on `todo.repeat == null`), but the `Task completed` / `Undo` affordance
+  appears immediately so the user can reverse the advance. The server-side advance/undo
+  rules are owned by `SPEC-todo-completion-history.md`.
 - **Transport config (per kernel contract):** the app's API client gains
   `TAGS_API_URL`/`TODO_API_URL` base URLs; auth uses the kernel's single shared
   `life-api` audience — no per-service audience names appear in the client. Env

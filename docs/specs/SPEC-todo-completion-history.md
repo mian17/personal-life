@@ -29,7 +29,9 @@ Success looks like: a repeating todo due Mon Oct 5 is ticked on Mon Oct 5 → on
 row is appended (`occurrence = 2026-10-05`), the todo advances to Mon Oct 12 and stays
 **open**, and `/todos?done=true` lists a row *for* the Oct 5 occurrence, labeled with its real
 completion date, while `/todos` (Open) still shows the Oct 12 instance. A one-off tick
-appends one row and closes the todo; Undo removes that row and reopens it. A double tick can
+appends one row and closes the todo; Undo removes that row and reopens it. Undoing a
+**repeating** tick deletes that same Oct 5 row and restores the due (and reminder) to Oct 5.
+A double tick can
 never double-record (`UNIQUE (todoId, occurrence)`).
 
 The Done row renders **only** the completion date (`dueDateLabel(completedAt, today)`), never
@@ -192,8 +194,11 @@ Let `D = todo.dueDate` (already normalized) and `repeat = todo.repeat`.
 1. **Repeating tick** — `patch.done === true`, `repeat !== null`, `D !== null` (invariant:
    a repeat requires a due):
    - `occurrence = D` (the **pre-advance** due, in its stored shape).
-   - `next = advanceToOnOrAfter(dueSortKey(D, tz), repeat, nowLocal())` (unchanged engine;
-     `custom` from `todo-custom-repeat` joins here later).
+   - `days = parseRepeatDays(todo.repeatDays)`; `local = dueSortKey(D, tz)`;
+     `stepped = nextOccurrence(local, repeat, days)` (**one step strictly past** the
+     just-completed occurrence, so a future due cannot jam), then
+     `next = advanceToOnOrAfter(stepped, repeat, nowLocal(), days)` (roll forward to
+     on/after now; `custom` from `todo-custom-repeat` joins here via `days`).
    - In one transaction: guarded-insert one completion row
      (`{ id: randomUUID(), ownerSub: sub, todoId: id, occurrence: D,
      completedAt: new Date().toISOString() }`); set
@@ -211,9 +216,17 @@ Let `D = todo.dueDate` (already normalized) and `repeat = todo.repeat`.
      (invariant: at most one row per `(todoId, occurrence)`). Other rows — e.g. prior
      repeating occurrences recorded before the repeat was cleared — are **preserved**; set
      `todo.done = false`, `todo.version += 1`, `todo.updatedAt = now`; `manager.save(todo)`.
-4. **Un-complete on a repeating todo** — `patch.done === false`, `repeat !== null`: the log
-   is **untouched** (append-only; un-completing a past occurrence is out of scope, intent
-   Out of scope). `todo.done` is already `false`; the existing version/updatedAt bump stands.
+4. **Un-complete on a repeating todo** — `patch.done === false`, `repeat !== null`,
+   `D !== null`: undoes the most recent **tick**. In one transaction:
+   `manager.getRepository(TodoCompletion).findOne({ where: { ownerSub: sub, todoId: id },
+   order: { completedAt: 'DESC' } })`. If that row exists and its `occurrence !== '~'`,
+   `repo.delete({ id: last.id, ownerSub: sub })` and set `todo.dueDate = last.occurrence`
+   — `occurrence` is stored in the persisted dual shape (date-only `YYYY-MM-DD`, or a
+   canonical UTC instant for a timed due), so assigning it back verbatim restores exactly
+   the pre-tick due — plus `todo.reminderScheduledAt = reminderAt(todo.dueDate, tz)`
+   (re-armed). If no dated row exists, `dueDate`/`reminderScheduledAt` are left unchanged
+   (a safe no-op). `todo.done` is set to `false`; the existing version/updatedAt bump
+   stands. This is *not* "log untouched": earlier occurrence rows are still preserved.
 
 After the transaction commits, `await this.cache.bumpGeneration(sub)` runs exactly once
 (pre-mutation reads die; a thrown transaction never bumps). The tag-association handling and
@@ -352,9 +365,10 @@ primitives). No raw `<a>`/`<button>` is introduced — `ListItem` owns the `next
 
 The pre-change gate is the correct end state: `hide={hideDone && todo.repeat == null}` and
 `collapsing={todo.repeat == null && collapsing}` **stay**. A repeating tick advances and
-stays open, so a repeating row never auto-hides and never shows the Undo snackbar (undone
-via the `repeat == null` gate — un-completing a past occurrence is out of scope; a one-off
-tick keeps today's snackbar/Undo unchanged). No `DoneToggle` edit.
+stays open, so a repeating row still **does not auto-hide** — but it **does** show the Undo
+snackbar: `PATCH { done: false }` undoes the latest repeat tick (Completion rules §4), which
+deletes that occurrence's row and restores the due. `SPEC-todo-ui.md` owns the UI wording; a
+one-off tick keeps today's snackbar/Undo unchanged. No `DoneToggle` edit.
 
 ### Frozen selector-surface record (conceptually; the `SPEC-todo-ui.md` edit is plan T1)
 
@@ -371,7 +385,11 @@ Targeted named files only (Project Profile commands; no full suite, no E2E):
 
 1. **Entity + tick/undo rules** — `apps/todo-service/test/todo-completion.e2e-spec.ts`:
    repeating tick appends exactly one row (`occurrence` = pre-advance due, correct dual
-   shape), advances the due, re-arms `reminderScheduledAt`, and leaves `done: false`; a
+   shape), advances the due strictly past the ticked occurrence, re-arms
+   `reminderScheduledAt`, and leaves `done: false`; a
+   **future-dated** repeating tick advances to the day after its due; repeat tick undo
+   deletes that occurrence's row, restores the due and re-arms the reminder (no row →
+   no-op); a
    one-off tick appends one row and sets `done: true`; un-complete deletes **only that
    occurrence's** row and sets `done: false`; a due-less one-off records `occurrence = '~'`
    and un-complete uses the `'~'` sentinel; a todo carrying several completion rows whose
@@ -409,8 +427,9 @@ No existing-suite reconciliation is due: the `Todo` DTO key set is unchanged (15
   recorded above; any new token value; anything frozen by `AGENTS.md` `frozen-surfaces`.
 - **Never:** a title/list snapshot column in v1 (C7); plaintext content in Redis/logs; a
   reopen path or a `done = true` write in the sweep/repeating tick (C4); `limit`/`cursor` in
-  the cache key; a raw HTML element or app-side CSS in the Done view (Contract 1); un-
-  completing or editing a past repeating occurrence from the UI (intent Out of scope);
+  the cache key; a raw HTML element or app-side CSS in the Done view (Contract 1); editing
+  an arbitrary past repeating occurrence from the UI (un-completing the latest repeat tick is
+  in scope — Completion rules §4);
   merge to `master` without the user's explicit request.
 - **Cross-spec amendments (conceptual; landing in the same chapter):**
   `SPEC-todo-service.md` and `SPEC-todo-due-repeat-notify.md` restate the advance-on-tick
@@ -445,8 +464,9 @@ No existing-suite reconciliation is due: the `Todo` DTO key set is unchanged (15
 ## Open Questions
 
 - None blocking. Deferred follow-ons (recorded from the intent): materialized future
-  occurrences; `RECURRENCE-ID`/`EXDATE` exception overrides; editing or un-completing a past
-  repeating occurrence from the UI; a retention/pruning policy for old completion rows; a
+  occurrences; `RECURRENCE-ID`/`EXDATE` exception overrides; editing an arbitrary **past**
+  repeating occurrence from the UI (undoing the *latest* repeat tick is in scope — Completion
+  rules §4); a retention/pruning policy for old completion rows; a
   per-todo history view and stats; a denormalized title/list snapshot so history outlives a
   permanently deleted todo (C7 upgrade); multi-device sync of the log beyond the existing
   per-owner model.

@@ -45,8 +45,11 @@ tick/completion contract that chapter builds on, so it lands first). `master` un
 
 ## Out of scope (follow-on chapters)
 
-- Materialized occurrences, `RECURRENCE-ID`/`EXDATE` exception overrides, editing or
-  un-completing a **past repeating occurrence** from the UI.
+- Materialized occurrences, `RECURRENCE-ID`/`EXDATE` exception overrides, editing an
+  arbitrary **past repeating occurrence** from the UI. (Un-completing the *latest* repeat
+  tick — restore the just-completed occurrence — is **in scope**: `PATCH { done: false }`
+  deletes that occurrence's row and restores the due and reminder; see
+  `docs/specs/SPEC-todo-completion-history.md` Completion rules §4.)
 - Retention/pruning policy for old completion rows; a per-todo history view; stats.
 - A denormalized title/list snapshot so history outlives a permanently deleted todo (C7 upgrade).
 - Multi-device sync of the log beyond the existing per-owner model.

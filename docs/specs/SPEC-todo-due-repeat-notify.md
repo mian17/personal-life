@@ -185,8 +185,11 @@ advanced row:
    (`SPEC-todo-completion-history.md` C3/C4).
 
 - A **non-recurring** todo's `done: true` is unchanged (marks done; row hides via the UI).
-- A repeating tick will **record a completion and** advance — the row **does not** hide and
-  no undo snackbar is shown (UI section).
+- A repeating tick will **record a completion and** advance — the row **does not** hide
+  (no auto-hide). `PATCH { done: false }` on that row undoes the latest tick: it deletes that
+  occurrence's completion row, restores the due and re-arms the reminder — see
+  `SPEC-todo-completion-history.md` Completion rules §1/§4 for the server-side contract and
+  the Undo snackbar wording.
 - Trash/restore semantics are unchanged; a recurring todo with a past occurrence and no tick
   simply stays **overdue** until ticked, with its stored reminder already fired (N3).
 

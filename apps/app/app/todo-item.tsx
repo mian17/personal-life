@@ -141,7 +141,7 @@ export function TodoItem({
         },
       });
     }
-    setCollapsing(value);
+    if (todo.repeat == null) setCollapsing(value);
   };
 
   const doneToggle = (
@@ -154,6 +154,13 @@ export function TodoItem({
       onToggle={() => {
         undoneBySnackbar.current = false;
         void updateTodoAction(todo.id, { done: !todo.done }, todo.version);
+        // A repeating tick advances rather than completes, so the row never
+        // collapses — but the user still deserves the same Undo affordance.
+        // Only a tick TO done (`!todo.done`) gets it: an already-done repeating
+        // row sends `done: false` (an undo), which must not fire "Task
+        // completed" or an Undo that has nothing to reverse. `handleCollapse`
+        // only sets `collapsing` when `repeat == null`, so nothing collapses.
+        if (todo.repeat != null && !todo.done) handleCollapse(true);
       }}
       onCollapse={handleCollapse}
     />
