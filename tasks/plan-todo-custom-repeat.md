@@ -150,11 +150,17 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/shared/src/index.ts`,
-    `packages/shared/test/index.test.ts` (new, if absent).
+    `packages/shared/test/index.test.ts` (new, if absent), and the eight app test files whose
+    `Todo` object literals gain `repeatDays: null` (the same migration pattern as
+    `todo-due-repeat-notify` T2): `apps/app/test/todo-item.test.tsx`,
+    `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
+    `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
+    `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
+    `apps/app/test/routes-todos-trash.test.tsx`.
   - Reference files (read-only): `docs/specs/SPEC-todo-custom-repeat.md`,
     `docs/specs/SPEC-todo-service.md`.
-  - Strictly prohibited files: every other file — the app test-literal migration happens in the
-    owning workspace tasks (T8/T9) to keep this task shared-only.
+  - Strictly prohibited files: every other file (the service tests use `h.todos.create(...)`, not
+    full row literals, so they need no migration).
 
 [IMPLEMENTATION REQUIREMENTS]
   - `TODO_REPEATS` becomes `['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'custom'] as const`
@@ -166,17 +172,22 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     comment: `null`/omitted = no custom days; present only meaningful when `repeat === 'custom'`.
   - No runtime helpers in this package beyond the constants (parsing/formatting is T5's service
     concern and T8's label concern).
+  - **App literal migration:** each of the eight named app test files' `Todo` object literal gains
+    `repeatDays: null` so `npm run typecheck -w @life/app` stays green. No app production code
+    constructs a `Todo` literal (verified), so only tests change.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/shared` then
-    `npm run test:unit -w @life/shared -- test/index.test.ts`.
+  - Permitted test command: `npm run build -w @life/shared` then `npm run typecheck -w @life/shared`,
+    `npm run typecheck -w @life/app`, and `npm run test:unit -w @life/shared -- test/index.test.ts`.
   - Strict constraints: NO full suites, NO E2E; max test executions: 2.
 
 [DEFINITION OF DONE]
   - [ ] `TODO_REPEATS` includes `'custom'`; `TODO_REPEAT_DAYS` is exported.
   - [ ] `Todo.repeatDays`, `CreateTodoInput.repeatDays`, `UpdateTodoInput.repeatDays` exist with
         the exact types above.
-  - [ ] `npm run typecheck -w @life/shared` passes with zero errors; no file outside scope.
+  - [ ] All eight app test files carry `repeatDays: null` in their `Todo` literal.
+  - [ ] `npm run typecheck -w @life/shared` and `npm run typecheck -w @life/app` pass with zero
+        errors; no file outside scope.
 
 ### T3 — UI short-weekday vocabulary (module `todo-custom-repeat`)
 
@@ -246,12 +257,12 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - A `useEffect` on `open`: `open ? el.showModal() : el.close()`; attach a `close` listener on
     the element mapping to `onOpenChange(false)` (covers Escape and backdrop). Guard against the
     `close` event re-entrancy (only call when currently `open`).
-  - CSS in `blocks.css` (tokens only): `.ui-dialog` (`--panel`, `--radius-lg`, padding from
-    `--space-*`, `border`), `.ui-dialog::backdrop` (a translucent scrim — use a token; if none
-    fits, add one token in `tokens.css` ONLY via an approved change — otherwise use
-    `color-mix`/`rgba` is FORBIDDEN, so plan: add `--scrim` token in `tokens.css` as an
-    explicitly-approved one-line addition, recorded in the task's DoD). Head/body/footer layout
-    via tokens.
+  - CSS in `blocks.css` (tokens only, NO new token — token values are a frozen human-owned
+    surface, `AGENTS.md` frozen-surfaces): `.ui-dialog` (`--panel`, `--radius-lg`, padding from
+    `--space-*`, `border`), `.ui-dialog__head`/`__title`/`__body`/`__footer` layout via tokens.
+    **Do NOT style `.ui-dialog::backdrop`** — the native `<dialog>`'s platform-default backdrop
+    already dims the page; overriding it would need a colour literal, which is forbidden outside
+    `tokens.css`. `tokens.css` is untouched by this task.
   - Export `Dialog`/`DialogProps` from the barrel.
 
 [VERIFICATION & TESTING RULES]
@@ -264,9 +275,9 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - [ ] `dialog.test.tsx` covers: closed → `showModal` not called; `open` → `showModal` called;
         a `close` event calls `onOpenChange(false)`; the `Close` `IconButton` calls it too;
         footer renders when provided.
-  - [ ] `--scrim` token added to `tokens.css` (the ONLY allowed token addition) and the
-        tripwire `packages/ui/test/tokens.test.ts` updated in the same task if it enumerates tokens.
-  - [ ] No raw hex/rgb/px in `blocks.css`; `npm run typecheck -w @life/ui` passes; no file outside scope.
+  - [ ] `tokens.css` and `packages/ui/test/tokens.test.ts` are untouched (frozen surface preserved).
+  - [ ] No raw hex/rgb/px in `blocks.css`; no `::backdrop` colour override; `npm run typecheck -w @life/ui`
+        passes; no file outside scope.
 
 ### T5 — Recurrence custom branch (module `todo-custom-repeat`)
 
