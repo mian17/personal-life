@@ -1,4 +1,9 @@
-import { advanceToOnOrAfter, nextOccurrence } from '../src/todos/recurrence';
+import {
+  advanceToOnOrAfter,
+  formatRepeatDays,
+  nextOccurrence,
+  parseRepeatDays,
+} from '../src/todos/recurrence';
 
 describe('recurrence: nextOccurrence shape and rules', () => {
   it('advances daily by one day, preserving shape', () => {
@@ -71,5 +76,61 @@ describe('recurrence: advanceToOnOrAfter', () => {
     // Jan 31 → Feb 28 (clamped) → Mar 28 → Apr 28: the clamp is per-step and
     // does not recover the 31st.
     expect(advanceToOnOrAfter('2026-01-31', 'monthly', '2026-04-01')).toBe('2026-04-28');
+  });
+});
+
+describe('recurrence: custom BYDAY set', () => {
+  it('steps to the next chosen day within the set (Thu → Fri)', () => {
+    // 2026-10-01 is a Thursday; [4,5] is Thu+Fri.
+    expect(nextOccurrence('2026-10-01', 'custom', [4, 5])).toBe('2026-10-02');
+  });
+
+  it('wraps to the next week when the set is exhausted (Fri → next Thu)', () => {
+    expect(nextOccurrence('2026-10-02', 'custom', [4, 5])).toBe('2026-10-08');
+  });
+
+  it('advances a due outside the set to the next chosen day (Mon → Thu)', () => {
+    // 2026-10-05 is a Monday, not in [4,5].
+    expect(nextOccurrence('2026-10-05', 'custom', [4, 5])).toBe('2026-10-08');
+  });
+
+  it('behaves as daily for the full [1..7] set', () => {
+    expect(nextOccurrence('2026-03-08', 'custom', [1, 2, 3, 4, 5, 6, 7])).toBe('2026-03-09');
+    expect(nextOccurrence('2026-03-31', 'custom', [1, 2, 3, 4, 5, 6, 7])).toBe('2026-04-01');
+  });
+
+  it('preserves the time-of-day and the date-only/timed shape', () => {
+    expect(nextOccurrence('2026-10-01T09:30', 'custom', [4, 5])).toBe('2026-10-02T09:30');
+    expect(nextOccurrence('2026-10-01', 'custom', [4, 5])).toBe('2026-10-02');
+  });
+
+  it('returns the value unchanged when days is null or empty', () => {
+    expect(nextOccurrence('2026-10-01', 'custom', null)).toBe('2026-10-01');
+    expect(nextOccurrence('2026-10-01', 'custom', [])).toBe('2026-10-01');
+  });
+
+  it('converges on or after now and never returns a past occurrence', () => {
+    expect(advanceToOnOrAfter('2026-10-01', 'custom', '2026-10-09', [4, 5])).toBe('2026-10-09');
+    expect(advanceToOnOrAfter('2026-10-02', 'custom', '2026-10-02', [4, 5])).toBe('2026-10-02');
+  });
+});
+
+describe('recurrence: repeatDays CSV owners', () => {
+  it('formatRepeatDays sorts, de-dupes, and nulls empty input', () => {
+    expect(formatRepeatDays([5, 4, 4])).toBe('4,5');
+    expect(formatRepeatDays([1])).toBe('1');
+    expect(formatRepeatDays(null)).toBeNull();
+    expect(formatRepeatDays([])).toBeNull();
+  });
+
+  it('parseRepeatDays parses CSVs and nulls empty input', () => {
+    expect(parseRepeatDays('4,5')).toEqual([4, 5]);
+    expect(parseRepeatDays(null)).toBeNull();
+    expect(parseRepeatDays('')).toBeNull();
+  });
+
+  it('parseRepeatDays drops out-of-range and non-integer values defensively', () => {
+    expect(parseRepeatDays('4,9,0,3')).toEqual([4, 3]);
+    expect(parseRepeatDays('4,x')).toEqual([4]);
   });
 });

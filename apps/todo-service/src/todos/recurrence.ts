@@ -42,12 +42,19 @@ function weekday(y: number, m: number, d: number): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
+/** ISO weekday (1=Mon … 7=Sun) of a calendar date. */
+function iso(y: number, m: number, d: number): number {
+  const wd = weekday(y, m, d);
+  return wd === 0 ? 7 : wd;
+}
+
 /**
  * One step of `repeat` on the local value. `monthly` clamps to the target
  * month's last day; `yearly` clamps Feb 29 to Feb 28; `weekdays` skips
- * Sat/Sun; `daily`/`weekly` preserve the time-of-day.
+ * Sat/Sun; `custom` steps to the next day whose ISO weekday is in `days`
+ * (≤ 7 steps); `daily`/`weekly` preserve the time-of-day.
  */
-export function nextOccurrence(local: string, repeat: TodoRepeat): string {
+export function nextOccurrence(local: string, repeat: TodoRepeat, days: number[] | null = null): string {
   const p = parse(local);
 
   if (repeat === 'daily') {
@@ -64,6 +71,15 @@ export function nextOccurrence(local: string, repeat: TodoRepeat): string {
     while (weekday(p.y, p.m, p.d) === 0 || weekday(p.y, p.m, p.d) === 6) {
       p.d += 1;
       normalize(p);
+    }
+    return format(p);
+  }
+  if (repeat === 'custom') {
+    if (!days || days.length === 0) return local;
+    for (let i = 0; i < 7; i += 1) {
+      p.d += 1;
+      normalize(p);
+      if (days.includes(iso(p.y, p.m, p.d))) return format(p);
     }
     return format(p);
   }
@@ -95,10 +111,32 @@ function normalize(p: Local): string {
 
 /**
  * Advance `local` by `repeat` until the candidate is on or after `nowLocal`
- * (same-shape string compare). Never returns a past occurrence.
+ * (same-shape string compare). Never returns a past occurrence. `days` is the
+ * custom weekday set; it is trailing for backward compatibility.
  */
-export function advanceToOnOrAfter(local: string, repeat: TodoRepeat, nowLocal: string): string {
+export function advanceToOnOrAfter(
+  local: string,
+  repeat: TodoRepeat,
+  nowLocal: string,
+  days: number[] | null = null,
+): string {
   let candidate = local;
-  while (candidate < nowLocal) candidate = nextOccurrence(candidate, repeat);
+  while (candidate < nowLocal) candidate = nextOccurrence(candidate, repeat, days);
   return candidate;
+}
+
+/** Sorted, de-duplicated ISO weekday CSV (`[5,4,4]` → `'4,5'`); `null` for null/empty. */
+export function formatRepeatDays(days: number[] | null): string | null {
+  if (!days || days.length === 0) return null;
+  return [...new Set(days)].sort((a, b) => a - b).join(',');
+}
+
+/** Parse an ISO weekday CSV; `null`/`''` → `null`; out-of-range values dropped. */
+export function parseRepeatDays(csv: string | null): number[] | null {
+  if (!csv) return null;
+  const days = csv
+    .split(',')
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 7);
+  return days.length === 0 ? null : days;
 }
