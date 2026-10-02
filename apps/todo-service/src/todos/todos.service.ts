@@ -791,8 +791,11 @@ export class TodosService {
    *
    * A due patch is normalized (timed → canonical instant) and the reminder is
    * recomputed whenever the due or the repeat changes. Clearing the due clears
-   * both the repeat and the reminder. Ticking a recurring todo advances it to
-   * the next occurrence on/after now instead of closing it (N2/N3).
+   * both the repeat and the reminder. Ticking a recurring todo records a
+   * completion for the pre-advance due `D` and advances to the next occurrence
+   * on/after now, remaining open (`done: false`); a non-recurring `done: true`
+   * logs `occurrence = D ?? '~'` and closes it, `done: false` deletes only that
+   * occurrence's log row (N2/N3).
    */
   async update(
     sub: string,

@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { KeysService } from '../src/keys/keys.service';
 import { UserKeys } from '../src/keys/user-keys.entity';
 import { Todo } from '../src/todos/todo.entity';
+import { TodoCompletion } from '../src/todos/todo-completion.entity';
 import { TodoTag } from '../src/todos/todo-tag.entity';
 import { List } from '../src/lists/list.entity';
 import { TodosService } from '../src/todos/todos.service';
@@ -42,7 +43,7 @@ export async function makeUnitHarness(
   const dataSource = new DataSource({
     type: 'better-sqlite3',
     database: join(dir, 'todo.db'),
-    entities: [Todo, TodoTag, List, UserKeys],
+    entities: [Todo, TodoTag, List, UserKeys, TodoCompletion],
     synchronize: true,
     logging: options.logging ?? false,
     logger: {
@@ -65,6 +66,7 @@ export async function makeUnitHarness(
     cache,
     keys,
     lists,
+    dataSource,
   );
   return { dataSource, keys, todos, lists, cache, dir, log };
 }
