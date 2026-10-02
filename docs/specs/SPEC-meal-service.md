@@ -96,17 +96,22 @@ Other rules:
 Required by Contract 2, Rule 4.
 
 **Isolation (lesson 0011):** meal-service gets its **own Redis instance** (`redis-meal`),
-wired with its own `MEAL_REDIS_URL`. Pointing at `redis-note`/`redis-todo` with service-prefixed
-keys does **not** satisfy this contract — `docs/intent/redis-shared-state.md` decision 3 is one
-instance per service, not a shared instance with disjoint namespaces. `compose.yaml`,
-`.env.development.example`, and `MAP-redis.md` are updated in the same change; a capability map
-that never names the module is how the previous violation shipped (lesson 0011).
+wired with the repo's single per-service `REDIS_URL` (injected by `compose.yaml` in production;
+**unset in dev/e2e**, which intentionally runs Redis-free — `MAP-redis.md` and `.env.example`:
+"No Redis keys belong here"). Pointing at `redis-note`/`redis-todo` with service-prefixed keys
+does **not** satisfy this contract — `docs/intent/redis-shared-state.md` decision 3 is one
+instance per service, not a shared instance with disjoint namespaces. `compose.yaml` and
+`MAP-redis.md` are updated in the same change; a capability map that never names the module is
+how the previous violation shipped (lesson 0011).
+
+Key shape follows `@life/cache` and Contract 2 Rule 3 — `<service>:<sub>:v<gen>:<rest>`, with
+per-owner isolation carried by the `<sub>` segment:
 
 | Shape cached | Key | Contents |
 |---|---|---|
-| Food rows, list/all | `meal:food:v<gen>:<rest>` (per-owner) | rows as persisted, ciphertext |
-| Entry rows for a date | `meal:entries:v<gen>:<date>` | rows as persisted, ciphertext |
-| Saved-meal rows | `meal:saved:v<gen>:<rest>` | rows as persisted, ciphertext |
+| Food rows, list/all | `meal:<sub>:v<gen>:food:<rest>` | rows as persisted, ciphertext |
+| Entry rows for a date | `meal:<sub>:v<gen>:entries:<date>` | rows as persisted, ciphertext |
+| Saved-meal rows | `meal:<sub>:v<gen>:saved:<rest>` | rows as persisted, ciphertext |
 | Generation counter | `meal:gen:<sub>` | integer, bumped per successful write |
 
 - **Filters and pagination never enter the key.** A date is part of the *fetch identity* (one

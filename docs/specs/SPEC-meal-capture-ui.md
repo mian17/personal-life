@@ -35,7 +35,6 @@ e2e (single spec): npx playwright test --config apps/app/playwright.config.ts <f
 ```
 apps/app/
   lib/meal-api.ts                 # server-only BFF client (the only caller of meal-service)
-  lib/meal-today.ts               # ONE owner of "which day is now" — see Date rules
   app/(meals)/meals/page.tsx      # today: total vs target, meal groups, three doors
   app/(meals)/meals/[date]/…      # a specific day
   app/(meals)/meals/entry/[id]/…  # review-correct editor for one entry
@@ -74,15 +73,16 @@ or `PillGroup`, forms use `Input`/`Select`/`Textarea`.
 
 ## Date rules
 
-- **"Today" is the client's day.** The client sends its IANA zone
-  (`Intl.DateTimeFormat().resolvedOptions().timeZone`) or its local `YYYY-MM-DD`; the server
-  resolves the day from that. **Never** `new Date()` host-local in a request path
-  (lesson 0019). Production is UTC; the user is UTC+7, so a host-clock "today" is wrong for the
-  first seven hours of every local day.
+- **"Today" is the client's day, and its single owner already exists: `apps/app/lib/today.ts`
+  (`getToday()`).** The meals routes import it exactly as the todo routes do — **no second
+  owner is created** (lesson 0016; a duplicate was caught in plan validation and removed).
+  `getToday()` reads the browser's IANA zone from the existing `tz` cookie (written by
+  `<TimeZoneSync>`) and falls back to `FALLBACK_TZ`, so a host-clock "today" never enters a
+  request path (lesson 0019). Production is UTC and the user is UTC+7, so a host-clock day
+  would be wrong for the first seven hours of every local day.
+- The service receives the resolved `YYYY-MM-DD` from the BFF and never re-derives it.
 - Rendering a stored date uses the existing `@life/ui` helper (dd/mm/yyyy; relative text for
   Today/Tomorrow). No `toLocale*`, no ad-hoc `toISOString().slice(0,10)` (lesson 0003).
-- `lib/meal-today.ts` is the **single owner** of this derivation (lesson 0016) — the service
-  receives the resolved date and does not re-derive it from its own clock.
 
 ## Testing Strategy
 
