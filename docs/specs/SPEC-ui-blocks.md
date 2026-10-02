@@ -255,9 +255,10 @@ The leading done toggle renders the `Checkbox` atom (rounded square, radius
 wins the `--checkbox-size` cascade by source order (`.ui-list-item--dense` follows
 `.ui-list-item--todo`). `tone?`
 (`danger | amber | accent`, off by default; adds `.ui-list-item--<tone>`) tints the row's
-leading icon control via the matching token colour. The tone rules are declared after
-`.ui-list-item--done .ui-icon-btn`, so in a matrix row a completed task keeps its quadrant
-colour (the filled check); only a NON-toned done row turns muted. The row action slots
+leading icon control via the matching token colour. Each tone rule is scoped
+`.ui-list-item--<tone>:not(.ui-list-item--done) .ui-icon-btn`, so an OPEN toned row is
+tinted and a completed row turns muted exactly like an un-toned one — a done row is never
+coloured by its quadrant. The row action slots
 (trailing / deleteAction) are vertically
 centred against the row (`align-items: center`), while the row link still stretches
 to full height (`align-self: stretch`) so the tap/hover area is unchanged. The row
@@ -269,7 +270,9 @@ Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title
 (`.ui-list-item--done .ui-list-item__title { color: var(--muted);
 text-decoration: line-through; }`) and muting row icon buttons
-(`.ui-list-item--done .ui-icon-btn { color: var(--muted); }`). `collapsing?` adds
+(`.ui-list-item--done .ui-icon-btn { color: var(--muted); }`). Because the tone
+rules above exclude `.ui-list-item--done`, this mute wins for a completed toned
+row too — every done row is uniformly muted. `collapsing?` adds
 `.ui-list-item--collapsing` (`height: 0; min-height: 0; opacity: 0; overflow:
 hidden;`), which animates because the base `.ui-list-item` rule carries
 `transition: height/opacity var(--duration-base) var(--ease-standard)` and

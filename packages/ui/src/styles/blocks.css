@@ -375,18 +375,19 @@
   font-size: var(--space-0-7);
 }
 
-/* Row tone: tint the leading done toggle for a coloured lens row (matrix
-   quadrants). These follow `.ui-list-item--done`, so a completed row keeps its
-   quadrant colour (the filled check) rather than turning muted. */
-.ui-list-item--danger .ui-icon-btn {
+/* Row tone: tint the leading done toggle of an OPEN coloured-lens row (matrix
+   quadrants). A completed row is muted (title + icons) regardless of tone, so
+   the tone rules exclude done — the `.ui-list-item--done .ui-icon-btn` rule
+   above (declared earlier) then wins for done rows. */
+.ui-list-item--danger:not(.ui-list-item--done) .ui-icon-btn {
   color: var(--danger);
 }
 
-.ui-list-item--amber .ui-icon-btn {
+.ui-list-item--amber:not(.ui-list-item--done) .ui-icon-btn {
   color: var(--amber);
 }
 
-.ui-list-item--accent .ui-icon-btn {
+.ui-list-item--accent:not(.ui-list-item--done) .ui-icon-btn {
   color: var(--accent);
 }
 

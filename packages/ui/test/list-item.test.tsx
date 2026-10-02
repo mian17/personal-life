@@ -306,6 +306,14 @@ describe('ListItem', () => {
     expect(block).toMatch(/text-decoration:\s*line-through/);
   });
 
+  it('mutes a completed toned row uniformly: the tone rules yield to --done', () => {
+    const doneIcon = cssBlock(blocksCss(), '.ui-list-item--done .ui-icon-btn');
+    expect(doneIcon).toMatch(/color:\s*var\(--muted\)/);
+    for (const tone of ['danger', 'amber', 'accent']) {
+      expect(blocksCss()).toContain(`.ui-list-item--${tone}:not(.ui-list-item--done) .ui-icon-btn`);
+    }
+  });
+
   it('collapses the row to zero height while hiding', () => {
     const block = cssBlock(blocksCss(), '.ui-list-item--collapsing');
     expect(block).toMatch(/height:\s*0/);

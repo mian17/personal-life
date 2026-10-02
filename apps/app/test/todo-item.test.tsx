@@ -57,32 +57,35 @@ function markup(size?: 'default' | 'dense', overrides: Partial<Todo> = {}): stri
 // namespace is a frozen copy and cannot be.
 const ReactModule = jest.requireActual<typeof import('react')>('react');
 
-/** `TodoItem`'s element tree, the props surface a node test can drive. */
+/** `TodoItem`'s element tree; its props surface a node test can drive. */
 type ItemTree = ReactElement<Record<string, unknown>>;
 
 /**
- * `TodoItem` runs `useSnackbar` plus one `useState` for the optimistic done
- * state; a direct call is outside React, so the harness stubs both through the
- * live-module read: `useContext` captures `showSnackbar`, `useState` returns a
- * harness-owned `completed` flag the test can read/reset. Markup assertions that
- * do not care about either go through `markup()` instead.
+ * `TodoItem` runs `useSnackbar` plus one `useState` for the version-anchored
+ * optimistic done state; a direct call is outside React, so the harness stubs
+ * both through the live-module read: `useContext` captures `showSnackbar`,
+ * `useState` returns a harness-owned `completedVersion` anchor the test can
+ * read/reset. Markup assertions that do not care about either go through
+ * `markup()` instead.
  */
 function snackbarHarness() {
   const showSnackbar = jest.fn();
-  let completed = false;
+  let completedVersion: number | null = null;
+  let renderedVersion = 0;
   const ctxSpy = jest
     .spyOn(ReactModule, 'useContext')
     .mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
   const stateSpy = jest
     .spyOn(ReactModule, 'useState')
     .mockImplementation((() => [
-      completed,
-      (value: boolean) => {
-        completed = value;
+      completedVersion,
+      (value: number | null) => {
+        completedVersion = value;
       },
     ]) as unknown as typeof ReactModule.useState);
 
   function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
+    renderedVersion = todo(options?.overrides).version;
     return TodoItem({
       todo: todo(options?.overrides),
       today: TODAY,
@@ -95,11 +98,15 @@ function snackbarHarness() {
   return {
     renderTree,
     showSnackbar,
-    get completed() {
-      return completed;
+    get completedVersion() {
+      return completedVersion;
     },
-    setCompleted: (value: boolean) => {
-      completed = value;
+    get completed() {
+      // Mirror `TodoItem`'s computed `completed` for the row last rendered.
+      return completedVersion !== null && completedVersion === renderedVersion;
+    },
+    setCompleted: (value: number | null) => {
+      completedVersion = value;
     },
     restore: () => {
       ctxSpy.mockRestore();
@@ -277,7 +284,7 @@ describe('TodoItem tick keeps the row visible', () => {
     expect(markup(undefined, { done: true })).not.toContain('ui-list-item--collapsing');
   });
 
-  it('repeating: keeps the row rendered, shows the snackbar, and undoes unconditionally', () => {
+  it('repeating: a tick strikes optimistically through completeTodoAction, shows the snackbar, and undoes unconditionally', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
     completeMock.mockClear();
@@ -287,12 +294,11 @@ describe('TodoItem tick keeps the row visible', () => {
 
       toggle.props.onToggle();
 
-      // The advance write fires immediately, still version-checked.
-      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: true }, 0);
-      // A repeating row stays open server-side, so there is no optimistic strike
-      // and the linger action is not used.
-      expect(completeMock).not.toHaveBeenCalled();
-      expect(harness.completed).toBe(false);
+      // Same path as a non-recurring tick: strike optimistically, then write
+      // through the linger action, still version-checked.
+      expect(harness.completed).toBe(true);
+      expect(completeMock).toHaveBeenNthCalledWith(1, 't1', 0);
+      expect(updateMock).not.toHaveBeenCalled();
 
       // Snackbar appears immediately, with the one-off copy and action.
       expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
@@ -305,11 +311,36 @@ describe('TodoItem tick keeps the row visible', () => {
       expect(first).not.toBeNull();
       expect(markup(undefined, { repeat: 'daily' })).not.toContain('ui-list-item--collapsing');
 
-      // Undo reverses server-side with no expectedVersion.
+      // Undo clears the version anchor and reverses server-side with no
+      // expectedVersion.
       snackbar.onAction();
-      expect(updateMock).toHaveBeenNthCalledWith(2, 't1', { done: false });
-      expect(updateMock.mock.calls[1]).toEqual(['t1', { done: false }]);
       expect(harness.completed).toBe(false);
+      expect(harness.completedVersion).toBeNull();
+      expect(updateMock).toHaveBeenNthCalledWith(1, 't1', { done: false });
+      expect(updateMock.mock.calls[0]).toEqual(['t1', { done: false }]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('repeating: the optimistic strike self-resets when the server advance bumps the version', () => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      const first = harness.renderTree({ overrides: { repeat: 'daily' } });
+      doneToggle(first).props.onToggle();
+      expect(harness.completedVersion).toBe(0);
+
+      // Still on the ticked version: the row renders struck.
+      const struck = harness.renderTree({ overrides: { repeat: 'daily' } });
+      expect(renderToStaticMarkup(struck)).toContain('ui-list-item--done');
+
+      // The advance bumped todo.version, so the anchor no longer matches and the
+      // strike self-resets — the advanced occurrence renders open.
+      const advanced = harness.renderTree({ overrides: { repeat: 'daily', version: 1 } });
+      expect(harness.completed).toBe(false);
+      expect(renderToStaticMarkup(advanced)).not.toContain('ui-list-item--done');
     } finally {
       harness.restore();
     }

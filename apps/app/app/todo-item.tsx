@@ -23,7 +23,7 @@ import { repeatLabel } from '@/lib/todo-repeat-label';
  * (frozen label, always ghost) with the `Checkbox` glyph. Ticking a row is a
  * plain toggle — the row never hides or collapses.
  */
-function DoneToggle({ done, label, onToggle }: { done: boolean; label: string; onToggle: () => void }) {
+export function DoneToggle({ done, label, onToggle }: { done: boolean; label: string; onToggle: () => void }) {
   return (
     <IconButton label={label} variant="ghost" onClick={onToggle}>
       <Checkbox checked={done} />
@@ -62,9 +62,14 @@ export function TodoItem({
 }) {
   const { showSnackbar } = useSnackbar();
   // Optimistic completion: the row strikes/mutes in place at tick time and is
-  // relocated by `completeTodoAction`'s delayed revalidation. Never set for a
-  // repeating todo — its server state stays open after the advance.
-  const [completed, setCompleted] = useState(false);
+  // relocated by `completeTodoAction`'s delayed revalidation. The anchor IS set
+  // for a repeating tick too: the write goes through `completeTodoAction`, which
+  // records the occurrence and advances the due while keeping `done: false`, so
+  // when the delayed revalidation arrives the row's bumped `todo.version` no
+  // longer matches `completedVersion` and the (open) next occurrence renders
+  // un-struck — no effect needed to reset it.
+  const [completedVersion, setCompletedVersion] = useState<number | null>(null);
+  const completed = completedVersion !== null && completedVersion === todo.version;
   const done = todo.done || completed;
 
   const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
@@ -77,26 +82,24 @@ export function TodoItem({
       label={done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
       onToggle={() => {
         if (!todo.done) {
-          if (todo.repeat) {
-            // Repeating rows stay open (the server advances them) — never
-            // optimistically strike them; the write is immediate and version-checked.
-            void updateTodoAction(todo.id, { done: true }, todo.version);
-          } else {
-            setCompleted(true);
-            void completeTodoAction(todo.id, todo.version);
-          }
+          // One path for every open todo, repeating or not: record this
+          // occurrence through `completeTodoAction` (which keeps a repeating
+          // row's server state open) and strike it optimistically here. The
+          // repeating advance bumps `todo.version`, self-clearing the anchor.
+          setCompletedVersion(todo.version);
+          void completeTodoAction(todo.id, todo.version);
           showSnackbar({
             message: 'Task completed',
             actionLabel: 'Undo',
             onAction: () => {
               // No expectedVersion: the done write bumped the row's version, so a
               // version-checked PATCH would 409. This is an unconditional undo.
-              setCompleted(false);
+              setCompletedVersion(null);
               void updateTodoAction(todo.id, { done: false });
             },
           });
         } else {
-          setCompleted(false);
+          setCompletedVersion(null);
           void updateTodoAction(todo.id, { done: false }, todo.version);
         }
       }}
