@@ -147,6 +147,9 @@ export type { SnackbarProps } from './components/snackbar';
 export { SnackbarProvider, useSnackbar } from './components/snackbar-provider';
 export type { SnackbarApi, SnackbarOptions } from './components/snackbar-provider';
 
+export { Dialog } from './components/dialog';
+export type { DialogProps } from './components/dialog';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 

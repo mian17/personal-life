@@ -835,3 +835,45 @@
 .ui-snackbar__action {
   flex-shrink: 0;
 }
+
+/* -------------------------------------------------------- Dialog */
+
+/* Native `<dialog>` modal: top-layer surface (cannot be clipped by an ancestor's
+   `overflow: hidden`), Escape and focus trapping for free. The backdrop is left
+   to the platform default — styling `::backdrop` would need a colour literal,
+   which is forbidden outside tokens.css. */
+.ui-dialog {
+  width: min(100% - var(--space-2), var(--content-width));
+  padding: var(--space-1);
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.ui-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0-5);
+  margin-bottom: var(--space-1);
+}
+
+.ui-dialog__title {
+  font-size: var(--space-1-25);
+  font-weight: 700;
+  margin: 0;
+}
+
+.ui-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ui-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-0-5);
+  margin-top: var(--space-1);
+}
