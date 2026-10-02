@@ -1,7 +1,8 @@
 # Production runbook — todo-completion-history + todo-custom-repeat
 
-Scope: **64 files, two chapters**, `8cc6b98..d288927` on `feat/todo-custom-repeat`.
-Both chapters are five-lane **N/N PASS** (`tasks/five-lane-todo-completion-history.md`,
+Scope: **two chapters** — `8cc6b98..<branch tip>` on `feat/todo-custom-repeat`
+(`d288927` when this runbook was written, 64 files; the tip may be later). Both chapters are
+five-lane **N/N PASS** (`tasks/five-lane-todo-completion-history.md`,
 `tasks/five-lane-todo-custom-repeat.md`).
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
@@ -20,9 +21,15 @@ Production currently runs ≈ **`8cc6b98`** (`feat/todo-due-repeat-notify`). Evi
 | todo-service image → `todo_completion`, `repeatDays`, `custom repeat requires repeatDays` | 0 | both new chapters **absent** |
 
 ```bash
-git diff --name-only 8cc6b98 d288927 | wc -l      # → 64
-git diff --name-only 8cc6b98 d288927               # → ONLY the two chapters' files
+git log --oneline 8cc6b98..HEAD                    # → only the two chapters' commits
+git diff --name-only 8cc6b98 HEAD                  # → 64 at d288927; +1 per later doc fix
 ```
+
+> The repeat-tick **advance + undo** bug (ticked future-dated repeat re-targeted the same
+> occurrence, and a repeating row showed no Undo) is fixed on the tip after `d288927`
+> (`1e42756`): a tick steps strictly past the completed occurrence, and `done:false` on a
+> repeating todo restores it. If you deploy an earlier tip, you ship that bug. Verify with
+> `git log --oneline -1`. The runbook's boot/verify/rollback steps are unchanged.
 
 **Correction to the earlier assumption:** Select dropdowns, the importance label, and the
 row-actions `Menu` are **already deployed** — they are *not* part of this batch. The
@@ -101,7 +108,14 @@ New behavior (the two chapters):
       the row still shows the **next** occurrence (`done` stays open). This is the
       Apple-Reminders flow (lesson 0017); advance-only is a regression.
 - [ ] `/todos?done=true` → the Done view renders the completion log (title + time).
-- [ ] Unticking a one-off removes only that row; unticking a repeating todo leaves history.
+- [ ] Unticking a one-off removes only that row.
+- [ ] Tick a repeating todo → a `Task completed` / `Undo` snackbar appears (repeating fires it
+      **immediately**, one-off after its ~1s linger) and the row **stays put**. The due
+      advances **strictly past** the occurrence it just consumed — including a *future-due*
+      row in **Later**: a second tick must record a **different** occurrence, never jam on
+      the same one (that jam was bug `1e42756`).
+- [ ] Press **Undo** on that snackbar → the occurrence's row vanishes from the **Done** list,
+      the due rolls back to it, the reminder re-arms, and the row is still open.
 - [ ] Repeat field → `Custom…` → modal opens titled **Custom repeat** with the due date's
       weekday pre-ticked; tick a second day → **Confirm** → the row reads
       `Custom (Thu, Fri)`.
