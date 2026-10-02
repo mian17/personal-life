@@ -143,7 +143,9 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     per rule, lesson 0016);
     `compareTodos`/cursor use `dueSortKey`; `CachedTodoRow` carries `repeat`/`reminderScheduledAt`
     verbatim; ciphertext guards unchanged. Public `markReminded(sub, id)` clears the reminder and
-    bumps the generation (the sweep seam; `todos.module.ts` exports `TodosService`).
+    bumps the generation (the sweep seam; `todos.module.ts` exports `TodosService`). The sweep
+    clears through this seam — it never **writes** the todo table directly (it reads the due rows
+    through its own T7 repository handle).
   - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
     shared-build precondition) then `npm run typecheck -w @life/todo-service`.
     NO full suites/E2E (behavior is T8), max 2.
@@ -160,6 +162,7 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [TASK OBJECTIVE] Store the Web Push subscription and serve the VAPID public key.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed: `apps/todo-service/src/push/push-subscription.entity.ts` (new),
+      `apps/todo-service/src/push/push-subscribe.dto.ts` (new),
       `apps/todo-service/src/push/push.service.ts` (new),
       `apps/todo-service/src/push/push.controller.ts` (new),
       `apps/todo-service/src/push/push.module.ts` (new),
@@ -168,10 +171,12 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
       `apps/todo-service/src/todos/todos.controller.ts`, `apps/todo-service/src/keys/keys.module.ts`,
       `apps/todo-service/src/auth/auth.guard.ts`.
     - Strictly prohibited: every file not listed above.
-  - [IMPLEMENTATION REQUIREMENTS] `PushSubscription` entity (`endpoint` unique, `ownerSub` indexed);
-    `PushService` (`getPublicKey`, `subscribe` upsert-by-endpoint, `unsubscribe` idempotent,
-    `listFor`); `PushController` `GET key`, `POST/DELETE subscribe`; `PushModule` registered;
-    `push_subscription` outside the cache.
+  - [IMPLEMENTATION REQUIREMENTS] `PushSubscription` entity (`ownerSub` indexed, composite
+    `UNIQUE (ownerSub, endpoint)` — never endpoint alone); a decorated `PushSubscribeDto` class
+    for the `POST` body (the global `ValidationPipe` cannot validate the erased shared
+    interface); `PushService` (`getPublicKey`, `subscribe` upsert scoped by `(sub, endpoint)`,
+    `unsubscribe` idempotent, `listFor`); `PushController` `GET key`, `POST/DELETE subscribe`;
+    `PushModule` registered; `push_subscription` outside the cache.
   - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
     shared-build precondition) then `npm run typecheck -w @life/todo-service`.
     NO full suites/E2E, max 2.
@@ -197,10 +202,14 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
       bump + `markReminded`), `apps/todo-service/src/push/push.service.ts`, `apps/todo-service/src/keys/keys.service.ts`,
       `packages/cache/src/index.ts`.
     - Strictly prohibited: every file not listed above.
-  - [IMPLEMENTATION REQUIREMENTS] `PushSender` interface + `WebPushSender` (`web-push`);
-    `ReminderService.sweep()` (one DB query for `deletedAt IS NULL AND done=0 AND
-    reminderScheduledAt IS NOT NULL AND <= now`; decrypt title; send; call
-    `TodosService.markReminded(sub,id)` which clears + bumps; delete on 404/410);
+  - [IMPLEMENTATION REQUIREMENTS] `PushSender` interface
+    `send(sub, endpoint, payload) => Promise<{ endpoint; statusCode }>` (the endpoint identifies
+    the attempted subscription and is returned so the caller deletes the exact row on 404/410) +
+    `WebPushSender` (`web-push`); `ReminderService.sweep()` (one DB query through its own
+    repository handle for `deletedAt IS NULL AND done=0 AND reminderScheduledAt IS NOT NULL AND
+    <= now`; decrypt title; `send(sub, endpoint, payload)`; call `TodosService.markReminded(sub,id)`
+    which clears + bumps; delete the returned endpoint on 404/410; never writes the todo table
+    directly);
     `RemindersModule` with `setInterval(30s)` in `onModuleInit` and clear in `onModuleDestroy`;
     missing VAPID env ⇒ no-op. Env wiring for `TODO_TIMEZONE`/`TODO_VAPID_PUBLIC_KEY`/
     `TODO_VAPID_PRIVATE_KEY`/VAPID subject in both env examples + `compose.yaml`; Redis stays
@@ -233,20 +242,24 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     - Strictly prohibited: every production source file (a failing gate re-opens T5/T6/T7).
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: timed round-trip + reminder present; date-only
     09:00; repeat-requires-due 400; daily-missed advance; weekdays Fri→Mon; monthly clamp;
-    non-recurring done; clear-due clears reminder; `dueSortKey` order. Reminders: fake `PushSender`,
-    exactly-once, clear + bump, 404/410 delete, no-VAPID no-op, done/trashed skip; zero
-    `getThrough`/read-through reads during a `sweep()` (direct-DB deviation, spec Testing #8). Push endpoints:
-    key returned; subscribe upserts by endpoint (no duplicate row); delete idempotent; another `sub`
-    cannot read/affect the caller's subscriptions. Cache: `todo:all`/`todo:trash` carry both
-    fields, `enc.v1.`-only, sweep-clear bump. The two existing DTO-shape suites
-    (`todos.e2e-spec.ts` key list, `ownership.e2e-spec.ts` `todoKeys` twice) gain
-    `repeat`/`reminderScheduledAt`. No production edit to pass.
+    non-recurring done; clear-due clears reminder; `dueSortKey` order. Reminders: fake `PushSender`
+    receives `(sub, endpoint, payload)`, exactly-once, clear + bump, a 404/410 (with its
+    `endpoint`) deletes that subscription, no-VAPID no-op, done/trashed skip; zero
+    `getThrough`/read-through reads during a `sweep()` (direct-DB deviation, spec Testing #8). Push
+    endpoints: key returned; subscribe upserts scoped by `(sub, endpoint)` (no duplicate row);
+    delete idempotent; another `sub` cannot read/affect the caller's subscriptions (nor overwrite
+    a foreign row via a shared endpoint). Cache: `todo:all`/`todo:trash` carry both fields,
+    `enc.v1.`-only, sweep-clear bump. The two existing DTO-shape suites: `todos.e2e-spec.ts`'s
+    13-key list gains the two new fields → 15; `ownership.e2e-spec.ts`'s stale 11-key `todoKeys`
+    (twice) is brought to the full 15 keys (also add `important`/`effectiveImportant`). No
+    production edit to pass.
   - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` (the T2
     shared-build precondition) then
     `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] The four new suites cover every case above; the two existing key lists carry both fields.
+    - [ ] The three new suites and the two existing suites cover every case above; both existing
+          key lists are the full 15-key set.
     - [ ] The prescribed six-file command passes; typecheck passes.
     - [ ] No file outside scope modified.
   - Dependencies: T7. Size: M.
@@ -335,7 +348,8 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
       `AGENTS.md` (Contract 1 checks).
     - Strictly prohibited: every production source file (a failing test re-opens T10/T11).
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: editor payload join+repeat; row timed/repeat
-    label + no-hide recurring tick; `isUrgent` timed today/tomorrow; push-toggle branches
+    label + no-hide recurring tick; `isUrgent` timed today/tomorrow and **malformed stays false**
+    (`dueDateState` returns `'none'` for `dueDay === ''`); push-toggle branches
     (unsupported / not-installed / subscribe); the two Contract 1 greps clean; the five existing
     `todo(...)` fixtures gain the two required fields.
   - [VERIFICATION & TESTING RULES] Permitted:

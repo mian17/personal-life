@@ -261,11 +261,16 @@ than extracting it from the todo write path.
     `HH:mm`, zero-padded). Comparison is by `dueDay`.
   - `due-date-pill.tsx`: `dueDateState(value, today)` derives `overdue`/`today`/`later` by
     comparing `dueDay(value)` to `today` (day-granular, so a timed todo due earlier today is
-    `today`, not `overdue`). `todayIso` is re-exported through `index.ts` (preserved).
+    `today`, not `overdue`). **`dueDay(value) === ''` (missing/malformed) returns `'none'`** —
+    never `overdue`/`today`/`later`; `'' < today` must not silently classify a malformed date as
+    overdue. This preserves `isUrgent('not-a-date', today) === false` (`apps/app/lib/matrix.ts`
+    delegates to `dueDateState`; `apps/app/test/matrix.test.ts` asserts it). `todayIso` is
+    re-exported through `index.ts` (preserved).
   - `dueDate.tsx` is unchanged (it already delegates to `dueDateLabel`).
   - Update the two UI tests to cover: a timed value today → `dueDateState 'today'` and label
-    `Today HH:mm`; a timed value tomorrow → `Tomorrow HH:mm`; a date-only value is byte-identical
-    to today (existing assertions stay green).
+    `Today HH:mm`; a timed value tomorrow → `Tomorrow HH:mm`; a malformed value → `dueDateState
+    'none'` (not `overdue`); a date-only value is byte-identical to today (existing assertions
+    stay green).
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run test:unit -w @life/ui -- test/format-date.test.ts test/due-date-pill.test.tsx`
@@ -385,8 +390,9 @@ than extracting it from the todo write path.
       keep `done=false`, bump `version` once. A non-recurring `done:true` is unchanged.
     - **Sweep seam (public, unconditional):** `markReminded(sub: string, id: string): Promise<void>`
       on `TodosService` clears the todo's `reminderScheduledAt` and bumps the owner's generation
-      counter (after the write). T7's sweep calls this seam — the sweep never writes the todo
-      table directly and never imports the repository.
+      counter (after the write). T7's sweep calls this seam to clear a fired reminder — the sweep
+      never **writes** the todo table directly; it holds its **own** repository handle for the
+      read-only due-row query (T7).
     - `compareTodos` and the cursor (`encodeCursor`/`decodeCursor`/`afterCursor`) use
       `dueSortKey(dto.dueDate, tz)` (D3) instead of the raw `dueDate`; `OrderedTodo.due` becomes
       the sort key. Cursor payload shape stays `base64(<due sort key>|<createdAt>|<id>)`.
@@ -421,6 +427,7 @@ than extracting it from the todo write path.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/todo-service/src/push/push-subscription.entity.ts` (new),
+    `apps/todo-service/src/push/push-subscribe.dto.ts` (new),
     `apps/todo-service/src/push/push.service.ts` (new),
     `apps/todo-service/src/push/push.controller.ts` (new),
     `apps/todo-service/src/push/push.module.ts` (new),
@@ -432,13 +439,21 @@ than extracting it from the todo write path.
 
 [IMPLEMENTATION REQUIREMENTS]
   - Entity `PushSubscription` (`@Entity('push_subscription')`): `id` uuid PK, `ownerSub` (indexed),
-    `endpoint` unique, `p256dh`, `auth`, `createdAt`; registered in `app.module.ts` `entities`.
+    **composite `@Unique(['ownerSub', 'endpoint'])`** (never a global endpoint unique — a global
+    unique would let a foreign `sub` upsert over another owner's row), `p256dh`, `auth`,
+    `createdAt`; registered in `app.module.ts` `entities`.
+  - New `PushSubscribeDto` class (`push-subscribe.dto.ts`), decorated (`@IsString`/`@ValidateNested`
+    + `class-validator`/`class-transformer`), mirroring the shared `PushSubscribeInput`
+    interface — a decorated class is required because the global
+    `ValidationPipe({ whitelist, transform, forbidNonWhitelisted })` cannot validate an erased
+    TypeScript interface (an interface-typed body accepts arbitrary payloads).
   - `PushService`: `getPublicKey(): { publicKey: string }` (from `TODO_VAPID_PUBLIC_KEY`);
-    `subscribe(sub, input: PushSubscribeInput)` upsert-by-endpoint for that `sub`;
+    `subscribe(sub, input: PushSubscribeInput)` upsert **scoped by `(sub, endpoint)`** for that
+    caller (a second caller can never overwrite a foreign row via a shared endpoint);
     `unsubscribe(sub, endpoint)` idempotent delete; `listFor(sub)` (used by the reminders module
     within the process).
   - `PushController` (`@Controller('api/push')`, guarded): `GET key` → public key;
-    `POST subscribe` (body `PushSubscribeInput`) → `{ok:true}`; `DELETE subscribe`
+    `POST subscribe` (body `PushSubscribeDto`) → `{ok:true}`; `DELETE subscribe`
     (body `{endpoint}`) → `{ok:true}`. Static paths only; no `:id` collision.
   - `PushModule` imports `TypeOrmModule.forFeature([PushSubscription])`, exports `PushService`;
     registered in `app.module.ts`.
@@ -450,8 +465,10 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The three routes exist with the exact paths/methods; subscribe upserts by endpoint.
-  - [ ] The entity is registered and `PushService` is exported.
+  - [ ] The three routes exist with the exact paths/methods; subscribe upserts scoped by
+        `(sub, endpoint)`; the composite unique is on the entity.
+  - [ ] `PushSubscribeDto` is a decorated class (not the bare interface); the entity is registered
+        and `PushService` is exported.
   - [ ] `npm run typecheck -w @life/todo-service` passes; no file outside scope modified.
 
 ### T7 — Reminders sweep + sender (module `todo-due-repeat-notify`)
@@ -478,16 +495,22 @@ than extracting it from the todo write path.
     T5's `markReminded` seam is not touched).
 
 [IMPLEMENTATION REQUIREMENTS]
-  - `PushSender` interface: `send(sub: string, payload: { title: string; body: string; url: string }): Promise<{ statusCode: number }>`.
-    Production `WebPushSender` wraps `web-push` (`setVapidDetails` from `TODO_VAPID_*`, `sendNotification`);
-    a `404`/`410` result is surfaced so the caller deletes that subscription.
+  - `PushSender` interface:
+    `send(sub: string, endpoint: string, payload: { title: string; body: string; url: string }): Promise<{ endpoint: string; statusCode: number }>`.
+    The endpoint identifies the subscription being attempted and is returned alongside the
+    `statusCode`, so the caller can delete the exact row on `404`/`410`. Production
+    `WebPushSender` wraps `web-push` (`setVapidDetails` from `TODO_VAPID_*`, `sendNotification`
+    against the subscription identified by `endpoint`); a `404`/`410` result is surfaced so the
+    caller deletes **that** subscription.
   - `ReminderService.sweep(): Promise<number>` — one DB query
     `todo.deletedAt IS NULL AND todo.done = 0 AND todo.reminderScheduledAt IS NOT NULL AND todo.reminderScheduledAt <= nowIso`
-    (repository find with `LessThanOrEqual`); for each due row: decrypt `title` in-request, build
-    the payload, `PushSender.send` to every subscription of the owner, then call the T5
-    `TodosService.markReminded(sub, id)` seam (which clears `reminderScheduledAt` and bumps the
-    owner's generation counter after the write). Returns the fired count. A `404`/`410` deletes
-    that subscription and continues. The sweep never writes the todo table directly.
+    (its **own** repository handle for the read query: find with `LessThanOrEqual` over
+    `todo.reminderScheduledAt`); for each due row: decrypt `title` in-request, build the payload,
+    `PushSender.send(sub, endpoint, payload)` to every subscription of the owner, then call the
+    T5 `TodosService.markReminded(sub, id)` seam (which clears `reminderScheduledAt` and bumps
+    the owner's generation counter after the write). Returns the fired count. A `404`/`410`
+    deletes the subscription named by the returned `endpoint` and continues. The sweep never
+    **writes** the todo table directly (the clear goes through `markReminded`).
   - Env wiring: `TODO_TIMEZONE` (IANA name, default `Asia/Ho_Chi_Minh`), `TODO_VAPID_PUBLIC_KEY`,
     `TODO_VAPID_PRIVATE_KEY`, and the VAPID subject/contact var (e.g. `TODO_VAPID_SUBJECT`) are
     added to `.env.example`, `.env.development.example`, and `compose.yaml` (service environment).
@@ -510,8 +533,9 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; typecheck + build only; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `sweep()` fires once per due row, calls `markReminded` (clears + bumps), and skips
-        `done`/trashed/null-reminder rows.
+  - [ ] `sweep()` fires once per due row, calls `markReminded` (clears + bumps), skips
+        `done`/trashed/null-reminder rows, and deletes the exact subscription named by the
+        `PushSender`-returned `endpoint` on a `404`/`410`.
   - [ ] Missing VAPID env ⇒ no-op (no crash).
   - [ ] The four env vars are documented/wired in both env examples and `compose.yaml`; Redis stays
         compose-injected only; `package-lock.json` is updated.
@@ -529,7 +553,8 @@ than extracting it from the todo write path.
     `apps/todo-service/test/push.e2e-spec.ts` (new),
     `apps/todo-service/test/todo-cache.e2e-spec.ts`,
     `apps/todo-service/test/todos.e2e-spec.ts` (existing DTO-shape key list),
-    `apps/todo-service/test/ownership.e2e-spec.ts` (existing `todoKeys` list, asserted twice).
+    `apps/todo-service/test/ownership.e2e-spec.ts` (existing stale 11-key `todoKeys` list,
+    asserted twice — brought to the full 15-key set).
   - Reference files (read-only): `apps/todo-service/test/todo-harness.ts`,
     `apps/todo-service/test/fake-redis.ts`, `apps/todo-service/test/setup-env.ts`.
   - Strictly prohibited files: every production source file (a failing gate re-opens T5/T6/T7).
@@ -542,20 +567,25 @@ than extracting it from the todo write path.
     a non-recurring `done:true` marks done; clearing the due clears the reminder; `dueSortKey`
     ordering (a timed value sorts by its local day).
   - `reminders.e2e-spec.ts`: inject a fake `PushSender`; a due row fires exactly once, the fake
-    receives one payload, `reminderScheduledAt` is cleared, and the generation bumps; a
-    `404`/`410` deletes that subscription; no VAPID env ⇒ no-op; a `done`/trashed row is skipped.
+    receives one payload (with the subscription's `endpoint`), `reminderScheduledAt` is cleared,
+    and the generation bumps; a `404`/`410` (returned with its `endpoint`) deletes **that**
+    subscription; no VAPID env ⇒ no-op; a `done`/trashed row is skipped.
     **Direct-DB deviation (spec Testing #8):** spy/capture the cache and assert **zero**
     read-through reads (`getThrough`) occur during a `sweep()` call — the sweep path reads the
-    DB directly, bypassing the cache, and only the `markReminded` generation bump touches it.
-  - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; subscribe upserts by endpoint for the
-    caller's `sub` (no duplicate row on repeat subscribe); delete is idempotent (unknown endpoint
-    still 200); another `sub` cannot read or affect the caller's subscriptions.
+    DB directly through its own repository handle, bypassing the cache, and only the
+    `markReminded` generation bump touches it.
+  - `push.e2e-spec.ts`: `GET /api/push/key` returns a key; subscribe upserts scoped by
+    `(sub, endpoint)` for the caller (no duplicate row on repeat subscribe); delete is idempotent
+    (unknown endpoint still 200); another `sub` cannot read or affect the caller's subscriptions,
+    **and cannot overwrite the caller's row via a shared endpoint** (composite uniqueness).
   - `todo-cache.e2e-spec.ts`: the `todo:all`/`todo:trash` serialized values carry
     `repeat`/`reminderScheduledAt`; content fields remain `enc.v1.`-only and the no-known-plaintext
     assertions still pass; the invalidation table gains the sweep-clear bump.
-  - **Existing DTO-shape assertions (the two new read fields):** `todos.e2e-spec.ts`'s
-    `Object.keys(created.body).sort()` list and `ownership.e2e-spec.ts`'s `todoKeys` array
-    (asserted twice) gain `repeat` and `reminderScheduledAt`.
+  - **Existing DTO-shape assertions:** `todos.e2e-spec.ts`'s 13-key
+    `Object.keys(created.body).sort()` list gains `repeat`/`reminderScheduledAt` → 15;
+    `ownership.e2e-spec.ts`'s stale 11-key `todoKeys` array (asserted twice) is brought to the
+    **full 15-key** set — it must also add `important` and `effectiveImportant`, not just the two
+    new fields; appending only two would leave it at 13 and fail against the 15-key response.
   - No production file may be edited to make a test pass.
 
 [VERIFICATION & TESTING RULES]
@@ -565,8 +595,10 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; only these named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The four new suites cover every behavior above; the two existing suites' key lists
-        include `repeat`/`reminderScheduledAt`.
+  - [ ] The **three new suites** (`todos-due-repeat`, `reminders`, `push`) and the **two
+        existing suites** (`todo-cache`, `todos`/`ownership`) cover every behavior above; both
+        existing DTO-shape key lists are the full 15-key set (with `repeat`/
+        `reminderScheduledAt`).
   - [ ] The prescribed six-file test command passes.
   - [ ] `npm run typecheck -w @life/todo-service` passes with zero errors.
   - [ ] No file outside scope modified.
@@ -733,7 +765,9 @@ than extracting it from the todo write path.
   - `todo-item.test.tsx`: the row renders a timed label and a `repeatLabel`; a recurring tick does
     not set the `collapsing`/`hide` state.
   - `matrix.test.ts`: `isUrgent` is true for a timed value due today and a timed value due
-    tomorrow; unchanged for date-only.
+    tomorrow; unchanged for date-only; **a missing/malformed date stays `false`** (the existing
+    `isUrgent('not-a-date', TODAY) === false` assertion must remain green — the `dueDateState`
+    refactor returns `'none'` for `dueDay === ''`).
   - `push-toggle.test.tsx` (new): the three push-toggle branches — unsupported (no `PushManager`)
     renders guidance and no control; not-installed (`!navigator.standalone`) renders the add-to-
     Home-Screen guidance; supported+installed renders the `Switch` and the subscribe path calls
@@ -753,7 +787,8 @@ than extracting it from the todo write path.
     max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The four suites cover the listed cases and pass; the five existing fixture helpers carry
+  - [ ] The four suites cover the listed cases (including a malformed date → `isUrgent false`,
+        `dueDateState 'none'`) and pass; the five existing fixture helpers carry
         `repeat: null`/`reminderScheduledAt: null` and typecheck.
   - [ ] The two mechanical greps are clean.
   - [ ] `npm run typecheck -w @life/app` passes; no file outside scope modified.
@@ -802,8 +837,9 @@ than extracting it from the todo write path.
     - todo-service source: `apps/todo-service/src/todos/due-time.ts`, `recurrence.ts`,
       `todos.service.ts`, `todos.controller.ts`, `todos.module.ts`,
       `dto/create-todo.dto.ts`, `dto/update-todo.dto.ts`, `todo.entity.ts`;
-      `apps/todo-service/src/push/push-subscription.entity.ts`, `push.service.ts`,
-      `push.controller.ts`, `push.module.ts`; `apps/todo-service/src/reminders/reminder.service.ts`,
+      `apps/todo-service/src/push/push-subscription.entity.ts`, `push-subscribe.dto.ts`,
+      `push.service.ts`, `push.controller.ts`, `push.module.ts`;
+      `apps/todo-service/src/reminders/reminder.service.ts`,
       `push-sender.ts`, `reminders.module.ts`; `apps/todo-service/src/app.module.ts`;
       `apps/todo-service/package.json`.
     - todo-service tests: `apps/todo-service/test/due-time.test.ts`, `recurrence.test.ts`,
