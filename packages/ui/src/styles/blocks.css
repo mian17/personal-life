@@ -245,9 +245,11 @@
 /* Row delete action: a compact icon button instead of the default 48px tap
    square — same inner padding on all sides, a small right inset so the glyph
    does not sit flush to the row edge, and a highlight rounded to the row radius
-   (`--radius-lg`) so the tap/focus ring follows the row corner. The leading
-   checkbox (`IconButton`, not in a form) is untouched. */
-.ui-list-item form .ui-btn--icon {
+   (`--radius-lg`) so the tap/focus ring follows the row corner. Targets the
+   `danger` delete control at any size (todo/note row `size="icon"` and the trash
+   page's default-size `ConfirmButton`); the quiet Restore button and the leading
+   checkbox (`IconButton`, not a `.ui-btn`) are untouched. */
+.ui-list-item form .ui-btn--danger {
   width: auto;
   min-width: 0;
   height: auto;
