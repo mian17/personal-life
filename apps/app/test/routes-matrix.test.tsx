@@ -85,7 +85,7 @@ describe('/todos/matrix page wiring', () => {
     const el = await TodosMatrixPage();
 
     expect(el.type).toBe(ListShell);
-    expect(el.props.title).toBe('Todos');
+    expect(el.props.title).toBe('Matrix');
     const block = el.props.body;
     expect(block.type).toBe(MatrixBlock);
 

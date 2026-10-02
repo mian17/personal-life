@@ -344,7 +344,7 @@ export default async function TodosMatrixPage() {
 
   return (
     <ListShell
-      title="Todos"
+      title="Matrix"
       navTrailing={<TodosNav />}
       tabs={
         <TabBar aria-label="Todos views">
