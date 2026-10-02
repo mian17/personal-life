@@ -11,7 +11,7 @@ Contracts: `AGENTS.md` Contract 1 (Shared UI) and Contract 2 (BE → cache → D
 Governing prior decisions read before writing (lesson 0012): `docs/intent/redis-shared-state.md`
 decision 3, `docs/specs/MAP-redis.md`, `docs/specs/MAP-todo-ecosystem.md`, lesson 0003
 (frontend dates), 0011 (per-service Redis), 0012 (cross-chapter invariants), 0014 (visible
-labels / page chrome), 0015 (size the process).
+labels / page chrome), 0015 (size the process), 0016 (one owner per rule).
 
 ## Objective
 
@@ -248,7 +248,10 @@ sibling fields (lesson 0014).
 - **Editor (`apps/app/app/todo-editor.tsx`):**
   - `PillGroup label="Due"` keeps the frozen `Input type="date"` (`aria-label="Due date"`).
   - New `PillGroup label="Time"` wraps an `Input type="time"` (`aria-label="Due time"`) —
-    empty ⇒ date-only; present ⇒ timed. The editor joins them into
+    empty ⇒ date-only; present ⇒ timed. The editor's `dueTime` state is seeded from a timed due
+    via the single `@life/ui` owner `localTimePart(todo.dueDate)` (date-only/missing → `''`), so no
+    app-side `new Date(...)` re-derives the local time (Contract 1 Rule 3 / lesson 0016). The editor
+    joins them into
     `dueDate = 'YYYY-MM-DDTHH:mm'` (or the date alone) for the write; the service normalizes.
   - New `PillGroup label="Repeat"` composed of `Pill as="button" size="chip"` options
     (`None`/`Daily`/`Weekly`/`Monthly`/`Yearly`/`Weekdays`) — **reuses the existing `Pill`
@@ -267,19 +270,25 @@ sibling fields (lesson 0014).
 - **`@life/ui` formatter (lesson 0003 — one helper owns date formatting):**
   - New low-level `packages/ui/src/lib/date-parts.ts` owns `todayIso`, `dueDay(value)` → the
     **local calendar day** `YYYY-MM-DD` from either a date-only string (read the parts directly
-    — no `Date`) or a UTC instant (local parts via `Date`), and the leading-date `datePart`
-    helper. `format-date.ts` and `due-date-pill.tsx` both import from it (this breaks the
+    — no `Date`) or a UTC instant (local parts via `Date`), the leading-date `datePart`
+    helper, and `localTimePart(value)` → the local `HH:mm` for a timed value (`''` otherwise).
+    `localTimePart` is the single owner of the timed local time part: `dueDateLabel` uses it and
+    the editor consumes it to seed `dueTime` — no second formatter re-derives `new Date(...)`
+    (Contract 1 Rule 3 / lesson 0016). `format-date.ts` and `due-date-pill.tsx` both import from it
+    (this breaks the
     existing `format-date → due-date-pill` import cycle); `due-date-pill.tsx` **re-exports**
     `todayIso` (`export { todayIso } from '../lib/date-parts';`) so its existing consumers —
     `due-date.tsx` (imports `dueDateState` + `todayIso`) and `packages/ui/test/format-date.test.ts`
     (imports `todayIso` from `../src/components/due-date-pill`) — keep working unchanged
-    (`due-date.tsx` stays out of scope); `index.ts` keeps re-exporting `todayIso` **and `dueDay`**
+    (`due-date.tsx` stays out of scope); `index.ts` keeps re-exporting `todayIso` **and `dueDay`
+    and `localTimePart`**
     from the new module so the public surface is preserved. `dueDay` is used by
     `dueDateState`, `dueDateLabel`, and matrix `isUrgent`; grouping consumes it transitively
     (`groupTodos` → `dueDateState` → `dueDay`, `apps/app/lib/todo-groups.ts` stays out of scope).
   - `dueDateLabel(value, today?)` → `Today`/`Tomorrow`/`dd/mm/yyyy` for date-only (unchanged)
-    and `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value. A
-    missing/malformed value (`duePart === ''`) renders `No date` (not a raw/garbage string).
+    and `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value (time via
+    `localTimePart`). A
+    missing/malformed value (`dueDay(value) === ''`) renders `No date` (not a raw/garbage string).
   - `dueDateState(value, today)` compares `dueDay(value)` to `today` **day-granular**; when
     `dueDay(value) === ''` (missing/malformed) it returns `'none'`, so a malformed date is
     never classified `overdue`/`today`/`later`. This preserves the frozen
@@ -331,8 +340,9 @@ Test:      npm run test:unit -w @life/todo-service -- test/due-time.test.ts test
 Build:     npm run build -w @life/shared && npm run build -w @life/todo-service
 ```
 
-The `npm run build -w @life/shared` precondition is stated here once and referenced by T4–T8
-in the plan/ledger; every `npm run typecheck -w @life/todo-service` runs after it.
+The `npm run build -w @life/shared` precondition is stated here once and referenced by T4–T12
+in the plan/ledger; every `npm run typecheck -w @life/todo-service` and
+`npm run typecheck -w @life/app` runs after it.
 
 ## Testing Strategy
 
@@ -370,10 +380,13 @@ in the plan/ledger; every `npm run typecheck -w @life/todo-service` runs after i
     15. `ownership.e2e-spec.ts`'s `todoKeys` is stale at 11 and must be brought to the full
     15-key set — adding `important`, `effectiveImportant`, `repeat`, `reminderScheduledAt` —
     because it is asserted against the same response twice; appending only the two new fields
-    (→ 13) would fail. The five existing app fixtures (`todo-groups.test.ts`,
+    (→ 13) would fail. The app test `Todo` literals are migrated in **T2** to carry
+    `repeat: null`/`reminderScheduledAt: null` — the five existing fixtures (`todo-groups.test.ts`,
     `todo-query.test.ts`, `routes-todos-list.test.tsx`, `routes-matrix.test.tsx`,
-    `routes-todos-trash.test.tsx`) add `repeat: null`/`reminderScheduledAt: null` to their
-    `todo(...)` helpers so `npm run typecheck -w @life/app` compiles.
+    `routes-todos-trash.test.tsx`) plus the three files T10/T12 edit additively
+    (`todo-item.test.tsx`, `routes-todo-edit.test.tsx`, `matrix.test.ts`). Because
+    `apps/app/tsconfig.json` includes `**/*.ts`/`**/*.tsx` (only `test/e2e/**` is excluded), the
+    migration is due in T2, before the first `npm run typecheck -w @life/app`.
 
 ## Boundaries
 

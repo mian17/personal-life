@@ -8,7 +8,7 @@ Specs/maps amended in this chapter: `docs/specs/SPEC-todo-service.md`, `docs/spe
 Ledger: `tasks/todo-todo-due-repeat-notify.md`.
 Governing intent: `docs/intent/todo-due-repeat-notify.md` (N1–N5).
 Prior decisions read before planning (lesson 0012): `docs/intent/redis-shared-state.md` dec. 3,
-`docs/specs/MAP-redis.md`, `docs/specs/MAP-todo-ecosystem.md`, lessons 0003/0011/0012/0014/0015.
+`docs/specs/MAP-redis.md`, `docs/specs/MAP-todo-ecosystem.md`, lessons 0003/0011/0012/0014/0015/0016.
 
 Process: global protocol §3 (testing policy), §5 (mandatory task template), §6 (plan-validation
 gate), §7 (review), §7.6 (five-lane for feature work). Every task is in §5 template form.
@@ -50,8 +50,8 @@ than extracting it from the todo write path.
   is system-side and per-owner cache state is stale/fail-open, so the sweep is the one documented
   exception to "DB behind cache"; it serves no user read and invalidates the owner's cache after
   clearing a fired reminder.
-- D8: **Push subscription** — `push_subscription(endpoint UNIQUE, p256dh, auth, ownerSub)` stores
-  delivery capability only, outside the cache; `GET /api/push/key`, `POST/DELETE /api/push/subscribe`.
+- D8: **Push subscription** — `push_subscription(UNIQUE (ownerSub, endpoint), p256dh, auth, ownerSub)`
+  stores delivery capability only, outside the cache; `GET /api/push/key`, `POST/DELETE /api/push/subscribe`.
 - D9: **Payload privacy (deliberate)** — the push payload carries the decrypted title and transits
   Apple's push service; recorded decision; never persisted; upgrade path = generic body + in-app
   fetch. `@life/crypto` still owns all at-rest content.
@@ -72,8 +72,9 @@ than extracting it from the todo write path.
 - [ ] `grep -n "Due time" docs/specs/SPEC-todo-ui.md` non-empty.
 
 ### Phase 2 — Shared + UI date model
-- [ ] T2: `@life/shared` wire types (`TodoRepeat`, `repeat`, `reminderScheduledAt`, push input).
-- [ ] T3: `@life/ui` date helpers (`dueDay`, timed `dueDateLabel`, day-granular `dueDateState`).
+- [ ] T2: `@life/shared` wire types (`TodoRepeat`, `repeat`, `reminderScheduledAt`, push input) +
+      app test literal migration.
+- [ ] T3: `@life/ui` date helpers (`dueDay`, `localTimePart`, timed `dueDateLabel`, day-granular `dueDateState`).
 
 ### Checkpoint: Shared + UI
 - [ ] `npm run typecheck -w @life/shared` exits 0.
@@ -104,8 +105,8 @@ than extracting it from the todo write path.
 - [ ] `npm run build -w @life/todo-service` exits 0.
 
 ### Phase 6 — Backend tests
-- [ ] T8: due/repeat/reminder/advance behavior suite + reminders sweep suite + cache additions +
-      the two existing DTO-shape suites.
+- [ ] T8: due/repeat/reminder/advance behavior suite + reminders sweep suite + push subscription
+      suite + cache additions + the three existing suites (`todo-cache`, `todos`, `ownership`).
 
 ### Checkpoint: Backend tests
 - [ ] `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts` green.
@@ -122,7 +123,7 @@ than extracting it from the todo write path.
 - [ ] T11: settings "Reminders" block + `PushToggle` + static `sw.js`.
 
 ### Checkpoint: App UI
-- [ ] `npm run typecheck -w @life/app` exits 0.
+- [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` exits 0.
 - [ ] `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts` green.
 - [ ] Contract 1 mechanical greps clean.
 
@@ -184,14 +185,22 @@ than extracting it from the todo write path.
   - [ ] MAP-todo-ecosystem row reconciled; MAP-redis records `redis-todo` ownership unchanged.
   - [ ] No placeholder or contradictory "v2/deferred recurrence" text remains.
 
-### T2 — Shared wire types (module `todo-due-repeat-notify`)
+### T2 — Shared wire types + app literal migration (module `todo-due-repeat-notify`)
 
 [TASK OBJECTIVE]
   Add the `TodoRepeat` type and the `repeat`/`reminderScheduledAt` wire fields, plus the push
-  subscription input type, to `@life/shared`.
+  subscription input type, to `@life/shared`; and migrate every app test `Todo` literal to the
+  two required-but-nullable fields so the app compiles against the new read type.
 
 [SCOPE & REPOSITORY CONTEXT]
-  - Allowed files to edit/create: `packages/shared/src/index.ts`.
+  - Allowed files to edit/create: `packages/shared/src/index.ts`, and the eight app test
+    files whose `Todo` object literals gain the two required fields —
+    `apps/app/test/todo-item.test.tsx`, `apps/app/test/routes-todo-edit.test.tsx`,
+    `apps/app/test/matrix.test.ts` (the files T10/T12 edit additively), plus the five
+    existing fixtures `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
+    `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
+    `apps/app/test/routes-todos-trash.test.tsx` (each `todo(...)` helper gains `repeat: null`
+    and `reminderScheduledAt: null`; no other fixture change).
   - Reference files (read-only): `packages/shared/src/index.ts` (the `Todo`/`List` precedent),
     `apps/todo-service/src/todos/dto/create-todo.dto.ts`,
     `apps/todo-service/src/todos/dto/update-todo.dto.ts`.
@@ -206,27 +215,39 @@ than extracting it from the todo write path.
   - `interface UpdateTodoInput`: add `repeat?: TodoRepeat | null;` (optional; `null` clears).
   - Add `export interface PushSubscribeInput { endpoint: string; keys: { p256dh: string; auth: string } }`.
   - No other signature changes.
+  - **Same task, after the type lands:** every `Todo` object literal in the eight named app
+    test files gains `repeat: null` and `reminderScheduledAt: null`. `apps/app/tsconfig.json`
+    includes `**/*.ts`/`**/*.tsx` (only `test/e2e/**` is excluded), so `npm run typecheck -w @life/app`
+    compiles these fixtures; `ts-jest` (under `tsconfig.test.json`) also type-checks them. Without
+    this migration the shared `Todo` change breaks the first `npm run typecheck -w @life/app`
+    (`T9`), before T10/T11/T12 ever run.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/shared`.
-  - **Shared-build precondition (stated once here; referenced by T4–T8):** every consumer
+  - Permitted test command: `npm run typecheck -w @life/shared` and, after the app literals are
+    migrated, `npm run build -w @life/shared` (the shared-build precondition) then
+    `npm run typecheck -w @life/app`.
+  - **Shared-build precondition (stated once here; referenced by T4–T12):** every consumer
     resolves `@life/shared` through `node_modules` to `packages/shared/dist/index.d.ts`
     (`packages/shared/package.json` `"types"`). `npm run typecheck -w @life/shared` never emits
     `dist`, so run `npm run build -w @life/shared` before any downstream
-    `npm run typecheck -w @life/todo-service` (T4–T8); T9–T13 repeat it in their own commands.
+    `npm run typecheck -w @life/todo-service` or `npm run typecheck -w @life/app`; T4–T12 repeat
+    it in their own commands.
   - Strict constraints: NO full suites, NO E2E; typecheck only; max test executions: 2.
 
 [DEFINITION OF DONE]
   - [ ] `TODO_REPEATS`, `TodoRepeat`, the three `repeat` fields, `reminderScheduledAt`, and
         `PushSubscribeInput` exist exactly as specified.
-  - [ ] `npm run typecheck -w @life/shared` passes with zero errors.
+  - [ ] Every `Todo` literal in the eight named app test files carries `repeat: null` and
+        `reminderScheduledAt: null`.
+  - [ ] `npm run typecheck -w @life/shared` and (after `npm run build -w @life/shared`)
+        `npm run typecheck -w @life/app` pass with zero errors.
   - [ ] No files outside the allowed scope were modified.
 
 ### T3 — UI date helpers (module `todo-due-repeat-notify`)
 
 [TASK OBJECTIVE]
-  Make one `@life/ui` helper own the local day and the timed/date label, so grouping, state and
-  the row render a timed due correctly without app-side parsing.
+  Make one `@life/ui` helper own the local day, the local time part, and the timed/date label, so
+  grouping, state, the row, and the editor render a timed due correctly without app-side parsing.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `packages/ui/src/lib/date-parts.ts` (new),
@@ -239,26 +260,33 @@ than extracting it from the todo write path.
 
 [IMPLEMENTATION REQUIREMENTS]
   - Primitive reuse plan (Contract 1): no new visual primitive; this is the existing
-    `formatDate`/`dueDateLabel`/`dueDateState`/`todayIso` surface only.
+    `formatDate`/`dueDateLabel`/`dueDateState`/`todayIso` surface plus the new low-level date/time
+    helpers.
   - **Import-cycle fix:** `format-date.ts` currently imports `todayIso` from
     `./due-date-pill`; adding `dueDay` (used by `due-date-pill.tsx`) would create a cycle.
     Add `packages/ui/src/lib/date-parts.ts` (new, low level) exporting `todayIso`,
-    `dueDay`, and the leading-`YYYY-MM-DD` `datePart` helper. `format-date.ts` and
+    `dueDay`, `datePart`, and `localTimePart`. `format-date.ts` and
     `due-date-pill.tsx` both import from it. `due-date-pill.tsx` **re-exports** `todayIso`
     (`export { todayIso } from '../lib/date-parts';`) so its existing consumers —
     `due-date.tsx` (which imports both `dueDateState` and `todayIso`) and
     `packages/ui/test/format-date.test.ts` (`import { todayIso } from '../src/components/due-date-pill'`)
     — keep working unchanged; `due-date.tsx` is **not** in scope. `index.ts` keeps re-exporting
-    `todayIso` (`from './components/due-date-pill'` or the new module) **and `dueDay`** from the
-    new module, so the public surface is preserved (and `dueDay` is consumable by the app).
+    `todayIso` (`from './components/due-date-pill'` or the new module), **and `dueDay` and
+    `localTimePart`** from the new module, so the public surface is preserved and both helpers
+    are consumable by the app.
   - `date-parts.ts`: `export function dueDay(value: string | null | undefined): string` →
     the local calendar day `YYYY-MM-DD`; date-only (`^\d{4}-\d{2}-\d{2}$`) returns its own parts
     (no `Date`); a timed instant returns its **local** parts via `new Date(value)` (local getters).
     Missing/malformed → `''`. `todayIso` and `datePart` move here unchanged.
+  - `date-parts.ts`: `export function localTimePart(value: string | null | undefined): string` →
+    the local `HH:mm` (zero-padded) for a **timed** value, and `''` for a date-only/missing/malformed
+    value. This is the single owner of the timed local time part; `dueDateLabel` uses it internally
+    and the editor (T10) consumes it to seed its `dueTime` state from a timed due — no app or
+    second formatter re-derives `new Date(...)` (Contract 1 Rule 3 / lesson 0016).
   - `format-date.ts`: keeps `formatDate`/`dueDateLabel`; `dueDateLabel(value, today?)` keeps
     `No date`/`Today`/`Tomorrow`/`dd/mm/yyyy` for date-only and adds
-    `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value (time via local
-    `HH:mm`, zero-padded). Comparison is by `dueDay`.
+    `Today HH:mm` / `Tomorrow HH:mm` / `dd/mm/yyyy HH:mm` for a timed value (time via
+    `localTimePart(value)`). Comparison is by `dueDay`.
   - `due-date-pill.tsx`: `dueDateState(value, today)` derives `overdue`/`today`/`later` by
     comparing `dueDay(value)` to `today` (day-granular, so a timed todo due earlier today is
     `today`, not `overdue`). **`dueDay(value) === ''` (missing/malformed) returns `'none'`** —
@@ -268,7 +296,8 @@ than extracting it from the todo write path.
     re-exported through `index.ts` (preserved).
   - `dueDate.tsx` is unchanged (it already delegates to `dueDateLabel`).
   - Update the two UI tests to cover: a timed value today → `dueDateState 'today'` and label
-    `Today HH:mm`; a timed value tomorrow → `Tomorrow HH:mm`; a malformed value → `dueDateState
+    `Today HH:mm`; a timed value tomorrow → `Tomorrow HH:mm`; `localTimePart` returns the local
+    `HH:mm` for a timed value and `''` for a date-only value; a malformed value → `dueDateState
     'none'` (not `overdue`); a date-only value is byte-identical to today (existing assertions
     stay green).
 
@@ -278,7 +307,8 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; only these two named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] `dueDay` is exported and is the single day-derivation helper; `todayIso` stays exported
+  - [ ] `dueDay` is exported and is the single day-derivation helper; `localTimePart` is exported
+        and is the single timed local-time helper; `todayIso` stays exported
         from `@life/ui` (via `due-date-pill.tsx`'s re-export of `date-parts.ts`) and its existing
         importers (`due-date.tsx`, `format-date.test.ts`) compile unchanged.
   - [ ] Date-only behavior is unchanged (existing tests still pass).
@@ -595,8 +625,8 @@ than extracting it from the todo write path.
   - Strict constraints: NO full suites, NO E2E; only these named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The **three new suites** (`todos-due-repeat`, `reminders`, `push`) and the **two
-        existing suites** (`todo-cache`, `todos`/`ownership`) cover every behavior above; both
+  - [ ] The **three new suites** (`todos-due-repeat`, `reminders`, `push`) and the **three
+        existing suites** (`todo-cache`, `todos`, `ownership`) cover every behavior above; both
         existing DTO-shape key lists are the full 15-key set (with `repeat`/
         `reminderScheduledAt`).
   - [ ] The prescribed six-file test command passes.
@@ -654,7 +684,7 @@ than extracting it from the todo write path.
     `apps/app/app/todo-item.tsx`, `apps/app/lib/matrix.ts`,
     `apps/app/lib/todo-repeat-label.ts` (new; app copy).
   - Reference files (read-only): `packages/ui/src/index.ts` (`Input`, `PillGroup`, `Pill`,
-    `Switch`, `dueDay`, `dueDateLabel`, `dueDateState`), `apps/app/lib/todo-groups.ts`,
+    `Switch`, `dueDay`, `localTimePart`, `dueDateLabel`, `dueDateState`), `apps/app/lib/todo-groups.ts`,
     `docs/specs/SPEC-todo-ui.md`.
   - Strictly prohibited files: every file not listed above (no `packages/ui` edit, no settings
     page, no e2e spec).
@@ -669,7 +699,9 @@ than extracting it from the todo write path.
     e.g. `daily` → `Daily`, `weekdays` → `Weekdays`). It is app-owned because `@life/ui` has no
     `@life/shared` dependency — do not put it in `@life/ui`. Consumed by the row and the editor
     option labels.
-  - `todo-editor.tsx`: add `dueTime` state seeded from a timed due; `PillGroup label="Time"`
+  - `todo-editor.tsx`: add `dueTime` state seeded from a timed due via the single
+    `@life/ui` owner `localTimePart(todo.dueDate)` (date-only/missing → `''`, so no app-side
+    `new Date(...)` re-derivation — lesson 0016); `PillGroup label="Time"`
     (`Input type="time" aria-label="Due time"`); `PillGroup label="Repeat"` with the six options
     (`aria-pressed`, active); the save payload joins date+time into `dueDate = 'YYYY-MM-DDTHH:mm'`
     (or the date alone when no time) and carries `repeat` (null for None). The `PillGroup label="Due"`/
@@ -685,15 +717,18 @@ than extracting it from the todo write path.
     comparison (using `dueDateState` + `dueDay`) so a timed "tomorrow" is still urgent.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run typecheck -w @life/app` and
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run typecheck -w @life/app` and
     `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts`.
   - Strict constraints: NO full suites, NO E2E; only these three named files; max test executions: 2.
 
 [DEFINITION OF DONE]
-  - [ ] The editor writes a joined date+time and a `repeat` value; existing `Due`/`Due date`
+  - [ ] The editor writes a joined date+time and a `repeat` value; the `dueTime` state is seeded
+        via `localTimePart` (no app-side date parsing); existing `Due`/`Due date`
         selectors are unchanged.
   - [ ] A recurring tick does not hide/collapse the row; matrix urgency is timed-safe.
-  - [ ] `npm run typecheck -w @life/app` and the three-file test command pass; no file outside scope.
+  - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` and the three-file
+        test command pass; no file outside scope.
 
 ### T11 — App UI settings + service worker (module `todo-due-repeat-notify`)
 
@@ -747,12 +782,10 @@ than extracting it from the todo write path.
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit/create: `apps/app/test/todo-item.test.tsx`,
     `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`,
-    `apps/app/test/push-toggle.test.tsx` (new),
-    and the five existing app fixtures whose `todo(...)` helper literals gain the two required
-    `Todo` fields — `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
-    `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
-    `apps/app/test/routes-todos-trash.test.tsx` (each `todo(...)` helper gains `repeat: null`
-    and `reminderScheduledAt: null`; no other fixture change).
+    `apps/app/test/push-toggle.test.tsx` (new). The five existing app fixtures
+    (`todo-groups.test.ts`, `todo-query.test.ts`, `routes-todos-list.test.tsx`,
+    `routes-matrix.test.tsx`, `routes-todos-trash.test.tsx`) already carry the two required
+    `Todo` fields from T2; this task only typechecks them, it does not re-edit them.
   - Reference files (read-only): `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
     `apps/app/app/push-toggle.tsx`, `apps/app/lib/matrix.ts`,
     `packages/ui/src/lib/date-parts.ts`, `packages/ui/src/index.ts`,
@@ -772,26 +805,26 @@ than extracting it from the todo write path.
     renders guidance and no control; not-installed (`!navigator.standalone`) renders the add-to-
     Home-Screen guidance; supported+installed renders the `Switch` and the subscribe path calls
     `subscribeToPush`.
-  - **Existing fixtures (`Todo` gains two required read fields):** every `todo(...)` helper in the
-    five app fixture files listed in scope gains `repeat: null` and `reminderScheduledAt: null`
-    so `npm run typecheck -w @life/app` compiles; no behavior assertions change.
+  - **Existing fixtures (already migrated in T2):** every `todo(...)` helper in the
+    eight app test files already carries `repeat: null`/`reminderScheduledAt: null` from T2;
+    T12 adds no new literals for them — the `npm run typecheck -w @life/app` run here covers them.
   - Mechanical checks (Contract 1, run in this task's verification):
     `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps/app --include='*.tsx'`
     → only the documented exemptions; `grep -rn "next/link" apps/app --include='*.tsx'` → zero.
 
 [VERIFICATION & TESTING RULES]
-  - Permitted test command: `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
+  - Permitted test command: `npm run build -w @life/shared` (the T2 shared-build precondition)
+    then `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
     and `npm run typecheck -w @life/app`.
-  - Strict constraints: NO full suites, NO E2E; only the four named test files run; the five
-    fixture files are touched only to add the two required literal fields (typecheck covers them);
-    max test executions: 2.
+  - Strict constraints: NO full suites, NO E2E; only the four named test files run; the eight
+    app test fixtures were migrated in T2 (typecheck covers them); max test executions: 2.
 
 [DEFINITION OF DONE]
   - [ ] The four suites cover the listed cases (including a malformed date → `isUrgent false`,
-        `dueDateState 'none'`) and pass; the five existing fixture helpers carry
-        `repeat: null`/`reminderScheduledAt: null` and typecheck.
+        `dueDateState 'none'`) and pass; the app test `Todo` literals carry
+        `repeat: null`/`reminderScheduledAt: null` (migrated in T2) and typecheck.
   - [ ] The two mechanical greps are clean.
-  - [ ] `npm run typecheck -w @life/app` passes; no file outside scope modified.
+  - [ ] `npm run build -w @life/shared` then `npm run typecheck -w @life/app` pass; no file outside scope modified.
 
 ### T13 — Five-lane verification (module `todo-due-repeat-notify`)
 

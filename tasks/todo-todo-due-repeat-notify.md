@@ -39,10 +39,16 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     - [ ] No file outside scope modified.
   - Dependencies: none. Size: S.
 
-- [ ] T2: Shared wire types — module `todo-due-repeat-notify`
-  - [TASK OBJECTIVE] Add `TodoRepeat`, `repeat`, `reminderScheduledAt`, and `PushSubscribeInput`.
+- [ ] T2: Shared wire types + app literal migration — module `todo-due-repeat-notify`
+  - [TASK OBJECTIVE] Add `TodoRepeat`, `repeat`, `reminderScheduledAt`, and `PushSubscribeInput`,
+    and migrate the app test `Todo` literals to the two required fields.
   - [SCOPE & REPOSITORY CONTEXT]
-    - Allowed: `packages/shared/src/index.ts`.
+    - Allowed: `packages/shared/src/index.ts`, plus the eight app test files whose `Todo` object
+      literals gain `repeat: null`/`reminderScheduledAt: null` — `apps/app/test/todo-item.test.tsx`,
+      `apps/app/test/routes-todo-edit.test.tsx`, `apps/app/test/matrix.test.ts`, and the five
+      fixtures `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
+      `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
+      `apps/app/test/routes-todos-trash.test.tsx`.
     - Reference (read-only): `packages/shared/src/index.ts` (Todo/List precedent),
       `apps/todo-service/src/todos/dto/*.ts`.
     - Strictly prohibited: every file not listed above.
@@ -51,19 +57,29 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `repeat: TodoRepeat|null` + `reminderScheduledAt: string|null`; `CreateTodoInput`
     and `UpdateTodoInput` gain `repeat?: TodoRepeat|null`; add
     `export interface PushSubscribeInput { endpoint: string; keys: { p256dh: string; auth: string } }`.
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/shared`. **Shared-build
-    precondition (stated once; referenced by T4–T8):** consumers resolve `@life/shared` via
+    Then every `Todo` literal in the eight named app test files gains `repeat: null` and
+    `reminderScheduledAt: null` (no other fixture change) — `apps/app/tsconfig.json` includes
+    `**/*.ts`/`**/*.tsx` (only `test/e2e/**` excluded), so `npm run typecheck -w @life/app`
+    compiles them.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/shared` and (after the
+    app literals are migrated) `npm run build -w @life/shared` then `npm run typecheck -w @life/app`.
+    **Shared-build
+    precondition (stated once; referenced by T4–T12):** consumers resolve `@life/shared` via
     `packages/shared` `"types": "dist/index.d.ts"`, and `typecheck` never emits `dist`, so run
-    `npm run build -w @life/shared` before any `npm run typecheck -w @life/todo-service`;
-    T9–T13 repeat it. NO full suites/E2E, max 2.
+    `npm run build -w @life/shared` before any `npm run typecheck -w @life/todo-service` or
+    `npm run typecheck -w @life/app`;
+    T4–T12 repeat it. NO full suites/E2E, max 2.
   - [DEFINITION OF DONE]
     - [ ] `TODO_REPEATS` + all listed types exist exactly as specified.
-    - [ ] `npm run typecheck -w @life/shared` passes with zero errors.
+    - [ ] Every `Todo` literal in the eight named app test files carries both new fields.
+    - [ ] `npm run typecheck -w @life/shared` and (after `npm run build -w @life/shared`)
+          `npm run typecheck -w @life/app` pass with zero errors.
     - [ ] No file outside scope modified.
-  - Dependencies: T1. Size: XS.
+  - Dependencies: T1. Size: S.
 
 - [ ] T3: UI date helpers — module `todo-due-repeat-notify`
-  - [TASK OBJECTIVE] One `@life/ui` helper owns the local day and the timed/date label.
+  - [TASK OBJECTIVE] One `@life/ui` helper owns the local day, the local time part, and the
+    timed/date label.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed: `packages/ui/src/lib/date-parts.ts` (new),
       `packages/ui/src/lib/format-date.ts`,
@@ -72,21 +88,25 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     - Reference (read-only): `packages/ui/src/components/due-date.tsx`, `docs/lessons/0003-*.md`.
     - Strictly prohibited: every file not listed above.
   - [IMPLEMENTATION REQUIREMENTS] New low-level `date-parts.ts` exports `todayIso`, `dueDay`
-    (`value` → local `YYYY-MM-DD`; date-only: own parts, no `Date`; timed: local getters) and
-    `datePart`; `format-date.ts` and `due-date-pill.tsx` both import from it (breaks the
+    (`value` → local `YYYY-MM-DD`; date-only: own parts, no `Date`; timed: local getters),
+    `datePart`, and `localTimePart` (local `HH:mm` for a timed value, `''` otherwise — the single
+    owner the T10 editor consumes to seed `dueTime`); `format-date.ts` and `due-date-pill.tsx`
+    both import from it (breaks the
     `format-date → due-date-pill` cycle); `due-date-pill.tsx` **re-exports** `todayIso`
     (`export { todayIso } from '../lib/date-parts';`) so `due-date.tsx` (imports `dueDateState`
     + `todayIso`) and `format-date.test.ts` (imports `todayIso` from `../src/components/due-date-pill`)
     keep working unchanged — `due-date.tsx` is not in scope; `index.ts` re-exports `todayIso`
-    **and `dueDay`**.
-    `dueDateLabel` adds `Today/Tomorrow/dd-mm-yyyy HH:mm` for timed; `dueDateState` compares
+    **and `dueDay` and `localTimePart`**.
+    `dueDateLabel` adds `Today/Tomorrow/dd-mm-yyyy HH:mm` for timed (time via `localTimePart`);
+    `dueDateState` compares
     `dueDay` (day-granular); `dueDate.tsx` unchanged. Update the two tests for timed values +
-    date-only non-regression.
+    date-only non-regression + `localTimePart`.
   - [VERIFICATION & TESTING RULES] Permitted:
     `npm run test:unit -w @life/ui -- test/format-date.test.ts test/due-date-pill.test.tsx` and
     `npm run typecheck -w @life/ui`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] `dueDay` is the single day-derivation helper; `todayIso` stays exported from `@life/ui`
+    - [ ] `dueDay` is the single day-derivation helper and `localTimePart` the single timed
+          local-time helper; `todayIso` stays exported from `@life/ui`
           (via `due-date-pill.tsx`'s re-export of `date-parts.ts`) so its existing importers
           (`due-date.tsx`, `format-date.test.ts`) compile unchanged.
     - [ ] Date-only behavior unchanged; timed behavior as specified.
@@ -258,7 +278,7 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `npm run test:unit -w @life/todo-service -- test/todos-due-repeat.e2e-spec.ts test/reminders.e2e-spec.ts test/push.e2e-spec.ts test/todo-cache.e2e-spec.ts test/todos.e2e-spec.ts test/ownership.e2e-spec.ts`
     and `npm run typecheck -w @life/todo-service`. NO full suites/E2E, only these files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] The three new suites and the two existing suites cover every case above; both existing
+    - [ ] The three new suites and the three existing suites cover every case above; both existing
           key lists are the full 15-key set.
     - [ ] The prescribed six-file command passes; typecheck passes.
     - [ ] No file outside scope modified.
@@ -298,17 +318,20 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     `PillGroup`+`Pill as="button" size="chip"` (Repeat), unchanged date field, `DueDate` (row).
     New `todo-repeat-label.ts` exports `repeatLabel(repeat: TodoRepeat | null): string | null`
     (app copy — `@life/ui` has no `@life/shared` dep), consumed by the row and editor options.
-    Editor joins date+time + carries `repeat`; a repeat with no due **blocks save** until a due
-    exists (no auto-set today). Row shows the timed label + repeat label; `DoneToggle`
+    Editor joins date+time + carries `repeat`, seeding `dueTime` from the single `@life/ui`
+    `localTimePart` owner (no app-side `new Date(...)`); a repeat with no due **blocks save** until
+    a due exists (no auto-set today). Row shows the timed label + repeat label; `DoneToggle`
     hide/collapsing gated on `!todo.repeat`. `matrix.ts` `isUrgent` uses `dueDay`/`dueDateState`
     (timed-tomorrow still urgent).
-  - [VERIFICATION & TESTING RULES] Permitted: `npm run typecheck -w @life/app` and
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` then
+    `npm run typecheck -w @life/app` and
     `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts`.
     NO full suites/E2E, only these three files, max 2.
   - [DEFINITION OF DONE]
-    - [ ] Editor writes joined date+time + `repeat`; existing Due/Due date selectors unchanged.
+    - [ ] Editor writes joined date+time + `repeat` (seeded via `localTimePart`); existing
+          Due/Due date selectors unchanged.
     - [ ] Recurring tick doesn't hide/collapse; matrix urgency timed-safe.
-    - [ ] Typecheck + three-file tests pass; no file outside scope modified.
+    - [ ] Build + typecheck + three-file tests pass; no file outside scope modified.
   - Dependencies: T3, T5. Size: M.
 
 - [ ] T11: App UI settings + service worker — module `todo-due-repeat-notify`
@@ -338,11 +361,10 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [TASK OBJECTIVE] Add/update the UI regression tests and run the Contract 1 mechanical checks.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed: `apps/app/test/todo-item.test.tsx`, `apps/app/test/routes-todo-edit.test.tsx`,
-      `apps/app/test/matrix.test.ts`, `apps/app/test/push-toggle.test.tsx` (new), and the five
-      existing fixtures whose `todo(...)` helpers gain `repeat: null`/`reminderScheduledAt: null`:
-      `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
-      `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
-      `apps/app/test/routes-todos-trash.test.tsx`.
+      `apps/app/test/matrix.test.ts`, `apps/app/test/push-toggle.test.tsx` (new). The five
+      existing fixtures (`todo-groups.test.ts`, `todo-query.test.ts`, `routes-todos-list.test.tsx`,
+      `routes-matrix.test.tsx`, `routes-todos-trash.test.tsx`) already carry the two required
+      `Todo` fields from T2; this task only typechecks them.
     - Reference (read-only): `apps/app/app/todo-editor.tsx`, `apps/app/app/todo-item.tsx`,
       `apps/app/app/push-toggle.tsx`, `apps/app/lib/matrix.ts`, `packages/ui/src/index.ts`,
       `AGENTS.md` (Contract 1 checks).
@@ -350,15 +372,16 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
   - [IMPLEMENTATION REQUIREMENTS] As in the plan: editor payload join+repeat; row timed/repeat
     label + no-hide recurring tick; `isUrgent` timed today/tomorrow and **malformed stays false**
     (`dueDateState` returns `'none'` for `dueDay === ''`); push-toggle branches
-    (unsupported / not-installed / subscribe); the two Contract 1 greps clean; the five existing
-    `todo(...)` fixtures gain the two required fields.
-  - [VERIFICATION & TESTING RULES] Permitted:
+    (unsupported / not-installed / subscribe); the two Contract 1 greps clean. The app test `Todo`
+    literals were already migrated in T2; no new literals here.
+  - [VERIFICATION & TESTING RULES] Permitted: `npm run build -w @life/shared` then
     `npm run test:unit -w @life/app -- test/todo-item.test.tsx test/routes-todo-edit.test.tsx test/matrix.test.ts test/push-toggle.test.tsx`
     and `npm run typecheck -w @life/app`. NO full suites/E2E; only the four named test files run,
-    the five fixture files add only the two literals (typecheck covers them), max 2.
+    the eight app test fixtures were migrated in T2, max 2.
   - [DEFINITION OF DONE]
-    - [ ] The four suites cover the listed cases and pass; the five fixtures typecheck; the two greps are clean.
-    - [ ] Typecheck passes; no file outside scope modified.
+    - [ ] The four suites cover the listed cases and pass; the app test `Todo` literals typecheck
+          (migrated in T2); the two greps are clean.
+    - [ ] Build + typecheck pass; no file outside scope modified.
   - Dependencies: T10, T11. Size: S.
 
 - [ ] T13: Five-lane verification — module `todo-due-repeat-notify`
@@ -381,7 +404,7 @@ no full suite, no E2E. The five-lane gate (T13) is five parallel subagent lanes,
     correctness/domain, code quality, security, QA, plan conformance. Fail-closed; any failed lane
     → fix blockers → re-run ONLY the failed lanes → repeat until N/N. Commit only on N/N, staged by
     explicit paths (never `git add -A`): the chapter's shared/UI files, todo-service source + tests,
-    app source + tests (including the five fixtures), infra (`package-lock.json`, both env examples,
+    app source + tests (including the T2-migrated test literals), infra (`package-lock.json`, both env examples,
     `compose.yaml`), and the spec/plan/ledger files — the exact path list is in the plan T13 Step 4.
     Commit convention: Conventional Commits, e.g. `feat(todos): due time, recurrence, and Web Push reminders`.
   - [VERIFICATION & TESTING RULES] Permitted: the suite-gate commands (QA lane only). NO full
