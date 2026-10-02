@@ -30,7 +30,7 @@ task's §5 template is the plan; the ledger does not re-state it, so the two can
 | T7 | App: `listTodoCompletions`, `collectTodoCompletions`, `todo-completion-list.tsx`, page branch | App | T2, T5 | M | [x] `60a1812` |
 | T8 | App tests (`routes-todos-completions`, `routes-todos-list` reconciliation) + mechanical checks | App | T7 | M | [x] `b15dbbd` |
 | T9 | Integration review + report | Verify | T8 | S | [x] report written |
-| T10 | Five-lane verification (N/N PASS) | Verify | T9 | S | [ ] |
+| T10 | Five-lane verification (N/N PASS) | Verify | T9 | S | [x] 5/5 PASS |
 
 ## Checkpoints
 
@@ -46,7 +46,7 @@ task's §5 template is the plan; the ledger does not re-state it, so the two can
 - [x] App: `npm run build -w @life/shared` then `npm run typecheck -w @life/app` exits 0;
       `npm run test:unit -w @life/app -- test/routes-todos-completions.test.tsx test/routes-todos-list.test.tsx`
       green (2 suites, 14 tests); Contract 1 greps clean.
-- [ ] Verify: T9 report + T10 five-lane N/N PASS.
+- [x] Verify: T9 report + T10 five-lane N/N PASS.
 
 ## Coordination (not a task)
 
