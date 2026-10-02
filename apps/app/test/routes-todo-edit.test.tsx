@@ -37,6 +37,7 @@ import { listTags } from '@/lib/tags-api';
 import { createTodoAction, updateTodoAction } from '@/app/todo-actions';
 import EditTodoPage from '@/app/todos/[id]/edit/page';
 import { TodoEditor } from '@/app/todo-editor';
+import { RecurrenceDialog } from '@/app/recurrence-dialog';
 
 const mockedGetTodo = getTodo as jest.MockedFunction<typeof getTodo>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
@@ -193,6 +194,8 @@ interface EditorTree extends ReactElement {
 interface EditorField extends ReactElement {
   props: {
     'aria-label'?: string;
+    value?: string;
+    options?: Array<{ value: string; label: string }>;
     onChange?: (event: { target: { value: string } }) => void;
   };
 }
@@ -655,6 +658,106 @@ describe('TodoEditor Time and Repeat fields', () => {
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
       expect(patch.dueDate).toBeNull();
       expect(patch.repeat).toBeNull();
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('TodoEditor custom repeat', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('offers a Custom option and opening it does not commit the repeat', () => {
+    const fixture = todo({ dueDate: '2026-10-01', repeat: null, version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      const select = selectByLabel(first, 'Repeat');
+      const options = select.props.options as Array<{ value: string; label: string }>;
+      expect(options.some((option) => option.value === 'custom')).toBe(true);
+      expect(options.find((option) => option.value === 'custom')?.label).toBe('Custom…');
+      expect(select.props.value).toBe('');
+
+      select.props.onChange!({ target: { value: 'custom' } });
+
+      const second = harness.renderTree(fixture);
+      // The controlled Select snaps back to the committed value; opening the modal
+      // is not a commit.
+      expect(selectByLabel(second, 'Repeat').props.value).toBe('');
+      expect(findByType(second.props.children, RecurrenceDialog)?.props.open).toBe(true);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('confirms the days and saves custom + repeatDays', async () => {
+    const fixture = todo({ dueDate: '2026-10-01', repeat: null, version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      selectByLabel(first, 'Repeat').props.onChange!({ target: { value: 'custom' } });
+
+      const opened = harness.renderTree(fixture);
+      const dialog = findByType(opened.props.children, RecurrenceDialog);
+      expect(dialog?.props.open).toBe(true);
+      (dialog!.props.onConfirm as (days: number[]) => void)([4, 5]);
+      // The dialog's Confirm button pairs onConfirm with onOpenChange(false).
+      (dialog!.props.onOpenChange as (open: boolean) => void)(false);
+
+      const confirmed = harness.renderTree(fixture);
+      const options = selectByLabel(confirmed, 'Repeat').props.options as Array<{
+        value: string;
+        label: string;
+      }>;
+      expect(options.find((option) => option.value === 'custom')?.label).toBe('Custom (Thu, Fri)');
+      expect(findByType(confirmed.props.children, RecurrenceDialog)?.props.open).toBe(false);
+
+      await confirmed.props.actions.props.onClick();
+
+      expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.repeat).toBe('custom');
+      expect(patch.repeatDays).toEqual([4, 5]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('clearing the due resets repeatDays and closes the dialog', async () => {
+    const fixture = todo({ dueDate: '2026-10-01', repeat: null, version: 3 });
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree(fixture);
+      selectByLabel(first, 'Repeat').props.onChange!({ target: { value: 'custom' } });
+      const opened = harness.renderTree(fixture);
+      (findByType(opened.props.children, RecurrenceDialog)!.props.onConfirm as (days: number[]) => void)([4, 5]);
+
+      const confirmed = harness.renderTree(fixture);
+      expect(selectByLabel(confirmed, 'Repeat').props.value).toBe('custom');
+
+      inputByLabel(confirmed, 'Due date').props.onChange!({ target: { value: '' } });
+      const cleared = harness.renderTree(fixture);
+      expect(findByType(cleared.props.children, RecurrenceDialog)?.props.open).toBe(false);
+      // `value` is `repeatDays`, so the reset to [] is observable at the boundary.
+      expect(findByType(cleared.props.children, RecurrenceDialog)?.props.value).toEqual([]);
+
+      // Time/Repeat fields are gone, so the save carries neither repeat nor days.
+      await cleared.props.actions.props.onClick();
+      const [, patch] = mockedUpdateTodoAction.mock.calls[0];
+      expect(patch.repeat).toBeNull();
+      expect(patch.repeatDays).toBeUndefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('seeds repeatDays from a saved custom todo', () => {
+    const fixture = todo({ dueDate: '2026-10-01', repeat: 'custom', repeatDays: [4, 5], version: 3 });
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(fixture);
+      expect(selectByLabel(tree, 'Repeat').props.value).toBe('custom');
+      expect(findByType(tree.props.children, RecurrenceDialog)?.props.value).toEqual([4, 5]);
     } finally {
       harness.restore();
     }

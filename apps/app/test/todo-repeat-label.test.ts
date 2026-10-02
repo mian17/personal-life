@@ -27,6 +27,19 @@ describe('repeatLabel', () => {
     expect(repeatLabel(null)).toBeNull();
   });
 
+  it('renders a custom repeat with its sorted weekday set', () => {
+    // Tue is [2]; 2026-10-01 is a Thursday.
+    expect(repeatLabel('custom', '2026-10-01', [4, 5])).toBe('Custom (Thu, Fri)');
+    expect(repeatLabel('custom', '2026-10-01', [2])).toBe('Custom (Tue)');
+    expect(repeatLabel('custom', '2026-10-01', [5, 4])).toBe('Custom (Thu, Fri)');
+  });
+
+  it('falls back to the bare Custom label for no/empty custom days', () => {
+    expect(repeatLabel('custom', '2026-10-01', [])).toBe('Custom');
+    expect(repeatLabel('custom', '2026-10-01', null)).toBe('Custom');
+    expect(repeatLabel('custom')).toBe('Custom');
+  });
+
   it('falls back to the bare base label when the due date is missing or malformed', () => {
     expect(repeatLabel('weekly')).toBe('Weekly');
     expect(repeatLabel('weekly', null)).toBe('Weekly');
