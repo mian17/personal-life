@@ -19,12 +19,14 @@ both apps — so tags feel identical everywhere (I3).
   covers its `waitForURL` updates). Playwright navigation URLs update to the new
   paths — the explicitly approved changes; no selector/text/role in the frozen e2e
   surface changes.
-- **`/todos`:** grouped `Overdue` / `Today` / `Done` (a done todo is always in Done;
+- **`/todos`:** the page heading is `Today` (user-approved; was `Todos`). It always
+  shows the full grouped list — no search box and no status/tag/list filter chrome.
+  Grouped `Overdue` / `Today` / `Done` (a done todo is always in Done;
   open later/undated todos stay hidden until due); done toggle;
   create (composer/FAB); inline edit title, note, due date + optional **time**, optional
   **repeat**, list; **soft delete to
   trash**; a `/todos/trash` page (restore / delete-forever / empty) reached from a
-  Trash entry in the toolbar; filters by list, tag, and done state. Data via the
+  Trash entry in the toolbar. Data via the
   todo-service API (server actions compose registry + todo calls — BFF composition,
   MAP M4). The list page also carries the shared `TabBar` (List / Matrix) added by
   `ui-tabs`, present through `ListShell`'s `tabs` slot only when the matrix opt-in is
@@ -242,11 +244,15 @@ recorded surface this spec froze:
   renders one `TodoItem` per done todo — the same row anatomy as Overdue/Today
   (`ListItem variant="todo" done` + the leading `DoneToggle`) — with no trash control;
   tapping the filled checkmark sends `done:false` and the row moves back to
-  Today/Overdue on revalidate. Status pills are `All` / `Open` only. The backend
-  completion log and the server undo rule are unchanged
-  (`SPEC-todo-completion-history.md`); only the app's Done surface changed. No existing
-  name/role/aria-label changes (`All`, `Open`, `Status`, the row `href`s all stay).
-  Recorded as a surface change; the human-owned suite changes only if the user asks.
+  Today/Overdue on revalidate. The backend completion log and the server undo rule are
+  unchanged
+  (`SPEC-todo-completion-history.md`); only the app's Done surface changed.
+- **Today page chrome (user-approved surface change):** the `/todos` heading is now
+  `Today`. The `Search todos` search box, the `Status` / `All` / `Open` pills and the
+  `Tags` / `Lists` filter navs are removed from `/todos`; the page always shows the full
+  grouped list and passes no search/filter axes to `listTodos`. Row `href`s are
+  unchanged. Recorded as a surface change; the human-owned suite changes only if the
+  user asks.
 - **Custom repeat additions (todo-custom-repeat):** the new accessible names `Custom repeat`
   (the modal title), `Frequency`, `Days`, the seven day labels `Mon`…`Sun`, `Confirm`,
   `Cancel`, and `Close` (the modal's close `IconButton`). The Repeat `Select` remains the

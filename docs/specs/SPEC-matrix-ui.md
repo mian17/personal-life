@@ -255,7 +255,7 @@ byte-identical (no tabs node):
 const matrixEnabled = await readPref('matrix'); // @/lib/preferences
 
 <ListShell
-  title="Todos"
+  title="Today"
   navTrailing={<>{/* …existing links… */
     <IconLink href={settingsHref('/todos')} label="Settings"><Settings size={20} aria-hidden /></IconLink>
   </>}
@@ -265,7 +265,7 @@ const matrixEnabled = await readPref('matrix'); // @/lib/preferences
       <Tab href="/todos/matrix">Matrix</Tab>
     </TabBar>
   ) : undefined}
-  // …existing search / filters / body / fab unchanged…
+  // …existing body / fab unchanged (no search / filters — removed from `/todos`)…
 />
 ```
 

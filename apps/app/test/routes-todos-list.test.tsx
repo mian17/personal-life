@@ -1,33 +1,28 @@
-import type { List, TagUsage, Todo } from '@life/shared';
-import { PreservingSearchBox } from '@life/app-kit';
-import { ListShell, Pill, PillGroup, Tab, TabBar, TagFilterNav } from '@life/ui';
+import type { List, Todo } from '@life/shared';
+import { ListShell, Tab, TabBar } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
   listTodos: jest.fn(),
-  listTodoTagUsage: jest.fn(),
   listLists: jest.fn(),
 }));
 jest.mock('@/lib/tags-api', () => ({
   listTags: jest.fn(),
-  resolveTags: jest.fn(),
 }));
 // The barrel re-exports the server-only `readPref` (next/headers); mock it so the
 // server module never loads under jest.
 jest.mock('@/lib/preferences', () => ({ readPref: jest.fn() }));
 
-import { listTodos, listTodoTagUsage, listLists } from '@/lib/todo-api';
-import { listTags, resolveTags } from '@/lib/tags-api';
+import { listTodos, listLists } from '@/lib/todo-api';
+import { listTags } from '@/lib/tags-api';
 import { readPref } from '@/lib/preferences';
 import TodosPage from '@/app/todos/page';
 import { TodoList } from '@/app/todo-list';
 import { TodosNav } from '@/app/todos-nav';
 
 const mockedListTodos = listTodos as jest.MockedFunction<typeof listTodos>;
-const mockedUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUsage>;
 const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
 const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
-const mockedResolveTags = resolveTags as jest.MockedFunction<typeof resolveTags>;
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
 
 function todo(overrides: Partial<Todo> = {}): Todo {
@@ -57,15 +52,6 @@ function asArray(node: { props: { children: unknown } }): any[] {
   return Array.isArray(kids) ? kids : [kids];
 }
 
-function find(node: any, type: unknown, label?: string): any {
-  return asArray(node.props ? node : { props: { children: node } }).find(
-    (child) =>
-      child != null &&
-      child.type === type &&
-      (label === undefined || child.props.label === label),
-  );
-}
-
 describe('/todos list page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -73,7 +59,6 @@ describe('/todos list page wiring', () => {
       todos: [todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })],
       nextCursor: null,
     });
-    mockedUsage.mockResolvedValue([{ tagId: 1, count: 2 }] as TagUsage[]);
     mockedListLists.mockResolvedValue([
       {
         id: 'l1',
@@ -86,81 +71,33 @@ describe('/todos list page wiring', () => {
     mockedListTags.mockResolvedValue([
       { id: 1, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
     ]);
-    mockedResolveTags.mockResolvedValue([{ id: 1, name: 'errand' }]);
     mockedReadPref.mockResolvedValue(false);
   });
 
-  it('renders ListShell titled Todos with the frozen fab label', async () => {
-    const el = await TodosPage({
-      searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
-    });
+  it('renders ListShell titled Today with the frozen fab label', async () => {
+    const el = await TodosPage();
 
     expect(el.type).toBe(ListShell);
-    expect(el.props.title).toBe('Todos');
+    expect(el.props.title).toBe('Today');
     expect(el.props.fabLabel).toBe('New todo');
     expect(el.props.fabHref).toBe('/todos/new');
   });
 
-  it('preserves the q/list/tag/done params in the search box', async () => {
-    const el = await TodosPage({
-      searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
-    });
+  it('passes no filter or search axes through to listTodos', async () => {
+    await TodosPage();
 
-    const search = el.props.search;
-    expect(search.type).toBe(PreservingSearchBox);
-    expect(search.props.path).toBe('/todos');
-    expect(search.props.q).toBe('milk');
-    expect(search.props.params).toEqual({ list: 'l1', tag: '1', done: 'false' });
+    expect(mockedListTodos).toHaveBeenCalledWith({ cursor: undefined });
   });
 
-  it('passes the filter axes through to listTodos', async () => {
-    await TodosPage({
-      searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
-    });
+  it('renders no search box and no filter slots', async () => {
+    const el = await TodosPage();
 
-    expect(mockedListTodos).toHaveBeenCalledWith({
-      q: 'milk',
-      listId: 'l1',
-      tagId: 1,
-      done: false,
-      cursor: undefined,
-    });
-  });
-
-  it('renders only the All/Open status pills (the Done view is a section, not a pill)', async () => {
-    const el = await TodosPage({
-      searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
-    });
-
-    const status = find(el.props.filters, PillGroup, 'Status');
-    expect(status.type).toBe(PillGroup);
-    const pills = asArray(status);
-    expect(pills.map((p) => p.props.children)).toEqual(['All', 'Open']);
-    expect(pills[0].type).toBe(Pill);
-    expect(pills[0].props.active).toBe(false);
-    expect(pills[1].props.active).toBe(true);
-    expect(pills[0].props.href).toContain('q=milk');
-    expect(pills[1].props.href).toContain('done=false');
-  });
-
-  it('hands the tag and list filters to TagFilterNav, preserving the current params', async () => {
-    const el = await TodosPage({
-      searchParams: Promise.resolve({ q: 'milk', list: 'l1', tag: '1', done: 'false' }),
-    });
-
-    const tagsNav = find(el.props.filters, TagFilterNav, 'Tags');
-    expect(tagsNav.props.items.map((i: any) => i.name)).toEqual(['All tags', 'errand']);
-    expect(tagsNav.props.items[1].active).toBe(true);
-    expect(tagsNav.props.items[1].href).toContain('q=milk');
-    expect(tagsNav.props.items[1].href).toContain('tag=1');
-
-    const listsNav = find(el.props.filters, TagFilterNav, 'Lists');
-    expect(listsNav.props.items.map((i: any) => i.name)).toEqual(['All lists', 'Groceries']);
-    expect(listsNav.props.items[1].active).toBe(true);
+    expect(el.props.search).toBeUndefined();
+    expect(el.props.filters).toBeUndefined();
   });
 
   it('keeps the frozen nav link labels the e2e suite depends on', async () => {
-    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+    const el = await TodosPage();
 
     expect(el.props.navTrailing.type).toBe(TodosNav);
     const html = renderToStaticMarkup(<TodosNav />);
@@ -173,7 +110,7 @@ describe('/todos list page wiring', () => {
 
   it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {
     mockedReadPref.mockResolvedValue(true);
-    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+    const el = await TodosPage();
 
     const tabs = el.props.tabs;
     expect(tabs.type).toBe(TabBar);
@@ -188,24 +125,16 @@ describe('/todos list page wiring', () => {
   });
 
   it('renders no tabs node when the opt-in is off', async () => {
-    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+    const el = await TodosPage();
 
     expect(el.props.tabs).toBeUndefined();
   });
 
   it('always renders TodoList as the body — no Done-view body swap', async () => {
-    const all = await TodosPage({ searchParams: Promise.resolve({}) });
-    expect(all.props.body.type).toBe(TodoList);
-    expect(all.props.body.props.hideDone).toBeUndefined();
+    const el = await TodosPage();
 
-    const open = await TodosPage({ searchParams: Promise.resolve({ done: 'false' }) });
-    expect(open.props.body.type).toBe(TodoList);
-    expect(open.props.body.props.hideDone).toBeUndefined();
-
-    // `?done=true` no longer swaps the body: the Done section lives inside TodoList.
-    const doneParam = await TodosPage({ searchParams: Promise.resolve({ done: 'true' }) });
-    expect(doneParam.props.body.type).toBe(TodoList);
-    expect(doneParam.props.body.props.hideDone).toBeUndefined();
+    expect(el.props.body.type).toBe(TodoList);
+    expect(el.props.body.props.hideDone).toBeUndefined();
   });
 
   it('renders a done todo as a struck row with no trash control', async () => {
@@ -213,7 +142,7 @@ describe('/todos list page wiring', () => {
       todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],
       nextCursor: null,
     });
-    const el = await TodosPage({ searchParams: Promise.resolve({}) });
+    const el = await TodosPage();
 
     const html = renderToStaticMarkup(el.props.body);
     expect(html).toContain('ui-list-item--done');

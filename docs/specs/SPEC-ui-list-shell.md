@@ -97,20 +97,23 @@ The empty-state decision lives in `apps/app/app/note-list.tsx:8-10` and
 
 ### Frozen e2e surface (what the suite actually queries — must not change)
 
-- `getByRole('heading', { name: 'Notes' | 'Todos' })` → `PageTitle` (from `title`)
-  (`journey.ts:40`; `journey.suite.ts:41,85,154,160`).
+- `getByRole('heading', { name: 'Notes' | 'Today' })` → `PageTitle` (from `title`)
+  (`journey.ts:40`; `journey.suite.ts:41,85,154`; the todos heading is now `Today`
+  — `journey.suite.ts:160` still asserts `Todos`, a pending human-owned suite update
+  that agents must not edit).
 - `getByLabel('New note')` → `FabLink` aria-label (from `fabLabel`) (`journey.ts:65`).
 - `getByLabel('Search notes')` → the `SearchField` inside the `search` slot
   (`journey.ts:84`).
 - `getByLabel('Trash')` → an `IconLink` in `navTrailing` (`journey.suite.ts:93,102`).
 - `getByRole('link', { name: 'errand', exact: true })` → `TagFilterNav` filter pills in
-  the `filters` slot (`journey.suite.ts:74`).
+  the `filters` slot (`journey.suite.ts:74` — the **notes** page; `/todos` no longer
+  passes a `filters` slot).
 - `getByRole('listitem')` (`journey.ts:104`), `getByLabel(`Delete ${title}`)`
   (`journey.ts:90`) and `getByRole('link', { name: <note title> })` (`journey.ts:74`) →
   rows/links inside `body` (the app-owned list component).
 
 Preserved but **not** asserted by any test today — the shell must not alter them all the
-same: the todos fab label `New todo`, the todos search label `Search todos`, and the
+same: the todos fab label `New todo` and the
 `navTrailing` links `Manage tags` / `Manage lists` / `Notes` / `Todos`.
 
 Frozen-surface change approved by the user (intent L4 / map D7, `SPEC-matrix-ui.md`): the
@@ -168,21 +171,12 @@ Slots, not data:
 
 ```tsx
 <ListShell
-  title="Todos"
+  title="Today"
   navTrailing={<>
     <IconLink href="/notes" label="Notes"><StickyNote size={20} aria-hidden /></IconLink>
     <IconLink href="/todos/tags" label="Manage tags"><Tags size={20} aria-hidden /></IconLink>
     <IconLink href="/todos/trash" label="Trash"><Trash2 size={20} aria-hidden /></IconLink>
     <ThemeToggle />
-  </>}
-  search={<TodoSearchBox q={q} listId={list} tag={tag} done={done} />}
-  filters={<>
-    <PillGroup label="Status" aria-label="Status">
-      <Pill as="a" size="filter" href="/todos" active>All</Pill>
-      <Pill as="a" size="filter" href="/todos?done=false">Open</Pill>
-      <Pill as="a" size="filter" href="/todos?done=true">Done</Pill>
-    </PillGroup>
-    {namedTags.length > 0 && <TagFilterNav label="Tags" items={tagFilterItems} />}
   </>}
   body={<TodoList groups={groups} today={today} lists={lists} availableTags={availableTags} />}
   fabHref="/todos/new"
