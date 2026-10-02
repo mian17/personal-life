@@ -21,8 +21,8 @@ Production currently runs ≈ **`8cc6b98`** (`feat/todo-due-repeat-notify`). Evi
 | todo-service image → `todo_completion`, `repeatDays`, `custom repeat requires repeatDays` | 0 | both new chapters **absent** |
 
 ```bash
-git log --oneline 8cc6b98..HEAD                    # → only the two chapters' commits
-git diff --name-only 8cc6b98 HEAD                  # → 64 at d288927; +1 per later doc fix
+git log --oneline 8cc6b98..HEAD                    # → the chapters + the tick fix + durable Undo
+git diff --name-only 8cc6b98 HEAD                  # → 68 at the tip 5157bf1
 ```
 
 > The repeat-tick **advance + undo** bug (ticked future-dated repeat re-targeted the same
@@ -31,12 +31,20 @@ git diff --name-only 8cc6b98 HEAD                  # → 64 at d288927; +1 per l
 > repeating todo restores it. If you deploy an earlier tip, you ship that bug. Verify with
 > `git log --oneline -1`. The runbook's boot/verify/rollback steps are unchanged.
 
+> **Deploy ref: `5157bf1`.** On that tip the server's undo rule is a single "delete this
+> todo's newest completion row, restore the due iff the occurrence is a real date" rule, and
+> the **Done view carries an icon-only Undo control on each task's newest completion row**
+> (so the durable undo still works after the snackbar expires). Tip `d288927` or earlier ships
+> neither. Both `app` and `todo-service` change in this delta.
+
 **Correction to the earlier assumption:** Select dropdowns, the importance label, and the
 row-actions `Menu` are **already deployed** — they are *not* part of this batch. The
-pending set is exactly two chapters:
+pending set is the two chapters below plus the tick fix and the durable Undo:
 
 1. **completion history** — `todo_completion` table, `GET /api/todos/completions`, the Done view
 2. **custom repeat** — `repeatDays` column, `@life/ui` `Dialog`, `RecurrenceDialog`, `Custom (Thu, Fri)`
+3. **durable Done-view Undo** — an icon-only Undo control on each task's newest completion row
+   (after the snackbar expires), backed by the unified newest-row server undo rule
 
 ### Migration verdict — none
 
@@ -56,7 +64,7 @@ undecryptable.
 ## 1. Pre-flight
 
 - [ ] Working tree clean and on the deploy ref: `git status --short && git log -1 --oneline`
-      → clean, `d288927`.
+      → clean, `5157bf1`.
 - [ ] Record the images you are about to replace (your rollback target):
 
       docker images --format '{{.ID}}  {{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | grep personal-life
@@ -116,6 +124,10 @@ New behavior (the two chapters):
       the same one (that jam was bug `1e42756`).
 - [ ] Press **Undo** on that snackbar → the occurrence's row vanishes from the **Done** list,
       the due rolls back to it, the reminder re-arms, and the row is still open.
+- [ ] Let the snackbar expire, then open **Done** → each task's **newest** completion row
+      carries an icon-only **Undo** control (`aria-label` "Undo completion of …") and older
+      rows carry none. Press it → that row vanishes and the task reopens at that occurrence.
+      Tick a task again → a new row appears with the control; pressing it walks back one step.
 - [ ] Repeat field → `Custom…` → modal opens titled **Custom repeat** with the due date's
       weekday pre-ticked; tick a second day → **Confirm** → the row reads
       `Custom (Thu, Fri)`.
