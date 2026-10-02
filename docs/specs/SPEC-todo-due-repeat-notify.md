@@ -32,7 +32,7 @@ there is no migration framework, so new columns are additive and non-destructive
 todo(
   ...
   dueDate              TEXT NULL,   -- 'YYYY-MM-DD' (date-only) OR canonical UTC instant '…Z' (timed)
-  repeat               TEXT NULL,   -- null | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly'
+  repeat               TEXT NULL,   -- null | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly' | 'custom'
   reminderScheduledAt  TEXT NULL,   -- canonical UTC instant of the current occurrence's reminder; null = no reminder
   ...
 )
@@ -120,9 +120,11 @@ required-but-nullable.
 | `repeat` | `TodoRepeat \| null` | optional; omitted/`null` ⇒ none | optional; omitted ⇒ unchanged; `null` ⇒ clears the repeat |
 | `reminderScheduledAt` (read only) | `string \| null` | — | — (server-computed) |
 
-- `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;`
+- `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'custom'] as const;`
   and `export type TodoRepeat = (typeof TODO_REPEATS)[number];` (the array is the single source;
-  the DTO validates with `@IsIn(TODO_REPEATS)`).
+  the DTO validates with `@IsIn(TODO_REPEATS)`). `custom` carries its weekday set via the
+  plaintext `repeatDays` column, owned by `SPEC-todo-custom-repeat.md` (this chapter does not
+  define that column).
 - Read DTO `Todo` gains `repeat: TodoRepeat | null` and
   `reminderScheduledAt: string | null` (the exact stored instant). Both are present on
   every todo read (`POST`, `GET /api/todos`, `GET /api/todos/:id`, `PATCH`, `POST /:id/restore`).

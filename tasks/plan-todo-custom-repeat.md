@@ -5,7 +5,8 @@ never merged without the user's explicit request). Module id: `todo-custom-repea
 (see `MAP-todo-ecosystem.md`). Spec (owner, referenced by every task):
 `docs/specs/SPEC-todo-custom-repeat.md`.
 Specs/maps amended in this chapter: `docs/specs/SPEC-todo-service.md`,
-`docs/specs/SPEC-todo-ui.md`, `docs/specs/SPEC-ui-blocks.md`, `docs/specs/MAP-ui-primitives.md`.
+`docs/specs/SPEC-todo-ui.md`, `docs/specs/SPEC-todo-due-repeat-notify.md`,
+`docs/specs/SPEC-ui-blocks.md`, `docs/specs/MAP-ui-primitives.md`.
 Ledger: `tasks/todo-todo-custom-repeat.md`.
 Governing intent: `docs/intent/todo-custom-repeat.md` (C1–C6).
 
@@ -57,7 +58,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 ## Task List
 
 ### Phase 1 — Spec
-- [ ] T1: amend `SPEC-todo-service.md`, `SPEC-todo-ui.md`, `SPEC-ui-blocks.md`, `MAP-ui-primitives.md`.
+- [ ] T1: amend `SPEC-todo-service.md`, `SPEC-todo-ui.md`, `SPEC-todo-due-repeat-notify.md`,
+      `SPEC-ui-blocks.md`, `MAP-ui-primitives.md`.
 
 ### Checkpoint: Spec
 - [ ] `grep -n "repeatDays" docs/specs/SPEC-todo-service.md` non-empty.
@@ -115,7 +117,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
 
 [SCOPE & REPOSITORY CONTEXT]
   - Allowed files to edit: `docs/specs/SPEC-todo-service.md`, `docs/specs/SPEC-todo-ui.md`,
-    `docs/specs/SPEC-ui-blocks.md`, `docs/specs/MAP-ui-primitives.md`.
+    `docs/specs/SPEC-todo-due-repeat-notify.md`, `docs/specs/SPEC-ui-blocks.md`,
+    `docs/specs/MAP-ui-primitives.md`.
   - Reference files (read-only): `docs/specs/SPEC-todo-custom-repeat.md`, `docs/intent/todo-custom-repeat.md`.
   - Strictly prohibited files: every other file (no code).
 
@@ -128,6 +131,11 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     the invariants section records `custom ⟺ non-empty days` (400 otherwise) and that any
     non-custom repeat stores `repeatDays = null`; the advance section records the BYDAY step.
     The `## Cache Rules` section records `CachedTodoRow` gaining `repeatDays` (key unchanged).
+  - `SPEC-todo-due-repeat-notify.md` (the enum owner): the data-model column comment and the
+    `TODO_REPEATS` literal both gain `'custom'`; note in one line that `custom` carries its
+    weekday set via the `repeatDays` column owned by `todo-custom-repeat`. Do not add a
+    `repeatDays` column definition to this spec; leave its Recurrence-advance section as-is
+    (the set-aware detail is owned by `SPEC-todo-custom-repeat.md`).
   - `SPEC-todo-ui.md`: the editor section records the Repeat `Select` gaining `Custom…`, the
     `recurrence-dialog.tsx` composition (Frequency weekly-only + Mon–Sun multi-select), the
     no-commit-on-open / no-op-cancel behavior, and the label `Custom (Thu, Fri)`. The frozen
@@ -163,8 +171,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `apps/app/test/todo-groups.test.ts`, `apps/app/test/todo-query.test.ts`,
     `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
     `apps/app/test/routes-todos-trash.test.tsx`,
-    `apps/app/test/routes-todos-completions.test.tsx` (created by `todo-completion-history`,
-    commit `60a1812`).
+    `apps/app/test/routes-todos-completions.test.tsx` (created by `todo-completion-history`
+    T8, commit `b15dbbd`).
   - Reference files (read-only): `docs/specs/SPEC-todo-custom-repeat.md`,
     `docs/specs/SPEC-todo-service.md`.
   - Strictly prohibited files: every other file (the service tests use `h.todos.create(...)`, not
