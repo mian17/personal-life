@@ -1,5 +1,7 @@
 # 0005 — Each route is its own app; sign-in returns to the originating route
 
+**Summary:** Each top-level route is its own app: own PWA identity and own post-auth return; never a hard-coded global landing.
+
 - **Date:** 2026-10-01
 - **Source:** user feedback on the login flow / PWA install
 

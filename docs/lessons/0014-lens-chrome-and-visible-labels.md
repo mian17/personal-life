@@ -1,5 +1,7 @@
 # 0014 — A lens keeps its page's chrome; a toggle needs a visible label
 
+**Summary:** A new lens inherits the page chrome by default; an accessible name is not a visible label; test the shell, not just the body.
+
 - **Date:** 2026-10-01
 - **Source:** user feedback on the shipped Eisenhower matrix lens
 

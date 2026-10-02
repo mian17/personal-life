@@ -1,5 +1,7 @@
 # 0006 — "Same in the UI" means whole-page blocks, not primitives
 
+**Summary:** "Same in the UI" means whole-page blocks with props, scoped by consistency (spacing) not byte-similarity; inventory the layer before extracting.
+
 **Date:** 2026-10-01 — interview for the notes/todos shared-UI refactor.
 
 ## The feedback

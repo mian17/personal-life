@@ -1,5 +1,7 @@
 # 0010 — Fixing the plan after validating-plans is a subagent handoff
 
+**Summary:** Fixing validator findings is a delegated subagent task; there is no "mechanical, so I'll do it myself" exemption.
+
 - **Date:** 2026-10-01
 - **Source:** user feedback on the `validating-plans` loop (inline-tag terminator plan)
 

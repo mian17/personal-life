@@ -1,5 +1,7 @@
 # 0015 — Small UI feedback and bug fixes skip the plan workflow; delegate straight to subagents
 
+**Summary:** Size the process: small UI fixes skip planning/validating-plans and five-lane; delegate straight to a subagent, still verify.
+
 - **Date:** 2026-10-02
 - **Source:** user feedback while starting the completed-todo declutter change
 

@@ -1,5 +1,7 @@
 # 0012 — A later chapter can overwrite an earlier locked decision; per-chapter validation cannot catch it
 
+**Summary:** Read the governing intent/map before extending a surface; validation is intra-chapter, locked decisions are cross-chapter; a spec rationalization is a smell.
+
 - **Date:** 2026-10-01
 - **Source:** user question — why the tags-service Redis deployment was missed, after 0011
 

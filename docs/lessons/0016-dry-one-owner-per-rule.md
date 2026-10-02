@@ -1,5 +1,7 @@
 # 0016 — DRY: one owner per rule, never a second copy
 
+**Summary:** DRY: one owner per rule, in code and in the plan; reuse shared layers before writing a local copy; don't over-collapse trivial one-liners.
+
 - **Date:** 2026-10-02
 - **Source:** user feedback while planning the `todo-due-repeat-notify` chapter
 

@@ -1,5 +1,7 @@
 # 0011 — "Per-service Redis" means a dedicated instance, not a shared one
 
+**Summary:** "Per-service cache" means a dedicated instance, not a shared one with namespaced keys; verify ownership, not presence.
+
 - **Date:** 2026-10-01
 - **Source:** user question about the tags service and Redis
 

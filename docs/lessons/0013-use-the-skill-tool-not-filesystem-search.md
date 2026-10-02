@@ -1,5 +1,7 @@
 # 0013 — Load a skill with the skill tool, never by searching the filesystem
 
+**Summary:** Load a skill with the skill tool, never by grepping the filesystem; the tool resolves the root.
+
 - **Date:** 2026-10-01
 - **Source:** user feedback while starting the `validating-plans` gate
 

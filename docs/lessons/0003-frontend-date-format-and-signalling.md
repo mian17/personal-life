@@ -1,5 +1,7 @@
 # 0003 — Frontend dates: dd/mm/yyyy via a shared helper, signal with relative text
 
+**Summary:** Frontend dates: dd/mm/yyyy through one `@life/ui` helper, relative text (Today/Tomorrow) else the date; parse calendar parts from the ISO string, never `toLocale*`.
+
 - **Date:** 2026-10-01
 - **Source:** user feedback (todo row date styling)
 

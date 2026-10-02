@@ -1,5 +1,7 @@
 # 0009 — inline `#tag` creation on autosave leaks orphan tags
 
+**Summary:** Never create registry rows by parsing a draft: gate inline-tag creation on a user-produced terminator (whitespace); classify trigger vs inherent orphans.
+
 **Date:** 2026-10-01 — orphaned-tag investigation.
 
 ## The feedback

@@ -1,5 +1,7 @@
 # 0008 — Enforce recall at the tool layer, not just in instructions
 
+**Summary:** Enforce a process rule mechanically at the tool layer (a hook), never by instruction; global hook, lessons resolved per project from the session directory.
+
 **Date:** 2026-10-01.
 
 ## The feedback
@@ -28,6 +30,13 @@ recall happen at prompt submission regardless of what the agent remembers.
   fails resolution **aborts prompt admission**; the config dir is watched, so it hot-loads.
 - Prove it before shipping: a fake-`ctx` harness exercised all five cases (attach, no
   duplicates, preserve existing, no-op without a lessons dir, never throw).
+- **Inject a digest, not the bodies.** Attaching every full lesson on every prompt does not
+  scale — the context cost grows with each lesson saved. The hook now emits one
+  `path — summary` line per lesson (each file carries a `**Summary:**` line) to a single
+  temp digest file and attaches only that; the full bodies stay on disk and are read on
+  demand when a trigger matches. If the digest cannot be written, it degrades to attaching
+  the full files so recall is never silently lost. A lesson without a `**Summary:**` line
+  falls back to its title.
 
 ## Where
 
