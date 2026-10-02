@@ -26,6 +26,16 @@ Build order: `nutrition-model` → `meal-service` + `target-onboarding` → `mea
 - `meal-capture-ui` is the only module that touches `@life/ui`; it must not introduce visual
   language of its own (Contract 1).
 
+## Decision log
+
+- **2026-10-02 — `nutrition-model` ships as `packages/nutrition`, not as code inside
+  `meal-service`.** Decided by the Tech Lead under standing autonomy (user asleep,
+  intent already confirmed). Rationale: the service sums per-entry nutrients and the UI
+  formats them as units and `%DV`; two implementations of the same 27-field unit table
+  drift, and drift here is *silently wrong numbers* in the one output the whole app exists
+  to produce. Follows the `@life/cache` / `@life/crypto` precedent for pure shared code.
+  Cost: one more workspace. Accepted.
+
 ## Deliberately absent modules
 
 - No sharing module, no barcode module, no trends/history module, no import module — all
