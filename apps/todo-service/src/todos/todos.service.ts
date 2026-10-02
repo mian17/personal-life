@@ -6,12 +6,19 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { IsNull, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
-import type { TagUsage, Todo as TodoDto, TodoPage, TodoRepeat } from '@life/shared';
+import type {
+  TagUsage,
+  Todo as TodoDto,
+  TodoCompletion as TodoCompletionDto,
+  TodoCompletionPage,
+  TodoPage,
+  TodoRepeat,
+} from '@life/shared';
 import { Todo } from './todo.entity';
 import { TodoCompletion } from './todo-completion.entity';
 import { TodoTag } from './todo-tag.entity';
@@ -19,7 +26,14 @@ import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
 import { advanceToOnOrAfter } from './recurrence';
 import { KeysService } from '../keys/keys.service';
 import { ListsService } from '../lists/lists.service';
-import { TODO_ALL, TODO_CACHE, TODO_TAGS, TODO_TRASH, TodosCache } from '../cache/todo-cache';
+import {
+  TODO_ALL,
+  TODO_CACHE,
+  TODO_COMPLETIONS,
+  TODO_TAGS,
+  TODO_TRASH,
+  TodosCache,
+} from '../cache/todo-cache';
 
 /**
  * Deduplicate the `tagIds` a write carries, preserving first-seen order then
@@ -264,6 +278,45 @@ function afterTrashCursor(
   );
 }
 
+/**
+ * Completion keyset cursor, `base64(<completedAt>|<id>)`. Completion order is
+ * `completedAt DESC, id DESC`, so the pair is the stable boundary key.
+ */
+function encodeCompletionCursor(item: { completedAt: string; id: string }): string {
+  return Buffer.from(`${item.completedAt}|${item.id}`).toString('base64');
+}
+
+function decodeCompletionCursor(cursor: string): { completedAt: string; id: string } {
+  const [completedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
+  return { completedAt, id };
+}
+
+/**
+ * True when `item` falls strictly after the cursor in `completedAt DESC, id
+ * DESC` order, so a page boundary can neither repeat nor skip a row.
+ */
+function afterCompletionCursor(
+  item: { completedAt: string; id: string },
+  cursor: { completedAt: string; id: string },
+): boolean {
+  return (
+    item.completedAt < cursor.completedAt ||
+    (item.completedAt === cursor.completedAt && item.id < cursor.id)
+  );
+}
+
+/**
+ * True only for a SQLite UNIQUE-constraint failure — the guarded insert's
+ * double-tick case. Any other driver error must propagate.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    err instanceof QueryFailedError &&
+    ((err.driverError as { code?: string } | undefined)?.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      err.message.includes('UNIQUE constraint failed'))
+  );
+}
+
 @Injectable()
 export class TodosService {
   private readonly logger = new Logger(TodosService.name);
@@ -280,6 +333,7 @@ export class TodosService {
     @Inject(TODO_CACHE) private readonly cache: TodosCache,
     private readonly keys: KeysService,
     private readonly lists: ListsService,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -406,6 +460,35 @@ export class TodosService {
   /** The configured zone's current wall-clock, same shape the recurrence helpers compare. */
   private nowLocal(): string {
     return dueSortKey(new Date().toISOString(), this.tz);
+  }
+
+  /**
+   * Append exactly one completion occurrence, idempotently. The guarded read
+   * makes a repeated tick a no-op; the UNIQUE constraint is the backstop, and
+   * only that violation is swallowed so a real write failure still aborts the
+   * transaction.
+   */
+  private async writeCompletion(
+    manager: EntityManager,
+    sub: string,
+    todoId: string,
+    occurrence: string,
+    completedAt: string,
+  ): Promise<void> {
+    const repo = manager.getRepository(TodoCompletion);
+    const existing = await repo.findOne({ where: { todoId, occurrence } });
+    if (existing) return;
+    try {
+      await repo.insert({
+        id: randomUUID(),
+        ownerSub: sub,
+        todoId,
+        occurrence,
+        completedAt,
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+    }
   }
 
   /** The owner's full ciphertext row-set — the one cached `todo:all` entry. */
@@ -609,6 +692,82 @@ export class TodosService {
   }
 
   /**
+   * `GET /api/todos/completions` — the owner's completion log through the
+   * read-through cache under the rest key `todo:completions` (one entry serves
+   * every cursor/limit variant). Cached value = serialized completion rows as
+   * stored; the title/list join runs post-hit from the same cached `todo:all`
+   * row-set (`C7` — never a snapshot). A completion whose todo is no longer
+   * active (trashed) is omitted; a permanently deleted todo already cascaded
+   * its rows. Order `completedAt DESC, id DESC`, keyset-paginated in memory.
+   */
+  async findCompletions(
+    sub: string,
+    opts: { limit?: number; cursor?: string },
+  ): Promise<TodoCompletionPage> {
+    const limit = opts.limit ?? 50;
+    const rows = await this.cache.getThrough(
+      sub,
+      TODO_COMPLETIONS,
+      async () => {
+        const found = await this.dataSource
+          .getRepository(TodoCompletion)
+          .createQueryBuilder('c')
+          .where('c.ownerSub = :sub', { sub })
+          .orderBy('c.completedAt', 'DESC')
+          .addOrderBy('c.id', 'DESC')
+          .getMany();
+        return found.map(toCachedCompletionRow);
+      },
+      { decode: decodeCompletionRows },
+    );
+
+    const todoRows = await this.rawRows(sub);
+    const dek = await this.readDek(sub, todoRows);
+    const byId = new Map(todoRows.map((row) => [row.id, row]));
+    const joined = rows.filter((row) => byId.has(row.todoId));
+
+    const desc = (a: string, b: string) => (a === b ? 0 : a < b ? 1 : -1);
+    const ordered = [...joined].sort(
+      (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
+    );
+    const after = opts.cursor
+      ? ordered.filter((item) =>
+          afterCompletionCursor(item, decodeCompletionCursor(opts.cursor!)),
+        )
+      : ordered;
+
+    const hasMore = after.length > limit;
+    const page = hasMore ? after.slice(0, limit) : after;
+    const last = page[page.length - 1];
+    const nextCursor = hasMore && last ? encodeCompletionCursor(last) : null;
+
+    // Resolve list names only when a page row is actually listed.
+    const listedIds = new Set(
+      page
+        .map((row) => byId.get(row.todoId)!.listId)
+        .filter((listId): listId is string => listId !== null),
+    );
+    const names = new Map<string, string>();
+    if (listedIds.size > 0) {
+      for (const list of await this.lists.list(sub)) names.set(list.id, list.name);
+    }
+
+    const completions: TodoCompletionDto[] = page.map((row) => {
+      const todo = byId.get(row.todoId)!;
+      return {
+        id: row.id,
+        todoId: row.todoId,
+        occurrence: row.occurrence,
+        completedAt: row.completedAt,
+        title: this.openField(todo.title, dek!, todoTitleAad(sub, row.todoId), row.todoId),
+        listId: todo.listId,
+        listName: todo.listId !== null ? names.get(todo.listId) ?? null : null,
+      };
+    });
+    return { completions, nextCursor };
+  }
+
+  /**
    * `GET /api/todos/:id` — served from the one cached `todo:all` row-set (the
    * spec enumerates exactly three todo cache shapes; the id is a filter, so no
    * id ever enters the key space). Decrypt, then slice by id in memory after the
@@ -685,17 +844,9 @@ export class TodosService {
     if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
 
     // Advance-on-tick: a recurring tick moves the todo to its next occurrence
-    // and keeps it open; a non-recurring `done:true` is unchanged.
+    // and keeps it open; a non-recurring `done:true` closes it. The mutation
+    // itself (flag + completion log + advance) runs in one transaction below.
     const advance = patch.done === true && todo.repeat !== null && todo.dueDate !== null;
-    if (advance) {
-      const local = dueSortKey(todo.dueDate, this.tz);
-      const next = advanceToOnOrAfter(local, todo.repeat!, this.nowLocal());
-      todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
-      todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
-      todo.done = false;
-    } else {
-      if (patch.done !== undefined) todo.done = patch.done;
-    }
 
     // The repeat-requires-due invariant holds against the resulting due.
     if (todo.repeat !== null && todo.dueDate === null) {
@@ -723,8 +874,38 @@ export class TodosService {
 
     todo.version += 1;
     todo.updatedAt = new Date();
-    const saved = await this.todos.save(todo);
-    // Bump AFTER the mutation — a 409 above never bumps.
+    // A done patch mutates the flag, the completion log and the advance in one
+    // transaction; every other patch keeps the linear path.
+    const saved =
+      patch.done === undefined
+        ? await this.todos.save(todo)
+        : await this.dataSource.transaction(async (manager) => {
+            if (advance) {
+              // Log the pre-advance due before overwriting it (occurrence = D).
+              const occurrence = todo.dueDate!;
+              const local = dueSortKey(todo.dueDate!, this.tz);
+              const next = advanceToOnOrAfter(local, todo.repeat!, this.nowLocal());
+              await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+              todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
+              todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+              todo.done = false;
+            } else if (patch.done === true) {
+              // One-off tick: occurrence is the due, or '~' when undated.
+              const occurrence = todo.dueDate ?? '~';
+              await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+              todo.done = true;
+            } else if (todo.repeat === null) {
+              // Un-complete one-off: drop only that occurrence's log row.
+              await manager
+                .getRepository(TodoCompletion)
+                .delete({ ownerSub: sub, todoId: id, occurrence: todo.dueDate ?? '~' });
+              todo.done = false;
+            }
+            // Un-complete repeating: the log is untouched; `done` is already false.
+            return manager.save(todo);
+          });
+    // Bump AFTER the save/commit — a 409 above never bumps, a thrown
+    // transaction never reaches here.
     await this.cache.bumpGeneration(sub);
     const row = { ...toCachedTodoRow(saved), tagIds: currentIds };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));

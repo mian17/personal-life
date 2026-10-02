@@ -40,6 +40,12 @@ export class TodosController {
     return this.todos.findTrash(principal.sub, { limit: query.limit, cursor: query.cursor });
   }
 
+  // Literal route declared before the `:id` route; only limit/cursor are read.
+  @Get('completions')
+  findCompletions(@Principal() principal: Principal, @Query() query: ListTodosQuery) {
+    return this.todos.findCompletions(principal.sub, { limit: query.limit, cursor: query.cursor });
+  }
+
   @Delete('trash')
   async emptyTrash(@Principal() principal: Principal) {
     return { ok: true, ...(await this.todos.emptyTrash(principal.sub)) };
