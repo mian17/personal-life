@@ -314,6 +314,30 @@ describe('ListItem', () => {
     }
   });
 
+  it('tints the todo checkbox: the tone rule wins the cascade on the leading control', () => {
+    const css = blocksCss();
+    const classCount = (selector: string) => (selector.match(/\.[\w-]+/g) ?? []).length;
+
+    // The todo row's leading toggle must not reset the colour the tone sets.
+    expect(cssBlock(css, '.ui-list-item--todo .ui-icon-btn')).not.toContain('color');
+
+    for (const tone of ['danger', 'amber', 'accent']) {
+      const selector = `.ui-list-item--${tone}:not(.ui-list-item--done) .ui-icon-btn`;
+      const rule = cssBlock(css, selector);
+      // The tint is declared on the control that leads the row ...
+      expect(rule).toMatch(new RegExp(`color:\\s*var\\(--${tone}\\)`));
+      // ... and the selector outranks the base `.ui-icon-btn` colour, so it wins.
+      expect(classCount(selector)).toBeGreaterThan(classCount('.ui-icon-btn'));
+    }
+
+    const atoms = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    expect(cssBlock(atoms, '.ui-icon-btn')).toMatch(/color:\s*var\(--text\)/);
+    // The square glyph inherits that colour, so the tint reaches the checkbox.
+    const checkbox = cssBlock(atoms, '.ui-checkbox');
+    expect(checkbox).toMatch(/color:\s*inherit/);
+    expect(checkbox).toMatch(/border:[^;]*currentColor/);
+  });
+
   it('applies one done treatment at both todo sizes, muting the signal due date too', () => {
     const { unmount } = render(
       <ul>

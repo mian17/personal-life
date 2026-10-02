@@ -204,3 +204,43 @@ describe('/todos list page wiring', () => {
     expect(html).toContain('Mark Water plants done');
   });
 });
+
+describe('/todos list row tint', () => {
+  const TODAY = todayIso();
+
+  function rowClasses(html: string, title: string): string[] {
+    const row = html.split('<li ').find((chunk) => chunk.includes(`>${title}<`));
+    if (!row) throw new Error(`no row rendered for "${title}"`);
+    const classAttr = row.slice(0, row.indexOf('>')).match(/class="([^"]*)"/)?.[1] ?? '';
+    return classAttr.split(/\s+/).filter(Boolean);
+  }
+
+  it('tints Overdue/Today rows by quadrant and leaves Done rows untinted', async () => {
+    mockedListTodos.mockResolvedValue({
+      todos: [
+        todo({ id: 'oi', title: 'Overdue important', dueDate: '2000-01-01', effectiveImportant: true }),
+        todo({ id: 'tn', title: 'Today not important', dueDate: TODAY, effectiveImportant: false }),
+        todo({ id: 'di', title: 'Done important', dueDate: '2000-01-01', effectiveImportant: true, done: true }),
+        todo({ id: 'dn', title: 'Done neither', dueDate: null, effectiveImportant: false, done: true }),
+      ],
+      nextCursor: null,
+    });
+
+    const el = await TodosPage();
+    const html = renderToStaticMarkup(el.props.body);
+
+    // Overdue + important → danger (quadrant I); Today + not important → amber (II).
+    expect(rowClasses(html, 'Overdue important')).toContain('ui-list-item--danger');
+    expect(rowClasses(html, 'Today not important')).toContain('ui-list-item--amber');
+
+    // Done rows stay muted and untinted — even a would-be quadrant I row, plus
+    // quadrant IV, carries no tone class.
+    for (const title of ['Done important', 'Done neither']) {
+      const classes = rowClasses(html, title);
+      expect(classes).toContain('ui-list-item--done');
+      expect(classes).not.toContain('ui-list-item--danger');
+      expect(classes).not.toContain('ui-list-item--amber');
+      expect(classes).not.toContain('ui-list-item--accent');
+    }
+  });
+});

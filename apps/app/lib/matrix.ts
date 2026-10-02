@@ -61,6 +61,19 @@ export function quadrantOf(
   return important ? 'not-urgent-important' : 'not-urgent-not-important';
 }
 
+/**
+ * The leading-checkbox tint for a todo's quadrant, from the single `QUADRANTS`
+ * mapping (I `danger`, II `amber`, III `accent`, IV none). `rowToneOf` is the
+ * one owner of quadrant → row tone; `/todos` and `/todos/matrix` both consume it.
+ */
+export function rowToneOf(
+  todo: Pick<Todo, 'effectiveImportant' | 'dueDate'>,
+  today: string,
+): ListItemTone | undefined {
+  const id = quadrantOf(todo, today);
+  return QUADRANTS.find((quadrant) => quadrant.id === id)?.rowTone ?? undefined;
+}
+
 /** One quadrant's labelled bucket, in the fixed `QUADRANTS` order. */
 export interface QuadrantBucket {
   id: QuadrantId;

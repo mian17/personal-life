@@ -1,5 +1,6 @@
 import type { List as TodoList } from '@life/shared';
 import { EmptyState, List, Section, type TagOption } from '@life/ui';
+import { rowToneOf } from '@/lib/matrix';
 import type { TodoGroup } from '@/lib/todo-groups';
 import { TodoItem } from './todo-item';
 
@@ -40,6 +41,7 @@ export function TodoList({
                   today={today}
                   lists={lists}
                   availableTags={availableTags}
+                  tone={todo.done ? undefined : rowToneOf(todo, today)}
                 />
               ))}
             </List>
