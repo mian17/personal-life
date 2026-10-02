@@ -177,6 +177,33 @@ sibling fields (lesson 0014). Field contracts live in `SPEC-todo-due-repeat-noti
   `notificationclick` (focus an existing `/todos` window, else `openWindow(data.url)` with
   `data.url = '/todos/<id>/edit'`). No bundler, no `next-pwa`.
 
+## Custom repeat surfaces (todo-custom-repeat)
+
+Additive to the editor's Repeat field (`SPEC-todo-custom-repeat.md`); composition stays
+`@life/ui`-only, no raw HTML, tokens only.
+
+- **Editor (`apps/app/app/todo-editor.tsx`):** the Repeat `Select` gains a **`Custom…`**
+  option (beside the canned `None`/`Daily`/… labels), whose committed label is
+  `repeatLabel('custom', dueDate, repeatDays)` (`Custom (Thu, Fri)`) once custom is set. Its
+  `value` remains the **committed** repeat: choosing `Custom…` **opens the modal and does not
+  commit** (the controlled `Select` snaps back to the committed value); `Confirm` sets
+  `repeat: 'custom'` + the days; Cancel and Escape are a no-op. Selecting a canned option
+  (or `None`) clears the days. Editor state gains `repeatDays: number[]`; the due-clear
+  cascade resets it to `[]` and closes the modal. The save payload sends `repeatDays` only
+  when `repeat === 'custom'` (omitted otherwise).
+- **`recurrence-dialog.tsx` (new app composition):** a `Dialog` titled `Custom repeat`
+  composed from `Dialog` + `Select` (aria-label `Frequency`, one option `Weekly` — the seam
+  for monthly later) + a Mon–Sun **multi-select** of seven `Pill as="button" size="chip"`
+  toggles (short names from the `@life/ui` weekday owner, wrapped in a visible
+  `PillGroup label="Days"`) + a footer of `Button variant="ghost"` `Cancel` and primary
+  `Button` `Confirm` (disabled while the draft is empty). Open seeding: the committed custom
+  set if any, else the due date's ISO weekday. The whole modal (frequency, draft days) is
+  local; only `Confirm` writes back.
+- **Label (`apps/app/lib/todo-repeat-label.ts`):** `repeatLabel(repeat, dueDate?, repeatDays?)`
+  maps `custom` → `Custom (Thu, Fri)` (days sorted ISO Mon→Sun, short names from the single
+  `@life/ui` weekday owner, never `toLocale*`). The row (`todo-item.tsx`) and the editor's
+  Repeat option both read this one function.
+
 ## Frozen e2e surface updates (matrix-ui, user-approved)
 
 The theme-toggle relocation approved in the matrix intent (L4 / map D7) changes the
@@ -210,6 +237,12 @@ recorded surface this spec froze:
   delete, no Undo). No existing name/role/aria-label changes: `Done`/`All`/`Open`/`Status`
   and every row `href` all stay. Recorded as surface additions only; the human-owned suite
   changes only if the user asks.
+- **Custom repeat additions (todo-custom-repeat):** the new accessible names `Custom repeat`
+  (the modal title), `Frequency`, `Days`, the seven day labels `Mon`…`Sun`, `Confirm`,
+  `Cancel`, and `Close` (the modal's close `IconButton`). The Repeat `Select` remains the
+  existing `combobox`; choosing `Custom…` opens the modal instead of committing. The label
+  `Custom (Thu, Fri)` is data (a committed value's text), not a frozen control name.
+  Recorded as surface additions only; the human-owned suite changes only if the user asks.
 
 No current Playwright assertion queried the theme toggle or a tab, so the frozen suite is
 not rewritten by this chapter — the surface *record* is what updates (here, in

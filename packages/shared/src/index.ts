@@ -49,8 +49,11 @@ export interface NotePage {
 export const NOTE_BODY_MAX = 20000;
 export const TAG_NAME_MAX = 50;
 
-export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;
+export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'custom'] as const;
 export type TodoRepeat = (typeof TODO_REPEATS)[number];
+
+/** The valid custom-repeat day domain (`ISO` weekdays 1..7, Mon..Sun). */
+export const TODO_REPEAT_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /**
  * The todo domain wire contract (`SPEC-todo-service`), owned by
@@ -79,6 +82,8 @@ export interface Todo {
   effectiveImportant: boolean;
   dueDate: string | null;
   repeat: TodoRepeat | null;
+  /** ISO weekdays 1..7 (Mon..Sun); `null` = not a custom repeat. */
+  repeatDays: number[] | null;
   reminderScheduledAt: string | null;
   listId: string | null;
   tagIds: number[];
@@ -93,6 +98,11 @@ export interface CreateTodoInput {
   note?: string;
   dueDate?: string;
   repeat?: TodoRepeat | null;
+  /**
+   * ISO weekdays 1..7 (Mon..Sun); `null`/omitted = no custom days. Present only
+   * meaningful when `repeat === 'custom'`.
+   */
+  repeatDays?: number[] | null;
   listId?: string;
   /** `null` (or omitted) = inherit the list default. */
   important?: boolean | null;
@@ -110,6 +120,11 @@ export interface UpdateTodoInput {
   dueDate?: string | null;
   /** `null` clears the repeat; omitting leaves it unchanged. */
   repeat?: TodoRepeat | null;
+  /**
+   * ISO weekdays 1..7 (Mon..Sun); `null`/omitted = no custom days. Present only
+   * meaningful when `repeat === 'custom'`.
+   */
+  repeatDays?: number[] | null;
   /** `null` detaches the list; omitting leaves it unchanged. */
   listId?: string | null;
   /** A `tagIds` write REPLACES the association set (kernel detach semantics). */

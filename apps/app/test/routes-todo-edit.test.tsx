@@ -55,6 +55,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     effectiveImportant: false,
     dueDate: '2026-10-02',
     repeat: null,
+    repeatDays: null,
     reminderScheduledAt: null,
     listId: 'l1',
     tagIds: [7],

@@ -172,7 +172,11 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `apps/app/test/routes-todos-list.test.tsx`, `apps/app/test/routes-matrix.test.tsx`,
     `apps/app/test/routes-todos-trash.test.tsx`,
     `apps/app/test/routes-todos-completions.test.tsx` (created by `todo-completion-history`
-    T8, commit `b15dbbd`).
+    T8, commit `b15dbbd`), plus `apps/app/lib/todo-repeat-label.ts` (execution-discovered:
+    extending `TodoRepeat` makes the `Record<TodoRepeat, string>` non-total, so the base label
+    key must land in the same change). **T2 adds ONLY the minimal `custom: 'Custom'` base entry
+    required to keep `Record<TodoRepeat, string>` total; T8 owns the days-aware
+    `Custom (Thu, Fri)` branch.**
   - Reference files (read-only): `docs/specs/SPEC-todo-custom-repeat.md`,
     `docs/specs/SPEC-todo-service.md`.
   - Strictly prohibited files: every other file (the service tests use `h.todos.create(...)`, not
@@ -192,6 +196,10 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     `repeatDays: null` (in `routes-todos-completions.test.tsx` beside `repeat: null` in the
     `todo()` factory) so `npm run typecheck -w @life/app` stays green. No app production code
     constructs a `Todo` literal (verified), so only tests change.
+  - **App label base entry:** in `apps/app/lib/todo-repeat-label.ts`, add `custom: 'Custom'` to
+    `BASE_LABELS` so the `Record<TodoRepeat, string>` stays total once `'custom'` joins the
+    enum. **T2 adds ONLY this minimal base entry; T8 owns the days-aware `Custom (Thu, Fri)`
+    branch.** `repeatLabel`'s signature and behavior are otherwise unchanged.
 
 [VERIFICATION & TESTING RULES]
   - Permitted test command: `npm run build -w @life/shared` then `npm run typecheck -w @life/shared`,
@@ -203,6 +211,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
   - [ ] `Todo.repeatDays`, `CreateTodoInput.repeatDays`, `UpdateTodoInput.repeatDays` exist with
         the exact types above.
   - [ ] All nine app test files carry `repeatDays: null` in their `Todo` literal.
+  - [ ] `apps/app/lib/todo-repeat-label.ts` `BASE_LABELS` carries the minimal `custom: 'Custom'`
+        base entry (T8 enriches it to the days-aware branch; T2 does not).
   - [ ] `npm run typecheck -w @life/shared` and `npm run typecheck -w @life/app` pass with zero
         errors; no file outside scope.
 
@@ -479,7 +489,8 @@ dropdown (weekly-only today) is the seam for monthly later. No row is rewritten.
     sorted ISO Mon→Sun and mapped directly through `@life/ui` `WEEKDAY_SHORT[i-1]` (the short
     label for ISO weekday `i`; never `toLocale*`). `weekdayShort(iso)` (T3) is only for turning a
     date into its short name and is not used here; empty days → bare `Custom`. The other repeats
-    are unchanged.
+    are unchanged. Note: T2 already added the minimal base key `custom: 'Custom'` to
+    `BASE_LABELS`; T8 enriches that existing key (it does not add a second `custom` entry).
   - `recurrence-dialog.tsx` (`'use client'`), props
     `{ open, onOpenChange, dueDate: string, value: number[], onConfirm(days: number[]) }`:
     - `Dialog` titled `Custom repeat`.

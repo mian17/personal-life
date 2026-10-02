@@ -21,7 +21,8 @@ todo(
   important BOOLEAN NULL,            -- plaintext metadata, NULL = inherit list default (L6)
   dueDate   TEXT NULL,               -- 'YYYY-MM-DD' (date-only) or canonical UTC
                                      -- instant '…Z' (timed); plaintext metadata
-  repeat    TEXT NULL,               -- null | daily | weekdays | weekly | monthly | yearly
+  repeat    TEXT NULL,               -- null | daily | weekdays | weekly | monthly | yearly | custom
+  repeatDays TEXT NULL,              -- CSV of ISO weekdays 1..7 (Mon..Sun), e.g. '4,5'; null = not custom
   reminderScheduledAt TEXT NULL,     -- canonical UTC instant of the current reminder; null = none
   listId    TEXT NULL,               -- FK list.id, ON DELETE SET NULL (detach)
   origin    TEXT NULL,               -- JSON {service,id} — kernel orchestrator seam
@@ -70,7 +71,10 @@ push_subscription(
   naive and never round-trips through `Date` (lesson 0003). Index
   `IDX_todo_reminder_scheduled_at` on `reminderScheduledAt` backs the reminder sweep
   predicate. `synchronize: true` applies the additive columns (no migration framework).
-- `repeat` and `reminderScheduledAt` are **plaintext, non-content** metadata (like
+  `repeatDays` is additive too: `repeat` keeps its flat enum and gains `'custom'`, and
+  `repeatDays` holds the ISO weekday set as CSV (`'4,5'`) — no row rewrite; every existing
+  row keeps `repeatDays = null` (`SPEC-todo-custom-repeat.md`).
+- `repeat`, `repeatDays`, and `reminderScheduledAt` are **plaintext, non-content** metadata (like
   `done`/`important`/`dueDate`): no `@life/crypto` envelope, no AAD, no user text.
   `reminderScheduledAt` is the lasting reminder record ("the letter"); no separate
   notification table is introduced. `push_subscription` stores **delivery capability
@@ -127,15 +131,20 @@ Due-time / recurrence / reminder field contracts (`SPEC-todo-due-repeat-notify.m
 additive, plaintext, non-content. Optionality splits by direction: request fields optional,
 read fields required-but-nullable:
 
-- `Todo` (read DTO) carries `repeat: TodoRepeat | null` and
+- `Todo` (read DTO) carries `repeat: TodoRepeat | null`,
+  `repeatDays: number[] | null`, and
   `reminderScheduledAt: string | null`, present on every read (`POST`, `GET /api/todos`,
   `GET /api/todos/:id`, `PATCH`, `POST /:id/restore`).
-  `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const;`
+  `export const TODO_REPEATS = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'custom'] as const;`
   and `export type TodoRepeat = (typeof TODO_REPEATS)[number];` — the array is the single
   source; the DTO validates with `@IsIn(TODO_REPEATS)` (owner: `@life/shared`).
 - `CreateTodoInput.dueDate?: string | null` and `UpdateTodoInput.dueDate?: string | null`;
   `repeat?: TodoRepeat | null` on both. Update: omitted = unchanged; `null` on `dueDate`
   clears the due **and** the reminder; `null` on `repeat` clears the repeat.
+- `repeatDays?: number[] | null` on both inputs, validated
+  `@IsOptional() @ValidateIf((_, v) => v !== null) @IsArray() @ArrayNotEmpty() @IsIn(TODO_REPEAT_DAYS, { each: true })`
+  (`TODO_REPEAT_DAYS` = ISO weekdays `1..7`, owner `@life/shared`). `null`/omitted = no custom
+  days; present only meaningful when `repeat === 'custom'` (`SPEC-todo-custom-repeat.md`).
 - Request `dueDate` is a date-only `YYYY-MM-DD` or a local-timed `YYYY-MM-DDTHH:mm`
   (`datetime-local`, no zone); the service normalizes a timed request to the canonical UTC
   instant in `TODO_TIMEZONE` (below) before storing. Validation is
@@ -153,7 +162,13 @@ read fields required-but-nullable:
   `reminderScheduledAt = null`. A **done** todo keeps its stored reminder until
   ticked/cleared; the sweep skips `done` rows.
 - **A repeat requires a due date.** Create/update with `repeat != null` and no resulting
-  `dueDate` → 400 (`BadRequestException('repeat requires a dueDate')`).
+  `dueDate` → 400 (`BadRequestException('repeat requires a dueDate')`). This applies to
+  `custom` too.
+- **Custom day-set invariants (`SPEC-todo-custom-repeat.md`):** `repeat === 'custom'` ⟺
+  `repeatDays` is a non-empty set — `custom` with no days → 400
+  (`BadRequestException('custom repeat requires repeatDays')`); any non-`custom` repeat stores
+  `repeatDays = null` (a provided set is normalized away); clearing the due clears `repeat`
+  **and** `repeatDays`.
 - **Advance-on-tick records a completion (N2/N3, no scheduler; amended by
   `SPEC-todo-completion-history.md` C4, lesson 0017):** `PATCH /api/todos/:id { done: true }`
   where the todo has `repeat` **records a completion and** advances. Let `D = todo.dueDate`
@@ -161,7 +176,8 @@ read fields required-but-nullable:
   `todo_completion` row with `occurrence = D` (the pre-advance due, in its stored shape) and
   `completedAt = new Date().toISOString()`, then advance the todo to its next occurrence
   on/after "now" in the `TODO_TIMEZONE` local calendar (daily +1d; weekdays next Mon–Fri;
-  weekly +7d; monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28),
+  weekly +7d; monthly +1 month clamped to month end; yearly +1 year, Feb 29 → Feb 28;
+  custom next day whose ISO weekday is in `repeatDays`, ≤ 7 steps, time-of-day preserved),
   skipping candidates before now, re-derive `reminderScheduledAt`, and return the advanced
   row. `done` stays **`false`** — the row advances and remains open. `version` bumps once;
   the generation counter bumps after the write. **`UNIQUE (todoId, occurrence)`** is the
@@ -172,7 +188,7 @@ read fields required-but-nullable:
   **only that occurrence's** row (any other rows are preserved). Ticking a recurring todo
   hides nothing (no undo snackbar — UI). Trash/restore semantics are unchanged.
 
-- `POST /api/todos {title, note?, dueDate?, repeat?, listId?, important?, tagIds?}` → 201 (version 0).
+- `POST /api/todos {title, note?, dueDate?, repeat?, repeatDays?, listId?, important?, tagIds?}` → 201 (version 0).
   `important` is `boolean | null`; omitted or `null` stores `null` (inherit the list default).
 - `GET /api/todos?{q, listId, tagId, done, important, dueBefore, dueAfter}` → cursor page.
   Cursor payload: `base64(<due sort key>|<createdAt>|<id>)` (`~` = undated sentinel).
@@ -184,7 +200,7 @@ read fields required-but-nullable:
   per kernel); `tagId` filters over `todo_tag`; all content filtering happens after
   cache hits (AGENTS.md Contract 2).
 - `GET /api/todos/:id` · `PATCH /api/todos/:id {title?, note?, done?, dueDate?, repeat?,
-  important?, listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins;
+  repeatDays?, important?, listId?, tagIds?, expectedVersion?}` (409 on stale; omit = last-write-wins;
   `important: null` clears the override back to inherit) ·
   `DELETE /api/todos/:id` (**soft** delete: sets `deletedAt`).
 - `GET /api/todos/trash?{limit, cursor}` → cursor page of soft-deleted todos,
@@ -273,8 +289,10 @@ A bounded NestJS module `apps/todo-service/src/reminders/` (the only sender; no
   carry the
   plaintext `important: boolean | null` (non-content, alongside `done`) and the
   cached list rows carry `importantDefault: boolean | null` (`SPEC-todo-importance.md`);
-  the cached todo rows also carry the plaintext `repeat: TodoRepeat | null` and
-  `reminderScheduledAt: string | null` (non-content, `SPEC-todo-due-repeat-notify.md`);
+  the cached todo rows also carry the plaintext `repeat: TodoRepeat | null`,
+  `repeatDays: number[] | null`, and
+  `reminderScheduledAt: string | null` (non-content, `SPEC-todo-due-repeat-notify.md`,
+  `SPEC-todo-custom-repeat.md`);
   content columns (`title`/`note`/`name`) remain `enc.v1.`-only.
 - Key composition `todo:<sub>:v<gen>:<rest>` — including `todo:<sub>:v<gen>:trash` and
   the completion log's `todo:<sub>:v<gen>:completions` (`TODO_COMPLETIONS` rest).
@@ -306,8 +324,8 @@ A bounded NestJS module `apps/todo-service/src/reminders/` (the only sender; no
   `done`); they are stored in the clear in SQL and Redis, while no content plaintext
   ever enters Redis. The cache suite's ciphertext assertions (content fields
   `enc.v1.`-only, no known plaintext) are unchanged and still fail on any content leak.
-  `repeat`/`reminderScheduledAt` extend the same plaintext exception; `repeat`/`reminderScheduledAt`
-  never enter the cache key.
+  `repeat`/`repeatDays`/`reminderScheduledAt` extend the same plaintext exception;
+  `repeat`/`repeatDays`/`reminderScheduledAt` never enter the cache key.
 - **`push_subscription` is outside the cache:** it is delivery capability, read directly
   (config + subscribe/unsubscribe writes), never a request-path read-through shape and
   never cached. `GET /api/push/key` reads config, not the DB.

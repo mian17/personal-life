@@ -91,7 +91,39 @@ and the notes app's current pages map onto these one-to-one.
           duration?: number />                       // default 5000
 <SnackbarProvider>children</SnackbarProvider>       // holds current snackbar; useSnackbar()
                                                     //   returns { showSnackbar }
+<Dialog open: boolean                               // controlled modal on native <dialog>;
+        onOpenChange: (open: boolean) => void       //   stores no open state
+        title: ReactNode                            //   → .ui-dialog__title
+        children: ReactNode                         //   → .ui-dialog__body
+        footer?: ReactNode                          //   → .ui-dialog__footer (action row)
+        className? />                               // native backdrop/top-layer/Escape
 ```
+
+### Dialog (`SPEC-todo-custom-repeat.md`)
+
+The recurrence modal needs an overlay; there is no popover/dialog primitive. `Dialog` is the
+smallest reusable one, built on the **native `<dialog>`** element so the platform supplies the
+backdrop, top-layer rendering (`.ui-card { overflow: hidden }` cannot clip it), Escape-to-close,
+and focus trapping for free — no portal library. It is **controlled** and stores no open state.
+
+```ts
+export interface DialogProps {
+  open: boolean;                          // controlled; the block stores no open state
+  onOpenChange: (open: boolean) => void;  // Escape / backdrop / close button
+  title: ReactNode;                       // heading (rendered in .ui-dialog__title)
+  children: ReactNode;                    // body
+  footer?: ReactNode;                     // action row (Confirm/Cancel), right-aligned
+  className?: string;
+}
+```
+
+- `'use client'`. A ref effect on `open` calls the native `showModal()` / `close()`; the
+  element's `close` event maps to `onOpenChange(false)` (Escape/backdrop). `jsdom` does not
+  implement `showModal`/`close`, so the test owns the shim.
+- The close affordance is an `IconButton` (`X`, label `Close`) — no raw `<button>`.
+- Tokens only: `.ui-dialog` surface (`--panel`, `--radius-lg`), padding/gap from `--space-*`.
+  `tokens.css` is untouched; `.ui-dialog::backdrop` is **not** styled (the native default
+  backdrop dims the page; a colour would need a literal outside `tokens.css`).
 
 ### Todo-ecosystem additions (T7)
 
@@ -133,6 +165,10 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
 | row disclosure trigger | `Menu` `⋯` (`MoreVertical`), label `Actions for <name>`, `aria-haspopup="menu"` |
 | view affordances (in the `Menu` panel) | `IconButton label="Rename tag <name>"` (`Pencil`) + `IconButton label="Delete tag <name>"` (`CircleX`) |
 | inline edit | `Input` (`aria-label="Rename tag <name>"`) + `IconButton` `Save` (`Check`) + `IconButton` `Cancel` (`X`) |
+| `Dialog` root | native `<dialog class="ui-dialog">` (platform element — exempt plumbing) |
+| `Dialog` head | `.ui-dialog__head` (structural glue) + title span `.ui-dialog__title` + `IconButton` (`X`, label `Close`) |
+| `Dialog` body | `.ui-dialog__body` (structural glue, holds `children`) |
+| `Dialog` footer (when `footer` set) | `.ui-dialog__footer` (structural glue, holds `footer`) |
 
 #### Accessibility
 

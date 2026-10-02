@@ -16,6 +16,7 @@ const BASE_LABELS: Record<TodoRepeat, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   yearly: 'Yearly',
+  custom: 'Custom',
 };
 
 /** The ordinal suffix for a day of the month (`1st`, `2nd`, `11th`, `21st`). */

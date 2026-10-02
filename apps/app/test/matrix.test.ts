@@ -14,6 +14,7 @@ function todo(id: string, dueDate: string | null, effectiveImportant: boolean): 
     effectiveImportant,
     dueDate,
     repeat: null,
+    repeatDays: null,
     reminderScheduledAt: null,
     listId: null,
     tagIds: [],
