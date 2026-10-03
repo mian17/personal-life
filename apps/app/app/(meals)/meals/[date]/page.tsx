@@ -1,4 +1,4 @@
-import { mealDay } from '../page';
+import { mealDay } from '../day';
 
 export const dynamic = 'force-dynamic';
 

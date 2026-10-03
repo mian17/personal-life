@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { spawnService, waitForHttp, type SpawnedService } from './services';
 import {
@@ -47,6 +47,7 @@ export interface StackConfig {
   notePort: number;
   tagsPort: number;
   todoPort: number;
+  mealPort: number;
   /** Browser origin the app is reached on (`localhost` or `127.0.0.1`). */
   appOrigin: string;
   /** Scratch directory for the IdP/note-service DBs and keys. */
@@ -67,6 +68,33 @@ function build(workspace: string): Promise<void> {
       (err) => (err ? reject(err) : resolve()),
     );
   });
+}
+
+/**
+ * Find the app's standalone server directory under `.next/standalone`. Next
+ * mirrors the monorepo layout there, so `server.js` sits under some prefix of
+ * `apps/app` — exactly `apps/app` from the primary checkout, but
+ * `.worktrees/<slug>/apps/app` when the checkout is a git worktree. Walk to
+ * whichever `apps/app/server.js` exists rather than assuming the depth.
+ */
+function findStandaloneAppDir(standaloneRoot: string): string {
+  const stack = [standaloneRoot];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    if (existsSync(join(dir, 'server.js')) && dir.endsWith(join('apps', 'app'))) return dir;
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== 'node_modules') {
+        stack.push(join(dir, entry.name));
+      }
+    }
+  }
+  throw new Error(`no standalone app server found under ${standaloneRoot}`);
 }
 
 function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
@@ -136,6 +164,18 @@ function todoEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
+function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(cfg.mealPort),
+    HOST: '127.0.0.1',
+    DB_PATH: `${cfg.stateDir}/meal-service.db`,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    MEAL_SERVICE_AUDIENCE: 'life-api',
+    MEAL_MASTER_KEY: HARNESS_MASTER_KEY,
+  };
+}
+
 function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   const origin = cfg.appOrigin;
   return {
@@ -145,6 +185,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     API_URL: `http://127.0.0.1:${cfg.notePort}`,
     TAGS_API_URL: `http://127.0.0.1:${cfg.tagsPort}`,
     TODO_API_URL: `http://127.0.0.1:${cfg.todoPort}`,
+    MEAL_API_URL: `http://127.0.0.1:${cfg.mealPort}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
@@ -216,6 +257,17 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     }),
   );
 
+  await build('apps/meal-service');
+  services.push(
+    await spawnService({
+      name: 'meal-service',
+      command: 'node',
+      args: ['dist/main.js'],
+      cwd: `${repoRoot()}/apps/meal-service`,
+      env: mealEnv(cfg),
+    }),
+  );
+
   const app = await spawnApp(cfg);
   services.push(app);
 
@@ -223,6 +275,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   await waitForHttp(`http://127.0.0.1:${cfg.notePort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
+  await waitForHttp(`http://127.0.0.1:${cfg.mealPort}/health`);
   await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
 
   return services;
@@ -231,17 +284,24 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
 async function spawnApp(cfg: StackConfig): Promise<SpawnedService> {
   if (cfg.mode === 'production') {
     await build('apps/app');
-    // `output: 'standalone'` omits static assets; Docker copies them in. Do the
-    // same so the built app serves CSS/JS exactly like production.
-    const standalone = `${repoRoot()}/apps/app/.next/standalone/apps/app`;
-    mkdirSync(`${standalone}/.next`, { recursive: true });
-    cpSync(`${repoRoot()}/apps/app/.next/static`, `${standalone}/.next/static`, { recursive: true });
-    mkdirSync(`${standalone}/public`, { recursive: true });
-    cpSync(`${repoRoot()}/apps/app/public`, `${standalone}/public`, { recursive: true });
+    // `output: 'standalone'` mirrors the monorepo layout below
+    // `apps/app/.next/standalone/`, so the app's server lands under
+    // `<...>/apps/app/server.js`. From the primary checkout that prefix is just
+    // `apps/app`; run from a git worktree and Next nests the worktree's relative
+    // path in between (`.worktrees/<slug>/apps/app`). Locate it instead of
+    // assuming the depth, so the same harness serves both.
+    const standaloneRoot = `${repoRoot()}/apps/app/.next/standalone`;
+    const appDir = findStandaloneAppDir(standaloneRoot);
+    // The build omits static assets; Docker copies them in. Do the same so the
+    // built app serves CSS/JS exactly like production.
+    mkdirSync(`${appDir}/.next`, { recursive: true });
+    cpSync(`${repoRoot()}/apps/app/.next/static`, `${appDir}/.next/static`, { recursive: true });
+    mkdirSync(`${appDir}/public`, { recursive: true });
+    cpSync(`${repoRoot()}/apps/app/public`, `${appDir}/public`, { recursive: true });
     return spawnService({
       name: 'app',
       command: 'node',
-      args: ['.next/standalone/apps/app/server.js'],
+      args: [join(appDir, 'server.js')],
       cwd: `${repoRoot()}/apps/app`,
       env: appEnv(cfg),
     });

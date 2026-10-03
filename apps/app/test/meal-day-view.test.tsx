@@ -9,7 +9,7 @@ jest.mock('@/lib/meal-api', () => ({
 
 import { ApiError } from '@/lib/api-error';
 import { listDayEntries, getMealTarget, type MealEntry, type MealTarget } from '@/lib/meal-api';
-import { mealDay } from '@/app/(meals)/meals/page';
+import { mealDay } from '@/app/(meals)/meals/day';
 import MealDatePage from '@/app/(meals)/meals/[date]/page';
 
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
