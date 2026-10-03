@@ -170,6 +170,32 @@ export const TODO_TITLE_MAX = 500;
 export const TODO_NOTE_MAX = 20000;
 export const TODO_LIST_NAME_MAX = 100;
 
+/** The feedback domain wire contract (`SPEC-feedback-service`, `SPEC-feedback-ui`). */
+export const FEEDBACK_TYPE_VALUES = ['feature_request', 'enhancement', 'bug_report'] as const;
+export type FeedbackType = (typeof FEEDBACK_TYPE_VALUES)[number];
+
+export const FEEDBACK_APPS = ['notes', 'todos', 'feedback'] as const;
+export type FeedbackApp = (typeof FEEDBACK_APPS)[number];
+
+export const FEEDBACK_DESCRIPTION_MAX = 2000;
+
+export interface FeedbackDto {
+  id: string;
+  app: string;
+  type: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface CreateFeedbackInput {
+  id: string;
+  app: FeedbackApp;
+  type: FeedbackType;
+  description: string;
+}
+
+export type FeedbackSubmitResult = { ok: true; id: string } | { ok: false; message: string };
+
 export interface PushSubscribeInput {
   endpoint: string;
   keys: { p256dh: string; auth: string };
