@@ -56,8 +56,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
 
 - [ ] T2: compose infra — module `feedback-infra`
   - [TASK OBJECTIVE] Add the `postgres`, `rabbitmq`, and `redis-feedback` compose services
-    with named volumes, healthchecks, and no host ports, plus the two password names in
-    `.env.example`.
+    with named volumes, healthchecks, and the confirmed publish policy (`postgres`/
+    `rabbitmq` publish host loopback `127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`;
+    `redis-feedback` publishes none), plus the two password names in `.env.example`.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed files to edit/create: `compose.yaml`, `.env.example`.
     - Reference files (read-only): `docs/specs/SPEC-feedback-infra.md` (`## compose.yaml
@@ -97,7 +98,8 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Strict constraints: NO full suites, NO E2E; max test executions: 2.
   - [DEFINITION OF DONE]
     - [ ] `docker compose config` parses and shows the three services with named volumes,
-          healthchecks, and zero published ports.
+          healthchecks, `postgres`/`rabbitmq` publishing host loopback only
+          (`127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`), `redis-feedback` publishing none.
     - [ ] `.env.example` documents both password names; `.env.development.example` untouched by this task (T10's per P1).
     - [ ] No `feedback-service` compose block added; no file outside scope modified.
   - Dependencies: T1. Size: S.
