@@ -88,10 +88,12 @@ export async function mealDay(day: string, emptyBody: string) {
           </ButtonLink>
         </Stack>
       </Card>
-      <Row>
-        <ButtonLink href="/meals/entry/new">Log manually</ButtonLink>
-        <ButtonLink href="/meals/saved">Saved meals</ButtonLink>
-      </Row>
+      <Section>
+        <Row>
+          <ButtonLink href="/meals/entry/new">Log manually</ButtonLink>
+          <ButtonLink href="/meals/saved">Saved meals</ButtonLink>
+        </Row>
+      </Section>
       {entries.length === 0 ? (
         <EmptyState body={emptyBody} />
       ) : (

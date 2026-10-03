@@ -111,6 +111,17 @@ describe('meals day view', () => {
     expect(html).toContain('href="/meals/saved"');
   });
 
+  it('spaces the manual + saved doors row below the summary card with the section rhythm', async () => {
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    // Same block rhythm as the target page's Card → Section junction: the doors
+    // row is wrapped in the `Section` primitive, which owns `.ui-section`'s
+    // `margin-block-start` (packages/ui owns the block rhythm, not the atoms).
+    expect(html).toMatch(
+      /ui-section"><div class="ui-stack ui-stack--md"><div class="ui-row ui-row--md"><a class="ui-btn ui-btn--primary ui-btn--default" href="\/meals\/entry\/new">Log manually<\/a><a class="ui-btn ui-btn--primary ui-btn--default" href="\/meals\/saved">Saved meals<\/a>/,
+    );
+  });
+
   it('groups entries under their meal with a subtotal, in Breakfast/Lunch/Dinner/Snacks order', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 's1', mealGroup: 'snack', nutrients: vector({ calories: 100 }) }),
