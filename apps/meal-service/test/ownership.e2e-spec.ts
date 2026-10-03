@@ -256,4 +256,56 @@ describe('Meal ownership (e2e)', () => {
       expect(aAfter.body).toEqual(aBefore.body);
     });
   });
+
+  describe('saved meals', () => {
+    const post = (body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).post('/api/saved-meals'), token).send(body);
+    const list = (token: string) =>
+      auth(request(app.getHttpServer()).get('/api/saved-meals'), token);
+    const one = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).get(`/api/saved-meals/${id}`), token);
+    const remove = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).delete(`/api/saved-meals/${id}`), token);
+
+    const savedVector = (calories: number): Record<Nutrient, number> => {
+      const out = {} as Record<Nutrient, number>;
+      for (const { key } of NUTRIENTS) out[key] = 0;
+      out.calories = calories;
+      return out;
+    };
+
+    const body = (name: string, calories: number) => ({
+      name,
+      mealGroup: 'dinner',
+      items: [{ foodId: 'food-a', quantity: 1, nutrients: savedVector(calories) }],
+    });
+
+    it("scopes the list and one-read to the caller (B sees nothing of A's saved meal)", async () => {
+      const created = await post(body('A dinner', 640), tokenA).expect(201);
+
+      const bList = await list(tokenB).expect(200);
+      expect(bList.body).toEqual([]);
+
+      const aList = await list(tokenA).expect(200);
+      expect(aList.body).toHaveLength(1);
+      expect(aList.body[0].items[0].nutrients.calories).toBe(640);
+      expect(aList.body[0]).not.toHaveProperty('ownerSub');
+
+      await one(created.body.id, tokenB).expect(404);
+      await one(created.body.id, tokenA).expect(200);
+    });
+
+    it("returns a byte-identical 404 for a foreign id and a missing id", async () => {
+      const created = await post(body('A lunch', 500), tokenA).expect(201);
+
+      const f = await one(created.body.id, tokenB).expect(404);
+      const m = await one(MISSING_ID, tokenB).expect(404);
+      expect(JSON.stringify(f.body)).toBe(JSON.stringify(m.body));
+
+      await remove(created.body.id, tokenB).expect(404);
+      const stillThere = await one(created.body.id, tokenA).expect(200);
+      expect(stillThere.body.name).toBe('A lunch');
+    });
+  });
 });
+
