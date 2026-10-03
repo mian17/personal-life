@@ -11,7 +11,8 @@ direction, and build order confirmed line-by-line in the interview restate.
 | `note-cache` | `apps/note-service` gets a read-through cache for its read methods (list/trash/one/tags), invalidated by generation-bump on every write | — |
 | `tags-cache` | `apps/tags-service` gets a read-through cache for its own tag rows, invalidated by generation-bump on every write | — |
 | `todo-cache` | `apps/todo-service` gets a read-through cache for its own reads, invalidated by generation-bump on every write | — |
-| `redis-deploy` | Five internal-only Redis services in `compose.yaml` — one per service, **never shared** (intent decision 3) — env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache`, `tags-cache`, `todo-cache` |
+| `feedback-cache` | `apps/feedback-service` gets a read-through cache for its own reads, invalidated by generation-bump on every write. Its `redis-feedback` instance is provisioned by the feedback chapter alongside the `postgres` + `rabbitmq` services (`SPEC-feedback-infra.md`) — **its own instance, never shared** (intent decision 3, lesson 0011), `REDIS_URL` as elsewhere | — |
+| `redis-deploy` | Six internal-only Redis services in `compose.yaml` — one per service, **never shared** (intent decision 3) — env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache`, `tags-cache`, `todo-cache`, `feedback-cache` |
 
 Build order: `app-state` first (highest risk: distributed refresh lock + fail-closed
 semantics), then `idp-cache` ∥ `note-cache` (independent, parallel-safe), with
