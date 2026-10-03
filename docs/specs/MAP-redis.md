@@ -11,14 +11,15 @@ direction, and build order confirmed line-by-line in the interview restate.
 | `note-cache` | `apps/note-service` gets a read-through cache for its read methods (list/trash/one/tags), invalidated by generation-bump on every write | — |
 | `tags-cache` | `apps/tags-service` gets a read-through cache for its own tag rows, invalidated by generation-bump on every write | — |
 | `todo-cache` | `apps/todo-service` gets a read-through cache for its own reads, invalidated by generation-bump on every write | — |
-| `redis-deploy` | Five internal-only Redis services in `compose.yaml` — one per service, **never shared** (intent decision 3) — env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache`, `tags-cache`, `todo-cache` |
+| `meal-cache` | `apps/meal-service` gets the service's single namespace adapter over `@life/cache` (`src/cache/meal-cache.ts`) — a read-through cache for its food/entry/saved reads, invalidated by generation-bump on every write | — |
+| `redis-deploy` | Six internal-only Redis services in `compose.yaml` — one per service (`redis-app`, `redis-idp`, `redis-note`, `redis-tags`, `redis-todo`, `redis-meal`) — **never shared** (intent decision 3) — env wiring, integration-test seam (`TEST_REDIS_URL`) | `app-state`, `idp-cache`, `note-cache`, `tags-cache`, `todo-cache`, `meal-cache` |
 
 Build order: `app-state` first (highest risk: distributed refresh lock + fail-closed
 semantics), then `idp-cache` ∥ `note-cache` (independent, parallel-safe), with
 `redis-deploy` wiring landing alongside and closing with the integration proof.
 
-Module shape: no new processes — all three modules are retrofits inside existing
-services. `redis-deploy` is compose + env + test-harness only. Each service reads exactly
+Module shape: no new processes — every cache module is a retrofit inside an existing
+service. `redis-deploy` is compose + env + test-harness only. Each service reads exactly
 one env var (`REDIS_URL`), pointing at its own Redis instance; unset means today's
 behavior (in-memory / direct-DB), which is how dev and e2e stay Redis-free.
 
