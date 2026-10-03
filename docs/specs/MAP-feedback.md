@@ -36,13 +36,19 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
 - Consumer: at-least-once; dedups on `event_id`.
 
 ### Service HTTP contract
-- `POST /feedback` — body `{ id, app, type, description }` where `id` is the client-supplied
-  idempotency key (UUID); owner taken from the JWT (`principal.sub`). Returns `201 { id }`.
-- `GET /feedback` — owner-scoped; returns entries newest-first for in-memory grouping by
-  app then type. Cache key shape `feedback:<owner_sub>:v<gen>:list` (filters/pagination never
-  in the key, per Contract 2 Rule 3).
-- Feedback DTO: `{ id, app, type, description, createdAt }` (description decrypted in the
-  request path only).
+- Routes live under the repo's `/api/<resource>` prefix (as `api/notes`, `api/lists`):
+  `POST /api/feedback`, `GET /api/feedback`. Service port `3006`.
+- `POST /api/feedback` — body `{ id, app, type, description }` where `id` is the
+  client-supplied idempotency key (UUID); owner taken from the JWT (`principal.sub`).
+  Returns `201 { id }`. A repeat of an already-owned `id` is the same no-op `201 { id }` —
+  `409` is never emitted. Validation failures are `400` (never `422`).
+- `GET /api/feedback` — owner-scoped; returns a **bare `FeedbackDto[]`** (no envelope),
+  newest-first, for in-memory grouping by app then type. Cache key shape
+  `feedback:<owner_sub>:v<gen>:list` (filters/pagination never in the key, per
+  Contract 2 Rule 3).
+- Wire types live in `@life/shared` (`feedback/dto/`): `FeedbackDto = { id, app, type,
+  description, createdAt }` (description decrypted in the request path only),
+  `FeedbackType`, `CreateFeedbackInput`, `FEEDBACK_DESCRIPTION_MAX` (2000).
 
 ### Cache contract (Contract 2)
 - Read-through, per-owner generation counter bumped on successful writes, TTL backstop,
