@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "apps/note-service",
+    "apps/feedback-service",
     "apps/tags-service",
     "apps/todo-service",
     "apps/app",
