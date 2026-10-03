@@ -1,0 +1,37 @@
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Principal } from '../auth/principal';
+import { EstimatePhotoDto } from './dto/estimate-photo.dto';
+import { PhotoService } from './photo.service';
+
+/**
+ * `POST /api/estimates/photo` — the ONE path string the UI's server action
+ * posts to (`SPEC-meal-service` Photo → Gemini pipeline; Task 17's call site in
+ * `lib/meal-api.ts`). `@Controller('api/estimates')` follows the repo's
+ * `api/<noun>` convention.
+ *
+ * The route returns a **suggestion, never an entry**: the client's
+ * `readable: true` items become the editor's draft, and an explicit
+ * `{ readable: false, reason: 'could-not-read' }` opens it empty (manual mode).
+ * Nothing is written, nothing is cached, and no image byte reaches a log.
+ *
+ * `@Principal()` is bound here like every other route (`SPEC-meal-service` Code
+ * Style: the owner comes from the verified token, never the body — enforced by
+ * the global `forbidNonWhitelisted` pipe, which rejects an `ownerSub` field).
+ * An estimate persists nothing, so the principal is read as proof of an
+ * authenticated caller and is not forwarded to a query that does not exist.
+ */
+@Controller('api/estimates')
+export class PhotoController {
+  constructor(private readonly photo: PhotoService) {}
+
+  @Post('photo')
+  @HttpCode(HttpStatus.OK)
+  estimate(@Principal() _owner: Principal, @Body() dto: EstimatePhotoDto) {
+    // The principal is read here because every route's owner is bound to it
+    // (`SPEC-meal-service` Code Style); it is not forwarded, because an
+    // estimate persists nothing to scope. `OK`, not `201 Created`: the endpoint
+    // produces no resource — a suggestion is a transient read, and a failure is
+    // a valid answer to a valid request.
+    return this.photo.estimate(dto.imageBase64, dto.mimeType, dto.hint);
+  }
+}

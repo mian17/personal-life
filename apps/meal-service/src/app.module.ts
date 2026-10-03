@@ -9,6 +9,7 @@ import { Serving } from './foods/serving.entity';
 import { HealthModule } from './health/health.module';
 import { KeysModule } from './keys/keys.module';
 import { UserKeys } from './keys/user-keys.entity';
+import { PhotoModule } from './photo/photo.module';
 import { SavedMeal } from './saved-meals/saved-meal.entity';
 import { SavedMealItem } from './saved-meals/saved-meal-item.entity';
 import { SavedMealsModule } from './saved-meals/saved-meals.module';
@@ -29,6 +30,7 @@ import { TargetModule } from './targets/target.module';
     FoodsModule,
     EntriesModule,
     SavedMealsModule,
+    PhotoModule,
   ],
 })
 export class AppModule {}
