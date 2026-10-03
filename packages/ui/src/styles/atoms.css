@@ -511,3 +511,51 @@
   opacity: 0.5;
 }
 
+/* --------------------------------------------------------- FilePicker */
+
+/* Generic file-upload field: the native `<input type="file">` is the control
+   (visually hidden, focused via the surface), and `.ui-file-picker__surface`
+   is the visible affordance — the same field shell as a form control. The
+   label is rendered visibly inside the surface, so the atom is never
+   aria-label-only (lesson 0014). The input is clipped rather than
+   `display:none` so it keeps its place in the tab order and stays focusable;
+   focus is drawn on the surface through `:focus-within`. */
+.ui-file-picker {
+  display: block;
+}
+
+.ui-file-picker__input {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ui-file-picker__surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-25);
+  padding: var(--space-0-75);
+  border-radius: var(--radius-md);
+  border: var(--border-width) dashed var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ui-file-picker__label {
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+.ui-file-picker__input:focus-visible + .ui-file-picker__surface,
+.ui-file-picker__input:focus + .ui-file-picker__surface {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-file-picker__input:disabled + .ui-file-picker__surface {
+  cursor: default;
+  opacity: 0.5;
+}
+

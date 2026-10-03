@@ -72,6 +72,14 @@ for these without any visible change.
                                      //   feeds it from the client's tz (lesson 0019).
                                      //   Renders <time dateTime> for dated states; the
                                      //   empty state renders `emptyLabel` with no <time>.
+<FilePicker label: string            // generic upload field: native <input type="file">
+            accept?: string          //   with `label` as the visible text and the
+            capture? multiple? name? //   control's accessible name (never aria-only —
+            disabled? onFiles? onChange? />
+                                     //   lesson 0014). `accept` defaults to "image/*";
+                                     //   capture/multiple/name/disabled forward as-is.
+                                     //   onFiles receives the selected FileList, onChange
+                                     //   the raw event. Owns `.ui-file-picker*`, token-only.
 ```
 
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
@@ -93,7 +101,10 @@ owns the frozen `trash-delete` hook (on `ConfirmSubmit`, trash/page.tsx:59-64);
 chip), the `.filters a` pill, and the `.active` active-state values; `Textarea`
 variant `editor` absorbs `.editor-body`; `LocalTime` / `ConfirmButton` /
 `ThemeToggle` are direct generalizations of `app/local-time.tsx`,
-`app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `DueDatePill` (T7, `todo-ui`) is a
+`app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `FilePicker` (new) has no legacy
+counterpart: a generic upload field — native `<input type="file">` plus a visible
+`label` surface — owning `.ui-file-picker*` (token-only; focus ring on the surface
+via `:focus-within`). `DueDatePill` (T7, `todo-ui`) is a
 new atom with **no** legacy counterpart: it owns `.ui-due-pill` and its state
 modifiers (`.ui-due-pill--overdue|today`, colours from `--danger`/`--accent`); the
 `none`/`later` states need no extra declaration. `Checkbox` is the presentational

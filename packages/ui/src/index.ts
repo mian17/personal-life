@@ -11,6 +11,9 @@ export type { CheckboxProps } from './components/checkbox';
 export { Input } from './components/input';
 export type { InputProps } from './components/input';
 
+export { FilePicker } from './components/file-picker';
+export type { FilePickerProps } from './components/file-picker';
+
 export { Textarea } from './components/textarea';
 export type { TextareaProps, TextareaVariant } from './components/textarea';
 
