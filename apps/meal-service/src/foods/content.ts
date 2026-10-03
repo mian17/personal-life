@@ -43,11 +43,17 @@ export function zeroVector(): NutrientVector {
 }
 
 /**
- * The single owner of the "a vector is complete" rule: all 27 fields present and
- * finite, and nothing else. A missing or unknown field is rejected rather than
- * defaulted — `SPEC-meal-service` Nutrient semantics allows a *whole* vector of
- * zeroes for absent data, never a partial vector with holes in it, and a
- * silently dropped field would make the day sum quietly wrong.
+ * The single owner of the "a vector is complete" rule: all 27 fields present,
+ * finite, and non-negative, and nothing else. A missing or unknown field is
+ * rejected rather than defaulted — `SPEC-meal-service` Nutrient semantics allows
+ * a *whole* vector of zeroes for absent data, never a partial vector with holes
+ * in it, and a silently dropped field would make the day sum quietly wrong.
+ *
+ * Mass is a magnitude, so a negative value is rejected here at the one write
+ * boundary every vector crosses (food, entry, saved meal, photo). `scale()`
+ * clamps negatives and `format()` renders them as the unknown affordance, so a
+ * negative would otherwise be stored verbatim and silently subtract from the day
+ * total; refusing it keeps the boundary consistent with the model.
  */
 export function completeVector(value: unknown): NutrientVector {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -62,6 +68,9 @@ export function completeVector(value: unknown): NutrientVector {
     const number = source[key];
     if (typeof number !== 'number' || !Number.isFinite(number)) {
       throw new Error(`nutrient vector field ${key} must be a finite number`);
+    }
+    if (number < 0) {
+      throw new Error(`nutrient vector field ${key} must not be negative`);
     }
     out[key] = number;
   }

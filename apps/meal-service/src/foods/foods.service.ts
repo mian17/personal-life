@@ -268,21 +268,31 @@ export class FoodsService {
 
     if (dto.name !== undefined) food.name = encryptField(dek, dto.name, foodNameAad(sub, food.id));
     if (dto.servingGrams !== undefined) food.servingGrams = dto.servingGrams;
-    food.nutrients =
-      base === null ? null : this.sealVector(dek, base, foodNutrientsAad(sub, food.id));
+    // A PATCH that omits `nutrients` leaves the stored base vector untouched:
+    // writing NULL here would erase the food's numbers on a name-only edit (a
+    // NULL base reads back as all zeroes). Only an explicit vector replaces it.
+    const baseChanged = base !== null;
+    if (baseChanged) {
+      food.nutrients = this.sealVector(dek, base, foodNutrientsAad(sub, food.id));
+    }
 
     food.version += 1;
     const saved = await this.foods.save(food);
 
     // The serving set is replaced when the client sends one, re-derived when the
     // vector or serving weight moved, and otherwise left untouched — so a
-    // serving can never disagree with the food it belongs to.
+    // serving can never disagree with the food it belongs to. Re-deriving a
+    // changed base needs the vector, so a PATCH that moves `servingGrams`
+    // without `nutrients` reuses the food's stored base (decrypted once here).
     let servings: Serving[];
     if (dto.portions !== undefined) {
       if (base === null) {
         throw new BadRequestException('nutrients are required to replace portions');
       }
       servings = await this.replaceServings(sub, saved, base, normalizePortions(dto.portions), dek);
+    } else if (baseChanged || dto.servingGrams !== undefined) {
+      const effectiveBase = base ?? (await this.storedBaseVector(sub, saved, dek));
+      servings = await this.deriveServings(sub, saved, effectiveBase, dek);
     } else {
       servings = await this.servings.find({ where: { foodId: saved.id, ownerSub: sub } });
       servings.sort((a, b) => a.id.localeCompare(b.id));
@@ -356,5 +366,41 @@ export class FoodsService {
     if (rows.length > 0) await this.servings.insert(rows);
     rows.sort((a, b) => a.id.localeCompare(b.id));
     return rows;
+  }
+
+  /**
+   * The food's current base vector, decrypted, for a PATCH that moved
+   * `servingGrams` or supplied a new vector without a `portions` replacement.
+   * An all-zero base (a food created before any vector was set) yields all-zero
+   * servings, which is the model's documented "absent data is 0" case.
+   */
+  private async storedBaseVector(sub: string, food: Food, dek: Buffer): Promise<NutrientVector> {
+    if (!food.nutrients) return zeroVector();
+    return readStoredVector(this.openField(food.nutrients, dek, foodNutrientsAad(sub, food.id), food.id));
+  }
+
+  /**
+   * Re-derive every existing serving's own vector from `base` and the food's
+   * current `servingGrams`, keeping the rows' ids, labels, and grams. Used when
+   * the base vector or serving weight changed but the client did not send a new
+   * `portions` set, so a serving can never serve a stale number.
+   */
+  private async deriveServings(
+    sub: string,
+    food: Food,
+    base: NutrientVector,
+    dek: Buffer,
+  ): Promise<Serving[]> {
+    const existing = await this.servings.find({ where: { foodId: food.id, ownerSub: sub } });
+    for (const serving of existing) {
+      serving.nutrients = this.sealVector(
+        dek,
+        servingVector(base, food.servingGrams, serving),
+        servingNutrientsAad(sub, serving.id),
+      );
+    }
+    if (existing.length > 0) await this.servings.save(existing);
+    existing.sort((a, b) => a.id.localeCompare(b.id));
+    return existing;
   }
 }
