@@ -6,3 +6,5 @@ export * from './restore';
 // `export *` pair is unambiguous. Consumers call each script's `main` directly.
 export { main } from './backup';
 export { PgRunner, createComposePgRunner, createDockerPgRunner } from './pg-client';
+export { runBackupPg } from './backup-pg';
+export { runRestorePg } from './restore-pg';
