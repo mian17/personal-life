@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest",
     "db:backup": "ts-node scripts/backup.ts",
-    "db:restore": "ts-node scripts/restore.ts"
+    "db:restore": "ts-node scripts/restore.ts",
+    "db:backup:pg": "ts-node scripts/backup-pg.ts"
   },
   "dependencies": {
     "@life/shared": "*",
