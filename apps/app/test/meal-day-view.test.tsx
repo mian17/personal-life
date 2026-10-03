@@ -84,6 +84,24 @@ describe('meals day view', () => {
     expect(html).toContain(`${format('calories', 0)} — No target set`);
   });
 
+  it('links to the target page with "Set target" when no target is set', async () => {
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toContain('href="/meals/target"');
+    expect(html).toContain('Set target');
+    expect(html).not.toContain('Edit target');
+  });
+
+  it('links to the target page with "Edit target" when a target is set', async () => {
+    mockedGetMealTarget.mockResolvedValue(target({ calories: 2000 }));
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toContain('href="/meals/target"');
+    expect(html).toContain('Edit target');
+    expect(html).not.toContain('Set target');
+  });
+
   it('keeps all three doors reachable on an empty day', async () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 

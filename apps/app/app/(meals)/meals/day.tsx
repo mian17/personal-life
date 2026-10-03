@@ -12,6 +12,7 @@ import {
   PageTitle,
   Row,
   Section,
+  Stack,
   StatusText,
 } from '@life/ui';
 import { Camera } from 'lucide-react';
@@ -80,7 +81,12 @@ export async function mealDay(day: string, emptyBody: string) {
       <NavBar trailing={<MealsNav />} />
       <PageTitle>Meals — {formatDate(day)}</PageTitle>
       <Card>
-        <StatusText>{daySummary(totalCalories, target)}</StatusText>
+        <Stack gap="sm">
+          <StatusText>{daySummary(totalCalories, target)}</StatusText>
+          <ButtonLink href="/meals/target" variant="ghost">
+            {target ? 'Edit target' : 'Set target'}
+          </ButtonLink>
+        </Stack>
       </Card>
       <Row>
         <ButtonLink href="/meals/entry/new">Log manually</ButtonLink>
