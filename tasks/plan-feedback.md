@@ -28,7 +28,9 @@ command.
 Three modules in map dependency order, vertically sliced:
 
 1. `feedback-infra` — `postgres` + `rabbitmq` + `redis-feedback` compose services (named
-   volumes, healthchecks, no host ports) and a PostgreSQL-only backup/restore pair in
+   volumes, healthchecks; `postgres`/`rabbitmq` published host-loopback on
+   `127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`, `redis-feedback` internal-only) and a
+   PostgreSQL-only backup/restore pair in
    `@life/db` (`db:backup:pg` / `db:restore:pg`, `PgRunner` seam, fake-runner unit tests,
    throwaway-container integration suite skipped when Docker is absent).
 2. `feedback-service` — new NestJS workspace `apps/feedback-service` (kernel copy):
@@ -80,7 +82,10 @@ Locked by the confirmed intent/map — traced here, not re-decided:
   verified pre-restore snapshot). `pg_dump -Fc` + `pg_restore --list` replace
   `VACUUM INTO` + `quick_check`; every client runs INSIDE the container via the
   `PgRunner` seam (host has no `psql`/`pg_dump`).
-- **A8 (map HTTP/wire locks):** `@Controller('api/feedback')`; port 3006;
+- **A8 (map HTTP/wire locks):** `@Controller('api/feedback')`; prod/container port `3008`,
+  dev port `3108` (dev wiring per P1); internal-only in compose — no published host
+  port, like note/tags/todo; `FEEDBACK_API_URL` names the app-side base URL (default
+  `http://127.0.0.1:3008`);
   `POST` body `{ id, app, type, description }` (owner from `principal.sub`); validation
   failures `400` only; `GET` returns a bare `FeedbackDto[]` newest-first;
   wire types live in `@life/shared` (`FeedbackApp`, `FeedbackType`, `FeedbackDto`,
@@ -92,26 +97,37 @@ Locked by the confirmed intent/map — traced here, not re-decided:
 
 Decisions taken in planning (recorded here so no task re-opens them silently):
 
-- **P1 — dev/e2e fallback story.** The infra spec leaves `.env.development.example`
-  unchanged ("dev and e2e run with zero Postgres and zero RabbitMQ … the
-  feedback-service module owns that fallback story") while the UI spec requires the e2e
-  harness to launch feedback-service "once the feedback-infra stack is up". Resolution:
-  the service always requires `FEEDBACK_DB_URL` to boot (service spec); `npm run dev`
-  does NOT start feedback-service by default (no Postgres in dev — README documents
-  opting in); the e2e harness starts a throwaway Postgres container
-  (`docker run --rm`, the `pg-integration.test.ts` pattern), waits for `pg_isready`, and
-  passes `FEEDBACK_DB_URL` to the spawned feedback-service. The e2e runs with NO
-  RabbitMQ and NO Redis: broker-down reconnect/backoff and cache fail-open are the
-  spec's own failure modes, so the e2e proves the HTTP/UI path while the service suites
-  (with a fake AMQP sink) prove the event path. This is the only reading consistent with
-  both specs.
+- **P1 — dev/e2e wiring + fallback story.** Confirmed ports: feedback-service binds `3008`
+  (prod/container default) and runs on `3108` in dev. Dev wiring mirrors tags/todo exactly:
+  the root `dev` script gains `"PORT=3108 npm run dev -w apps/feedback-service"` (compare tags
+  `PORT=3104`, todo `PORT=3105`) and `.env.development.example` gains
+  `FEEDBACK_API_URL=http://127.0.0.1:3108` (compare `TODO_API_URL=http://127.0.0.1:3105`). Dev
+  therefore needs a reachable Postgres and RabbitMQ plus `FEEDBACK_MASTER_KEY` in
+  `.env.development`: `FEEDBACK_DB_URL=postgresql://feedback:<password>@127.0.0.1:5432/feedback`
+  and `RABBITMQ_URL=amqp://feedback:<password>@127.0.0.1:5672` (the compose `postgres`/`rabbitmq`
+  host-loopback publishes), and the service refuses to boot without the DB URL + master key
+  (service spec); the local bring-up is `docker compose up -d postgres rabbitmq`, documented
+  in README by T10. Redis stays optional in dev: cache fail-open is the spec's own failure
+  mode (broker-down reconnect/backoff still covers transient broker loss). The e2e harness starts a throwaway Postgres container (`docker run --rm`, the
+  `pg-integration.test.ts` pattern), waits for `pg_isready`, and passes `FEEDBACK_DB_URL` to
+  the spawned feedback-service — on the harness's own port scheme (31xx/32xx per
+  `apps/app/test/e2e/config.ts`; 3008/3108 never enter the harness). The e2e runs NO RabbitMQ
+  and NO Redis: broker-down tolerance covers the event path, so the e2e proves the HTTP/UI path
+  while the service suites (fake AMQP sink) prove the event path. This supersedes the earlier
+  "dev runs with zero Postgres" reading and is the only reading consistent with the confirmed
+  port decision and both specs.
 - **P2 — compose split.** T2 owns only `postgres`/`rabbitmq`/`redis-feedback` +
   volumes + the two password names in `.env.example`. The `feedback-service` compose
   block (with the `FEEDBACK_DB_URL`/`RABBITMQ_URL` injection, healthy-`depends_on`,
-  `FEEDBACK_MASTER_KEY` fail-fast, `REDIS_URL: redis://redis-feedback:6379`), the
-  Dockerfile, the app-side `FEEDBACK_URL`, and README land in T10 after the workspace
-  exists — the tags/todo T9 precedent. (Last chapter's five-lane HIGH was the compose
-  app missing service URLs; `FEEDBACK_URL` is explicitly T10's.)
+  `FEEDBACK_MASTER_KEY` fail-fast, `REDIS_URL: redis://redis-feedback:6379`, the verifier
+  pair `IDP_ISSUER: ${IDP_ISSUER:-}` +
+  `FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}` (the copied
+  verifier throws without `IDP_ISSUER` — fail closed)), the
+  Dockerfile, the app-side `FEEDBACK_API_URL`, dev wiring, and README land in T10 after
+  the workspace exists — the tags/todo T9 precedent (dev wiring posture: P1; compose
+  prod value `FEEDBACK_API_URL: http://feedback-service:3008`). The service stays
+  internal-only (no published host port), like note/tags/todo. (Last chapter's five-lane
+  HIGH was the compose app missing service URLs.)
 - **P3 — new dependencies.** `pg` (TypeORM Postgres driver, T7) and `amqplib` +
   `@types/amqplib` (T9) are the only new runtime dependencies — the service spec's
   allowance, forced by locked decisions 2/4. Lockfile via `npm install` only.
@@ -136,13 +152,15 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
       feedback chapter as the need Postgres + the broker earned their place against.
 
 ### Phase 2 — feedback-infra
-- [ ] T2: `compose.yaml` — `postgres` + `rabbitmq` + `redis-feedback` (named volumes, healthchecks, no host ports) + `.env.example` secret names
+- [ ] T2: `compose.yaml` — `postgres` + `rabbitmq` + `redis-feedback` (named volumes, healthchecks, `postgres`/`rabbitmq` published host-loopback on `127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`, `redis-feedback` internal-only) + `.env.example` secret names
 - [ ] T3: `@life/db` — `PgRunner` seam (`pg-client.ts`: compose/docker runners, URL parsing, dump/verify/count helpers)
 - [ ] T4: `@life/db` — `db:backup:pg` (`runBackupPg` + thin CLI + fake-runner unit suite + root/workspace scripts)
 - [ ] T5: `@life/db` — `db:restore:pg` (`runRestorePg` + thin CLI + fake-runner unit suite + throwaway-container integration suite + scripts)
 
 ### Checkpoint: Infra up
-- [ ] `docker compose config` shows the three new services with named volumes, healthchecks, and zero published ports.
+- [ ] `docker compose config` shows the three new services with named volumes, healthchecks,
+      and published ports only on host loopback (`127.0.0.1:5432:5432`, `127.0.0.1:5672:5672`;
+      `redis-feedback` publishes none).
 - [ ] `docker compose up -d postgres rabbitmq redis-feedback` → all healthchecks green (tech lead, once).
 - [ ] `npm run typecheck -w packages/db` clean; `backup-pg`/`restore-pg` unit suites green; `pg-integration` green or Docker-absent-skipped.
 
@@ -151,7 +169,7 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 - [ ] T7: `apps/feedback-service` — kernel-copy scaffold (main/app.factory/app.module, AuthGuard, ValidationPipe, health, keys custody)
 - [ ] T8: feedback API slice — entity, DTO, controller (`POST`/`GET /api/feedback`), service, read-through cache, `enc.v1.` at rest
 - [ ] T9: event slice — `feedback_event`/`feedback_cursor` entities, boot-ensured NOTIFY trigger DDL, LISTEN dispatcher + cursor, RabbitMQ publisher (`amqplib`)
-- [ ] T10: service test suites (the spec's seven groups) + Dockerfile + compose `feedback-service` block + env/README wiring
+- [ ] T10: service test suites (the spec's seven groups) + Dockerfile + compose `feedback-service` block + env/dev-script/README wiring
 
 ### Checkpoint: Service API + event proven
 - [ ] `POST` persists one row + one event in one transaction; duplicate `id` → same `201 { id }`, no second event.
@@ -174,6 +192,7 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 - [ ] `grep -rln "getThrough" apps/*/src` → feedback-service read flow goes through the read-through cache.
 - [ ] `grep -rn "## Cache Rules" docs/specs/SPEC-feedback-*.md` → present (service) / recorded N/A (infra, ui).
 - [ ] `git diff` shows zero changes to `manifest-notes.json`, `manifest-todos.json`, `viewport.themeColor`, `icon.svg`, and the frozen e2e selector surface.
+- [ ] Existing affected suite green unchanged: `npm run test:unit -w @life/app -- test/routes-todos-list.test.tsx` (it asserts the Notes/Todos nav aria-labels T13 edits — SPEC-feedback-ui Success 6 "existing suites unchanged and passing").
 
 ### Phase 5 — Close
 - [ ] T15: five-lane verification gate (§7.6) → report; merge awaits the user's explicit request
@@ -194,7 +213,7 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 | T7 | `apps/feedback-service` kernel-copy scaffold | feedback-service | T6 | L (scaffold copy) |
 | T8 | feedback API slice (POST/GET + cache + `enc.v1.`) | feedback-service | T7 | M |
 | T9 | event slice (trigger DDL + LISTEN dispatcher + RabbitMQ publisher) | feedback-service | T8 | M |
-| T10 | service suites (seven groups) + Dockerfile + compose/env/README wiring | feedback-service | T9 | M |
+| T10 | service suites (seven groups) + Dockerfile + compose/env/dev-script/README wiring | feedback-service | T9 | M |
 | T11 | `@life/ui` `FeedbackForm` + `FeedbackNavItem` + optional-fab `ListShell` | feedback-ui | T6 | M |
 | T12 | `apps/app` BFF + server action + `/feedback` route + inbox | feedback-ui | T11 | M |
 | T13 | toolbar integration + PWA identity + manifest/gate suites | feedback-ui | T12 | M |
@@ -211,15 +230,15 @@ forces parallel subagents. Everything else is a strict chain per the index.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| First Postgres + RabbitMQ in the stack (a new infra class: images, volumes, healthchecks, backup semantics) | High | Stock images only; healthcheck-gated `depends_on`; internal-only (no host ports); the PG backup/restore pair is proven by unit + throwaway-container integration suites (T4/T5) before the service relies on the store; restore fails closed on an up/unknown probe. |
+| First Postgres + RabbitMQ in the stack (a new infra class: images, volumes, healthchecks, backup semantics) | High | Stock images only; healthcheck-gated `depends_on`; published host-loopback only (`127.0.0.1:5432`/`127.0.0.1:5672`), Redis instances internal-only; the PG backup/restore pair is proven by unit + throwaway-container integration suites (T4/T5) before the service relies on the store; restore fails closed on an up/unknown probe. |
 | Postgres NOTIFY is transient — dropped on disconnect or listener-queue overflow | Med | The `feedback_event` table (addressed by `seq` cursor) is the source of truth; the 60s reconciliation tick replays `seq > last_seq` until caught up (A2); service test group 7 proves a dropped notification is republished in order with `event_id` dedup. |
 | `@life/ui` → `@life/shared` is a new dependency edge | Med | Types-only, one line in `packages/ui/package.json`; jest `moduleNameMapper` mirrors the existing `@life/*` source-resolution pattern; `npm run typecheck -w @life/ui` and `-w @life/app` gate it; shared never imports ui (no cycle). |
 | Docker-dependent tests (`pg-integration.test.ts`, feedback-service suites, the e2e harness's throwaway Postgres) | Med | Unit/integration suites are skipped, not failed, when Docker is absent (infra spec); the e2e fails fast with a clear message (it is the chapter's final proof — a silent skip would hide it); fake-runner unit tests never touch Docker. |
-| e2e harness must launch feedback-service + a throwaway Postgres | Med | T14 mirrors the `pg-integration.test.ts` container pattern and the existing `spawnService`/`waitForHttp` harness; the app gets `FEEDBACK_URL`; `REDIS_URL` unset (fail-open → direct DB) and no RabbitMQ (spec'd broker-down tolerance); teardown force-removes the container. |
+| e2e harness must launch feedback-service + a throwaway Postgres | Med | T14 mirrors the `pg-integration.test.ts` container pattern and the existing `spawnService`/`waitForHttp` harness; the app gets `FEEDBACK_API_URL`; `REDIS_URL` unset (fail-open → direct DB) and no RabbitMQ (spec'd broker-down tolerance); teardown force-removes the container. |
 | `amqplib` is a new runtime dependency | Low | Forced by locked decision 4; publisher sits behind a small interface so tests use a fake AMQP sink recording confirms; lockfile via `npm install` only. |
 | Frozen surfaces (e2e selectors, token values, existing PWA constants) | Med | New selectors and new files only; T13 asserts zero diff to `manifest-notes.json`/`manifest-todos.json`/`viewport.themeColor`/`icon.svg`; the Contract mechanical-checks checkpoint re-runs every grep before the gate. |
 | Cross-chapter invariant drift (architecture.md's no-brokers/SQLite posture silently overwritten) | High | T1 reconciles the governing docs FIRST and records the revision as the deliberate cross-chapter decision (lesson 0012); the validation gate checks the plan against it. |
-| Dev posture drifts (feedback-service half-wired in `npm run dev`) | Low | P1 recorded: dev does not start feedback-service by default; README (T10) documents opting in with a running Postgres; `.env.development.example` unchanged. |
+| Dev posture drift (feedback-service needs Postgres + `FEEDBACK_MASTER_KEY` under dev) | Med | P1 recorded: the root `dev` script starts feedback-service on 3108 (tags/todo pattern) and `.env.development.example` gains `FEEDBACK_API_URL=http://127.0.0.1:3108`; README (T10) documents bringing up the local Postgres (compose `postgres`) + setting `FEEDBACK_DB_URL`/`FEEDBACK_MASTER_KEY` before `npm run dev`. |
 
 ## Open Questions
 

@@ -35,11 +35,23 @@ Build:     npm run build -w @life/feedback-service
 
 Env contract: `FEEDBACK_DB_URL` (Postgres connection URL), `REDIS_URL`
 (`redis-feedback`, its own instance — lesson 0011), `RABBITMQ_URL`,
-`IDP_ISSUER` + `FEEDBACK_IDP_JWKS_URL` (kernel two-var pattern),
+`IDP_ISSUER` + `FEEDBACK_IDP_JWKS_URL` (kernel two-var pattern — the copied
+verifier throws at boot when `IDP_ISSUER` is unset, so a compose-launched service
+fails closed; compose injects both, `IDP_ISSUER: ${IDP_ISSUER:-}` +
+`FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}`, the
+sibling compose pattern),
 `FEEDBACK_SERVICE_AUDIENCE` (default `life-api`, kernel token model),
 `FEEDBACK_MASTER_KEY` (32-byte base64, own custody — MAP M3 precedent),
 `FEEDBACK_TEST_DB_URL` (throwaway Postgres for tests only), and `PORT`
-(default `3006`; main.ts binds it, mirroring note-service's bootstrap). The
+(default `3008`; `3108` in dev — main.ts binds it, mirroring note-service's
+bootstrap). Addressing: production uses the internal compose network —
+`FEEDBACK_DB_URL=postgresql://…@postgres:5432/feedback`,
+`RABBITMQ_URL=amqp://…@rabbitmq:5672`; dev runs the service on the host (`3108`)
+and reaches the same compose services through their host-loopback publishes —
+`FEEDBACK_DB_URL=postgresql://feedback:<password>@127.0.0.1:5432/feedback`,
+`RABBITMQ_URL=amqp://feedback:<password>@127.0.0.1:5672` (infra spec §Compose
+topology), with `FEEDBACK_MASTER_KEY` from `.env.development`. Redis stays
+fail-open in dev as elsewhere. The
 service refuses to boot without the DB URL, the master key, or the verifier
 config.
 

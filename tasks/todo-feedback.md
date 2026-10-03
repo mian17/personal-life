@@ -63,20 +63,24 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Reference files (read-only): `docs/specs/SPEC-feedback-infra.md` (`## compose.yaml
       additions`), `compose.yaml` (the five existing Redis instances, lines ~227-356, and
       the bottom `volumes:` block), `docs/specs/MAP-redis.md`.
-    - Strictly prohibited files: everything else — NOT `.env.development.example` (stays
-      unchanged, P1), NOT the `feedback-service` compose block (T10's), NOT `apps/**`.
+    - Strictly prohibited files: everything else — NOT `.env.development.example` (T10's per P1; T2
+      owns only `.env.example`), NOT the `feedback-service` compose block (T10's), NOT `apps/**`.
   - [IMPLEMENTATION REQUIREMENTS]
     - `postgres`: image `postgres:17-alpine`; `POSTGRES_DB: feedback`; `POSTGRES_USER:
       feedback`; `POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?FEEDBACK_DB_PASSWORD is
       required}` (fail-fast, the `NOTE_MASTER_KEY` pattern); volume
       `postgres-data:/var/lib/postgresql/data`; joins the existing `life` network; the
       healthcheck from the spec (`pg_isready -U feedback -d feedback`, interval 10s,
-      timeout 3s, retries 5, start_period 10s); `restart: unless-stopped`; **no `ports:`**.
+      timeout 3s, retries 5, start_period 10s); `restart: unless-stopped`; **`ports:`
+      `127.0.0.1:5432:5432`** — host loopback only (the `app`/`idp` comment pattern, so the
+      host-run dev service on 3108 reaches it; production stays `postgres:5432`).
     - `rabbitmq`: image `rabbitmq:4.1-alpine` (confirm the minor tag against Docker Hub at
       implementation); `RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-feedback}`;
       `RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}`; volume
       `rabbitmq-data:/var/lib/rabbitmq`; the `rabbitmq-diagnostics -q ping` healthcheck;
-      `restart: unless-stopped`; **no `ports:`** (management UI not exposed); network `life`.
+      `restart: unless-stopped`; **`ports:` `127.0.0.1:5672:5672`** — host loopback only
+      (dev reachability on 3108; production stays `rabbitmq:5672`); network `life`.
+      The management UI stays off: image without `-management`, `15672` never published.
     - `redis-feedback`: a sixth internal-only Redis instance mirroring the existing five
       exactly (same image/tag, `redis-feedback-data` named volume, `life` network, same
       healthcheck, no host ports) — its own instance, never a namespaced tenant
@@ -84,8 +88,8 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Bottom `volumes:` block gains `postgres-data:`, `rabbitmq-data:`, `redis-feedback-data:`.
     - `.env.example` gains the two documented **names** (values never committed), matching
       the `NOTE_MASTER_KEY` comment style: `FEEDBACK_DB_PASSWORD=` and `RABBITMQ_PASSWORD=`.
-      No `FEEDBACK_MASTER_KEY`/`FEEDBACK_URL` here (T10 owns service wiring), no
-      `.env.development.example` change.
+      No `FEEDBACK_MASTER_KEY`/`FEEDBACK_API_URL` here (T10 owns service wiring), no
+      `.env.development.example` change in this task.
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `docker compose config` (config validation only — no `up`, no
       build, no test suite). Do NOT run the stack; the tech lead brings the three services
@@ -94,7 +98,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   - [DEFINITION OF DONE]
     - [ ] `docker compose config` parses and shows the three services with named volumes,
           healthchecks, and zero published ports.
-    - [ ] `.env.example` documents both password names; `.env.development.example` unchanged.
+    - [ ] `.env.example` documents both password names; `.env.development.example` untouched by this task (T10's per P1).
     - [ ] No `feedback-service` compose block added; no file outside scope modified.
   - Dependencies: T1. Size: S.
 
@@ -104,11 +108,14 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     dump/verify/table-count helpers the backup/restore cores consume.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed files to edit/create: `packages/db/src/pg-client.ts` (new),
+      `packages/db/src/backup.ts` (one additive `export` on the existing `readManifest` —
+      SQLite/Postgres parity; T4/T5s' unit suites assert the same manifest-less exclusion),
       `packages/db/src/index.ts` (re-export `PgRunner`, `createComposePgRunner`,
       `createDockerPgRunner`).
     - Reference files (read-only): `docs/specs/SPEC-feedback-infra.md`
       (`### The client inside the container`), `packages/db/src/backup.ts`
-      (`pruneRoutineSnapshots`/`readManifest` — reused, never copied),
+      (`pruneRoutineSnapshots` — reused unchanged; `readManifest` — import the export,
+      never copy),
       `packages/db/src/backup.ts`/`restore.ts` (the SQLite probe/build shape),
       `docs/specs/SPEC-db-backup-restore.md` (the mirrored contract).
     - Strictly prohibited files: `packages/db/src/backup-pg.ts`/`restore-pg.ts` (T4/T5),
@@ -135,6 +142,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `tableCounts(database)` → `Record<tableName, rowCount>` for every base table in
       `public`, and the restore-side `replaceDatabase(database, containerPath)` helper
       (`DROP DATABASE IF EXISTS …; CREATE DATABASE … OWNER …; pg_restore --no-owner -d …`).
+    - `packages/db/src/backup.ts`: add the `export` keyword to the existing `readManifest`
+      (one-word diff, no logic change) so the PG restore core reads pre-restore manifests
+      through it instead of reimplementing; `pruneRoutineSnapshots` stays an import.
     - Default URL when unset: `postgresql://feedback@postgres:5432/feedback`. Secrets never
       appear in argv or logs (A7).
   - [VERIFICATION & TESTING RULES]
@@ -143,8 +153,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       suites); max test executions: 2.
   - [DEFINITION OF DONE]
     - [ ] `PgRunner` + both factories + the listed helpers exist exactly as typed; no `any`.
-    - [ ] `packages/db/src/index.ts` re-exports the seam; `npm run typecheck -w packages/db`
-          passes; no file outside scope modified.
+    - [ ] `packages/db/src/index.ts` re-exports the seam; `readManifest` is exported
+          (SQLite/Postgres parity — the PG restore core uses it via import in T5);
+          `npm run typecheck -w packages/db` passes; no file outside scope modified.
   - Dependencies: T2 (compose service name is referenced). Size: M.
 
 - [ ] T4: `db:backup:pg` — module `feedback-infra`
@@ -229,6 +240,10 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `tables` — mismatch exits 1 and prints
       `recover from backup/pre-restore-<stamp>/feedback.dump`; success prints one line per
       restored database.
+    - The snapshot `manifest.json` is read with the exported `readManifest` from
+      `packages/db/src/backup.ts` (import, never a local copy — SQLite/Postgres parity);
+      an unreadable/missing manifest is fail-safe: skip the count comparison rather than
+      guess, never crash the restore.
     - The probe is per the spec: TCP to `127.0.0.1:3002`/`3003` and the DB-native
       other-backend count (`pg_stat_activity … pid <> pg_backend_pid()`); fails closed on
       any `up`/`unknown`.
@@ -305,13 +320,13 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed files to edit/create: `apps/feedback-service/**` (new: `package.json` with
       `build`/`typecheck`/`test:unit` scripts + jest config resolving `@life/*` from source,
-      `tsconfig.json`, `nest-cli.json`, `src/main.ts` (binds `PORT` default 3006),
+      `tsconfig.json`, `nest-cli.json`, `src/main.ts` (binds `PORT` default 3008),
       `src/app.factory.ts` (`createApp()`: global `AuthGuard` + global
       `ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true })`),
       `src/app.module.ts` (`TypeOrmModule.forRoot({ type: 'postgres', url:
       FEEDBACK_DB_URL, entities: [...], synchronize: true })`), `src/auth/**` (AuthGuard +
       jwt-verifier + principal + `@Public()` exempting the health trio only — kernel copy:
-      offline JWKS, 30s skew, `aud=FEEDBACK_SERVICE_AUDIENCE`, fail closed),
+      offline JWKS, 30s skew, `IDP_ISSUER` + `FEEDBACK_IDP_JWKS_URL`, `aud=FEEDBACK_SERVICE_AUDIENCE`, fail closed),
       `src/health/**` (`/health/live`, `/health/ready` (DB + key-custody config only — never
       Redis/RabbitMQ, side-effect-free), `/health` alias)), root `package.json` (workspaces
       += `apps/feedback-service`), `package-lock.json` (via `npm install` only).
@@ -343,7 +358,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Strict constraints: NO full suites, NO E2E (behavior/health suites are T10); typecheck
       + build only; max test executions: 2.
   - [DEFINITION OF DONE]
-    - [ ] The workspace builds and typechecks; `PORT` defaults to 3006; the global guard +
+    - [ ] The workspace builds and typechecks; `PORT` defaults to 3008; the global guard +
           whitelist pipe are wired; the health trio answers per the kernel dialect.
     - [ ] Root `package.json` workspaces includes `apps/feedback-service`; lockfile updated
           via `npm install`; no file outside scope modified.
@@ -487,11 +502,22 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       service block: build, `depends_on` healthy for `postgres`/`rabbitmq`/`redis-feedback`,
       env `FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback`,
       `RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672`,
-      `REDIS_URL: redis://redis-feedback:6379`, fail-fast `FEEDBACK_MASTER_KEY`,
-      `FEEDBACK_IDP_JWKS_URL`, `FEEDBACK_SERVICE_AUDIENCE`, `PORT: 3006`; healthcheck
-      `/health/ready`; the `app` service gains `FEEDBACK_URL: http://feedback-service:3006`),
-      `.env.example` (`FEEDBACK_MASTER_KEY=`, `FEEDBACK_URL=` documented names),
-      `README.md` (services/ports + the P1 dev note),
+      `REDIS_URL: redis://redis-feedback:6379`, fail-fast `FEEDBACK_MASTER_KEY`, the verifier
+      pair `IDP_ISSUER: ${IDP_ISSUER:-}` +
+      `FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}` (the
+      copied verifier throws without `IDP_ISSUER` — fail closed, so a compose-launched
+      service never boots half-configured), `FEEDBACK_SERVICE_AUDIENCE`,
+      `PORT: 3008` (prod/container; dev runs 3108); healthcheck
+      `/health/ready`; the `app` service gains `FEEDBACK_API_URL: http://feedback-service:3008`
+      (sibling `TODO_API_URL: http://todo-service:3005` pattern; internal-only, no published
+      host port)),
+      `.env.example` (`FEEDBACK_MASTER_KEY=` documented — sibling parity; master keys only,
+      no `*_API_URL` names belong there),
+      `.env.development.example` (dev wiring per P1: `FEEDBACK_API_URL=http://127.0.0.1:3108`
+      next to `TODO_API_URL=http://127.0.0.1:3105`, plus the commented `FEEDBACK_DB_URL` /
+      `FEEDBACK_MASTER_KEY` names a dev run needs), root `package.json` (the `dev` script
+      gains `"PORT=3108 npm run dev -w apps/feedback-service"` next to the tags `3104` /
+      todo `3105` entries), `README.md` (services/ports + the P1 dev note),
       `apps/app/Dockerfile`, `apps/idp/Dockerfile`, `apps/note-service/Dockerfile`,
       `apps/tags-service/Dockerfile`, `apps/todo-service/Dockerfile` (add the new
       `apps/feedback-service/package.json` to their explicit manifest `COPY` sets so
@@ -501,7 +527,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       (`## Testing Strategy`, seven groups), `docs/specs/SPEC-feedback-infra.md`
       (`### compose.yaml additions`, `## Hard lines`).
     - Strictly prohibited files: service `src/**` (a failing test re-opens T7/T8/T9),
-      `.env.development.example` (P1 — unchanged), `apps/app/test/e2e/**` (T14).
+      `apps/app/test/e2e/**` (T14).
   - [IMPLEMENTATION REQUIREMENTS]
     - Suites cover the spec's seven groups: (1) idempotency — same `id` twice → one
       `feedback` row + one `feedback_event` row, both `201 { id }`; another owner's `id` →
@@ -522,8 +548,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       directory; skip, not fail, when Docker is unavailable.
     - Compose block mirrors the tags/todo services exactly (image/build, no unnecessary host
       port beyond the sibling pattern, `/health/ready` healthcheck, fail-fast master key).
-    - README records the P1 dev posture: `npm run dev` does not start feedback-service by
-      default; opting in requires a running Postgres + the two new secret values.
+    - README records the P1 dev posture: `npm run dev` starts feedback-service on 3108; dev
+      needs a local Postgres (compose `postgres`) + `FEEDBACK_DB_URL` and `FEEDBACK_MASTER_KEY`
+      in `.env.development` or the service exits fail-closed at boot.
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `npm run build -w @life/shared` then
       `npm run test:unit -w @life/feedback-service -- test/feedback.e2e-spec.ts test/feedback-events.e2e-spec.ts test/health.e2e-spec.ts`
@@ -536,7 +563,14 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
           cleanly); the ciphertext assertions pass.
     - [ ] `docker compose config` shows the `feedback-service` block with both URL
           injections, healthy `depends_on`, `REDIS_URL`, fail-fast master key, and the app's
-          `FEEDBACK_URL`; Dockerfiles carry the new manifest; lockfile updated.
+          `FEEDBACK_API_URL`; both env injections (`FEEDBACK_DB_URL`, `RABBITMQ_URL`);
+          the app gets no 3108/3008 leak (dev 3108 is the dev stack's; harness uses 3106/3206);
+          Dockerfiles carry the new manifest; lockfile updated.
+    - [ ] Dev wiring is live: root `dev` script contains `"PORT=3108 npm run dev -w
+          apps/feedback-service"` next to the tags `3104` / todo `3105` entries;
+          `.env.development.example` gains `FEEDBACK_API_URL=http://127.0.0.1:3108` plus the
+          commented `FEEDBACK_DB_URL` / `FEEDBACK_MASTER_KEY` names; README documents the
+          3108 dev port, the local Postgres, and the fail-closed boot without them.
     - [ ] No production source file edited to make a test pass; no file outside scope.
   - Dependencies: T9. Size: M.
 
@@ -631,7 +665,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `apps/app/test/e2e/**` (T14).
   - [IMPLEMENTATION REQUIREMENTS]
     - `lib/feedback-api.ts` follows `lib/api.ts`: `import 'server-only'`;
-      `const FEEDBACK_URL = process.env.FEEDBACK_URL ?? 'http://127.0.0.1:3006'`; one thin
+      `const FEEDBACK_API_URL = process.env.FEEDBACK_API_URL ?? 'http://127.0.0.1:3008'`
+      (dev runs on 3108 — dev stack overrides `FEEDBACK_API_URL` to
+      `http://127.0.0.1:3108`, mirroring `TODO_API_URL`); one thin
       `call<T>()` over `callService`; `listFeedback(): Promise<FeedbackDto[]>` (`GET
       /api/feedback`) and `createFeedback(input: CreateFeedbackInput)` (`POST
       /api/feedback`). The browser never talks to the service directly; the BFF only forwards
@@ -656,14 +692,18 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       (h3 type) → `List` → `ListItem` (title = description, `meta = <LocalTime
       dateTime={createdAt} />`). One row type — plain `ListItem`, no variant, no leading
       control, no href, no sibling row component (lesson 0018). Zero entries → `EmptyState`
-      (`heading="No feedback yet."`); a group bucket that somehow arrives empty renders an
+      (`heading="No feedback yet."`, `body="Use the feedback button in the toolbar to send
+      the first one."` — body copy points at the toolbar item, SPEC-feedback-ui line 324);
+      a group bucket that somehow arrives empty renders an
       inline `EmptyState`, never an empty `<List>`. Dates only through `LocalTime` (lesson
       0003); no today/overdue logic (lesson 0019 not applicable).
     - `FeedbackInbox` receives the action as a prop and forwards it to `FeedbackNavItem`
       (a client component) — the app never manages dialog state.
     - Test `feedback-inbox.test.tsx`: app→type nesting; newest-first order preserved inside
       groups; canonical group order; unknown app/type labels fall back to the raw id; zero
-      entries → `EmptyState`; never an empty `<List>`.
+      entries → `EmptyState` asserting `heading="No feedback yet."` and the toolbar-pointing
+      `body` copy (`"Use the feedback button in the toolbar to send the first one."`);
+      never an empty `<List>`.
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `npm run build -w @life/shared` then
       `npm run test:unit -w @life/app -- test/feedback-inbox.test.tsx` and
@@ -692,8 +732,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `/feedback`, `name: "Personal Life — Feedback"`, `short_name: "Feedback"`,
       `display: standalone`, icon `/icon-feedback.png` 512×512 `purpose: any`, the same
       light-app palette values as the sibling manifests — copied as values inside the new
-      file), `apps/app/public/icon-feedback.png` (new — 512×512, produced the same
-      per-route SVG → rasterize way as `icon-notes.png`/`icon-todos.png`),
+      file), `apps/app/public/icon-feedback.png` (new 512×512 PNG, committed like the
+      sibling icons — `icon-notes.png`/`icon-todos.png` are checked-in binaries; the repo
+      has no icon-generator script and no rasterizer dependency),
       `apps/app/test/manifests.test.ts` (+ `/feedback` case),
       `apps/app/test/gate.test.ts` (+ the two new public paths).
     - Reference files (read-only): `apps/app/app/notes/page.tsx` (current navTrailing order),
@@ -713,16 +754,19 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       new selectors only).
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `npm run build -w @life/shared` then
-      `npm run test:unit -w @life/app -- test/manifests.test.ts test/gate.test.ts` and
+      `npm run test:unit -w @life/app -- test/manifests.test.ts test/gate.test.ts
+      test/routes-todos-list.test.tsx` and
       `npm run typecheck -w @life/app`.
-    - Strict constraints: NO full suites, NO E2E; only these two named files; max test
+    - Strict constraints: NO full suites, NO E2E; only these three named files; max test
       executions: 2.
   - [DEFINITION OF DONE]
     - [ ] The three toolbars render the item with the correct `app` id, Settings last;
           `/feedback` has its own manifest + icon + gate entries.
     - [ ] `git diff` shows zero changes to the frozen manifests, `viewport.themeColor`,
           `icon.svg`, and the frozen e2e suites.
-    - [ ] The named suites + `npm run typecheck -w @life/app` pass; no file outside scope.
+    - [ ] Named suites + `npm run typecheck -w @life/app` pass; no file outside scope.
+    - [ ] `test/routes-todos-list.test.tsx` (the existing suite asserting the Todos nav
+          aria-labels this task edits) stays green unchanged.
   - Dependencies: T12. Size: M.
 
 - [ ] T14: e2e harness + the one targeted e2e run — module `feedback-ui`
@@ -744,9 +788,13 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Harness: start a throwaway Postgres (`docker run --rm -d --name feedback-pg-e2e … 
       postgres:17-alpine`), wait for `pg_isready`; spawn `feedback-service` with
       `FEEDBACK_DB_URL` → the throwaway, a test `FEEDBACK_MASTER_KEY`, the harness's
-      `FEEDBACK_IDP_JWKS_URL`/audience, `PORT` on a free test port; **no `REDIS_URL`**
+      `FEEDBACK_IDP_JWKS_URL`/audience, `PORT` on the harness's own scheme — never
+      3008/3108: add `feedbackPort` to `testPorts()` (`E2E_FEEDBACK_PORT ?? 3106`) and to
+      `devPorts()` (`E2E_DEV_FEEDBACK_PORT ?? 3206`), mirroring the existing 31xx/32xx
+      entries in `apps/app/test/e2e/config.ts`; **no `REDIS_URL`**
       (fail-open direct DB) and **no `RABBITMQ_URL`** (the spec's broker-down tolerance);
-      the app gets `FEEDBACK_URL` → the spawned service. `global-teardown` force-removes the
+      the app gets `FEEDBACK_API_URL` → the spawned service (harness port, never 3008/3108).
+      `global-teardown` force-removes the
       container and its scratch state. Docker absent → fail fast with a clear message (the
       e2e is the chapter's final proof; a silent skip would hide it).
     - `feedback.spec.ts`, one test (`-g "submit feedback"`): on `/notes`, `getByLabel('Send
@@ -788,7 +836,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `npm run typecheck -w @life/ui` and
       `npm run test:unit -w @life/ui -- test/feedback-form.test.tsx test/feedback-nav-item.test.tsx test/list-shell.test.tsx`;
       `npm run typecheck -w @life/app` and
-      `npm run test:unit -w @life/app -- test/feedback-inbox.test.tsx test/manifests.test.ts test/gate.test.ts`;
+      `npm run test:unit -w @life/app -- test/feedback-inbox.test.tsx test/manifests.test.ts test/gate.test.ts test/routes-todos-list.test.tsx` (the last is an existing suite T13's toolbar edits touch — Success 6 requires it unchanged and passing);
       plus the six Contract mechanical greps from the plan's checkpoint.
     - Then five parallel lane subagents (read-only; QA runs the suite gate), each returning
       `{lane, verdict: PASS|PASS_WITH_NITS|FAIL, blockers: [{file, issue, severity}]}`:

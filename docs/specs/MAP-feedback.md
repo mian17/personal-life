@@ -23,10 +23,15 @@ Dependency direction is one-way (ui → service → infra). No cycles.
 These are fixed by the confirmed intent; module specs must not re-decide them.
 
 ### Infrastructure / env
-- Postgres: own compose service + persistent named volume. Service reads `FEEDBACK_DB_URL`.
+- Postgres: own compose service + persistent named volume, publishing
+  `127.0.0.1:5432:5432` (host loopback only, so the host-run dev service reaches it;
+  production addresses stay on the compose network, `postgres:5432`). Service reads
+  `FEEDBACK_DB_URL`.
   Tests read `FEEDBACK_TEST_DB_URL`.
-- RabbitMQ: own compose service. Producer reads `RABBITMQ_URL`.
+- RabbitMQ: own compose service, publishing `127.0.0.1:5672:5672` (host loopback only;
+  production `rabbitmq:5672`; management UI never published). Producer reads `RABBITMQ_URL`.
 - Redis: `redis-feedback`, own instance (per-service isolation), `REDIS_URL` as elsewhere.
+  Internal-only: no published host port, fail-open in dev.
 
 ### Event contract
 - Exchange `feedback` (durable, topic), routing key `feedback.submitted`.
@@ -37,7 +42,7 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
 
 ### Service HTTP contract
 - Routes live under the repo's `/api/<resource>` prefix (as `api/notes`, `api/lists`):
-  `POST /api/feedback`, `GET /api/feedback`. Service port `3006`.
+  `POST /api/feedback`, `GET /api/feedback`. Service port `3008` (dev `3108`).
 - `POST /api/feedback` — body `{ id, app, type, description }` where `id` is the
   client-supplied idempotency key (UUID); owner taken from the JWT (`principal.sub`).
   Returns `201 { id }`. A repeat of an already-owned `id` is the same no-op `201 { id }` —

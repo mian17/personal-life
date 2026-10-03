@@ -39,7 +39,7 @@ edit/delete, anonymous submission, the event consumer.
 - `@life/app-kit` — `RouteLayout` + `routeLayoutMetadata` for the `/feedback` segment
   layout (same mechanism as `notes/layout.tsx` / `todos/layout.tsx`).
 - Data path: page → BFF client (`lib/feedback-api.ts`, `callService`) → `feedback-service`
-  (`FEEDBACK_URL`). The browser never talks to the service directly.
+  (`FEEDBACK_API_URL`). The browser never talks to the service directly.
 - No new runtime dependencies (`lucide-react` icon only).
 
 ## Commands
@@ -258,15 +258,17 @@ The item is an `IconButton`, not `IconLink`: it opens a dialog (a control), not 
 **Read** — `apps/app/app/feedback/page.tsx` (server component, `dynamic = 'force-dynamic'`):
 
 ```unknown
-GET $FEEDBACK_URL/api/feedback   (Authorization: Bearer <caller's IdP token>, via callService)
+GET $FEEDBACK_API_URL/api/feedback   (Authorization: Bearer <caller's IdP token>, via callService)
 → FeedbackDto[]              owner-scoped, newest-first, no pagination in v1
 ```
 
 `lib/feedback-api.ts` follows `lib/api.ts` exactly: `import 'server-only'`,
-`const FEEDBACK_URL = process.env.FEEDBACK_URL ?? 'http://127.0.0.1:3006'`, one thin
-`call<T>()` wrapper over `callService`. Port 3006 is the chosen `feedback-service` port
+`const FEEDBACK_API_URL = process.env.FEEDBACK_API_URL ?? 'http://127.0.0.1:3008'`, one thin
+`call<T>()` wrapper over `callService` (sibling env naming: `TAGS_API_URL`,
+`TODO_API_URL`). Port 3008 is the chosen `feedback-service` port
 (3001 notes, 3004 tags, 3005 todos are taken); `SPEC-feedback-service` binds `PORT`
-default `3006` to match. The bare-array `FeedbackDto[]` return (no envelope, no cursor) is
+default `3008` to match. The dev stack runs the service on 3108, so the app's dev env
+overrides with `FEEDBACK_API_URL=http://127.0.0.1:3108`. The bare-array `FeedbackDto[]` return (no envelope, no cursor) is
 matched by `SPEC-feedback-service`'s `200 FeedbackDto[]` for the same reason. Auth /
 owner-scoping / decryption are the service's job (Contract 2); the BFF only
 forwards the caller's token — no client-side auth of any kind.
@@ -275,7 +277,7 @@ forwards the caller's token — no client-side auth of any kind.
 
 ```unknown
 submitFeedbackAction(input: CreateFeedbackInput): Promise<FeedbackSubmitResult>
-  → POST $FEEDBACK_URL/api/feedback  { id, app, type, description }  → 201 { id }
+  → POST $FEEDBACK_API_URL/api/feedback  { id, app, type, description }  → 201 { id }
   → catch ApiError → { ok: false, message }   (duplicates return 201, never 409)
   → on ok: revalidatePath('/feedback')
 ```
@@ -338,9 +340,10 @@ logic in this module, so lesson 0019 does not apply.
   `display: standalone`, icon `/icon-feedback.png` (512×512, `purpose: any`), and the same
   light-app palette the sibling manifests use (`#0f1115`), copied as *values inside a new
   file*.
-- **New** `apps/app/public/icon-feedback.png` — 512×512 PNG produced the same way
-  `icon-notes.png` / `icon-todos.png` were (per-route SVG → rasterize; iOS ignores SVG for
-  the Home Screen).
+- **New** `apps/app/public/icon-feedback.png` — 512×512 PNG checked in as a binary asset,
+  exactly like `icon-notes.png` / `icon-todos.png` (which are checked-in binaries, not
+  generated). There is no per-route SVG and no rasterize/build step; the file is added to
+  the repo as-is. iOS ignores SVG for the Home Screen, hence the PNG.
 - **New** `apps/app/app/feedback/layout.tsx` — `routeLayoutMetadata('/manifest-feedback.json',
   'Feedback', '/icon-feedback.png')` + `export default RouteLayout`, mirroring
   `notes/layout.tsx`.
@@ -437,7 +440,7 @@ frozen spec file is edited.
   changing token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md`); editing
   existing PWA constants (`manifest-notes.json`, `manifest-todos.json`,
   `viewport.themeColor`); adding a `danger` tone to `AlertBanner`; adding a dependency;
-  port/env changes beyond `FEEDBACK_URL`; any change to `feedback-service`'s wire contract.
+  port/env changes beyond `FEEDBACK_API_URL`; any change to `feedback-service`'s wire contract.
 - **Never:** raw `<button>/<input>/<textarea>/<a>/<label>` or styled `<div>` in `apps/*` UI
   code; inline `style=`; hex/rgb/px/rem in app CSS; a second app stylesheet; a per-app fork of
   the form or the inbox shell; `next/link` in `apps/*`; domain fetch inside `packages/ui`
@@ -491,7 +494,7 @@ None. Decisions taken while writing, recorded here:
 
 - **Feedback app shows the item too** (`app="feedback"`) — intent says "every frontend
   app"; no exception was carved out.
-- **`FEEDBACK_URL` default port 3006** and a bare `FeedbackDto[]` from
+- **`FEEDBACK_API_URL` default port 3008** (dev overrides to `3108`) and a bare `FeedbackDto[]` from
   `GET /api/feedback` — fixed here and matched by `SPEC-feedback-service` and the
   locked interfaces in `MAP-feedback.md`.
 - **Notes sub-pages** (`/notes/tags`, `/notes/trash`, settings) do not carry the item in v1;
