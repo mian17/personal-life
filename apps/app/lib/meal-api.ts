@@ -67,6 +67,36 @@ export function getMealTarget(date: string): Promise<MealTarget> {
 }
 
 /**
+ * Body of `PUT /api/target/profile` — exactly the profile INPUTS (`SPEC-target-
+ * onboarding` Boundaries) plus the client's `validFrom` day. The computed
+ * kcal/BMR/TDEE/macro grams are deliberately absent: the service derives them
+ * from these inputs, and its `forbidNonWhitelisted` pipe rejects a body that
+ * carries them ("the client CANNOT send computed kcal/bmr/tdee/macros").
+ */
+export interface MealProfileInput {
+  age: number;
+  sex: string;
+  heightCm: number;
+  weightKg: number;
+  activity: string;
+  goal: string;
+  date: string;
+}
+
+/**
+ * `PUT /api/target/profile` — store a new versioned target row for a profile
+ * change; prior rows are untouched, so past days keep the target that applied
+ * then (`SPEC-target-onboarding`). `date` is the client's own day, resolved by
+ * the shared owner (`getToday()`), never a fresh clock read here.
+ */
+export function putMealProfile(input: MealProfileInput): Promise<MealTarget> {
+  return call<MealTarget>('/api/target/profile', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+/**
  * The ONE photo estimate path (`SPEC-meal-service` Photo → Gemini pipeline).
  * It is a named constant so the literal exists in exactly one place: this BFF
  * client is the single call site, and the service route is the single definition.
