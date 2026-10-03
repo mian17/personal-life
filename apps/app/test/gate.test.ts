@@ -89,8 +89,10 @@ describe('public paths', () => {
       '/auth/logout',
       '/manifest-notes.json',
       '/manifest-todos.json',
+      '/manifest-feedback.json',
       '/icon-notes.png',
       '/icon-todos.png',
+      '/icon-feedback.png',
       '/icon.svg',
       '/favicon.ico',
     ]) {

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { metadata as notesMetadata } from '@/app/notes/layout';
 import { metadata as todosMetadata } from '@/app/todos/layout';
+import { metadata as feedbackMetadata } from '@/app/feedback/layout';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const readManifest = (file: string) =>
@@ -26,8 +27,18 @@ describe('per-route PWA manifests', () => {
     expect(todos.icons[0].src).toBe('/icon-todos.png');
   });
 
+  it('gives /feedback its own identity', () => {
+    const feedback = readManifest('manifest-feedback.json');
+    expect(feedback.id).toBe('/feedback');
+    expect(feedback.start_url).toBe('/feedback');
+    expect(feedback.scope).toBe('/feedback');
+    expect(feedback.short_name).toBe('Feedback');
+    expect(feedback.icons[0].src).toBe('/icon-feedback.png');
+  });
+
   it('links each manifest from its route segment layout', () => {
     expect(notesMetadata.manifest).toBe('/manifest-notes.json');
     expect(todosMetadata.manifest).toBe('/manifest-todos.json');
+    expect(feedbackMetadata.manifest).toBe('/manifest-feedback.json');
   });
 });
