@@ -3,17 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera, Check, Trash2 } from 'lucide-react';
-import {
-  NUTRIENTS,
-  NUTRIENT_LABELS,
-  UNKNOWN,
-  format,
-  scale,
-  sum,
-  type Food,
-  type Nutrient,
-  type NutrientVector,
-} from '@life/nutrition';
+import type { Nutrient, NutrientVector } from '@life/nutrition';
 import {
   AlertBanner,
   Button,
@@ -41,14 +31,28 @@ import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './action
  * fields are `Input`/`Textarea`/`Select`, rows are `List`/`ListItem`, actions are
  * `Button`/`IconButton`. No raw element, no app-local CSS, no inline style.
  *
- * Nutrient display goes through `@life/nutrition`'s formatter — the single owner
- * of units and of the unknown affordance. An estimated-but-unknown field renders
- * the em dash and never a fabricated `0`; `0` is only ever a value the user
- * actually confirmed.
+ * Nutrient display data (field labels, the unknown em dash, the all-zero
+ * vector, the total's unit) arrives as plain-JSON props derived server-side
+ * from `@life/nutrition` — the package stays out of the browser bundle (plan
+ * Task 14: no `'use client'` component imports it). An estimated-but-unknown
+ * field renders the em dash and never a fabricated `0`; `0` is only ever a
+ * value the user actually confirmed.
  */
 
-/** The fields the review step shows and corrects (one display choice, not a unit table). */
-const HEADLINE = ['calories', 'fat', 'carbohydrates', 'protein'] as const satisfies readonly Nutrient[];
+/**
+ * The nutrition display data the server page derives from `@life/nutrition`.
+ * Plain JSON, so it crosses the server/client boundary without the package.
+ */
+export interface NutritionFields {
+  /** The fields the review step shows and corrects, in display order (one display choice, not a unit table). */
+  fields: readonly { key: Nutrient; label: string }[];
+  /** The unknown affordance: an estimated-but-unknown value renders this, never `0`. */
+  unknown: string;
+  /** The all-zero vector: the stored meaning of "no value", never a displayed number. */
+  empty: NutrientVector;
+  /** The unit the run total renders in (the calories unit on the server). */
+  totalUnit: string;
+}
 
 /** The meal groups, in display order (`SPEC-meal-service` entries vocabulary). */
 const GROUPS: { value: MealGroup; label: string }[] = [
@@ -74,14 +78,23 @@ export interface EditorItem {
   known: readonly Nutrient[];
 }
 
-/** A minimal single-serving `Food` so the one scaling rule (`scale`) can be reused. */
-function food(vector: NutrientVector): Food {
-  return { id: '', name: '', servingGrams: 0, nutrients: vector, portions: [] };
+/**
+ * The run total's display string — the server's formatter rule (whole number +
+ * space + unit for a known value; the unknown em dash for a non-finite/negative
+ * one), reproduced here from props so the client carries no `@life/nutrition`.
+ */
+function totalDisplay(value: number, unit: string, unknown: string): string {
+  if (!Number.isFinite(value) || value < 0) return unknown;
+  return `${value.toFixed(0)} ${unit}`;
 }
 
-/** The all-zero vector: the stored meaning of "no value", never a displayed number. */
-function zeroVector(): NutrientVector {
-  return Object.fromEntries(NUTRIENTS.map(({ key }) => [key, 0])) as NutrientVector;
+/** A portion change rescales an effective vector by `factor` (the model's linear rule: non-positive factors collapse to the absent-data zero). */
+function scaleVector(vector: NutrientVector, factor: number): NutrientVector {
+  const out = {} as NutrientVector;
+  for (const key of Object.keys(vector) as Nutrient[]) {
+    out[key] = !(factor > 0) ? 0 : Math.max(0, vector[key] * factor);
+  }
+  return out;
 }
 
 /** Two decimals is past any displayed precision; keeps a scaled vector from rendering a long float. */
@@ -91,14 +104,31 @@ function round2(value: number): number {
 
 /**
  * The review editor. `entry` absent = a new meal (the `/meals/entry/new` photo
- * and manual doors); `date` is the client's resolved `YYYY-MM-DD` (lesson 0019).
+ * and manual doors); `date` is the client's resolved `YYYY-MM-DD` (lesson 0019);
+ * `nutrition` is the plain-JSON display data derived from `@life/nutrition` on
+ * the server, so the package never enters the browser bundle (plan Task 14).
  */
-export function MealEditor({ entry, date }: { entry: MealEntry | null; date: string }) {
+export function MealEditor({
+  entry,
+  date,
+  nutrition,
+}: {
+  entry: MealEntry | null;
+  date: string;
+  nutrition: NutritionFields;
+}) {
   const router = useRouter();
   const [items, setItems] = useState<EditorItem[]>(
     entry
-      ? [{ dish: entry.foodId, quantity: entry.quantity, nutrients: entry.nutrients, known: HEADLINE }]
-      : [{ dish: '', quantity: 1, nutrients: zeroVector(), known: [] }],
+      ? [
+          {
+            dish: entry.foodId,
+            quantity: entry.quantity,
+            nutrients: entry.nutrients,
+            known: nutrition.fields.map(({ key }) => key),
+          },
+        ]
+      : [{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }],
   );
   const [mealGroup, setMealGroup] = useState<MealGroup>(entry?.mealGroup ?? 'lunch');
   const [hint, setHint] = useState('');
@@ -117,13 +147,18 @@ export function MealEditor({ entry, date }: { entry: MealEntry | null; date: str
 
   /**
    * The day's number the editor itself will store: the sum of the confirmed
-   * items' calories, rendered through the shared formatter. An item the user has
+   * items' calories, rendered through the server-passed unit (the `@life/nutrition`
+   * formatter's calories rule, mirrored in `totalDisplay`). An item the user has
    * not confirmed contributes its absent-data zero (the service's storage rule),
    * so this never differs from what the day view reads back — one convention, not
    * a second display for the same figure. The "no invented numbers" rule lives on
    * the fields: an unconfirmed value renders the em dash, never a `0`.
    */
-  const total = format('calories', sum(items.map((item) => item.nutrients)).calories);
+  const total = totalDisplay(
+    items.reduce((acc, item) => acc + item.nutrients.calories, 0),
+    nutrition.totalUnit,
+    nutrition.unknown,
+  );
 
   function updateItem(index: number, patch: Partial<EditorItem>) {
     setItems((previous) =>
@@ -152,14 +187,14 @@ export function MealEditor({ entry, date }: { entry: MealEntry | null; date: str
     });
   }
 
-  /** A portion change scales the effective vector by the same ratio, through `scale`. */
+  /** A portion change rescales the effective vector by the same ratio (see `scaleVector`). */
   function setPortion(index: number, raw: string, item: EditorItem) {
     const next = Number(raw);
     // An empty or junk portion keeps the last good one — it must never scale the
     // vector to zero (which would silently erase the correction).
     if (!Number.isFinite(next) || next < 0) return;
     const factor = item.quantity > 0 ? next / item.quantity : 0;
-    updateItem(index, { quantity: next, nutrients: scale(food(item.nutrients), factor) });
+    updateItem(index, { quantity: next, nutrients: scaleVector(item.nutrients, factor) });
   }
 
   function removeItem(index: number) {
@@ -169,7 +204,7 @@ export function MealEditor({ entry, date }: { entry: MealEntry | null; date: str
   function addItem() {
     setItems((previous) => [
       ...previous,
-      { dish: '', quantity: 1, nutrients: zeroVector(), known: [] },
+      { dish: '', quantity: 1, nutrients: nutrition.empty, known: [] },
     ]);
   }
 
@@ -193,16 +228,16 @@ export function MealEditor({ entry, date }: { entry: MealEntry | null; date: str
             dish: suggestion.dish,
             quantity: 1,
             nutrients: suggestion.nutrients,
-            known: HEADLINE,
+            known: nutrition.fields.map(({ key }) => key),
           })),
         );
         setPhotoFailed(false);
       } else {
-        setItems([{ dish: '', quantity: 1, nutrients: zeroVector(), known: [] }]);
+        setItems([{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }]);
         setPhotoFailed(true);
       }
     } catch {
-      setItems([{ dish: '', quantity: 1, nutrients: zeroVector(), known: [] }]);
+      setItems([{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }]);
       setPhotoFailed(true);
     } finally {
       setEstimating(false);
@@ -317,15 +352,15 @@ export function MealEditor({ entry, date }: { entry: MealEntry | null; date: str
                   value={String(item.quantity)}
                   onChange={(event) => setPortion(index, event.target.value, item)}
                 />
-                {HEADLINE.map((key) => {
+                {nutrition.fields.map(({ key, label }) => {
                   const known = item.known.includes(key);
                   return (
                     <Input
                       key={key}
                       type="number"
                       inputMode="decimal"
-                      aria-label={`${NUTRIENT_LABELS[key]} for ${item.dish || `item ${index + 1}`}`}
-                      placeholder={UNKNOWN}
+                      aria-label={`${label} for ${item.dish || `item ${index + 1}`}`}
+                      placeholder={nutrition.unknown}
                       value={known ? String(round2(item.nutrients[key])) : ''}
                       onChange={(event) => correctValue(index, key, event.target.value, item)}
                     />

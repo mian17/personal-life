@@ -36,7 +36,7 @@ import { getToday } from '@/lib/today';
 import { notFound } from 'next/navigation';
 import SavedMealPage from '@/app/(meals)/meals/saved/[id]/page';
 import SavedMealsPage from '@/app/(meals)/meals/saved/page';
-import { relogMealAction } from '@/app/(meals)/meals/saved/actions';
+import { relogMealAction } from '@/app/(meals)/meals/actions';
 
 const mockedListSavedMeals = listSavedMeals as jest.MockedFunction<typeof listSavedMeals>;
 const mockedGetSavedMeal = getSavedMeal as jest.MockedFunction<typeof getSavedMeal>;

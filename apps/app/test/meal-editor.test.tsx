@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NUTRIENTS, UNKNOWN, format, type NutrientVector } from '@life/nutrition';
+import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type NutrientVector } from '@life/nutrition';
 import { Button, FilePicker, IconButton, Input, StatusText, Textarea } from '@life/ui';
 
 const mockBack = jest.fn();
@@ -22,7 +22,11 @@ jest.mock('@/lib/client', () => ({
 }));
 
 import { callService } from '@/lib/client';
-import { MealEditor, type EditorItem } from '@/app/(meals)/meals/entry/[id]/editor';
+import {
+  MealEditor,
+  type EditorItem,
+  type NutritionFields,
+} from '@/app/(meals)/meals/entry/[id]/editor';
 import type { MealEntry } from '@/lib/meal-api';
 
 const mockCallService = callService as unknown as jest.Mock;
@@ -61,6 +65,22 @@ interface EditorTree extends ReactElement {
   props: { children: ReactNode; banner?: ReactNode; actions?: ReactNode };
 }
 
+/**
+ * The server-derived `@life/nutrition` display data the meals route passes the
+ * client editor — the same shape `entry/[id]/page.tsx` builds.
+ */
+const NUTRITION: NutritionFields = {
+  fields: [
+    { key: 'calories', label: NUTRIENT_LABELS.calories },
+    { key: 'fat', label: NUTRIENT_LABELS.fat },
+    { key: 'carbohydrates', label: NUTRIENT_LABELS.carbohydrates },
+    { key: 'protein', label: NUTRIENT_LABELS.protein },
+  ],
+  unknown: UNKNOWN,
+  empty: Object.fromEntries(NUTRIENTS.map(({ key }) => [key, 0])) as NutrientVector,
+  totalUnit: NUTRIENTS.find(({ key }) => key === 'calories')!.unit,
+};
+
 function stateHarness() {
   const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
@@ -77,7 +97,7 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    return MealEditor({ entry: initialEntry, date }) as unknown as EditorTree;
+    return MealEditor({ entry: initialEntry, date, nutrition: NUTRITION }) as unknown as EditorTree;
   }
 
   return { renderTree, restore: () => spy.mockRestore() };
