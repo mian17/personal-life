@@ -13,12 +13,7 @@ import { Dialog } from './dialog';
 import { Pill } from './pill';
 import { PillGroup } from './pill-group';
 import { Textarea } from './textarea';
-
-export const FEEDBACK_TYPES: readonly { value: FeedbackType; label: string }[] = [
-  { value: 'feature_request', label: 'Feature request' },
-  { value: 'enhancement', label: 'Enhancement' },
-  { value: 'bug_report', label: 'Bug report' },
-] as const;
+import { FEEDBACK_TYPES } from './feedback-types';
 
 export interface FeedbackFormProps {
   open: boolean;
