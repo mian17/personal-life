@@ -2,6 +2,9 @@
 export { Button } from './components/button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './components/button';
 
+export { ButtonLink } from './components/button-link';
+export type { ButtonLinkProps } from './components/button-link';
+
 export { IconButton } from './components/icon-button';
 export type { IconButtonProps, IconButtonVariant } from './components/icon-button';
 

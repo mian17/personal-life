@@ -36,6 +36,14 @@ for these without any visible change.
                                      //   var(--space-0-75) = 0.75rem = 12px; the todo row
                                      //   sets 1.25rem normal / 0.75rem dense)
 <IconLink href label>children</IconLink>  // <a>/<Link> with the 40×40 bordered visual
+<ButtonLink href variant="primary" | "ghost" | "danger" | "quiet"
+            size="default" | "bare" | "icon">children</ButtonLink>
+   // <a>/<Link> carrying Button's exact visual classes
+   //   (`ui-btn ui-btn--{variant} ui-btn--{size}`) — the link form of a Button.
+   //   Element semantics stay split: Button stays <button>, ButtonLink is the
+   //   anchor; there is no `as`-prop and no element swapping (the "an atom never
+   //   swaps the element type" freeze above). For a door/navigation that should
+   //   read as a button, not a tag.
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
@@ -99,7 +107,11 @@ rule and the bare `textarea` rule (globals.css:139-152); `Select` (new) owns
 bordered square classes `.theme-toggle`, `.editor-back`, `.editor-save` — all three
 render as `<button>` today (note-editor.tsx:346, :352); `IconLink` absorbs
 `.header-icon` — which in the app is used **only on `next/link` anchors**
-(page.tsx:30, trash/page.tsx:17), so it must render a link; `StatusText` owns
+(page.tsx:30, trash/page.tsx:17), so it must render a link; `ButtonLink` (new) has
+no legacy counterpart and introduces no new CSS: it renders a `next/link` anchor
+wearing `Button`'s exact classes (`ui-btn ui-btn--{variant} ui-btn--{size}`) for a
+navigation that should read as a button rather than a tag — the anchor half of the
+`IconLink`/`IconButton` pair at button scale; `StatusText` owns
 `.editor-status` (span `role="status"`, note-editor.tsx:349); `ConfirmButton`
 owns the frozen `trash-delete` hook (on `ConfirmSubmit`, trash/page.tsx:59-64);
 `Pill` owns `.tag-chip`, `.tag-chip-remove` (the remove affordance is part of the

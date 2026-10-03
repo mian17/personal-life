@@ -17,6 +17,9 @@
  * | danger    | bare    | `.trash-empty`                                      |
  * | quiet     | default | `.trash-restore`                                    |
  * | quiet     | bare    | (new) compact quiet button, no legacy counterpart   |
+ * ButtonLink (new — no legacy counterpart): the same visual classes on a
+ * `next/link` anchor; adds no CSS of its own, only `.ui-btn`'s
+ * `text-decoration: none` (a no-op for `<button>`).
  *
  * IconButton (sole owner of the 40x40 bordered square controls)
  * | variant | legacy class(es)                    |
@@ -76,6 +79,9 @@
   font-weight: 600;
   cursor: pointer;
   min-height: var(--tap-height);
+  /* Anchor form (ButtonLink) must not inherit the UA underline; a no-op on
+     `<button>`. Same treatment every anchor atom already carries. */
+  text-decoration: none;
 }
 
 /* default size — the 48px tap target (global button geometry) */

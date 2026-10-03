@@ -1,5 +1,6 @@
 import { format, sum } from '@life/nutrition';
 import {
+  ButtonLink,
   Card,
   EmptyState,
   FabLink,
@@ -9,7 +10,6 @@ import {
   NavBar,
   PageShell,
   PageTitle,
-  Pill,
   Row,
   Section,
   StatusText,
@@ -83,12 +83,8 @@ export async function mealDay(day: string, emptyBody: string) {
         <StatusText>{daySummary(totalCalories, target)}</StatusText>
       </Card>
       <Row>
-        <Pill as="a" href="/meals/entry/new">
-          Log manually
-        </Pill>
-        <Pill as="a" href="/meals/saved">
-          Saved meals
-        </Pill>
+        <ButtonLink href="/meals/entry/new">Log manually</ButtonLink>
+        <ButtonLink href="/meals/saved">Saved meals</ButtonLink>
       </Row>
       {entries.length === 0 ? (
         <EmptyState body={emptyBody} />
