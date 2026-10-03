@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Feedback } from './feedback/feedback.entity';
 import { FeedbackEvent } from './feedback/feedback-event.entity';
 import { FeedbackCursor } from './feedback/feedback-cursor.entity';
+import { EventModule } from './event/event.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { HealthModule } from './health/health.module';
 import { KeysModule } from './keys/keys.module';
@@ -25,6 +26,7 @@ if (!dbUrl) {
     KeysModule,
     HealthModule,
     FeedbackModule,
+    EventModule,
   ],
 })
 export class AppModule {}
