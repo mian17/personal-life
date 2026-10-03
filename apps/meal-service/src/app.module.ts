@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
+import { Entry } from './entries/entry.entity';
+import { EntriesModule } from './entries/entries.module';
 import { Food } from './foods/food.entity';
 import { FoodsModule } from './foods/foods.module';
 import { Serving } from './foods/serving.entity';
@@ -15,13 +17,14 @@ import { TargetModule } from './targets/target.module';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db'),
-      entities: [UserKeys, Target, Food, Serving],
+      entities: [UserKeys, Target, Food, Serving, Entry],
       synchronize: true,
     }),
     KeysModule,
     HealthModule,
     TargetModule,
     FoodsModule,
+    EntriesModule,
   ],
 })
 export class AppModule {}

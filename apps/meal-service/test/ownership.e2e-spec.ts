@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
+import { NUTRIENTS, type Nutrient } from '@life/nutrition';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
 
 /**
@@ -124,6 +125,96 @@ describe('Meal ownership (e2e)', () => {
 
       const bSearch = await list(tokenB, 'shared-token').expect(200);
       expect(bSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
+    });
+  });
+
+  describe('entries', () => {
+    const DAY = '2026-09-03';
+    const post = (body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).post('/api/entries'), token).send(body);
+    const list = (date: string, token: string) =>
+      auth(request(app.getHttpServer()).get(`/api/entries?date=${date}`), token);
+    const one = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).get(`/api/entries/${id}`), token);
+    const patch = (id: string, body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).patch(`/api/entries/${id}`), token).send(body);
+    const remove = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).delete(`/api/entries/${id}`), token);
+
+    /** A complete 27-field vector (missing data is 0), distinct per caller. */
+    const entryVector = (calories: number): Record<Nutrient, number> => {
+      const out = {} as Record<Nutrient, number>;
+      for (const { key } of NUTRIENTS) out[key] = 0;
+      out.calories = calories;
+      return out;
+    };
+
+    it("scopes the day to the caller (B sees nothing of A's entries)", async () => {
+      await post(
+        { date: DAY, mealGroup: 'breakfast', foodId: 'food-a', quantity: 1, nutrients: entryVector(500) },
+        tokenA,
+      ).expect(201);
+
+      const bList = await list(DAY, tokenB).expect(200);
+      expect(bList.body).toEqual([]);
+
+      const aList = await list(DAY, tokenA).expect(200);
+      expect(aList.body).toHaveLength(1);
+      expect(aList.body[0].nutrients.calories).toBe(500);
+      expect(aList.body[0]).not.toHaveProperty('ownerSub');
+    });
+
+    it("returns a byte-identical 404 for a foreign id and a missing id", async () => {
+      const created = await post(
+        { date: DAY, mealGroup: 'lunch', foodId: 'food-a', quantity: 1, nutrients: entryVector(300) },
+        tokenA,
+      ).expect(201);
+
+      const compare404 = async (foreign: () => request.Test, missing: () => request.Test) => {
+        const f = await foreign().expect(404);
+        const m = await missing().expect(404);
+        expect(f.status).toBe(m.status);
+        expect(JSON.stringify(f.body)).toBe(JSON.stringify(m.body));
+      };
+
+      await compare404(
+        () => one(created.body.id, tokenB),
+        () => one(MISSING_ID, tokenB),
+      );
+      await compare404(
+        () => patch(created.body.id, { mealGroup: 'dinner' }, tokenB),
+        () => patch(MISSING_ID, { mealGroup: 'dinner' }, tokenB),
+      );
+      await compare404(
+        () => remove(created.body.id, tokenB),
+        () => remove(MISSING_ID, tokenB),
+      );
+
+      // B's failed attempts never touched A's row or its snapshot.
+      const reread = await one(created.body.id, tokenA).expect(200);
+      expect(reread.body.mealGroup).toBe('lunch');
+      expect(reread.body.nutrients.calories).toBe(300);
+    });
+
+    it("does not let B's entries move A's day total", async () => {
+      const aBefore = await list(DAY, tokenA).expect(200);
+      const totalBefore = aBefore.body.reduce(
+        (n: number, e: { nutrients: { calories: number } }) => n + e.nutrients.calories,
+        0,
+      );
+
+      await post(
+        { date: DAY, mealGroup: 'snack', foodId: 'food-b', quantity: 1, nutrients: entryVector(700) },
+        tokenB,
+      ).expect(201);
+
+      const aAfter = await list(DAY, tokenA).expect(200);
+      const totalAfter = aAfter.body.reduce(
+        (n: number, e: { nutrients: { calories: number } }) => n + e.nutrients.calories,
+        0,
+      );
+      expect(aAfter.body).toEqual(aBefore.body);
+      expect(totalAfter).toBe(totalBefore);
     });
   });
 
