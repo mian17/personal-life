@@ -34,6 +34,15 @@ export function isPublicPath(pathname: string): boolean {
 export interface GateInput {
   /** Whether this is a production-style run (the ACCESS gate is skipped in dev). */
   isProduction: boolean;
+  /**
+   * Whether the Tailscale ACCESS gate runs at all. Defaults to `true` when
+   * omitted, so every existing caller and test keeps the fail-closed behavior.
+   * `middleware.ts` passes `false` only when its `APP_DEV_SKIP_ACCESS_GATE=1`
+   * opt-out is set — a `dev:build` run needs it because `next start` forces
+   * `NODE_ENV=production` on its process and would otherwise 403 header-less
+   * localhost. The opt-out is a command-line flag, never a deployed env value.
+   */
+  accessGate?: boolean;
   pathname: string;
   /** Tailscale/Serve traffic marker (Next sets this in production). */
   hasForwardedHost: boolean;
@@ -48,8 +57,9 @@ export interface GateInput {
 export function decideGate(input: GateInput): GateDecision {
   // 1. ACCESS gate — environment-dependent. Dev is skipped: localhost has no
   // Tailscale header, and Next always injects `x-forwarded-host`, so running the
-  // owner check in dev would wrongly forbid it.
-  if (input.isProduction && input.hasForwardedHost) {
+  // owner check in dev would wrongly forbid it. `accessGate` defaults on so a
+  // caller that omits it (or a production process) is fail-closed.
+  if ((input.accessGate ?? true) && input.isProduction && input.hasForwardedHost) {
     const owner = input.ownerLogin;
     const login = input.tailscaleLogin;
     if (!owner || !login || login.toLowerCase() !== owner.toLowerCase()) {

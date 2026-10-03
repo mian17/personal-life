@@ -152,3 +152,61 @@ describe('dev (non-production) gate', () => {
     ).toBe('redirect-login');
   });
 });
+
+describe('accessGate opt-out (`dev:build` under `next start`)', () => {
+  it('defaults to the gate on: an omitted flag keeps production fail-closed', () => {
+    // `next start` forces NODE_ENV=production; without the explicit opt-out the
+    // Tailscale check must still run, so a header-less proxied request is 403.
+    expect(
+      decideGate({
+        ...base,
+        isProduction: true,
+        hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
+        tailscaleLogin: null,
+        hasValidSession: true,
+      }),
+    ).toBe('forbidden');
+  });
+
+  it('skips the ACCESS gate when explicitly disabled, but keeps the identity gate', () => {
+    // Header-less localhost is allowed through — but identity is still required,
+    // so a cold request is sent to login, never to the data layer.
+    expect(
+      decideGate({
+        ...base,
+        isProduction: true,
+        accessGate: false,
+        hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
+        tailscaleLogin: null,
+        hasValidSession: false,
+      }),
+    ).toBe('redirect-login');
+    expect(
+      decideGate({
+        ...base,
+        isProduction: true,
+        accessGate: false,
+        hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
+        tailscaleLogin: 'intruder@example.com',
+        hasValidSession: true,
+      }),
+    ).toBe('next');
+  });
+
+  it('still runs the ACCESS gate when explicitly enabled', () => {
+    expect(
+      decideGate({
+        ...base,
+        isProduction: true,
+        accessGate: true,
+        hasForwardedHost: true,
+        ownerLogin: 'owner@example.com',
+        tailscaleLogin: null,
+        hasValidSession: true,
+      }),
+    ).toBe('forbidden');
+  });
+});
