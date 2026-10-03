@@ -8,7 +8,7 @@ One deliverable, four independently testable capabilities with one-way dependenc
 |---|---|---|
 | `ui-tokens` | `@life/ui` package skeleton + the visual language: design tokens (CSS custom properties), theme contract (data-theme + prefers-color-scheme + pre-hydration snippet) | — |
 | `ui-atoms` | Fixed-API visual primitives: Button, IconButton, Checkbox, IconLink, Input, Textarea, Select, Pill, Card, StatusText, LocalTime, ConfirmButton, ThemeToggle, DueDatePill, Switch | `ui-tokens` |
-| `ui-blocks` | App-level composition blocks: PageShell, NavBar, PageTitle, EmptyState, List/ListItem, TagFilterNav, FabLink, EditorToolbar, EditorScreen, AlertBanner, SearchField, PillGroup, PageActions, TagPicker, TagManager, ListManager, Menu, Stack, Section, Row, EditorStack, TrashBlock, ManagerBlock, ListShell, EditorChrome, SettingsRow, SettingsBlock, TabBar, Tab, MatrixBlock, Dialog | `ui-atoms` |
+| `ui-blocks` | App-level composition blocks: PageShell, NavBar, PageTitle, EmptyState, List/ListItem, TagFilterNav, FabLink, EditorToolbar, EditorScreen, AlertBanner, SearchField, PillGroup, PageActions, TagPicker, TagManager, ListManager, Menu, Stack, Section, Row, EditorStack, TrashBlock, ManagerBlock, ListShell, EditorChrome, SettingsRow, SettingsBlock, TabBar, Tab, MatrixBlock, Dialog, FeedbackForm, FeedbackNavItem | `ui-atoms` |
 | `notes-port` | `apps/app` rewritten onto `@life/ui`, pixel-identical, frozen e2e selector surface, `globals.css` absorbed into the package | `ui-blocks` |
 
 Build order: `ui-tokens` → `ui-atoms` → `ui-blocks` → `notes-port`.

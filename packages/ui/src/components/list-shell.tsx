@@ -18,12 +18,12 @@ export interface ListShellProps {
   filters?: ReactNode;
   /** Empty-state OR list body. The app decides which it passes. */
   body: ReactNode;
-  /** Fixed action button `FabLink` href (supplied by the app). */
-  fabHref: string;
+  /** Fixed action button `FabLink` href (supplied by the app). Omit all three `fab*` props and no `FabLink` renders (a page with no create action). */
+  fabHref?: string;
   /** Fab aria-label; frozen visible/accessible text supplied by the app. */
-  fabLabel: string;
+  fabLabel?: string;
   /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). */
-  fabIcon: ReactNode;
+  fabIcon?: ReactNode;
   /**
    * Opt into a full-viewport-height page: the `body` slot grows to fill the
    * remaining space, for a full-height body such as the matrix. Off by default,
@@ -52,9 +52,11 @@ export function ListShell({
       {search}
       {filters}
       {fill ? <div className="ui-list-shell__body">{body}</div> : body}
-      <FabLink href={fabHref} label={fabLabel}>
-        {fabIcon}
-      </FabLink>
+      {fabHref != null && (
+        <FabLink href={fabHref} label={fabLabel ?? ''}>
+          {fabIcon}
+        </FabLink>
+      )}
     </PageShell>
   );
 }

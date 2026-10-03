@@ -1,0 +1,138 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import type {
+  CreateFeedbackInput,
+  FeedbackApp,
+  FeedbackSubmitResult,
+  FeedbackType,
+} from '@life/shared';
+import { AlertBanner } from './alert-banner';
+import { Button } from './button';
+import { Dialog } from './dialog';
+import { Pill } from './pill';
+import { PillGroup } from './pill-group';
+import { Textarea } from './textarea';
+
+export const FEEDBACK_TYPES: readonly { value: FeedbackType; label: string }[] = [
+  { value: 'feature_request', label: 'Feature request' },
+  { value: 'enhancement', label: 'Enhancement' },
+  { value: 'bug_report', label: 'Bug report' },
+] as const;
+
+export interface FeedbackFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Which app the entry belongs to (`'notes' | 'todos' | 'feedback'`). */
+  app: string;
+  /** Submit seam: the app passes its server action. Receives the idempotency key. */
+  onSubmit: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
+  /** Dialog title (frozen visible text). Default "Send feedback". */
+  title?: string;
+  /** Submit button label. Default "Send". */
+  submitLabel?: string;
+}
+
+const DESCRIPTION_REQUIRED = 'Description is required.';
+const SUBMIT_FAILED = "Couldn't send feedback. Try again.";
+
+/**
+ * The submit-feedback dialog: three-way type picker + required description,
+ * composed entirely from `@life/ui` primitives (no new visual language).
+ */
+export function FeedbackForm({
+  open,
+  onOpenChange,
+  app,
+  onSubmit,
+  title = 'Send feedback',
+  submitLabel = 'Send',
+}: FeedbackFormProps) {
+  const [type, setType] = useState<FeedbackType>(FEEDBACK_TYPES[0].value);
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  // Idempotency key (SPEC-feedback-ui, locked intent 5): one per open, reused by
+  // every attempt of that open, regenerated on a fresh open. Request path only —
+  // never persisted, logged, or cached.
+  const idRef = useRef('');
+
+  useEffect(() => {
+    if (!open) return;
+    idRef.current = crypto.randomUUID();
+    setError(null);
+    setType(FEEDBACK_TYPES[0].value);
+    setDescription('');
+  }, [open]);
+
+  async function submit() {
+    if (description.trim().length === 0) {
+      // The rule is taught by the error, not by an inert button.
+      setError(DESCRIPTION_REQUIRED);
+      descriptionRef.current?.focus();
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      const result = await onSubmit({
+        id: idRef.current,
+        app: app as FeedbackApp,
+        type,
+        description: description.trim(),
+      });
+      if (result.ok) {
+        onOpenChange(false);
+      } else {
+        // Same banner, dialog stays open, same id kept for the retry.
+        setError(result.message);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message ? cause.message : SUBMIT_FAILED);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={pending} onClick={submit}>
+            {pending ? 'Sending…' : submitLabel}
+          </Button>
+        </>
+      }
+    >
+      {error != null && <AlertBanner role="alert">{error}</AlertBanner>}
+      <PillGroup role="group" aria-label="Feedback type">
+        {FEEDBACK_TYPES.map((feedbackType) => (
+          <Pill
+            key={feedbackType.value}
+            as="button"
+            active={type === feedbackType.value}
+            aria-pressed={type === feedbackType.value}
+            onClick={() => setType(feedbackType.value)}
+          >
+            {feedbackType.label}
+          </Pill>
+        ))}
+      </PillGroup>
+      <Textarea
+        ref={descriptionRef}
+        aria-label="Description"
+        aria-required
+        aria-invalid={error != null || undefined}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+    </Dialog>
+  );
+}
