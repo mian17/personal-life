@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Feedback } from './feedback/feedback.entity';
+import { FeedbackEvent } from './feedback/feedback-event.entity';
+import { FeedbackCursor } from './feedback/feedback-cursor.entity';
+import { FeedbackModule } from './feedback/feedback.module';
 import { HealthModule } from './health/health.module';
 import { KeysModule } from './keys/keys.module';
 import { UserKeys } from './keys/user-keys.entity';
@@ -15,12 +19,12 @@ if (!dbUrl) {
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: dbUrl,
-      // T8/T9 add the feedback, event, and cursor entities here.
-      entities: [UserKeys],
+      entities: [UserKeys, Feedback, FeedbackEvent, FeedbackCursor],
       synchronize: true,
     }),
     KeysModule,
     HealthModule,
+    FeedbackModule,
   ],
 })
 export class AppModule {}
