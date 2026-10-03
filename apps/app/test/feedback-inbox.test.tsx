@@ -1,4 +1,5 @@
 import type { CreateFeedbackInput, FeedbackDto, FeedbackSubmitResult } from '@life/shared';
+import { FeedbackNavItem } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FeedbackInbox } from '../app/feedback-inbox';
 
@@ -94,5 +95,15 @@ describe('FeedbackInbox grouping', () => {
 
     expect(html).not.toMatch(/<ul[^>]*><\/ul>/);
     expect(rowTitles(html).length).toBeGreaterThan(0);
+  });
+
+  it('mounts the feedback toolbar item for this app on the empty inbox', () => {
+    const el = FeedbackInbox({
+      entries: [],
+      submitFeedbackAction: noopAction,
+    }) as unknown as { props: { navTrailing: any } };
+
+    expect(el.props.navTrailing.type).toBe(FeedbackNavItem);
+    expect(el.props.navTrailing.props.app).toBe('feedback');
   });
 });

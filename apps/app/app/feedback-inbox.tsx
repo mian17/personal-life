@@ -1,4 +1,5 @@
 import type { CreateFeedbackInput, FeedbackDto, FeedbackSubmitResult } from '@life/shared';
+import { FEEDBACK_APPS } from '@life/shared';
 import {
   EmptyState,
   FEEDBACK_TYPES,
@@ -11,7 +12,7 @@ import {
 } from '@life/ui';
 
 const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', feedback: 'Feedback' };
-const APP_ORDER = ['notes', 'todos', 'feedback'];
+const APP_ORDER = FEEDBACK_APPS;
 const TYPE_ORDER = FEEDBACK_TYPES.map((t) => t.value);
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(
   FEEDBACK_TYPES.map((t) => [t.value, t.label]),
@@ -21,7 +22,7 @@ const EMPTY_HEADING = 'No feedback yet.';
 const EMPTY_BODY = 'Use the feedback button in the toolbar to send the first one.';
 
 /** Canonical ids first, unknown ids last (alphabetical). */
-function orderedKeys(keys: string[], canonical: string[]): string[] {
+function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
   const known = canonical.filter((key) => keys.includes(key));
   const unknown = keys.filter((key) => !canonical.includes(key)).sort();
   return [...known, ...unknown];
