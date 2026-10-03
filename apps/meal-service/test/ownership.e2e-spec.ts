@@ -1,0 +1,168 @@
+import { INestApplication } from '@nestjs/common';
+import { rmSync } from 'fs';
+import { join } from 'path';
+import request from 'supertest';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+
+/**
+ * Two-subject ownership isolation (`SPEC-meal-service` Success Criterion 1):
+ * boot the real app with the real guard and drive it over HTTP for two
+ * independently minted subjects A and B. Every route is scoped by the verified
+ * `sub`, so a foreign id is indistinguishable from a missing one (byte-identical
+ * 404) and B can never read, mutate, or delete A's food or target.
+ *
+ * Food and target blocks are separate describes so Tasks 9 (entry) and 11
+ * (saved meal) can extend this file with their own cross-entity blocks without
+ * restructuring it. `NODE_ENV` is pinned to a non-development value for the
+ * whole suite (jest workers share `process.env`; the guard's dev bypass reads it
+ * per request).
+ */
+
+const TEST_DB = join(__dirname, 'test-ownership.db');
+process.env.DB_PATH = TEST_DB;
+
+const BASE_NODE_ENV = 'test';
+const MISSING_ID = '11111111-1111-4111-8111-111111111111';
+
+let tokenA = '';
+let tokenB = '';
+
+const auth = (r: request.Test, token: string) => r.set('Authorization', `Bearer ${token}`);
+
+describe('Meal ownership (e2e)', () => {
+  let app: INestApplication;
+  let harness: JwtTestHarness;
+  let originalEnv: NodeJS.ProcessEnv;
+
+  beforeAll(async () => {
+    originalEnv = { ...process.env };
+    process.env.NODE_ENV = BASE_NODE_ENV;
+    process.env.DB_PATH = TEST_DB;
+
+    harness = await new JwtTestHarness().start();
+    configureVerifierEnv(harness);
+    tokenA = await harness.sign({ subject: 'user-a', expiresIn: 3600 });
+    tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
+
+    rmSync(TEST_DB, { force: true });
+    const { createApp } = await import('../src/app.factory');
+    app = await createApp();
+    await app.init();
+  });
+
+  afterEach(() => {
+    // The dev bypass must never leak into a later case in this worker.
+    process.env.NODE_ENV = BASE_NODE_ENV;
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(TEST_DB, { force: true });
+    await harness.stop();
+    process.env = originalEnv;
+  });
+
+  describe('foods', () => {
+    const post = (body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).post('/api/foods'), token).send(body);
+    const list = (token: string, q?: string) =>
+      auth(
+        request(app.getHttpServer()).get('/api/foods' + (q ? `?q=${encodeURIComponent(q)}` : '')),
+        token,
+      );
+    const one = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).get(`/api/foods/${id}`), token);
+    const patch = (id: string, body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).patch(`/api/foods/${id}`), token).send(body);
+    const remove = (id: string, token: string) =>
+      auth(request(app.getHttpServer()).delete(`/api/foods/${id}`), token);
+
+    it("scopes the list to the caller (B sees nothing of A's foods)", async () => {
+      await post({ name: 'A oats', servingGrams: 100 }, tokenA).expect(201);
+
+      const bList = await list(tokenB).expect(200);
+      expect(bList.body).toEqual([]);
+
+      const aList = await list(tokenA).expect(200);
+      expect(aList.body.map((f: { name: string }) => f.name)).toContain('A oats');
+    });
+
+    it('returns a byte-identical 404 for a foreign id and a missing id', async () => {
+      const created = await post({ name: 'A rice', servingGrams: 150 }, tokenA).expect(201);
+
+      const compare404 = async (foreign: () => request.Test, missing: () => request.Test) => {
+        const f = await foreign().expect(404);
+        const m = await missing().expect(404);
+        expect(f.status).toBe(m.status);
+        expect(JSON.stringify(f.body)).toBe(JSON.stringify(m.body));
+      };
+
+      await compare404(
+        () => one(created.body.id, tokenB),
+        () => one(MISSING_ID, tokenB),
+      );
+      await compare404(
+        () => patch(created.body.id, { name: 'hijack' }, tokenB),
+        () => patch(MISSING_ID, { name: 'hijack' }, tokenB),
+      );
+      await compare404(
+        () => remove(created.body.id, tokenB),
+        () => remove(MISSING_ID, tokenB),
+      );
+
+      // B's failed attempts never touched A's row.
+      const reread = await one(created.body.id, tokenA).expect(200);
+      expect(reread.body.name).toBe('A rice');
+    });
+
+    it("does not leak B's matching food through A's search (`q` post-decrypt)", async () => {
+      await post({ name: 'shared-token-A', servingGrams: 100 }, tokenA).expect(201);
+      await post({ name: 'shared-token-B', servingGrams: 100 }, tokenB).expect(201);
+
+      const aSearch = await list(tokenA, 'shared-token').expect(200);
+      expect(aSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-A']);
+
+      const bSearch = await list(tokenB, 'shared-token').expect(200);
+      expect(bSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
+    });
+  });
+
+  describe('targets', () => {
+    const put = (body: Record<string, unknown>, token: string) =>
+      auth(request(app.getHttpServer()).put('/api/target/profile'), token).send(body);
+    const get = (date: string, token: string) =>
+      auth(request(app.getHttpServer()).get(`/api/target?date=${date}`), token);
+
+    const PROFILE = {
+      age: 30,
+      sex: 'male',
+      heightCm: 180,
+      weightKg: 80,
+      activity: 'moderate',
+      goal: 'maintain',
+    };
+
+    it("scopes the target read to the caller (B 404s while A has a row)", async () => {
+      await put({ ...PROFILE, date: '2026-01-01' }, tokenA).expect(200);
+
+      await get('2026-06-01', tokenB).expect(404);
+
+      const aTarget = await get('2026-06-01', tokenA).expect(200);
+      expect(aTarget.body.weightKg).toBe(80);
+      expect(aTarget.body).not.toHaveProperty('ownerSub');
+    });
+
+    it("B's profile write never alters A's target", async () => {
+      await put({ ...PROFILE, date: '2026-01-01' }, tokenA).expect(200);
+      const aBefore = await get('2026-06-01', tokenA).expect(200);
+
+      await put(
+        { ...PROFILE, weightKg: 120, date: '2026-01-01' },
+        tokenB,
+      ).expect(200);
+
+      const aAfter = await get('2026-06-01', tokenA).expect(200);
+      expect(aAfter.body).toEqual(aBefore.body);
+    });
+  });
+});
