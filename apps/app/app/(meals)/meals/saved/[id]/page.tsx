@@ -3,7 +3,7 @@ import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, S
 import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal } from '@/lib/meal-api';
-import { relogMealAction } from '../actions';
+import { relogMealAction } from '../../actions';
 import { MealsNav } from '../../../../meals-nav';
 
 export const dynamic = 'force-dynamic';

@@ -71,4 +71,12 @@ pays rent instead of being retyped every day.
 - Added sugars and net carbs (MFP-only fields; derivable later without a data migration.
 - Micronutrient fields outside the agreed 27 (Vitamin D/E/K, B5, selenium, copper,
   manganese, iodine).
+
+**Clarification (2026-10-04).** The editor exposing the **full agreed 27** for inspection
+and correction is *in scope* and matches the 27-field rule above — the earlier revision of
+the form showed only the 4 headline nutrients, which under-delivered on it. What stays out
+of scope is *tracking new micronutrients beyond the 27* (the line above), which this does
+not add. No new field, no schema change: the 27 already exist and the photo estimate already
+populates them; this surfaces what was stored. See
+`docs/specs/SPEC-meal-capture-nutrients.md`.
 - Billing/paywall tiers — everything is free and single-tier.
