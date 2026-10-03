@@ -199,6 +199,15 @@
   color: var(--text);
 }
 
+/* Disabled: a gated control must not look live (the meal editor's Save as meal
+   gave zero feedback otherwise). Attribute selector outranks the base
+   `cursor: pointer`, so it wins the cascade. The literal 0.5 is the file's
+   existing disabled precedent (.ui-switch:disabled, .ui-pill--button:disabled). */
+.ui-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* --------------------------------------------------------- IconButton */
 
 .ui-icon-btn {
@@ -226,6 +235,12 @@
 .ui-icon-btn--ghost {
   background: transparent;
   border-color: transparent;
+}
+
+/* Same disabled treatment as .ui-btn[disabled] — one look for every gated control. */
+.ui-icon-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* --------------------------------------------------------- Checkbox */

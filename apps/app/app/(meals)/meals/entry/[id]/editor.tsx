@@ -18,6 +18,7 @@ import {
   Select,
   StatusText,
   Textarea,
+  useSnackbar,
 } from '@life/ui';
 import type { MealEntry, MealGroup } from '@/lib/meal-api';
 import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './actions';
@@ -118,6 +119,7 @@ export function MealEditor({
   nutrition: NutritionFields;
 }) {
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [items, setItems] = useState<EditorItem[]>(
     entry
       ? [
@@ -137,7 +139,6 @@ export function MealEditor({
   const [saving, setSaving] = useState(false);
   const [savingMeal, setSavingMeal] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [mealSaved, setMealSaved] = useState(false);
 
   // One rule for "there is a confirmed number here": calories are known for
   // every item. It gates the save actions and the frozen snapshot.
@@ -274,8 +275,10 @@ export function MealEditor({
           nutrients,
         })),
       );
-      setMealSaved(true);
       setSavingMeal(false);
+      // The save feedback is the app's snackbar idiom (one owner for the
+      // message), not an inline line that's easy to miss under the button.
+      showSnackbar({ message: 'Saved to your meals.' });
     } catch {
       setSavingMeal(false);
     }
@@ -386,7 +389,6 @@ export function MealEditor({
         <Button onClick={saveAsMeal} disabled={!canSave || savingMeal}>
           Save as meal
         </Button>
-        {mealSaved && <StatusText>Saved to your meals.</StatusText>}
       </Section>
     </EditorChrome>
   );

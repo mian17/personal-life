@@ -19,9 +19,14 @@ for these without any visible change.
 <Button children: ReactNode
         variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare" | "icon"
         type="submit" | "button" onClick? formAction? aria-label? title?>
+        // `disabled` forwards to the native control AND renders a disabled look:
+        //   `.ui-btn[disabled]` — cursor: not-allowed + opacity 0.5 (one gated-control
+        //   treatment, matching the existing .ui-switch/.ui-pill--button precedent).
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
             children: ReactNode      // the icon
-            variant="default" | "ghost">
+            variant="default" | "ghost"
+            disabled?>               // forwards to the control; `.ui-icon-btn[disabled]`
+                                     //   is the same not-allowed/0.5 treatment
 <Checkbox checked?: boolean />       // presentational done-toggle glyph: a rounded square
                                      //   (radius --space-0-2 — the panel-box rounding feel),
                                      //   fills with the row's currentColor and reveals a

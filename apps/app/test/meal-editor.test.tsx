@@ -84,6 +84,15 @@ const NUTRITION: NutritionFields = {
 function stateHarness() {
   const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
+  // `MealEditor` runs `useSnackbar` (a `useContext` hook); a direct call is
+  // outside React, so stub it here — every render path needs it, not just the
+  // save test. Captured messages are exposed for assertions.
+  const shown: { message: string }[] = [];
+  const ctxSpy = jest
+    .spyOn(ReactModule, 'useContext')
+    .mockImplementation((() => ({
+      showSnackbar: (options: { message: string }) => shown.push(options),
+    })) as unknown as typeof ReactModule.useContext);
 
   function renderTree(initialEntry: MealEntry | null = null, date = '2026-10-03'): EditorTree {
     let index = 0;
@@ -100,7 +109,14 @@ function stateHarness() {
     return MealEditor({ entry: initialEntry, date, nutrition: NUTRITION }) as unknown as EditorTree;
   }
 
-  return { renderTree, restore: () => spy.mockRestore() };
+  return {
+    renderTree,
+    shown,
+    restore: () => {
+      spy.mockRestore();
+      ctxSpy.mockRestore();
+    },
+  };
 }
 
 /** Is `node` a rendered React element? */
@@ -366,6 +382,9 @@ describe('MealEditor save-as-meal control', () => {
         mealGroup: 'lunch',
         items: [{ foodId: 'Salad', quantity: 1, nutrients: vector({ calories: 250 }) }],
       });
+
+      // Exactly one owner for the message — the snackbar, not an inline line.
+      expect(harness.shown).toEqual([{ message: 'Saved to your meals.' }]);
     } finally {
       harness.restore();
     }
