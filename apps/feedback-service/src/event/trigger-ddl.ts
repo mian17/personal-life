@@ -14,7 +14,7 @@ import type { DataSource } from 'typeorm';
 export const FEEDBACK_NOTIFY_DDL = `
 CREATE OR REPLACE FUNCTION notify_feedback() RETURNS trigger AS $$
 BEGIN PERFORM pg_notify('feedback_events',
-  json_build_object('seq', NEW.seq, 'event_id', NEW.event_id)::text);
+  json_build_object('seq', NEW.seq, 'event_id', NEW."eventId")::text);
 RETURN NEW; END; $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS feedback_notify ON feedback_event;
 CREATE TRIGGER feedback_notify AFTER INSERT ON feedback_event

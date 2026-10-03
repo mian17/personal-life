@@ -209,7 +209,7 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
   /** Seed the singleton resume point on first boot. */
   private async seedCursor(): Promise<void> {
     await this.dataSource.query(
-      'INSERT INTO feedback_cursor (id, last_seq) VALUES ($1, 0) ON CONFLICT (id) DO NOTHING',
+      'INSERT INTO feedback_cursor (id, "lastSeq") VALUES ($1, 0) ON CONFLICT (id) DO NOTHING',
       [CURSOR_ID],
     );
   }
