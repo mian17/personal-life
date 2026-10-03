@@ -10,7 +10,6 @@ import {
   NavBar,
   PageShell,
   PageTitle,
-  Row,
   Section,
   Stack,
   StatusText,
@@ -65,8 +64,8 @@ async function loadTarget(date: string) {
 
 /**
  * The one meals day view: total vs target, entries grouped by meal, and the
- * three entry doors (photo FAB front door; manual + saved as pills, always all
- * available). The whole-page block both day routes render.
+ * photo FAB front door into the editor (saved meals live in the toolbar nav).
+ * The whole-page block both day routes render.
  *
  * Nutrient strings come from the shared `@life/nutrition` formatter and totals
  * from its `sum()` (no app-local unit table); the upload atom itself lives on
@@ -88,12 +87,6 @@ export async function mealDay(day: string, emptyBody: string) {
           </ButtonLink>
         </Stack>
       </Card>
-      <Section>
-        <Row>
-          <ButtonLink href="/meals/entry/new">Log manually</ButtonLink>
-          <ButtonLink href="/meals/saved">Saved meals</ButtonLink>
-        </Row>
-      </Section>
       {entries.length === 0 ? (
         <EmptyState body={emptyBody} />
       ) : (

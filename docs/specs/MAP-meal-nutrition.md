@@ -12,7 +12,7 @@ The Decision log below is the record of the two cross-cutting decisions, not a t
 |---|---|---|
 | `nutrition-model` | The 27-field nutrient vocabulary, units, per-food records, portion/serving model, and pure scaling arithmetic (food × quantity → nutrients). Shared by every other module. | — |
 | `meal-service` | The backend service: owner-scoped diary entries, saved meals, targets, photo→Gemini pipeline, cache layering, content at rest. | `nutrition-model` |
-| `meal-capture-ui` | The three entry doors (saved meal / manual / photo+hint), the review-correct step, and the day view with total vs target. Consumes `meal-service` through the `apps/app` BFF. | `meal-service` |
+| `meal-capture-ui` | The photo entry door (its editor also serves manual entry), the saved-meals toolbar door, the review-correct step, and the day view with total vs target. Consumes `meal-service` through the `apps/app` BFF. | `meal-service` |
 | `target-onboarding` | Profile capture (age, sex, height, weight, activity) and the derivation + versioning of the daily calorie/macro target. | `nutrition-model` |
 
 Build order: `nutrition-model` → `meal-service` + `target-onboarding` → `meal-capture-ui`

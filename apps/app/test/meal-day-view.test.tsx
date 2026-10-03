@@ -102,24 +102,18 @@ describe('meals day view', () => {
     expect(html).not.toContain('Set target');
   });
 
-  it('keeps all three doors reachable on an empty day', async () => {
+  it('keeps the photo door on an empty day, with no redundant body doors', async () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('No meals logged today.');
     expect(html).toContain('href="/meals/entry/new?door=photo"');
-    expect(html).toContain('href="/meals/entry/new"');
-    expect(html).toContain('href="/meals/saved"');
-  });
-
-  it('spaces the manual + saved doors row below the summary card with the section rhythm', async () => {
-    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
-
-    // Same block rhythm as the target page's Card → Section junction: the doors
-    // row is wrapped in the `Section` primitive, which owns `.ui-section`'s
-    // `margin-block-start` (packages/ui owns the block rhythm, not the atoms).
-    expect(html).toMatch(
-      /ui-section"><div class="ui-stack ui-stack--md"><div class="ui-row ui-row--md"><a class="ui-btn ui-btn--primary ui-btn--default" href="\/meals\/entry\/new">Log manually<\/a><a class="ui-btn ui-btn--primary ui-btn--default" href="\/meals\/saved">Saved meals<\/a>/,
-    );
+    expect(html).toContain('Log meal from photo');
+    // Manual entry is the photo door's own fallback, never a second body door.
+    expect(html).not.toContain('Log manually');
+    expect(html).not.toContain('href="/meals/entry/new"');
+    // Saved meals is a toolbar icon only — no body button (the `ui-icon-link`
+    // markup proves it; a body door would render a `ui-btn` anchor).
+    expect(html).not.toContain('>Saved meals</a>');
   });
 
   it('groups entries under their meal with a subtotal, in Breakfast/Lunch/Dinner/Snacks order', async () => {

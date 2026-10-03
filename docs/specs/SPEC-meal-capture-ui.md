@@ -4,8 +4,8 @@ Module id: `meal-capture-ui` (see `MAP-meal-nutrition.md`). Depends on: `meal-se
 
 ## Objective
 
-The user-facing surface: the three entry doors, the review-and-correct step, the day view with
-total vs target, and the saved-meals list.
+The user-facing surface: the photo entry door (whose editor also serves manual entry),
+the review-and-correct step, the day view with total vs target, and the saved-meals list.
 
 This module introduces **no visual language of its own**. Every element composes a `@life/ui`
 primitive; any gap is fixed upstream in `packages/ui` per Contract 1 Rule 3, never patched here.
@@ -35,7 +35,7 @@ e2e (single spec): npx playwright test --config apps/app/playwright.config.ts <f
 ```
 apps/app/
   lib/meal-api.ts                 # server-only BFF client (the only caller of meal-service)
-  app/(meals)/meals/page.tsx      # today: total vs target, meal groups, three doors
+  app/(meals)/meals/page.tsx      # today: total vs target, meal groups, photo door
   app/(meals)/meals/[date]/…      # a specific day
   app/(meals)/meals/entry/[id]/…  # review-correct editor for one entry
   app/(meals)/meals/saved/…       # saved meals list + one-tap re-log
@@ -88,7 +88,7 @@ or `PillGroup`, forms use `Input`/`Select`/`Textarea`.
 
 | Concern | Test level | Why |
 |---|---|---|
-| Three doors all reachable from the day view | e2e | it is the product's main promise |
+| Photo door + saved-meals toolbar door reachable from the day view | e2e | the product's main promise |
 | Photo failure opens manual entry, shows no invented numbers | e2e | the specific correctness rule from the intent doc |
 | Correct-then-save persists the corrected vector | e2e | the accuracy mechanism |
 | Saved meal re-logs snapshot values, not a re-guess | e2e | the payoff of correcting once |

@@ -13,9 +13,12 @@ import { logIn } from './journey';
  * of that concern — so no provider is called.
  */
 
-/** The day view's three entry doors, exactly as they render (day view). */
+/**
+ * The day view's entry doors, exactly as they render. The photo FAB opens the
+ * editor (manual entry is that same editor's fallback, not a separate door);
+ * `Saved meals` is the toolbar nav icon.
+ */
 const PHOTO_DOOR = 'Log meal from photo';
-const MANUAL_DOOR = 'Log manually';
 const SAVED_DOOR = 'Saved meals';
 
 /** A saved-meal name per run, so a rerun can never collide with the last one. */
@@ -77,25 +80,22 @@ async function listedEntryCalories(page: Page): Promise<number[]> {
 }
 
 test.describe('meals day view', () => {
-  test('the three entry doors are all reachable from the day view', async ({ page }) => {
+  test('the entry doors are reachable from the day view', async ({ page }) => {
     await openMeals(page);
 
-    // Every door renders as a link, all three at once.
-    for (const door of [PHOTO_DOOR, MANUAL_DOOR, SAVED_DOOR]) {
+    // Every door renders as a link, at once.
+    for (const door of [PHOTO_DOOR, SAVED_DOOR]) {
       await expect(page.getByRole('link', { name: door, exact: true })).toBeVisible();
     }
+    // The manual door is gone: the photo door's own editor *is* manual entry.
+    await expect(page.getByRole('link', { name: 'Log manually', exact: true })).toHaveCount(0);
 
     // The photo door opens the editor with the picker already at hand.
     await openDoor(page, PHOTO_DOOR);
     await expect(page.getByRole('heading', { name: 'Log meal' })).toBeVisible();
     await expect(page.getByLabel('Choose a photo')).toBeVisible();
 
-    // The manual door opens the same editor.
-    await page.goto('/meals');
-    await openDoor(page, MANUAL_DOOR);
-    await expect(page.getByRole('heading', { name: 'Log meal' })).toBeVisible();
-
-    // The saved-meal door opens the saved list.
+    // The saved-meal toolbar door opens the saved list.
     await page.goto('/meals');
     await page.getByRole('link', { name: SAVED_DOOR, exact: true }).click();
     await page.waitForURL(/\/meals\/saved$/, { timeout: 15_000 });
@@ -132,7 +132,7 @@ test.describe('meals day view', () => {
     page,
   }) => {
     await openMeals(page);
-    await openDoor(page, MANUAL_DOOR);
+    await openDoor(page, PHOTO_DOOR);
 
     await page.getByLabel('Dish for item 1').fill('Rice bowl');
     await page.getByLabel('Calories for Rice bowl').fill('450');
@@ -152,7 +152,7 @@ test.describe('meals day view', () => {
 
   test('a saved meal re-logs its snapshot in one tap', async ({ page }) => {
     await openMeals(page);
-    await openDoor(page, MANUAL_DOOR);
+    await openDoor(page, PHOTO_DOOR);
 
     await page.getByLabel('Dish for item 1').fill('Overnight oats');
     await page.getByLabel('Calories for Overnight oats').fill('320');
@@ -181,7 +181,7 @@ test.describe('meals day view', () => {
     // This test owns its fixture: it must not depend on other tests' writes, so
     // it logs its own entry before reading the day total back.
     await openMeals(page);
-    await openDoor(page, MANUAL_DOOR);
+    await openDoor(page, PHOTO_DOOR);
 
     const dish = 'Total probe dish';
     const calories = 400;

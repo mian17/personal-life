@@ -8,10 +8,16 @@ describe('meals toolbar nav', () => {
 
     expect(html).toContain('href="/meals/target"');
     expect(html).toContain('aria-label="Daily target"');
+    expect(html).toContain('href="/meals/saved"');
+    expect(html).toContain('aria-label="Saved meals"');
     expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('aria-label="Settings"');
     // Notes/todos put the gear last; meals matches.
     expect(html.indexOf('aria-label="Settings"')).toBeGreaterThan(
+      html.indexOf('aria-label="Saved meals"'),
+    );
+    // Saved meals sits between the daily target and the gear.
+    expect(html.indexOf('aria-label="Saved meals"')).toBeGreaterThan(
       html.indexOf('aria-label="Daily target"'),
     );
   });

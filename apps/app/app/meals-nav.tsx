@@ -1,6 +1,6 @@
 import { settingsHref } from '@life/app-kit';
 import { IconLink } from '@life/ui';
-import { Settings, Target } from 'lucide-react';
+import { Bookmark, Settings, Target } from 'lucide-react';
 
 /**
  * The Meals toolbar nav icons, shared by the list and day routes. The target
@@ -11,6 +11,9 @@ export function MealsNav() {
     <>
       <IconLink href="/meals/target" label="Daily target">
         <Target size={20} aria-hidden />
+      </IconLink>
+      <IconLink href="/meals/saved" label="Saved meals">
+        <Bookmark size={20} aria-hidden />
       </IconLink>
       <IconLink href={settingsHref('/meals')} label="Settings">
         <Settings size={20} aria-hidden />
