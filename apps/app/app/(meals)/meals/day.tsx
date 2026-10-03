@@ -6,6 +6,7 @@ import {
   formatDate,
   List,
   ListItem,
+  NavBar,
   PageShell,
   PageTitle,
   Pill,
@@ -14,6 +15,7 @@ import {
   StatusText,
 } from '@life/ui';
 import { Camera } from 'lucide-react';
+import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';
 import { getMealTarget, listDayEntries, type MealEntry } from '@/lib/meal-api';
 
@@ -75,6 +77,7 @@ export async function mealDay(day: string, emptyBody: string) {
 
   return (
     <PageShell>
+      <NavBar trailing={<MealsNav />} />
       <PageTitle>Meals — {formatDate(day)}</PageTitle>
       <Card>
         <StatusText>{daySummary(totalCalories, target)}</StatusText>

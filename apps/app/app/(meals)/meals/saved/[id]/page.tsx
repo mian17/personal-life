@@ -1,8 +1,9 @@
 import { format, sum } from '@life/nutrition';
-import { Button, Card, List, ListItem, PageShell, PageTitle, Section } from '@life/ui';
+import { Button, Card, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal } from '@/lib/meal-api';
 import { relogMealAction } from '../actions';
+import { MealsNav } from '../../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ export default async function SavedMealPage({ params }: { params: Promise<{ id: 
 
   return (
     <PageShell>
+      <NavBar trailing={<MealsNav />} />
       <PageTitle>{meal.name}</PageTitle>
       <Card>Re-log {total} in one tap — the corrected numbers, not a new guess.</Card>
       <Section label="Items">

@@ -1,6 +1,7 @@
 import { format, sum } from '@life/nutrition';
-import { EmptyState, List, ListItem, PageShell, PageTitle } from '@life/ui';
+import { EmptyState, List, ListItem, NavBar, PageShell, PageTitle } from '@life/ui';
 import { listSavedMeals } from '@/lib/meal-api';
+import { MealsNav } from '../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ export default async function SavedMealsPage() {
 
   return (
     <PageShell>
+      <NavBar trailing={<MealsNav />} />
       <PageTitle>Saved meals</PageTitle>
       {saved.length === 0 ? (
         <EmptyState body="No saved meals yet. Correct a meal and save it to re-log it in one tap." />

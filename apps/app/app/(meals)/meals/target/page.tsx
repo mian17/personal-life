@@ -1,9 +1,10 @@
 import { format } from '@life/nutrition';
-import { Card, PageShell, PageTitle, StatusText } from '@life/ui';
+import { Card, NavBar, PageShell, PageTitle, StatusText } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 import { getMealTarget, type MealTarget } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import { TargetProfileForm } from './form';
+import { MealsNav } from '../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export default async function TargetPage() {
 
   return (
     <PageShell>
+      <NavBar trailing={<MealsNav />} />
       <PageTitle>Daily target</PageTitle>
       <Card>
         {target == null ? (
