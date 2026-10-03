@@ -1,6 +1,10 @@
 # Capability Map: meal-nutrition
 
 / Source: `docs/intent/meal-nutrition.md` (confirmed 2026-10-02).
+Status: **shipped** 2026-10-03 — all four modules below are implemented and live in the
+codebase: `nutrition-model` → `packages/nutrition`, `meal-service` + `target-onboarding` →
+`apps/meal-service` (routes included), `meal-capture-ui` → the meals routes in `apps/app`.
+The Decision log below is the record of the two cross-cutting decisions, not a to-do.
 
 ## Modules
 
