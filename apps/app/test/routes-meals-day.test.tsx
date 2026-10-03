@@ -4,16 +4,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
   listDayEntries: jest.fn(),
+  getMealTarget: jest.fn(),
 }));
 jest.mock('@/lib/today', () => ({
   getToday: jest.fn(),
 }));
 
-import { listDayEntries, type MealEntry } from '@/lib/meal-api';
+import { ApiError } from '@/lib/api-error';
+import { listDayEntries, getMealTarget, type MealEntry } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import MealsPage from '@/app/(meals)/meals/page';
 
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
+const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
@@ -40,6 +43,7 @@ describe('/meals day route wiring', () => {
     jest.clearAllMocks();
     mockedGetToday.mockResolvedValue('2026-10-03');
     mockedListDayEntries.mockResolvedValue([]);
+    mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
   });
 
   it("reads the day from the shared owner and sends THAT day to the BFF (lesson 0016)", async () => {

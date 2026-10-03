@@ -1,42 +1,121 @@
 import { format, sum } from '@life/nutrition';
-import { EmptyState, formatDate, List, ListItem, PageShell, PageTitle, StatusText } from '@life/ui';
-import { listDayEntries } from '@/lib/meal-api';
+import {
+  Card,
+  EmptyState,
+  FabLink,
+  formatDate,
+  List,
+  ListItem,
+  PageShell,
+  PageTitle,
+  Pill,
+  Row,
+  Section,
+  StatusText,
+} from '@life/ui';
+import { Camera } from 'lucide-react';
+import { ApiError } from '@/lib/api-error';
+import { getMealTarget, listDayEntries, type MealEntry } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 
 export const dynamic = 'force-dynamic';
 
+/** The four meal groups in display order (spec: day view). */
+const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
+  { key: 'breakfast', label: 'Breakfast' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'dinner', label: 'Dinner' },
+  { key: 'snack', label: 'Snacks' },
+];
+
 /**
- * The meals day view — minimal wiring for Task 14; Task 16 extends it.
- *
- * "Which day now" comes from the existing shared owner `getToday()` (never a
- * second derivation, lesson 0016; the user's zone, not the host clock, lesson
- * 0019), and that resolved day is what the BFF sends the service. Totals are
- * summed with the shared `@life/nutrition` model so the UI can never disagree
- * with the service, and nutrient strings come from its formatter (no app-local
- * unit table).
+ * The day's headline: total eaten against the target and what remains. A missing
+ * profile (target 404) is "no target set", never an error page; an over-target
+ * day reads "X over" so the shared formatter's negative guard never leaks an
+ * em dash into the remaining figure.
  */
-export default async function MealsPage() {
-  const today = await getToday();
-  const entries = await listDayEntries(today);
-  const total = format('calories', sum(entries.map((e) => e.nutrients)).calories);
+function daySummary(totalCalories: number, target: { calories: number } | null): string {
+  const eaten = format('calories', totalCalories);
+  if (target == null) return `${eaten} — No target set`;
+  const rest = target.calories - totalCalories;
+  const tail =
+    rest >= 0 ? `${format('calories', rest)} left` : `${format('calories', -rest)} over`;
+  return `${eaten} / ${format('calories', target.calories)}, ${tail}`;
+}
+
+/** The target row, or `null` when the owner has no profile yet (404). */
+async function loadTarget(date: string) {
+  try {
+    return await getMealTarget(date);
+  } catch (error: unknown) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/**
+ * The one meals day view: total vs target, entries grouped by meal, and the
+ * three entry doors (photo FAB front door; manual + saved as pills, always all
+ * available). The whole-page block both day routes render, so the structure and
+ * spacing of the two can never drift (lessons 0016 + 0006) — `day` is the
+ * client's resolved `YYYY-MM-DD` (lesson 0019), never derived inside the view.
+ *
+ * Nutrient strings come from the shared `@life/nutrition` formatter and totals
+ * from its `sum()` (no app-local unit table); the upload atom itself lives on
+ * the entry editor — the photo door opens it, it is not composed here.
+ */
+export async function mealDay(day: string, emptyBody: string) {
+  const [entries, target] = await Promise.all([listDayEntries(day), loadTarget(day)]);
+  const totalCalories = sum(entries.map((entry) => entry.nutrients)).calories;
 
   return (
     <PageShell>
-      <PageTitle>Meals — {formatDate(today)}</PageTitle>
-      <StatusText>{total}</StatusText>
+      <PageTitle>Meals — {formatDate(day)}</PageTitle>
+      <Card>
+        <StatusText>{daySummary(totalCalories, target)}</StatusText>
+      </Card>
+      <Row>
+        <Pill as="a" href="/meals/entry/new">
+          Log manually
+        </Pill>
+        <Pill as="a" href="/meals/saved">
+          Saved meals
+        </Pill>
+      </Row>
       {entries.length === 0 ? (
-        <EmptyState body="No meals logged today." />
+        <EmptyState body={emptyBody} />
       ) : (
-        <List>
-          {entries.map((entry) => (
-            <ListItem
-              key={entry.id}
-              title={entry.mealGroup}
-              meta={format('calories', entry.nutrients.calories)}
-            />
-          ))}
-        </List>
+        GROUPS.map((group) => {
+          const items = entries.filter((entry) => entry.mealGroup === group.key);
+          if (items.length === 0) return null;
+          const subtotal = format(
+            'calories',
+            sum(items.map((entry) => entry.nutrients)).calories,
+          );
+          return (
+            <Section key={group.key} label={`${group.label} — ${subtotal}`}>
+              <List>
+                {items.map((entry) => (
+                  <ListItem
+                    key={entry.id}
+                    title={format('calories', entry.nutrients.calories)}
+                    meta={`× ${entry.quantity}`}
+                  />
+                ))}
+              </List>
+            </Section>
+          );
+        })
       )}
+      <FabLink href="/meals/entry/new?door=photo" label="Log meal from photo">
+        <Camera size={28} strokeWidth={2.5} aria-hidden />
+      </FabLink>
     </PageShell>
   );
+}
+
+/** Today: the day comes from the shared owner `getToday()` (never a second derivation, lesson 0016). */
+export default async function MealsPage() {
+  const today = await getToday();
+  return mealDay(today, 'No meals logged today.');
 }
