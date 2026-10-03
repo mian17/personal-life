@@ -210,3 +210,8 @@ export function listSavedMeals(): Promise<SavedMeal[]> {
 export function getSavedMeal(id: string): Promise<SavedMeal> {
   return call<SavedMeal>(`/api/saved-meals/${id}`);
 }
+
+/** `DELETE /api/saved-meals/:id` — soft delete (owner-scoped; a foreign id is a 404). */
+export function deleteSavedMeal(id: string): Promise<void> {
+  return call<void>(`/api/saved-meals/${id}`, { method: 'DELETE' });
+}

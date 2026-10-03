@@ -1,5 +1,6 @@
 import { format, sum } from '@life/nutrition';
-import { Button, Card, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
+import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
+import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal } from '@/lib/meal-api';
 import { relogMealAction } from '../actions';
@@ -23,7 +24,14 @@ export default async function SavedMealPage({ params }: { params: Promise<{ id: 
 
   return (
     <PageShell>
-      <NavBar trailing={<MealsNav />} />
+      <NavBar
+        leading={
+          <IconLink href="/meals/saved" label="Back">
+            <ArrowLeft size={20} aria-hidden />
+          </IconLink>
+        }
+        trailing={<MealsNav />}
+      />
       <PageTitle>{meal.name}</PageTitle>
       <Card>Re-log {total} in one tap — the corrected numbers, not a new guess.</Card>
       <Section label="Items">

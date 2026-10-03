@@ -12,6 +12,7 @@ jest.mock('@/lib/meal-api', () => ({
   listSavedMeals: jest.fn(),
   getSavedMeal: jest.fn(),
   createMealEntry: jest.fn(),
+  deleteSavedMeal: jest.fn(),
   estimatePhoto: mockEstimatePhoto,
   FOOD_ID_MAX: 64,
 }));
@@ -28,6 +29,7 @@ jest.mock('next/navigation', () => ({
 
 import {
   createMealEntry,
+  deleteSavedMeal,
   getSavedMeal,
   listSavedMeals,
   type SavedMeal,
@@ -37,10 +39,12 @@ import { notFound } from 'next/navigation';
 import SavedMealPage from '@/app/(meals)/meals/saved/[id]/page';
 import SavedMealsPage from '@/app/(meals)/meals/saved/page';
 import { relogMealAction } from '@/app/(meals)/meals/actions';
+import { deleteSavedMealAction } from '@/app/(meals)/meals/saved/actions';
 
 const mockedListSavedMeals = listSavedMeals as jest.MockedFunction<typeof listSavedMeals>;
 const mockedGetSavedMeal = getSavedMeal as jest.MockedFunction<typeof getSavedMeal>;
 const mockedCreateMealEntry = createMealEntry as jest.MockedFunction<typeof createMealEntry>;
+const mockedDeleteSavedMeal = deleteSavedMeal as jest.MockedFunction<typeof deleteSavedMeal>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 const mockedNotFound = notFound as unknown as jest.Mock;
 
@@ -138,6 +142,46 @@ describe('saved meals list', () => {
     expect(html).toContain(format('calories', 350));
     expect(html).not.toContain('No saved meals yet');
   });
+
+  it('leads with a back control to /meals', async () => {
+    mockedListSavedMeals.mockResolvedValue([savedMeal()]);
+
+    const el = await SavedMealsPage();
+    const html = renderToStaticMarkup(el);
+
+    expect(html).toContain('aria-label="Back"');
+    expect(html).toContain('href="/meals"');
+  });
+
+  it('gives each row a delete control wired to the server action', async () => {
+    mockedListSavedMeals.mockResolvedValue([
+      savedMeal({ id: 's1', name: 'Overnight oats' }),
+      savedMeal({ id: 's2', name: 'Chicken salad' }),
+    ]);
+
+    const el = await SavedMealsPage();
+    const html = renderToStaticMarkup(el);
+
+    expect(html).toContain('aria-label="Delete Overnight oats"');
+    expect(html).toContain('aria-label="Delete Chicken salad"');
+
+    const deleteButton = find(
+      el,
+      Button,
+      (b) => b.props['aria-label'] === 'Delete Overnight oats',
+    );
+    expect(deleteButton!.props.type).toBe('submit');
+
+    // The wrapping form's action deletes THIS row's id, then refreshes the list.
+    const form = find(
+      el,
+      'form',
+      (f) => typeof f.props.action === 'function',
+    );
+    expect(form).toBeDefined();
+    await (form!.props.action as () => Promise<void>)();
+    expect(mockedDeleteSavedMeal).toHaveBeenCalledWith('s1');
+  });
 });
 
 describe('one saved meal detail', () => {
@@ -182,6 +226,28 @@ describe('one saved meal detail', () => {
 
     await expect(SavedMealPage({ params: Promise.resolve({ id: 'x' }) })).rejects.toBe(missing);
     expect(mockedNotFound).toHaveBeenCalled();
+  });
+
+  it('leads with a back control to the saved list', async () => {
+    mockedGetSavedMeal.mockResolvedValue(savedMeal());
+
+    const el = await SavedMealPage({ params: Promise.resolve({ id: 's1' }) });
+    const html = renderToStaticMarkup(el);
+
+    expect(html).toContain('aria-label="Back"');
+    expect(html).toContain('href="/meals/saved"');
+  });
+});
+
+describe('delete saved meal action', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('deletes the meal, then refreshes the saved list', async () => {
+    mockedDeleteSavedMeal.mockResolvedValue(undefined);
+
+    await deleteSavedMealAction('s1');
+
+    expect(mockedDeleteSavedMeal).toHaveBeenCalledWith('s1');
   });
 });
 
