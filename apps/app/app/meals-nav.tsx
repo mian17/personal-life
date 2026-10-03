@@ -1,11 +1,20 @@
+import { settingsHref } from '@life/app-kit';
 import { IconLink } from '@life/ui';
-import { Target } from 'lucide-react';
+import { Settings, Target } from 'lucide-react';
 
-/** The Meals toolbar nav icons, shared by every meals route. */
+/**
+ * The Meals toolbar nav icons, shared by the list and day routes. The target
+ * route is a full-screen editor that renders its own chrome, so it has no nav.
+ */
 export function MealsNav() {
   return (
-    <IconLink href="/meals/target" label="Daily target">
-      <Target size={20} aria-hidden />
-    </IconLink>
+    <>
+      <IconLink href="/meals/target" label="Daily target">
+        <Target size={20} aria-hidden />
+      </IconLink>
+      <IconLink href={settingsHref('/meals')} label="Settings">
+        <Settings size={20} aria-hidden />
+      </IconLink>
+    </>
   );
 }
