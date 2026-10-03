@@ -44,13 +44,6 @@ async function openDoor(page: Page, door: string): Promise<void> {
   await page.waitForURL(/\/meals\/entry\/new/, { timeout: 15_000 });
 }
 
-/** The `format('calories', …)` number in a read-out ("450 kcal" → 450). */
-function calories(text: string | null): number {
-  const match = /^([\d.]+)\s*kcal$/.exec(text?.trim() ?? '');
-  if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(text)}`);
-  return Number(match[1]);
-}
-
 /**
  * The day's own total: the only `role="status"` on the day view (`<Card><StatusText>`).
  * The status text is the day summary (`"1220 kcal — No target set"`), so the
@@ -65,17 +58,20 @@ async function dayTotal(page: Page): Promise<number> {
 
 /**
  * The confirmed entries the day view actually lists: every row carrying the
- * `× <portions>` read-out, read back from its own calorie figure. Reading the
- * day's sum off the page is the only honest check — a pre-known total would have
- * to be re-derived here, which is the drift this replaces.
+ * `N kcal × <portions>` read-out, each read back from its own calorie figure.
+ * A row without a `×` is an unconfirmed entry and is skipped; a row that has a
+ * `×` but no readable figure before it is spec drift and throws. Reading the
+ * day's sum off the page is the only honest check — a pre-known total would
+ * have to be re-derived here, which is the drift this replaces.
  */
 async function listedEntryCalories(page: Page): Promise<number[]> {
   const rows = await page.getByRole('listitem').allInnerTexts();
   const figures: number[] = [];
   for (const row of rows) {
-    const parts = row.split('×');
-    if (parts.length < 2) continue;
-    figures.push(calories(parts[0]));
+    if (!row.includes('×')) continue;
+    const match = /(?:^|\s)([\d.]+)\s*kcal\s*×/.exec(row.replace(/\n/g, ' '));
+    if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(row)}`);
+    figures.push(Number(match[1]));
   }
   return figures;
 }
@@ -182,10 +178,24 @@ test.describe('meals day view', () => {
   });
 
   test('the day total is the sum of the confirmed entries', async ({ page }) => {
+    // This test owns its fixture: it must not depend on other tests' writes, so
+    // it logs its own entry before reading the day total back.
     await openMeals(page);
+    await openDoor(page, MANUAL_DOOR);
 
+    const dish = 'Total probe dish';
+    const calories = 400;
+    await page.getByLabel('Dish for item 1').fill(dish);
+    await page.getByLabel(`Calories for ${dish}`).fill(String(calories));
+
+    await page.getByLabel('Save meal').click();
+    await page.waitForURL(/\/meals$/, { timeout: 15_000 });
+
+    // The entry this test logged is the one the day view must list.
     const confirmed = await listedEntryCalories(page);
+    expect(confirmed).toContain(calories);
     expect(confirmed.length).toBeGreaterThan(0);
+
     const summed = confirmed.reduce((total, kcal) => total + kcal, 0);
     expect(await dayTotal(page)).toBe(summed);
   });
