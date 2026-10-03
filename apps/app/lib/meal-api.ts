@@ -149,6 +149,13 @@ export interface SavedMeal {
   updatedAt: string;
 }
 
+/**
+ * `CreateEntryDto.FOOD_ID_MAX` on the service — the bound a write's `foodId`
+ * must respect (lesson 0016: one owner for the value; the entry editor mirrors
+ * it locally because it predates this export).
+ */
+export const FOOD_ID_MAX = 64;
+
 export function createMealEntry(input: CreateMealEntryInput): Promise<MealEntry> {
   return call<MealEntry>('/api/entries', { method: 'POST', body: JSON.stringify(input) });
 }
@@ -162,4 +169,14 @@ export function updateMealEntry(
 
 export function createSavedMeal(input: CreateSavedMealInput): Promise<SavedMeal> {
   return call<SavedMeal>('/api/saved-meals', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/** `GET /api/saved-meals` — the owner's frozen meals, newest-first. */
+export function listSavedMeals(): Promise<SavedMeal[]> {
+  return call<SavedMeal[]>('/api/saved-meals');
+}
+
+/** `GET /api/saved-meals/:id` — one frozen meal by id (a foreign id is a 404). */
+export function getSavedMeal(id: string): Promise<SavedMeal> {
+  return call<SavedMeal>(`/api/saved-meals/${id}`);
 }
