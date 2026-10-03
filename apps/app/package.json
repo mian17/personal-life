@@ -17,6 +17,7 @@
   "dependencies": {
     "@life/shared": "*",
     "@life/ui": "*",
+    "@life/nutrition": "*",
     "@life/app-kit": "*",
     "lucide-react": "^1.47.0",
     "next": "^15.2.4",
@@ -52,6 +53,7 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@life/ui$": "<rootDir>/../../packages/ui/src/index.ts",
+      "^@life/nutrition$": "<rootDir>/../../packages/nutrition/src/index.ts",
       "^@life/app-kit/preference-action$": "<rootDir>/../../packages/app-kit/src/preference-action.ts",
       "^server-only$": "<rootDir>/test/stubs/server-only.ts"
     },
