@@ -1,10 +1,8 @@
 import { format } from '@life/nutrition';
-import { Card, NavBar, PageShell, PageTitle, StatusText } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 import { getMealTarget, type MealTarget } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import { TargetProfileForm } from './form';
-import { MealsNav } from '../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +10,11 @@ export const dynamic = 'force-dynamic';
  * The target onboarding page (`SPEC-target-onboarding`): the target row that
  * applies today, and the profile form that stores the next version. A missing
  * profile (target 404) is the first-run state, not an error page.
+ *
+ * The page is an editor screen: the frame — back + save — belongs to the form
+ * (its Save needs the form's own `saving` state), and the day's derived-calorie
+ * headline is passed down as the read-only `summary` the server computed here.
+ * One `EditorChrome`, one save control, no app shell duplicated around it.
  */
 
 /** A missing row is the empty state; any other failure is a real error. */
@@ -39,17 +42,9 @@ export default async function TargetPage() {
   const target = await loadTarget(today);
 
   return (
-    <PageShell>
-      <NavBar trailing={<MealsNav />} />
-      <PageTitle>Daily target</PageTitle>
-      <Card>
-        {target == null ? (
-          <StatusText>No target set yet — add your profile below.</StatusText>
-        ) : (
-          <StatusText>{targetSummary(target)}</StatusText>
-        )}
-      </Card>
-      <TargetProfileForm initial={target} />
-    </PageShell>
+    <TargetProfileForm
+      initial={target}
+      summary={target == null ? null : targetSummary(target)}
+    />
   );
 }

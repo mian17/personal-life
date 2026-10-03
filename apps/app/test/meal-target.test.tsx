@@ -1,9 +1,13 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from '@life/nutrition';
-import { Card, Input, PageShell, Select, StatusText } from '@life/ui';
+import { EditorChrome, IconButton, Input, Select, SettingsRow, StatusText } from '@life/ui';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
+
+// The form's editor chrome reads the router on render (Back via `router.back()`),
+// so the hook must resolve off the raw module the compiled client component reads.
+jest.mock('next/navigation', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 
@@ -148,7 +152,49 @@ describe('target profile form composition', () => {
       const html = renderToStaticMarkup(tree);
       expect(html).toContain('ui-input');
       expect(html).toContain('ui-select');
-      expect(html).toContain('ui-btn');
+      // The toolbar save is an IconButton now — no bare submit button remains.
+      expect(html).toContain('ui-icon-btn');
+      expect(html).not.toContain('Set target');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('frames the fields in the editor chrome: one back control and one save', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      const chrome = find(tree, EditorChrome);
+      expect(chrome).toBeDefined();
+      // Back is the chrome's own control, not an in-body link.
+      expect((chrome!.props.back as { label: string }).label).toBe('Back');
+
+      // Exactly one save trigger: the IconButton in `actions`, body provides none.
+      const save = find(chrome!.props.actions, IconButton);
+      expect(save).toBeDefined();
+      expect(save!.props.label).toBe('Save');
+      expect(find(tree, 'button', (el) => el.props.type === 'submit')).toBeUndefined();
+
+      const html = renderToStaticMarkup(tree);
+      expect(html).toContain('Daily target');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('shows every profile field as a visible label beside its control', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      // The visible labels are `SettingsRow` copy; each row still hosts the
+      // labelled control, so sighted and assistive users read the same field.
+      for (const label of ['Age', 'Sex', 'Height (cm)', 'Weight (kg)', 'Activity', 'Goal']) {
+        const row = find(tree, SettingsRow, (el) => text(el.props.label) === label);
+        expect(row).toBeDefined();
+        expect(field(tree, label)).toBeDefined();
+      }
     } finally {
       harness.restore();
     }
@@ -226,7 +272,14 @@ describe('target profile form submits inputs only', () => {
       await (form.props.onSubmit as (event: unknown) => Promise<void>)({ preventDefault: jest.fn() });
 
       expect(mockedPutMealProfile).not.toHaveBeenCalled();
-      const alert = find(harness.renderTree(), StatusText);
+      // The empty-state headline is also a `StatusText`; the error is the row
+      // carrying the validation copy, so match on its text.
+      const alert = find(
+        harness.renderTree(),
+        StatusText,
+        (el) => text(el).includes('Enter your age'),
+      );
+      expect(alert).toBeDefined();
       expect(text(alert)).toContain('Enter your age');
     } finally {
       harness.restore();
@@ -269,7 +322,8 @@ describe('target page', () => {
     const html = renderToStaticMarkup(el);
 
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-03');
-    expect(el.type).toBe(PageShell);
+    // The page is the form itself: no app shell (PageShell/Card/NavBar) wraps it.
+    expect(el.type).toBe(TargetProfileForm);
     expect(html).toContain(format('calories', 2400));
     expect(html).toContain(format('protein', 112));
     expect(html).not.toContain('No target set yet');
@@ -285,7 +339,13 @@ describe('target page', () => {
     const el = await TargetPage();
     const html = renderToStaticMarkup(el);
 
-    expect(find(el, Card)).toBeDefined();
+    // The page is an editor screen now (lesson 0014: the chrome is the shell) —
+    // assert the rendered markup, not the element tree: `el` is the form element
+    // and `find` only walks element props, not the function it points at.
+    expect(html).toContain('ui-editor-toolbar');
+    expect(html).toContain('aria-label="Back"');
+    expect(html).toContain('>Daily target</h1>');
+    expect(html).toContain('aria-label="Save"');
     expect(html).toContain('No target set yet');
     expect(html).toContain('Set your target');
   });

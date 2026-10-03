@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Input, Section, Select, StatusText } from '@life/ui';
+import { useRouter } from 'next/navigation';
+import { Check } from 'lucide-react';
+import { EditorChrome, IconButton, Input, Section, Select, SettingsRow, StatusText } from '@life/ui';
 import type { MealTarget } from '@/lib/meal-api';
 import { saveProfileAction } from './actions';
 
@@ -11,11 +13,13 @@ import { saveProfileAction } from './actions';
  * derived server-side and must never be sent from the browser ("Never: let the
  * client send computed kcal" — `forbidNonWhitelisted` rejects such a body).
  *
- * Composition is `@life/ui` only (Contract 1 Rule 1): fields are `Input`/`Select`,
- * the block is `Section`, the action is `Button`, feedback is `StatusText`. The
- * `<form>` is glue (submit semantics + native numeric validation), no className,
- * no raw control, no app CSS. Sex/activity/goal are `Select`s over the service
- * enums, so a level the service does not have cannot be offered here.
+ * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `EditorChrome`
+ * (back leading, save in `actions`, mirroring the meal entry editor), each field
+ * is a `SettingsRow` (visible label left, control right) hosting an
+ * `Input`/`Select`, feedback is `StatusText`. The `<form>` is glue (submit
+ * semantics + native numeric validation), no className, no raw control, no app
+ * CSS. Sex/activity/goal are `Select`s over the service enums, so a level the
+ * service does not have cannot be offered here.
  */
 
 /** `SEXES` in the service's `target-calculator.ts`. */
@@ -44,8 +48,17 @@ const GOAL_OPTIONS = [
  * The profile form. `initial` is the current target row's stored profile, so an
  * existing profile opens as an edit rather than an empty onboarding form; with no
  * target the fields start on the defaults a first-run user changes at most a few.
+ * `summary` is the day's derived-calorie headline the server page computed — it
+ * renders read-only above the fields and never travels back down the save path.
  */
-export function TargetProfileForm({ initial }: { initial: MealTarget | null }) {
+export function TargetProfileForm({
+  initial,
+  summary,
+}: {
+  initial: MealTarget | null;
+  summary?: string | null;
+}) {
+  const router = useRouter();
   const [age, setAge] = useState(initial == null ? '' : String(initial.age));
   const [sex, setSex] = useState(initial?.sex ?? 'male');
   const [heightCm, setHeightCm] = useState(initial == null ? '' : String(initial.heightCm));
@@ -55,14 +68,19 @@ export function TargetProfileForm({ initial }: { initial: MealTarget | null }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // A blank or non-numeric body field would serialise to `0`/`null` and answer
+  // with an opaque 400, so the toolbar save stays disabled until the numerics
+  // parse; the service DTO owns every bound.
+  const profileReady = [age, heightCm, weightKg].every(
+    (raw) => raw.trim() !== '' && Number.isFinite(Number(raw)),
+  );
+
   async function save(): Promise<void> {
     // The six profile inputs only (`UpdateProfileDto` minus `date`): computed
     // values (kcal/bmr/tdee/macros) never travel down this path, and `date` is
     // owned by the server action's `getToday()`, not the browser clock.
     const profile = { age: Number(age), sex, heightCm: Number(heightCm), weightKg: Number(weightKg), activity, goal };
-    // A blank or non-numeric body field would serialise to `0`/`null` and answer
-    // with an opaque 400, so it is caught here; the service DTO owns every bound.
-    if ([age, heightCm, weightKg].some((raw) => raw.trim() === '' || !Number.isFinite(Number(raw)))) {
+    if (!profileReady) {
       setError('Enter your age, height and weight as numbers.');
       return;
     }
@@ -78,63 +96,105 @@ export function TargetProfileForm({ initial }: { initial: MealTarget | null }) {
   }
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        return save();
-      }}
+    <EditorChrome
+      back={{ label: 'Back', onBack: () => router.back() }}
+      title="Daily target"
+      actions={
+        <IconButton label="Save" onClick={save} disabled={saving || !profileReady}>
+          <Check size={20} aria-hidden />
+        </IconButton>
+      }
     >
-      <Section label={initial == null ? 'Set your target' : 'Update your profile'}>
-        <Input
-          aria-label="Age"
-          type="number"
-          min={1}
-          max={130}
-          required
-          value={age}
-          onChange={(event) => setAge(event.target.value)}
-        />
-        <Select
-          aria-label="Sex"
-          value={sex}
-          options={SEX_OPTIONS}
-          onChange={(event) => setSex(event.target.value)}
-        />
-        <Input
-          aria-label="Height (cm)"
-          type="number"
-          min={50}
-          max={260}
-          required
-          value={heightCm}
-          onChange={(event) => setHeightCm(event.target.value)}
-        />
-        <Input
-          aria-label="Weight (kg)"
-          type="number"
-          min={20}
-          max={500}
-          required
-          value={weightKg}
-          onChange={(event) => setWeightKg(event.target.value)}
-        />
-        <Select
-          aria-label="Activity"
-          value={activity}
-          options={ACTIVITY_OPTIONS}
-          onChange={(event) => setActivity(event.target.value)}
-        />
-        <Select
-          aria-label="Goal"
-          value={goal}
-          options={GOAL_OPTIONS}
-          onChange={(event) => setGoal(event.target.value)}
-        />
-        {error !== '' ? <StatusText>{error}</StatusText> : null}
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Set target'}
-        </Button>
-      </Section>
-    </form>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          return save();
+        }}
+      >
+        {summary != null ? (
+          <StatusText>{summary}</StatusText>
+        ) : (
+          <StatusText>No target set yet — add your profile below.</StatusText>
+        )}
+        <Section label={initial == null ? 'Set your target' : 'Update your profile'}>
+          <SettingsRow
+            label="Age"
+            control={
+              <Input
+                aria-label="Age"
+                type="number"
+                min={1}
+                max={130}
+                required
+                value={age}
+                onChange={(event) => setAge(event.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Sex"
+            control={
+              <Select
+                aria-label="Sex"
+                value={sex}
+                options={SEX_OPTIONS}
+                onChange={(event) => setSex(event.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Height (cm)"
+            control={
+              <Input
+                aria-label="Height (cm)"
+                type="number"
+                min={50}
+                max={260}
+                required
+                value={heightCm}
+                onChange={(event) => setHeightCm(event.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Weight (kg)"
+            control={
+              <Input
+                aria-label="Weight (kg)"
+                type="number"
+                min={20}
+                max={500}
+                required
+                value={weightKg}
+                onChange={(event) => setWeightKg(event.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Activity"
+            control={
+              <Select
+                aria-label="Activity"
+                value={activity}
+                options={ACTIVITY_OPTIONS}
+                onChange={(event) => setActivity(event.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Goal"
+            control={
+              <Select
+                aria-label="Goal"
+                value={goal}
+                options={GOAL_OPTIONS}
+                onChange={(event) => setGoal(event.target.value)}
+              />
+            }
+          />
+          {error !== '' ? <StatusText>{error}</StatusText> : null}
+        </Section>
+      </form>
+    </EditorChrome>
   );
 }
