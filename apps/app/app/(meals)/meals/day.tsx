@@ -100,13 +100,19 @@ export async function mealDay(day: string, emptyBody: string) {
           return (
             <Section key={group.key} label={`${group.label} — ${subtotal}`}>
               <List>
-                {items.map((entry) => (
-                  <ListItem
-                    key={entry.id}
-                    title={format('calories', entry.nutrients.calories)}
-                    meta={`× ${entry.quantity}`}
-                  />
-                ))}
+                {items.map((entry) => {
+                  // Blank dish (only a caller that bypasses the editor's non-empty
+                  // rule) falls back to the old calories-title row, never blank.
+                  const dish = entry.foodId.trim();
+                  const calories = format('calories', entry.nutrients.calories);
+                  return (
+                    <ListItem
+                      key={entry.id}
+                      title={dish || calories}
+                      meta={dish ? `${calories} × ${entry.quantity}` : `× ${entry.quantity}`}
+                    />
+                  );
+                })}
               </List>
             </Section>
           );

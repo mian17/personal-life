@@ -114,6 +114,31 @@ describe('meals day view', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it('titles each entry with its dish and keeps calories + quantity in meta', async () => {
+    mockedListDayEntries.mockResolvedValue([
+      entry({ id: 'a', foodId: 'Toast', quantity: 2, nutrients: vector({ calories: 123 }) }),
+    ]);
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toContain('Toast');
+    expect(html).toMatch(
+      /ui-list-item__title">Toast<\/span><span class="ui-list-item__sub">123 kcal × 2</,
+    );
+  });
+
+  it('falls back to calories as the title when a dish is blank', async () => {
+    mockedListDayEntries.mockResolvedValue([
+      entry({ id: 'a', foodId: '   ', nutrients: vector({ calories: 123 }) }),
+    ]);
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toMatch(
+      /ui-list-item__title">123 kcal<\/span><span class="ui-list-item__sub">× 1</,
+    );
+  });
+
   it('renders the [date] route through the same view for the route day', async () => {
     mockedGetMealTarget.mockResolvedValue(target({ calories: 2000 }));
     const el = await MealDatePage({ params: Promise.resolve({ date: '2026-10-02' }) });
