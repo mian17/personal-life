@@ -5,6 +5,9 @@ A self-owned personal API that centralizes life data. Domain #1 is **notes/journ
 - `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
 - `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
 - `apps/idp` — NestJS OpenID Connect Identity Provider (users, login, sessions, OIDC).
+- `apps/tags-service`, `apps/todo-service` — NestJS + TypeORM/SQLite domain APIs.
+- `apps/feedback-service` — NestJS + TypeORM/Postgres feedback ingest; a `feedback_event`
+  change log publishes metadata-only `feedback.submitted` messages to RabbitMQ.
 - `packages/shared` — shared DTO/types.
 
 ## Requirements
@@ -34,11 +37,17 @@ client secret with `openssl rand -hex 32` (see the OIDC keys in `.env.example`).
 
 ## Production (Docker Compose)
 
-Docker Compose is the production path; `npm run start` is no longer used. Three services
-run on the internal `life` network: `note-service`, `tags-service`, `todo-service`
-(no published ports), `idp` (published
+Docker Compose is the production path; `npm run start` is no longer used. Four services
+run on the internal `life` network: `note-service`, `tags-service`, `todo-service`,
+`feedback-service` (no published ports), `idp` (published
 on host loopback `127.0.0.1:3003` so Tailscale Serve can proxy to it), and `app`
 (published on host loopback `127.0.0.1:3002`).
+
+`feedback-service` additionally depends on the infra it owns: Postgres (storage +
+the `feedback_event` change log), RabbitMQ (the durable `feedback` topic exchange
+consumers bind `feedback.submitted` to), and its own read-through cache
+(`redis-feedback`). Compose injects `FEEDBACK_DB_URL`/`RABBITMQ_URL`/`REDIS_URL` and
+fails fast on a missing `FEEDBACK_MASTER_KEY`.
 
 ```unknown
 cp .env.example .env
@@ -102,20 +111,29 @@ tailscale serve status       # show the current Serve routes
 ## Development
 
 ```unknown
-npm run dev        # note-service :3001 + app :3000 + idp :3003 (all three)
+npm run dev        # note-service :3101 + app :3100 + idp :3102 + tags :3104
+                    # + todo :3105 + feedback :3108 (all six)
 npm run build      # compile all workspaces
 npm run lint
 npm test
 ```
 
 `npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`), runs
-with `NODE_ENV=development`, and starts all three services in one command. It runs the
+with `NODE_ENV=development`, and starts all six services in one command. It runs the
 Tailscale **network access gate** only in production (dev has no Tailscale header), so
 locally only this device reaches the app via loopback. The IdP **login/session gate is the
 app's real flow in every environment** — including localhost — so after seeding a dev user
 you log in locally against the IdP before the notes UI renders. Ports differ by mode so a
 production preview never collides with dev. The API binds loopback on the host in dev;
 inside Docker it binds `0.0.0.0` so the web container can reach `http://note-service:3001`.
+
+Dev `feedback-service` runs on host port 3108 against the real compose Postgres and
+RabbitMQ (published on host loopback): start them once with
+`docker compose up -d postgres rabbitmq`, then set `FEEDBACK_DB_URL` and
+`FEEDBACK_MASTER_KEY` in `.env.development` (keys in `.env.development.example`).
+The service exits **fail-closed** at boot without them. Without `RABBITMQ_URL` it still
+boots — writes keep committing to the `feedback_event` log and the dispatcher retries
+until the broker appears — and without `REDIS_URL` reads fall straight to Postgres.
 
 Outside production the IdP uses a throwaway database (`apps/idp/data/scratch.db`) — the
 dev server and the dev seed share it, and the production identity DB

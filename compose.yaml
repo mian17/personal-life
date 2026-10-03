@@ -127,6 +127,53 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  feedback-service:
+    build:
+      context: .
+      dockerfile: apps/feedback-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3008"
+      HOST: 0.0.0.0
+      # Postgres + RabbitMQ (feedback-infra). Compose injects the connection
+      # strings over the internal network; .env keeps only the passwords.
+      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback
+      RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      # JWT-only auth, same offline-JWKS pattern as note/tags/todo: `iss` must
+      # equal the IdP's browser-facing issuer, while the JWKS is fetched over the
+      # internal compose network.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}
+      FEEDBACK_SERVICE_AUDIENCE: ${FEEDBACK_SERVICE_AUDIENCE:-life-api}
+      # Content-encryption master key (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      FEEDBACK_MASTER_KEY: ${FEEDBACK_MASTER_KEY:?FEEDBACK_MASTER_KEY is required (openssl rand -base64 32)}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-feedback:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis-feedback:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3008/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   idp:
     build:
       context: .
@@ -193,6 +240,7 @@ services:
       # call dies inside the app container.
       TAGS_API_URL: http://tags-service:3004
       TODO_API_URL: http://todo-service:3005
+      FEEDBACK_API_URL: http://feedback-service:3008
       # The app's fallback "today" zone, before the browser's `tz` cookie lands.
       # Must match the backend's TODO_TIMEZONE so SSR today agrees with storage.
       TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -215,6 +263,8 @@ services:
       tags-service:
         condition: service_healthy
       todo-service:
+        condition: service_healthy
+      feedback-service:
         condition: service_healthy
       idp:
         condition: service_healthy
