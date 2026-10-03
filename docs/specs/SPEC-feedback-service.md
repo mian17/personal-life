@@ -144,8 +144,10 @@ mirror. Both routes live under `/api/feedback`.
 ## Event stream (locked decision 3 — transactional log + push, no polling)
 
 There is **no selector loop over business rows** — no
-`SELECT … WHERE dispatched_at IS NULL` relay over `feedback`, no timer sweep.
-The mechanism is NOTIFY-push, and only NOTIFY-push:
+`SELECT … WHERE dispatched_at IS NULL` relay over `feedback`, no timer sweep
+over the `feedback` business table. The dispatcher has TWO triggers, both
+reading only the `feedback_event` log by `seq` cursor — push for immediacy,
+plus a low-frequency reconciliation tick as the safety net:
 
 1. **One transaction** inserts `feedback` + `feedback_event`
    (`event_id = feedback.id`, `occurred_at = now()`).
@@ -164,19 +166,33 @@ The mechanism is NOTIFY-push, and only NOTIFY-push:
    ```
    Channel: `feedback_events`. Payloads stay tiny (seq + UUID, far under the
    8000-byte NOTIFY limit); the full row is always loaded from the DB.
-3. The **dispatcher** holds one persistent `LISTEN feedback_events` connection.
-   On notify it loads the event row by `seq`, hands it to the publisher, and on
-   publish confirm advances `feedback_cursor.last_seq` and stamps
-   `dispatched_at`. Cursor advance happens only after the broker confirm.
+3. The **dispatcher** holds one persistent `LISTEN feedback_events` connection
+   (push — primary, immediate). On notify it loads the event row by `seq`,
+   hands it to the publisher, and on publish confirm advances
+   `feedback_cursor.last_seq` and stamps `dispatched_at`. Cursor advance
+   happens only after the broker confirm.
 4. The **publisher** opens a confirm channel on durable exchange `feedback` and
    publishes persistent messages with routing key `feedback.submitted`,
    body `{ event_id, feedback_id, owner_sub, app, type, occurred_at }`, waiting
    for the publisher confirm before reporting success.
-5. **Startup/reconnect = bounded ordered change-log read, never a business-row
-   scan:** `SELECT * FROM feedback_event WHERE seq > :last_seq ORDER BY seq ASC
-   LIMIT <batch>` from the persisted cursor, publishing each in order, then
-   resuming on notifications. This is a cursor walk over the log, not a poll
-   over `feedback`.
+5. **Recovery on startup/reconnect = bounded ordered change-log read, never a
+   business-row scan:** `SELECT * FROM feedback_event WHERE seq > :last_seq
+   ORDER BY seq ASC LIMIT <batch>` from the persisted cursor, publishing each
+   in order, then resuming on notifications. This is a cursor walk over the
+   log, not a poll over `feedback`.
+6. **Reconciliation tick (safety net, low frequency):** every 60s (default) the
+   dispatcher compares the log head (`SELECT MAX(seq) FROM feedback_event`)
+   against `feedback_cursor.last_seq` and, if behind, replays the same bounded
+   cursor walk (`WHERE seq > :last_seq ORDER BY seq ASC LIMIT <batch>`) until
+   caught up. Postgres NOTIFY is transient — undelivered to a disconnected
+   listener and dropped silently on listener-queue overflow while staying
+   connected — so reconnect replay alone is not sufficient; the table,
+   addressed by cursor, is the source of truth and the tick is the backstop.
+   The push path is what makes dispatch immediate.
+
+This is NOT the rejected selector: there is still no query over the `feedback`
+business table and no `WHERE dispatched_at IS NULL` business-row scan; the only
+reads are by `seq` cursor over `feedback_event`.
 
 **Delivery guarantees (stated honestly):** at-least-once delivery —
 a crash between confirm and cursor advance replays that event on restart.
@@ -245,6 +261,10 @@ a data directory):
    read path without `REDIS_URL` (direct DB).
 6. Health: `/health/live` 200 with the DB down; `/health/ready` 503 on DB down
    or missing key custody; `/health` aliases readiness.
+7. Dropped-notification reconciliation: advance the log without notifying
+   (missed NOTIFY, no reconnect) → the reconciliation tick publishes the missed
+   event and advances the cursor, in order, with `event_id` dedup on the
+   consumer.
 
 Max 2 test executions per verification (project profile).
 
@@ -287,7 +307,7 @@ Max 2 test executions per verification (project profile).
   dedups on `event_id` (at-least-once delivery, exactly-once effect).
 - [ ] `GET /api/feedback` returns the owner's entries newest-first; no plaintext
   or ciphertext description exists outside Postgres + the request path.
-- [ ] Typecheck + the six test groups green within the 2-run limit; no file
+- [ ] Typecheck + the seven test groups green within the 2-run limit; no file
   outside this spec touched.
 
 ## Open Questions
