@@ -72,17 +72,21 @@ Replaces the current text ("Portions multiply the numbers below; a blank value m
 unknown, not zero."). The first clause described the multiplier the user can no longer see;
 the second is still true and still load-bearing. New text carries only what remains true.
 
-## Frozen surface — **REQUIRES EXPLICIT APPROVAL**
+## Frozen surface — **APPROVED 2026-10-04**
 
 The e2e selector surface is frozen (project profile `frozen-surfaces`): roles, **visible
 text**, and **aria-labels**. Changing `Portions` to `Grams` changes both —
 `label="Portions"` and `aria-label={`Portions for ${subject}`}` in
 `apps/app/app/(meals)/meals/entry/[id]/editor.tsx`, plus the hint line's visible text.
 
-**This spec is written on the assumption the rename is approved.** If it is not, the
-alternative is to keep the label `Portions` while the value underneath becomes a weight —
-which would make the label lie, and is worse than the frozen-surface cost it avoids.
-Approval is requested separately; no label changes until it lands.
+**Approved by the user 2026-10-04**, with the condition that **the e2e specs referencing
+the old selectors are updated in the same change** — not deferred to a follow-up. So this
+spec is binding on the rename, and any e2e spec matching on `Portions`, the old
+`Portions for …` aria-label, or the old hint text ships its update in the same commit.
+
+The label is renamed because the alternative is worse: keeping `Portions` over a value
+that is now a weight would make the label lie. A frozen surface protects selectors from
+casual churn; it does not protect a label that has become false.
 
 ## Contract 1 conformance
 
