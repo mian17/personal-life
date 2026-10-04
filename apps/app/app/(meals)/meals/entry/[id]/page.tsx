@@ -7,7 +7,7 @@ import {
   type Nutrient,
   type NutrientVector,
 } from '@life/nutrition';
-import { getMealEntry } from '@/lib/meal-api';
+import { getMealEntry, listMealFoods, restoredFoodName } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import { MealEditor, type NutritionFields } from './editor';
 
@@ -75,5 +75,13 @@ export default async function MealEntryPage({ params }: { params: Promise<{ id: 
   }
 
   const entry = await loadOrNotFound(() => getMealEntry(id));
-  return <MealEditor entry={entry} date={entry.date} nutrition={NUTRITION} />;
+  const catalog = await listMealFoods();
+  return (
+    <MealEditor
+      entry={entry}
+      date={entry.date}
+      nutrition={NUTRITION}
+      foodName={restoredFoodName(entry.foodId, catalog)}
+    />
+  );
 }

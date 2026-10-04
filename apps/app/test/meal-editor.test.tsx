@@ -22,12 +22,12 @@ jest.mock('@/lib/client', () => ({
 }));
 
 import { callService } from '@/lib/client';
+import { restoredFoodName, type MealEntry, type MealFood } from '@/lib/meal-api';
 import {
   MealEditor,
   type EditorItem,
   type NutritionFields,
 } from '@/app/(meals)/meals/entry/[id]/editor';
-import type { MealEntry } from '@/lib/meal-api';
 
 const mockCallService = callService as unknown as jest.Mock;
 
@@ -113,7 +113,11 @@ function stateHarness() {
       showSnackbar: (options: { message: string }) => shown.push(options),
     })) as unknown as typeof ReactModule.useContext);
 
-  function renderTree(initialEntry: MealEntry | null = null, date = '2026-10-03'): EditorTree {
+  function renderTree(
+    initialEntry: MealEntry | null = null,
+    date = '2026-10-03',
+    foodName?: string,
+  ): EditorTree {
     let index = 0;
     spy.mockImplementation(((initial: unknown) => {
       const i = index++;
@@ -125,7 +129,7 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    return MealEditor({ entry: initialEntry, date, nutrition: NUTRITION }) as unknown as EditorTree;
+    return MealEditor({ entry: initialEntry, date, nutrition: NUTRITION, foodName }) as unknown as EditorTree;
   }
 
   return {
@@ -373,7 +377,13 @@ describe('MealEditor save persists corrected values', () => {
 
   it('creates one entry per corrected item for a new meal', async () => {
     const harness = stateHarness();
-    mockCallService.mockResolvedValue({});
+    // The log path lists the catalog first, then creates the missing food — the
+    // create returns the id the entry POST carries.
+    const createdFood = { id: 'created-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      return Promise.resolve({});
+    });
     try {
       const first = harness.renderTree();
       (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
@@ -387,17 +397,128 @@ describe('MealEditor save persists corrected values', () => {
       const ready = harness.renderTree();
       await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
 
-      const [base, path, init] = mockCallService.mock.calls[0];
+      const [base, path, init] = mockCallService.mock.calls.at(-1)!;
       expect(base).toBe('http://127.0.0.1:3106');
       expect(path).toBe('/api/entries');
       expect(init.method).toBe('POST');
       expect(JSON.parse(init.body)).toEqual({
         date: '2026-10-03',
         mealGroup: 'lunch',
-        foodId: 'Toast',
+        foodId: 'created-food',
         quantity: 1,
         nutrients: vector({ calories: 90 }),
       });
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('MealEditor log-time catalog', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('creates the food at 100 g with the base vector before logging a foodId:null item', async () => {
+    const harness = stateHarness();
+    const createdFood = { id: 'new-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      return Promise.resolve({});
+    });
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: 'Toast' },
+      });
+      (field(first, 'Grams for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: '200' },
+      });
+      const sized = harness.renderTree();
+      (field(sized, 'Calories for Toast').props.onChange as (e: unknown) => void)({
+        target: { value: '180' },
+      });
+
+      const ready = harness.renderTree();
+      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+
+      const paths = mockCallService.mock.calls.map((call) => call[1]);
+      expect(paths[0]).toBe('/api/foods');
+      expect(paths[1]).toBe('/api/foods');
+      expect(paths[2]).toBe('/api/entries');
+
+      const createBody = JSON.parse(mockCallService.mock.calls[1][2].body);
+      expect(createBody).toEqual({
+        name: 'Toast',
+        servingGrams: 100,
+        nutrients: vector({ calories: 90 }),
+      });
+      const entryBody = JSON.parse(mockCallService.mock.calls[2][2].body);
+      expect(entryBody.foodId).toBe('new-food');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('reuses a carried foodId — no food is created', async () => {
+    // A new meal logged straight from a photo estimate: one row carries the
+    // catalog id the estimate resolved, so the log path posts no `/api/foods`
+    // create — the food and entry POSTs carry that reused id.
+    const harness = stateHarness();
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve([]);
+      if (path === '/api/entries') return Promise.resolve({});
+      return Promise.resolve({
+        readable: true,
+        items: [{ name: 'Omelette', grams: 100, foodId: 'omelette-id', fdcId: null, servingGrams: 100, nutrients: vector({ calories: 250 }) }],
+      });
+    });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+
+      const ready = harness.renderTree();
+      expect(field(ready, 'Dish for item 1').props.value).toBe('Omelette');
+      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+
+      const createCalls = mockCallService.mock.calls.filter(
+        (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
+      );
+      expect(createCalls).toHaveLength(0);
+      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      expect(entryBody.foodId).toBe('omelette-id');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('matches a foodId:null item by normalized key — reuses, never duplicates', async () => {
+    const harness = stateHarness();
+    // Trailing whitespace and a case difference normalize to the same key, so
+    // `  chicken ` reuses the existing `Chicken` food — no duplicate is created.
+    const existing = { id: 'chicken-id', name: 'Chicken', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
+      return Promise.resolve({});
+    });
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: 'Chicken' },
+      });
+      const named = harness.renderTree();
+      (field(named, 'Calories for Chicken').props.onChange as (e: unknown) => void)({
+        target: { value: '165' },
+      });
+
+      const ready = harness.renderTree();
+      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+
+      const createCalls = mockCallService.mock.calls.filter(
+        (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
+      );
+      expect(createCalls).toHaveLength(0);
+      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      expect(entryBody.foodId).toBe('chicken-id');
     } finally {
       harness.restore();
     }
@@ -670,5 +791,53 @@ describe('MealEditor composition', () => {
       known: ['calories'],
     };
     expect(item.nutrients).toEqual(vector({ calories: 400 }));
+  });
+});
+
+describe('restored entry display name', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function food(overrides: Partial<MealFood> = {}): MealFood {
+    return {
+      id: 'f-oat',
+      name: 'Oatmeal',
+      servingGrams: 100,
+      nutrients: vector(),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+      ...overrides,
+    };
+  }
+
+  it('renders the catalog food name for a restored entry whose foodId is a catalog id', () => {
+    const harness = stateHarness();
+    const catalog = [food({ id: 'f-oat', name: 'Oatmeal' })];
+    try {
+      const tree = harness.renderTree(
+        entry({ foodId: 'f-oat' }),
+        '2026-10-03',
+        restoredFoodName('f-oat', catalog),
+      );
+      expect(field(tree, 'Dish for item 1').props.value).toBe('Oatmeal');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('renders the stored dish name when foodId matches no catalog food (pre-feature entry)', () => {
+    const harness = stateHarness();
+    const catalog = [food({ id: 'f-oat', name: 'Oatmeal' })];
+    try {
+      const tree = harness.renderTree(
+        entry({ foodId: 'Salad' }),
+        '2026-10-03',
+        restoredFoodName('Salad', catalog),
+      );
+      expect(field(tree, 'Dish for item 1').props.value).toBe('Salad');
+    } finally {
+      harness.restore();
+    }
   });
 });

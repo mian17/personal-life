@@ -187,10 +187,13 @@ export function MealEditor({
   entry,
   date,
   nutrition,
+  foodName,
 }: {
   entry: MealEntry | null;
   date: string;
   nutrition: NutritionFields;
+  /** A restored entry's dish name, resolved against the catalog by the page. */
+  foodName?: string;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -198,12 +201,11 @@ export function MealEditor({
     entry
       ? [
           {
-            dish: entry.foodId,
-            // Every pre-feature entry stored the dish name as `foodId` (`actions.ts`
-            // posted `foodId: item.dish`), so the stored value is never a catalog
-            // reference and no migration runs: `null` is the honest seed, and the log
-            // path recovers the real food by normalized name before any create. The
-            // entry stores no base, so the grams view reads 100.
+            // The dish name comes from the page (resolved against the catalog);
+            // a pre-feature entry — whose `foodId` *is* the dish name — falls
+            // back to `entry.foodId`. Never the raw id as a label. The entry
+            // stores no base, so the grams view reads 100.
+            dish: foodName ?? entry.foodId,
             foodId: null,
             servingGrams: 100,
             quantity: entry.quantity,

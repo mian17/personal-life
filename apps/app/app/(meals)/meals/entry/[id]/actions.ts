@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache';
 import type { NutrientVector } from '@life/nutrition';
 import {
   createMealEntry,
+  createMealFood,
   createSavedMeal,
   estimatePhoto,
+  listMealFoods,
   updateMealEntry,
+  type MealFood,
   type MealGroup,
   type PhotoEstimate,
   type SavedMeal,
@@ -19,10 +22,16 @@ import {
  * service URL stay server-side.
  */
 
-/** The editor's route, revalidated after a write so the day view is fresh. */
-function revalidateEditor(id: string) {
-  revalidatePath(`/meals/entry/${id}`);
-  revalidatePath('/meals');
+/**
+ * One logged row as the editor confirmed it: the food's stored name (`dish`),
+ * the catalog reference when the estimate resolved one (`foodId`), and the
+ * effective vector (already scaled by `quantity`) with its servings multiplier.
+ */
+interface ConfirmedRow {
+  dish: string;
+  foodId?: string | null;
+  quantity: number;
+  nutrients: NutrientVector;
 }
 
 /**
@@ -61,24 +70,20 @@ export async function saveEntryAction(
     date: string;
     mealGroup: MealGroup;
     expectedVersion: number;
-    items: Array<{
-      dish: string;
-      foodId?: string | null;
-      quantity: number;
-      nutrients: NutrientVector;
-    }>;
+    items: ConfirmedRow[];
   },
 ): Promise<void> {
   const { date, mealGroup, expectedVersion, items } = input;
   if (id === null) {
-    // A created entry needs a quantity alongside its snapshot (the service
-    // rejects a quantity change without one), so both ride each per-item POST.
+    // A Food row is created only here, at log time — never at estimate time
+    // (`SPEC-meal-capture-grams § The log-time create path`).
+    const catalog = await listMealFoods();
+    const pendingCreates = new Map<string, Promise<string>>();
     for (const item of items) {
       await createMealEntry({
         date,
         mealGroup,
-        // A catalog id wins; a bare item still logs under its dish name.
-        foodId: item.foodId || item.dish,
+        foodId: await resolveFoodId(item, catalog, pendingCreates),
         quantity: item.quantity,
         nutrients: item.nutrients,
       });
@@ -86,6 +91,9 @@ export async function saveEntryAction(
     revalidatePath('/meals');
     return;
   }
+  // A correction to an already-logged entry stays entry-local: the PATCH writes
+  // the snapshot only and never creates or updates a catalog food (locked
+  // decision — a catalog food is written once, at creation).
   const [first] = items;
   if (!first) return;
   await updateMealEntry(id, {
@@ -94,6 +102,69 @@ export async function saveEntryAction(
     expectedVersion,
   });
   revalidateEditor(id);
+}
+
+/** The editor's route, revalidated after a write so the day view is fresh. */
+function revalidateEditor(id: string) {
+  revalidatePath(`/meals/entry/${id}`);
+  revalidatePath('/meals');
+}
+
+/**
+ * The comparison key for matching a logged name to the catalog: trim, collapse
+ * internal whitespace, case-fold (`SPEC-meal-capture-grams § The normalized
+ * name key`). The stored name keeps the user's exact spelling — the key exists
+ * only for comparison, so `Chicken`/`chicken`/`chicken ` are one food and
+ * `chicken`/`chicken breast` stay two.
+ */
+function nameKey(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * The vector the catalog stores: the confirmed effective vector un-scaled by
+ * `quantity` (servings). The editor's `canSave` guarantees `quantity > 0`, so
+ * this never divides by zero (`effective ÷ 0` would yield `NaN`/`Infinity`).
+ */
+function baseVector(effective: NutrientVector, quantity: number): NutrientVector {
+  const out = {} as NutrientVector;
+  for (const key of Object.keys(effective) as (keyof NutrientVector)[]) {
+    out[key] = effective[key] / quantity;
+  }
+  return out;
+}
+
+/**
+ * Resolve one confirmed row to its catalog id. An item carrying a `foodId`
+ * reuses it — no new food, no USDA call. A `foodId: null` item is matched by
+ * normalized key against the catalog; only a miss creates the food at
+ * `servingGrams: 100`, and the id it returns is what the entry carries.
+ *
+ * `pendingCreates` keys in-flight creates by normalized key, so two rows of one
+ * log that normalize the same produce one `Food` and two `Entry`s: the second
+ * row joins the first's promise instead of creating a second food.
+ */
+async function resolveFoodId(
+  row: ConfirmedRow,
+  catalog: MealFood[],
+  pendingCreates: Map<string, Promise<string>>,
+): Promise<string> {
+  if (row.foodId) return row.foodId;
+
+  const key = nameKey(row.dish);
+  const matched = catalog.find((food) => nameKey(food.name) === key);
+  if (matched) return matched.id;
+
+  const inFlight = pendingCreates.get(key);
+  if (inFlight) return inFlight;
+
+  const created = createMealFood({
+    name: row.dish,
+    servingGrams: 100,
+    nutrients: baseVector(row.nutrients, row.quantity),
+  }).then((food) => food.id);
+  pendingCreates.set(key, created);
+  return created;
 }
 
 /**

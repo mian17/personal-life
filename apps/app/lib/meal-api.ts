@@ -206,6 +206,60 @@ export function updateMealEntry(
   return call<MealEntry>(`/api/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
+/** The wire shape of one serving (`FoodsService.ServingDto`). */
+export interface ServingDto {
+  id: string;
+  label: string;
+  grams: number;
+  nutrients: NutrientVector;
+}
+
+/** The wire shape of one catalog food (`FoodsService.FoodDto`). */
+export interface MealFood {
+  id: string;
+  name: string;
+  servingGrams: number;
+  nutrients: NutrientVector;
+  servings: ServingDto[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * `GET /api/foods` — the owner's whole catalog. The names arrive decrypted, so
+ * the log path can compare them in memory; the catalog is single-user and small,
+ * so one list beats a round trip per name.
+ */
+export function listMealFoods(): Promise<MealFood[]> {
+  return call<MealFood[]>('/api/foods');
+}
+
+/**
+ * `POST /api/foods` — create the catalog food one logged item is missing.
+ * `servingGrams` is 100 and `nutrients` is the confirmed vector un-scaled back
+ * to that base (`SPEC-meal-capture-grams § The log-time create path`).
+ */
+export function createMealFood(input: {
+  name: string;
+  servingGrams: number;
+  nutrients: NutrientVector;
+}): Promise<MealFood> {
+  return call<MealFood>('/api/foods', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/**
+ * The dish name a restored entry shows. `foodId` carries a resolved catalog id
+ * from this feature on, so the name comes from the catalog; an id matching no
+ * catalog food is a pre-feature row whose `foodId` *is* the dish name, so that
+ * stored value is the name — an unmatched id is never rendered as a label.
+ * (`SPEC-meal-capture-grams` keeps `MealEntry` name-free and the service
+ * unedited, so the join happens on the entry page, from this list.)
+ */
+export function restoredFoodName(foodId: string, catalog: MealFood[]): string {
+  return catalog.find((food) => food.id === foodId)?.name ?? foodId;
+}
+
 export function createSavedMeal(input: CreateSavedMealInput): Promise<SavedMeal> {
   return call<SavedMeal>('/api/saved-meals', { method: 'POST', body: JSON.stringify(input) });
 }
