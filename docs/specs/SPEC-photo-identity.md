@@ -35,13 +35,17 @@ Identity only. No nutrient field may appear anywhere in the model's response sch
 
 ```ts
 interface PhotoFoodSuggestion {
-  name: string;      // the food as a catalog name, e.g. "chicken"
-  grams: number;     // the quantity to log
-  fdcId: number | null;  // the USDA food the model chose, or null
+  name: string;          // the food as a catalog name, e.g. "chicken"
+  grams: number;         // the quantity to log
+  foodId: string | null;  // the catalog food the model chose, or null
+  fdcId: number | null;   // the USDA food the model chose, or null
 }
 ```
 
-`fdcId` is an **integer** (USDA's own type), not a string.
+`fdcId` is an **integer** (USDA's own type), not a string. `foodId` is a reference to
+one of our own catalog foods; the tool result is catalog-first (below), so the model
+picks either a catalog `foodId` (reuse — zero USDA calls) or a USDA `fdcId`, or neither.
+Both are identity, not numbers; no nutrient field exists here.
 
 ### Resolution — three paths, and the one the design had no answer for
 
@@ -56,8 +60,20 @@ the numbers.** Path by path:
 | # | Condition | Vector source | Item shows |
 |---|---|---|---|
 | 1 | A catalog food is named `name` | the catalog's existing vector | that food's numbers |
-| 2 | No catalog food; USDA resolves `fdcId` | `usda-source`'s mapped per-100 g vector, frozen into a new `Food` (`servingGrams: 100`) | USDA numbers |
+| 2 | No catalog food; USDA resolves `fdcId` | `usda-source`'s mapped per-100 g vector (stored when the food is created at log time, `servingGrams: 100`) | USDA numbers |
 | 3 | No catalog food; USDA cannot resolve | **none** — the food is created with `zeroVector()` | the unknown affordance |
+
+**Nothing here is written at estimate time.** All three paths resolve an on-the-wire
+vector only — no `Food` row is created during the estimate. The backend resolves the
+*vector* (reuse the catalog's stored vector on path 1, call `usda-source` on path 2,
+`zeroVector()` on path 3) and returns a `PhotoEstimateItem` (identity + resolved vector +
+`servingGrams`). The catalog row itself is written **at log time** (amendment 2026-10-04):
+the estimate is a draft, and creating registry rows from a draft litters the catalog with
+foods the user then edits or abandons — the same failure mode as
+`docs/lessons/0009-autosave-inline-tag-orphans.md`, whose rule is that creation is gated on
+a user-produced confirmation. The confirmation here is the log-meal click. (The **log-time
+create path** — reuse-existing / create-at-100 g / un-scaling the per-100 g base — lives in
+`SPEC-meal-capture-grams.md §"The log-time create path"`, not here.)
 
 Rationale for path 3: "never dropped" is a statement about the **food**, not about its
 numbers — the row is logged, which is what matters, and `content.ts` already gives an
@@ -76,30 +92,50 @@ Path 1 is the **dedup rule** and it is what makes rate limits a non-issue: a pho
 `chicken` reuses the catalog food named `chicken` and calls USDA **zero times**. Exact
 match on name, no fuzzy matching, no brand logic. Locked in the intent.
 
+**The normalized key.** Uniqueness is compared on a **normalized key** — trim, collapse
+internal whitespace, case-fold — while the **stored name keeps the user's exact spelling**.
+So `Chicken` / `chicken` / `chicken ` are **one** food; `chicken` and `chicken breast` are
+**two**. The first is typographic and would otherwise pollute the catalog with one food per
+capitalisation; the second is a real semantic difference and is **accepted as its own food**,
+not fuzzy-merged. Semantic variation is allowed; typographic variation is not.
+
+**Two rows naming the same food** (two portions of `chicken` in one photo) produce **one
+catalog food and two entries** — two logged portions, not a duplicate.
+
 ## The tool loop
 
 The model is given one function declaration and must call it to see candidates:
 
 ```ts
 // declared in `tools: [{ functionDeclarations: [...] }]`
-usda_search(query: string, dataType?: string[]) -> { foods: { fdcId, description, dataType, score }[] }
+search_food(query: string) -> {
+  catalog: { id: string; name: string; servingGrams: number }[];
+  usda: { name: string; fdcId: number }[];   // empty unless the catalog had no match
+}
 ```
 
-Turns: photo + prompt → model returns `functionCall` → backend runs the real search
-(`usda-source`) → backend sends `functionResponse` with the candidates → model returns the
-final JSON, naming one `fdcId` per food. Then the backend, not the model, fetches the
-authoritative vector by that `fdcId` and maps it.
+**Search order is catalog first, USDA second.** The tool queries our **own catalog first**
+(`FoodsService.findAll`), and only when nothing matches does it query the USDA API
+(`usda-source`). The result carries **no nutrient amounts** — catalog rows expose
+`id`/`name`/`servingGrams`, USDA candidates expose `name`/`fdcId` — so no number can reach
+the answer by being echoed from a tool result. Rationale: a food the user already corrected
+is a better answer than a fresh USDA guess, and it costs **zero API calls**. It also makes
+repeat photos free — the second `chicken` resolves against the catalog with no USDA traffic
+(intent "Amendment 2026-10-04 — search order"; `usda-source` keeps no cache of its own, the
+catalog *is* the cache).
 
-Why the model picks rather than the backend taking the top hit: `search "chicken"` returns
-"Chicken, broilers or fryers, breast, meat only, raw" alongside "Chicken, nuggets,
+Turns: photo + prompt → model returns `functionCall` → backend runs the catalog-first search
+→ backend sends `functionResponse` with the candidates → model returns the final JSON,
+naming one catalog `id` per food when it matched the catalog, else one `fdcId`. Then the
+backend, not the model, resolves the vector by that id (an existing catalog food reuses its
+stored vector; else `usda-source` fetches the authoritative vector by `fdcId` and maps it).
+
+Why the model picks rather than the backend taking the top hit: for USDA, `search "chicken"`
+returns "Chicken, broilers or fryers, breast, meat only, raw" alongside "Chicken, nuggets,
 frozen, prepared". The score field does not know which one is on the plate. Seeing the
 candidates and judging is the one thing the model is genuinely better at here. Cost, stated
 plainly: this is a multi-turn call — slower and more tokens than the single call it
-replaces.
-
-**The model is given candidate names and ids, never nutrient amounts.** A candidate's
-numbers are not in the tool payload, so no number can reach the answer by being echoed
-from a tool result.
+replaces; a catalog hit spends none of it on USDA.
 
 ## Invariants that must survive the rewrite
 

@@ -95,6 +95,10 @@ that would move.
   failure value and never returns a partial or invented nutrient. The 27 vector fields are
   generated from `@life/nutrition` and validated by `completeVector`, the existing single owner
   of the completeness rule (lesson 0016) — one vocabulary, not a second copy.
+  *Superseded (2026-10-04 revision):* `PhotoItemSuggestion` no longer exists as a live type —
+  the split renamed it into `PhotoFoodSuggestion` (the model's identity-only output: `name`,
+  `grams`, `foodId`, `fdcId`) and `PhotoEstimateItem` (the service's BFF wire item: identity
+  plus resolved `nutrients` and `servingGrams`). See `SPEC-photo-identity.md`.
 
   **Assumption on record:** because the docs site was unreachable, the model-id families and any
   doc-only guidance (e.g. per-model image byte limits) could not be read from prose; only the

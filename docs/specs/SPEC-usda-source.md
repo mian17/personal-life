@@ -146,8 +146,10 @@ so rather than to invent a second cache (lessons 0011, 0016 — one owner per ru
 
 **On honesty of the fallback.** `Food` has no provenance field and adding one would be a
 migration (a human's to run, never an agent's). So "was this USDA-verified?" is **not**
-persisted per food. It lives where the feature already carries it: the estimate response
-marks each item `isEstimated`, and the editor already renders that. A food created from a
+persisted per food, and the estimate response carries **no `isEstimated` field**:
+estimated-vs-verified is **client-derived** — the editor derives it per item from the
+resolved vector's `known` coverage (`editor.tsx`'s `isEstimated`), and a food whose vector
+could not be resolved renders the existing unknown affordance. A food created from a
 USDA lookup and one created from an approximation look identical in the catalog — and the
 user can correct either, which is the mechanism that actually matters.
 
