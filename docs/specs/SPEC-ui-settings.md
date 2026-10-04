@@ -153,7 +153,13 @@ component.
 - `SettingsRow` owns `.ui-settings-row`, `.ui-settings-row__text`,
   `.ui-settings-row__label`, `.ui-settings-row__desc` (muted: `var(--muted)`), and
   `.ui-settings-row__control` in `blocks.css`. Two-column layout (label left, control
-  right, wrap on narrow widths), token spacing only.
+  right), token spacing only. **Below the `sm` breakpoint (`640px`), the row stacks: the
+  label moves above its control and the control takes the full width** — on a narrow
+  screen the two-column flex (`justify-content: space-between`, control `flex-shrink: 0`)
+  squeezes the label against the control and clips its text, so the row reflows to a
+  labelled field instead. The breakpoint value comes from the app-wide breakpoint scale
+  (`SPEC-ui-tokens.md`); the `@media` writes `640px` with a `/* sm */` comment (the
+  documented exemption — media queries cannot read tokens).
 - `SettingsBlock` adds **no** CSS: it composes `Section` (`.ui-section*`), `Card`
   (`.ui-card`) and `Stack` (`.ui-stack*`), whose classes are already owned upstream.
 - `ManagerBlock` reuses `.ui-page` / `.ui-nav-bar` / `.ui-page-title`; no app stylesheet.

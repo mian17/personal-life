@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, Disclosure, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea } from '@life/ui';
+import { Button, Dialog, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -450,16 +450,24 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
     }
   });
 
-  it('renders one collapsed All nutrients (27) region per item', () => {
+  it('renders one All nutrients (27) trigger per item with its modal closed', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
-      const disclosures = findAll(tree, Disclosure);
-      expect(disclosures).toHaveLength(1);
-      expect(text(disclosures[0].props.label)).toBe('All nutrients (27)');
-      // Collapsed by default — no `open` in the emitted markup.
+      const triggers = findAll(tree, Button).filter((el) =>
+        text(el.props.children).includes('All nutrients (27)'),
+      );
+      expect(triggers).toHaveLength(1);
+      expect(text(triggers[0].props.children)).toBe('All nutrients (27)');
+
+      const dialogs = findAll(tree, Dialog);
+      expect(dialogs).toHaveLength(1);
+      expect(dialogs[0].props.title).toBe('All nutrients');
+      expect(dialogs[0].props.size).toBe('full');
+      expect(dialogs[0].props.open).toBe(false);
+
       const html = renderToStaticMarkup(tree);
-      expect(html).not.toContain('<details class="ui-disclosure" open');
+      expect(html).toContain('ui-dialog--full');
     } finally {
       harness.restore();
     }
@@ -468,12 +476,18 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
   it('expanded, lists all 27 nutrients exactly once across the seven groups', () => {
     const harness = stateHarness();
     try {
-      const tree = harness.renderTree(entry());
-      const disclosure = findAll(tree, Disclosure)[0];
-      // The rows inside the expanded region — the same field rows the open
-      // disclosure shows. Element text (not a substring scan) is the unit: the
-      // 27 rows are `SettingsRow`s whose label is the nutrient + its unit.
-      const rows = findAll(disclosure.props.children as ReactElement, SettingsRow);
+      const first = harness.renderTree(entry());
+      // Tapping the trigger runs its `onClick` — `setOpenNutrients(index)` —
+      // through the same store the harness drives; the re-render then shows the
+      // item's modal open.
+      (button(first, (el) => text(el.props.children).includes('All nutrients')).props.onClick as () => void)();
+
+      const dialog = findAll(harness.renderTree(), Dialog).find((el) => el.props.open === true);
+      expect(dialog).toBeDefined();
+      // The rows inside the open modal — the same field rows the inline form
+      // shows. Element text (not a substring scan) is the unit: the 27 rows are
+      // `SettingsRow`s whose label is the nutrient + its unit.
+      const rows = findAll(dialog!.props.children as ReactElement, SettingsRow);
       const labels = rows.map((row) => text(row.props.label));
 
       const expected = (Object.keys(NUTRIENT_LABELS) as Nutrient[]).map(
@@ -490,7 +504,7 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       expect(labels).toContain('Caffeine (mg)');
 
       // `Caffeine` renders under its own `Other` group, not dropped or merged.
-      const bodyHtml = renderToStaticMarkup(disclosure.props.children as ReactElement);
+      const bodyHtml = renderToStaticMarkup(dialog!.props.children as ReactElement);
       expect(bodyHtml).toContain('Other');
     } finally {
       harness.restore();
@@ -521,8 +535,9 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       expect(sodium.props.value).toBe('480');
       expect(sodium.props.placeholder).toBe(UNKNOWN);
 
-      const disclosure = findAll(tree, Disclosure)[0];
-      expect(text(disclosure.props.label)).toBe('All nutrients (27) · 23 estimated');
+      // A photo estimate seeds all 27, so its trigger counts the estimated extras.
+      const trigger = button(tree, (el) => text(el.props.children).includes('All nutrients'));
+      expect(text(trigger.props.children)).toBe('All nutrients (27) · 23 estimated');
 
       // A manual item keeps the em dash and the plain label.
       const manual = stateHarness();
@@ -531,7 +546,10 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
         const manualSodium = field(manualTree, 'Sodium in Cholesterol & sodium for item 1');
         expect(manualSodium.props.value).toBe('');
         expect(manualSodium.props.placeholder).toBe(UNKNOWN);
-        expect(text(findAll(manualTree, Disclosure)[0].props.label)).toBe('All nutrients (27)');
+        const manualTrigger = button(manualTree, (el) =>
+          text(el.props.children).includes('All nutrients'),
+        );
+        expect(text(manualTrigger.props.children)).toBe('All nutrients (27)');
       } finally {
         manual.restore();
       }

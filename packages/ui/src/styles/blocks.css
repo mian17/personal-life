@@ -597,6 +597,15 @@
   flex-shrink: 0;
 }
 
+/* sm — 640px: below the app's `sm` breakpoint the row becomes a labelled field
+   (label above a full-width control), so the two-column flex stops clipping it. */
+@media (max-width: 640px) {
+  .ui-settings-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* -------------------------------------------------------------- Stack */
 
 /* Purely presentational vertical rhythm: grid so children stack regardless of
@@ -638,47 +647,6 @@
 
 .ui-row--lg {
   gap: var(--space-2);
-}
-
-/* --------------------------------------------------------- Disclosure */
-
-/* Native `<details>`/`<summary>` collapsible region: the platform owns the
-   toggle, keyboard, and expanded/collapsed state; the chevron is a pure CSS
-   transform on `[open]`. No outer margins — the parent's rhythm owns spacing
-   (same rule as Stack/Row). */
-.ui-disclosure {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-md);
-}
-
-.ui-disclosure__summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-0-5);
-  padding: var(--space-0-6) var(--space-0-75);
-  cursor: pointer;
-  list-style: none;
-}
-
-/* Drop the native disclosure triangle on every engine. */
-.ui-disclosure__summary::-webkit-details-marker {
-  display: none;
-}
-
-/* CSS-rendered chevron: points right collapsed, down open. */
-.ui-disclosure__summary::after {
-  content: '▸';
-  margin-left: auto;
-  color: var(--muted);
-  transition: transform var(--duration-fast) var(--ease-standard);
-}
-
-.ui-disclosure[open] .ui-disclosure__summary::after {
-  transform: rotate(90deg);
-}
-
-.ui-disclosure__body {
-  padding: 0 var(--space-0-75) var(--space-0-6);
 }
 
 /* -------------------------------------------------------- TagPicker */
@@ -952,4 +920,17 @@
   justify-content: flex-end;
   gap: var(--space-0-5);
   margin-top: var(--space-1);
+}
+
+/* Full-screen sheet: edge-to-edge and square-cornered. `margin: 0` undoes the
+   native centred box so it fills the viewport; `100dvh` tracks the dynamic
+   viewport height on mobile. The percent/dvh literals are structural
+   fill-the-viewport lengths no token describes — not theme values. */
+.ui-dialog--full {
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  margin: 0;
 }

@@ -25,6 +25,11 @@
   --icon-btn-size: 40px;
   --fab-size: 56px;
 
+  /* Breakpoints: app-wide scale documented in SPEC-ui-tokens.md, pinned by
+     BREAKPOINTS in test/tokens.test.ts. Media queries cannot read custom
+     properties, so no tokens live here — each media rule writes its literal
+     value with a comment naming its breakpoint (e.g. `/* sm — 640px *​/`). */
+
   /* type — literals promoted to tokens, values unchanged */
   --font-size: 16px;
   --leading: 1.5;

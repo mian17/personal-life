@@ -43,13 +43,6 @@ and the notes app's current pages map onto these one-to-one.
 <Row gap?="sm|md|lg">children</Row>                // horizontal companion to Stack: flex, wraps,
                                                    //   same token gap, no outer margins (added by the
                                                    //   ui-blocks revision change)
-<Disclosure label: ReactNode                        // native collapsible region
-           defaultOpen?: boolean                    //   (<details>/<summary>): label = always-visible
-           className?: string                       //   summary (plus a CSS chevron), children =
-           children: ReactNode />                   //   .ui-disclosure__body; UNCONTROLLED (no open/
-                                                   //   onToggle) and no `'use client'` — the platform
-                                                   //   owns toggle/keyboard/a11y; collapsed by default
-                                                   //   (added by the ui-blocks revision change)
 <EditorStack gap?="sm|md|lg">children</EditorStack> // full-height field stack under an EditorToolbar
                                                    //   (flex:1, token gap; no outer margins; added by the
                                                    //   /todos redesign)
@@ -103,6 +96,8 @@ and the notes app's current pages map onto these one-to-one.
         title: ReactNode                            //   → .ui-dialog__title
         children: ReactNode                         //   → .ui-dialog__body
         footer?: ReactNode                          //   → .ui-dialog__footer (action row)
+        size?="default|full"                        //   "full" → .ui-dialog--full: edge-to-edge,
+                                                    //   100dvh, square corners (a full-screen sheet)
         className? />                               // native backdrop/top-layer/Escape
 ```
 
@@ -120,9 +115,17 @@ export interface DialogProps {
   title: ReactNode;                       // heading (rendered in .ui-dialog__title)
   children: ReactNode;                    // body
   footer?: ReactNode;                     // action row (Confirm/Cancel), right-aligned
+  size?: 'default' | 'full';              // 'full' → .ui-dialog--full (full-screen sheet)
   className?: string;
 }
 ```
+
+- `size="full"` adds `.ui-dialog--full`: `width: 100%; height: 100dvh; max-width: none;
+  border-radius: 0` (plus `margin: 0` so it fills the viewport, not the native centred
+  box). It is the **full-screen sheet** — a surface that takes over the screen rather than
+  floating (e.g. a long optional field group opened from a row). Default `size` (omitted)
+  keeps the centred panel: `width: min(100% - var(--space-2), var(--content-width))`.
+  Both sizes are token-only; no colour literal is introduced.
 
 - `'use client'`. A ref effect on `open` calls the native `showModal()` / `close()`; a `close`
   listener maps the native `close` event to `onOpenChange(false)` — that is the **Escape** path.
@@ -282,8 +285,8 @@ overrides the row link to a column (`flex-direction: column; align-items: stretc
 title reads as the parent line and `children` stack beneath it. The indent is a token step on
 the nested body (`padding-left: var(--space-1)`), not app CSS; a future tree spine would be a
 left border on the same class. The area owns `.ui-list-item--nested` and the child body's
-padding — no app-level indentation. It composes `Stack`/`Disclosure` inside the body; it adds
-no markup of its own beyond the wrapper the base row already renders.
+padding — no app-level indentation. It composes `Stack` and other blocks inside the body; it
+adds no markup of its own beyond the wrapper the base row already renders.
 
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title

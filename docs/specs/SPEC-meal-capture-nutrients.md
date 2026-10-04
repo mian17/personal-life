@@ -42,25 +42,28 @@ written down, not silent).
 
 ## Behavior
 
-### The item form (default — collapsed)
+### The item form (collapsed)
 
-Per item: a row header (`Item N`, trash action), then labelled rows for
-`Dish`, `Portions`, `Calories (kcal)`, `Fat (g)`, `Carbs (g)`, `Protein (g)` — every
-label **visible on the left of its control**, the `SettingsRow` idiom already used by
-`/meals/target`. Below them, one `Disclosure`:
+Per item: **the dish input is the row's parent line** (a `ListItem variant="nested"` title),
+then its nutrients indented beneath it — `Portions`, `Calories (kcal)`, `Fat (g)`,
+`Carbs (g)`, `Protein (g)` — every label **visible on the left of its control**, the
+`SettingsRow` idiom already used by `/meals/target`. There is **no redundant `Item N`
+header line**: the dish is the row identity. Below the fields, one **`All nutrients (27)`
+trigger button**:
 
-- Label: `All nutrients (27)` — and, when the item came from a photo estimate,
+- It reads `All nutrients (27)` — and, when the item came from a photo estimate,
   `All nutrients (27) · 23 estimated` (the count of the non-headline nutrients the
   estimate produced). A manually-entered item shows the plain label, no hint.
-- **Collapsed by default** — never auto-opened. Gemini fills all 27 on every readable
-  photo, so auto-open would mean an always-open wall of 27 rows for the common case.
+- It **opens the full-screen nutrients modal** (below), it does not expand inline — a
+  third nesting level inside the row was the wrong shape.
 - One short hint line under the `Items` section explains the two things the boxes don't:
   portions multiply the numbers below; a blank value means unknown, not zero.
 
-### The item form (expanded — all 27, grouped, nothing dropped)
+### The nutrients modal (full screen)
 
-Expanding the `Disclosure` shows all 27 nutrients, each exactly once, in groups — every
-group a labelled sub-heading, every field a visible label with its unit:
+The trigger opens a **`Dialog size="full"`** — a full-screen sheet (`100dvh`, edge-to-edge,
+square corners) titled `All nutrients`, holding all 27 nutrients, each exactly once, in
+groups — every group a labelled sub-heading, every field a visible label with its unit:
 
 | Group | Fields |
 |---|---|
@@ -78,8 +81,8 @@ it is listed rather than dropped. Labels, units (`kcal`/`g`/`mg`/`mcg`), and `un
 (em dash) all come from `@life/nutrition` — **no app-local nutrient or unit table**
 (lesson 0016; one owner per rule).
 
-The four headline fields **repeat** inside the expanded `Macros` group: the region is
-"all nutrients", not "the extras" — the expanded view is the complete picture.
+The four headline fields **repeat** inside the `Macros` group: the modal is "all
+nutrients", not "the extras" — it is the complete picture.
 
 ## Data flow
 
@@ -96,8 +99,8 @@ The four headline fields **repeat** inside the expanded `Macros` group: the regi
   estimate (today it is seeded from the 4-field `fields`), so an estimate's real micro
   numbers render when expanded rather than the `—` placeholder. Manual items start with an
   empty `known` set (unchanged).
-- The `Disclosure` is a server-renderable primitive; the editor is already `'use client'`,
-  so it composes the primitive client-side. No new server round-trip.
+- The `Dialog` is the `@life/ui` modal (native `<dialog>`, controlled `open`/`onOpenChange`);
+  the editor is already `'use client'`, so it composes it client-side. No new server round-trip.
 
 ## Commands
 
@@ -113,7 +116,7 @@ e2e (single spec): npx playwright test --config apps/app/playwright.config.ts ap
 | Concern | Test level | Why |
 |---|---|---|
 | Every inline headline field shows a visible label + unit | unit (apps/app) | the reported symptom |
-| The `Disclosure` renders the `All nutrients (27)` summary; collapsed by default | unit (apps/app) | the new surface |
+| The `All nutrients (27)` trigger opens a full-screen `Dialog size="full"` | unit (apps/app) | the new surface |
 | Expanded region contains all 27 labels, each exactly once, grouped | unit (apps/app) | "grouped but never drop a nutrient" |
 | `· 23 estimated` hint shows for a photo item, absent for a manual item | unit (apps/app) | the hint's condition |
 | A photo estimate's micro value renders its number, not `—` | unit (apps/app) | the point: estimates must land, not be discarded |
@@ -121,11 +124,11 @@ e2e (single spec): npx playwright test --config apps/app/playwright.config.ts ap
 
 ## Boundaries
 
-- **Always:** compose `@life/ui` (`Disclosure`, `SettingsRow`, `Input`); route units and
-  labels through `@life/nutrition`; keep the four headline fields inline and the collapse
-  collapsed by default.
+- **Always:** compose `@life/ui` (`Dialog`, `SettingsRow`, `Input`, `ListItem variant="nested"`);
+  route units and labels through `@life/nutrition`; keep the four headline fields inline and
+  the full 27 behind the modal trigger.
 - **Ask first:** changing the frozen e2e selector surface; any further `packages/ui`
-  primitive; opening the collapse by default.
+  primitive; opening the modal on first render.
 - **Never:** a raw `<details>`/`<summary>`/`<input>` in `apps/*` (Contract 1 Rule 1); an
   app-local unit or nutrient-label table; fabricating `0` for unknown; a second nutrient
   list that can drift from `@life/nutrition`.
@@ -133,8 +136,8 @@ e2e (single spec): npx playwright test --config apps/app/playwright.config.ts ap
 ## Success Criteria
 
 1. Every field in the item form has a visible label; the headline rows show their unit.
-2. A `Disclosure` labelled `All nutrients (27)` renders collapsed; expanding it shows all
-   27 fields exactly once across the seven groups; nothing dropped, `Caffeine` listed.
+2. An `All nutrients (27)` trigger opens a full-screen `Dialog size="full"`; the modal shows
+   all 27 fields exactly once across the seven groups; `Caffeine` listed under `Other`.
 3. A photo-estimated item marks all 27 `known` and shows real micro numbers; a manual
    item shows `—` and no `estimated` hint.
 4. `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps --include='*.tsx'`

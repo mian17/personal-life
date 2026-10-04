@@ -7,7 +7,7 @@ import type { Nutrient, NutrientVector } from '@life/nutrition';
 import {
   AlertBanner,
   Button,
-  Disclosure,
+  Dialog,
   EditorChrome,
   EmptyState,
   FilePicker,
@@ -186,6 +186,9 @@ export function MealEditor({
   const [saving, setSaving] = useState(false);
   const [savingMeal, setSavingMeal] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
+  // Which item's full-screen nutrients modal is open, by index — one open at a
+  // time, and no item is the "no item" sentinel `null`.
+  const [openNutrients, setOpenNutrients] = useState<number | null>(null);
 
   // One rule for "there is a confirmed number here": calories are known for
   // every item. It gates the save actions and the frozen snapshot.
@@ -332,12 +335,43 @@ export function MealEditor({
   }
 
   /**
+   * One item's nutrients as grouped rows for the full-screen modal — the same
+   * field rows the inline form shows, one per key, with the same `known` gate
+   * and `correctValue` wiring, only grouped under their sub-heading.
+   */
+  function nutrientRows(item: EditorItem, index: number, subject: string) {
+    return nutrition.groups.map((group) => (
+      <Section key={group.title} label={group.title} headingLevel="h3">
+        {group.fields.map(({ key, label, unit }) => (
+          <SettingsRow
+            key={key}
+            label={`${label} (${unit})`}
+            control={
+              <Input
+                type="number"
+                inputMode="decimal"
+                aria-label={`${label} in ${group.title} for ${subject}`}
+                placeholder={nutrition.unknown}
+                value={item.known.includes(key) ? String(round2(item.nutrients[key])) : ''}
+                onChange={(event) => correctValue(index, key, event.target.value, item)}
+              />
+            }
+          />
+        ))}
+      </Section>
+    ));
+  }
+
+  /**
    * One item's form. Returned as JSX (not a nested component) so the item's
    * controls stay in this render's element tree, where the harness reaches them.
    */
   function itemForm(item: EditorItem, index: number) {
     const subject = item.dish !== '' ? item.dish : `item ${index + 1}`;
     const estimated = isEstimated(item, nutrition);
+    // The count comes from the groups, so the trigger can never claim a number
+    // the modal does not hold.
+    const triggerLabel = `All nutrients (${estimatedKeys(nutrition).length})${estimated ? ` · ${nutrition.extraCount} estimated` : ''}`;
     return (
       <ListItem
         key={index}
@@ -384,32 +418,17 @@ export function MealEditor({
             }
           />
         ))}
-        {/* The count comes from the groups, so the summary can never claim a
-            number the region does not hold. */}
-        <Disclosure
-          label={`All nutrients (${estimatedKeys(nutrition).length})${estimated ? ` · ${nutrition.extraCount} estimated` : ''}`}
+        <Button variant="ghost" onClick={() => setOpenNutrients(index)}>
+          {triggerLabel}
+        </Button>
+        <Dialog
+          open={openNutrients === index}
+          onOpenChange={(open) => { if (!open) setOpenNutrients(null); }}
+          title="All nutrients"
+          size="full"
         >
-          {nutrition.groups.map((group) => (
-            <Section key={group.title} label={group.title} headingLevel="h3">
-              {group.fields.map(({ key, label, unit }) => (
-                <SettingsRow
-                  key={key}
-                  label={`${label} (${unit})`}
-                  control={
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      aria-label={`${label} in ${group.title} for ${subject}`}
-                      placeholder={nutrition.unknown}
-                      value={item.known.includes(key) ? String(round2(item.nutrients[key])) : ''}
-                      onChange={(event) => correctValue(index, key, event.target.value, item)}
-                    />
-                  }
-                />
-              ))}
-            </Section>
-          ))}
-        </Disclosure>
+          {nutrientRows(item, index, subject)}
+        </Dialog>
       </ListItem>
     );
   }
