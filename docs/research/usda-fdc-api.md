@@ -18,11 +18,16 @@ the canonical spec if a complete reading is ever needed.
 |---|---|---|
 | Auth | **API key in the query string** — `?api_key=…` (`ApiKeyAuth: { in: query, name: api_key }`) | Not a header. The key travels in the URL, so it must never reach a log line or an error message. `photo.module` already emits no logs; the USDA client must keep that rule. |
 | Base URL | `https://api.nal.usda.gov/fdc` | |
-| License | CC0 1.0 | No attribution obligation. |
+| License | CC0 1.0 | Public domain — no legal attribution duty. They do **ask** for it: `U.S. Department of Agriculture, Agricultural Research Service. FoodData Central, 2019. fdc.nal.usda.gov.` Costless to honour; cite in the about/credits surface when the catalog is shown. |
+| **Key handling** | data.gov keys found "online, such as in a code repository, will be deactivated to prevent malicious use" | The vendor actively scans for leaked keys and kills them. The key is therefore an env var read at runtime and **never** logged, never in a URL that reaches a log, never committed. This upgrades the hard line from hygiene to a real outage risk. |
 | `fdcId` | **integer** | Not a string. Decide the type before it reaches the Gemini tool schema. |
 | `nutrients` query filter | max **25** values | We track **27** nutrients, so the response cannot be narrowed to exactly our set in one call. |
 | Search returns nutrients | `SearchResultFood.foodNutrients: AbridgedFoodNutrient[]` | A single `/v1/foods/search` call yields candidates **and** their numbers — no second fetch needed to show a match. |
 | `pageSize` | default 50, max 200 | |
+| **Rate limit — real key** | **1,000 req/hour per IP**; exceed → `429` and the key is **blocked for 1 hour** | A retry storm after a 429 is not just futile, it extends the block. One `429` must fail open to the fallback path, not queue. |
+| **Rate limit — `DEMO_KEY`** | **30 req/hour, 50 req/day per IP** | Dev/exploration only. Usable for a smoke test; far too low to develop against casually, which makes **caching mandatory from the first line** rather than a later optimisation. |
+| **Rate-limit headers** | `X-RateLimit-Limit`, `X-RateLimit-Remaining` on **every** response | Read them. Back off as `Remaining` approaches 0 instead of discovering the wall via a `429`. |
+| `DEMO_KEY` | `?api_key=DEMO_KEY` | Documented public key for exploring the API before signup. Not a stand-in for production. |
 | `dataType` filter | `Branded` \| `Foundation` \| `Survey (FNDDS)` \| `SR Legacy` | For "what is this food", **Foundation** and **SR Legacy** are the generic-whole-food types. Branded is packaged goods — wrong shape for "chicken". |
 
 ---
@@ -148,5 +153,32 @@ Adds `foodClass`, `foodCategory`, `foodPortions[]`, `foodComponents[]`,
    report per serving — out of scope for now.
 4. **Which `dataType` to search.** Restrict to `Foundation` + `SR Legacy` so the
    model matches whole ingredients, not packaged products.
-5. **Rate limits.** Not in the spec body; documented on the FDC website. Need a
-   back-off/caching story before this is called per-photo.
+5. ~~**Rate limits.**~~ **Settled** (FDC API guide, pasted 2026-10-04): 1,000 req/hour
+   per IP on a real key with a 1-hour block on exceed; `DEMO_KEY` is 30/hour, 50/day.
+   `X-RateLimit-Limit` / `X-RateLimit-Remaining` come back on every response, so the
+   client backs off on the header rather than waiting for a `429`. See the facts table.
+
+---
+
+## Verification status (2026-10-04)
+
+The **live field-name question is still open** — specifically whether
+`AbridgedFoodNutrient` returns `number` / `amount` / `unitName` (its `properties`, which
+this file assumes) or `nutrientNumber` / `unit` (its `required` list). Two attempts to
+settle it against the live API failed for environment reasons, not API reasons:
+
+- `curl https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&…` → HTTP 403 with
+  body `Approval required for api.nal.usda.gov:443`. That is the **sandbox egress
+  policy**, not USDA refusing the key.
+- The same call through the fetch tool → the same 403.
+
+`sbx` is not on this machine's `PATH`, so the block cannot be cleared from here. To settle
+it, run the call from a machine with egress and paste the response:
+
+```sh
+curl -s 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=broccoli&dataType=SR%20Legacy&pageSize=1'
+```
+
+One `foods` entry's `foodNutrients[]` settles it. **Do not write the mapping table against
+the assumption** — the spec's `required`/`properties` disagreement is exactly the kind of
+detail that turns "USDA-verified" into "silently wrong".
