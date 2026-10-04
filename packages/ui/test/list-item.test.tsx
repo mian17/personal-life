@@ -233,6 +233,46 @@ describe('ListItem', () => {
     expect(classesOf(screen.getByRole('listitem'))).toEqual(['ui-list-item']);
   });
 
+  it('adds the nested variant: a column row whose body indents beneath the title', () => {
+    render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span data-testid="child" />
+        </ListItem>
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--nested',
+    ]);
+
+    // The title is the parent line; the child lives in the indented body below it.
+    const body = document.querySelector('.ui-list-item__nested-body')!;
+    expect(body.contains(screen.getByTestId('child'))).toBe(true);
+    expect(body.previousElementSibling).toBe(document.querySelector('.ui-list-item__text'));
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    const link = block('.ui-list-item--nested .ui-list-item__link');
+    expect(link).toMatch(/flex-direction:\s*column/);
+    expect(link).toMatch(/align-items:\s*stretch/);
+
+    const nestedBody = block('.ui-list-item--nested .ui-list-item__nested-body');
+    const indent = nestedBody.match(/padding-left:\s*([^;]+);/)?.[1] ?? '';
+    expect(indent).toMatch(/var\(--space-/);
+    expect(indent).not.toMatch(/\d+(px|rem)/);
+
+    // The row top-aligns so the delete slot sits with the parent line, not centred
+    // against the tall body; the slot drops one row-padding step to meet the title.
+    expect(block('.ui-list-item--nested')).toMatch(/align-items:\s*flex-start/);
+    expect(css).toMatch(
+      /\.ui-list-item--nested > \.ui-icon-btn\s*,\s*\.ui-list-item--nested > form\s*\{[^}]*margin-top:\s*var\(--space-0-9\)/,
+    );
+  });
+
   it('adds a tone class for a coloured lens row, and none without a tone', () => {
     const { unmount } = render(
       <ul>

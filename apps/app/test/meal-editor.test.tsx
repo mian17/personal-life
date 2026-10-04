@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, Disclosure, FilePicker, IconButton, Input, SettingsRow, StatusText, Textarea } from '@life/ui';
+import { Button, Disclosure, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -438,11 +438,13 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       const tree = harness.renderTree();
 
       // The visible label lives on a SettingsRow beside its control — the
-      // emitted text, not the aria-label a sighted user never sees.
+      // emitted text, not the aria-label a sighted user never sees. The dish is
+      // the parent line now, so it reads through the row's own placeholder.
       const html = renderToStaticMarkup(tree);
-      for (const label of ['Dish', 'Portions', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
+      for (const label of ['Portions', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
         expect(html).toContain(label);
       }
+      expect(html).toContain('placeholder="Dish name"');
     } finally {
       harness.restore();
     }
@@ -559,6 +561,35 @@ describe('MealEditor composition', () => {
       expect(html).toContain('ui-file-picker');
       expect(html).toContain('ui-textarea');
       expect(html).toContain('ui-btn');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('renders the dish as the row title with the nutrients nested beneath it', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+      // The dish is the row's title (the parent line), not a child field row.
+      const row = findAll(tree, ListItem)[0];
+      expect(text(row.props.title)).toBe('');
+      expect(isElement(row.props.title) && row.props.title.props['aria-label']).toBe(
+        'Dish for item 1',
+      );
+      // The dish input is the row title; every other field is a nested child.
+      expect(field(tree, 'Dish for item 1').props.value).toBe('');
+      expect(findAll(tree, SettingsRow)[0].props.label).toBe('Portions');
+
+      // The emitted markup carries the nested variant the CSS turns into a
+      // column, with the child body before the delete slot.
+      const html = renderToStaticMarkup(tree);
+      expect(html).toContain('ui-list-item--nested');
+      expect(html).toContain('ui-list-item__nested-body');
+      const rowStart = html.indexOf('ui-list-item--nested');
+      const body = html.indexOf('ui-list-item__nested-body', rowStart);
+      const remove = html.indexOf('Remove item', rowStart);
+      expect(body).toBeGreaterThan(-1);
+      expect(remove).toBeGreaterThan(body);
     } finally {
       harness.restore();
     }

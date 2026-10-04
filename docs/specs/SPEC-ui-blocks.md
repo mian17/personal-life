@@ -19,7 +19,7 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
                                                    //   deleteAction?,
-                                                   //   variant?="todo",
+                                                   //   variant?="todo" | "nested",
                                                    //   size?="default|dense",
                                                    //   tone?="danger|amber|accent",
                                                    //   done?, collapsing?,
@@ -272,6 +272,18 @@ to full height (`align-self: stretch`) so the tap/hover area is unchanged. The r
 also carries a token-derived `min-height` floor equal to one two-line row (title +
 sub, ~75.6px at the frozen base), so a row with empty `meta`/`snippet` cannot
 collapse.
+
+The **`nested`** variant (`variant="nested"`, off by default; adds `.ui-list-item--nested`)
+presents a row that owns an indented child region — a parent line (its `title`) with a stack
+of children below it, one level in. It exists because the base row renders `title` and
+`children` as siblings in a horizontal flex row (`.ui-list-item__link`, `align-items: center`),
+so a row whose children are a *vertical field body* lays them out side by side. The variant
+overrides the row link to a column (`flex-direction: column; align-items: stretch`) so the
+title reads as the parent line and `children` stack beneath it. The indent is a token step on
+the nested body (`padding-left: var(--space-1)`), not app CSS; a future tree spine would be a
+left border on the same class. The area owns `.ui-list-item--nested` and the child body's
+padding — no app-level indentation. It composes `Stack`/`Disclosure` inside the body; it adds
+no markup of its own beyond the wrapper the base row already renders.
 
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title

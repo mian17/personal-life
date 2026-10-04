@@ -382,6 +382,33 @@
   font-size: var(--space-0-7);
 }
 
+/* Nested row: the title is the parent line, `children` stack indented beneath
+   it. The base row lays title and children side by side (the link is a
+   horizontal flex row); the nested variant turns the link into a column so the
+   title keeps its own line and the child body stacks below it, one token step
+   in. The row top-aligns so the delete slot sits with the parent line instead
+   of centring against the tall body; the slot drops one row-padding step to
+   meet the title line. */
+.ui-list-item--nested {
+  align-items: flex-start;
+}
+
+.ui-list-item--nested .ui-list-item__link {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ui-list-item--nested .ui-list-item__nested-body {
+  display: grid;
+  gap: var(--space-0-5);
+  padding-left: var(--space-1);
+}
+
+.ui-list-item--nested > .ui-icon-btn,
+.ui-list-item--nested > form {
+  margin-top: var(--space-0-9);
+}
+
 /* Row tone: tint the leading done toggle of an OPEN coloured-lens row (matrix
    quadrants). A completed row is muted (title + icons) regardless of tone, so
    the tone rules exclude done — the `.ui-list-item--done .ui-icon-btn` rule

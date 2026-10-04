@@ -341,24 +341,21 @@ export function MealEditor({
     return (
       <ListItem
         key={index}
-        title={item.dish !== '' ? item.dish : 'New item'}
+        variant="nested"
+        title={
+          <Input
+            aria-label={`Dish for item ${index + 1}`}
+            placeholder="Dish name"
+            value={item.dish}
+            onChange={(event) => updateItem(index, { dish: event.target.value })}
+          />
+        }
         deleteAction={
           <IconButton label={`Remove ${item.dish || 'item'}`} onClick={() => removeItem(index)}>
             <Trash2 size={18} aria-hidden />
           </IconButton>
         }
       >
-        <SettingsRow
-          label="Dish"
-          control={
-            <Input
-              aria-label={`Dish for item ${index + 1}`}
-              placeholder="Dish name"
-              value={item.dish}
-              onChange={(event) => updateItem(index, { dish: event.target.value })}
-            />
-          }
-        />
         <SettingsRow
           label="Portions"
           control={
