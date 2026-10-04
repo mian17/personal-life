@@ -14,8 +14,27 @@ The Decision log below is the record of the two cross-cutting decisions, not a t
 | `meal-service` | The backend service: owner-scoped diary entries, saved meals, targets, photo→Gemini pipeline, cache layering, content at rest. | `nutrition-model` |
 | `meal-capture-ui` | The photo entry door (its editor also serves manual entry), the saved-meals toolbar door, the review-correct step, and the day view with total vs target. Consumes `meal-service` through the `apps/app` BFF. | `meal-service` |
 | `target-onboarding` | Profile capture (age, sex, height, weight, activity) and the derivation + versioning of the daily calorie/macro target. | `nutrition-model` |
+| `usda-source` | The USDA FoodData Central reference provider: keyword search and fetch-by-id, the **nutrient-number → `@life/nutrition` key mapping** with unit normalization to a per-100 g vector, and caching. Owns the API-key handling and the "never let a URL reach a log" rule. | `nutrition-model` |
 
-Build order: `nutrition-model` → `meal-service` + `target-onboarding` → `meal-capture-ui`
+Build order: `nutrition-model` → `usda-source` → `meal-service` + `target-onboarding` → `meal-capture-ui`
+
+## Revision 2026-10-04 — photo → real foods (`docs/intent/meal-food-capture.md`)
+
+One new module, two extended. Source: the confirmed intent, and
+`docs/research/usda-fdc-api.md` for the external contract.
+
+| Module | Change | Depends on |
+|---|---|---|
+| `usda-source` | **new** — the reference data provider | `nutrition-model` |
+| `meal-service` | extended — the photo pipeline becomes **identity-only** (Gemini returns `name + grams + fdcId`, no nutrient fields) and gains a USDA search tool; the foods path gains **dedup-by-name** | `usda-source` |
+| `meal-capture-ui` | extended — `Portions` becomes `Grams`; rows are foods | `meal-service` |
+
+Dependency direction is unchanged and acyclic: `nutrition-model` → `usda-source` →
+`meal-service` → `meal-capture-ui`. `usda-source` ships **inside**
+`apps/meal-service/src/usda/`, following the `target-onboarding` precedent (a module need
+not be a workspace). `ponytail:` extract to `packages/usda` only when a second consumer
+(food picker, second service) actually exists — the nutrient-mapping table is the piece
+that would move.
 
 ## Notes on boundaries
 
@@ -81,6 +100,27 @@ Build order: `nutrition-model` → `meal-service` + `target-onboarding` → `mea
   doc-only guidance (e.g. per-model image byte limits) could not be read from prose; only the
   structural contract above was verified first-party. A later live smoke check against the
   configured model remains the human-run validation (spec's "one optional manual smoke check").
+
+- **2026-10-04 — Gemini is identity-only; nutrient values never transcribe through the
+  model.** Decided by the Tech Lead under standing autonomy (intent confirmed). The model
+  returns `name + grams + fdcId` and the backend fetches the authoritative vector by id.
+  Rationale: asking one call to both *recognise* food and *invent 27 numbers* mixes a
+  high-accuracy task with a low-accuracy one, and the invented half is the half the whole
+  app exists to produce. A number copied through the model's own text can drift from its
+  source even when the source is correct. Cost accepted: the estimate becomes a multi-turn
+  call (photo → tool call → answer), so it is slower, and USDA lookups need caching.
+
+- **2026-10-04 — `usda-source` ships inside `apps/meal-service/src/usda/`, not as a
+  workspace package.** `ponytail:` extraction ceiling — the nutrient-number → key mapping
+  table is the piece that moves to `packages/usda` if a second consumer (a food picker, a
+  second service) appears. Rationale: `nutrition-model` earned a workspace because two
+  consumers *already existed* (the service sums, the UI formats). `usda-source` has one
+  today. Building the package now would be scaffolding for a consumer that does not exist.
+
+- **2026-10-04 — Food base is 100 g.** `Food.servingGrams = 100` with the base vector
+  per-100 g, matching the nutrition-label convention and USDA's own reporting basis for
+  Foundation / SR Legacy. Fits the existing `Food`/`Serving`/`Entry` schema with **no
+  migration**.
 
 ## Deliberately absent modules
 
