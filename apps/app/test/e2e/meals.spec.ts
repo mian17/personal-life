@@ -136,7 +136,9 @@ test.describe('meals day view', () => {
 
     await page.getByLabel('Dish for item 1').fill('Rice bowl');
     await page.getByLabel('Calories for Rice bowl').fill('450');
-    await page.getByLabel('Portions for Rice bowl').fill('2');
+    // The box is a weight now: 200 g at the 100 g base is 2 servings, so the
+    // calories rescale to 450 × 2 — the same corrected figure as before.
+    await page.getByLabel('Grams for Rice bowl').fill('200');
     await expect(page.getByLabel('Calories for Rice bowl')).toHaveValue('900');
 
     // The day view is left, not the editor: it is what the user goes back to.

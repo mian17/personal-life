@@ -61,7 +61,12 @@ export async function saveEntryAction(
     date: string;
     mealGroup: MealGroup;
     expectedVersion: number;
-    items: Array<{ dish: string; quantity: number; nutrients: NutrientVector }>;
+    items: Array<{
+      dish: string;
+      foodId?: string | null;
+      quantity: number;
+      nutrients: NutrientVector;
+    }>;
   },
 ): Promise<void> {
   const { date, mealGroup, expectedVersion, items } = input;
@@ -72,7 +77,8 @@ export async function saveEntryAction(
       await createMealEntry({
         date,
         mealGroup,
-        foodId: item.dish,
+        // A catalog id wins; a bare item still logs under its dish name.
+        foodId: item.foodId || item.dish,
         quantity: item.quantity,
         nutrients: item.nutrients,
       });

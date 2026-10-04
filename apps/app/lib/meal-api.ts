@@ -103,11 +103,20 @@ export function putMealProfile(input: MealProfileInput): Promise<MealTarget> {
  */
 const PHOTO_ESTIMATE_PATH = '/api/estimates/photo';
 
-/** One dish the model read out of a photo (`GeminiClient.PhotoItemSuggestion`). */
-export interface PhotoItemSuggestion {
-  dish: string;
-  ingredients: string[];
-  portionGrams: number;
+/**
+ * One resolved estimate item, exactly as the service reports it: the food's
+ * name, the grams the estimate weighed, the catalog id when one matched, the
+ * USDA id when the model read one, the food's own base serving, and that
+ * base's nutrient vector. The BFF forwards every field; it computes none —
+ * the grams → servings conversion happens in the editor, which is where the
+ * user sees and corrects the weight.
+ */
+export interface PhotoEstimateItem {
+  name: string;
+  grams: number;
+  foodId: string | null;
+  fdcId: number | null;
+  servingGrams: number;
   nutrients: NutrientVector;
 }
 
@@ -117,7 +126,7 @@ export interface PhotoItemSuggestion {
  * nothing to render but the reason.
  */
 export type PhotoEstimate =
-  | { readable: true; items: PhotoItemSuggestion[] }
+  | { readable: true; items: PhotoEstimateItem[] }
   | { readable: false; reason: string };
 
 /** The image bytes, base64-encoded; they live only for the duration of the request. */

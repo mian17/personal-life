@@ -222,7 +222,14 @@ describe('MealEditor photo door', () => {
     mockCallService.mockResolvedValue({
       readable: true,
       items: [
-        { dish: 'Omelette', ingredients: ['egg'], portionGrams: 120, nutrients: vector({ calories: 250 }) },
+        {
+          name: 'Omelette',
+          grams: 100,
+          foodId: null,
+          fdcId: null,
+          servingGrams: 100,
+          nutrients: vector({ calories: 250 }),
+        },
       ],
     });
     try {
@@ -441,7 +448,7 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       // emitted text, not the aria-label a sighted user never sees. The dish is
       // the parent line now, so it reads through the row's own placeholder.
       const html = renderToStaticMarkup(tree);
-      for (const label of ['Portions', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
+      for (const label of ['Grams', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
         expect(html).toContain(label);
       }
       expect(html).toContain('placeholder="Dish name"');
@@ -517,9 +524,11 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       readable: true,
       items: [
         {
-          dish: 'Omelette',
-          ingredients: ['egg'],
-          portionGrams: 120,
+          name: 'Omelette',
+          grams: 100,
+          foodId: null,
+          fdcId: null,
+          servingGrams: 100,
           nutrients: vector({ calories: 250, sodium: 480, caffeine: 12 }),
         },
       ],
@@ -553,6 +562,41 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       } finally {
         manual.restore();
       }
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('keeps an all-zero estimate unknown — the em dash, never a fabricated 0', async () => {
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({
+      readable: true,
+      items: [
+        {
+          name: 'Mystery dish',
+          grams: 100,
+          foodId: null,
+          fdcId: null,
+          servingGrams: 100,
+          nutrients: vector(),
+        },
+      ],
+    });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      const tree = harness.renderTree();
+
+      // The path-3 zero vector resolved nothing, so a non-headline field renders
+      // the unknown affordance — never `String(round2(0))` = `'0'`.
+      const sodium = field(tree, 'Sodium in Cholesterol & sodium for Mystery dish');
+      expect(sodium.props.value).toBe('');
+      expect(sodium.props.placeholder).toBe(UNKNOWN);
+
+      // `known` is empty, so `isEstimated` is false and the trigger stays plain.
+      const trigger = button(tree, (el) => text(el.props.children).includes('All nutrients'));
+      expect(text(trigger.props.children)).toBe('All nutrients (27)');
     } finally {
       harness.restore();
     }
@@ -596,7 +640,7 @@ describe('MealEditor composition', () => {
       );
       // The dish input is the row title; every other field is a nested child.
       expect(field(tree, 'Dish for item 1').props.value).toBe('');
-      expect(findAll(tree, SettingsRow)[0].props.label).toBe('Portions');
+      expect(findAll(tree, SettingsRow)[0].props.label).toBe('Grams');
 
       // The emitted markup carries the nested variant the CSS turns into a
       // column: the remove button sits on the title line beside the dish input
@@ -619,6 +663,8 @@ describe('MealEditor composition', () => {
   it('keeps EditorItem raw vectors scaled and serialisable', () => {
     const item: EditorItem = {
       dish: 'Rice',
+      foodId: null,
+      servingGrams: 100,
       quantity: 2,
       nutrients: vector({ calories: 400 }),
       known: ['calories'],

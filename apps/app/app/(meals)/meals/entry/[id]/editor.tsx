@@ -22,7 +22,7 @@ import {
   Textarea,
   useSnackbar,
 } from '@life/ui';
-import type { MealEntry, MealGroup } from '@/lib/meal-api';
+import type { MealEntry, MealGroup, PhotoEstimateItem } from '@/lib/meal-api';
 import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './actions';
 
 /**
@@ -113,10 +113,16 @@ function isEstimated(item: EditorItem, nutrition: NutritionFields): boolean {
 /**
  * One reviewed item. `nutrients` is the **effective** vector (already scaled by
  * `quantity`) — the exact value that persists, so a correction and its saved
- * snapshot can never disagree.
+ * snapshot can never disagree. `quantity` stays servings (the model's own
+ * meaning); the `Grams` box is a view over it through `servingGrams`, so a
+ * weight is entered without redefining what the entry stores.
  */
 export interface EditorItem {
   dish: string;
+  /** The catalog food the estimate resolved to, or `null` — the log path's reuse reference (never persisted here). */
+  foodId: string | null;
+  /** The food's base weight; 100 for every food this feature creates, a referenced food's own base otherwise. */
+  servingGrams: number;
   quantity: number;
   nutrients: NutrientVector;
   /** Fields the user has confirmed; everything else renders the unknown em dash. */
@@ -142,9 +148,33 @@ function scaleVector(vector: NutrientVector, factor: number): NutrientVector {
   return out;
 }
 
+/** True when no field resolved a value — the absent-data zero vector, which renders as unknown, never as a fabricated `0`. */
+function isZeroVector(vector: NutrientVector): boolean {
+  return Object.values(vector).every((value) => value === 0);
+}
+
 /** Two decimals is past any displayed precision; keeps a scaled vector from rendering a long float. */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * A resolved estimate as the item the editor reviews: the wire item's grams
+ * become servings through its own base, and the per-serving vector scales to
+ * the same effective weight. A path-3 all-zero vector keeps an empty `known`
+ * set, so every field renders the unknown em dash — never a fabricated `0`.
+ */
+function toEditorItem(estimate: PhotoEstimateItem, nutrition: NutritionFields): EditorItem {
+  const quantity = estimate.servingGrams > 0 ? estimate.grams / estimate.servingGrams : 1;
+  const nutrients = scaleVector(estimate.nutrients, quantity);
+  return {
+    dish: estimate.name,
+    foodId: estimate.foodId,
+    servingGrams: estimate.servingGrams,
+    quantity,
+    nutrients,
+    known: isZeroVector(nutrients) ? [] : estimatedKeys(nutrition),
+  };
 }
 
 /**
@@ -169,6 +199,13 @@ export function MealEditor({
       ? [
           {
             dish: entry.foodId,
+            // Every pre-feature entry stored the dish name as `foodId` (`actions.ts`
+            // posted `foodId: item.dish`), so the stored value is never a catalog
+            // reference and no migration runs: `null` is the honest seed, and the log
+            // path recovers the real food by normalized name before any create. The
+            // entry stores no base, so the grams view reads 100.
+            foodId: null,
+            servingGrams: 100,
             quantity: entry.quantity,
             nutrients: entry.nutrients,
             // An existing entry's stored vector cannot say which fields the user
@@ -177,7 +214,7 @@ export function MealEditor({
             known: nutrition.fields.map(({ key }) => key),
           },
         ]
-      : [{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }],
+      : [{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }],
   );
   const [mealGroup, setMealGroup] = useState<MealGroup>(entry?.mealGroup ?? 'lunch');
   const [hint, setHint] = useState('');
@@ -194,7 +231,13 @@ export function MealEditor({
   // every item. It gates the save actions and the frozen snapshot.
   const caloriesKnown =
     items.length > 0 && items.every((item) => item.known.includes('calories'));
-  const canSave = caloriesKnown && items.every((item) => item.dish.trim() !== '');
+  // A zero-quantity item agrees with Task 11's log path: the log path divides the
+  // confirmed effective vector by `quantity` to recover the per-100 g base, so
+  // `quantity <= 0` would divide by zero and yield `NaN`/`Infinity`. Such an item
+  // is never sent down the create path — it blocks save here, where Task 11 states the same guard.
+  const canSave =
+    caloriesKnown &&
+    items.every((item) => item.dish.trim() !== '' && item.quantity > 0);
 
   /**
    * The day's number the editor itself will store: the sum of the confirmed
@@ -238,14 +281,19 @@ export function MealEditor({
     });
   }
 
-  /** A portion change rescales the effective vector by the same ratio (see `scaleVector`). */
-  function setPortion(index: number, raw: string, item: EditorItem) {
-    const next = Number(raw);
-    // An empty or junk portion keeps the last good one — it must never scale the
-    // vector to zero (which would silently erase the correction).
-    if (!Number.isFinite(next) || next < 0) return;
-    const factor = item.quantity > 0 ? next / item.quantity : 0;
-    updateItem(index, { quantity: next, nutrients: scaleVector(item.nutrients, factor) });
+  /** A servings change rescales the effective vector by the ratio between old and new servings. */
+  function setPortion(index: number, servings: number, item: EditorItem) {
+    // Empty or junk input arrives as `NaN` (or a negative) and keeps the last good
+    // value — it must never scale the vector to zero, which would silently erase
+    // the correction. A zero weight is a real answer, and `canSave` blocks it.
+    if (!Number.isFinite(servings) || servings < 0) return;
+    const factor = item.quantity > 0 ? servings / item.quantity : 0;
+    updateItem(index, { quantity: servings, nutrients: scaleVector(item.nutrients, factor) });
+  }
+
+  /** The `Grams` box is a view over `quantity`: the typed weight over the item's own base is servings. */
+  function setGrams(index: number, raw: string, item: EditorItem) {
+    setPortion(index, Number(raw) / item.servingGrams, item);
   }
 
   function removeItem(index: number) {
@@ -255,7 +303,7 @@ export function MealEditor({
   function addItem() {
     setItems((previous) => [
       ...previous,
-      { dish: '', quantity: 1, nutrients: nutrition.empty, known: [] },
+      { dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] },
     ]);
   }
 
@@ -274,21 +322,14 @@ export function MealEditor({
     try {
       const result = await estimatePhotoAction(form);
       if (result.readable) {
-        setItems(
-          result.items.map((suggestion) => ({
-            dish: suggestion.dish,
-            quantity: 1,
-            nutrients: suggestion.nutrients,
-            known: estimatedKeys(nutrition),
-          })),
-        );
+        setItems(result.items.map((item) => toEditorItem(item, nutrition)));
         setPhotoFailed(false);
       } else {
-        setItems([{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }]);
+        setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
         setPhotoFailed(true);
       }
     } catch {
-      setItems([{ dish: '', quantity: 1, nutrients: nutrition.empty, known: [] }]);
+      setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
       setPhotoFailed(true);
     } finally {
       setEstimating(false);
@@ -303,7 +344,7 @@ export function MealEditor({
         date,
         mealGroup,
         expectedVersion: entry?.version ?? 0,
-        items: items.map(({ dish, quantity, nutrients }) => ({ dish, quantity, nutrients })),
+        items: items.map(({ foodId, dish, quantity, nutrients }) => ({ foodId, dish, quantity, nutrients })),
       });
       router.back();
     } catch {
@@ -391,14 +432,14 @@ export function MealEditor({
         }
       >
         <SettingsRow
-          label="Portions"
+          label="Grams"
           control={
             <Input
               type="number"
               inputMode="decimal"
-              aria-label={`Portions for ${subject}`}
-              value={String(item.quantity)}
-              onChange={(event) => setPortion(index, event.target.value, item)}
+              aria-label={`Grams for ${subject}`}
+              value={String(round2(item.quantity * item.servingGrams))}
+              onChange={(event) => setGrams(index, event.target.value, item)}
             />
           }
         />
@@ -477,7 +518,7 @@ export function MealEditor({
       </Section>
 
       <Section label="Items" actions={<Button size="bare" onClick={addItem}>Add item</Button>}>
-        <StatusText>Portions multiply the numbers below; a blank value means unknown, not zero.</StatusText>
+        <StatusText>Grams scale the numbers below; a blank value means unknown, not zero.</StatusText>
         {items.length === 0 ? (
           <EmptyState body="Nothing to review yet. Add an item or send a photo." />
         ) : (
