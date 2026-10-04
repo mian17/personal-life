@@ -71,6 +71,30 @@ behind the cache contract.
 - **Saved meals already match the Lose It model** (one saved meal holds many
   frozen foods and re-logs them into one meal slot) and are not reworked.
 
+### Amendment 2026-10-04 — search order, and when the catalog is written
+
+Set by the user after the original confirmation. Two refinements to the flow above.
+
+- **Search order is catalog first, USDA second.** The model's search reaches our
+  **own catalog first**; only when nothing matches does it query the USDA API.
+  Rationale: a food the user has already corrected is a better answer than a
+  fresh USDA guess, and it costs zero API calls. It also makes repeat photos free
+  — the second "chicken" resolves against the catalog with no USDA traffic.
+  (This narrows the earlier "dedup by name" decision: that rule still governs the
+  *write*, this governs the *search*.)
+- **The catalog is written at log time, never at estimate time.** A food becomes
+  a catalog row only when the user clicks **log meal**. Rationale: an estimate is
+  a draft, and creating registry rows from a draft litters the catalog with foods
+  the user then edits or throws away — the same failure mode as
+  `0009-autosave-inline-tag-orphans`, whose rule is that creation is gated on a
+  user-produced confirmation. The confirmation here is the log click.
+- **A catalog food is written once, at creation.** The vector stored is the one
+  the user actually confirmed — including any correction they typed — un-scaled
+  back to the per-100 g base (`effective ÷ quantity`, quantity in servings).
+  Later corrections to an entry stay **entry-local**: they do not write back to
+  the food. Changing a food is the existing food-edit path, not a side effect of
+  logging one. One rule, no surprises.
+
 ## Constraint
 
 - Fits the existing `Food` / `Serving` / `Entry` schema — **no DB migration**
@@ -80,7 +104,8 @@ behind the cache contract.
 
 ## Out of scope
 
-- Food browser / search UI — the catalog gets *written*, not browsed.
+- Food browser / search **UI** — the catalog is written and searched by the
+  model's tool, but there is no human-facing browse surface here.
 - Brand capture (optional in the Lose It form; a photo cannot read a brand).
 - Exact precision for foods USDA cannot resolve: those still log, with
   approximate numbers, rather than being dropped.
