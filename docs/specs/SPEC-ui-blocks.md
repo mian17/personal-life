@@ -43,6 +43,13 @@ and the notes app's current pages map onto these one-to-one.
 <Row gap?="sm|md|lg">children</Row>                // horizontal companion to Stack: flex, wraps,
                                                    //   same token gap, no outer margins (added by the
                                                    //   ui-blocks revision change)
+<Disclosure label: ReactNode                        // native collapsible region
+           defaultOpen?: boolean                    //   (<details>/<summary>): label = always-visible
+           className?: string                       //   summary (plus a CSS chevron), children =
+           children: ReactNode />                   //   .ui-disclosure__body; UNCONTROLLED (no open/
+                                                   //   onToggle) and no `'use client'` — the platform
+                                                   //   owns toggle/keyboard/a11y; collapsed by default
+                                                   //   (added by the ui-blocks revision change)
 <EditorStack gap?="sm|md|lg">children</EditorStack> // full-height field stack under an EditorToolbar
                                                    //   (flex:1, token gap; no outer margins; added by the
                                                    //   /todos redesign)

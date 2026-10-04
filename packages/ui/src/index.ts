@@ -107,6 +107,9 @@ export type { StackGap, StackProps } from './components/stack';
 export { Section } from './components/section';
 export type { SectionHeadingLevel, SectionProps } from './components/section';
 
+export { Disclosure } from './components/disclosure';
+export type { DisclosureProps } from './components/disclosure';
+
 export { SettingsRow } from './components/settings-row';
 export type { SettingsRowProps } from './components/settings-row';
 

@@ -613,6 +613,47 @@
   gap: var(--space-2);
 }
 
+/* --------------------------------------------------------- Disclosure */
+
+/* Native `<details>`/`<summary>` collapsible region: the platform owns the
+   toggle, keyboard, and expanded/collapsed state; the chevron is a pure CSS
+   transform on `[open]`. No outer margins — the parent's rhythm owns spacing
+   (same rule as Stack/Row). */
+.ui-disclosure {
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.ui-disclosure__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding: var(--space-0-6) var(--space-0-75);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Drop the native disclosure triangle on every engine. */
+.ui-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* CSS-rendered chevron: points right collapsed, down open. */
+.ui-disclosure__summary::after {
+  content: '▸';
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.ui-disclosure[open] .ui-disclosure__summary::after {
+  transform: rotate(90deg);
+}
+
+.ui-disclosure__body {
+  padding: 0 var(--space-0-75) var(--space-0-6);
+}
+
 /* -------------------------------------------------------- TagPicker */
 
 /* A picker is a labelled region: the label sits BESIDE the chips (one row,
