@@ -1035,17 +1035,21 @@ base; uniqueness is compared on a **normalized key**, not the stored name.
   - `apps/app/app/(meals)/meals/entry/[id]/actions.ts`
   - `apps/app/lib/meal-api.ts`
   - `apps/app/test/meal-editor.test.tsx`
+  - `apps/app/app/(meals)/meals/entry/[id]/page.tsx`
+  - `apps/app/app/(meals)/meals/entry/[id]/editor.tsx` — **restore-seed only**: the line
+    that seeds a restored entry's `dish` (the `dish: entry.foodId` seed, editor.tsx:201).
+    The rest of the editor is Task 9's and stays out of bounds here.
 - Reference files (read-only): `apps/meal-service/src/foods/foods.service.ts` (its
   **existing public** `findAll`/`create` are called; the file is not edited);
   `apps/meal-service/src/foods/dto/create-food.dto.ts`;
   `apps/meal-service/src/entries/dto/create-entry.dto.ts`;
-  `apps/app/app/(meals)/meals/entry/[id]/editor.tsx`;
   `docs/specs/SPEC-meal-capture-grams.md § The log-time create path`;
   `docs/lessons/`
 - Strictly prohibited files: `apps/meal-service/src/foods/foods.service.ts` (no new
   method, no `portions`/`normalizePortions` touch), `foods.controller.ts`,
-  `create-food.dto.ts`, `editor.tsx` (Task 9 owns it), the estimate path in
-  `apps/meal-service/src/photo/`, and every other file — no service edit, no spec.
+  `create-food.dto.ts`, `editor.tsx` **outside its restore-seed line** (the rest of the
+  editor is Task 9's), the estimate path in `apps/meal-service/src/photo/`, and every
+  other file — no service edit, no spec.
 
 [IMPLEMENTATION REQUIREMENTS]
 - **A `Food` row is created only at log time.** The estimate path creates none (Task 8);
@@ -1100,6 +1104,13 @@ base; uniqueness is compared on a **normalized key**, not the stored name.
   create-entry.dto.ts:44–47`), so a `null`-food item's create runs **before** its entry
   POST; the create returns the id the entry then carries. The null is resolved here, never
   on the wire.
+- **The Task 10 dish-name fallback is removed.** Task 10 left
+  `foodId: item.foodId || item.dish` in `saveEntryAction` as the transitional stand-in
+  (needed until Task 9's editor sets `foodId`); with this task's resolution in place the
+  `|| item.dish` half is **deleted** — the entry POST carries the resolved catalog id
+  only: the reused food's id, or the newly created food's id. `EditorItem.dish` is the
+  food's **name**, never an id, so it is never written into `foodId`; from this task on,
+  `foodId` is never sent a dish name again.
 - **Uniqueness is compared on a normalized key** (amendment 2026-10-04; SPEC-meal-capture-
   grams § The normalized name key): trim, collapse internal whitespace, case-fold — the
   **stored name keeps the user's exact spelling**. `Chicken`/`chicken`/`chicken ` are one
@@ -1115,6 +1126,20 @@ base; uniqueness is compared on a **normalized key**, not the stored name.
   on the new-meal (`id === null`) branch, where each confirmed item has no entry yet.
 - **Each new `EditorItem.dish` (name) is the stored name**, exactly as the user typed it;
   the normalized key exists only for comparison, never as the stored name.
+- **A restored entry's display name is resolved from the catalog, never from `foodId`
+  directly.** From this task on `foodId` carries a resolved catalog id, so the Task 9
+  restore seed (`dish: entry.foodId`, editor.tsx:201) would render a raw id as the name —
+  and worse, the log path would then normalize that id, match no food, and create a new
+  food named after an id. The restore seed instead looks the entry's `foodId` up in the
+  foods list this task already adds (`listMealFoods()`) and uses that food's `name` as
+  `dish`; an entry whose `foodId` matches no catalog food is a pre-feature row whose
+  `foodId` *is* the dish name, so it falls back to `entry.foodId` as the name — an
+  unmatched id is never rendered as a label. `MealEntry` gains **no** name field, and
+  `apps/meal-service` is **not** edited (the service's `EntryDto`,
+  `apps/meal-service/src/entries/entries.service.ts:30–40`, mirrors the shape and would
+  need a service-side join — out of scope and prohibited here). `EditorItem.foodId`
+  stays `null` for restored entries exactly as Task 9 seeds it — the name resolution
+  must not start feeding `foodId`.
 - **Primitive reuse plan (Contract 1):** **no UI change** — this task edits server
   actions and the BFF client only, so no `@life/ui` primitive is involved and no raw HTML
   is written. The editor surface is Task 9's, untouched here.
@@ -1125,11 +1150,14 @@ base; uniqueness is compared on a **normalized key**, not the stored name.
   tool closure) is not touched here.
 - [ ] A `Food` is created only on the log path, never at estimate time
 - [ ] An item carrying a `foodId` reuses it; `foodId: null` creates first, then logs the entry
+- [ ] The Task 10 `foodId: item.foodId || item.dish` fallback is gone (`grep -n "item.foodId || item.dish"` over `apps/app` returns zero); no entry POST carries a dish name in `foodId`
 - [ ] The stored base is the confirmed effective vector ÷ `quantity` (servings); a `quantity <= 0` item is never sent down the create path (the editor's `canSave` guard in Task 9 blocks save, so the log path divides only positive `quantity`)
 - [ ] Uniqueness compares the normalized key (trim/collapse/case-fold); the stored name keeps the user's spelling
 - [ ] A restored entry (`foodId: null`, `dish` = the food's stored exact spelling) matches by normalized key and its food is reused, not duplicated
 - [ ] Two same-normalized-key items yield one `Food` and two `Entry`s; the `PATCH` branch writes no food
 - [ ] `meal-api.ts` gains `listMealFoods`/`createMealFood` and the `MealFood`/`ServingDto` wire types as new exports; `foods.service.ts` and `create-food.dto.ts` are not modified
+- [ ] A restored entry logged after this feature shows the food's **name**, not its catalog id
+- [ ] A restored **pre-feature** entry still shows the dish name (the `entry.foodId` fallback), and re-logging it reuses the existing food instead of creating one named after an id
 
 [VERIFICATION & TESTING RULES]
 - Permitted unit command: `npm run test:unit -w apps/app -- test/meal-editor.test.tsx --runInBand`
@@ -1137,6 +1165,9 @@ base; uniqueness is compared on a **normalized key**, not the stored name.
 - New test: logging a `foodId: null` item issues `POST /api/foods` (at `servingGrams: 100`,
   base = effective ÷ quantity) **before** `POST /api/entries` with the returned id; logging
   an item with a `foodId` issues no `POST /api/foods`.
+- Restore-name assertions in the same `test/meal-editor.test.tsx`: a restored entry whose
+  `foodId` is a catalog id renders the food's **name**; a restored entry whose `foodId`
+  matches no catalog food renders `foodId` itself (the pre-feature fallback).
 - NO full suites, NO E2E. Max test executions: 2.
 
 [DEFINITION OF DONE]
