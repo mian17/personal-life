@@ -66,6 +66,16 @@ behind the cache contract.
   `portionGrams` field is promoted from a side note to the primary quantity).
 - **Dedup by name.** A photo-said "chicken" reuses the catalog food named
   `chicken` if one exists, else creates it. No fuzzy matching, no brand logic.
+  - **Which comparison:** uniqueness runs on a **normalized key** — trim,
+    collapse internal whitespace, case-fold — while the stored name keeps the
+    user's exact spelling. So `Chicken` / `chicken` / `chicken ` are one food;
+    `chicken` and `chicken breast` are two. The first is a typo and would
+    otherwise pollute the catalog with one food per capitalisation; the second
+    is a real difference and is **accepted** (2026-10-04) as its own food rather
+    than fuzzy-merged into the first. Semantic variation is allowed; typographic
+    variation is not.
+  - **Two rows naming the same food** (two portions in one photo) produce one
+    catalog food and **two entries** — two logged portions, not a duplicate.
 - **Model output is identity-only.** `name + grams + fdcId`; no nutrient fields
   in the Gemini response schema.
 - **Saved meals already match the Lose It model** (one saved meal holds many
