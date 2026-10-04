@@ -273,6 +273,66 @@ describe('ListItem', () => {
     );
   });
 
+  it('renders the nested titleAction inside the title line, and marks the line for it', () => {
+    render(
+      <ul>
+        <ListItem
+          variant="nested"
+          title="Omelette"
+          titleAction={<button data-testid="remove">Remove</button>}
+        >
+          <span data-testid="child" />
+        </ListItem>
+      </ul>,
+    );
+
+    const titleLine = document.querySelector('.ui-list-item__title')!;
+    expect(classesOf(titleLine)).toEqual(['ui-list-item__title', 'ui-list-item__title--with-action']);
+
+    const slot = document.querySelector('.ui-list-item__title-action')!;
+    expect(slot.contains(screen.getByTestId('remove'))).toBe(true);
+    // The action rides the title line, not the indented child body.
+    expect(titleLine.contains(slot)).toBe(true);
+    expect(document.querySelector('.ui-list-item__nested-body')!.contains(slot)).toBe(false);
+    // ... and the title content stays the line's first child, so it grows.
+    expect(titleLine.firstChild!.textContent).toBe('Omelette');
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const block = (selector: string) =>
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+        [])[1] ?? '';
+
+    const line = block('.ui-list-item--nested .ui-list-item__title--with-action');
+    expect(line).toMatch(/display:\s*flex/);
+    expect(line).toMatch(/align-items:\s*stretch/);
+    expect(line).toMatch(/gap:\s*var\(--space-0-5\)/);
+
+    const titleChild = block('.ui-list-item--nested .ui-list-item__title--with-action > :first-child');
+    expect(titleChild).toMatch(/flex:\s*1/);
+    expect(titleChild).toMatch(/min-width:\s*0/);
+
+    // The action stretches to the line and never sets its own height — unstyled,
+    // the `IconButton` would take its fixed `--icon-btn-size`, not the input's.
+    const action = block('.ui-list-item__title-action');
+    expect(action).toBeTruthy();
+    expect(action).not.toMatch(/\bheight\b/);
+  });
+
+  it('leaves the nested title a plain block when no titleAction is given', () => {
+    render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span data-testid="child" />
+        </ListItem>
+      </ul>,
+    );
+
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toEqual([
+      'ui-list-item__title',
+    ]);
+    expect(document.querySelector('.ui-list-item__title-action')).toBeNull();
+  });
+
   it('adds a tone class for a coloured lens row, and none without a tone', () => {
     const { unmount } = render(
       <ul>

@@ -599,15 +599,18 @@ describe('MealEditor composition', () => {
       expect(findAll(tree, SettingsRow)[0].props.label).toBe('Portions');
 
       // The emitted markup carries the nested variant the CSS turns into a
-      // column, with the child body before the delete slot.
+      // column: the remove button sits on the title line beside the dish input
+      // (the `titleAction` slot, not a `deleteAction` sibling beside the body),
+      // so the nutrient rows below take the full width.
       const html = renderToStaticMarkup(tree);
       expect(html).toContain('ui-list-item--nested');
       expect(html).toContain('ui-list-item__nested-body');
-      const rowStart = html.indexOf('ui-list-item--nested');
-      const body = html.indexOf('ui-list-item__nested-body', rowStart);
-      const remove = html.indexOf('Remove item', rowStart);
-      expect(body).toBeGreaterThan(-1);
-      expect(remove).toBeGreaterThan(body);
+      expect(html).toContain('ui-list-item__title-action');
+      expect(html.indexOf('Remove item')).toBeGreaterThan(-1);
+      const titleLine = html.indexOf('ui-list-item__title-action');
+      const body = html.indexOf('ui-list-item__nested-body');
+      expect(titleLine).toBeLessThan(body);
+      expect(html.indexOf('Remove item', titleLine)).toBeLessThan(body);
     } finally {
       harness.restore();
     }

@@ -288,6 +288,15 @@ left border on the same class. The area owns `.ui-list-item--nested` and the chi
 padding — no app-level indentation. It composes `Stack` and other blocks inside the body; it
 adds no markup of its own beyond the wrapper the base row already renders.
 
+The nested variant also takes an optional **`titleAction`** slot: a control rendered on the
+parent line beside `title` (e.g. a row's delete affordance, so it sits against the title
+control rather than beside the whole child body — a `deleteAction` sibling would steal
+horizontal width from every child row). When set, `.ui-list-item__title` becomes a
+horizontal flex line (`display: flex; align-items: stretch; gap: var(--space-0-5)`) whose
+`title` content grows (`flex: 1; min-width: 0`) and whose `titleAction` stretches to the
+line's height — so a button in the slot matches the height of a control in the title. The
+slot is `nested`-only; without it the title line keeps the base block layout.
+
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title
 (`.ui-list-item--done .ui-list-item__title { color: var(--muted);

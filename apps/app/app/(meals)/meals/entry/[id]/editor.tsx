@@ -384,7 +384,7 @@ export function MealEditor({
             onChange={(event) => updateItem(index, { dish: event.target.value })}
           />
         }
-        deleteAction={
+        titleAction={
           <IconButton label={`Remove ${item.dish || 'item'}`} onClick={() => removeItem(index)}>
             <Trash2 size={18} aria-hidden />
           </IconButton>

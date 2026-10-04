@@ -404,6 +404,35 @@
   padding-left: var(--space-1);
 }
 
+/* Title line carrying a `titleAction` (a row delete affordance): a horizontal
+   flex line, so the action sits against the title control instead of beside the
+   whole child body — a `deleteAction` sibling would steal horizontal width from
+   every child row. Nested-only, and only when the slot is filled, so a nested
+   row without it keeps the base title block. */
+.ui-list-item--nested .ui-list-item__title--with-action {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-0-5);
+}
+
+/* The line's height comes from the title control (an `Input`); the title child
+   grows to fill the leftover width, so `min-width: 0` lets it shrink and the
+   control ellipsize rather than push the action off the line. */
+.ui-list-item--nested .ui-list-item__title--with-action > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The action is a size-less slot, so it takes the line's height: `stretch`
+   aligns its top and bottom to the line (already stretched by the title control),
+   and the control inside centres in that box. It sets no height of its own — the
+   line is the single owner of this row's height. */
+.ui-list-item__title-action {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .ui-list-item--nested > .ui-icon-btn,
 .ui-list-item--nested > form {
   margin-top: var(--space-0-9);
