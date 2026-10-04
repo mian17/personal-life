@@ -7,6 +7,7 @@ import type { Nutrient, NutrientVector } from '@life/nutrition';
 import {
   AlertBanner,
   Button,
+  Disclosure,
   EditorChrome,
   EmptyState,
   FilePicker,
@@ -16,6 +17,7 @@ import {
   ListItem,
   Section,
   Select,
+  SettingsRow,
   StatusText,
   Textarea,
   useSnackbar,
@@ -40,13 +42,24 @@ import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './action
  * value the user actually confirmed.
  */
 
+/** One nutrient as the server sends it: the key, the `@life/nutrition` label, and its unit. */
+export interface NutrientField {
+  key: Nutrient;
+  label: string;
+  unit: string;
+}
+
 /**
  * The nutrition display data the server page derives from `@life/nutrition`.
  * Plain JSON, so it crosses the server/client boundary without the package.
  */
 export interface NutritionFields {
-  /** The fields the review step shows and corrects, in display order (one display choice, not a unit table). */
-  fields: readonly { key: Nutrient; label: string }[];
+  /** The fields the review step shows inline, in display order, with their package labels and units. */
+  fields: readonly NutrientField[];
+  /** The seven groups of the expanded `All nutrients` region (app-owned grouping, package labels/units). */
+  groups: readonly { title: string; fields: readonly NutrientField[] }[];
+  /** The number of nutrients outside the inline headline (23), for the expanded region's summary hint. */
+  extraCount: number;
   /** The unknown affordance: an estimated-but-unknown value renders this, never `0`. */
   unknown: string;
   /** The all-zero vector: the stored meaning of "no value", never a displayed number. */
@@ -65,6 +78,37 @@ const GROUPS: { value: MealGroup; label: string }[] = [
 
 /** `CreateEntryDto.FOOD_ID_MAX` on the service; the dish name stands in until a food picker exists. */
 const FOOD_ID_MAX = 64;
+
+/**
+ * A photo estimate is a complete 27-nutrient vector (`gemini.client.ts` requires
+ * all 27), so every field renders its real number. The set is seeded from the
+ * groups, not the 4-field headline, so the micros the pipeline produced are not
+ * silently discarded.
+ */
+function estimatedKeys(nutrition: NutritionFields): Nutrient[] {
+  return nutrition.groups.flatMap((group) => group.fields.map(({ key }) => key));
+}
+
+/**
+ * The short label the spec gives the inline headline row (`Carbs (g)`, not the
+ * package's `Carbohydrates`); every other label is the package's own. Unit comes
+ * from the package — this only shortens the one name the spec spells short.
+ */
+function inlineLabel(label: string): string {
+  return label === 'Carbohydrates' ? 'Carbs' : label;
+}
+
+/**
+ * True when the item's `known` set covers every non-headline nutrient — the
+ * fingerprint of a photo estimate (which seeds all 27). A manual item (empty set)
+ * or a restored entry (headline only) is never "estimated".
+ */
+function isEstimated(item: EditorItem, nutrition: NutritionFields): boolean {
+  const headline = new Set(nutrition.fields.map(({ key }) => key));
+  return estimatedKeys(nutrition)
+    .filter((key) => !headline.has(key))
+    .every((key) => item.known.includes(key));
+}
 
 /**
  * One reviewed item. `nutrients` is the **effective** vector (already scaled by
@@ -127,6 +171,9 @@ export function MealEditor({
             dish: entry.foodId,
             quantity: entry.quantity,
             nutrients: entry.nutrients,
+            // An existing entry's stored vector cannot say which fields the user
+            // confirmed, so only the headline is treated as known — the same rule
+            // the editor had before the expanded region existed.
             known: nutrition.fields.map(({ key }) => key),
           },
         ]
@@ -229,7 +276,7 @@ export function MealEditor({
             dish: suggestion.dish,
             quantity: 1,
             nutrients: suggestion.nutrients,
-            known: nutrition.fields.map(({ key }) => key),
+            known: estimatedKeys(nutrition),
           })),
         );
         setPhotoFailed(false);
@@ -284,6 +331,92 @@ export function MealEditor({
     }
   }
 
+  /**
+   * One item's form. Returned as JSX (not a nested component) so the item's
+   * controls stay in this render's element tree, where the harness reaches them.
+   */
+  function itemForm(item: EditorItem, index: number) {
+    const subject = item.dish !== '' ? item.dish : `item ${index + 1}`;
+    const estimated = isEstimated(item, nutrition);
+    return (
+      <ListItem
+        key={index}
+        title={item.dish !== '' ? item.dish : 'New item'}
+        deleteAction={
+          <IconButton label={`Remove ${item.dish || 'item'}`} onClick={() => removeItem(index)}>
+            <Trash2 size={18} aria-hidden />
+          </IconButton>
+        }
+      >
+        <SettingsRow
+          label="Dish"
+          control={
+            <Input
+              aria-label={`Dish for item ${index + 1}`}
+              placeholder="Dish name"
+              value={item.dish}
+              onChange={(event) => updateItem(index, { dish: event.target.value })}
+            />
+          }
+        />
+        <SettingsRow
+          label="Portions"
+          control={
+            <Input
+              type="number"
+              inputMode="decimal"
+              aria-label={`Portions for ${subject}`}
+              value={String(item.quantity)}
+              onChange={(event) => setPortion(index, event.target.value, item)}
+            />
+          }
+        />
+        {nutrition.fields.map(({ key, label, unit }) => (
+          <SettingsRow
+            key={key}
+            label={`${inlineLabel(label)} (${unit})`}
+            control={
+              <Input
+                type="number"
+                inputMode="decimal"
+                aria-label={`${label} for ${subject}`}
+                placeholder={nutrition.unknown}
+                value={item.known.includes(key) ? String(round2(item.nutrients[key])) : ''}
+                onChange={(event) => correctValue(index, key, event.target.value, item)}
+              />
+            }
+          />
+        ))}
+        {/* The count comes from the groups, so the summary can never claim a
+            number the region does not hold. */}
+        <Disclosure
+          label={`All nutrients (${estimatedKeys(nutrition).length})${estimated ? ` · ${nutrition.extraCount} estimated` : ''}`}
+        >
+          {nutrition.groups.map((group) => (
+            <Section key={group.title} label={group.title} headingLevel="h3">
+              {group.fields.map(({ key, label, unit }) => (
+                <SettingsRow
+                  key={key}
+                  label={`${label} (${unit})`}
+                  control={
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      aria-label={`${label} in ${group.title} for ${subject}`}
+                      placeholder={nutrition.unknown}
+                      value={item.known.includes(key) ? String(round2(item.nutrients[key])) : ''}
+                      onChange={(event) => correctValue(index, key, event.target.value, item)}
+                    />
+                  }
+                />
+              ))}
+            </Section>
+          ))}
+        </Disclosure>
+      </ListItem>
+    );
+  }
+
   return (
     <EditorChrome
       back={{ label: 'Back', onBack: () => router.back() }}
@@ -328,50 +461,11 @@ export function MealEditor({
       </Section>
 
       <Section label="Items" actions={<Button size="bare" onClick={addItem}>Add item</Button>}>
+        <StatusText>Portions multiply the numbers below; a blank value means unknown, not zero.</StatusText>
         {items.length === 0 ? (
           <EmptyState body="Nothing to review yet. Add an item or send a photo." />
         ) : (
-          <List>
-            {items.map((item, index) => (
-              <ListItem
-                key={index}
-                title={item.dish !== '' ? item.dish : 'New item'}
-                deleteAction={
-                  <IconButton label={`Remove ${item.dish || 'item'}`} onClick={() => removeItem(index)}>
-                    <Trash2 size={18} aria-hidden />
-                  </IconButton>
-                }
-              >
-                <Input
-                  aria-label={`Dish for item ${index + 1}`}
-                  placeholder="Dish name"
-                  value={item.dish}
-                  onChange={(event) => updateItem(index, { dish: event.target.value })}
-                />
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  aria-label={`Portions for ${item.dish || `item ${index + 1}`}`}
-                  value={String(item.quantity)}
-                  onChange={(event) => setPortion(index, event.target.value, item)}
-                />
-                {nutrition.fields.map(({ key, label }) => {
-                  const known = item.known.includes(key);
-                  return (
-                    <Input
-                      key={key}
-                      type="number"
-                      inputMode="decimal"
-                      aria-label={`${label} for ${item.dish || `item ${index + 1}`}`}
-                      placeholder={nutrition.unknown}
-                      value={known ? String(round2(item.nutrients[key])) : ''}
-                      onChange={(event) => correctValue(index, key, event.target.value, item)}
-                    />
-                  );
-                })}
-              </ListItem>
-            ))}
-          </List>
+          <List>{items.map(itemForm)}</List>
         )}
       </Section>
 

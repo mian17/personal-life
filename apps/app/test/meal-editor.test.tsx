@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type NutrientVector } from '@life/nutrition';
-import { Button, FilePicker, IconButton, Input, StatusText, Textarea } from '@life/ui';
+import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
+import { Button, Disclosure, FilePicker, IconButton, Input, SettingsRow, StatusText, Textarea } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -66,16 +66,35 @@ interface EditorTree extends ReactElement {
 }
 
 /**
+ * The seven display groups of the expanded region — the same app-owned grouping
+ * `entry/[id]/page.tsx` derives. Every one of the 27 keys appears exactly once.
+ */
+const GROUPS: { title: string; keys: Nutrient[] }[] = [
+  { title: 'Macros', keys: ['calories', 'fat', 'carbohydrates', 'protein'] },
+  { title: 'Fat breakdown', keys: ['monounsaturatedFat', 'polyunsaturatedFat', 'saturatedFat', 'transFat'] },
+  { title: 'Cholesterol & sodium', keys: ['cholesterol', 'sodium'] },
+  { title: 'Carb breakdown', keys: ['fiber', 'sugar'] },
+  { title: 'Vitamins', keys: ['vitaminA', 'vitaminC', 'thiaminB1', 'riboflavinB2', 'niacinB3', 'folateB9', 'vitaminB6', 'vitaminB12'] },
+  { title: 'Minerals', keys: ['calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc'] },
+  { title: 'Other', keys: ['caffeine'] },
+];
+
+function unitOf(key: Nutrient): string {
+  return NUTRIENTS.find((n) => n.key === key)!.unit;
+}
+
+function nutrientField(key: Nutrient) {
+  return { key, label: NUTRIENT_LABELS[key], unit: unitOf(key) };
+}
+
+/**
  * The server-derived `@life/nutrition` display data the meals route passes the
  * client editor — the same shape `entry/[id]/page.tsx` builds.
  */
 const NUTRITION: NutritionFields = {
-  fields: [
-    { key: 'calories', label: NUTRIENT_LABELS.calories },
-    { key: 'fat', label: NUTRIENT_LABELS.fat },
-    { key: 'carbohydrates', label: NUTRIENT_LABELS.carbohydrates },
-    { key: 'protein', label: NUTRIENT_LABELS.protein },
-  ],
+  fields: (['calories', 'fat', 'carbohydrates', 'protein'] as const).map(nutrientField),
+  extraCount: 23,
+  groups: GROUPS.map(({ title, keys }) => ({ title, fields: keys.map(nutrientField) })),
   unknown: UNKNOWN,
   empty: Object.fromEntries(NUTRIENTS.map(({ key }) => [key, 0])) as NutrientVector,
   totalUnit: NUTRIENTS.find(({ key }) => key === 'calories')!.unit,
@@ -166,6 +185,25 @@ function button(tree: EditorTree, match: (el: ReactElement<Record<string, unknow
   return found;
 }
 
+/** Depth-first collect of every element of a type (used for set-equality checks). */
+function findAll(node: unknown, type: unknown): ReactElement<Record<string, unknown>>[] {
+  if (Array.isArray(node)) return node.flatMap((child) => findAll(child, type));
+  if (!isElement(node)) return [];
+  const rest = Object.values(node.props).flatMap((value) => findAll(value, type));
+  return node.type === type ? [node, ...rest] : rest;
+}
+
+/**
+ * The run total's `StatusText` — located by its `<number> kcal` content, not by
+ * tree position, so the `Items` hint (also a `StatusText`, under `Items` before
+ * the total) never gets mistaken for it.
+ */
+function runTotal(tree: EditorTree): ReactElement<Record<string, unknown>> {
+  const found = find(tree, StatusText, (el) => /kcal$/.test(text(el)));
+  if (!found) throw new Error('no run total rendered');
+  return found;
+}
+
 /** Concatenate every string in a rendered node subtree. */
 function text(node: unknown): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -208,7 +246,7 @@ describe('MealEditor photo door', () => {
       const seeded = harness.renderTree();
       expect(field(seeded, 'Dish for item 1').props.value).toBe('Omelette');
       expect(field(seeded, 'Calories for Omelette').props.value).toBe('250');
-      const total = find(seeded, StatusText);
+      const total = runTotal(seeded);
       expect(text(total)).toBe(format('calories', 250));
     } finally {
       harness.restore();
@@ -280,7 +318,7 @@ describe('MealEditor unknown affordance', () => {
       // Nothing is confirmed, so nothing was invented: the per-item field is
       // empty (em dash) and the run total is a true zero — the same figure the
       // day view renders for an entry set with no confirmed calories.
-      expect(text(find(tree, StatusText))).toBe(format('calories', 0));
+      expect(text(runTotal(tree))).toBe(format('calories', 0));
 
       const html = renderToStaticMarkup(tree);
       expect(html).toContain(`placeholder="${UNKNOWN}"`);
@@ -385,6 +423,116 @@ describe('MealEditor save-as-meal control', () => {
 
       // Exactly one owner for the message — the snackbar, not an inline line.
       expect(harness.shown).toEqual([{ message: 'Saved to your meals.' }]);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('MealEditor labelled fields and the all-nutrients region', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('gives every inline field a visible label with its unit', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      // The visible label lives on a SettingsRow beside its control — the
+      // emitted text, not the aria-label a sighted user never sees.
+      const html = renderToStaticMarkup(tree);
+      for (const label of ['Dish', 'Portions', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
+        expect(html).toContain(label);
+      }
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('renders one collapsed All nutrients (27) region per item', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+      const disclosures = findAll(tree, Disclosure);
+      expect(disclosures).toHaveLength(1);
+      expect(text(disclosures[0].props.label)).toBe('All nutrients (27)');
+      // Collapsed by default — no `open` in the emitted markup.
+      const html = renderToStaticMarkup(tree);
+      expect(html).not.toContain('<details class="ui-disclosure" open');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('expanded, lists all 27 nutrients exactly once across the seven groups', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(entry());
+      const disclosure = findAll(tree, Disclosure)[0];
+      // The rows inside the expanded region — the same field rows the open
+      // disclosure shows. Element text (not a substring scan) is the unit: the
+      // 27 rows are `SettingsRow`s whose label is the nutrient + its unit.
+      const rows = findAll(disclosure.props.children as ReactElement, SettingsRow);
+      const labels = rows.map((row) => text(row.props.label));
+
+      const expected = (Object.keys(NUTRIENT_LABELS) as Nutrient[]).map(
+        (key) => `${NUTRIENT_LABELS[key]} (${unitOf(key)})`,
+      );
+      // Set-equality against the package vocabulary: nothing dropped, misspelled
+      // or invented — a dropped key fails, an extra row fails.
+      expect(new Set(labels)).toEqual(new Set(expected));
+      expect(labels).toHaveLength(27);
+      // And every label appears EXACTLY once (no duplicate/mis-grouped field).
+      for (const label of expected) {
+        expect(labels.filter((l) => l === label)).toHaveLength(1);
+      }
+      expect(labels).toContain('Caffeine (mg)');
+
+      // `Caffeine` renders under its own `Other` group, not dropped or merged.
+      const bodyHtml = renderToStaticMarkup(disclosure.props.children as ReactElement);
+      expect(bodyHtml).toContain('Other');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('shows real micro numbers and the estimated hint for a photo item, the em dash for a manual one', async () => {
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({
+      readable: true,
+      items: [
+        {
+          dish: 'Omelette',
+          ingredients: ['egg'],
+          portionGrams: 120,
+          nutrients: vector({ calories: 250, sodium: 480, caffeine: 12 }),
+        },
+      ],
+    });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      const tree = harness.renderTree();
+
+      // The estimate's micro is a real number, not the em dash.
+      const sodium = field(tree, 'Sodium in Cholesterol & sodium for Omelette');
+      expect(sodium.props.value).toBe('480');
+      expect(sodium.props.placeholder).toBe(UNKNOWN);
+
+      const disclosure = findAll(tree, Disclosure)[0];
+      expect(text(disclosure.props.label)).toBe('All nutrients (27) · 23 estimated');
+
+      // A manual item keeps the em dash and the plain label.
+      const manual = stateHarness();
+      try {
+        const manualTree = manual.renderTree();
+        const manualSodium = field(manualTree, 'Sodium in Cholesterol & sodium for item 1');
+        expect(manualSodium.props.value).toBe('');
+        expect(manualSodium.props.placeholder).toBe(UNKNOWN);
+        expect(text(findAll(manualTree, Disclosure)[0].props.label)).toBe('All nutrients (27)');
+      } finally {
+        manual.restore();
+      }
     } finally {
       harness.restore();
     }
