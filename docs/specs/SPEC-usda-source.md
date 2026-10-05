@@ -44,72 +44,135 @@ means for a logged food. It is never a thrown string, never a zero-filled vector
 
 ## The mapping — the one place this silently breaks
 
-USDA identifies nutrients by **number**. We identify them by **key**. This table is the
-join, and it is where "USDA-verified" becomes "silently wrong" if one row is off.
+USDA identifies nutrients by **number** (a string on the wire). We identify them by
+**key**. This table is the join, and it is where "USDA-verified" becomes "silently
+wrong" if one row is off.
 
-| our key | our unit | USDA no. | USDA nutrient name | USDA `unitName` |
-|---|---|---|---|---|
-| `calories` | kcal | 208 | Energy (Atwater General Factors) | kcal |
-| `fat` | g | 204 | Total lipid (fat) | g |
-| `monounsaturatedFat` | g | 645 | Fatty acids, total monounsaturated | g |
-| `polyunsaturatedFat` | g | 646 | Fatty acids, total polyunsaturated | g |
-| `saturatedFat` | g | 606 | Fatty acids, total saturated | g |
-| `transFat` | g | 605 | Fatty acids, total trans | g |
-| `cholesterol` | mg | 601 | Cholesterol | mg |
-| `sodium` | mg | 307 | Sodium, Na | mg |
-| `carbohydrates` | g | 205 | Carbohydrate, by difference | g |
-| `fiber` | g | 291 | Fiber, total dietary | g |
-| `sugar` | g | 269 | Sugars, total including NLEA | g |
-| `protein` | g | 203 | Protein | g |
-| `vitaminA` | mcg | 318 | Vitamin A, RAE | mcg |
-| `vitaminC` | mg | 401 | Vitamin C, total ascorbic acid | mg |
-| `thiaminB1` | mg | 404 | Thiamin | mg |
-| `riboflavinB2` | mg | 405 | Riboflavin | mg |
-| `niacinB3` | mg | 406 | Niacin | mg |
-| `folateB9` | mcg | 417 | Folate, total | mcg |
-| `vitaminB6` | mg | 415 | Vitamin B-6 | mg |
-| `vitaminB12` | mcg | 418 | Vitamin B-12 | mcg |
-| `calcium` | mg | 301 | Calcium, Ca | mg |
-| `iron` | mg | 303 | Iron, Fe | mg |
-| `magnesium` | mg | 304 | Magnesium, Mg | mg |
-| `phosphorus` | mg | 305 | Phosphorus, P | mg |
-| `potassium` | mg | 306 | Potassium, K | mg |
-| `zinc` | mg | 309 | Zinc, Zn | mg |
-| `caffeine` | mg | 262 | Caffeine | mg |
+| our key | our unit | USDA no. | USDA id | USDA nutrient name | USDA `unitName` | conversion |
+|---|---|---|---|---|---|---|
+| `calories` | kcal | 208 | 1008 | Energy | KCAL | none |
+| `fat` | g | 204 | 1004 | Total lipid (fat) | G | none |
+| `monounsaturatedFat` | g | 645 | 1292 | Fatty acids, total monounsaturated | G | none |
+| `polyunsaturatedFat` | g | 646 | 1293 | Fatty acids, total polyunsaturated | G | none |
+| `saturatedFat` | g | 606 | 1258 | Fatty acids, total saturated | G | none |
+| `transFat` | g | 605 | 1257 | Fatty acids, total trans | G | none |
+| `cholesterol` | mg | 601 | 1253 | Cholesterol | MG | none |
+| `sodium` | mg | 307 | 1093 | Sodium, Na | MG | none |
+| `carbohydrates` | g | 205 | 1005 | Carbohydrate, by difference | G | none |
+| `fiber` | g | 291 | 1079 | Fiber, total dietary | G | none |
+| `sugar` | g | 269 | 2000 | Total Sugars | G | none |
+| `protein` | g | 203 | 1003 | Protein | G | none |
+| `vitaminA` | mcg | 320 | 1106 | Vitamin A, RAE | UG | none |
+| `vitaminC` | mg | 401 | 1162 | Vitamin C, total ascorbic acid | MG | none |
+| `thiaminB1` | mg | 404 | 1165 | Thiamin | MG | none |
+| `riboflavinB2` | mg | 405 | 1166 | Riboflavin | MG | none |
+| `niacinB3` | mg | 406 | 1167 | Niacin | MG | none |
+| `folateB9` | mcg | 417 | 1177 | Folate, total | UG | none |
+| `vitaminB6` | mg | 415 | 1175 | Vitamin B-6 | MG | none |
+| `vitaminB12` | mcg | 418 | 1178 | Vitamin B-12 | UG | none |
+| `calcium` | mg | 301 | 1087 | Calcium, Ca | MG | none |
+| `iron` | mg | 303 | 1089 | Iron, Fe | MG | none |
+| `magnesium` | mg | 304 | 1090 | Magnesium, Mg | MG | none |
+| `phosphorus` | mg | 305 | 1091 | Phosphorus, P | MG | none |
+| `potassium` | mg | 306 | 1092 | Potassium, K | MG | none |
+| `zinc` | mg | 309 | 1095 | Zinc, Zn | MG | none |
+| `caffeine` | mg | 262 | 1057 | Caffeine | MG | none |
 
-**Status: PROPOSED. Not yet verified against a live response or USDA's canonical nutrient
-list.** Implementation of the mapping is gated on that verification (see below). The
-numbers are the standard USDA nutrient numbers, but "standard" is not "checked", and this
-table is exactly where a confident wrong answer would live.
+**Status: CONFIRMED against live responses** — `GET /v1/foods/search` and
+`GET /v1/food/{fdcId}`, fetched 2026-10-05 (samples retained at
+`/tmp/opencode/usda-search.json` and `/tmp/opencode/usda-food.json`). Every row
+above appears in the live payload with the listed number, id, name, and unit.
+The mapper keys on the **number** (a string, e.g. `"269"`); the `nutrientId`
+column is a cross-check only.
 
-Four rows have a competing candidate that would change the number, not just its name:
+Four rows had a competing candidate. Two of the plan's premises were wrong; all
+four are settled below as explicit corrections, so nobody "fixes" them back:
 
-| our key | chosen | competing | why it matters |
+| our key | chosen | competing | resolution |
 |---|---|---|---|
-| `calories` | 208 | 209 (Atwater Specific Factors) | different energy factors → different kcal |
-| `sugar` | 269 | 2000 (Sugars, total) | not always both present in SR Legacy |
-| `folateB9` | 417 (total) | 435 (DFE) | DFE is a different basis than raw folate |
-| `vitaminA` | 318 (RAE) | 320 (IU) | IU ≠ mcg; only RAE matches our unit |
+| `calories` | **208** | 209 | 208 = **Energy** (`KCAL`); 209 = **Starch** (`G`) — a carbohydrate, not an energy value. There was never a real contest. (268 = Energy in `kJ`, also rejected — see "no numeric conversion".) |
+| `sugar` | **269** | 2000 | 269 = **Total Sugars** with `nutrientId` **2000**. The two are the *same* nutrient — the plan confused an FDC `nutrientId` with a `nutrientNumber`. No phantom row. |
+| `folateB9` | **417** (total) | 435 (DFE) | 435 = "Folate, DFE" (`UG`), a bioavailability-adjusted derived measure (DFE = natural folate + 1.7 × folic acid). Our key is "Folate (B9)" and the vector stores the observed quantity, so the table takes the total. One row, one source, consistent with the other 26. |
+| `vitaminA` | **320** | 318 | **The plan's labels were reversed.** 318 = **Vitamin A, IU** (`IU`); 320 = **Vitamin A, RAE** (`UG`). Our `vitaminA` unit is `mcg`, so 320 needs no conversion. 318 is rejected: IU→RAE is form-dependent (1 IU = 0.3 mcg retinol, but carotenoids differ) and cannot be done correctly from an amount alone. |
+
+### Which endpoint the mapper reads — and which it never touches
+
+The two endpoints return **different shapes**. Only `GET /v1/food/{fdcId}`
+supplies a nutrient vector (Task 4's `fetchByFdcId`). The mapper reads
+`foodNutrients[].nutrient.number` + `.nutrient.unitName` + `.amount` — nothing else.
+
+`GET /v1/foods/search` → `foods[].foodNutrients[]` rows are **flat**:
+```json
+{ "nutrientId": 1292, "nutrientName": "Fatty acids, total monounsaturated",
+  "nutrientNumber": "645", "unitName": "G", "value": 0.031,
+  "derivationCode": "NC", "derivationDescription": "Calculated", "derivationId": 49,
+  "foodNutrientSourceId": 2, "foodNutrientSourceCode": "4",
+  "foodNutrientSourceDescription": "Calculated or imputed", "rank": 11400,
+  "indentLevel": 1, "foodNutrientId": 1518787, "dataPoints": 0 }
+```
+Winning names here: `nutrientNumber` (**string**), `nutrientName`, `nutrientId`
+(number), `unitName` — and the value is **`value`**.
+
+`GET /v1/food/{fdcId}` → `foodNutrients[]` rows are **nested**:
+```json
+{ "nutrient": { "id": 1008, "number": "208", "name": "Energy", "rank": 500, "unitName": "kcal" },
+  "amount": 34.0, "type": "FoodNutrient", "id": 1518841,
+  "dataPoints": 49, "min": 22.0, "max": 44.0,
+  "foodNutrientDerivation": { "id": 43, "code": "JO", "description": "..." } }
+```
+Winning names here: `nutrient.number` (**string**), `nutrient.name`,
+`nutrient.id` (number), `nutrient.unitName` — and the value is **`amount`** at the
+row's top level, not `value`. The plan's competing value-field candidates were
+both wrong: the answer is `value` on search, `amount` on fetch-by-id.
+`nutrientNumber` wins over `number` on search; `number` wins (nested under
+`nutrient`) on fetch-by-id. `unitName` wins over `unit` on both.
+
+The search shape is **never mapped**: the `search_food` tool uses only
+`foods[].description` (the name) and `foods[].fdcId`, and its result deliberately
+carries **no** nutrient amounts (`SPEC-photo-identity.md` §"The tool loop").
+Map the wrong shape and the join reads the wrong fields — state this once, here,
+so it stays stated.
 
 ### Rules the mapper must hold
 
-1. **Match by number, verify by `unitName`.** A nutrient is accepted only when its
-   `unitName` equals the unit our key declares. Where a unit genuinely differs in the
-   source (`kJ` → `kcal`), convert explicitly and record that it converted. Anything else
-   is `reason: 'unmapped'` — **never** a silent pass-through of a foreign unit.
-2. **A missing USDA row is `0`, and that is this codebase's established meaning of
+1. **Match by number, verify by normalised unit.** A row is accepted only when its
+   **normalised unit** equals the unit our key declares. Normalisation is **spelling
+   only — there is no numeric conversion anywhere**, because every one of the 27 keys'
+   USDA rows reports a unit that is a spelling variant of our unit:
+
+   | USDA spelling | our unit |
+   |---|---|
+   | `g` \| `G` | `g` |
+   | `mg` \| `MG` | `mg` |
+   | `mcg` \| `µg` \| `UG` \| `ug` | `mcg` |
+   | `kcal` \| `KCAL` | `kcal` |
+
+   Unit spelling differs by endpoint — search returns `G`, `MG`, `UG`, `KCAL`, `IU`,
+   `kJ`; fetch-by-id returns `g`, `mg`, `µg`, `kcal`, `IU`. Our vocabulary
+   (`packages/nutrition/src/nutrients.ts`) uses `mcg`, ASCII, never `µg`. A row whose
+   **normalised** unit does not equal the key's expected unit yields `unmapped` —
+   **never** a silent pass-through and **never** an invented conversion factor. In
+   particular an `IU` row (e.g. `318` "Vitamin A, IU", or a `kJ` energy row `268`) is
+   never mapped to a `mcg`/`mg`/`g`/`kcal` key; `unmapped` is the correct outcome.
+2. **Skip group rows structurally.** `GET /v1/food/{fdcId}` mixes in group rows, e.g.
+   `{ "nutrient": { "id": 2045, "number": "951", "name": "Proximates", "rank": 50, "unitName": "g" }, "type": "FoodNutrient" }`
+   — these carry **no `amount`**. Observed group numbers: `951` Proximates, `950`,
+   `952`, `956`, `300`, `500`. The robust rule is structural, not a hard-coded group
+   list: **skip any row where `amount` is not a number**. (A missing nutrient row is
+   still `0` per rule 3 below; a group row is skipped, not treated as a nutrient.)
+3. **A missing USDA row is `0`, and that is this codebase's established meaning of
    absent.** `apps/meal-service/src/foods/content.ts` already owns this rule:
    `zeroVector()` is "no nutrient data for this field", and a vector is whole or absent —
    never partial with holes. USDA foods legitimately lack rows (a food with no measured
    caffeine has no 262), so the mapper fills all 27 and a missing row becomes `0`. If
    *nothing* maps, return `reason: 'unmapped'` rather than an all-zero vector, which would
    read as "verified none" when it means "we found nothing".
-3. **`completeVector()` is the completeness rule — the mapper does not restate it.**
+4. **`completeVector()` is the completeness rule — the mapper does not restate it.**
    Every vector leaving this module goes through `content.ts`'s `completeVector`: all 27
    fields, finite, non-negative. The mapper's job is to produce 27 numbers;
    `completeVector` is the only code allowed to declare one a valid vector (lesson 0016 —
    one owner per rule).
-4. **The mapping runs once.** The catalog stores our mapped per-100 g vector, never the
+5. **The mapping runs once.** The catalog stores our mapped per-100 g vector, never the
    raw USDA payload; it is sealed via `foodNutrientsAad` on the way in like any other
    food field.
 
@@ -155,18 +218,24 @@ user can correct either, which is the mechanism that actually matters.
 
 ## Open verification — gates the mapping implementation
 
-1. **JSON field names for `AbridgedFoodNutrient`.** The OpenAPI block declares
-   `required: [id, nutrientNumber, unit]` while its `properties` show `number`, `name`,
-   `amount`, `unitName`. Unresolved: live calls to `api.nal.usda.gov` return
-   `403 Approval required` from this sandbox's egress policy (not from USDA), and `sbx` is
-   not installed here. Settle with one call and read `foodNutrients[]`:
-   ```sh
-   curl -s 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=broccoli&dataType=SR%20Legacy&pageSize=1'
-   ```
-2. **The mapping table above** — verify against USDA's canonical nutrient list or a live
-   response before the mapper is written. Gate, not a suggestion.
+**All items below are resolved as of 2026-10-05**, against live `/v1/foods/search` and
+`/v1/food/{fdcId}` responses (samples at `/tmp/opencode/usda-search.json`,
+`/tmp/opencode/usda-food.json`). The mapping table at the top of this file is
+**CONFIRMED**; the mapper is unblocked.
+
+1. ~~**JSON field names for `AbridgedFoodNutrient`.**~~ **Resolved — there are TWO shapes,
+   one per endpoint.** `GET /v1/foods/search`: flat rows — `nutrientNumber` (**string**),
+   `nutrientName`, `nutrientId` (number), `unitName`, value is **`value`**.
+   `GET /v1/food/{fdcId}`: nested rows — `nutrient.number` (**string**), `nutrient.name`,
+   `nutrient.id` (number), `nutrient.unitName`, value is **`amount`** at the row's top
+   level. `unitName` wins over `unit` on both. Only `fetchByFdcId`'s shape is mapped — see
+   "Which endpoint the mapper reads" above.
+2. ~~**The mapping table above.**~~ **Resolved** — all 27 rows confirmed against the live
+   responses; see the table and the four contested-row corrections above.
 3. **`dataType` selection** — restrict search to `Foundation` + `SR Legacy`, so the model
-   matches whole ingredients rather than packaged products.
+   matches whole ingredients rather than packaged products. (Task 4's `usda_search` takes
+   this pair as a caller-supplied parameter; it stays the caller's choice, not a fact this
+   verification settles.)
 
 ## Non-goals
 

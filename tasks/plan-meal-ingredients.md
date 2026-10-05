@@ -161,7 +161,8 @@ actually arrived.
 ## Task 1: Verify USDA field names and the nutrient mapping table
 
 [TASK OBJECTIVE]
-Confirm the JSON field names on `AbridgedFoodNutrient`, and every row of the
+Confirm the JSON field names on the nutrient rows returned by both `/v1/foods/search`
+and `/v1/food/{fdcId}` (the mapper reads the fetch-by-id shape), and every row of the
 nutrient-number → key table in `SPEC-usda-source.md`, before any mapper is written.
 
 [SCOPE & REPOSITORY CONTEXT]
@@ -172,17 +173,27 @@ nutrient-number → key table in `SPEC-usda-source.md`, before any mapper is wri
 - Strictly prohibited files: every other file — no code, no tests, no other spec
 
 [IMPLEMENTATION REQUIREMENTS]
-- Confirm two facts: the JSON field names on `AbridgedFoodNutrient`, and each row of
-  the mapping table. The four contested rows (`calories` 208 vs 209, `sugar` 269 vs
-  2000, `folateB9` 417 vs 435, `vitaminA` 318 vs 320) are where a confident wrong
-  answer would live.
-- **Resolve the `AbridgedFoodNutrient` field-name conflict as an explicit deliverable**
-  (`SPEC-usda-source.md` `## Open verification` 1): the OpenAPI `required` list names
-  `id`/`nutrientNumber`/`unit`, while its `properties` block names
-  `number`/`name`/`amount`/`unitName`. The live response settles which pair the mapper
-  must read — `nutrientNumber` vs `number` and `unit` vs `unitName` (with `amount` the
-  value field) are the competing candidates; state the winning names in
-  `SPEC-usda-source.md`, not merely "the field names".
+- Confirm two facts: the JSON field names on the nutrient rows of both endpoints, and
+  each row of the mapping table. Four keys — `calories`, `sugar`, `folateB9`,
+  `vitaminA` — are the ones to confirm first, because a wrong pick there changes the
+  number, not just its name.
+- **Resolve the two per-endpoint nutrient-row shapes as an explicit deliverable**
+  (`SPEC-usda-source.md` `## Open verification` 1). There is no single shared
+  nutrient-row shape to confirm:
+  - `GET /v1/foods/search` → `foods[].foodNutrients[]` rows are **flat**:
+    `nutrientNumber` (**string**), `nutrientId` (number), `nutrientName`, `unitName`,
+    with the value field named **`value`**.
+  - `GET /v1/food/{fdcId}` → `foodNutrients[]` rows are **nested**:
+    `nutrient: { id, number, name, rank, unitName }` plus a top-level **`amount`**.
+
+  The mapper reads the **fetch-by-id** (nested) shape only — that is the payload the
+  vector comes from. Search's `foodNutrients[]` is never mapped: `search_food` uses only
+  `foods[].description` and `foods[].fdcId`. So the value-field question to settle and
+  record is **`value` vs `amount`** (`amount` is never a search-row field), and
+  `SPEC-usda-source.md` must state the winning field names **per endpoint**, not merely
+  "the field names". Record the group-row rule alongside: a row whose `nutrient.number`
+  is a group (e.g. `"951"`, Proximates) carries no `amount` and is skipped — a
+  structural rule, never a hard-coded group list.
 - Flip `SPEC-usda-source.md`'s status line from `PROPOSED` to confirmed, citing the
   source.
 - **Confirm the estimated-vs-verified wording** in `SPEC-usda-source.md:147–154` — it
@@ -192,13 +203,17 @@ nutrient-number → key table in `SPEC-usda-source.md`, before any mapper is wri
   verify the two specs agree.
 - [ ] `SPEC-usda-source.md:147–154` confirmed to state the client-derived mechanism
   (no `isEstimated` response field); the two specs agree — confirm-only, no edit
-- [ ] A real `/v1/foods/search` response shows the actual `foodNutrients[]` field names
-- [ ] The `nutrientNumber`/`number` and `unit`/`unitName` (and `amount`) conflict is resolved, with the winning names stated in the spec
+- [ ] Real `/v1/foods/search` **and** `/v1/food/{fdcId}` responses show the actual
+      `foodNutrients[]` field names of each endpoint (fetch-by-id is the one the mapper
+      reads; search's rows are quoted for completeness only)
+- [ ] The two per-endpoint shapes are stated in the spec, including the `value` vs
+      `amount` value-field name per endpoint and the no-`amount` group-row skip rule
 - [ ] Every one of the 27 rows is confirmed against USDA's canonical nutrient list or a live response
 - [ ] `SPEC-usda-source.md`'s status line reads confirmed, with the source cited
 
 [VERIFICATION & TESTING RULES]
 - `curl -s 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=broccoli&dataType=SR%20Legacy&pageSize=1'` returns a food whose `foodNutrients[]` is quoted in the spec
+- `curl -s 'https://api.nal.usda.gov/fdc/v1/food/<fdcId>?api_key=DEMO_KEY'` (for one `fdcId` the search returned) has its nested `foodNutrients[]` quoted in the spec — this is the shape the mapper reads
 - No code written in this task. No tests. No build. No git commands.
 - Max test executions: 0 (verification task; the `curl` is the one external check).
 
@@ -207,7 +222,7 @@ nutrient-number → key table in `SPEC-usda-source.md`, before any mapper is wri
 - [ ] No file outside the allowed scope was modified.
 - [ ] No test, build, or git command run.
 
-**Dependencies:** Human provides a networked run or a pasted response.
+**Dependencies:** Human provides a networked run or a pasted response (networked run verified live 2026-10-05; ordering unchanged).
 **Estimated scope:** XS
 
 ## Task 2: Verify the Gemini function-calling envelope

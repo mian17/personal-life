@@ -22,7 +22,7 @@ the canonical spec if a complete reading is ever needed.
 | **Key handling** | data.gov keys found "online, such as in a code repository, will be deactivated to prevent malicious use" | The vendor actively scans for leaked keys and kills them. The key is therefore an env var read at runtime and **never** logged, never in a URL that reaches a log, never committed. This upgrades the hard line from hygiene to a real outage risk. |
 | `fdcId` | **integer** | Not a string. Decide the type before it reaches the Gemini tool schema. |
 | `nutrients` query filter | max **25** values | We track **27** nutrients, so the response cannot be narrowed to exactly our set in one call. |
-| Search returns nutrients | `SearchResultFood.foodNutrients: AbridgedFoodNutrient[]` | A single `/v1/foods/search` call yields candidates **and** their numbers — no second fetch needed to show a match. |
+| Search returns nutrients | `SearchResultFood.foodNutrients` rows are **flat**: `nutrientNumber` (string), `nutrientName`, `nutrientId` (number), `unitName`, value in **`value`** — verified live 2026-10-05 | A single `/v1/foods/search` call yields candidates **and** their numbers — no second fetch needed to show a match. But these rows are **never mapped**: `search_food` uses only `description` + `fdcId` and carries no amounts. Only `GET /v1/food/{fdcId}` rows are mapped. |
 | `pageSize` | default 50, max 200 | |
 | **Rate limit — real key** | **1,000 req/hour per IP**; exceed → `429` and the key is **blocked for 1 hour** | A retry storm after a 429 is not just futile, it extends the block. One `429` must fail open to the fallback path, not queue. |
 | **Rate limit — `DEMO_KEY`** | **30 req/hour, 50 req/day per IP** | Dev/exploration only. Usable for a smoke test; far too low to develop against casually, which makes **caching mandatory from the first line** rather than a later optimisation. |
@@ -87,20 +87,85 @@ Also `POST /v1/foods` (`FoodsCriteria`: `fdcIds`, `format`, `nutrients`).
 | `score` | float | how well it matched the query |
 | `foodNutrients` | `AbridgedFoodNutrient[]` | **the numbers, already here** |
 
-### `AbridgedFoodNutrient`
+### Nutrient-row shapes — confirmed live 2026-10-05
 
-| Field | Type | Example |
-|---|---|---|
-| `number` | integer | `303` — the USDA **nutrient number** |
-| `name` | string | `Iron, Fe` |
-| `amount` | float | `0.53` |
-| `unitName` | string | `mg` |
-| `derivationCode` | string | `LCCD` |
-| `derivationDescription` | string | |
+**There are TWO shapes, one per endpoint — not one `AbridgedFoodNutrient`.** The earlier
+mismatch (the OpenAPI block's `required: [id, nutrientNumber, unit]` against its
+`properties` showing `number` / `name` / `amount` / `unitName`) was the schema conflating
+the two endpoints. Verified against live responses; samples retained at
+`/tmp/opencode/usda-search.json` and `/tmp/opencode/usda-food.json`.
 
-Note: the OpenAPI block lists `required: [id, nutrientNumber, unit]` while the
-`properties` show `number` / `name` / `amount` / `unitName`. The property names are
-what the API actually returns; treat the `required` list as spec sloppiness.
+#### `GET /v1/foods/search` — `foods[].foodNutrients[]` rows are **flat**
+
+```json
+{ "nutrientId": 1292, "nutrientName": "Fatty acids, total monounsaturated",
+  "nutrientNumber": "645", "unitName": "G", "value": 0.031,
+  "derivationCode": "NC", "derivationDescription": "Calculated", "derivationId": 49,
+  "foodNutrientSourceId": 2, "foodNutrientSourceCode": "4",
+  "foodNutrientSourceDescription": "Calculated or imputed", "rank": 11400,
+  "indentLevel": 1, "foodNutrientId": 1518787, "dataPoints": 0 }
+```
+
+Winning names here: `nutrientNumber` (**string**, e.g. `"645"` — wins over `number`),
+`nutrientName`, `nutrientId` (number), `unitName` (wins over `unit` on both endpoints),
+and the value is **`value`**. Other fields observed: `derivationCode` (`NC`),
+`derivationDescription`, `derivationId`, `foodNutrientSourceId`/`Code`/`Description`,
+`rank`, `indentLevel`, `foodNutrientId`, `dataPoints`, sometimes `min`/`max`.
+
+#### `GET /v1/food/{fdcId}` — `foodNutrients[]` rows are **nested**
+
+```json
+{ "nutrient": { "id": 1008, "number": "208", "name": "Energy", "rank": 500, "unitName": "kcal" },
+  "amount": 34.0, "type": "FoodNutrient", "id": 1518841,
+  "dataPoints": 49, "min": 22.0, "max": 44.0,
+  "foodNutrientDerivation": { "id": 43, "code": "JO", "description": "..." } }
+```
+
+Winning names here: `nutrient.number` (**string**), `nutrient.name`, `nutrient.id`
+(number), `nutrient.unitName`; and the value is **`amount`** at the row's top level — **not**
+`value`. The competing value-field candidates were both wrong: the answer is `value` on
+search and `amount` on fetch-by-id.
+
+#### Which one the mapper reads
+
+Only `GET /v1/food/{fdcId}` supplies a nutrient vector (`fetchByFdcId`): the mapper reads
+`foodNutrients[].nutrient.number` + `.nutrient.unitName` + `.amount` — nothing else. The
+search shape is **never mapped**: `search_food` uses only `foods[].description` (the name)
+and `foods[].fdcId`, and its result deliberately carries no amounts
+(`SPEC-photo-identity.md` §"The tool loop").
+
+#### Group rows — skip structurally
+
+`/v1/food/{fdcId}` mixes in group rows carrying **no `amount`**:
+
+```json
+{ "nutrient": { "id": 2045, "number": "951", "name": "Proximates", "rank": 50, "unitName": "g" },
+  "type": "FoodNutrient" }
+```
+
+Observed group numbers: `951` Proximates, `950` Lipids, `952` Vitamins and Other
+Components, `956` Carbohydrates, `300` Minerals, `500` Amino acids. The rule is
+**structural, not a hard-coded group list: skip any row where `amount` is not a number.**
+
+#### Unit spelling — normalise, never convert
+
+Unit spelling differs by endpoint: search returns `G`, `MG`, `UG`, `KCAL`, `IU`, `kJ`;
+fetch-by-id returns `g`, `mg`, `µg`, `kcal`, `IU`. Our vocabulary
+(`packages/nutrition/src/nutrients.ts`) is `kcal | g | mg | mcg | ml` with `mcg` ASCII,
+never `µg`. Normalisation is **spelling only — there is no numeric conversion anywhere**,
+because every mapped key's USDA row reports a spelling variant of our unit:
+
+| USDA spelling | our unit |
+|---|---|
+| `g`, `G` | `g` |
+| `mg`, `MG` | `mg` |
+| `mcg`, `µg`, `UG`, `ug` | `mcg` |
+| `kcal`, `KCAL` | `kcal` |
+
+A row whose **normalised** unit does not equal its key's expected unit yields `unmapped` —
+never a silent pass-through, never an invented factor. An `IU` row (e.g. `318`
+"Vitamin A, IU") or a `kJ` row (`268` Energy in kJ) is never mapped to a
+`mcg`/`mg`/`g`/`kcal` key; `unmapped` is the correct outcome.
 
 ### `FoodNutrient` (full format)
 
@@ -137,20 +202,24 @@ Adds `foodClass`, `foodCategory`, `foodPortions[]`, `foodComponents[]`,
 
 ## Still to derive before implementation
 
-1. **Nutrient-number → `@life/nutrition` key mapping.** Our 27 keys are
-   (`packages/nutrition/src/nutrients.ts`): `calories`, `fat`, `monounsaturatedFat`,
-   `polyunsaturatedFat`, `saturatedFat`, `transFat`, `cholesterol`, `sodium`,
-   `carbohydrates`, `fiber`, `sugar`, `protein`, `vitaminA`, `vitaminC`, `thiaminB1`,
-   `riboflavinB2`, `niacinB3`, `folateB9`, `vitaminB6`, `vitaminB12`, `calcium`,
-   `iron`, `magnesium`, `phosphorus`, `potassium`, `zinc`, `caffeine`.
-   This mapping table is the single place where "correct nutrients" can silently
-   become wrong, so it gets its own spec section and its own tests.
-2. **Unit normalization.** USDA reports `unitName`; our vocabulary is
-   `kcal | g | mg | mcg | ml` (with `mcg`, never `µg`). Any mismatch is a conversion
-   or a rejection — never a silent pass-through.
-3. **Per-100 g basis.** USDA's `amount` is per 100 g for Foundation/SR Legacy. Our
-   decision is `Food.servingGrams = 100`, so those match directly. Branded foods
-   report per serving — out of scope for now.
+1. **Nutrient-number → `@life/nutrition` key mapping.** **Resolved 2026-10-05** — the
+   confirmed 27-row table lives in `docs/specs/SPEC-usda-source.md` §"The mapping"
+   (keyed on the **string** `nutrientNumber`; `nutrientId` recorded as a cross-check). Our
+   27 keys are (`packages/nutrition/src/nutrients.ts`): `calories`, `fat`,
+   `monounsaturatedFat`, `polyunsaturatedFat`, `saturatedFat`, `transFat`, `cholesterol`,
+   `sodium`, `carbohydrates`, `fiber`, `sugar`, `protein`, `vitaminA`, `vitaminC`,
+   `thiaminB1`, `riboflavinB2`, `niacinB3`, `folateB9`, `vitaminB6`, `vitaminB12`,
+   `calcium`, `iron`, `magnesium`, `phosphorus`, `potassium`, `zinc`, `caffeine`.
+   The table is the single place where "correct nutrients" can silently become wrong, so
+   it gets its own spec section and its own tests.
+2. **Unit normalization.** **Resolved 2026-10-05** — spelling only, no numeric conversion;
+   see "Unit spelling" above. USDA reports `unitName` (per endpoint, see the two shapes);
+   our vocabulary is `kcal | g | mg | mcg | ml` (with `mcg`, never `µg`). A normalised-unit
+   mismatch is `unmapped` — never a silent pass-through, never an invented factor.
+3. **Per-100 g basis.** USDA's `amount` is per 100 g for Foundation/SR Legacy (the live
+   SR Legacy sample confirms it: broccoli raw = 34 kcal / 100 g). Our decision is
+   `Food.servingGrams = 100`, so those match directly. Branded foods report per serving —
+   out of scope for now.
 4. **Which `dataType` to search.** Restrict to `Foundation` + `SR Legacy` so the
    model matches whole ingredients, not packaged products.
 5. ~~**Rate limits.**~~ **Settled** (FDC API guide, pasted 2026-10-04): 1,000 req/hour
@@ -160,25 +229,14 @@ Adds `foodClass`, `foodCategory`, `foodPortions[]`, `foodComponents[]`,
 
 ---
 
-## Verification status (2026-10-04)
+## Verification status (2026-10-05)
 
-The **live field-name question is still open** — specifically whether
-`AbridgedFoodNutrient` returns `number` / `amount` / `unitName` (its `properties`, which
-this file assumes) or `nutrientNumber` / `unit` (its `required` list). Two attempts to
-settle it against the live API failed for environment reasons, not API reasons:
-
-- `curl https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&…` → HTTP 403 with
-  body `Approval required for api.nal.usda.gov:443`. That is the **sandbox egress
-  policy**, not USDA refusing the key.
-- The same call through the fetch tool → the same 403.
-
-`sbx` is not on this machine's `PATH`, so the block cannot be cleared from here. To settle
-it, run the call from a machine with egress and paste the response:
-
-```sh
-curl -s 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=broccoli&dataType=SR%20Legacy&pageSize=1'
-```
-
-One `foods` entry's `foodNutrients[]` settles it. **Do not write the mapping table against
-the assumption** — the spec's `required`/`properties` disagreement is exactly the kind of
-detail that turns "USDA-verified" into "silently wrong".
+**The live field-name question is settled.** `GET /v1/foods/search` and
+`GET /v1/food/{fdcId}` were both reached and their `foodNutrients[]` shapes are the two
+documented above — flat (search, `nutrientNumber`/`unitName`/`value`) and nested
+(fetch-by-id, `nutrient.number`/`nutrient.unitName`/`amount`). Samples retained at
+`/tmp/opencode/usda-search.json` and `/tmp/opencode/usda-food.json`. The 27-row mapping
+table in `SPEC-usda-source.md` is confirmed against them and its status line reads
+confirmed. This supersedes the 2026-10-04 note that the question was blocked by the
+sandbox egress policy (HTTP 403 `Approval required for api.nal.usda.gov:443`) — the API
+was reachable for the 2026-10-05 verification.
