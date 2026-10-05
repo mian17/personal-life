@@ -375,11 +375,22 @@ client, failing closed at construction when unconfigured. The consumer wiring in
 
 [IMPLEMENTATION REQUIREMENTS]
 - Fail closed at construction when unconfigured, like `GeminiClient` — but only for the
-  lookup path, never for boot.
-- Validate `USDA_API_KEY`/`USDA_API_BASE` at construction, naming variables, never values.
+  lookup path, never for boot. The variable whose absence fails is the **key**,
+  `USDA_API_KEY` (the secret); nothing else is required for boot.
+- **Env reading is `UsdaClient`'s, not this module's.** `USDA_API_KEY` is required and is
+  validated at construction by `UsdaClient` itself (Task 4's landed code) — the error
+  names the variable, never its value. `USDA_API_BASE` is **optional**, defaulting to the
+  documented FDC base URL (`https://api.nal.usda.gov/fdc`, `docs/research/usda-fdc-api.md`).
+  `usda.module.ts` does **not** re-validate env: the client owns its own env reading, and a
+  second check would give one rule two owners.
 - Meal-service boots with USDA unconfigured; only the lookup path degrades.
-- **`usda.module.ts` only.** It exports the USDA client provider (a factory behind a DI
-  token, mirroring `GEMINI_CLIENT_FACTORY`) so a consumer module can import it. This task
+- **`usda.module.ts` only.** It exports the USDA client provider — a **thunk** behind a DI
+  token, `{ provide: USDA_CLIENT_FACTORY, useValue: () => new UsdaClient(process.env) }`,
+  mirroring `GEMINI_CLIENT_FACTORY`. It is the factory function, never an instantiated
+  client: Nest resolves providers eagerly, so `useValue: new UsdaClient(...)` would run the
+  constructor at boot and throw on a missing key, breaking the "boots with USDA
+  unconfigured" rule below. The thunk defers construction to the first lookup, so a
+  consumer module can import it. This task
   does **not** edit `photo.module.ts`: importing `UsdaModule` into `PhotoModule` and
   injecting the client into `PhotoService` happens in Task 8, the first task that consumes
   both `FoodsService` and the USDA client in the resolution path (that file appears in
@@ -389,8 +400,11 @@ client, failing closed at construction when unconfigured. The consumer wiring in
 - **Cache plan (Contract 2 Rule 4):** this task adds no cache. It introduces no second
   Redis client and no forked `@life/cache`; the food catalog (`FoodsCache`) remains the
   only cache, per `SPEC-usda-source.md` `## Cache Rules`.
-- [ ] `USDA_API_KEY`/`USDA_API_BASE` validated at construction, naming variables
-- [ ] Meal-service boots with USDA unconfigured
+- [ ] `USDA_API_KEY` validated at construction by `UsdaClient` (task 4), naming the
+      variable; `USDA_API_BASE` optional with its documented default; no re-validation in
+      `usda.module.ts`
+- [ ] Meal-service boots with USDA unconfigured (key missing fails only the lookup path,
+      never boot — the DI token's value is a thunk, not an instantiated client)
 - [ ] No second Redis client, no forked `@life/cache`
 - [ ] `photo.module.ts` is not edited here (Task 8 owns its wiring)
 
