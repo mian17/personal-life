@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { GeminiClient, type PhotoReadResult } from './gemini.client';
+import type { NutrientVector } from '@life/nutrition';
+import { zeroVector } from '../foods/content';
+import { COULD_NOT_READ, GeminiClient, type PhotoFoodSuggestion } from './gemini.client';
 
 /**
  * DI token for the Gemini client factory.
@@ -15,6 +17,20 @@ import { GeminiClient, type PhotoReadResult } from './gemini.client';
  * (`overrideProvider(GEMINI_CLIENT_FACTORY)`).
  */
 export const GEMINI_CLIENT_FACTORY = Symbol('GEMINI_CLIENT_FACTORY');
+
+/**
+ * One item of the service's estimate response: the model's identity answer plus
+ * the base and vector the **backend** resolved for it. The model never sees
+ * these numbers — it names the food and weighs it; the vector and `servingGrams`
+ * are attached here (Task 8), after the identity answer comes back.
+ *
+ * `nutrients` is the resolved vector at the food's per-serving base, unscaled:
+ * the editor multiplies it by the logged quantity, it is never scaled here.
+ */
+export interface PhotoEstimateItem extends PhotoFoodSuggestion {
+  servingGrams: number;
+  nutrients: NutrientVector;
+}
 
 /**
  * The photo estimate: image (+ optional hint) → Gemini → suggestion, and only
@@ -48,14 +64,46 @@ export class PhotoService {
   ) {}
 
   /**
+   * Turn the model's identity answer into the estimate response. The only place
+   * that builds `PhotoEstimateItem`: each suggestion keeps its name, grams,
+   * and ids, and gains a base and a vector.
+   *
+   * The seeded `servingGrams: 100` and `zeroVector()` ("no nutrient data") are
+   * Task 6's shape scaffolding — Task 8 replaces both with the resolved base
+   * and vector (catalog, USDA, or absent). A failure answer passes through as
+   * the one failure shape.
+   *
    * @param imageBase64 raw image bytes, base64 — validated by the DTO, decoded
    *   here and handed straight to the model.
    * @param mimeType the client's image type; the model validates it against its
    *   documented allowlist (one owner, `GeminiClient`).
    * @param hint optional steering text — a hint, never a correction.
    */
-  estimate(imageBase64: string, mimeType: string, hint?: string): Promise<PhotoReadResult> {
+  async estimate(
+    imageBase64: string,
+    mimeType: string,
+    hint?: string,
+  ): Promise<
+    { readable: true; items: PhotoEstimateItem[] } | { readable: false; reason: typeof COULD_NOT_READ }
+  > {
     this.client ??= this.makeClient();
-    return this.client.readPhoto({ mimeType, bytes: Buffer.from(imageBase64, 'base64') }, hint);
+    const read = await this.client.readPhoto(
+      { mimeType, bytes: Buffer.from(imageBase64, 'base64') },
+      hint,
+    );
+    if (!read.readable) return read;
+    return { readable: true, items: read.items.map(seedEstimateItem) };
   }
+}
+
+/** Seed one estimate item with the shape; Task 8 fills the numbers. */
+function seedEstimateItem(suggestion: PhotoFoodSuggestion): PhotoEstimateItem {
+  return {
+    name: suggestion.name,
+    grams: suggestion.grams,
+    foodId: suggestion.foodId,
+    fdcId: suggestion.fdcId,
+    servingGrams: 100,
+    nutrients: zeroVector(),
+  };
 }

@@ -8,6 +8,7 @@ import { AuthGuard } from '../src/auth/auth.guard';
 import { MealCache } from '../src/cache/meal-cache';
 import { Entry } from '../src/entries/entry.entity';
 import { COULD_NOT_READ, GeminiClient } from '../src/photo/gemini.client';
+import { zeroVector } from '../src/foods/content';
 import { GEMINI_CLIENT_FACTORY } from '../src/photo/photo.service';
 import { FakeGemini, geminiResponse, readablePayload } from './fake-gemini';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
@@ -117,7 +118,21 @@ describe('Photo estimates (e2e)', () => {
 
     expect(res.body.readable).toBe(true);
     expect(res.body.items).toHaveLength(1);
-    expect(res.body.items[0].dish).toBe('Chicken salad');
+
+    // Identity is the model's answer; `servingGrams`/`nutrients` are the
+    // service's own fields — the model's payload carries no nutrient key at all.
+    // The two seeded values below are this task's shape scaffolding; Task 8
+    // replaces them with the catalog- or USDA-resolved base and vector.
+    expect(res.body.items[0]).toEqual({
+      name: 'Chicken salad',
+      grams: 250,
+      foodId: null,
+      fdcId: null,
+      servingGrams: 100,
+      nutrients: zeroVector(),
+    });
+    // Estimated-vs-verified is derived by the editor, never carried on the wire.
+    expect(res.body.items[0]).not.toHaveProperty('isEstimated');
 
     // The hint rides to the model as steering input, alongside the image.
     const textParts = fake

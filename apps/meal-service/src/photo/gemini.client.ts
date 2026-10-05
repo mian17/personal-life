@@ -1,6 +1,3 @@
-import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
-import { completeVector } from '../foods/content';
-
 /**
  * meal-service's only Gemini call (`SPEC-meal-service` Photo → Gemini pipeline):
  * a plain `fetch` against the Generative Language API, no SDK — one endpoint,
@@ -31,12 +28,17 @@ import { completeVector } from '../foods/content';
 /** The single reason the pipeline can fail with — "I could not read this." */
 export const COULD_NOT_READ = 'could-not-read' as const;
 
-/** One dish the model read out of the photo, with a complete nutrient vector. */
-export interface PhotoItemSuggestion {
-  dish: string;
-  ingredients: string[];
-  portionGrams: number;
-  nutrients: NutrientVector;
+/**
+ * One food the model read out of the photo — identity only. No nutrient field
+ * lives here: the model names the food and weighs it, and the backend resolves
+ * the numbers later (Task 8). `foodId` is a catalog id the model chose, or
+ * null; `fdcId` is a USDA id it chose, or null.
+ */
+export interface PhotoFoodSuggestion {
+  name: string;
+  grams: number;
+  foodId: string | null;
+  fdcId: number | null;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface PhotoItemSuggestion {
  * nothing to render but the reason.
  */
 export type PhotoReadResult =
-  | { readable: true; items: PhotoItemSuggestion[] }
+  | { readable: true; items: PhotoFoodSuggestion[] }
   | { readable: false; reason: typeof COULD_NOT_READ };
 
 const COULD_NOT_READ_RESULT: PhotoReadResult = { readable: false, reason: COULD_NOT_READ };
@@ -71,22 +73,24 @@ const IMAGE_MIME_TYPES = [
 ];
 
 const PROMPT = [
-  'You read a photo of a meal and describe what is on the plate.',
+  'You read a photo of a meal and name the real foods on the plate.',
   'Reply with JSON only, matching the given response schema exactly.',
-  'For each dish give its name, the ingredients you can see, the portion in grams,',
-  'and all 27 nutrient fields for that portion, each your best numeric estimate.',
+  'For each food give its name as a catalog name, the portion in grams,',
+  'and the catalog id or USDA id when you recognise one — else null.',
   '',
-  'Never invent a nutrient number. If you cannot read the photo, or cannot tell',
-  'what a dish is, answer with readable: false and an empty items array instead of',
-  'a guess. A missing dish is a better answer than a wrong one.',
+  'Never estimate a nutrient number. Your answer carries identity only:',
+  'names, weights, and ids. Numbers come from the catalog, never from you.',
+  'If you cannot read the photo, or cannot tell what a food is, answer with',
+  'readable: false and an empty items array instead of a guess. A missing',
+  'food is a better answer than a wrong one.',
 ].join('\n');
 
 /**
  * The response schema we ask for, in the API's own `Schema` shape (`type`
  * enum `STRING|NUMBER|INTEGER|BOOLEAN|ARRAY|OBJECT`, plus `properties`,
- * `required`, `items`). The 27 nutrient fields are generated from
- * `@life/nutrition` so the model is asked for exactly what `completeVector`
- * will later require — the vocabulary has one owner.
+ * `required`, `items`). Identity only: no nutrient key exists anywhere in
+ * this schema or the request body — the backend attaches the resolved vector
+ * later (Task 8). Nullable ids use the schema's `nullable` flag.
  */
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -100,21 +104,20 @@ const RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          dish: { type: 'STRING', description: 'Name of the dish as seen on the plate.' },
-          ingredients: { type: 'ARRAY', items: { type: 'STRING' } },
-          portionGrams: { type: 'NUMBER', description: 'Estimated total weight in grams.' },
-          nutrients: {
-            type: 'OBJECT',
-            properties: Object.fromEntries(
-              NUTRIENTS.map(({ key, label, unit }) => [
-                key,
-                { type: 'NUMBER', description: `${label} in ${unit}` },
-              ]),
-            ),
-            required: NUTRIENTS.map(({ key }) => key),
+          name: { type: 'STRING', description: 'Name of the food as a catalog name.' },
+          grams: { type: 'NUMBER', description: 'Estimated portion weight in grams.' },
+          foodId: {
+            type: 'STRING',
+            nullable: true,
+            description: 'Catalog food id when recognised, else null.',
+          },
+          fdcId: {
+            type: 'INTEGER',
+            nullable: true,
+            description: 'USDA food id when recognised, else null.',
           },
         },
-        required: ['dish', 'ingredients', 'portionGrams', 'nutrients'],
+        required: ['name', 'grams', 'foodId', 'fdcId'],
       },
     },
   },
@@ -157,9 +160,12 @@ export class GeminiClient {
   }
 
   /**
-   * Estimate a photo. Always resolves — transport, protocol, schema, and the
-   * model's own refusal all land on the same "could not read" result, so the
-   * controller has exactly one failure path (open manual entry).
+   * Read a photo's foods. Always resolves — transport, protocol, schema, and
+   * the model's own refusal all land on the same "could not read" result, so
+   * the controller has exactly one failure path (open manual entry).
+   *
+   * The terminal turn is model JSON text; a turn that is not JSON text (a tool
+   * call part, Task 7's loop) is not an answer and fails the same way.
    */
   async readPhoto(image: PhotoImage, hint?: string): Promise<PhotoReadResult> {
     if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return COULD_NOT_READ_RESULT;
@@ -171,7 +177,9 @@ export class GeminiClient {
       const items = readItems(parseJson(text));
       // `[]` covers the model's own `readable: false` — an empty suggestion is
       // the failure result, so there is no second way to express "no answer".
-      return items === null || items.length === 0 ? COULD_NOT_READ_RESULT : { readable: true, items };
+      return items === null || items.length === 0
+        ? COULD_NOT_READ_RESULT
+        : { readable: true, items };
     } catch {
       // Network error, aborted body, unreadable JSON: one outcome, no detail
       // logged (the body may contain the prompt, and the reason is the caller's).
@@ -231,46 +239,35 @@ function candidateText(envelope: unknown): string | null {
 
 /**
  * Validate the model's own JSON. Returns `null` for anything the schema does
- * not admit — no partial parse, no defaulted field. `completeVector` is the one
- * owner of the "a vector is complete" rule, so a vector with a hole in it (the
- * shape an invented number usually takes) fails here rather than reaching a
- * day total.
+ * not admit — no partial parse, no defaulted field. Identity only: a name, a
+ * weight, and two ids. `fdcId` is an integer or null; `foodId` a string or
+ * null. No nutrient field is read here because none is asked for.
  */
-function readItems(payload: unknown): PhotoItemSuggestion[] | null {
+function readItems(payload: unknown): PhotoFoodSuggestion[] | null {
   const root = record(payload);
   if (!root || typeof root.readable !== 'boolean') return null;
   if (!root.readable) return [];
   const items = root.items;
   if (!Array.isArray(items) || items.length === 0) return null;
-  const out: PhotoItemSuggestion[] = [];
+  const out: PhotoFoodSuggestion[] = [];
   for (const item of items) {
-    const parsed = readItem(item);
+    const parsed = readSuggestion(item);
     if (!parsed) return null;
     out.push(parsed);
   }
   return out;
 }
 
-function readItem(value: unknown): PhotoItemSuggestion | null {
+function readSuggestion(value: unknown): PhotoFoodSuggestion | null {
   const item = record(value);
   if (!item) return null;
-  const { dish, ingredients, portionGrams } = item;
-  if (typeof dish !== 'string' || dish.trim() === '') return null;
-  if (
-    !Array.isArray(ingredients) ||
-    ingredients.length === 0 ||
-    ingredients.some((name) => typeof name !== 'string' || name.trim() === '')
-  ) {
-    return null;
-  }
-  if (typeof portionGrams !== 'number' || !Number.isFinite(portionGrams) || portionGrams < 0) return null;
-  let nutrients: NutrientVector;
-  try {
-    nutrients = completeVector(item.nutrients);
-  } catch {
-    return null;
-  }
-  return { dish, ingredients: ingredients as string[], portionGrams, nutrients };
+  const { name, grams, foodId, fdcId } = item;
+  if (typeof name !== 'string' || name.trim() === '') return null;
+  if (typeof grams !== 'number' || !Number.isFinite(grams) || grams < 0) return null;
+  if (typeof foodId !== 'string' && foodId !== null) return null;
+  if (typeof fdcId !== 'number' && fdcId !== null) return null;
+  if (fdcId !== null && !Number.isInteger(fdcId)) return null;
+  return { name, grams, foodId, fdcId };
 }
 
 function parseJson(text: string): unknown {

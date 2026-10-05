@@ -1,4 +1,3 @@
-import { NUTRIENTS } from '@life/nutrition';
 import type { GeminiTransport } from '../src/photo/gemini.client';
 
 /**
@@ -17,7 +16,7 @@ export interface GeminiCall {
 export class FakeGemini {
   readonly calls: GeminiCall[] = [];
 
-  /** Default: a readable answer, one complete dish. */
+  /** Default: a readable answer, one identified food. */
   reply: (call: GeminiCall) => Promise<Response> | Response = () =>
     geminiResponse(readablePayload());
 
@@ -54,17 +53,15 @@ export function readablePayload(): unknown {
   return { readable: true, items: [item()] };
 }
 
-/** One complete dish — all 27 nutrient fields present and finite. */
+/** One identified food — identity only (`PhotoFoodSuggestion`). No nutrient
+ * field: the model answers identity, the backend resolves numbers (Task 8).
+ */
 export function item(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  const nutrients: Record<string, number> = {};
-  for (const { key } of NUTRIENTS) nutrients[key] = 0;
-  nutrients.calories = 320;
-  nutrients.protein = 12;
   return {
-    dish: 'Chicken salad',
-    ingredients: ['chicken', 'lettuce', 'olive oil'],
-    portionGrams: 250,
-    nutrients,
+    name: 'Chicken salad',
+    grams: 250,
+    foodId: null,
+    fdcId: null,
     ...overrides,
   };
 }

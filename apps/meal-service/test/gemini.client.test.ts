@@ -27,9 +27,6 @@ const BYTES = Buffer.from('not really a photo', 'utf8');
 
 const COULD_NOT_READ = { readable: false, reason: 'could-not-read' } as const;
 
-/** The fixture's 27-field vector, typed so a case may spread it. */
-const nutrientsOf = (dish: Record<string, unknown>) => dish.nutrients as Record<string, number>;
-
 function envOf(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return { GEMINI_API_KEY: KEY, GEMINI_MODEL: MODEL, GEMINI_API_BASE: BASE, ...overrides };
 }
@@ -85,14 +82,43 @@ describe('GeminiClient', () => {
     expect(slashed.calls[0].url).toBe(`${BASE}/models/${MODEL}:generateContent`);
   });
 
-  it('returns the read dishes when the answer satisfies the schema', async () => {
+  it('returns the read foods when the answer satisfies the schema', async () => {
     const fake = new FakeGemini();
     const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
     expect(result).toEqual({ readable: true, items: [item()] });
-    expect(result.readable && result.items[0].nutrients.calories).toBe(320);
-    expect(Object.keys(result.readable ? result.items[0].nutrients : {})).toHaveLength(
-      NUTRIENTS.length,
-    );
+
+    // The model's answer carries identity only: a name, a weight, and the two
+    // ids it chose (here: neither). A chosen id — a catalog string, a USDA
+    // integer — rides through unchanged.
+    const identified = new FakeGemini();
+    identified.reply = () =>
+      geminiResponse({ readable: true, items: [{ ...item(), foodId: 'food-1', fdcId: 12345 }] });
+    expect(await clientFor(identified).readPhoto({ mimeType: MIME, bytes: BYTES })).toEqual({
+      readable: true,
+      items: [{ name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345 }],
+    });
+  });
+
+  it('asks for identity only: the request body names no nutrient field', async () => {
+    const fake = new FakeGemini();
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+
+    // The schema's item asks for exactly the four identity fields — the model
+    // cannot answer a field the schema does not request.
+    const body = fake.lastRequestBody() as {
+      generationConfig: {
+        responseSchema: {
+          properties: { items: { items: { properties: Record<string, unknown>; required: string[] } } };
+        };
+      };
+    };
+    const itemSchema = body.generationConfig.responseSchema.properties.items.items;
+    expect(Object.keys(itemSchema.properties).sort()).toEqual(['fdcId', 'foodId', 'grams', 'name']);
+    expect([...itemSchema.required].sort()).toEqual(['fdcId', 'foodId', 'grams', 'name']);
+
+    // Not one of the 27 nutrient keys appears anywhere in the request.
+    const serialised = JSON.stringify(body);
+    for (const { key } of NUTRIENTS) expect(serialised).not.toContain(key);
   });
 
   it('maps a non-2xx, a timeout, and a schema-violating body to the same result', async () => {
@@ -117,9 +143,9 @@ describe('GeminiClient', () => {
 
     // 3. schema violations — four shapes of "do not guess", one result.
     const violating: unknown[] = [
-      { readable: true, items: [{ ...item(), nutrients: { ...nutrientsOf(item()), zinc: 'lots' } }] },
-      { readable: true, items: [{ ...item(), nutrients: { calories: 1 } }] },
-      { readable: true, items: [{ ...item(), portionGrams: '250 g' }] },
+      { readable: true, items: [{ ...item(), fdcId: 123.5 }] },
+      { readable: true, items: [{ ...item(), foodId: 12 }] },
+      { readable: true, items: [{ ...item(), grams: '250 g' }] },
       { readable: true, items: [] },
     ];
     for (const payload of violating) {
