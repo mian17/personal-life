@@ -264,6 +264,44 @@ describe('MealEditor photo door', () => {
     }
   });
 
+  it('seeds Grams and scales through the item base when servingGrams is not 100', async () => {
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({
+      readable: true,
+      items: [
+        {
+          name: 'Rice Bowl',
+          grams: 300,
+          foodId: null,
+          fdcId: null,
+          servingGrams: 150,
+          nutrients: vector({ calories: 150 }),
+        },
+      ],
+    });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      if (!picker) throw new Error('no FilePicker mounted');
+
+      await (picker.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+
+      const seeded = harness.renderTree();
+      expect(field(seeded, 'Grams for Rice Bowl').props.value).toBe('300');
+      expect(field(seeded, 'Calories for Rice Bowl').props.value).toBe('300');
+
+      (field(seeded, 'Grams for Rice Bowl').props.onChange as (e: unknown) => void)({
+        target: { value: '150' },
+      });
+
+      const resized = harness.renderTree();
+      expect(field(resized, 'Grams for Rice Bowl').props.value).toBe('150');
+      expect(field(resized, 'Calories for Rice Bowl').props.value).toBe('150');
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('passes the optional hint as steering input, never as a correction', async () => {
     const harness = stateHarness();
     mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
@@ -491,10 +529,47 @@ describe('MealEditor log-time catalog', () => {
     }
   });
 
-  it('matches a foodId:null item by normalized key — reuses, never duplicates', async () => {
+  it('matches a foodId:null item by normalized key — trim, collapse, case-fold — reuses, never duplicates', async () => {
     const harness = stateHarness();
-    // Trailing whitespace and a case difference normalize to the same key, so
-    // `  chicken ` reuses the existing `Chicken` food — no duplicate is created.
+    // The typed name differs from the stored `Chicken Breast` three ways at once:
+    // leading/trailing whitespace (trim), a doubled internal space (collapse), and
+    // case (case-fold). Only a real `nameKey` comparison reuses the row — a plain
+    // `food.name === dish` creates a duplicate.
+    const typedDish = '  chicken   breast  ';
+    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
+      return Promise.resolve({});
+    });
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: typedDish },
+      });
+      const named = harness.renderTree();
+      (field(named, `Calories for ${typedDish}`).props.onChange as (e: unknown) => void)({
+        target: { value: '165' },
+      });
+
+      const ready = harness.renderTree();
+      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+
+      const createCalls = mockCallService.mock.calls.filter(
+        (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
+      );
+      expect(createCalls).toHaveLength(0);
+      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      expect(entryBody.foodId).toBe('chicken-breast-id');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('matches a foodId:null item whose name is byte-identical to the stored name — reuses, never duplicates', async () => {
+    const harness = stateHarness();
+    // The plain exact-match case: the typed `Chicken` equals the stored `Chicken`,
+    // no normalization required. Kept separate from the normalized-key case so the
+    // fixture that discriminates normalization is not the one that does not.
     const existing = { id: 'chicken-id', name: 'Chicken', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
@@ -519,6 +594,58 @@ describe('MealEditor log-time catalog', () => {
       expect(createCalls).toHaveLength(0);
       const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
       expect(entryBody.foodId).toBe('chicken-id');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('shares one create between two same-key items in one save — one food, two entries', async () => {
+    const harness = stateHarness();
+    // Two confirmed rows resolved within a single save, whose names normalize to
+    // one key. The second `resolveFoodId` must join the first's in-flight create
+    // (keyed by the normalized key), not await a second create: exactly one
+    // `POST /api/foods`, two `POST /api/entries` carrying that one created id.
+    const secondDish = '  chicken  ';
+    const createdFood = { id: 'created-chicken', name: 'Chicken', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
+      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      return Promise.resolve({});
+    });
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: 'Chicken' },
+      });
+      const oneNamed = harness.renderTree();
+      (button(oneNamed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
+      const twoRows = harness.renderTree();
+      (field(twoRows, 'Dish for item 2').props.onChange as (e: unknown) => void)({
+        target: { value: secondDish },
+      });
+      const bothNamed = harness.renderTree();
+      (field(bothNamed, 'Calories for Chicken').props.onChange as (e: unknown) => void)({
+        target: { value: '165' },
+      });
+      const firstConfirmed = harness.renderTree();
+      (field(firstConfirmed, `Calories for ${secondDish}`).props.onChange as (e: unknown) => void)({
+        target: { value: '165' },
+      });
+
+      const ready = harness.renderTree();
+      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+
+      const createCalls = mockCallService.mock.calls.filter(
+        (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(JSON.parse(createCalls[0][2].body).name).toBe('Chicken');
+
+      const entryCalls = mockCallService.mock.calls.filter((call) => call[1] === '/api/entries');
+      expect(entryCalls).toHaveLength(2);
+      expect(entryCalls.map((call) => JSON.parse(call[2].body).foodId)).toEqual([
+        'created-chicken',
+        'created-chicken',
+      ]);
     } finally {
       harness.restore();
     }

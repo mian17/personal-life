@@ -55,6 +55,34 @@ function toolCallTurn(query: string, id?: string): Response {
   );
 }
 
+/**
+ * A clock already past the loop's 45 s bound: the first `Date.now()` sets the
+ * deadline, every later read is 60 s beyond it. Restore with `mockRestore()`.
+ */
+function startClockPastDeadline(): jest.SpiedFunction<typeof Date.now> {
+  const start = 1_000_000;
+  return jest
+    .spyOn(Date, 'now')
+    .mockReturnValueOnce(start)
+    .mockReturnValue(start + 60_000);
+}
+
+/**
+ * A clock that leaves the loop inside its 45 s bound but the tool a single
+ * millisecond: the deadline is set normally, the guard before the request still
+ * passes, and every later read is one millisecond short of the deadline. So
+ * `runSearchTool`'s remaining budget expires on a real timer. Restore with
+ * `mockRestore()`.
+ */
+function startClockWithOneMillisecondOfToolBudget(): jest.SpiedFunction<typeof Date.now> {
+  const start = 1_000_000;
+  return jest
+    .spyOn(Date, 'now')
+    .mockReturnValueOnce(start) // the loop's deadline: start + 45 s
+    .mockReturnValueOnce(start + 44_000) // the guard before the request: inside the bound
+    .mockReturnValue(start + 44_999); // the tool's budget: one millisecond
+}
+
 describe('the search_food turn loop', () => {
   it('answers a food found by the tool with the model\'s final JSON', async () => {
     const fake = searchingFake();
@@ -87,6 +115,52 @@ describe('the search_food turn loop', () => {
     expect(result).toEqual(COULD_NOT_READ);
     expect(calls).toBe(5);
     expect(fake.calls.length).toBeLessThanOrEqual(6);
+  });
+
+  it('stops on the forty-five-second wall clock before any further tool round', async () => {
+    const clock = startClockPastDeadline();
+    let toolCalls = 0;
+    const fake = new FakeGemini();
+    fake.reply = () => toolCallTurn('chicken');
+    const searchTool: SearchFood = async () => {
+      toolCalls += 1;
+      return CATALOG_HIT;
+    };
+
+    try {
+      const result = await clientFor(fake).readPhoto(image, undefined, searchTool);
+
+      // The deadline is read before the first request, so no call goes out and
+      // the tool never runs: the wall clock is a real second bound, not a no-op.
+      expect(result).toEqual(COULD_NOT_READ);
+      expect(fake.calls).toHaveLength(0);
+      expect(toolCalls).toBe(0);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('stops on the wall clock when a search tool never answers', async () => {
+    const clock = startClockWithOneMillisecondOfToolBudget();
+    let toolCalls = 0;
+    const fake = new FakeGemini();
+    fake.reply = () => toolCallTurn('chicken');
+    const searchTool: SearchFood = () => {
+      toolCalls += 1;
+      return new Promise(() => {}); // never settles
+    };
+
+    try {
+      const result = await clientFor(fake).readPhoto(image, undefined, searchTool);
+
+      // The tool ran and never answered, so only the remaining wall clock could
+      // have ended the loop: without the race this await would never return.
+      expect(result).toEqual(COULD_NOT_READ);
+      expect(toolCalls).toBe(1);
+      expect(fake.calls).toHaveLength(1);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('maps a throwing tool to the same failure, and never hangs', async () => {

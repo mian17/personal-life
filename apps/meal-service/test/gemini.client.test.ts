@@ -141,11 +141,13 @@ describe('GeminiClient', () => {
     const onTimeout = await readWith(hanging, 5);
     expect(onTimeout).toEqual(COULD_NOT_READ);
 
-    // 3. schema violations — four shapes of "do not guess", one result.
+    // 3. schema violations — six shapes of "do not guess", one result.
     const violating: unknown[] = [
       { readable: true, items: [{ ...item(), fdcId: 123.5 }] },
       { readable: true, items: [{ ...item(), foodId: 12 }] },
       { readable: true, items: [{ ...item(), grams: '250 g' }] },
+      { readable: true, items: [{ ...item(), grams: -1 }] },
+      { readable: true, items: [{ ...item(), grams: Infinity }] },
       { readable: true, items: [] },
     ];
     for (const payload of violating) {

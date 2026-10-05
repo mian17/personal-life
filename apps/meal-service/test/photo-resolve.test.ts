@@ -232,6 +232,32 @@ describe('PhotoService — the three paths', () => {
     expect(foods.createCalls).toHaveLength(0);
   });
 
+  it.each([
+    ['rate-limited', 429],
+    ['not-found', 404],
+  ])('fails open to the absent vector when the fdcId lookup is %s', async (_reason, status) => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    usda.reply = () => usdaResponse({}, status);
+    const gemini = new FakeGemini();
+    gemini.reply = () => readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID });
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    // A USDA outage costs the nutrient numbers and nothing else: the answer is
+    // still a readable estimate carrying the food, the way path 3 states it.
+    expect(usda.calls).toHaveLength(1);
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Broccoli, raw');
+    expect(result.items[0].grams).toBe(150);
+    expect(result.items[0].foodId).toBeNull();
+    expect(result.items[0].servingGrams).toBe(100);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+    expect(foods.createCalls).toHaveLength(0);
+  });
+
   it('resolves the absent vector when the model names no id', async () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();

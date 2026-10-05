@@ -20,7 +20,7 @@ const ENERGY_KJ = usdaRow('268', 'kJ', 141);
 const STARCH = usdaRow('209', 'g', 0);
 const TOTAL_SUGARS = usdaRow('269', 'g', 1.7);
 const FOLATE_TOTAL = usdaRow('417', 'µg', 63);
-const FOLATE_DFE = usdaRow('435', 'µg', 63);
+const FOLATE_DFE = usdaRow('435', 'µg', 107);
 const VITAMIN_A_RAE = usdaRow('320', 'µg', 31);
 const VITAMIN_A_IU = usdaRow('318', 'IU', 623);
 
@@ -52,8 +52,8 @@ describe('mapUsdaNutrients — the four contested rows', () => {
     const vector = expectCompleteVector(mapUsdaNutrients([FOLATE_TOTAL, FOLATE_DFE]));
 
     expect(vector.folateB9).toBe(63);
-    // One row in, one value out: a DFE row can never double-count into the total.
-    expect(vector.folateB9).not.toBe(126);
+    // A 435-reading table lands on the DFE row's 107, not the total's 63.
+    expect(vector.folateB9).not.toBe(107);
   });
 
   it('maps vitaminA from 320 RAE (µg), and an IU row cannot stand in for it', () => {
@@ -88,7 +88,9 @@ describe('mapUsdaNutrients — units are read, never converted', () => {
         usdaRow('208', 'KCAL', 34),
       ]),
     );
+    // Byte-identical in both spellings, and neither equals the DFE decoy.
     expect(searchSpellings).toEqual(fetchById);
+    expect(searchSpellings.folateB9).not.toBe(107);
   });
 
   it('yields unmapped when the unit is not a spelling of the key’s unit', () => {
@@ -204,6 +206,7 @@ describe('mapUsdaNutrients — the payload’s own structure decides', () => {
       thiaminB1: 0.071,
       riboflavinB2: 0.117,
       niacinB3: 0.639,
+      // 417 Folate, total's 63 — never 435 Folate, DFE's 107.
       folateB9: 63,
       vitaminB6: 0.175,
       vitaminB12: 0,

@@ -121,8 +121,9 @@ describe('Photo estimates (e2e)', () => {
 
     // Identity is the model's answer; `servingGrams`/`nutrients` are the
     // service's own fields — the model's payload carries no nutrient key at all.
-    // The two seeded values below are this task's shape scaffolding; Task 8
-    // replaces them with the catalog- or USDA-resolved base and vector.
+    // With both ids null the suggestion resolves down path 3, so the 100 g base
+    // and `zeroVector()` are the real result, not placeholders. The
+    // catalog-resolved and USDA-resolved paths live in `photo-resolve.test.ts`.
     expect(res.body.items[0]).toEqual({
       name: 'Chicken salad',
       grams: 250,
