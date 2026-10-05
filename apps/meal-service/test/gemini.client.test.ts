@@ -1,5 +1,5 @@
 import { NUTRIENTS } from '@life/nutrition';
-import { GeminiClient } from '../src/photo/gemini.client';
+import { GeminiClient, type SearchFoodResult } from '../src/photo/gemini.client';
 import {
   FakeGemini,
   geminiResponse,
@@ -36,9 +36,44 @@ function clientFor(fake: FakeGemini, env: NodeJS.ProcessEnv = envOf(), timeoutMs
   return new GeminiClient(env, fake.handler, timeoutMs);
 }
 
+/** A `functionCall` turn: the model asking `search_food` for `query`. */
+function functionCallTurn(query: string): Response {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        { content: { parts: [{ functionCall: { name: 'search_food', args: { query }, id: 'call-1' } }] } },
+      ],
+    }),
+  );
+}
+
+/** True when this request already carries our tool's answer — the turn to reply with JSON. */
+function alreadyAnswered(call: { init: RequestInit }): boolean {
+  const body = JSON.parse(String(call.init.body)) as {
+    contents?: { parts?: { functionResponse?: unknown }[] }[];
+  };
+  return (body.contents ?? []).some((turn) =>
+    (turn.parts ?? []).some((part) => part.functionResponse !== undefined),
+  );
+}
+
+/** One identified food carrying the search binding the response schema requires. */
+function boundItem(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...item(), searchQuery: null, ...overrides };
+}
+
+/** The tool-calling mode a request body carried, read from the parsed body. */
+function toolModeOf(body: Record<string, unknown>): unknown {
+  const toolConfig = body.toolConfig as
+    | { functionCallingConfig?: { mode?: unknown } }
+    | undefined;
+  return toolConfig?.functionCallingConfig?.mode;
+}
+
 describe('GeminiClient', () => {
   it('sends the hint as a separate steering input alongside the image', async () => {
     const fake = new FakeGemini();
+    fake.reply = () => geminiResponse({ readable: true, items: [boundItem()] });
     const withHint = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, HINT);
     expect(withHint.readable).toBe(true);
 
@@ -85,18 +120,19 @@ describe('GeminiClient', () => {
 
   it('returns the read foods when the answer satisfies the schema', async () => {
     const fake = new FakeGemini();
+    fake.reply = () => geminiResponse({ readable: true, items: [boundItem()] });
     const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
-    expect(result).toEqual({ readable: true, items: [item()] });
+    expect(result).toEqual({ readable: true, items: [boundItem()] });
 
-    // The model's answer carries identity only: a name, a weight, and the two
-    // ids it chose (here: neither). A chosen id — a catalog string, a USDA
-    // integer — rides through unchanged.
+    // The model's answer carries identity only: a name, a weight, the two ids
+    // it chose (here: neither), and the query that offered them. A chosen id —
+    // a catalog string, a USDA integer — rides through unchanged.
     const identified = new FakeGemini();
     identified.reply = () =>
-      geminiResponse({ readable: true, items: [{ ...item(), foodId: 'food-1', fdcId: 12345 }] });
+      geminiResponse({ readable: true, items: [boundItem({ foodId: 'food-1', fdcId: 12345 })] });
     expect(await clientFor(identified).readPhoto({ mimeType: MIME, bytes: BYTES })).toEqual({
       readable: true,
-      items: [{ name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345 }],
+      items: [{ name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345, searchQuery: null }],
     });
   });
 
@@ -104,7 +140,7 @@ describe('GeminiClient', () => {
     const fake = new FakeGemini();
     await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
 
-    // The schema's item asks for exactly the four identity fields — the model
+    // The schema's item asks for exactly the five identity fields — the model
     // cannot answer a field the schema does not request.
     const body = fake.lastRequestBody() as {
       generationConfig: {
@@ -114,8 +150,20 @@ describe('GeminiClient', () => {
       };
     };
     const itemSchema = body.generationConfig.responseSchema.properties.items.items;
-    expect(Object.keys(itemSchema.properties).sort()).toEqual(['fdcId', 'foodId', 'grams', 'name']);
-    expect([...itemSchema.required].sort()).toEqual(['fdcId', 'foodId', 'grams', 'name']);
+    expect(Object.keys(itemSchema.properties).sort()).toEqual([
+      'fdcId',
+      'foodId',
+      'grams',
+      'name',
+      'searchQuery',
+    ]);
+    expect([...itemSchema.required].sort()).toEqual([
+      'fdcId',
+      'foodId',
+      'grams',
+      'name',
+      'searchQuery',
+    ]);
 
     // Not one of the 27 nutrient keys appears anywhere in the request.
     const serialised = JSON.stringify(body);
@@ -142,13 +190,15 @@ describe('GeminiClient', () => {
     const onTimeout = await readWith(hanging, 5);
     expect(onTimeout).toEqual(SERVICE_UNAVAILABLE);
 
-    // 3. schema violations — six shapes of "do not guess", one result.
+    // 3. schema violations — eight shapes of "do not guess", one result.
     const violating: unknown[] = [
-      { readable: true, items: [{ ...item(), fdcId: 123.5 }] },
-      { readable: true, items: [{ ...item(), foodId: 12 }] },
-      { readable: true, items: [{ ...item(), grams: '250 g' }] },
-      { readable: true, items: [{ ...item(), grams: -1 }] },
-      { readable: true, items: [{ ...item(), grams: Infinity }] },
+      { readable: true, items: [boundItem({ fdcId: 123.5 })] },
+      { readable: true, items: [boundItem({ foodId: 12 })] },
+      { readable: true, items: [boundItem({ grams: '250 g' })] },
+      { readable: true, items: [boundItem({ grams: -1 })] },
+      { readable: true, items: [boundItem({ grams: Infinity })] },
+      { readable: true, items: [boundItem({ searchQuery: 12 })] },
+      { readable: true, items: [{ ...boundItem(), searchQuery: undefined }] },
       { readable: true, items: [] },
     ];
     for (const payload of violating) {
@@ -222,5 +272,53 @@ describe('GeminiClient', () => {
     const result = await clientFor(fake).readPhoto({ mimeType: 'image/tiff', bytes: BYTES });
     expect(result).toEqual(COULD_NOT_READ);
     expect(fake.calls).toHaveLength(0);
+  });
+
+  it('forces the first turn to search and lets later ones answer', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem()] })
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    expect(fake.calls).toHaveLength(2);
+    const modeOf = (call: { init: RequestInit }): unknown =>
+      toolModeOf(JSON.parse(String(call.init.body)) as Record<string, unknown>);
+    expect(modeOf(fake.calls[0])).toBe('ANY');
+    expect(modeOf(fake.calls[1])).toBe('AUTO');
+  });
+
+  it('maps a non-2xx on the request after a tool round to service-unavailable', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ error: { code: 429 } }, 429)
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    // The tool round succeeded; the failure is the second request, so the loop
+    // path's own non-2xx branch (not the single-shot one) is what runs.
+    expect(fake.calls).toHaveLength(2);
+    expect(result).toEqual(SERVICE_UNAVAILABLE);
+  });
+
+  it('maps a transport throw on the request after a tool round to service-unavailable', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? Promise.reject(new Error('fetch failed'))
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(fake.calls).toHaveLength(2);
+    expect(result).toEqual(SERVICE_UNAVAILABLE);
   });
 });

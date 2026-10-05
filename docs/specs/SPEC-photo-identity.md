@@ -39,13 +39,16 @@ interface PhotoFoodSuggestion {
   grams: number;         // the quantity to log
   foodId: string | null;  // the catalog food the model chose, or null
   fdcId: number | null;   // the USDA food the model chose, or null
+  searchQuery: string | null; // the search_food query that offered the id, or null
 }
 ```
 
 `fdcId` is an **integer** (USDA's own type), not a string. `foodId` is a reference to
 one of our own catalog foods; the tool result is catalog-first (below), so the model
 picks either a catalog `foodId` (reuse — zero USDA calls) or a USDA `fdcId`, or neither.
-Both are identity, not numbers; no nutrient field exists here.
+Both are identity, not numbers; no nutrient field exists here. `searchQuery` is the
+`search_food` query whose result carried the chosen id — the binding that keeps one
+food's id from resolving onto another food (below).
 
 ### Resolution — three paths, and the one the design had no answer for
 
@@ -137,6 +140,23 @@ candidates and judging is the one thing the model is genuinely better at here. C
 plainly: this is a multi-turn call — slower and more tokens than the single call it
 replaces; a catalog hit spends none of it on USDA.
 
+**Enforcement is two-sided.** The loop's first turn is forced (`functionCallingConfig.mode:
+"ANY"`, §"The verified envelope"), so the model cannot answer before the tool has shown it
+candidates; later turns relax to `AUTO` so it can answer once it has them. And the backend
+trusts only an id that the query the answer names as its `searchQuery` actually offered: an
+answer's `foodId` or `fdcId` that the named query did not return is not resolved — the item
+keeps its name and grams and takes the absent vector (path 3), and the person fills the
+numbers by hand. Naming an id is therefore a **reference, not a claim**: the model selects
+from what it was shown and names the search that showed it, and anything else is treated as
+no id at all. The gate covers both id kinds — a guessed catalog id could collide with a real
+row and attach another food's stored vector, exactly as a guessed `fdcId` could. It never
+gates `name` or `grams`: the model names foods by sight, the person can edit them, and
+neither carries a number.
+
+Residual limitation: the gate binds an id to a query, not to a food, so a model that
+deliberately reports a wrong-but-offered query-and-id pair can still cross-wire one food's
+vector onto another; the id is at least one the model was shown, not invented.
+
 ### The verified envelope (discovery document, 2026-10-05)
 
 Verified against the same source as the single call — the Generative Language discovery
@@ -193,12 +213,14 @@ terminating role, and the convention is `role: "user"` on the turn carrying the
 `functionResponse`. (The `Tool.functionDeclarations` prose mentions a role "function";
 the `Content` schema permits only 'user'/'model' — the schema wins.)
 
-**`functionCallingConfig.mode`: `AUTO`.** `ToolConfig.functionCallingConfig` takes `mode`
-∈ `MODE_UNSPECIFIED | AUTO | ANY | NONE | VALIDATED`, plus optional
-`allowedFunctionNames: string[]`. `AUTO` — the default — lets the model choose between a
-function call and a text answer per turn, which is what the flow needs: search when the
-food is not obvious, answer with the final JSON when it is. `ANY` would force a call on
-the final turn too; `VALIDATED` buys constrained decoding one function does not need.
+**`functionCallingConfig.mode`: `ANY` first, `AUTO` after.** `ToolConfig.functionCallingConfig`
+takes `mode` ∈ `MODE_UNSPECIFIED | AUTO | ANY | NONE | VALIDATED`, plus optional
+`allowedFunctionNames: string[]`. The loop's **first** request sends `ANY`, which forbids a
+terminal text turn: the model must call `search_food` before it can answer, so an answer can
+never be given without candidates. Every **later** request sends `AUTO`, the default, so the
+model may answer with the final JSON once it has them. `ANY` cannot be held for the whole
+loop — it forces a call on the final turn too, so the loop could never terminate on text;
+`VALIDATED` buys constrained decoding one function does not need.
 
 **Schema and tools coexist in one request.** `GenerationConfig` carries `responseSchema`,
 `responseMimeType`, `responseJsonSchema`, `thinkingConfig` — so the identity JSON schema

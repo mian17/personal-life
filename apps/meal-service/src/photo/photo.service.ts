@@ -33,10 +33,18 @@ export const GEMINI_CLIENT_FACTORY = Symbol('GEMINI_CLIENT_FACTORY');
  * these numbers — it names the food and weighs it; the vector and `servingGrams`
  * are attached here, after the identity answer comes back.
  *
+ * The wire shape is fixed at these six fields: the answer's `searchQuery` is
+ * consumed by resolution and never re-emitted, so the editor receives exactly
+ * what it always did.
+ *
  * `nutrients` is the resolved vector at the food's per-serving base, unscaled:
  * the editor multiplies it by the logged quantity, it is never scaled here.
  */
-export interface PhotoEstimateItem extends PhotoFoodSuggestion {
+export interface PhotoEstimateItem {
+  name: string;
+  grams: number;
+  foodId: string | null;
+  fdcId: number | null;
   servingGrams: number;
   nutrients: NutrientVector;
 }
@@ -67,14 +75,17 @@ interface ResolvedVector {
  *
  * Resolution is by the id the model's answer carries — the tool loop already
  * matched our catalog or USDA, so nothing here re-searches by name. Each
- * suggestion takes one of three paths (`SPEC-photo-identity.md` § Resolution):
+ * suggestion takes one of three paths (`SPEC-photo-identity.md` § Resolution),
+ * but only when the `search_food` query the answer names as its `searchQuery`
+ * actually offered that id: an id another food's query offered, or one no query
+ * offered, is treated as no id at all.
  *
  * 1. a catalog `foodId` reads that row's own stored vector through
  *    `FoodsService.findOne` — zero USDA calls;
  * 2. a bare `fdcId` fetches `usda-source`'s mapped vector for the wire only;
- * 3. neither id — or a `foodId` that no longer resolves — yields `zeroVector()`
- *    ("no nutrient data"), so a stale id fails open instead of failing the
- *    estimate.
+ * 3. neither id — or an id the named query did not offer, or a `foodId` that no
+ *    longer resolves — yields `zeroVector()` ("no nutrient data"), so the food
+ *    still logs and the person fills the numbers by hand.
  *
  * **Nothing is written here.** All three paths produce an on-the-wire vector
  * only — no `Food` row is created during an estimate; catalog creation is the
@@ -112,30 +123,44 @@ export class PhotoService {
   ): Promise<
     { readable: true; items: PhotoEstimateItem[] } | { readable: false; reason: PhotoFailureReason }
   > {
-    const read = await this.readPhoto(sub, imageBase64, mimeType, hint);
+    const offered = new OfferedIds();
+    const read = await this.readPhoto(sub, imageBase64, mimeType, hint, offered);
     if (!read.readable) return read;
-    return { readable: true, items: await this.resolveItems(sub, read.items) };
+    return { readable: true, items: await this.resolveItems(sub, read.items, offered) };
   }
 
   /** Hand the photo to the model, with the catalog-first search tool bound to `sub`. */
-  private async readPhoto(sub: string, imageBase64: string, mimeType: string, hint?: string) {
+  private async readPhoto(
+    sub: string,
+    imageBase64: string,
+    mimeType: string,
+    hint: string | undefined,
+    offered: OfferedIds,
+  ) {
     this.client ??= this.makeClient();
     return this.client.readPhoto(
       { mimeType, bytes: Buffer.from(imageBase64, 'base64') },
       hint,
-      (query) => this.searchFood(sub, query),
+      (query) => this.searchFoodAndRemember(sub, query, offered),
     );
   }
 
-  private resolveItems(sub: string, suggestions: PhotoFoodSuggestion[]): Promise<PhotoEstimateItem[]> {
-    return Promise.all(suggestions.map((suggestion) => this.resolveItem(sub, suggestion)));
+  private resolveItems(
+    sub: string,
+    suggestions: PhotoFoodSuggestion[],
+    offered: OfferedIds,
+  ): Promise<PhotoEstimateItem[]> {
+    return Promise.all(
+      suggestions.map((suggestion) => this.resolveItem(sub, suggestion, offered)),
+    );
   }
 
   private async resolveItem(
     sub: string,
     suggestion: PhotoFoodSuggestion,
+    offered: OfferedIds,
   ): Promise<PhotoEstimateItem> {
-    const resolved = await this.resolveVector(sub, suggestion);
+    const resolved = await this.resolveVector(sub, suggestion, offered);
     return {
       name: suggestion.name,
       grams: suggestion.grams,
@@ -146,12 +171,19 @@ export class PhotoService {
     };
   }
 
-  /** Path by the id the answer carries: catalog first, then USDA, then the absent vector. */
+  /**
+   * Path by the id the answer carries — catalog first, then USDA, then the
+   * absent vector — but only when the query the answer names as its
+   * `searchQuery` actually offered that id. An id another food's query offered,
+   * or a guessed id, is treated as no id at all: resolving it would attach a
+   * real food's vector to a food the model never matched.
+   */
   private async resolveVector(
     sub: string,
     suggestion: PhotoFoodSuggestion,
+    offered: OfferedIds,
   ): Promise<ResolvedVector> {
-    if (suggestion.foodId !== null) {
+    if (suggestion.foodId !== null && offered.hasCatalogId(suggestion.searchQuery, suggestion.foodId)) {
       const catalogRow = await this.findCatalogRow(sub, suggestion.foodId);
       if (catalogRow) {
         return {
@@ -160,7 +192,7 @@ export class PhotoService {
         };
       }
     }
-    if (suggestion.fdcId !== null) {
+    if (suggestion.fdcId !== null && offered.hasFdcId(suggestion.searchQuery, suggestion.fdcId)) {
       const vector = await this.fetchUsdaVector(suggestion.fdcId);
       if (vector) return { servingGrams: 100, nutrients: vector };
     }
@@ -194,8 +226,20 @@ export class PhotoService {
    * The catalog-first `search_food` closure the model calls: our own catalog
    * first, USDA only when nothing matched, so a repeat food costs zero API
    * calls (`SPEC-photo-identity.md` § The tool loop). The payload carries names
-   * and ids — a `servingGrams` base at most — never a nutrient amount.
+   * and ids — a `servingGrams` base at most — never a nutrient amount. Every id
+   * the result offers is remembered against the query that returned it, so
+   * resolution trusts only what the answer's `searchQuery` was shown.
    */
+  private async searchFoodAndRemember(
+    sub: string,
+    query: string,
+    offered: OfferedIds,
+  ): Promise<SearchFoodResult> {
+    const result = await this.searchFood(sub, query);
+    offered.keep(query, result);
+    return result;
+  }
+
   private async searchFood(sub: string, query: string): Promise<SearchFoodResult> {
     const catalog = await this.foods.findAll(sub, query);
     if (catalog.length > 0) {
@@ -245,4 +289,45 @@ function warnUsdaUnconfiguredOnce(): void {
 /** A catalog row as the tool payload sees it: id, name, and base — never a vector. */
 function toCatalogHit(food: FoodDto): SearchFoodResult['catalog'][number] {
   return { id: food.id, name: food.name, servingGrams: food.servingGrams };
+}
+
+/**
+ * The ids each `search_food` query offered, so resolution trusts an id only
+ * when the query the answer names as its `searchQuery` returned it — one food's
+ * search cannot vouch for another food's id. Built per `estimate` call and
+ * threaded down — never a field on the service, because concurrent estimates
+ * must not share one pool.
+ */
+class OfferedIds {
+  private readonly idsByQuery = new Map<string, OfferedIdsForQuery>();
+
+  keep(query: string, result: SearchFoodResult): void {
+    const offered = this.idsFor(query);
+    for (const food of result.catalog) offered.catalogIds.add(food.id);
+    for (const candidate of result.usda) offered.fdcIds.add(candidate.fdcId);
+  }
+
+  hasCatalogId(query: string | null, foodId: string): boolean {
+    if (query === null) return false;
+    return this.idsByQuery.get(query)?.catalogIds.has(foodId) ?? false;
+  }
+
+  hasFdcId(query: string | null, fdcId: number): boolean {
+    if (query === null) return false;
+    return this.idsByQuery.get(query)?.fdcIds.has(fdcId) ?? false;
+  }
+
+  private idsFor(query: string): OfferedIdsForQuery {
+    const existing = this.idsByQuery.get(query);
+    if (existing) return existing;
+    const created: OfferedIdsForQuery = { catalogIds: new Set<string>(), fdcIds: new Set<number>() };
+    this.idsByQuery.set(query, created);
+    return created;
+  }
+}
+
+/** The ids one `search_food` query returned: catalog string ids and USDA fdc ids. */
+interface OfferedIdsForQuery {
+  catalogIds: Set<string>;
+  fdcIds: Set<number>;
 }

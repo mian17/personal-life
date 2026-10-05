@@ -44,13 +44,17 @@ export type PhotoFailureReason = typeof COULD_NOT_READ | typeof SERVICE_UNAVAILA
  * One food the model read out of the photo — identity only. No nutrient field
  * lives here: the model names the food and weighs it, and the backend resolves
  * the numbers later (Task 8). `foodId` is a catalog id the model chose, or
- * null; `fdcId` is a USDA id it chose, or null.
+ * null; `fdcId` is a USDA id it chose, or null. `searchQuery` is the
+ * `search_food` query whose result carried that chosen id, or null when the
+ * model named no id — the binding that keeps one food's id from resolving onto
+ * another food (resolution trusts an id only when its own query offered it).
  */
 export interface PhotoFoodSuggestion {
   name: string;
   grams: number;
   foodId: string | null;
   fdcId: number | null;
+  searchQuery: string | null;
 }
 
 /**
@@ -80,6 +84,9 @@ interface ConversationTurn {
   role: 'user' | 'model';
   parts: unknown[];
 }
+
+/** The tool-calling mode one loop request sends: forced first, auto after. */
+type FunctionCallingMode = 'ANY' | 'AUTO';
 
 /** The API method; the request path is `<base>/models/<model>:<method>`. */
 const METHOD = 'generateContent';
@@ -115,9 +122,15 @@ const IMAGE_MIME_TYPES = [
 
 const PROMPT = [
   'You read a photo of a meal and name the real foods on the plate.',
+  'Call the search_food tool with each food name before you answer. When it',
+  'returns candidates, choose the one that best represents the food in the',
+  'photo and put that candidate id in your answer; an id that did not come',
+  'from that search result must be null.',
   'Reply with JSON only, matching the given response schema exactly.',
-  'For each food give its name as a catalog name, the portion in grams,',
-  'and the catalog id or USDA id when you recognise one — else null.',
+  'For each food give its name as a catalog name, the portion in grams, the',
+  'catalog id or USDA id you chose from a search result — else null — and in',
+  'searchQuery the exact search_food query you used to find that id. The',
+  'candidate id and the query you report must be one pair from one result.',
   '',
   'Never estimate a nutrient number. Your answer carries identity only:',
   'names, weights, and ids. Numbers come from the catalog, never from you.',
@@ -150,15 +163,21 @@ const RESPONSE_SCHEMA = {
           foodId: {
             type: 'STRING',
             nullable: true,
-            description: 'Catalog food id when recognised, else null.',
+            description: 'Catalog food id from a search_food result, else null.',
           },
           fdcId: {
             type: 'INTEGER',
             nullable: true,
-            description: 'USDA food id when recognised, else null.',
+            description: 'USDA food id from a search_food result, else null.',
+          },
+          searchQuery: {
+            type: 'STRING',
+            nullable: true,
+            description:
+              'The search_food query whose result carried this food’s id, else null.',
           },
         },
-        required: ['name', 'grams', 'foodId', 'fdcId'],
+        required: ['name', 'grams', 'foodId', 'fdcId', 'searchQuery'],
       },
     },
   },
@@ -175,8 +194,8 @@ const SEARCH_FOOD_DECLARATION = {
   name: SEARCH_TOOL_NAME,
   description:
     'Look up a food by name before answering. Returns matching catalog foods and ' +
-    'USDA candidates so you can name a food id or a USDA id. It never returns ' +
-    'nutrient amounts.',
+    'USDA candidates so you can name a food id or a USDA id; the id in your answer ' +
+    'must be one of the candidates it returns. It never returns nutrient amounts.',
   parameters: {
     type: 'OBJECT',
     properties: {
@@ -265,7 +284,8 @@ export class GeminiClient {
    * The `search_food` turn loop. The conversation grows two turns per round —
    * the model's `functionCall`, then our `functionResponse` — and ends on the
    * first text turn. Either bound stops it: five tool rounds, or forty-five
-   * seconds since the photo first went out.
+   * seconds since the photo first went out. The first request forces a call,
+   * later ones leave the choice to the model.
    */
   private async readWithSearch(
     image: PhotoImage,
@@ -277,7 +297,7 @@ export class GeminiClient {
     let toolsUsed = 0;
     for (;;) {
       if (Date.now() >= deadline) return readFailure(COULD_NOT_READ);
-      const response = await this.send(JSON.stringify(this.loopBody(turns)));
+      const response = await this.send(JSON.stringify(this.loopBody(turns, toolsUsed)));
       if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
       const parts = candidateParts(parseJson(await response.text()));
       if (!parts) return readFailure(COULD_NOT_READ);
@@ -301,10 +321,11 @@ export class GeminiClient {
   }
 
   /** One search-loop request: the conversation so far, plus the tool the model may call. */
-  private loopBody(turns: ConversationTurn[]): unknown {
+  private loopBody(turns: ConversationTurn[], toolsUsed: number): unknown {
     return {
       contents: turns,
       tools: [{ functionDeclarations: [SEARCH_FOOD_DECLARATION] }],
+      toolConfig: functionCallingConfig(toolsUsed),
       generationConfig: generationConfig(),
     };
   }
@@ -361,6 +382,21 @@ function readFailure(reason: PhotoFailureReason, status?: number): PhotoReadResu
 /** The identity-only JSON shape the final text turn must satisfy. */
 function generationConfig(): unknown {
   return { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA };
+}
+
+/**
+ * The tool config for one search-loop request. The first request forces a call
+ * (`ANY`), so the model cannot answer before the tool has shown it candidates;
+ * every later request lets it choose (`AUTO`), so it can answer once it has
+ * them. `ANY` cannot be held for the whole loop — it forbids the terminal text
+ * turn, so a loop that never relaxes could never end.
+ */
+function functionCallingConfig(toolsUsed: number): unknown {
+  return { functionCallingConfig: { mode: callingMode(toolsUsed) } };
+}
+
+function callingMode(toolsUsed: number): FunctionCallingMode {
+  return toolsUsed === 0 ? 'ANY' : 'AUTO';
 }
 
 /**
@@ -472,8 +508,9 @@ function toolResultPart(callId: string | undefined, found: SearchFoodResult): un
 /**
  * Validate the model's own JSON. Returns `null` for anything the schema does
  * not admit — no partial parse, no defaulted field. Identity only: a name, a
- * weight, and two ids. `fdcId` is an integer or null; `foodId` a string or
- * null. No nutrient field is read here because none is asked for.
+ * weight, two ids, and the query they came from. `fdcId` is an integer or null;
+ * `foodId` and `searchQuery` are strings or null. No nutrient field is read
+ * here because none is asked for.
  */
 function readItems(payload: unknown): PhotoFoodSuggestion[] | null {
   const root = record(payload);
@@ -493,13 +530,14 @@ function readItems(payload: unknown): PhotoFoodSuggestion[] | null {
 function readSuggestion(value: unknown): PhotoFoodSuggestion | null {
   const item = record(value);
   if (!item) return null;
-  const { name, grams, foodId, fdcId } = item;
+  const { name, grams, foodId, fdcId, searchQuery } = item;
   if (typeof name !== 'string' || name.trim() === '') return null;
   if (typeof grams !== 'number' || !Number.isFinite(grams) || grams < 0) return null;
   if (typeof foodId !== 'string' && foodId !== null) return null;
   if (typeof fdcId !== 'number' && fdcId !== null) return null;
   if (fdcId !== null && !Number.isInteger(fdcId)) return null;
-  return { name, grams, foodId, fdcId };
+  if (typeof searchQuery !== 'string' && searchQuery !== null) return null;
+  return { name, grams, foodId, fdcId, searchQuery };
 }
 
 function parseJson(text: string): unknown {

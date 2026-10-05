@@ -48,13 +48,20 @@ export function geminiResponse(payload: unknown, status = 200): Response {
   );
 }
 
-/** A model answer that read the photo. */
-export function readablePayload(): unknown {
-  return { readable: true, items: [item()] };
+/** A model answer that read the photo, one identified food, overridable per case. */
+export function readablePayload(overrides: Record<string, unknown> = {}): unknown {
+  return { readable: true, items: [item(overrides)] };
 }
 
-/** One identified food — identity only (`PhotoFoodSuggestion`). No nutrient
+/**
+ * One identified food — identity only (`PhotoFoodSuggestion`). No nutrient
  * field: the model answers identity, the backend resolves numbers (Task 8).
+ *
+ * The defaults are the honest "no id, no search" shape: `searchQuery` is
+ * mandatory by the contract, so it is always present, and its null value means
+ * what the null ids mean — nothing to resolve, the absent vector. A test that
+ * means a food found through a search overrides `foodId` and `searchQuery`
+ * together, naming the query whose result offered that id.
  */
 export function item(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -62,6 +69,7 @@ export function item(overrides: Record<string, unknown> = {}): Record<string, un
     grams: 250,
     foodId: null,
     fdcId: null,
+    searchQuery: null,
     ...overrides,
   };
 }

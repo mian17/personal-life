@@ -37,11 +37,13 @@ const CATALOG_HIT: SearchFoodResult = {
 
 const image = { mimeType: MIME, bytes: BYTES };
 
-/** A transport whose first reply is a `search_food` call, then the real answer. */
+/** A transport whose first reply is a `search_food` call, then the bound answer. */
 function searchingFake(query = 'chicken'): FakeGemini {
   const fake = new FakeGemini();
   fake.reply = (call) =>
-    fake.calls.length === 1 ? toolCallTurn(query, 'call-1') : geminiResponse(readablePayload());
+    fake.calls.length === 1
+      ? toolCallTurn(query, 'call-1')
+      : geminiResponse(readablePayload({ foodId: 'food-7', searchQuery: query }));
   return fake;
 }
 
@@ -94,7 +96,10 @@ describe('the search_food turn loop', () => {
 
     const result = await clientFor(fake).readPhoto(image, undefined, searchTool);
 
-    expect(result).toEqual({ readable: true, items: [item()] });
+    expect(result).toEqual({
+      readable: true,
+      items: [item({ foodId: 'food-7', searchQuery: 'chicken' })],
+    });
     expect(queries).toEqual(['chicken']);
     expect(fake.calls).toHaveLength(2);
   });

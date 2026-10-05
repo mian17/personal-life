@@ -33,6 +33,9 @@ const HINT = 'leftover from last night';
 const USDA_KEY = 'test-usda-key-DO-NOT-LOG-7f3a';
 const USDA_BASE = 'https://usda.test/fdc';
 const FDC_ID = 170379;
+const OTHER_FDC_ID = 999999;
+const CHICKEN_CALORIES = 165;
+const RICE_CALORIES = 130;
 
 const geminiEnv = (): NodeJS.ProcessEnv => ({
   GEMINI_API_KEY: 'test-gemini-key',
@@ -70,11 +73,12 @@ class FakeFoods {
 /** Injected USDA transport: records each request and replies with a scripted body. */
 class FakeUsda {
   readonly calls: { url: string; init: RequestInit }[] = [];
-  reply: () => Response = () => usdaResponse({ foods: [] });
+  reply: (call: { url: string }) => Response = () => usdaResponse({ foods: [] });
 
   readonly handler: UsdaTransport = (url, init) => {
-    this.calls.push({ url: String(url), init: init ?? {} });
-    return Promise.resolve(this.reply());
+    const call = { url: String(url) };
+    this.calls.push({ url: call.url, init: init ?? {} });
+    return Promise.resolve(this.reply(call));
   };
 
   lastParams(): URLSearchParams {
@@ -100,10 +104,10 @@ function foodDto(overrides: Partial<FoodDto> & Pick<FoodDto, 'id' | 'name'>): Fo
 }
 
 /** A search body in the live shape: `description` is the name, `foodNutrients` is never read. */
-function searchPayload(): unknown {
+function searchPayload(fdcId = FDC_ID, description = 'Broccoli, raw'): unknown {
   return {
     totalHits: 1,
-    foods: [{ fdcId: FDC_ID, description: 'Broccoli, raw', dataType: 'SR Legacy', score: 1 }],
+    foods: [{ fdcId, description, dataType: 'SR Legacy', score: 1 }],
   };
 }
 
@@ -117,6 +121,46 @@ function foodPayload(): unknown {
       { nutrient: { number: '204', unitName: 'g' }, amount: 0.37 },
       { nutrient: { number: '307', unitName: 'mg' }, amount: 33.0 },
     ],
+  };
+}
+
+/** A fetch-by-id body carrying one calorie amount, so two foods resolve distinct vectors. */
+function nutrientPayload(fdcId: number, calories: number): unknown {
+  return {
+    fdcId,
+    description: 'food',
+    foodNutrients: [{ nutrient: { number: '208', unitName: 'kcal' }, amount: calories }],
+  };
+}
+
+/**
+ * A USDA transport serving two foods: a search offers the `fdcId` scripted for
+ * its query (`chicken` → `FDC_ID`, anything else → `OTHER_FDC_ID`), and a
+ * fetch-by-id returns that id's calorie amount.
+ */
+function serveTwoFoodsFromUsda(usda: FakeUsda): void {
+  usda.reply = () => {
+    const call = usda.calls[usda.calls.length - 1];
+    const url = new URL(call.url);
+    const fetched = /\/food\/(\d+)$/.exec(url.pathname);
+    if (fetched) {
+      const fdcId = Number(fetched[1]);
+      return usdaResponse(
+        nutrientPayload(fdcId, fdcId === FDC_ID ? CHICKEN_CALORIES : RICE_CALORIES),
+      );
+    }
+    const query = url.searchParams.get('query');
+    return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : OTHER_FDC_ID, query ?? ''));
+  };
+}
+
+/** A model that searches `chicken` then `rice`, then answers with the scripted items. */
+function answerAfterTwoSearches(items: Record<string, unknown>[]) {
+  return (call: GeminiCall): Response => {
+    const answers = answersSoFar(call);
+    if (answers === 0) return toolCallTurn('chicken');
+    if (answers === 1) return toolCallTurn('rice');
+    return geminiResponse({ readable: true, items });
   };
 }
 
@@ -153,14 +197,21 @@ function toolCallTurn(query: string): Response {
   );
 }
 
-/** True when this request already carries our tool's answer — the turn to reply with JSON. */
-function alreadyAnswered(call: GeminiCall): boolean {
+/** How many `functionResponse` turns this request already carries. */
+function answersSoFar(call: GeminiCall): number {
   const body = JSON.parse(String(call.init.body)) as {
     contents?: { parts?: { functionResponse?: unknown }[] }[];
   };
-  return (body.contents ?? []).some((turn) =>
-    (turn.parts ?? []).some((part) => part.functionResponse !== undefined),
+  return (body.contents ?? []).reduce(
+    (count, turn) =>
+      count + (turn.parts ?? []).filter((part) => part.functionResponse !== undefined).length,
+    0,
   );
+}
+
+/** True when this request already carries our tool's answer — the turn to reply with JSON. */
+function alreadyAnswered(call: GeminiCall): boolean {
+  return answersSoFar(call) > 0;
 }
 
 /** The `functionResponse` payload the service handed back to the model on the second turn. */
@@ -180,7 +231,16 @@ describe('PhotoService — an estimate writes nothing', () => {
   it('creates no Food: after resolving, the catalog list is unchanged', async () => {
     const foods = new FakeFoods([foodDto({ id: 'food-1', name: 'Chicken' })]);
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Chicken', grams: 200, foodId: 'food-1', fdcId: null });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Chicken',
+            grams: 200,
+            foodId: 'food-1',
+            fdcId: null,
+            searchQuery: 'chicken',
+          })
+        : toolCallTurn('chicken');
     const photo = serviceFor(foods, gemini, new FakeUsda());
 
     await photo.estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
@@ -197,7 +257,16 @@ describe('PhotoService — the three paths', () => {
       foodDto({ id: 'food-1', name: 'Chicken', servingGrams: 150, nutrients: stored }),
     ]);
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Chicken', grams: 200, foodId: 'food-1', fdcId: null });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Chicken',
+            grams: 200,
+            foodId: 'food-1',
+            fdcId: null,
+            searchQuery: 'chicken',
+          })
+        : toolCallTurn('chicken');
     const usda = new FakeUsda();
 
     const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
@@ -215,14 +284,29 @@ describe('PhotoService — the three paths', () => {
   it('resolves a bare fdcId from USDA per 100 g and writes nothing', async () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
-    usda.reply = () => usdaResponse(foodPayload());
+    usda.reply = () => {
+      const call = usda.calls[usda.calls.length - 1];
+      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
+        return usdaResponse(searchPayload());
+      }
+      return usdaResponse(foodPayload());
+    };
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Broccoli, raw',
+            grams: 150,
+            foodId: null,
+            fdcId: FDC_ID,
+            searchQuery: 'broccoli',
+          })
+        : toolCallTurn('broccoli');
 
     const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
-    expect(usda.calls).toHaveLength(1);
-    expect(usda.calls[0].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
+    expect(usda.calls).toHaveLength(2);
+    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
     expect(result.readable).toBe(true);
     if (!result.readable) return;
     expect(result.items[0].foodId).toBeNull();
@@ -238,15 +322,31 @@ describe('PhotoService — the three paths', () => {
   ])('fails open to the absent vector when the fdcId lookup is %s', async (_reason, status) => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
-    usda.reply = () => usdaResponse({}, status);
+    usda.reply = () => {
+      const call = usda.calls[usda.calls.length - 1];
+      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
+        return usdaResponse(searchPayload());
+      }
+      return usdaResponse({}, status);
+    };
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Broccoli, raw',
+            grams: 150,
+            foodId: null,
+            fdcId: FDC_ID,
+            searchQuery: 'broccoli',
+          })
+        : toolCallTurn('broccoli');
 
     const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
     // A USDA outage costs the nutrient numbers and nothing else: the answer is
     // still a readable estimate carrying the food, the way path 3 states it.
-    expect(usda.calls).toHaveLength(1);
+    expect(usda.calls).toHaveLength(2);
+    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
     expect(result.readable).toBe(true);
     if (!result.readable) return;
     expect(result.items).toHaveLength(1);
@@ -259,9 +359,15 @@ describe('PhotoService — the three paths', () => {
   });
 
   it('resolves the absent vector when the model names no id', async () => {
-    const foods = new FakeFoods();
+    // A catalog row matches the query, so the search stays catalog-first and
+    // never touches USDA; the answer still names no id.
+    const foods = new FakeFoods([foodDto({ id: 'food-1', name: 'Chicken salad' })]);
     const usda = new FakeUsda();
-    const gemini = new FakeGemini(); // default payload: foodId null, fdcId null
+    const gemini = new FakeGemini();
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({ name: 'Chicken salad', grams: 250, foodId: null, fdcId: null, searchQuery: null })
+        : toolCallTurn('chicken salad');
 
     const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
@@ -281,10 +387,23 @@ describe('PhotoService — the three paths', () => {
     expect(usda.calls).toHaveLength(0);
   });
 
-  it('fails open to the absent vector when a carried foodId no longer exists', async () => {
-    const foods = new FakeFoods();
+  it('fails open to the absent vector when the offered foodId no longer resolves', async () => {
+    const foods = new FakeFoods([
+      foodDto({ id: 'food-1', name: 'Chicken', servingGrams: 150, nutrients: completeVector({ ...zeroVector(), calories: 165 }) }),
+    ]);
+    // The search offered food-1, but the row is gone by the time it resolves.
+    jest.spyOn(foods, 'findOne').mockRejectedValue(new NotFoundException('Food not found'));
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Chicken', grams: 200, foodId: 'gone', fdcId: null });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Chicken',
+            grams: 200,
+            foodId: 'food-1',
+            fdcId: null,
+            searchQuery: 'chicken',
+          })
+        : toolCallTurn('chicken');
 
     const result = await serviceFor(foods, gemini, new FakeUsda()).estimate(
       VALID_SUB,
@@ -297,6 +416,169 @@ describe('PhotoService — the three paths', () => {
     if (!result.readable) return;
     expect(result.items[0].servingGrams).toBe(100);
     expect(result.items[0].nutrients).toEqual(zeroVector());
+  });
+
+  it('resolves the absent vector when the answer names an fdcId no search offered', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    // The tool offers OTHER_FDC_ID for the query the answer names; the answer guesses FDC_ID.
+    usda.reply = () => usdaResponse(searchPayload(OTHER_FDC_ID));
+    const gemini = new FakeGemini();
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Broccoli, raw',
+            grams: 150,
+            foodId: null,
+            fdcId: FDC_ID,
+            searchQuery: 'broccoli',
+          })
+        : toolCallTurn('broccoli');
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    // An id the query never returned is no id: only the search ran, no fetch was
+    // attempted, and the food carries the absent vector.
+    expect(usda.calls).toHaveLength(1);
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items[0].fdcId).toBe(FDC_ID);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+  });
+
+  it('resolves the absent vector when the answer names a foodId the query it reports did not offer', async () => {
+    const foods = new FakeFoods([foodDto({ id: 'food-1', name: 'Chicken', servingGrams: 150 })]);
+    const usda = new FakeUsda();
+    // The `rice` search offers OTHER_FDC_ID; the answer names foodId food-1 but
+    // reports `searchQuery: "rice"`, so the query that would vouch for it is not
+    // the one it names.
+    usda.reply = () => usdaResponse(searchPayload(OTHER_FDC_ID, 'rice'));
+    const gemini = new FakeGemini();
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Chicken',
+            grams: 200,
+            foodId: 'food-1',
+            fdcId: null,
+            searchQuery: 'rice',
+          })
+        : toolCallTurn('rice');
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items[0].foodId).toBe('food-1');
+    expect(result.items[0].servingGrams).toBe(100);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+  });
+
+  it('resolves the absent vector when the answer names a foodId no search offered', async () => {
+    const foods = new FakeFoods([
+      foodDto({ id: 'food-1', name: 'Chicken', servingGrams: 150, nutrients: completeVector({ ...zeroVector(), calories: 165 }) }),
+    ]);
+    const gemini = new FakeGemini();
+    // The row exists and holds a vector, but no search offered its id.
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Chicken',
+            grams: 200,
+            foodId: 'food-1',
+            fdcId: null,
+            searchQuery: 'chicken',
+          })
+        : toolCallTurn('broccoli');
+
+    const result = await serviceFor(foods, gemini, new FakeUsda()).estimate(
+      VALID_SUB,
+      IMAGE_B64,
+      MIME,
+      HINT,
+    );
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items[0].foodId).toBe('food-1');
+    expect(result.items[0].servingGrams).toBe(100);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+  });
+
+  it('resolves the absent vector when the searchQuery is null even though the fdcId was offered', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    usda.reply = () => usdaResponse(searchPayload());
+    const gemini = new FakeGemini();
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({
+            name: 'Broccoli, raw',
+            grams: 150,
+            foodId: null,
+            fdcId: FDC_ID,
+            searchQuery: null,
+          })
+        : toolCallTurn('broccoli');
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    // No query named, so no query vouches: only the search ran, no fetch, absent vector.
+    expect(usda.calls).toHaveLength(1);
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items[0].fdcId).toBe(FDC_ID);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+  });
+});
+
+describe('PhotoService — each food’s id resolves against its own search query', () => {
+  it('resolves both foods to their own vectors when each answer names its own query', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    serveTwoFoodsFromUsda(usda);
+    const gemini = new FakeGemini();
+    gemini.reply = answerAfterTwoSearches([
+      { name: 'Chicken', grams: 200, foodId: null, fdcId: FDC_ID, searchQuery: 'chicken' },
+      { name: 'Rice', grams: 150, foodId: null, fdcId: OTHER_FDC_ID, searchQuery: 'rice' },
+    ]);
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items.map((item) => item.nutrients.calories)).toEqual([
+      CHICKEN_CALORIES,
+      RICE_CALORIES,
+    ]);
+    expect(result.items[0].nutrients.calories).not.toBe(result.items[1].nutrients.calories);
+  });
+
+  it('keeps rice on the absent vector when it names rice’s query beside chicken’s fdcId — the chicken vector is never attached to rice', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    serveTwoFoodsFromUsda(usda);
+    const gemini = new FakeGemini();
+    // The rice item cross-wires: it reports rice's own query but the fdcId the
+    // chicken search offered, so the query it names never offered that id.
+    gemini.reply = answerAfterTwoSearches([
+      { name: 'Chicken', grams: 200, foodId: null, fdcId: FDC_ID, searchQuery: 'chicken' },
+      { name: 'Rice', grams: 150, foodId: null, fdcId: FDC_ID, searchQuery: 'rice' },
+    ]);
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    const [chicken, rice] = result.items;
+    expect(chicken.nutrients.calories).toBe(CHICKEN_CALORIES);
+    expect(rice.nutrients).toEqual(zeroVector());
+    expect(rice.nutrients.calories).not.toBe(CHICKEN_CALORIES);
+    // The chicken id was fetched only for the chicken item, never for rice.
+    const chickenFetches = usda.calls.filter((call) =>
+      call.url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`),
+    );
+    expect(chickenFetches).toHaveLength(1);
   });
 });
 
@@ -338,7 +620,7 @@ describe('PhotoService — the search closure is catalog-first', () => {
     const usda = new FakeUsda();
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
-      alreadyAnswered(call) ? readableWith({ name: 'Chicken', grams: 200, foodId: 'food-1' }) : toolCallTurn('chicken');
+      alreadyAnswered(call) ? readableWith({ name: 'Chicken', grams: 200, foodId: 'food-1', searchQuery: 'chicken' }) : toolCallTurn('chicken');
 
     await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
@@ -355,7 +637,7 @@ describe('PhotoService — the search closure is catalog-first', () => {
     usda.reply = () => usdaResponse(searchPayload());
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
-      alreadyAnswered(call) ? readableWith({ name: 'Broccoli, raw', grams: 150 }) : toolCallTurn('broccoli');
+      alreadyAnswered(call) ? readableWith({ name: 'Broccoli, raw', grams: 150, searchQuery: null }) : toolCallTurn('broccoli');
 
     await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
@@ -377,11 +659,18 @@ describe('PhotoService — boot is independent of USDA config', () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
     const gemini = new FakeGemini();
+    // Empty catalog and empty USDA: the tool answers with no candidates, so the
+    // answer names no id and needs no USDA client to resolve.
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({ name: 'Chicken salad', grams: 250, foodId: null, fdcId: null, searchQuery: null })
+        : toolCallTurn('chicken salad');
 
     // The factory throws only if it is *run* — construction itself must not run it.
     expect(() => serviceFor(foods, gemini, usda, envWithoutKey)).not.toThrow();
 
-    // A read that needs no USDA lookup never runs the factory, so it never throws.
+    // A read whose search needs USDA runs the factory, catches its throw, and
+    // degrades to no candidates: the estimate still answers.
     const result = await serviceFor(foods, gemini, usda, envWithoutKey).estimate(
       VALID_SUB,
       IMAGE_B64,
@@ -389,25 +678,33 @@ describe('PhotoService — boot is independent of USDA config', () => {
       HINT,
     );
     expect(result.readable).toBe(true);
+    expect(usda.calls).toHaveLength(0);
   });
 });
 
-describe('PhotoService — a throwing USDA factory degrades the item, never the estimate', () => {
+describe('PhotoService — a USDA failure degrades the item, never the estimate', () => {
   const envWithoutKey: NodeJS.ProcessEnv = { USDA_API_BASE: USDA_BASE };
 
-  it('resolves the absent vector when the factory throws and the item carries only an fdcId', async () => {
+  it('fails open to the absent vector when fetchByFdcId throws for an offered fdcId', async () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
+    // Search succeeds and offers FDC_ID; only the fetch-by-id throws.
+    usda.reply = (call) => {
+      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
+        return usdaResponse(searchPayload());
+      }
+      throw new Error('fetch failed');
+    };
     const gemini = new FakeGemini();
-    gemini.reply = () => readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID });
+    gemini.reply = (call) =>
+      alreadyAnswered(call)
+        ? readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID, searchQuery: 'broccoli' })
+        : toolCallTurn('broccoli');
 
-    const result = await serviceFor(foods, gemini, usda, envWithoutKey).estimate(
-      VALID_SUB,
-      IMAGE_B64,
-      MIME,
-      HINT,
-    );
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
+    // The id was offered, so the gate lets the fetch run; the throw is the
+    // fail-open path, and the estimate still carries the food.
     expect(result.readable).toBe(true);
     if (!result.readable) return;
     expect(result.items).toHaveLength(1);
@@ -415,7 +712,8 @@ describe('PhotoService — a throwing USDA factory degrades the item, never the 
     expect(result.items[0].fdcId).toBe(FDC_ID);
     expect(result.items[0].servingGrams).toBe(100);
     expect(result.items[0].nutrients).toEqual(zeroVector());
-    expect(usda.calls).toHaveLength(0);
+    expect(usda.calls).toHaveLength(2);
+    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
     expect(foods.createCalls).toHaveLength(0);
   });
 
@@ -424,7 +722,9 @@ describe('PhotoService — a throwing USDA factory degrades the item, never the 
     const usda = new FakeUsda();
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
-      alreadyAnswered(call) ? readableWith({ name: 'Broccoli, raw', grams: 150 }) : toolCallTurn('broccoli');
+      alreadyAnswered(call)
+        ? readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: null, searchQuery: null })
+        : toolCallTurn('broccoli');
 
     const result = await serviceFor(foods, gemini, usda, envWithoutKey).estimate(
       VALID_SUB,
