@@ -36,7 +36,11 @@ the canonical spec if a complete reading is ever needed.
 
 ### `GET /v1/foods/search` — keyword search
 
-Params: `query` (required, supports search operators), `dataType[]`, `pageSize` (max
+Params: `query` (required, supports search operators), `dataType` (the spec writes the
+param as `dataType[]`, but the live API answers that array style with a `400`
+`{"error":"Bad Request","message":"Invalid request. Please try again."}` — send
+plain `dataType`, repeated once per value or comma-separated in one value; both
+return `200`, verified 2026-10-05), `pageSize` (max
 200), `pageNumber`, `sortBy` (`dataType.keyword` \| `lowercaseDescription.keyword` \| `fdcId`
 \| `publishedDate`), `sortOrder` (`asc` \| `desc`), `brandOwner`.
 
@@ -62,7 +66,8 @@ Also `POST /v1/foods` (`FoodsCriteria`: `fdcIds`, `format`, `nutrients`).
 
 ### `GET /v1/foods/list` — paged listing (abridged)
 
-`dataType[]`, `pageSize` (max 200), `pageNumber`, `sortBy`, `sortOrder`.
+`dataType` (same live wire shape as the search endpoint — repeated plain `dataType`,
+never the `dataType[]` the spec writes), `pageSize` (max 200), `pageNumber`, `sortBy`, `sortOrder`.
 
 ---
 

@@ -76,14 +76,16 @@ export class UsdaClient {
 
   /**
    * The candidate foods matching a name. The caller supplies the `dataType`
-   * pair, which rides out as the FDC `dataType[]` params — the restriction to
-   * whole ingredients stays the caller's choice, not a constant in here.
+   * pair, which rides out as one plain `dataType` param per value — the
+   * array-style `dataType[]` the old spelling sent is rejected with a 400. The
+   * restriction to whole ingredients stays the caller's choice, not a constant
+   * in here.
    */
   async usda_search(
     query: string,
     dataType: readonly ['Foundation', 'SR Legacy'],
   ): Promise<UsdaSearchResult> {
-    const url = this.urlFor('/v1/foods/search', { query, 'dataType[]': [...dataType] });
+    const url = this.urlFor('/v1/foods/search', { query, dataType: [...dataType] });
     try {
       const response = await this.send(url);
       if (response.status === 429) return RATE_LIMITED;

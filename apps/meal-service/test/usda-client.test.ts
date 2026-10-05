@@ -9,8 +9,10 @@ import { UsdaClient, type UsdaTransport } from '../src/usda/usda.client';
  * with a top-level `amount` that the mapper accepts.
  *
  * The claims proved here are the ones the pipeline stands on: the caller's
- * `dataType` pair rides out as `dataType[]`, the key never reaches any captured
- * output (it rides in the query string, so a logged URL would be a leaked key),
+ * `dataType` pair rides out as a plain `dataType` param repeated once per value
+ * (the array-style `dataType[]` is rejected by the API with a 400), the key
+ * never reaches any captured output (it rides in the query string, so a logged URL
+ * would be a leaked key),
  * a `429` is one `rate-limited` with no retry, and every other way the call can
  * go wrong lands on one typed reason instead of a partial vector.
  */
@@ -92,18 +94,18 @@ function foodPayload(): unknown {
 }
 
 describe('UsdaClient — the caller decides which data types to search', () => {
-  it('sends the caller’s dataType pair as the FDC dataType[] params', async () => {
+  it('sends the caller’s dataType pair as repeated plain dataType params', async () => {
     const fake = new FakeUsda();
     await clientFor(fake).usda_search('broccoli', ['Foundation', 'SR Legacy']);
 
     expect(fake.calls).toHaveLength(1);
     expect(fake.calls[0].init.method).toBe('GET');
-    expect(fake.lastParams().getAll('dataType[]')).toEqual(['Foundation', 'SR Legacy']);
+    expect(fake.lastParams().getAll('dataType')).toEqual(['Foundation', 'SR Legacy']);
     expect(fake.lastParams().get('query')).toBe('broccoli');
     expect(fake.calls[0].url.startsWith(`${BASE}/v1/foods/search?`)).toBe(true);
 
     // The pair is a caller-supplied parameter, not a constant in the client:
-    // the type locks it to exactly this pair, and it rides out as dataType[].
+    // the type locks it to exactly this pair, and it rides out as dataType.
 
     // Both coordinates come from env, and a trailing slash must not double up.
     const moved = new FakeUsda();
@@ -112,6 +114,15 @@ describe('UsdaClient — the caller decides which data types to search', () => {
       ['Foundation', 'SR Legacy'],
     );
     expect(moved.calls[0].url.startsWith('https://proxy.internal/fdc/v1/foods/search?')).toBe(true);
+  });
+
+  it('never sends the array-style dataType[] key the API rejects with a 400', async () => {
+    const fake = new FakeUsda();
+    await clientFor(fake).usda_search('broccoli', ['Foundation', 'SR Legacy']);
+
+    const params = fake.lastParams();
+    expect(params.getAll('dataType')).toEqual(['Foundation', 'SR Legacy']);
+    expect(params.has('dataType[]')).toBe(false);
   });
 
   it('returns search candidates as names and ids only', async () => {

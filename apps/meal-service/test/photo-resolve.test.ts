@@ -360,7 +360,7 @@ describe('PhotoService — the search closure is catalog-first', () => {
     await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
     expect(usda.calls).toHaveLength(1);
-    expect(usda.lastParams().getAll('dataType[]')).toEqual(['Foundation', 'SR Legacy']);
+    expect(usda.lastParams().getAll('dataType')).toEqual(['Foundation', 'SR Legacy']);
     expect(usda.lastParams().get('query')).toBe('broccoli');
     expect(usda.calls[0].url.startsWith(`${USDA_BASE}/v1/foods/search?`)).toBe(true);
 
