@@ -26,12 +26,13 @@ export class PhotoController {
 
   @Post('photo')
   @HttpCode(HttpStatus.OK)
-  estimate(@Principal() _owner: Principal, @Body() dto: EstimatePhotoDto) {
+  estimate(@Principal() owner: Principal, @Body() dto: EstimatePhotoDto) {
     // The principal is read here because every route's owner is bound to it
-    // (`SPEC-meal-service` Code Style); it is not forwarded, because an
-    // estimate persists nothing to scope. `OK`, not `201 Created`: the endpoint
-    // produces no resource — a suggestion is a transient read, and a failure is
-    // a valid answer to a valid request.
-    return this.photo.estimate(dto.imageBase64, dto.mimeType, dto.hint);
+    // (`SPEC-meal-service` Code Style), and forwarded as the scope of the
+    // catalog reads the estimate resolves against — a per-owner read even
+    // though nothing is written. `OK`, not `201 Created`: the endpoint
+    // produces no resource — a suggestion is a transient read, and a failure
+    // is a valid answer to a valid request.
+    return this.photo.estimate(owner.sub, dto.imageBase64, dto.mimeType, dto.hint);
   }
 }

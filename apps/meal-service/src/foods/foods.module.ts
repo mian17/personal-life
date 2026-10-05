@@ -11,6 +11,7 @@ import { FoodsService } from './foods.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Food, Serving]), KeysModule],
   controllers: [FoodsController],
+  exports: [FoodsService],
   providers: [
     // Composition, not a second client: the service's ONE adapter is provided
     // once per module that consumes it (Task 7's `MEAL_CACHE` token/factory),
