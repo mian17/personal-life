@@ -109,11 +109,19 @@ describe('mapUsdaNutrients — units are read, never converted', () => {
 });
 
 describe('mapUsdaNutrients — the payload’s own structure decides', () => {
-  it('skips a group row because it carries no amount, never because of its number', () => {
+  it('skips a row because it carries no amount, never because of its number', () => {
     const proximates = usdaRow('951', 'g'); // Proximates: a group header, no amount.
     const minerals = usdaRow('300', 'mg'); // Minerals: same shape, different number.
+    const caloriesWithoutAmount = usdaRow('208', 'kcal'); // Mapped number, no amount.
 
     expect(mapUsdaNutrients([proximates, minerals])).toEqual({ ok: false, reason: 'unmapped' });
+    expect(mapUsdaNutrients([proximates, caloriesWithoutAmount])).toEqual({
+      ok: false,
+      reason: 'unmapped',
+    });
+
+    const vector = expectCompleteVector(mapUsdaNutrients([ENERGY_KCAL, caloriesWithoutAmount]));
+    expect(vector.calories).toBe(34);
   });
 
   it('yields unmapped when nothing in the payload maps', () => {
