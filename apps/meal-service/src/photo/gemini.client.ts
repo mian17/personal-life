@@ -7,9 +7,10 @@
  *
  * 1. **Every failure is one failure.** A non-2xx, a timeout, a network error, a
  *    body that is not the documented envelope, a model answer that violates the
- *    schema, and the model's own "I could not read this" all return the same
- *    `COULD_NOT_READ` result. The service never turns a bad answer into a
- *    plausible-looking diary entry — a guessed number is worse than no number.
+ *    schema, a tool call that throws or outlives its bound, and the model's own
+ *    "I could not read this" all return the same `COULD_NOT_READ` result. The
+ *    service never turns a bad answer into a plausible-looking diary entry — a
+ *    guessed number is worse than no number.
  * 2. **The key and the image stay here.** All three coordinates (key, model id,
  *    API base) come from env, the key travels only in an `x-goog-api-key`
  *    header — never in the URL, which proxies log — and this module writes
@@ -52,8 +53,39 @@ export type PhotoReadResult =
 
 const COULD_NOT_READ_RESULT: PhotoReadResult = { readable: false, reason: COULD_NOT_READ };
 
+/**
+ * The caller's search tool (`SPEC-photo-identity.md` § The tool loop, declared
+ * once here): given a food name, answer with matching catalog rows and USDA
+ * candidates. Task 8 builds the closure over its injected services and passes
+ * it to `readPhoto`; this client only declares the shape and calls it.
+ */
+export interface SearchFoodResult {
+  catalog: { id: string; name: string; servingGrams: number }[];
+  usda: { name: string; fdcId: number }[];
+}
+
+export type SearchFood = (query: string) => Promise<SearchFoodResult>;
+
+/** One turn of the conversation the search loop builds up. */
+interface ConversationTurn {
+  role: 'user' | 'model';
+  parts: unknown[];
+}
+
 /** The API method; the request path is `<base>/models/<model>:<method>`. */
 const METHOD = 'generateContent';
+
+const SEARCH_TOOL_NAME = 'search_food';
+
+/**
+ * Task 2's bounds (SPEC-photo-identity § Bounds: "5 tool rounds, 45 s wall
+ * clock"): a meal photo holds a handful of foods, so a model still searching
+ * after five rounds is looping, not reading; forty-five seconds is three of
+ * this client's per-request timeouts. ponytail: fixed budget for every read;
+ * make it per-call only if a real model needs longer.
+ */
+const MAX_TOOL_ROUNDS = 5;
+const TOOL_LOOP_WALL_CLOCK_MS = 45_000;
 
 /**
  * Image MIME types the API documents for inline image bytes (`Blob.mimeType` in
@@ -124,6 +156,27 @@ const RESPONSE_SCHEMA = {
   required: ['readable', 'items'],
 };
 
+/**
+ * The `search_food` declaration the model sees, in `tools[].functionDeclarations`
+ * (SPEC-photo-identity § The verified envelope): `name` and `description` are
+ * required, `parameters` an OpenAPI 3.03 Parameter Object. The single property
+ * is the query — identity only, no nutrient argument.
+ */
+const SEARCH_FOOD_DECLARATION = {
+  name: SEARCH_TOOL_NAME,
+  description:
+    'Look up a food by name before answering. Returns matching catalog foods and ' +
+    'USDA candidates so you can name a food id or a USDA id. It never returns ' +
+    'nutrient amounts.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      query: { type: 'STRING', description: 'A food name to look up, e.g. "chicken".' },
+    },
+    required: ['query'],
+  },
+};
+
 /** Injected in tests; `fetch` in production (Node 18+ global, no SDK). */
 export type GeminiTransport = typeof fetch;
 
@@ -160,34 +213,93 @@ export class GeminiClient {
   }
 
   /**
-   * Read a photo's foods. Always resolves — transport, protocol, schema, and
-   * the model's own refusal all land on the same "could not read" result, so
-   * the controller has exactly one failure path (open manual entry).
+   * Read a photo's foods. Always resolves — transport, protocol, schema, the
+   * model's own refusal, a throwing tool, and an outlived bound all land on
+   * the same "could not read" result, so the controller has exactly one
+   * failure path (open manual entry).
    *
-   * The terminal turn is model JSON text; a turn that is not JSON text (a tool
-   * call part, Task 7's loop) is not an answer and fails the same way.
+   * Without a search tool this is Task 6's single shot: one request, and the
+   * terminal turn is model JSON text. With a tool, each `functionCall` turn
+   * runs the caller's search and answers with a `functionResponse` turn, until
+   * a text turn arrives or a bound stops the loop — five tool rounds, forty-
+   * five seconds of wall clock. Past either bound the turn at hand is treated
+   * as the final answer, and a turn with no usable JSON is the one failure.
    */
-  async readPhoto(image: PhotoImage, hint?: string): Promise<PhotoReadResult> {
+  async readPhoto(
+    image: PhotoImage,
+    hint?: string,
+    searchTool?: SearchFood,
+  ): Promise<PhotoReadResult> {
     if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return COULD_NOT_READ_RESULT;
     try {
-      const response = await this.send(JSON.stringify(this.requestBody(image, hint)));
-      if (!response.ok) return COULD_NOT_READ_RESULT;
-      const text = candidateText(parseJson(await response.text()));
-      if (text === null) return COULD_NOT_READ_RESULT;
-      const items = readItems(parseJson(text));
-      // `[]` covers the model's own `readable: false` — an empty suggestion is
-      // the failure result, so there is no second way to express "no answer".
-      return items === null || items.length === 0
-        ? COULD_NOT_READ_RESULT
-        : { readable: true, items };
+      if (searchTool === undefined) return await this.readOnce(image, hint);
+      return await this.readWithSearch(image, hint, searchTool);
     } catch {
-      // Network error, aborted body, unreadable JSON: one outcome, no detail
-      // logged (the body may contain the prompt, and the reason is the caller's).
+      // Network error, aborted body, unreadable JSON, throwing tool: one
+      // outcome, no detail logged (the body may contain the prompt, and the
+      // reason is the caller's).
       return COULD_NOT_READ_RESULT;
     }
   }
 
+  /** Task 6's single shot — no tool, one request, unchanged while the loop lives beside it. */
+  private async readOnce(image: PhotoImage, hint?: string): Promise<PhotoReadResult> {
+    const response = await this.send(JSON.stringify(this.requestBody(image, hint)));
+    if (!response.ok) return COULD_NOT_READ_RESULT;
+    const parts = candidateParts(parseJson(await response.text()));
+    if (!parts) return COULD_NOT_READ_RESULT;
+    return finishReading(parts);
+  }
+
+  /**
+   * The `search_food` turn loop. The conversation grows two turns per round —
+   * the model's `functionCall`, then our `functionResponse` — and ends on the
+   * first text turn. Either bound stops it: five tool rounds, or forty-five
+   * seconds since the photo first went out.
+   */
+  private async readWithSearch(
+    image: PhotoImage,
+    hint: string | undefined,
+    searchTool: SearchFood,
+  ): Promise<PhotoReadResult> {
+    const turns: ConversationTurn[] = [{ role: 'user', parts: this.firstParts(image, hint) }];
+    const deadline = Date.now() + TOOL_LOOP_WALL_CLOCK_MS;
+    let toolsUsed = 0;
+    for (;;) {
+      if (Date.now() >= deadline) return COULD_NOT_READ_RESULT;
+      const response = await this.send(JSON.stringify(this.loopBody(turns)));
+      if (!response.ok) return COULD_NOT_READ_RESULT;
+      const parts = candidateParts(parseJson(await response.text()));
+      if (!parts) return COULD_NOT_READ_RESULT;
+      const rawCall = findToolCall(parts);
+      if (rawCall === undefined) return finishReading(parts);
+      if (toolsUsed >= MAX_TOOL_ROUNDS) return finishReading(parts);
+      const call = readToolCall(rawCall);
+      if (!call) return COULD_NOT_READ_RESULT;
+      const found = await runSearchTool(searchTool, call.query, deadline);
+      if (!found) return COULD_NOT_READ_RESULT;
+      toolsUsed += 1;
+      turns.push({ role: 'model', parts }, { role: 'user', parts: [toolResultPart(call.id, found)] });
+    }
+  }
+
   private requestBody(image: PhotoImage, hint?: string): unknown {
+    return {
+      contents: [{ role: 'user', parts: this.firstParts(image, hint) }],
+      generationConfig: generationConfig(),
+    };
+  }
+
+  /** One search-loop request: the conversation so far, plus the tool the model may call. */
+  private loopBody(turns: ConversationTurn[]): unknown {
+    return {
+      contents: turns,
+      tools: [{ functionDeclarations: [SEARCH_FOOD_DECLARATION] }],
+      generationConfig: generationConfig(),
+    };
+  }
+
+  private firstParts(image: PhotoImage, hint?: string): unknown[] {
     const parts: unknown[] = [{ text: PROMPT }];
     if (hint && hint.trim() !== '') {
       parts.push({
@@ -197,10 +309,7 @@ export class GeminiClient {
       });
     }
     parts.push({ inlineData: { mimeType: image.mimeType, data: image.bytes.toString('base64') } });
-    return {
-      contents: [{ role: 'user', parts }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
-    };
+    return parts;
   }
 
   private async send(body: string): Promise<Response> {
@@ -224,17 +333,114 @@ export class GeminiClient {
   }
 }
 
-/** The API's response envelope is `candidates[].content.parts[].text`; anything else is not an answer. */
-function candidateText(envelope: unknown): string | null {
+/** The identity-only JSON shape the final text turn must satisfy. */
+function generationConfig(): unknown {
+  return { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA };
+}
+
+/**
+ * A candidate's `parts`, or null for a body that is not the documented
+ * envelope (`candidates[].content.parts`). The text answer is found by
+ * `finishReading`; a `functionCall` part is found by `findToolCall`.
+ */
+function candidateParts(envelope: unknown): unknown[] | null {
   const candidates = record(envelope)?.candidates;
   if (!Array.isArray(candidates) || candidates.length === 0) return null;
   const parts = record(record(candidates[0])?.content)?.parts;
-  if (!Array.isArray(parts)) return null;
+  return Array.isArray(parts) ? (parts as unknown[]) : null;
+}
+
+/**
+ * The answer a terminal turn carries, or the one failure. A `functionCall`
+ * part reaching here is not an answer — it fails the same way bad JSON does.
+ */
+function finishReading(parts: unknown[]): PhotoReadResult {
+  let text: string | null = null;
   for (const part of parts) {
-    const text = record(part)?.text;
-    if (typeof text === 'string' && text.trim() !== '') return text;
+    const candidate = record(part)?.text;
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
+      text = candidate;
+      break;
+    }
   }
-  return null;
+  if (text === null) return COULD_NOT_READ_RESULT;
+  const items = readItems(parseJson(text));
+  // `[]` covers the model's own `readable: false` — an empty suggestion is
+  // the failure result, so there is no second way to express "no answer".
+  return items === null || items.length === 0 ? COULD_NOT_READ_RESULT : { readable: true, items };
+}
+
+/**
+ * The turn's loop condition from the shape (Task 2's termination): a
+ * `functionCall` part means the loop continues — the caller runs the tool and
+ * answers it with a `functionResponse` turn. No such part ends the loop.
+ */
+function findToolCall(parts: unknown[]): Record<string, unknown> | undefined {
+  for (const part of parts) {
+    const call = record(record(part)?.functionCall);
+    if (call) return call;
+  }
+  return undefined;
+}
+
+/**
+ * The one `functionCall` this loop answers: ours, with a usable `args.query`.
+ * Anything else — another name, a missing query — is a bad envelope, the one
+ * failure. The `id` rides back on the matching `functionResponse`.
+ */
+function readToolCall(call: Record<string, unknown>): { id?: string; query: string } | null {
+  if (call.name !== SEARCH_TOOL_NAME) return null;
+  const query = record(call.args)?.query;
+  if (typeof query !== 'string' || query.trim() === '') return null;
+  return typeof call.id === 'string' ? { id: call.id, query } : { query };
+}
+
+/**
+ * Run one search round. A tool that throws (USDA 429, catalog error) answers
+ * null, and the loop collapses it to the one failure — a typed result, never
+ * a hang. The remaining wall clock races the tool too, so a slow tool cannot
+ * stall the loop past its 45 s bound. Task 8's closure fails open to this
+ * shape behind the tool.
+ */
+async function runSearchTool(
+  searchTool: SearchFood,
+  query: string,
+  deadline: number,
+): Promise<SearchFoodResult | null> {
+  try {
+    const budget = deadline - Date.now();
+    if (budget <= 0) return null;
+    return await Promise.race([searchTool(query), refuseAfter(budget)]);
+  } catch {
+    return null;
+  }
+}
+
+/** Rejects when the loop's remaining wall clock runs out, clearing its timer if it does not. */
+async function refuseAfter(budgetMs: number): Promise<never> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('search tool outlived its budget')), budgetMs);
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The `functionResponse` turn answering one call, on `role: "user"` by
+ * convention: `name` echoes the call, `id` echoes when the call carried one,
+ * `response` carries the names-and-ids result — never a nutrient amount.
+ */
+function toolResultPart(callId: string | undefined, found: SearchFoodResult): unknown {
+  return {
+    functionResponse: {
+      name: SEARCH_TOOL_NAME,
+      ...(callId === undefined ? {} : { id: callId }),
+      response: found,
+    },
+  };
 }
 
 /**
