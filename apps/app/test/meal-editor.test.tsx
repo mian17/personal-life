@@ -255,7 +255,7 @@ describe('MealEditor photo door', () => {
       });
 
       const seeded = harness.renderTree();
-      expect(field(seeded, 'Dish for item 1').props.value).toBe('Omelette');
+      expect(field(seeded, 'Food for item 1').props.value).toBe('Omelette');
       expect(field(seeded, 'Calories for Omelette').props.value).toBe('250');
       const total = runTotal(seeded);
       expect(text(total)).toBe(format('calories', 250));
@@ -331,7 +331,7 @@ describe('MealEditor photo door', () => {
       await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
 
       const failed = harness.renderTree();
-      expect(field(failed, 'Dish for item 1').props.value).toBe('');
+      expect(field(failed, 'Food for item 1').props.value).toBe('');
       const calories = field(failed, 'Calories for item 1');
       expect(calories.props.value).toBe('');
       expect(calories.props.placeholder).toBe(UNKNOWN);
@@ -356,7 +356,7 @@ describe('MealEditor unknown affordance', () => {
     try {
       // A fresh manual item: named, but no value confirmed — the unknown state.
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Mystery dish' },
       });
       const tree = harness.renderTree();
@@ -424,7 +424,7 @@ describe('MealEditor save persists corrected values', () => {
     });
     try {
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Toast' },
       });
       const named = harness.renderTree();
@@ -464,7 +464,7 @@ describe('MealEditor log-time catalog', () => {
     });
     try {
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Toast' },
       });
       (field(first, 'Grams for item 1').props.onChange as (e: unknown) => void)({
@@ -515,7 +515,7 @@ describe('MealEditor log-time catalog', () => {
       await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
 
       const ready = harness.renderTree();
-      expect(field(ready, 'Dish for item 1').props.value).toBe('Omelette');
+      expect(field(ready, 'Food for item 1').props.value).toBe('Omelette');
       await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
 
       const createCalls = mockCallService.mock.calls.filter(
@@ -543,7 +543,7 @@ describe('MealEditor log-time catalog', () => {
     });
     try {
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: typedDish },
       });
       const named = harness.renderTree();
@@ -577,7 +577,7 @@ describe('MealEditor log-time catalog', () => {
     });
     try {
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Chicken' },
       });
       const named = harness.renderTree();
@@ -613,13 +613,13 @@ describe('MealEditor log-time catalog', () => {
     });
     try {
       const first = harness.renderTree();
-      (field(first, 'Dish for item 1').props.onChange as (e: unknown) => void)({
+      (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Chicken' },
       });
       const oneNamed = harness.renderTree();
       (button(oneNamed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
       const twoRows = harness.renderTree();
-      (field(twoRows, 'Dish for item 2').props.onChange as (e: unknown) => void)({
+      (field(twoRows, 'Food for item 2').props.onChange as (e: unknown) => void)({
         target: { value: secondDish },
       });
       const bothNamed = harness.renderTree();
@@ -699,7 +699,7 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       for (const label of ['Grams', 'Calories (kcal)', 'Fat (g)', 'Carbs (g)', 'Protein (g)']) {
         expect(html).toContain(label);
       }
-      expect(html).toContain('placeholder="Dish name"');
+      expect(html).toContain('placeholder="Food name"');
     } finally {
       harness.restore();
     }
@@ -884,10 +884,10 @@ describe('MealEditor composition', () => {
       const row = findAll(tree, ListItem)[0];
       expect(text(row.props.title)).toBe('');
       expect(isElement(row.props.title) && row.props.title.props['aria-label']).toBe(
-        'Dish for item 1',
+        'Food for item 1',
       );
       // The dish input is the row title; every other field is a nested child.
-      expect(field(tree, 'Dish for item 1').props.value).toBe('');
+      expect(field(tree, 'Food for item 1').props.value).toBe('');
       expect(findAll(tree, SettingsRow)[0].props.label).toBe('Grams');
 
       // The emitted markup carries the nested variant the CSS turns into a
@@ -947,7 +947,7 @@ describe('restored entry display name', () => {
         '2026-10-03',
         restoredFoodName('f-oat', catalog),
       );
-      expect(field(tree, 'Dish for item 1').props.value).toBe('Oatmeal');
+      expect(field(tree, 'Food for item 1').props.value).toBe('Oatmeal');
     } finally {
       harness.restore();
     }
@@ -962,7 +962,7 @@ describe('restored entry display name', () => {
         '2026-10-03',
         restoredFoodName('Salad', catalog),
       );
-      expect(field(tree, 'Dish for item 1').props.value).toBe('Salad');
+      expect(field(tree, 'Food for item 1').props.value).toBe('Salad');
     } finally {
       harness.restore();
     }

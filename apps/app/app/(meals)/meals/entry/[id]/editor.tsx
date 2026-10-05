@@ -421,8 +421,8 @@ export function MealEditor({
         variant="nested"
         title={
           <Input
-            aria-label={`Dish for item ${index + 1}`}
-            placeholder="Dish name"
+            aria-label={`Food for item ${index + 1}`}
+            placeholder="Food name"
             value={item.dish}
             onChange={(event) => updateItem(index, { dish: event.target.value })}
           />

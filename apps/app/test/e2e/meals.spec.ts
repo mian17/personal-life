@@ -121,7 +121,7 @@ test.describe('meals day view', () => {
       await expect(field).toHaveValue('');
       await expect(field).toHaveAttribute('placeholder', '—');
     }
-    await expect(page.getByLabel('Dish for item 1')).toHaveValue('');
+    await expect(page.getByLabel('Food for item 1')).toHaveValue('');
 
     // Nothing was confirmed, so nothing can be saved or frozen.
     await expect(page.getByLabel('Save meal')).toBeDisabled();
@@ -134,7 +134,7 @@ test.describe('meals day view', () => {
     await openMeals(page);
     await openDoor(page, PHOTO_DOOR);
 
-    await page.getByLabel('Dish for item 1').fill('Rice bowl');
+    await page.getByLabel('Food for item 1').fill('Rice bowl');
     await page.getByLabel('Calories for Rice bowl').fill('450');
     // The box is a weight now: 200 g at the 100 g base is 2 servings, so the
     // calories rescale to 450 × 2 — the same corrected figure as before.
@@ -156,7 +156,7 @@ test.describe('meals day view', () => {
     await openMeals(page);
     await openDoor(page, PHOTO_DOOR);
 
-    await page.getByLabel('Dish for item 1').fill('Overnight oats');
+    await page.getByLabel('Food for item 1').fill('Overnight oats');
     await page.getByLabel('Calories for Overnight oats').fill('320');
     await page.getByLabel('Meal name').fill(SAVED_MEAL);
     await page.getByRole('button', { name: 'Save as meal', exact: true }).click();
@@ -187,7 +187,7 @@ test.describe('meals day view', () => {
 
     const dish = 'Total probe dish';
     const calories = 400;
-    await page.getByLabel('Dish for item 1').fill(dish);
+    await page.getByLabel('Food for item 1').fill(dish);
     await page.getByLabel(`Calories for ${dish}`).fill(String(calories));
 
     await page.getByLabel('Save meal').click();
