@@ -137,6 +137,88 @@ candidates and judging is the one thing the model is genuinely better at here. C
 plainly: this is a multi-turn call — slower and more tokens than the single call it
 replaces; a catalog hit spends none of it on USDA.
 
+### The verified envelope (discovery document, 2026-10-05)
+
+Verified against the same source as the single call — the Generative Language discovery
+document (`https://generativelanguage.googleapis.com/$discovery/rest?version=v1beta`),
+fetched 2026-10-05 (the docs host returns 403 from this environment; the API host serves
+the document). Every shape below is quoted from it, not inferred.
+
+**Request envelope** (`GenerateContentRequest`): `model` (required, `models/{model}`),
+`contents` (required, `Content[]`), plus optional `tools` (`Tool[]`), `toolConfig`
+(`ToolConfig`), `generationConfig` (`GenerationConfig`), `systemInstruction` (`Content`).
+
+**Tool declaration** — a `Tool` in `tools[]`. `Tool` also carries `googleSearch`,
+`fileSearch`, `codeExecution`, `urlContext`, `googleMaps`, `computerUse`, `mcpServers`,
+`googleSearchRetrieval`; only `functionDeclarations` is named here:
+
+```json
+{ "functionDeclarations": [
+    { "name": "search_food",              // string, REQUIRED
+      "description": "...",               // string, REQUIRED
+      "parameters": { ...Schema }         // optional, OpenAPI 3.03 Parameter Object
+    } ] }
+```
+
+`FunctionDeclaration` additionally offers `response` / `parametersJsonSchema` /
+`responseJsonSchema`; we use `parameters` only.
+
+**Tool call** — a `Part` in a `Content` the model returns:
+
+```json
+{ "functionCall": { "name": "search_food", "args": { "query": "..." }, "id": "..." } }
+```
+
+`name` is required, `args` an optional JSON object, `id` an optional "unique identifier
+of the function call".
+
+**Tool result** — the `Part` the client sends back in the next request's `contents`:
+
+```json
+{ "functionResponse": { "name": "search_food", "id": "...", "response": { ... } } }
+```
+
+`name` and `response` are required — `response` is "the function response in JSON object
+format. Callers can use any keys of their choice" — and `id` is optional, matching the
+corresponding `functionCall.id`. Our `response` payload is the `search_food` result
+above: catalog `id`/`name`/`servingGrams`, USDA `name`/`fdcId` — names and ids only.
+The model never carries nutrient values — identity only, per §"The new contract".
+
+**`role` is optional; the tool-result turn carries `role: "user"`.** `Content` is
+`{ role?: 'user' | 'model'; parts: Part[] }`, and the discovery document says of `role`:
+"The producer of the content. Must be either 'user' or 'model'. Useful to set for
+multi-turn conversations, otherwise **can be left blank or unset**." This was the open
+question (§"Open verification" 1) and the source answers it: a tool result needs no
+terminating role, and the convention is `role: "user"` on the turn carrying the
+`functionResponse`. (The `Tool.functionDeclarations` prose mentions a role "function";
+the `Content` schema permits only 'user'/'model' — the schema wins.)
+
+**`functionCallingConfig.mode`: `AUTO`.** `ToolConfig.functionCallingConfig` takes `mode`
+∈ `MODE_UNSPECIFIED | AUTO | ANY | NONE | VALIDATED`, plus optional
+`allowedFunctionNames: string[]`. `AUTO` — the default — lets the model choose between a
+function call and a text answer per turn, which is what the flow needs: search when the
+food is not obvious, answer with the final JSON when it is. `ANY` would force a call on
+the final turn too; `VALIDATED` buys constrained decoding one function does not need.
+
+**Schema and tools coexist in one request.** `GenerationConfig` carries `responseSchema`,
+`responseMimeType`, `responseJsonSchema`, `thinkingConfig` — so the identity JSON schema
+and the `search_food` declaration ride in the same `GenerateContentRequest`. The
+consequence: `responseSchema` constrains the **final text turn**, while a tool call
+arrives as a `functionCall` part, not as schema-constrained text.
+
+**Termination, stated from the shape, not inferred.** A turn ends when the candidate's
+`parts` contain **no** `functionCall`. A `functionCall` part means the loop continues —
+the client executes it and sends a `functionResponse` part in the next request. The
+terminal turn is the one whose part is `text`, which is what `responseSchema` shapes.
+
+**Bounds: 5 tool rounds, 45 s wall clock.** A meal photo holds a handful of distinct
+foods, so a model still searching after 5 rounds is looping, not reading; 45 s is 3 ×
+the client's existing 15 s per-request timeout (`gemini.client.ts`) — an estimate cannot
+sit for minutes while a diner waits. Hitting either bound stops the loop and the turn is
+treated as the model's final answer; if no usable JSON arrived, the result is
+`COULD_NOT_READ` (invariant 1 — every failure is one failure; a model that keeps
+searching terminates, never hangs).
+
 ## Invariants that must survive the rewrite
 
 These come from the current `gemini.client.ts` and are the reason it is trusted:
@@ -166,16 +248,16 @@ rule: any logged URL *is* a leaked key, and data.gov deactivates keys it finds p
 
 ## Open verification
 
-1. **The function-calling envelope.** The current single-call shape was verified against
-   the Generative Language discovery document (2026-10-03, recorded in `MAP-meal-nutrition.md`).
-   The `tools` / `functionDeclarations` / `functionCall` / `functionResponse` shape has had
-   **no such verification**, and the exact turn structure (which `role` carries a
-   `functionResponse`, how a loop terminates) is precisely where an unverified assumption
-   becomes a silent failure. Verify against the discovery document before implementing.
+1. **The function-calling envelope.** **Resolved 2026-10-05** — see §"The tool loop" →
+   *The verified envelope*. The `tools` / `functionDeclarations` / `functionCall` /
+   `functionResponse` shapes were verified against the Generative Language discovery
+   document; the open question of which `role` carries a `functionResponse` is answered
+   there (it is optional, conventionally `role: "user"`).
 2. **USDA's JSON field names and the mapping table** — see `SPEC-usda-source.md`. Path 2
    is unusable until those are settled.
-3. **Loop bounds.** Cap the tool loop (rounds and wall clock). A model that keeps searching
-   must terminate as `COULD_NOT_READ`, not hang.
+3. **Loop bounds.** **Chosen 2026-10-05** — 5 tool rounds and 45 s wall clock, recorded in
+   §"The tool loop" → *The verified envelope*; either bound exceeded stops the loop and no
+   usable JSON means `COULD_NOT_READ`. `gemini.client.ts` enforces both.
 
 ## Non-goals
 
