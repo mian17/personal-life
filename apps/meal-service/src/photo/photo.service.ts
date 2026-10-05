@@ -5,8 +5,8 @@ import { FoodsService, type FoodDto } from '../foods/foods.service';
 import type { UsdaClient } from '../usda/usda.client';
 import { USDA_CLIENT_FACTORY } from '../usda/usda.module';
 import {
-  COULD_NOT_READ,
   GeminiClient,
+  type PhotoFailureReason,
   type PhotoFoodSuggestion,
   type SearchFood,
   type SearchFoodResult,
@@ -110,7 +110,7 @@ export class PhotoService {
     mimeType: string,
     hint?: string,
   ): Promise<
-    { readable: true; items: PhotoEstimateItem[] } | { readable: false; reason: typeof COULD_NOT_READ }
+    { readable: true; items: PhotoEstimateItem[] } | { readable: false; reason: PhotoFailureReason }
   > {
     const read = await this.readPhoto(sub, imageBase64, mimeType, hint);
     if (!read.readable) return read;

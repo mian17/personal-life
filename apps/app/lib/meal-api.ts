@@ -121,13 +121,21 @@ export interface PhotoEstimateItem {
 }
 
 /**
+ * Every reason an estimate can fail with, over the wire. `no-image` is the BFF's
+ * own (no file, or an empty one); `meal-service` sends the other two. The set is
+ * a closed union, not `string`, so a fourth value would be a type error here
+ * rather than a silently wrong banner (`SPEC-photo-identity.md § Failure reasons`).
+ */
+export type PhotoFailureReason = 'no-image' | 'could-not-read' | 'service-unavailable';
+
+/**
  * The estimate's explicit result shape. `readable: false` carries no items on
  * purpose: a caller cannot render "0 kcal" from a failure, because there is
  * nothing to render but the reason.
  */
 export type PhotoEstimate =
   | { readable: true; items: PhotoEstimateItem[] }
-  | { readable: false; reason: string };
+  | { readable: false; reason: PhotoFailureReason };
 
 /** The image bytes, base64-encoded; they live only for the duration of the request. */
 export interface PhotoImage {
@@ -138,7 +146,9 @@ export interface PhotoImage {
 /**
  * The photo estimate call: a suggestion, never an entry. `hint` is the
  * optional steering text (a hint, never a correction). A transport or non-2xx
- * failure throws; the caller's only failure answer is "could not read".
+ * failure throws; a `readable: false` body carries the reason the caller
+ * renders — the photo's own (`could-not-read`) or the service's
+ * (`service-unavailable`).
  */
 export function estimatePhoto(image: PhotoImage, hint?: string): Promise<PhotoEstimate> {
   return call<PhotoEstimate>(PHOTO_ESTIMATE_PATH, {

@@ -219,18 +219,41 @@ treated as the model's final answer; if no usable JSON arrived, the result is
 `COULD_NOT_READ` (invariant 1 — every failure is one failure; a model that keeps
 searching terminates, never hangs).
 
+## Failure reasons
+
+A photo estimate that cannot produce foods resolves — it never throws — with
+`reason` from one closed set, carried unchanged from `GeminiClient` through
+`PhotoService`, the controller, and `lib/meal-api.ts` to the editor
+(`PhotoFailureReason` on both sides of the wire):
+
+| `reason` | Who owns the problem | What the user should do | Where it is classified |
+|---|---|---|---|
+| `could-not-read` | the photo — the model could not read it, or its answer was unusable | send a better photo, or type the meal by hand | `gemini.client.ts`: an unsupported mime, a body that is not the documented envelope, a schema violation, the model's own `readable: false`, a tool loop past its bound |
+| `service-unavailable` | the service — Gemini could not answer | retry later; the operator reads the server log | `gemini.client.ts`: a non-2xx (402, 403, 404, 429, 5xx), a transport throw, a timeout/raced expiry; the BFF when the call to `meal-service` itself fails |
+| `no-image` | the request — there was no photo | attach a photo | the BFF (`actions.ts`): no `File`, or `File.size === 0` |
+
+The distinction is the point: before this set, a 402 `RESOURCE_EXHAUSTED` (the
+account out of credit) collapsed into `could-not-read`, and the banner sent the
+user to re-photograph a meal when the real problem was a service account. Each
+failure is logged once, server-side, with its class and the API's HTTP status
+when the API answered — never the prompt, the body, the image, or the key. The
+editor renders the frozen `could-not-read` banner for the photo's own failures
+and a distinct outage banner for `service-unavailable`; either way it opens one
+empty row and leaves manual entry usable.
+
 ## Invariants that must survive the rewrite
 
 These come from the current `gemini.client.ts` and are the reason it is trusted:
 
-1. **Every failure is one failure.** A non-2xx, timeout, network error, bad envelope,
-   schema violation, the model's own `readable: false`, a tool call that never returns,
-   and a `fdcId` that resolves to nothing all collapse to `COULD_NOT_READ`. Exactly one
-   failure path reaches the controller.
+1. **Two failures, named by their owner.** A non-2xx, timeout, and network error are the
+   service's (`SERVICE_UNAVAILABLE`); a bad envelope, a schema violation, the model's own
+   `readable: false`, a tool call that never returns, and a `fdcId` that resolves to nothing
+   are the photo's (`COULD_NOT_READ`). See § Failure reasons for the full classification.
+   Exactly one typed failure path reaches the controller, and it carries the reason.
 2. **The key and the image stay in the client.** The Gemini key travels only in
    `x-goog-api-key` — deliberately never in the URL, "which proxies log". The image is
-   base64 inside one request body and is then dropped. This module writes nothing to any
-   log.
+   base64 inside one request body and is then dropped. This module logs a failure's class
+   and the API's HTTP status only — never the key, the image bytes, the prompt, or the body.
 3. **The hint is steering, not correction.** Same turn, labelled as a hint. A correction
    is a confirmed entry the BFF posts later.
 4. **Fail closed at construction.** Missing `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_BASE`

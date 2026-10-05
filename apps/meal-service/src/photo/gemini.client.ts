@@ -5,18 +5,21 @@
  *
  * Three rules this file exists to enforce:
  *
- * 1. **Every failure is one failure.** A non-2xx, a timeout, a network error, a
- *    body that is not the documented envelope, a model answer that violates the
- *    schema, a tool call that throws or outlives its bound, and the model's own
- *    "I could not read this" all return the same `COULD_NOT_READ` result. The
- *    service never turns a bad answer into a plausible-looking diary entry — a
- *    guessed number is worse than no number.
+ * 1. **Two failures, named by their owner.** A failure is either the photo's
+ *    (`COULD_NOT_READ`: an unsupported mime, a body that is not the documented
+ *    envelope, a model answer that violates the schema, the model's own "I could
+ *    not read this", a tool call or loop that outlives its bound) or the
+ *    service's (`SERVICE_UNAVAILABLE`: a non-2xx from the API, a network error,
+ *    a timeout). The caller renders a different message for each — send a better
+ *    photo, or retry later. The service never turns a bad answer into a
+ *    plausible-looking diary entry — a guessed number is worse than no number.
  * 2. **The key and the image stay here.** All three coordinates (key, model id,
  *    API base) come from env, the key travels only in an `x-goog-api-key`
- *    header — never in the URL, which proxies log — and this module writes
- *    nothing to any log. Image bytes exist as base64 inside one request body
- *    and are then dropped; they are never persisted (spec: not in Redis, DB,
- *    or a log).
+ *    header — never in the URL, which proxies log — and this module logs only a
+ *    failure's class and the API's HTTP status, never the key, the image bytes,
+ *    the prompt, or the response body. Image bytes exist as base64 inside one
+ *    request body and are then dropped; they are never persisted (spec: not in
+ *    Redis, DB, or a log).
  * 3. **The hint is steering, not correction.** It goes into the same turn as
  *    the image, labelled as a hint. Nothing here can revise an answer — a
  *    correction is a *confirmed entry* the BFF posts later.
@@ -26,8 +29,16 @@
  * 2026-10-03); see the Decision log in `MAP-meal-nutrition.md`.
  */
 
-/** The single reason the pipeline can fail with — "I could not read this." */
+import { Logger } from '@nestjs/common';
+
+/** The photo was unreadable — the photo is the problem, send a better one or type it by hand. */
 export const COULD_NOT_READ = 'could-not-read' as const;
+
+/** The photo service cannot answer — the service is the problem, retry later and read the server log. */
+export const SERVICE_UNAVAILABLE = 'service-unavailable' as const;
+
+/** Every way the pipeline can fail with, flowing from the client through the service to the editor. */
+export type PhotoFailureReason = typeof COULD_NOT_READ | typeof SERVICE_UNAVAILABLE;
 
 /**
  * One food the model read out of the photo — identity only. No nutrient field
@@ -49,9 +60,7 @@ export interface PhotoFoodSuggestion {
  */
 export type PhotoReadResult =
   | { readable: true; items: PhotoFoodSuggestion[] }
-  | { readable: false; reason: typeof COULD_NOT_READ };
-
-const COULD_NOT_READ_RESULT: PhotoReadResult = { readable: false, reason: COULD_NOT_READ };
+  | { readable: false; reason: PhotoFailureReason };
 
 /**
  * The caller's search tool (`SPEC-photo-identity.md` § The tool loop, declared
@@ -214,40 +223,41 @@ export class GeminiClient {
 
   /**
    * Read a photo's foods. Always resolves — transport, protocol, schema, the
-   * model's own refusal, a throwing tool, and an outlived bound all land on
-   * the same "could not read" result, so the controller has exactly one
-   * failure path (open manual entry).
+   * model's own refusal, a throwing tool, and an outlived bound all land on a
+   * typed failure with a reason: the model could not read the photo
+   * (`COULD_NOT_READ`), or the service could not answer (`SERVICE_UNAVAILABLE`).
+   * The editor renders manual entry for either, and a different banner for each.
    *
    * Without a search tool this is Task 6's single shot: one request, and the
    * terminal turn is model JSON text. With a tool, each `functionCall` turn
    * runs the caller's search and answers with a `functionResponse` turn, until
    * a text turn arrives or a bound stops the loop — five tool rounds, forty-
    * five seconds of wall clock. Past either bound the turn at hand is treated
-   * as the final answer, and a turn with no usable JSON is the one failure.
+   * as the final answer, and a turn with no usable JSON is `COULD_NOT_READ`.
    */
   async readPhoto(
     image: PhotoImage,
     hint?: string,
     searchTool?: SearchFood,
   ): Promise<PhotoReadResult> {
-    if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return COULD_NOT_READ_RESULT;
+    if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return readFailure(COULD_NOT_READ);
     try {
       if (searchTool === undefined) return await this.readOnce(image, hint);
       return await this.readWithSearch(image, hint, searchTool);
     } catch {
-      // Network error, aborted body, unreadable JSON, throwing tool: one
-      // outcome, no detail logged (the body may contain the prompt, and the
-      // reason is the caller's).
-      return COULD_NOT_READ_RESULT;
+      // A transport throw — network error, aborted body, expired deadline —
+      // is the service failing to answer, not the photo being unreadable. The
+      // classified reason is the only thing logged (rule 2).
+      return readFailure(SERVICE_UNAVAILABLE);
     }
   }
 
   /** Task 6's single shot — no tool, one request, unchanged while the loop lives beside it. */
   private async readOnce(image: PhotoImage, hint?: string): Promise<PhotoReadResult> {
     const response = await this.send(JSON.stringify(this.requestBody(image, hint)));
-    if (!response.ok) return COULD_NOT_READ_RESULT;
+    if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
     const parts = candidateParts(parseJson(await response.text()));
-    if (!parts) return COULD_NOT_READ_RESULT;
+    if (!parts) return readFailure(COULD_NOT_READ);
     return finishReading(parts);
   }
 
@@ -266,18 +276,18 @@ export class GeminiClient {
     const deadline = Date.now() + TOOL_LOOP_WALL_CLOCK_MS;
     let toolsUsed = 0;
     for (;;) {
-      if (Date.now() >= deadline) return COULD_NOT_READ_RESULT;
+      if (Date.now() >= deadline) return readFailure(COULD_NOT_READ);
       const response = await this.send(JSON.stringify(this.loopBody(turns)));
-      if (!response.ok) return COULD_NOT_READ_RESULT;
+      if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
       const parts = candidateParts(parseJson(await response.text()));
-      if (!parts) return COULD_NOT_READ_RESULT;
+      if (!parts) return readFailure(COULD_NOT_READ);
       const rawCall = findToolCall(parts);
       if (rawCall === undefined) return finishReading(parts);
       if (toolsUsed >= MAX_TOOL_ROUNDS) return finishReading(parts);
       const call = readToolCall(rawCall);
-      if (!call) return COULD_NOT_READ_RESULT;
+      if (!call) return readFailure(COULD_NOT_READ);
       const found = await runSearchTool(searchTool, call.query, deadline);
-      if (!found) return COULD_NOT_READ_RESULT;
+      if (!found) return readFailure(COULD_NOT_READ);
       toolsUsed += 1;
       turns.push({ role: 'model', parts }, { role: 'user', parts: [toolResultPart(call.id, found)] });
     }
@@ -333,6 +343,21 @@ export class GeminiClient {
   }
 }
 
+/**
+ * The one place a read failure is classified and recorded: the reason it
+ * carries to the caller, and — when the API answered — its HTTP status. The
+ * line holds no prompt, body, image, or key (rule 2). `GeminiClient` is not
+ * DI-managed, but Nest's `Logger` works standalone; the class name is its
+ * context.
+ */
+const logger = new Logger(GeminiClient.name);
+
+function readFailure(reason: PhotoFailureReason, status?: number): PhotoReadResult {
+  const detail = status === undefined ? '' : ` (HTTP ${status})`;
+  logger.error(`photo estimate failed: ${reason}${detail}`);
+  return { readable: false, reason };
+}
+
 /** The identity-only JSON shape the final text turn must satisfy. */
 function generationConfig(): unknown {
   return { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA };
@@ -351,8 +376,9 @@ function candidateParts(envelope: unknown): unknown[] | null {
 }
 
 /**
- * The answer a terminal turn carries, or the one failure. A `functionCall`
- * part reaching here is not an answer — it fails the same way bad JSON does.
+ * The answer a terminal turn carries, or the photo's refusal — a `functionCall`
+ * part reaching here is not an answer, and the model's own `readable: false`
+ * or an empty/invalid items shape means the photo could not be read.
  */
 function finishReading(parts: unknown[]): PhotoReadResult {
   let text: string | null = null;
@@ -363,11 +389,11 @@ function finishReading(parts: unknown[]): PhotoReadResult {
       break;
     }
   }
-  if (text === null) return COULD_NOT_READ_RESULT;
+  if (text === null) return readFailure(COULD_NOT_READ);
   const items = readItems(parseJson(text));
   // `[]` covers the model's own `readable: false` — an empty suggestion is
   // the failure result, so there is no second way to express "no answer".
-  return items === null || items.length === 0 ? COULD_NOT_READ_RESULT : { readable: true, items };
+  return items === null || items.length === 0 ? readFailure(COULD_NOT_READ) : { readable: true, items };
 }
 
 /**
@@ -397,8 +423,8 @@ function readToolCall(call: Record<string, unknown>): { id?: string; query: stri
 
 /**
  * Run one search round. A tool that throws (USDA 429, catalog error) answers
- * null, and the loop collapses it to the one failure — a typed result, never
- * a hang. The remaining wall clock races the tool too, so a slow tool cannot
+ * null, and the loop collapses it to the could-not-read failure — a typed
+ * result, never a hang. The remaining wall clock races the tool too, so a slow tool cannot
  * stall the loop past its 45 s bound. Task 8's closure fails open to this
  * shape behind the tool.
  */

@@ -324,7 +324,7 @@ describe('MealEditor photo door', () => {
 
   it('opens manual mode empty — no invented numbers — when the photo cannot be read', async () => {
     const harness = stateHarness();
-    mockCallService.mockRejectedValue(new Error('gemini down'));
+    mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
@@ -335,13 +335,39 @@ describe('MealEditor photo door', () => {
       const calories = field(failed, 'Calories for item 1');
       expect(calories.props.value).toBe('');
       expect(calories.props.placeholder).toBe(UNKNOWN);
-      expect(text(failed.props.banner)).toContain("Couldn't read that photo");
+      // The frozen banner, byte-identical: the reason is the photo's own, so a
+      // failure a user cannot act on never claims the service is down.
+      expect(text(failed.props.banner)).toBe(
+        "Couldn't read that photo. Enter the meal by hand — nothing was guessed.",
+      );
       // No confirmed item, so nothing was invented: the fields stay unknown and
       // neither save control is enabled.
       expect(button(failed, (el) => el.props.label === 'Save meal').props.disabled).toBe(true);
       expect(
         find(failed, Button, (el) => text(el.props.children).includes('Save as meal'))!.props.disabled,
       ).toBe(true);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('shows the service banner, not the photo banner, when the service cannot answer', async () => {
+    const harness = stateHarness();
+    mockCallService.mockRejectedValue(new Error('meal-service 500'));
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+
+      const failed = harness.renderTree();
+      // A service outage reads as retry-later, never as "send a better photo".
+      expect(text(failed.props.banner)).toBe(
+        'Photo service is unavailable. Enter the meal by hand — nothing was guessed.',
+      );
+      expect(text(failed.props.banner)).not.toContain("Couldn't read that photo");
+      // The failed attempt still opens one empty row and leaves manual entry usable.
+      expect(field(failed, 'Food for item 1').props.value).toBe('');
+      expect(button(failed, (el) => el.props.label === 'Save meal').props.disabled).toBe(true);
     } finally {
       harness.restore();
     }

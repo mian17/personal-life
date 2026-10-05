@@ -300,6 +300,38 @@ describe('PhotoService — the three paths', () => {
   });
 });
 
+describe('PhotoService — failure reasons name the layer that failed', () => {
+  it('answers service-unavailable when the photo API rejects the call (402, the real case)', async () => {
+    const fake = new FakeGemini();
+    fake.reply = () => new Response(JSON.stringify({ error: { code: 402, status: 'RESOURCE_EXHAUSTED' } }), { status: 402 });
+    const photo = serviceFor(new FakeFoods(), fake, new FakeUsda());
+
+    const result = await photo.estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result).toEqual({ readable: false, reason: 'service-unavailable' });
+  });
+
+  it('answers service-unavailable when the transport throws before answering', async () => {
+    const fake = new FakeGemini();
+    fake.reply = () => Promise.reject(new Error('fetch failed'));
+    const photo = serviceFor(new FakeFoods(), fake, new FakeUsda());
+
+    const result = await photo.estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result).toEqual({ readable: false, reason: 'service-unavailable' });
+  });
+
+  it('answers could-not-read when the model answers its own readable:false', async () => {
+    const fake = new FakeGemini();
+    fake.reply = () => geminiResponse({ readable: false, items: [] });
+    const photo = serviceFor(new FakeFoods(), fake, new FakeUsda());
+
+    const result = await photo.estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result).toEqual({ readable: false, reason: 'could-not-read' });
+  });
+});
+
 describe('PhotoService — the search closure is catalog-first', () => {
   it('reaches USDA zero times on a catalog hit, with names and ids only', async () => {
     const foods = new FakeFoods([foodDto({ id: 'food-1', name: 'Chicken', servingGrams: 120 })]);

@@ -22,7 +22,7 @@ import {
   Textarea,
   useSnackbar,
 } from '@life/ui';
-import type { MealEntry, MealGroup, PhotoEstimateItem } from '@/lib/meal-api';
+import type { MealEntry, MealGroup, PhotoEstimateItem, PhotoFailureReason } from '@/lib/meal-api';
 import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './actions';
 
 /**
@@ -224,7 +224,19 @@ export function MealEditor({
   const [estimating, setEstimating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingMeal, setSavingMeal] = useState(false);
-  const [photoFailed, setPhotoFailed] = useState(false);
+  // The reason the last photo attempt failed — `null` means the last attempt
+  // succeeded (or there was none). A failed attempt always opens the same
+  // empty draft; the reason selects only the banner text.
+  const [photoFailure, setPhotoFailure] = useState<PhotoFailureReason | null>(null);
+
+  // The photo's own failures (`no-image`, `could-not-read`) keep the frozen
+  // banner; a service failure (`service-unavailable`) gets the outage sibling.
+  const photoBanner =
+    photoFailure === 'service-unavailable'
+      ? 'Photo service is unavailable. Enter the meal by hand — nothing was guessed.'
+      : photoFailure === null
+        ? null
+        : "Couldn't read that photo. Enter the meal by hand — nothing was guessed.";
   // Which item's full-screen nutrients modal is open, by index — one open at a
   // time, and no item is the "no item" sentinel `null`.
   const [openNutrients, setOpenNutrients] = useState<number | null>(null);
@@ -312,7 +324,7 @@ export function MealEditor({
   /**
    * The photo door: one call site through `actions.ts`. A readable result seeds
    * the editor's item values; an unreadable one opens manual mode — one empty
-   * item, every field unknown, no numbers.
+   * item, every field unknown, no numbers — with the banner its reason earns.
    */
   async function onPhoto(files: FileList) {
     const file = files[0];
@@ -325,14 +337,16 @@ export function MealEditor({
       const result = await estimatePhotoAction(form);
       if (result.readable) {
         setItems(result.items.map((item) => toEditorItem(item, nutrition)));
-        setPhotoFailed(false);
+        setPhotoFailure(null);
       } else {
         setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
-        setPhotoFailed(true);
+        setPhotoFailure(result.reason);
       }
     } catch {
+      // `estimatePhotoAction` answers a typed failure rather than throwing, so
+      // this is a defensive fallback: the call never completed.
       setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
-      setPhotoFailed(true);
+      setPhotoFailure('service-unavailable');
     } finally {
       setEstimating(false);
     }
@@ -490,10 +504,8 @@ export function MealEditor({
         </IconButton>
       }
       banner={
-        photoFailed && (
-          <AlertBanner>
-            Couldn&apos;t read that photo. Enter the meal by hand — nothing was guessed.
-          </AlertBanner>
+        photoBanner !== null && (
+          <AlertBanner>{photoBanner}</AlertBanner>
         )
       }
     >

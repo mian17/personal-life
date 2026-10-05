@@ -10,8 +10,10 @@ import { PhotoService } from './photo.service';
  * `api/<noun>` convention.
  *
  * The route returns a **suggestion, never an entry**: the client's
- * `readable: true` items become the editor's draft, and an explicit
- * `{ readable: false, reason: 'could-not-read' }` opens it empty (manual mode).
+ * `readable: true` items become the editor's draft, and a failure response
+ * opens it empty (manual mode) — `could-not-read` when the photo was
+ * unreadable, `service-unavailable` when the photo service could not answer
+ * (see `SPEC-photo-identity.md` § Failure reasons).
  * Nothing is written, nothing is cached, and no image byte reaches a log.
  *
  * `@Principal()` is bound here like every other route (`SPEC-meal-service` Code

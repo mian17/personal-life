@@ -37,9 +37,10 @@ interface ConfirmedRow {
 /**
  * The ONE photo estimate call site. Reads the image plus the optional hint out
  * of the form and posts both through `lib/meal-api.ts`'s single
- * `POST /api/estimates/photo` path. A transport failure collapses to the same
- * explicit "could not read" answer as the model's own refusal, so the editor
- * has exactly one failure branch (open manual entry).
+ * `POST /api/estimates/photo` path. The service's own reason passes through
+ * unchanged; a call that never reached it — network, 5xx, an unreadable file —
+ * is `service-unavailable`, so the editor can tell "send a better photo" from
+ * "retry later" (`SPEC-photo-identity.md § Failure reasons`).
  */
 export async function estimatePhotoAction(formData: FormData): Promise<PhotoEstimate> {
   const file = formData.get('image');
@@ -55,7 +56,7 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
       hint,
     );
   } catch {
-    return { readable: false, reason: 'could-not-read' };
+    return { readable: false, reason: 'service-unavailable' };
   }
 }
 

@@ -14,8 +14,8 @@ import {
  *
  * The claims proved here are the ones the pipeline stands on: the hint reaches
  * the model as steering input, the request is addressed by env and not by a
- * hardcoded host, and *every* way the call can go wrong collapses onto one
- * "could not read" result instead of a partial guess.
+ * hardcoded host, and *every* way the call can go wrong collapses onto a typed
+ * failure owned by either the photo or the service — never a partial guess.
  */
 
 const KEY = 'test-key-DO-NOT-LOG-7f3a';
@@ -26,6 +26,7 @@ const MIME = 'image/jpeg';
 const BYTES = Buffer.from('not really a photo', 'utf8');
 
 const COULD_NOT_READ = { readable: false, reason: 'could-not-read' } as const;
+const SERVICE_UNAVAILABLE = { readable: false, reason: 'service-unavailable' } as const;
 
 function envOf(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return { GEMINI_API_KEY: KEY, GEMINI_MODEL: MODEL, GEMINI_API_BASE: BASE, ...overrides };
@@ -121,15 +122,15 @@ describe('GeminiClient', () => {
     for (const { key } of NUTRIENTS) expect(serialised).not.toContain(key);
   });
 
-  it('maps a non-2xx, a timeout, and a schema-violating body to the same result', async () => {
+  it('classifies each failure by its owner: the service for non-2xx and timeout, the photo for a bad body', async () => {
     const readWith = async (fake: FakeGemini, timeoutMs?: number) =>
       clientFor(fake, envOf(), timeoutMs).readPhoto({ mimeType: MIME, bytes: BYTES });
 
-    // 1. non-2xx — the API rejecting the call (rate limit, bad key, block).
+    // 1. non-2xx — the service failing to answer (rate limit, bad key, block).
     const rejected = new FakeGemini();
     rejected.reply = () => geminiResponse(readablePayload(), 429);
     const on429 = await readWith(rejected);
-    expect(on429).toEqual(COULD_NOT_READ);
+    expect(on429).toEqual(SERVICE_UNAVAILABLE);
 
     // 2. timeout — the request outlives the deadline and is aborted.
     const hanging = new FakeGemini();
@@ -139,7 +140,7 @@ describe('GeminiClient', () => {
         signal?.addEventListener('abort', () => reject(new Error('aborted')));
       });
     const onTimeout = await readWith(hanging, 5);
-    expect(onTimeout).toEqual(COULD_NOT_READ);
+    expect(onTimeout).toEqual(SERVICE_UNAVAILABLE);
 
     // 3. schema violations — six shapes of "do not guess", one result.
     const violating: unknown[] = [
