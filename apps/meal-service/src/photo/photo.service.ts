@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { NutrientVector } from '@life/nutrition';
 import { completeVector, zeroVector } from '../foods/content';
 import { FoodsService, type FoodDto } from '../foods/foods.service';
@@ -58,8 +58,8 @@ interface ResolvedVector {
  *   `POST /api/entries` (a different route, a different request).
  * - Image bytes are **never persisted and never logged.** They travel in one
  *   request body to the model and are dropped when it returns — not in the DB,
- *   not in Redis, not in a log line. This service emits no log at all, so byte,
- *   prompt, or key leakage has nowhere to hide.
+ *   not in Redis, not in a log line. The one line this service can emit is the
+ *   USDA-unconfigured diagnosis; it carries no byte, prompt, or key.
  * - Estimate responses are **never cached.** A Gemini result is per-request and
  *   unconfirmed; this module provides no `MEAL_CACHE` token on purpose, so
  *   there is no cache it could even touch. Only a confirmed entry gets the
@@ -184,7 +184,9 @@ export class PhotoService {
 
   /** Path 2: the USDA vector for the model's id, per 100 g, written nowhere. */
   private async fetchUsdaVector(fdcId: number): Promise<NutrientVector | null> {
-    const result = await this.usda().fetchByFdcId(fdcId);
+    const usda = this.usda();
+    if (!usda) return null;
+    const result = await usda.fetchByFdcId(fdcId);
     return result.ok ? completeVector(result.vector) : null;
   }
 
@@ -204,18 +206,40 @@ export class PhotoService {
 
   /** USDA candidates for a name, or none when the lookup failed — never a throw. */
   private async usdaCandidates(query: string): Promise<SearchFoodResult['usda']> {
-    const found = await this.usda().usda_search(query, ['Foundation', 'SR Legacy']);
+    const usda = this.usda();
+    if (!usda) return [];
+    const found = await usda.usda_search(query, ['Foundation', 'SR Legacy']);
     return found.ok ? found.candidates : [];
   }
 
   /**
    * The one USDA client, built on first lookup rather than at boot: the factory
-   * is a thunk (`USDA_CLIENT_FACTORY`), so a missing `USDA_API_KEY` fails the
+   * is a thunk (`USDA_CLIENT_FACTORY`), so a missing `USDA_API_KEY` fails a
    * lookup, never the service's construction.
+   *
+   * A factory that throws means "no USDA here" — the lookup degrades to the
+   * absent vector, the estimate still answers. This is the one place USDA
+   * availability is decided; both call sites take the null and move on
+   * (`SPEC-usda-source.md` § Cache Rules, failure mode).
    */
-  private usda(): UsdaClient {
-    return (this.usdaClient ??= this.makeUsdaClient());
+  private usda(): UsdaClient | null {
+    try {
+      return (this.usdaClient ??= this.makeUsdaClient());
+    } catch {
+      warnUsdaUnconfiguredOnce();
+      return null;
+    }
   }
+}
+
+/** The USDA-unconfigured diagnosis, logged once per process. A class only — never the URL. */
+const logger = new Logger(PhotoService.name);
+let warnedUsdaUnconfigured = false;
+
+function warnUsdaUnconfiguredOnce(): void {
+  if (warnedUsdaUnconfigured) return;
+  warnedUsdaUnconfigured = true;
+  logger.error('USDA lookup skipped: client is not configured (USDA_API_KEY must be set)');
 }
 
 /** A catalog row as the tool payload sees it: id, name, and base — never a vector. */

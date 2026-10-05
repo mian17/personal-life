@@ -391,3 +391,50 @@ describe('PhotoService — boot is independent of USDA config', () => {
     expect(result.readable).toBe(true);
   });
 });
+
+describe('PhotoService — a throwing USDA factory degrades the item, never the estimate', () => {
+  const envWithoutKey: NodeJS.ProcessEnv = { USDA_API_BASE: USDA_BASE };
+
+  it('resolves the absent vector when the factory throws and the item carries only an fdcId', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    const gemini = new FakeGemini();
+    gemini.reply = () => readableWith({ name: 'Broccoli, raw', grams: 150, foodId: null, fdcId: FDC_ID });
+
+    const result = await serviceFor(foods, gemini, usda, envWithoutKey).estimate(
+      VALID_SUB,
+      IMAGE_B64,
+      MIME,
+      HINT,
+    );
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Broccoli, raw');
+    expect(result.items[0].fdcId).toBe(FDC_ID);
+    expect(result.items[0].servingGrams).toBe(100);
+    expect(result.items[0].nutrients).toEqual(zeroVector());
+    expect(usda.calls).toHaveLength(0);
+    expect(foods.createCalls).toHaveLength(0);
+  });
+
+  it('hands the model empty USDA candidates when the factory throws during search_food', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    const gemini = new FakeGemini();
+    gemini.reply = (call) =>
+      alreadyAnswered(call) ? readableWith({ name: 'Broccoli, raw', grams: 150 }) : toolCallTurn('broccoli');
+
+    const result = await serviceFor(foods, gemini, usda, envWithoutKey).estimate(
+      VALID_SUB,
+      IMAGE_B64,
+      MIME,
+      HINT,
+    );
+
+    expect(result.readable).toBe(true);
+    expect(usda.calls).toHaveLength(0);
+    expect(toolResultSent(gemini)).toEqual({ catalog: [], usda: [] });
+  });
+});
