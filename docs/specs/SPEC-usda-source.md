@@ -31,7 +31,10 @@ catalog creation or dedup (that is `meal-service`'s), any nutrient arithmetic (t
 
 **Exports exactly one thing to the pipeline**: given an `fdcId`, return a complete
 `NutrientVector` per 100 g — already through `completeVector` — or a typed failure. It
-never returns a partial vector.
+never returns a partial vector. The pipeline resolves a whole photo with **one batch
+fetch** (`GET /v1/foods?fdcIds=`, one request per 20 ids) rather than one fetch per food;
+each batch entry shares the fetch-by-id row shape, so the mapping below is unchanged
+(`usda.client.ts` `fetchByFdcIds`; `fetchByFdcId` is its one-id convenience).
 
 ```ts
 type UsdaResult =
@@ -97,8 +100,17 @@ four are settled below as explicit corrections, so nobody "fixes" them back:
 
 ### Which endpoint the mapper reads — and which it never touches
 
-The two endpoints return **different shapes**. Only `GET /v1/food/{fdcId}`
-supplies a nutrient vector (Task 4's `fetchByFdcId`). The mapper reads
+Resolution fetches in **batch**: `GET /v1/foods?fdcIds=`, one request per estimate for
+as many as 20 ids, chunked per 20 beyond that — never one request per food. The batch
+list entries carry the **same nested rows** as the fetch-by-id body (the research note
+confirms it live: identical keys and row counts), so the mapper still reads only that
+one fetched row shape — `foodNutrients[].nutrient.number` + `.nutrient.unitName` +
+`.amount`, through `readNutrientRows` — whether the read was a batch or a single
+fetch. Invalid ids the list omits hold no vector (`null`, the absent vector downstream —
+never a throw, never a missing key), as does a failed chunk.
+
+The two search-vs-fetch endpoints return **different shapes**. Only the fetch
+(path above) supplies a nutrient vector. The mapper reads
 `foodNutrients[].nutrient.number` + `.nutrient.unitName` + `.amount` — nothing else.
 
 `GET /v1/foods/search` → `foods[].foodNutrients[]` rows are **flat**:

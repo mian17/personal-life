@@ -1,5 +1,10 @@
 import { NUTRIENTS } from '@life/nutrition';
-import { GeminiClient, type SearchFood, type SearchFoodResult } from '../src/photo/gemini.client';
+import {
+  GeminiClient,
+  MAX_TOOL_ROUNDS,
+  type SearchFood,
+  type SearchFoodResult,
+} from '../src/photo/gemini.client';
 import { FakeGemini, geminiResponse, item, readablePayload } from './fake-gemini';
 
 /**
@@ -104,7 +109,7 @@ describe('the search_food turn loop', () => {
     expect(fake.calls).toHaveLength(2);
   });
 
-  it('stops an over-running loop at five tool rounds on the one failure', async () => {
+  it('degrades an over-running loop past five tool rounds to the one failure', async () => {
     const fake = new FakeGemini();
     fake.reply = () => toolCallTurn('chicken');
     let calls = 0;
@@ -116,10 +121,13 @@ describe('the search_food turn loop', () => {
     const result = await clientFor(fake).readPhoto(image, undefined, searchTool);
 
     // The model never stopped searching, so no usable JSON arrived: the one
-    // failure shape, not a hang and not a partial answer.
+    // failure shape, not a hang and not a partial answer. The cap is spent on
+    // tool rounds; the overflow turn then answers the call empty — no tool runs,
+    // no id is offered — and the one further turn still carries a call instead
+    // of text, so the read fails rather than hanging.
     expect(result).toEqual(COULD_NOT_READ);
-    expect(calls).toBe(5);
-    expect(fake.calls.length).toBeLessThanOrEqual(6);
+    expect(calls).toBe(MAX_TOOL_ROUNDS);
+    expect(fake.calls).toHaveLength(MAX_TOOL_ROUNDS + 2);
   });
 
   it('stops on the forty-five-second wall clock before any further tool round', async () => {

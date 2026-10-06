@@ -20,6 +20,7 @@ import { UsdaClient, type UsdaTransport } from '../src/usda/usda.client';
 const KEY = 'test-usda-key-DO-NOT-LOG-7f3a';
 const BASE = 'https://usda.test/fdc';
 const FDC_ID = 170379;
+const OTHER_FDC_ID = 999999;
 
 const UNAVAILABLE = { ok: false, reason: 'unavailable' } as const;
 const RATE_LIMITED = { ok: false, reason: 'rate-limited' } as const;
@@ -93,6 +94,11 @@ function foodPayload(): unknown {
   };
 }
 
+/** The batch body's list: the fetch-by-id body once per id, each tagged with its own `fdcId`. */
+function listedFoods(fdcIds: readonly number[]): unknown {
+  return fdcIds.map((fdcId) => ({ ...(foodPayload() as Record<string, unknown>), fdcId }));
+}
+
 describe('UsdaClient — the caller decides which data types to search', () => {
   it('sends the caller’s dataType pair as repeated plain dataType params', async () => {
     const fake = new FakeUsda();
@@ -154,6 +160,96 @@ describe('UsdaClient — one food becomes our vector', () => {
     // The Proximates group row carries no amount and the kJ energy row is not
     // ours: neither moved a number, which is the mapper's rule, not a second one.
     expect(result.vector.vitaminC).toBe(0);
+  });
+});
+
+describe('UsdaClient — one batch request becomes every food’s vector', () => {
+  it('carries all requested ids in one request and maps each food back to its id', async () => {
+    const fake = new FakeUsda();
+    fake.reply = () => usdaResponse(listedFoods([FDC_ID, OTHER_FDC_ID]));
+    const vectors = await clientFor(fake).fetchByFdcIds([FDC_ID, OTHER_FDC_ID]);
+
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0].init.method).toBe('GET');
+    expect(fake.lastParams().getAll('fdcIds')).toEqual([String(FDC_ID), String(OTHER_FDC_ID)]);
+    expect(new URL(fake.calls[0].url).pathname).toBe('/fdc/v1/foods');
+    // Every requested id is a key: a mapped vector for the food USDA returned.
+    expect(vectors.get(FDC_ID)?.calories).toBe(34);
+    expect(vectors.get(OTHER_FDC_ID)?.calories).toBe(34);
+    expect(vectors.size).toBe(2);
+  });
+
+  it('splits 21 ids across exactly two requests and every id still resolves', async () => {
+    const ids = Array.from({ length: 21 }, (_value, index) => 1000 + index);
+    const fake = new FakeUsda();
+    fake.reply = (call) => {
+      const requested = new URL(call.url).searchParams.getAll('fdcIds').map(Number);
+      return usdaResponse(
+        requested.map((fdcId) => ({
+          fdcId,
+          description: 'food',
+          foodNutrients: [{ nutrient: { number: '208', unitName: 'kcal' }, amount: fdcId }],
+        })),
+      );
+    };
+    const vectors = await clientFor(fake).fetchByFdcIds(ids);
+
+    expect(fake.calls).toHaveLength(2);
+    const carried = fake.calls.map((call) => new URL(call.url).searchParams.getAll('fdcIds'));
+    expect(carried[0]).toEqual(ids.slice(0, 20).map(String));
+    expect(carried[1]).toEqual(ids.slice(20).map(String));
+    for (const params of carried) expect(params.length).toBeLessThanOrEqual(20);
+
+    expect(vectors.size).toBe(21);
+    expect(vectors.has(ids[0])).toBe(true);
+    expect(vectors.has(ids[ids.length - 1])).toBe(true);
+    for (const id of ids) expect(vectors.get(id)).not.toBeNull();
+    expect(vectors.get(ids[19])?.calories).toBe(ids[19]);
+    expect(vectors.get(ids[20])?.calories).toBe(ids[20]);
+  });
+
+  it('maps an id USDA omits to null without throwing or dropping the key', async () => {
+    const fake = new FakeUsda();
+    // USDA silently omits an id it does not know: the list holds only the valid one.
+    fake.reply = () => usdaResponse(listedFoods([FDC_ID]));
+    const vectors = await clientFor(fake).fetchByFdcIds([FDC_ID, OTHER_FDC_ID]);
+
+    expect(vectors.has(OTHER_FDC_ID)).toBe(true);
+    expect(vectors.get(OTHER_FDC_ID)).toBeNull();
+    expect(vectors.get(FDC_ID)?.calories).toBe(34);
+  });
+
+  it('maps a food whose rows do not map to null, keeping its key', async () => {
+    const fake = new FakeUsda();
+    fake.reply = () =>
+      usdaResponse([
+        { fdcId: FDC_ID, foodNutrients: [{ nutrient: { number: '951', unitName: 'g' }, type: 'FoodNutrient' }] },
+      ]);
+    const vectors = await clientFor(fake).fetchByFdcIds([FDC_ID]);
+
+    expect(vectors.get(FDC_ID)).toBeNull();
+  });
+
+  it('floors the whole requested set to null on a failed batch — no throw, no missing key', async () => {
+    for (const status of [429, 500, 404]) {
+      const fake = new FakeUsda();
+      fake.reply = () => usdaResponse({}, status);
+      const vectors = await clientFor(fake).fetchByFdcIds([FDC_ID, OTHER_FDC_ID]);
+      expect(vectors.get(FDC_ID)).toBeNull();
+      expect(vectors.get(OTHER_FDC_ID)).toBeNull();
+    }
+
+    // A body that is not the documented list, and a transport that throws, are
+    // the same whole-set null.
+    const malformed = new FakeUsda();
+    malformed.reply = () => usdaResponse({ foods: [] });
+    expect((await clientFor(malformed).fetchByFdcIds([FDC_ID])).get(FDC_ID)).toBeNull();
+
+    const broken = new FakeUsda();
+    broken.reply = () => {
+      throw new Error('network down');
+    };
+    expect((await clientFor(broken).fetchByFdcIds([FDC_ID])).get(FDC_ID)).toBeNull();
   });
 });
 

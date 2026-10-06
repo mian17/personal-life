@@ -1,5 +1,5 @@
 import { NUTRIENTS } from '@life/nutrition';
-import { GeminiClient, type SearchFoodResult } from '../src/photo/gemini.client';
+import { GeminiClient, MAX_TOOL_ROUNDS, type SearchFoodResult } from '../src/photo/gemini.client';
 import {
   FakeGemini,
   geminiResponse,
@@ -60,6 +60,30 @@ function alreadyAnswered(call: { init: RequestInit }): boolean {
 /** One identified food carrying the search binding the response schema requires. */
 function boundItem(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return { ...item(), searchQuery: null, ...overrides };
+}
+
+/** How many `functionResponse` turns this request already carries. */
+function answersSoFar(call: { init: RequestInit }): number {
+  const body = JSON.parse(String(call.init.body)) as {
+    contents?: { parts?: { functionResponse?: unknown }[] }[];
+  };
+  return (body.contents ?? []).reduce(
+    (count, turn) =>
+      count + (turn.parts ?? []).filter((part) => part.functionResponse !== undefined).length,
+    0,
+  );
+}
+
+/** The `response` payload of the last `functionResponse` the most recent request carries. */
+function lastToolResult(fake: FakeGemini): unknown {
+  const contents = (fake.lastRequestBody() as {
+    contents?: { parts?: { functionResponse?: { response?: unknown } }[] }[];
+  }).contents;
+  const responses = (contents ?? [])
+    .flatMap((turn) => turn.parts ?? [])
+    .filter((part) => part.functionResponse !== undefined)
+    .map((part) => part.functionResponse?.response);
+  return responses[responses.length - 1];
 }
 
 /** The tool-calling mode a request body carried, read from the parsed body. */
@@ -290,6 +314,33 @@ describe('GeminiClient', () => {
       toolModeOf(JSON.parse(String(call.init.body)) as Record<string, unknown>);
     expect(modeOf(fake.calls[0])).toBe('ANY');
     expect(modeOf(fake.calls[1])).toBe('AUTO');
+  });
+
+  it('degrades past the search cap: the overflow call is answered empty and the foods already found still read', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [], usda: [] };
+    };
+    // The model keeps calling search_food; only after the overflow answer does it
+    // finally name the food it found.
+    fake.reply = (call) =>
+      answersSoFar(call) > MAX_TOOL_ROUNDS
+        ? geminiResponse({ readable: true, items: [boundItem({ name: 'Chicken' })] })
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result).toEqual({ readable: true, items: [boundItem({ name: 'Chicken' })] });
+    // The cap allowed exactly MAX_TOOL_ROUNDS searches; the overflow turn ran the
+    // tool zero times, so it cost no USDA call.
+    expect(queries).toHaveLength(MAX_TOOL_ROUNDS);
+    // The overflow turn reached the model as one more request whose last tool
+    // answer was the empty result — it offered no id, so the stranded foods
+    // take the absent vector.
+    expect(fake.calls).toHaveLength(MAX_TOOL_ROUNDS + 2);
+    expect(lastToolResult(fake)).toEqual({ catalog: [], usda: [] });
   });
 
   it('maps a non-2xx on the request after a tool round to service-unavailable', async () => {

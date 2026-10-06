@@ -10,8 +10,9 @@ import { mapUsdaNutrients, type UsdaNutrientRow } from './mapping';
  * 1. `usda_search` lists candidate foods by name — names and USDA ids only,
  *    never a nutrient amount (the identity model picks one, Task 8). Search's
  *    `foodNutrients[]` is never read and never leaves this module.
- * 2. `fetchByFdcId` fetches one food and maps its nested `foodNutrients[]` into
- *    our per-100 g vector through `mapping.ts` — the one place a vector is made.
+ * 2. `fetchByFdcIds` fetches many foods in one request per 20 ids and maps each
+ *    nested `foodNutrients[]` into our per-100 g vector through `mapping.ts` —
+ *    the one place a vector is made. `fetchByFdcId` is its one-id convenience.
  *
  * Every failure collapses to one typed reason (`not-found`, `unmapped`,
  * `rate-limited`, `unavailable`), so the caller has exactly one path to "we
@@ -48,6 +49,9 @@ export type UsdaSearchResult = { ok: true; candidates: UsdaCandidate[] } | UsdaF
 export type UsdaTransport = typeof fetch;
 
 const DEFAULT_BASE = 'https://api.nal.usda.gov/fdc';
+
+/** The batch endpoint's one hard limit: at most 20 `fdcIds` per request. */
+const MAX_FDC_IDS_PER_REQUEST = 20;
 
 const NOT_FOUND: UsdaFailure = { ok: false, reason: 'not-found' };
 const RATE_LIMITED: UsdaFailure = { ok: false, reason: 'rate-limited' };
@@ -98,6 +102,24 @@ export class UsdaClient {
   }
 
   /**
+   * Many foods' nutrient vectors, per 100 g, already through `completeVector`,
+   * in one request per 20 ids. Every requested id appears in the result: a food
+   * USDA omits (invalid ids are silently skipped) or one whose rows map to
+   * nothing holds `null` — never a throw, never a missing key. Any transport or
+   * HTTP failure holds `null` for that request's whole set: the single-fetch
+   * semantics stay consistent with it, and an estimate must never fail because
+   * of it.
+   */
+  async fetchByFdcIds(fdcIds: readonly number[]): Promise<Map<number, NutrientVector | null>> {
+    const vectors = absentVectors(fdcIds);
+    for (const chunk of chunkByCap(fdcIds)) {
+      const found = await this.fetchBatch(chunk);
+      for (const [fdcId, vector] of found) vectors.set(fdcId, vector);
+    }
+    return vectors;
+  }
+
+  /**
    * One food's nutrient vector, per 100 g, already through `completeVector`.
    * `404` is `not-found`; a `429` is `rate-limited` and is not retried; every
    * other failure — non-2xx, malformed body, timeout, network error — is one
@@ -116,6 +138,30 @@ export class UsdaClient {
     } catch {
       return UNAVAILABLE;
     }
+  }
+
+  /**
+   * One batch request's outcomes for up to 20 ids: each requested id is a
+   * mapped vector or `null`. A failed request, a body that is not the list
+   * envelope, and an omitted id all leave the id `null` — the caller never
+   * special-cases a missing key.
+   */
+  private async fetchBatch(fdcIds: readonly number[]): Promise<Map<number, NutrientVector | null>> {
+    const vectors = absentVectors(fdcIds);
+    const url = this.urlFor('/v1/foods', { fdcIds: fdcIds.map(String) });
+    try {
+      const response = await this.send(url);
+      if (!response.ok) return vectors;
+      const foods = readFoodList(await response.json());
+      if (foods === null) return vectors;
+      for (const food of foods) {
+        const mapped = mapListedFood(food);
+        if (mapped) vectors.set(mapped.fdcId, mapped.vector);
+      }
+    } catch {
+      return vectors;
+    }
+    return vectors;
   }
 
   /**
@@ -193,6 +239,49 @@ function readNutrientRows(payload: unknown): UsdaNutrientRow[] | null {
     });
   }
   return rows;
+}
+
+/**
+ * The batch body's foods, or null for a body that is not the documented list.
+ * The list carries one food object per id, each with the same nested rows the
+ * fetch-by-id body has — so both endpoints reach the mapper through
+ * `readNutrientRows`, and the mapping path is one path.
+ */
+function readFoodList(payload: unknown): Record<string, unknown>[] | null {
+  if (!Array.isArray(payload)) return null;
+  const foods: Record<string, unknown>[] = [];
+  for (const food of payload) {
+    const row = record(food);
+    if (!row) return null;
+    foods.push(row);
+  }
+  return foods;
+}
+
+/** One listed food mapped to its id and vector, or null for a row we cannot attribute or map. */
+function mapListedFood(
+  food: Record<string, unknown>,
+): { fdcId: number; vector: NutrientVector } | null {
+  const fdcId = food.fdcId;
+  if (typeof fdcId !== 'number' || !Number.isInteger(fdcId)) return null;
+  const rows = readNutrientRows(food);
+  if (rows === null) return null;
+  const mapped = mapUsdaNutrients(rows);
+  return mapped.ok ? { fdcId, vector: mapped.vector } : null;
+}
+
+/** Every requested id, absent — the shape a failed or partial batch starts from. */
+function absentVectors(fdcIds: readonly number[]): Map<number, NutrientVector | null> {
+  return new Map(fdcIds.map((fdcId) => [fdcId, null]));
+}
+
+/** `fdcIds` split into runs no longer than the batch endpoint's 20-id cap. */
+function chunkByCap(fdcIds: readonly number[]): number[][] {
+  const chunks: number[][] = [];
+  for (let start = 0; start < fdcIds.length; start += MAX_FDC_IDS_PER_REQUEST) {
+    chunks.push(fdcIds.slice(start, start + MAX_FDC_IDS_PER_REQUEST));
+  }
+  return chunks;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

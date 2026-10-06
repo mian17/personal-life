@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { completeVector, zeroVector } from '../src/foods/content';
 import { FoodsService, type FoodDto } from '../src/foods/foods.service';
-import { GeminiClient, type SearchFoodResult } from '../src/photo/gemini.client';
+import { GeminiClient, MAX_TOOL_ROUNDS, type SearchFoodResult } from '../src/photo/gemini.client';
 import { PhotoService } from '../src/photo/photo.service';
 import { UsdaClient, type UsdaTransport } from '../src/usda/usda.client';
 import { FakeGemini, geminiResponse, item, type GeminiCall } from './fake-gemini';
@@ -34,8 +34,10 @@ const USDA_KEY = 'test-usda-key-DO-NOT-LOG-7f3a';
 const USDA_BASE = 'https://usda.test/fdc';
 const FDC_ID = 170379;
 const OTHER_FDC_ID = 999999;
+const BEANS_FDC_ID = 111222;
 const CHICKEN_CALORIES = 165;
 const RICE_CALORIES = 130;
+const BEANS_CALORIES = 88;
 
 const geminiEnv = (): NodeJS.ProcessEnv => ({
   GEMINI_API_KEY: 'test-gemini-key',
@@ -134,32 +136,70 @@ function nutrientPayload(fdcId: number, calories: number): unknown {
 }
 
 /**
- * A USDA transport serving two foods: a search offers the `fdcId` scripted for
- * its query (`chicken` → `FDC_ID`, anything else → `OTHER_FDC_ID`), and a
- * fetch-by-id returns that id's calorie amount.
+ * A USDA batch body tagged per food: each requested id maps to its own calorie
+ * amount, so one list carries every food the estimate resolves.
  */
-function serveTwoFoodsFromUsda(usda: FakeUsda): void {
-  usda.reply = () => {
-    const call = usda.calls[usda.calls.length - 1];
+function batchPayload(fdcIds: readonly number[]): unknown {
+  return fdcIds.map((fdcId) => nutrientPayload(fdcId, caloriesFor(fdcId)));
+}
+
+/** The calorie amount a scripted `fdcId` resolves to, so two foods' vectors differ. */
+function caloriesFor(fdcId: number): number {
+  if (fdcId === FDC_ID) return CHICKEN_CALORIES;
+  if (fdcId === OTHER_FDC_ID) return RICE_CALORIES;
+  return BEANS_CALORIES;
+}
+
+/**
+ * A USDA transport serving three foods: a search offers the `fdcId` scripted
+ * for its query (`chicken` -> `FDC_ID`, `rice` -> `OTHER_FDC_ID`, `beans` ->
+ * `BEANS_FDC_ID`), and the batch endpoint answers every requested id with its
+ * own calorie amount.
+ */
+function serveThreeFoodsFromUsda(usda: FakeUsda): void {
+  usda.reply = (call) => {
     const url = new URL(call.url);
-    const fetched = /\/food\/(\d+)$/.exec(url.pathname);
-    if (fetched) {
-      const fdcId = Number(fetched[1]);
-      return usdaResponse(
-        nutrientPayload(fdcId, fdcId === FDC_ID ? CHICKEN_CALORIES : RICE_CALORIES),
-      );
+    if (url.pathname.endsWith('/v1/foods')) {
+      return usdaResponse(batchPayload(url.searchParams.getAll('fdcIds').map(Number)));
     }
-    const query = url.searchParams.get('query');
-    return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : OTHER_FDC_ID, query ?? ''));
+    const query = url.searchParams.get('query') ?? '';
+    return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : query === 'rice' ? OTHER_FDC_ID : BEANS_FDC_ID, query));
   };
 }
 
-/** A model that searches `chicken` then `rice`, then answers with the scripted items. */
+/**
+ * A USDA transport serving two foods: a search offers the `fdcId` scripted for
+ * its query (`chicken` -> `FDC_ID`, anything else -> `OTHER_FDC_ID`), and the
+ * batch endpoint answers every requested id with its own calorie amount.
+ */
+function serveTwoFoodsFromUsda(usda: FakeUsda): void {
+  usda.reply = (call) => {
+    const url = new URL(call.url);
+    if (url.pathname.endsWith('/v1/foods')) {
+      return usdaResponse(batchPayload(url.searchParams.getAll('fdcIds').map(Number)));
+    }
+    const query = url.searchParams.get('query') ?? '';
+    return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : OTHER_FDC_ID, query));
+  };
+}
+
+/** A model that searches `chicken`, then `rice`, then answers with the scripted items. */
 function answerAfterTwoSearches(items: Record<string, unknown>[]) {
   return (call: GeminiCall): Response => {
     const answers = answersSoFar(call);
     if (answers === 0) return toolCallTurn('chicken');
     if (answers === 1) return toolCallTurn('rice');
+    return geminiResponse({ readable: true, items });
+  };
+}
+
+/** A model that searches `chicken`, `rice`, then `beans`, then answers with the scripted items. */
+function answerAfterThreeSearches(items: Record<string, unknown>[]) {
+  return (call: GeminiCall): Response => {
+    const answers = answersSoFar(call);
+    if (answers === 0) return toolCallTurn('chicken');
+    if (answers === 1) return toolCallTurn('rice');
+    if (answers === 2) return toolCallTurn('beans');
     return geminiResponse({ readable: true, items });
   };
 }
@@ -281,15 +321,13 @@ describe('PhotoService — the three paths', () => {
     expect(foods.createCalls).toHaveLength(0);
   });
 
-  it('resolves a bare fdcId from USDA per 100 g and writes nothing', async () => {
+  it('resolves a bare fdcId from USDA through one batch request, per 100 g, and writes nothing', async () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
-    usda.reply = () => {
-      const call = usda.calls[usda.calls.length - 1];
-      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
-        return usdaResponse(searchPayload());
-      }
-      return usdaResponse(foodPayload());
+    usda.reply = (call) => {
+      const url = new URL(call.url);
+      if (url.pathname.endsWith('/v1/foods')) return usdaResponse([foodPayload()]);
+      return usdaResponse(searchPayload());
     };
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
@@ -306,7 +344,8 @@ describe('PhotoService — the three paths', () => {
     const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
 
     expect(usda.calls).toHaveLength(2);
-    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
+    expect(new URL(usda.calls[1].url).pathname).toBe('/fdc/v1/foods');
+    expect(new URL(usda.calls[1].url).searchParams.getAll('fdcIds')).toEqual([String(FDC_ID)]);
     expect(result.readable).toBe(true);
     if (!result.readable) return;
     expect(result.items[0].foodId).toBeNull();
@@ -319,15 +358,13 @@ describe('PhotoService — the three paths', () => {
   it.each([
     ['rate-limited', 429],
     ['not-found', 404],
-  ])('fails open to the absent vector when the fdcId lookup is %s', async (_reason, status) => {
+  ])('fails open to the absent vector when the fdcId batch lookup is %s', async (_reason, status) => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
-    usda.reply = () => {
-      const call = usda.calls[usda.calls.length - 1];
-      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
-        return usdaResponse(searchPayload());
-      }
-      return usdaResponse({}, status);
+    usda.reply = (call) => {
+      const url = new URL(call.url);
+      if (url.pathname.endsWith('/v1/foods')) return usdaResponse({}, status);
+      return usdaResponse(searchPayload());
     };
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
@@ -346,7 +383,7 @@ describe('PhotoService — the three paths', () => {
     // A USDA outage costs the nutrient numbers and nothing else: the answer is
     // still a readable estimate carrying the food, the way path 3 states it.
     expect(usda.calls).toHaveLength(2);
-    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
+    expect(new URL(usda.calls[1].url).pathname).toBe('/fdc/v1/foods');
     expect(result.readable).toBe(true);
     if (!result.readable) return;
     expect(result.items).toHaveLength(1);
@@ -552,6 +589,43 @@ describe('PhotoService — each food’s id resolves against its own search quer
       RICE_CALORIES,
     ]);
     expect(result.items[0].nutrients.calories).not.toBe(result.items[1].nutrients.calories);
+    // Both foods' vectors arrive in one request, not one per food.
+    const batchCalls = usda.calls.filter((call) => new URL(call.url).pathname.endsWith('/v1/foods'));
+    expect(batchCalls).toHaveLength(1);
+    expect(new URL(batchCalls[0].url).searchParams.getAll('fdcIds')).toEqual([
+      String(FDC_ID),
+      String(OTHER_FDC_ID),
+    ]);
+  });
+
+  it('resolves three USDA foods through exactly one batch request, each answer naming its own query', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    serveThreeFoodsFromUsda(usda);
+    const gemini = new FakeGemini();
+    gemini.reply = answerAfterThreeSearches([
+      { name: 'Chicken', grams: 200, foodId: null, fdcId: FDC_ID, searchQuery: 'chicken' },
+      { name: 'Rice', grams: 150, foodId: null, fdcId: OTHER_FDC_ID, searchQuery: 'rice' },
+      { name: 'Beans', grams: 100, foodId: null, fdcId: BEANS_FDC_ID, searchQuery: 'beans' },
+    ]);
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    // One batch request carries all three ids — not three fetch-by-id calls.
+    const batchCalls = usda.calls.filter((call) => new URL(call.url).pathname.endsWith('/v1/foods'));
+    expect(batchCalls).toHaveLength(1);
+    expect(new URL(batchCalls[0].url).searchParams.getAll('fdcIds')).toEqual([
+      String(FDC_ID),
+      String(OTHER_FDC_ID),
+      String(BEANS_FDC_ID),
+    ]);
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    expect(result.items.map((item) => item.nutrients.calories)).toEqual([
+      CHICKEN_CALORIES,
+      RICE_CALORIES,
+      BEANS_CALORIES,
+    ]);
   });
 
   it('keeps rice on the absent vector when it names rice’s query beside chicken’s fdcId — the chicken vector is never attached to rice', async () => {
@@ -574,11 +648,62 @@ describe('PhotoService — each food’s id resolves against its own search quer
     expect(chicken.nutrients.calories).toBe(CHICKEN_CALORIES);
     expect(rice.nutrients).toEqual(zeroVector());
     expect(rice.nutrients.calories).not.toBe(CHICKEN_CALORIES);
-    // The chicken id was fetched only for the chicken item, never for rice.
-    const chickenFetches = usda.calls.filter((call) =>
-      call.url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`),
+    // The chicken id was fetched only for the chicken item, never for rice: the
+    // one batch request carried the chicken id and not the rejected rice id.
+    const batchCalls = usda.calls.filter((call) => new URL(call.url).pathname.endsWith('/v1/foods'));
+    expect(batchCalls).toHaveLength(1);
+    expect(new URL(batchCalls[0].url).searchParams.getAll('fdcIds')).toEqual([String(FDC_ID)]);
+  });
+});
+
+describe('PhotoService — the search cap degrades, never discards', () => {
+  it('answers with the foods it found when the model keeps calling search_food past the round cap', async () => {
+    const foods = new FakeFoods();
+    const usda = new FakeUsda();
+    usda.reply = (call) => {
+      const url = new URL(call.url);
+      if (url.pathname.endsWith('/v1/foods')) {
+        return usdaResponse(batchPayload(url.searchParams.getAll('fdcIds').map(Number)));
+      }
+      const query = url.searchParams.get('query');
+      return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : OTHER_FDC_ID, query ?? ''));
+    };
+    // The model searches five real foods, then a sixth (the overflow) it never
+    // gets a result for — the cap is five tool rounds.
+    const searches = ['chicken', 'rice', 'beans', 'tofu', 'kale', 'lentils'];
+    const gemini = new FakeGemini();
+    gemini.reply = (call) => {
+      const answers = answersSoFar(call);
+      if (answers >= MAX_TOOL_ROUNDS + 1) {
+        return geminiResponse({
+          readable: true,
+          items: [
+            { name: 'Chicken', grams: 200, foodId: null, fdcId: FDC_ID, searchQuery: 'chicken' },
+            // The food it could not search names no id: the absent vector.
+            { name: 'Lentils', grams: 100, foodId: null, fdcId: null, searchQuery: null },
+          ],
+        });
+      }
+      return toolCallTurn(searches[answers]);
+    };
+
+    const result = await serviceFor(foods, gemini, usda).estimate(VALID_SUB, IMAGE_B64, MIME, HINT);
+
+    expect(result.readable).toBe(true);
+    if (!result.readable) return;
+    const [chicken, lentils] = result.items;
+    expect(chicken.nutrients.calories).toBe(CHICKEN_CALORIES);
+    expect(lentils.nutrients).toEqual(zeroVector());
+
+    // The overflow turn ran no tool: exactly MAX_TOOL_ROUNDS searches reached
+    // the USDA, and the one batch carried only the id a real search offered.
+    const searchCalls = usda.calls.filter((call) =>
+      new URL(call.url).pathname.endsWith('/v1/foods/search'),
     );
-    expect(chickenFetches).toHaveLength(1);
+    expect(searchCalls).toHaveLength(MAX_TOOL_ROUNDS);
+    const batchCalls = usda.calls.filter((call) => new URL(call.url).pathname.endsWith('/v1/foods'));
+    expect(batchCalls).toHaveLength(1);
+    expect(new URL(batchCalls[0].url).searchParams.getAll('fdcIds')).toEqual([String(FDC_ID)]);
   });
 });
 
@@ -685,15 +810,13 @@ describe('PhotoService — boot is independent of USDA config', () => {
 describe('PhotoService — a USDA failure degrades the item, never the estimate', () => {
   const envWithoutKey: NodeJS.ProcessEnv = { USDA_API_BASE: USDA_BASE };
 
-  it('fails open to the absent vector when fetchByFdcId throws for an offered fdcId', async () => {
+  it('fails open to the absent vector when the batch request throws for an offered fdcId', async () => {
     const foods = new FakeFoods();
     const usda = new FakeUsda();
-    // Search succeeds and offers FDC_ID; only the fetch-by-id throws.
+    // Search succeeds and offers FDC_ID; only the batch request throws.
     usda.reply = (call) => {
-      if (call.url.startsWith(`${USDA_BASE}/v1/foods/search?`)) {
-        return usdaResponse(searchPayload());
-      }
-      throw new Error('fetch failed');
+      if (new URL(call.url).pathname.endsWith('/v1/foods')) throw new Error('fetch failed');
+      return usdaResponse(searchPayload());
     };
     const gemini = new FakeGemini();
     gemini.reply = (call) =>
@@ -713,7 +836,7 @@ describe('PhotoService — a USDA failure degrades the item, never the estimate'
     expect(result.items[0].servingGrams).toBe(100);
     expect(result.items[0].nutrients).toEqual(zeroVector());
     expect(usda.calls).toHaveLength(2);
-    expect(usda.calls[1].url.startsWith(`${USDA_BASE}/v1/food/${FDC_ID}?`)).toBe(true);
+    expect(new URL(usda.calls[1].url).pathname).toBe('/fdc/v1/foods');
     expect(foods.createCalls).toHaveLength(0);
   });
 

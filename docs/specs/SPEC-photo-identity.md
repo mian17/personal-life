@@ -66,6 +66,13 @@ the numbers.** Path by path:
 | 2 | No catalog food; USDA resolves `fdcId` | `usda-source`'s mapped per-100 g vector (stored when the food is created at log time, `servingGrams: 100`) | USDA numbers |
 | 3 | No catalog food; USDA cannot resolve | **none** — the food is created with `zeroVector()` | the unknown affordance |
 
+Path 2 is **batched across the whole photo**: resolution gathers the distinct `fdcId`s
+the answers carry — each only when the query it names actually offered it, and only
+when the catalog did not already supply the food — and fetches them in **one** request
+per 20 ids (`usda.client.ts` `fetchByFdcIds`), not one per food. An id any answer could
+not vouch for never enters the batch, and an id the batch returns nothing for (an
+invalid id, a failed request) takes `zeroVector()` exactly as path 3 states.
+
 **Nothing here is written at estimate time.** All three paths resolve an on-the-wire
 vector only — no `Food` row is created during the estimate. The backend resolves the
 *vector* (reuse the catalog's stored vector on path 1, call `usda-source` on path 2,
@@ -236,10 +243,17 @@ terminal turn is the one whose part is `text`, which is what `responseSchema` sh
 **Bounds: 5 tool rounds, 45 s wall clock.** A meal photo holds a handful of distinct
 foods, so a model still searching after 5 rounds is looping, not reading; 45 s is 3 ×
 the client's existing 15 s per-request timeout (`gemini.client.ts`) — an estimate cannot
-sit for minutes while a diner waits. Hitting either bound stops the loop and the turn is
-treated as the model's final answer; if no usable JSON arrived, the result is
-`COULD_NOT_READ` (invariant 1 — every failure is one failure; a model that keeps
-searching terminates, never hangs).
+sit for minutes while a diner waits. The wall clock is a hard stop: the turn at hand is
+treated as the model's final answer, and if no usable JSON arrived, the result is
+`COULD_NOT_READ`. The round cap **degrades instead of discarding**: when the model
+returns a `functionCall` with the budget spent, the loop does **not** run the tool — it
+answers the outstanding call with an empty result (`{ catalog: [], usda: [] }`, which
+offers no id) and allows **exactly one** further turn for the model to answer with the
+foods it already found. A second over-cap `functionCall` ends the loop as before. So the
+foods a model could not search take `zeroVector()` through path 3, and a photo that
+merely needed more searches still returns its foods — never `could-not-read` for that
+reason alone. The overflow turn runs no tool, so it costs no USDA call
+(`gemini.client.ts` `readWithSearch`).
 
 ## Failure reasons
 
@@ -298,11 +312,15 @@ rule: any logged URL *is* a leaked key, and data.gov deactivates keys it finds p
    `functionResponse` shapes were verified against the Generative Language discovery
    document; the open question of which `role` carries a `functionResponse` is answered
    there (it is optional, conventionally `role: "user"`).
-2. **USDA's JSON field names and the mapping table** — see `SPEC-usda-source.md`. Path 2
-   is unusable until those are settled.
+2. **USDA's JSON field names and the mapping table** — **Resolved 2026-10-05**, and the
+   fetch path is **batched**: one `GET /v1/foods?fdcIds=` request per estimate (chunked
+   at 20 ids) supplies every food's vector, and its list entries share the fetch-by-id
+   row shape, so one mapper reads both. See `SPEC-usda-source.md`.
 3. **Loop bounds.** **Chosen 2026-10-05** — 5 tool rounds and 45 s wall clock, recorded in
-   §"The tool loop" → *The verified envelope*; either bound exceeded stops the loop and no
-   usable JSON means `COULD_NOT_READ`. `gemini.client.ts` enforces both.
+   §"The tool loop" → *The verified envelope*. The wall clock is a hard stop (`COULD_NOT_READ`
+   if no usable JSON followed); the round cap **degrades** — the outstanding call is
+   answered empty, one further turn is allowed, and the foods already found still return.
+   `gemini.client.ts` enforces both.
 
 ## Non-goals
 

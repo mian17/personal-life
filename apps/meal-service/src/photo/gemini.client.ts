@@ -97,11 +97,17 @@ const SEARCH_TOOL_NAME = 'search_food';
  * Task 2's bounds (SPEC-photo-identity § Bounds: "5 tool rounds, 45 s wall
  * clock"): a meal photo holds a handful of foods, so a model still searching
  * after five rounds is looping, not reading; forty-five seconds is three of
- * this client's per-request timeouts. ponytail: fixed budget for every read;
- * make it per-call only if a real model needs longer.
+ * this client's per-request timeouts. Hitting the round cap no longer discards
+ * the read: the loop answers the outstanding call with an empty result and lets
+ * the model answer with the foods it already found (see `readWithSearch`).
+ * ponytail: fixed budget for every read; make it per-call only if a real model
+ * needs longer.
  */
-const MAX_TOOL_ROUNDS = 5;
+export const MAX_TOOL_ROUNDS = 5;
 const TOOL_LOOP_WALL_CLOCK_MS = 45_000;
+
+/** The answer to a call we will not run: it offers no candidate, so no id can resolve through it. */
+const NO_SEARCH_RESULT: SearchFoodResult = { catalog: [], usda: [] };
 
 /**
  * Image MIME types the API documents for inline image bytes (`Blob.mimeType` in
@@ -251,8 +257,9 @@ export class GeminiClient {
    * terminal turn is model JSON text. With a tool, each `functionCall` turn
    * runs the caller's search and answers with a `functionResponse` turn, until
    * a text turn arrives or a bound stops the loop — five tool rounds, forty-
-   * five seconds of wall clock. Past either bound the turn at hand is treated
-   * as the final answer, and a turn with no usable JSON is `COULD_NOT_READ`.
+   * five seconds of wall clock. Past the wall clock the turn at hand is treated
+   * as the final answer; past the round cap the call is answered empty for one
+   * further turn. A turn with no usable JSON is `COULD_NOT_READ`.
    */
   async readPhoto(
     image: PhotoImage,
@@ -285,7 +292,11 @@ export class GeminiClient {
    * the model's `functionCall`, then our `functionResponse` — and ends on the
    * first text turn. Either bound stops it: five tool rounds, or forty-five
    * seconds since the photo first went out. The first request forces a call,
-   * later ones leave the choice to the model.
+   * later ones leave the choice to the model. Past the round cap a call is not
+   * run: the loop answers it with an empty result and allows one further turn,
+   * so the model can answer with the foods it already found instead of losing
+   * the whole estimate. The foods it could not search take the absent vector
+   * through the existing path 3 — they are not special-cased here.
    */
   private async readWithSearch(
     image: PhotoImage,
@@ -295,6 +306,7 @@ export class GeminiClient {
     const turns: ConversationTurn[] = [{ role: 'user', parts: this.firstParts(image, hint) }];
     const deadline = Date.now() + TOOL_LOOP_WALL_CLOCK_MS;
     let toolsUsed = 0;
+    let exhaustedReplySent = false;
     for (;;) {
       if (Date.now() >= deadline) return readFailure(COULD_NOT_READ);
       const response = await this.send(JSON.stringify(this.loopBody(turns, toolsUsed)));
@@ -303,7 +315,16 @@ export class GeminiClient {
       if (!parts) return readFailure(COULD_NOT_READ);
       const rawCall = findToolCall(parts);
       if (rawCall === undefined) return finishReading(parts);
-      if (toolsUsed >= MAX_TOOL_ROUNDS) return finishReading(parts);
+      if (toolsUsed >= MAX_TOOL_ROUNDS) {
+        if (exhaustedReplySent) return finishReading(parts);
+        exhaustedReplySent = true;
+        const call = readToolCall(rawCall);
+        if (!call) return readFailure(COULD_NOT_READ);
+        // The cap is spent: no tool runs, so this turn costs no USDA call — and
+        // the empty answer offers no id, so the stranded foods take path 3.
+        turns.push({ role: 'model', parts }, { role: 'user', parts: [toolResultPart(call.id, NO_SEARCH_RESULT)] });
+        continue;
+      }
       const call = readToolCall(rawCall);
       if (!call) return readFailure(COULD_NOT_READ);
       const found = await runSearchTool(searchTool, call.query, deadline);

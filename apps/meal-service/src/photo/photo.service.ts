@@ -82,7 +82,8 @@ interface ResolvedVector {
  *
  * 1. a catalog `foodId` reads that row's own stored vector through
  *    `FoodsService.findOne` — zero USDA calls;
- * 2. a bare `fdcId` fetches `usda-source`'s mapped vector for the wire only;
+ * 2. a bare `fdcId` fetches `usda-source`'s mapped vector for the wire only —
+ *    every bare id one photo needs in a single batch request;
  * 3. neither id — or an id the named query did not offer, or a `foodId` that no
  *    longer resolves — yields `zeroVector()` ("no nutrient data"), so the food
  *    still logs and the person fills the numbers by hand.
@@ -145,58 +146,63 @@ export class PhotoService {
     );
   }
 
-  private resolveItems(
+  private async resolveItems(
     sub: string,
     suggestions: PhotoFoodSuggestion[],
     offered: OfferedIds,
   ): Promise<PhotoEstimateItem[]> {
-    return Promise.all(
-      suggestions.map((suggestion) => this.resolveItem(sub, suggestion, offered)),
+    const catalogVectors = await Promise.all(
+      suggestions.map((suggestion) => this.resolveCatalogVector(sub, suggestion, offered)),
+    );
+    const usdaVectors = await this.fetchUsdaVectors(
+      offeredFdcIdsToFetch(suggestions, catalogVectors, offered),
+    );
+    return suggestions.map((suggestion, index) =>
+      toEstimateItem(suggestion, catalogVectors[index], usdaVectors, offered),
     );
   }
 
-  private async resolveItem(
+  /**
+   * Path 1: the catalog's own stored vector when the answer names a `foodId`
+   * the query it reports actually offered — null otherwise, so the item falls
+   * through to the USDA path or the absent vector. The gate is unchanged: an id
+   * another food's query offered, or a guessed id, is no id at all.
+   */
+  private async resolveCatalogVector(
     sub: string,
     suggestion: PhotoFoodSuggestion,
     offered: OfferedIds,
-  ): Promise<PhotoEstimateItem> {
-    const resolved = await this.resolveVector(sub, suggestion, offered);
+  ): Promise<ResolvedVector | null> {
+    if (suggestion.foodId === null) return null;
+    if (!offered.hasCatalogId(suggestion.searchQuery, suggestion.foodId)) return null;
+    const catalogRow = await this.findCatalogRow(sub, suggestion.foodId);
+    if (catalogRow === null) return null;
     return {
-      name: suggestion.name,
-      grams: suggestion.grams,
-      foodId: suggestion.foodId,
-      fdcId: suggestion.fdcId,
-      servingGrams: resolved.servingGrams,
-      nutrients: resolved.nutrients,
+      servingGrams: catalogRow.servingGrams,
+      nutrients: completeVector(catalogRow.nutrients),
     };
   }
 
   /**
-   * Path by the id the answer carries — catalog first, then USDA, then the
-   * absent vector — but only when the query the answer names as its
-   * `searchQuery` actually offered that id. An id another food's query offered,
-   * or a guessed id, is treated as no id at all: resolving it would attach a
-   * real food's vector to a food the model never matched.
+   * Path 2, batched: one USDA request for every offered `fdcId` the catalog
+   * could not resolve, however many foods the photo holds. A client that is
+   * unconfigured, a factory that throws, or a request that fails leaves every
+   * id `null` — each item degrades to the absent vector, never the estimate.
    */
-  private async resolveVector(
-    sub: string,
-    suggestion: PhotoFoodSuggestion,
-    offered: OfferedIds,
-  ): Promise<ResolvedVector> {
-    if (suggestion.foodId !== null && offered.hasCatalogId(suggestion.searchQuery, suggestion.foodId)) {
-      const catalogRow = await this.findCatalogRow(sub, suggestion.foodId);
-      if (catalogRow) {
-        return {
-          servingGrams: catalogRow.servingGrams,
-          nutrients: completeVector(catalogRow.nutrients),
-        };
-      }
+  private async fetchUsdaVectors(
+    fdcIds: readonly number[],
+  ): Promise<Map<number, NutrientVector | null>> {
+    const vectors = new Map<number, NutrientVector | null>();
+    for (const fdcId of fdcIds) vectors.set(fdcId, null);
+    if (fdcIds.length === 0) return vectors;
+    const usda = this.usda();
+    if (!usda) return vectors;
+    const found = await usda.fetchByFdcIds(fdcIds);
+    for (const fdcId of fdcIds) {
+      const vector = found.get(fdcId) ?? null;
+      vectors.set(fdcId, vector === null ? null : completeVector(vector));
     }
-    if (suggestion.fdcId !== null && offered.hasFdcId(suggestion.searchQuery, suggestion.fdcId)) {
-      const vector = await this.fetchUsdaVector(suggestion.fdcId);
-      if (vector) return { servingGrams: 100, nutrients: vector };
-    }
-    return { servingGrams: 100, nutrients: zeroVector() };
+    return vectors;
   }
 
   /**
@@ -212,14 +218,6 @@ export class PhotoService {
       if (error instanceof NotFoundException) return null;
       throw error;
     }
-  }
-
-  /** Path 2: the USDA vector for the model's id, per 100 g, written nowhere. */
-  private async fetchUsdaVector(fdcId: number): Promise<NutrientVector | null> {
-    const usda = this.usda();
-    if (!usda) return null;
-    const result = await usda.fetchByFdcId(fdcId);
-    return result.ok ? completeVector(result.vector) : null;
   }
 
   /**
@@ -284,6 +282,72 @@ function warnUsdaUnconfiguredOnce(): void {
   if (warnedUsdaUnconfigured) return;
   warnedUsdaUnconfigured = true;
   logger.error('USDA lookup skipped: client is not configured (USDA_API_KEY must be set)');
+}
+
+/**
+ * The distinct `fdcId`s to fetch: each answer's own offered `fdcId` —
+ * an id another food's query offered, or a guessed id, never enters — once,
+ * and only when the catalog did not already resolve that food.
+ */
+function offeredFdcIdsToFetch(
+  suggestions: PhotoFoodSuggestion[],
+  catalogVectors: readonly (ResolvedVector | null)[],
+  offered: OfferedIds,
+): number[] {
+  const fdcIds: number[] = [];
+  const seen = new Set<number>();
+  for (const [index, suggestion] of suggestions.entries()) {
+    if (catalogVectors[index] !== null) continue;
+    if (suggestion.fdcId === null) continue;
+    if (!offered.hasFdcId(suggestion.searchQuery, suggestion.fdcId)) continue;
+    if (seen.has(suggestion.fdcId)) continue;
+    seen.add(suggestion.fdcId);
+    fdcIds.push(suggestion.fdcId);
+  }
+  return fdcIds;
+}
+
+/** One suggestion plus its resolved base and vector: the estimate response's item. */
+function toEstimateItem(
+  suggestion: PhotoFoodSuggestion,
+  catalogVector: ResolvedVector | null,
+  usdaVectors: Map<number, NutrientVector | null>,
+  offered: OfferedIds,
+): PhotoEstimateItem {
+  if (catalogVector !== null) {
+    return {
+      name: suggestion.name,
+      grams: suggestion.grams,
+      foodId: suggestion.foodId,
+      fdcId: suggestion.fdcId,
+      servingGrams: catalogVector.servingGrams,
+      nutrients: catalogVector.nutrients,
+    };
+  }
+  // The gate is re-checked at assembly, not only at collection: an id another
+  // food's query offered never enters the batch, and never attaches here either.
+  const usdaVector =
+    suggestion.fdcId === null || !offered.hasFdcId(suggestion.searchQuery, suggestion.fdcId)
+      ? null
+      : (usdaVectors.get(suggestion.fdcId) ?? null);
+  if (usdaVector !== null) {
+    return {
+      name: suggestion.name,
+      grams: suggestion.grams,
+      foodId: suggestion.foodId,
+      fdcId: suggestion.fdcId,
+      servingGrams: 100,
+      nutrients: usdaVector,
+    };
+  }
+  return {
+    name: suggestion.name,
+    grams: suggestion.grams,
+    foodId: suggestion.foodId,
+    fdcId: suggestion.fdcId,
+    servingGrams: 100,
+    nutrients: zeroVector(),
+  };
 }
 
 /** A catalog row as the tool payload sees it: id, name, and base — never a vector. */

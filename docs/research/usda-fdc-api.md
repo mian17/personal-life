@@ -64,6 +64,31 @@ omitted; empty set when nothing matches. Optional `format`, `nutrients`.
 
 Also `POST /v1/foods` (`FoodsCriteria`: `fdcIds`, `format`, `nutrients`).
 
+#### Batch by ids — confirmed live 2026-10-05
+
+`GET /v1/foods?fdcIds=747447,170379&api_key=…` → **200**, a JSON **list** of two
+foods; `POST /v1/foods` with body `{"fdcIds":[…]}` returns the same list (200). The
+list entries' `foodNutrients[]` rows are the **identical nested shape**
+`GET /v1/food/{fdcId}` returns — row keys `['nutrient', 'type']`, `nutrient` keys
+`['id', 'name', 'number', 'rank', 'unitName']`, `amount` on the row. The same id
+yields the same row count either way (747447 → 113 rows). So `mapUsdaNutrients`
+applies to a batch entry unchanged: the batch endpoint is the same read, once per
+20 ids instead of once per id.
+
+**Max 20 `fdcIds` per request.** An invalid or unknown id is **silently omitted**
+from the list (never a 404, never a throw) — the caller maps the absent id to its
+own "no vector" outcome. `format` and `nutrients` are optional, as on the single
+fetch.
+
+**Why batching is the fetch path, and not the search path.** There is **no batch
+search**: `GET /v1/foods/search` accepts repeated `query` params, but returns one
+**blended** `foods` list with **no per-query attribution**, and
+`GET /v1/foods?query=x&query=y` is a `400`. Search rows also cannot replace a
+fetch: `/v1/foods/search` returns 22 `foodNutrients` rows for a chicken breast that
+map only **15 of our 27** keys (no calories, no vitamins), while the fetch returns
+26 rows that map fully. So a photo's nutrient vectors come from **one batch fetch
+per estimate**, chunked at 20 ids — never from search, and never one fetch per food.
+
 ### `GET /v1/foods/list` — paged listing (abridged)
 
 `dataType` (same live wire shape as the search endpoint — repeated plain `dataType`,
