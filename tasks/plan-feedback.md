@@ -200,6 +200,30 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 ### Checkpoint: Complete
 - [ ] Five lanes N/N PASS; all acceptance criteria met; merge human-gated.
 
+### Phase 6 — Feedback title (2026-10-15 amendment, intent decision 10)
+
+Design input (landed **before** this phase, as the Tech Lead's spec-first artifact):
+`docs/intent/feedback-service.md` (outcome + locked decision 10) and the three specs —
+`MAP-feedback.md` (POST body, `FeedbackDto`, `CreateFeedbackInput`, `FEEDBACK_TITLE_MAX`),
+`SPEC-feedback-service.md` (data-model column + per-field AAD, API/DTO, cache row, test group 4,
+traceability), `SPEC-feedback-ui.md` (form field + ordered validation + frozen strings, inbox
+row mapping, tests). These tasks implement them and add no spec text.
+
+- [ ] T16: `@life/shared` — `FEEDBACK_TITLE_MAX` (= 200) + `title` on `FeedbackDto` / `CreateFeedbackInput`
+- [ ] T17: `apps/feedback-service` — `title` column (`enc.v1.`, AAD `life.v1|<sub>|feedback|title|<id>`), DTO (`@IsNotEmpty` + `@MaxLength(FEEDBACK_TITLE_MAX)`), encrypt + decrypt **both** fields, cache row guard covers `title`; service suites
+- [ ] T18: `@life/ui` — `FeedbackForm` title `Input` above the description + ordered validation (`errorField`) + frozen strings; form suite
+- [ ] T19: `apps/app` — inbox row renders `title` + `snippet`; inbox suite
+- [ ] T20: e2e — `feedback.spec.ts` gains the title step + the ONE targeted e2e run
+- [ ] T21: five-lane verification gate (§7.6) → report
+
+### Checkpoint: Title amendment
+- [ ] `FeedbackDto` / `CreateFeedbackInput` carry `title`; `FEEDBACK_TITLE_MAX` = 200 exported from `@life/shared`.
+- [ ] The raw `title` column and every cached row hold `enc.v1.` envelopes; no plaintext **or ciphertext** title exists in `feedback_event` rows or published message bodies.
+- [ ] The form refuses a blank title (`'Title is required.'`, **no** request) and, with a title present, a blank description (`'Description is required.'`).
+- [ ] The inbox renders the title line with the description beneath it (`ListItem` `title` + `snippet`).
+- [ ] A row submitted before the amendment (no title) still reads back — `synchronize` migration path proven (see risk row).
+- [ ] The one targeted e2e passed (T20).
+
 ## Ordered index (tasks in `tasks/todo-feedback.md`)
 
 | # | Task | Module | Depends on | Size |
@@ -219,6 +243,12 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 | T13 | toolbar integration + PWA identity + manifest/gate suites | feedback-ui | T12 | M |
 | T14 | e2e harness + `feedback.spec.ts` + ONE targeted e2e run | feedback-ui | T13, T10 | M |
 | T15 | five-lane gate (§7.6) | close | T14 | M |
+| T16 | `@life/shared` — `FEEDBACK_TITLE_MAX` + `title` fields | feedback-service | — | S |
+| T17 | service — `title` column + DTO + encrypt/decrypt both + suites | feedback-service | T16 | M |
+| T18 | `@life/ui` — title `Input` + ordered validation + form suite | feedback-ui | T16 | S |
+| T19 | `apps/app` — inbox `title` + `snippet` + suite | feedback-ui | T16 | S |
+| T20 | e2e — title step + ONE targeted e2e run | feedback-ui | T19 | S |
+| T21 | five-lane gate (§7.6) | close | T20 | M |
 
 ## Parallelization
 
@@ -233,7 +263,8 @@ forces parallel subagents. Everything else is a strict chain per the index.
 | First Postgres + RabbitMQ in the stack (a new infra class: images, volumes, healthchecks, backup semantics) | High | Stock images only; healthcheck-gated `depends_on`; published host-loopback only (`127.0.0.1:5432`/`127.0.0.1:5672`), Redis instances internal-only; the PG backup/restore pair is proven by unit + throwaway-container integration suites (T4/T5) before the service relies on the store; restore fails closed on an up/unknown probe. |
 | Postgres NOTIFY is transient — dropped on disconnect or listener-queue overflow | Med | The `feedback_event` table (addressed by `seq` cursor) is the source of truth; the 60s reconciliation tick replays `seq > last_seq` until caught up (A2); service test group 7 proves a dropped notification is republished in order with `event_id` dedup. |
 | `@life/ui` → `@life/shared` is a new dependency edge | Med | Types-only, one line in `packages/ui/package.json`; jest `moduleNameMapper` mirrors the existing `@life/*` source-resolution pattern; `npm run typecheck -w @life/ui` and `-w @life/app` gate it; shared never imports ui (no cycle). |
-| Docker-dependent tests (`pg-integration.test.ts`, feedback-service suites, the e2e harness's throwaway Postgres) | Med | Unit/integration suites are skipped, not failed, when Docker is absent (infra spec); the e2e fails fast with a clear message (it is the chapter's final proof — a silent skip would hide it); fake-runner unit tests never touch Docker. |
+| Docker-dependent tests (`pg-integration.test.ts`, feedback-service suites, the e2e harness's throwaway Postgres) | Med | Unit/integration suites are skipped, not failed, when Docker is absent (infra spec); the e2e fails fast with a clear message (it is the chapter's final proof — a silent skip would hide it); fake-runner unit tests never touch Docker. T17's pre-title rows are a brand-new table (`feedback` ships with T8), so no production backfill exists; the only hazard is a **local dev Postgres already holding `feedback` rows from testing** — in that case `synchronize` cannot turn `title` NOT NULL against old rows, and the fix is documented as dropped-and-resynced (dev-only, never a data directory). |
+| `title` is a map-locked wire-contract change (Phase 6) | Low | The `## Boundaries` "Ask first" clause is satisfied by the user's explicit answer ("Required title"); the authorization is recorded in the intent's decision 10, `MAP-feedback.md`, both specs, and this plan. |
 | e2e harness must launch feedback-service + a throwaway Postgres | Med | T14 mirrors the `pg-integration.test.ts` container pattern and the existing `spawnService`/`waitForHttp` harness; the app gets `FEEDBACK_API_URL`; `REDIS_URL` unset (fail-open → direct DB) and no RabbitMQ (spec'd broker-down tolerance); teardown force-removes the container. |
 | `amqplib` is a new runtime dependency | Low | Forced by locked decision 4; publisher sits behind a small interface so tests use a fake AMQP sink recording confirms; lockfile via `npm install` only. |
 | Frozen surfaces (e2e selectors, token values, existing PWA constants) | Med | New selectors and new files only; T13 asserts zero diff to `manifest-notes.json`/`manifest-todos.json`/`viewport.themeColor`/`icon.svg`; the Contract mechanical-checks checkpoint re-runs every grep before the gate. |

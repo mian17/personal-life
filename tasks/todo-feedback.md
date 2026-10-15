@@ -860,6 +860,237 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - [ ] No commit outside the explicit paths; merge remains human-gated.
   - Dependencies: T14. Size: M.
 
+- [ ] T16: `@life/shared` — feedback title wire fields — module `feedback-service`
+  - [TASK OBJECTIVE] Add the amendment-10 wire contract: `FEEDBACK_TITLE_MAX` (= 200) and a
+    required `title: string` on `FeedbackDto` and `CreateFeedbackInput`.
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create: `packages/shared/src/index.ts`,
+      `packages/shared/test/index.test.ts`.
+    - Reference files (read-only): `docs/specs/MAP-feedback.md` (locked interfaces),
+      `docs/specs/SPEC-feedback-service.md` (`## API / DTO contract`),
+      `docs/intent/feedback-service.md` (locked decision 10).
+    - Strictly prohibited files: every other file (no service, no UI, no app code).
+  - [IMPLEMENTATION REQUIREMENTS]
+    - `packages/shared/src/index.ts`: `export const FEEDBACK_TITLE_MAX = 200;` beside
+      `FEEDBACK_DESCRIPTION_MAX`; `FeedbackDto` gains `title: string;` before `description`;
+      `CreateFeedbackInput` gains `title: string;` before `description`. Every existing export
+      (`FEEDBACK_DESCRIPTION_MAX`, `FEEDBACK_APPS`, `FeedbackType`, …) stays byte-identical. No
+      new file, no runtime logic, no `feedback/dto/` split (the module is flat today).
+    - Code style: prose — intention-revealing names, the surrounding feedback block's existing
+      comment density (it is comment-free; add none).
+    - Test: extend `packages/shared/test/index.test.ts` with one case asserting
+      `FEEDBACK_TITLE_MAX === 200` and `FEEDBACK_TITLE_MAX < FEEDBACK_DESCRIPTION_MAX` (the two
+      bounds the service DTO mirrors).
+  - [VERIFICATION & TESTING RULES]
+    - Permitted commands: `npm run typecheck -w @life/shared` and
+      `npm run test:unit -w @life/shared -- test/index.test.ts`.
+    - Strict constraints: NO other workspace, NO full suite, NO E2E; max test executions: 2.
+  - [DEFINITION OF DONE]
+    - [ ] `FeedbackDto`/`CreateFeedbackInput` carry `title`; `FEEDBACK_TITLE_MAX` = 200 exported.
+    - [ ] No existing export changed; no file outside scope modified.
+    - [ ] Typecheck + the named test pass.
+  - Dependencies: —. Size: S.
+
+- [ ] T17: feedback-service — `title` column + DTO + encrypt/decrypt + suites — module `feedback-service`
+  - [TASK OBJECTIVE] Persist, read back, and encrypt/decrypt a required `title` beside the
+    description, keeping the event payload metadata-only (amendment 10).
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create:
+      `apps/feedback-service/src/feedback/feedback.entity.ts`,
+      `apps/feedback-service/src/feedback/dto/create-feedback.dto.ts`,
+      `apps/feedback-service/src/feedback/feedback.service.ts`,
+      `apps/feedback-service/test/feedback.e2e-spec.ts`,
+      `apps/feedback-service/test/feedback-harness.ts` (only if its POST-body builder needs `title`).
+    - Reference files (read-only): `docs/specs/SPEC-feedback-service.md` (data model, API/DTO,
+      cache, test group 4, traceability), `apps/feedback-service/src/event/**` (the **unchanged**
+      event contract — read only to confirm no title leaks in),
+      `apps/todo-service/src/todos/todo.entity.ts` + `apps/todo-service/src/todos/todos.service.ts`
+      (the `titleAad` + `encryptField`/`isCiphertextRow` precedent),
+      `apps/feedback-service/src/feedback/feedback-cache.ts`.
+    - Strictly prohibited files: `apps/feedback-service/src/event/**` (the event body stays
+      `{ event_id, feedback_id, owner_sub, app, type, occurred_at }` — putting a title in it is
+      **not** authorized), `feedback-event.entity.ts`, `trigger-ddl.ts`, `apps/app/**`,
+      `packages/**`.
+  - [IMPLEMENTATION REQUIREMENTS]
+    - Entity: `@Column({ type: 'text' }) title: string;` after `type`, before `description`; the
+      doc comment records that both `title` and `description` are `enc.v1.` envelopes with the
+      AAD `life.v1|<sub>|feedback|title|<id>`.
+    - Service: add `titleAad(ownerSub, feedbackId)` returning
+      `` `life.v1|${ownerSub}|feedback|title|${feedbackId}` `` mirroring `descriptionAad`;
+      `create` encrypts both fields; the cached row shape + `toCachedRow` carry `title`;
+      `isCiphertextRow` requires **both** `title` and `description` to start with `ENC_PREFIX`;
+      `toDto` decrypts both after the hit. The duplicate-`id` no-op path is unchanged.
+    - DTO: add `@IsNotEmpty()` + `@MaxLength(FEEDBACK_TITLE_MAX)` `title: string;` above
+      `description`, importing `FEEDBACK_TITLE_MAX` from `@life/shared` (the `description`
+      validator keeps `FEEDBACK_DESCRIPTION_MAX`).
+    - Event: **no change** — publisher, `feedback_event` entity, trigger DDL, dispatcher stay
+      title-free; the suite asserts that absence for `title` too.
+    - Suites: every POST body in `feedback.e2e-spec.ts` gains a `title`; the ciphertext
+      assertion covers the raw `title` column and cached values (no known plaintext); a
+      missing/blank/over-long title → `400`; the idempotency + event groups keep passing.
+    - Code style: prose — small single-purpose functions, intention-revealing names, the file's
+      existing doc-comment density on the AAD helper and the cached shape.
+  - [VERIFICATION & TESTING RULES]
+    - Precondition: `npm run build -w @life/shared` (T16 changed the shared types; consumers
+      resolve through `node_modules` → `packages/shared/dist` — ledger precondition above).
+    - Permitted commands: `npm run typecheck -w @life/feedback-service` and
+      `npm run test:unit -w @life/feedback-service -- test/feedback.e2e-spec.ts`.
+    - Strict constraints: NO full suite, NO E2E, and no `feedback-events.e2e-spec.ts` run (the
+      event path must not change); max test executions: 2.
+  - [DEFINITION OF DONE]
+    - [ ] Raw `title` + every cached row are `enc.v1.`; a blank/over-long title → `400`; a valid
+          POST round-trips both title and description through `GET`.
+    - [ ] No `feedback_event` row or message body carries a plaintext **or** ciphertext title
+          (asserted; the `src/event/**` files show no diff).
+    - [ ] No file outside scope modified; typecheck + the named suite pass.
+  - Dependencies: T16. Size: M.
+
+- [ ] T18: `@life/ui` — `FeedbackForm` title field + ordered validation — module `feedback-ui`
+  - [TASK OBJECTIVE] Add a required title `Input` above the description with ordered client
+    validation, and update the form suite.
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create: `packages/ui/src/components/feedback-form.tsx`,
+      `packages/ui/test/feedback-form.test.tsx`, `packages/ui/test/feedback-nav-item.test.tsx`
+      (its submit fixture gains `title`).
+    - Reference files (read-only): `docs/specs/SPEC-feedback-ui.md` (component contract,
+      rendered structure, validation, frozen strings), `packages/ui/src/components/input.tsx`,
+      `packages/ui/src/styles/blocks.css`.
+    - Strictly prohibited files: every other `packages/ui` file and all of `apps/**` (the inbox
+      row mapping is T19).
+  - [IMPLEMENTATION REQUIREMENTS]
+    - State: `title`, `description`, `error` (message), `errorField: 'title' | 'description' |
+      null`. On submit: trim both; blank title → `error = 'Title is required.'`,
+      `errorField = 'title'`; else blank description → `'Description is required.'`,
+      `errorField = 'description'`; on either, **no request** is sent and focus moves to the
+      offending control. Valid → `onSubmit({ id, app, type, title: title.trim(), description:
+      description.trim() })`.
+    - Markup: `<Input aria-label="Title" aria-required maxLength={FEEDBACK_TITLE_MAX}
+      aria-invalid={errorField === 'title' || undefined} …/>` immediately above the existing
+      `Textarea`; the `Textarea`'s `aria-invalid` becomes `errorField === 'description'`.
+      `title`/`description`/`error`/`errorField` reset on each fresh open (idempotency + reset
+      semantics unchanged). Import `FEEDBACK_TITLE_MAX` from `@life/shared`.
+    - Fit: no new CSS expected (the `Dialog` body flex gap owns spacing); if a hook is genuinely
+      needed, at most one token-only `ui-feedback-form` rule in `blocks.css` — never inline
+      `style`, never a raw value.
+    - Suites: `feedback-form.test.tsx` gains the two ordered cases (blank title; title present +
+      blank description), each asserting no `onSubmit` call, the exact message, `aria-invalid` on
+      the offending field, and focus there; the happy path asserts
+      `{ id, app, type, title, description }` trimmed; the retry-keeps-`id` and
+      reopen-mints-new-`id` cases keep passing with a title filled in.
+    - Code style: prose — the block's existing structure (small helpers, intention-revealing
+      names) and comment density.
+  - [VERIFICATION & TESTING RULES]
+    - Precondition: `npm run build -w @life/shared`.
+    - Permitted commands: `npm run typecheck -w @life/ui` and
+      `npm run test:unit -w @life/ui -- test/feedback-form.test.tsx test/feedback-nav-item.test.tsx`.
+    - Strict constraints: NO other suite, NO full suite, NO E2E; max test executions: 2.
+  - [DEFINITION OF DONE]
+    - [ ] Blank title and (with a title) blank description each block the request with their
+          exact message, `aria-invalid`, and focus on the offending field; a valid submit
+          carries both trimmed.
+    - [ ] `aria-label="Title"` present; idempotency semantics unchanged.
+    - [ ] No file outside scope modified; typecheck + the named suites pass.
+  - Dependencies: T16. Size: S.
+
+- [ ] T19: `apps/app` — inbox row title + description — module `feedback-ui`
+  - [TASK OBJECTIVE] Render each inbox entry as a title line with the description beneath it
+    (`ListItem` `title` + `snippet`), and update the inbox suite.
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create: `apps/app/app/feedback-inbox.tsx`,
+      `apps/app/test/feedback-inbox.test.tsx`.
+    - Reference files (read-only): `docs/specs/SPEC-feedback-ui.md` (`/feedback owner inbox` —
+      rendering), `packages/ui/src/components/list-item.tsx` (`snippet`), `apps/app/lib/feedback-api.ts`.
+    - Strictly prohibited files: `apps/app/lib/**`, `apps/app/app/feedback/**` (route + page),
+      `packages/**`, every other app suite.
+  - [IMPLEMENTATION REQUIREMENTS]
+    - `feedback-inbox.tsx`: each entry's `ListItem` becomes
+      `<ListItem title={entry.title} snippet={entry.description}
+      meta={<LocalTime dateTime={entry.createdAt} />} />`. Grouping, encounter order, app/type
+      labels, unknown-id fallback, `EmptyState`, and the one-row-type rule are unchanged — no
+      `variant`, no `leading`, no href.
+    - Suite: `feedback-inbox.test.tsx` fixtures gain a `title` distinct from the description;
+      assert the row title renders the entry title and the description renders in the row's
+      secondary line; the grouping/order/empty/fallback cases stay green.
+    - Code style: prose; the file's existing comment density.
+  - [VERIFICATION & TESTING RULES]
+    - Precondition: `npm run build -w @life/shared`.
+    - Permitted commands: `npm run typecheck -w @life/app` and
+      `npm run test:unit -w @life/app -- test/feedback-inbox.test.tsx`.
+    - Strict constraints: NO other app suite, NO full suite, NO E2E; max test executions: 2.
+  - [DEFINITION OF DONE]
+    - [ ] Row title = entry title, description = the row's `snippet`; grouping/order/empty
+          states and unknown-id fallback unchanged.
+    - [ ] No file outside scope modified; typecheck + the named suite pass.
+  - Dependencies: T16. Size: S.
+
+- [ ] T20: e2e — title step + the one targeted run — module `feedback-ui`
+  - [TASK OBJECTIVE] Extend the single targeted e2e with the required title and run it once.
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create: `apps/app/test/e2e/feedback.spec.ts`.
+    - Reference files (read-only): `docs/specs/SPEC-feedback-ui.md` (`## Testing Strategy` — E2E),
+      the harness files (`stack.ts`, `config.ts`, `global-setup.ts`, `global-teardown.ts`,
+      `services.ts`) that T14 already wired and this task does **not** touch.
+    - Strictly prohibited files: the harness files, the frozen suites (`journey*.ts`), all
+      production source.
+  - [IMPLEMENTATION REQUIREMENTS]
+    - The one test (`-g "submit feedback"`): blank **title** submit → assert
+      `'Title is required.'` and, after navigating to `/feedback`, the `EmptyState` (no row);
+      then pick a type, fill `getByLabel('Title')` + `getByLabel('Description')`, submit →
+      `/feedback` shows the entry under the right app and type group with **both** lines visible.
+      Only the spec's own selectors (`getByLabel('Send feedback')`, the pills, the title input,
+      the description textarea, the heading `Feedback`).
+    - Exactly ONE targeted run (a second only if the first fails: read the trace, fix the cause,
+      re-run once — profile `max-test-runs: 2`).
+  - [VERIFICATION & TESTING RULES]
+    - Permitted command:
+      `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/feedback.spec.ts -g "submit feedback"`
+      (the harness binds its own throwaway ports 3107/3207 — never 3008/3108).
+    - Strict constraints: NO other e2e spec, NO full suite, ONE targeted run (≤2); max test
+      executions: 2.
+  - [DEFINITION OF DONE]
+    - [ ] The single run passes: a blank title creates no row; a valid submit shows the title
+          **and** the description on `/feedback` under the right groups.
+    - [ ] No frozen suite/assertion or production source modified; no file outside scope.
+  - Dependencies: T19. Size: S.
+
+- [ ] T21: five-lane verification gate — module `close`
+  - [TASK OBJECTIVE] Run the §7.6 gate on the final integrated state and iterate until N/N PASS.
+  - [SCOPE & REPOSITORY CONTEXT]
+    - Allowed files to edit/create: none (verification only; fixes re-open their owning task).
+    - Reference files (read-only): the working diff, `tasks/plan-feedback.md`,
+      `tasks/todo-feedback.md`, `docs/specs/SPEC-feedback-*.md`, `docs/specs/MAP-feedback.md`,
+      `docs/intent/feedback-service.md`, `AGENTS.md` (Contracts + mechanical checks).
+    - Strictly prohibited files: everything (this task changes nothing).
+  - [IMPLEMENTATION REQUIREMENTS]
+    - Suite gate first, exact commands:
+      `npm run build -w @life/shared`;
+      `npm run typecheck -w @life/shared` and
+      `npm run test:unit -w @life/shared -- test/index.test.ts`;
+      `npm run typecheck -w @life/feedback-service` and
+      `npm run test:unit -w @life/feedback-service -- test/feedback.e2e-spec.ts test/feedback-events.e2e-spec.ts`;
+      `npm run typecheck -w @life/ui` and
+      `npm run test:unit -w @life/ui -- test/feedback-form.test.tsx test/feedback-nav-item.test.tsx`;
+      `npm run typecheck -w @life/app` and
+      `npm run test:unit -w @life/app -- test/feedback-inbox.test.tsx test/routes-todos-list.test.tsx`
+      (the last is the existing suite the toolbar composition touches — Success 6 requires it
+      unchanged and passing);
+      plus the six Contract mechanical greps from the plan's Phase 4 checkpoint.
+    - Then five parallel read-only lane subagents (correctness/domain, code quality, security,
+      QA, plan conformance), each returning
+      `{lane, verdict: PASS|PASS_WITH_NITS|FAIL, blockers: [{file, issue, severity}]}`; fail-closed;
+      fix blockers → re-run ONLY the failed lanes → repeat until N/N. Commit only on N/N, staged
+      by explicit paths (never `git add -A`).
+    - The e2e is NOT re-run inside the gate (T20 ran it once); the gate's suite commands stay
+      within §3 and the profile.
+  - [VERIFICATION & TESTING RULES]
+    - Permitted: the suite-gate commands (QA lane only). NO full suites, NO E2E; max test
+      executions: 2 per iteration. Evidence = per-round lane reports.
+  - [DEFINITION OF DONE]
+    - [ ] All suite-gate commands green; the six mechanical greps clean.
+    - [ ] Five lane verdicts all PASS (N/N); no partial verdict treated as done.
+    - [ ] No commit outside the explicit paths; merge remains human-gated.
+  - Dependencies: T20. Size: M.
+
 ## Checkpoints (planning-skill gates, global protocol §8 self-reviewed and logged)
 
 - After T1 (Governing docs): the two greps non-empty; architecture.md records the deliberate
@@ -874,8 +1105,17 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   to frozen PWA constants/selectors.
 - After T14: the one targeted e2e passes.
 - After T15: five-lane gate N/N → report; merge awaits the user's explicit request.
+- After T20 (title amendment): the one targeted e2e passes with the title step.
+- After T21: five-lane gate N/N → report; merge awaits the user's explicit request.
 
 ## Gate log
 
 - 2026-10-03: plan + ledger authored from the confirmed intent and the three module specs;
   pending the §6 plan-validation gate before the first task is delegated.
+- 2026-10-15: **title amendment (intent decision 10).** User confirmed a *required* title
+  alongside the description; spec-first artifacts landed before planning — intent (outcome +
+  decision 10), `MAP-feedback.md` (POST body, `FeedbackDto`, `CreateFeedbackInput`,
+  `FEEDBACK_TITLE_MAX`), `SPEC-feedback-service.md` (data-model column + per-field AAD, API/DTO,
+  cache row, test group 4, traceability, amendment note), `SPEC-feedback-ui.md` (form field +
+  ordered validation + frozen strings, inbox row mapping, tests, amendment note). Phase 6 +
+  T16–T21 appended; pending the §6 gate on the amended plan before T16 is delegated.
