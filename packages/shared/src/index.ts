@@ -177,12 +177,14 @@ export type FeedbackType = (typeof FEEDBACK_TYPE_VALUES)[number];
 export const FEEDBACK_APPS = ['notes', 'todos', 'meals', 'feedback'] as const;
 export type FeedbackApp = (typeof FEEDBACK_APPS)[number];
 
+export const FEEDBACK_TITLE_MAX = 200;
 export const FEEDBACK_DESCRIPTION_MAX = 2000;
 
 export interface FeedbackDto {
   id: string;
   app: string;
   type: string;
+  title: string;
   description: string;
   createdAt: string;
 }
@@ -191,6 +193,7 @@ export interface CreateFeedbackInput {
   id: string;
   app: FeedbackApp;
   type: FeedbackType;
+  title: string;
   description: string;
 }
 
