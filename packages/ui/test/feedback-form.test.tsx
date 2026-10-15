@@ -143,6 +143,22 @@ describe('FeedbackForm', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  it('clears aria-invalid from both fields after a corrected valid submit', async () => {
+    const { onSubmit } = renderForm();
+
+    await submitForm();
+    expect(screen.getByRole('alert').textContent).toBe('Title is required.');
+    expect(titleInput().getAttribute('aria-invalid')).toBe('true');
+
+    fireEvent.change(titleInput(), { target: { value: 'a title' } });
+    fireEvent.change(textarea(), { target: { value: 'a description' } });
+    await submitForm();
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(titleInput().getAttribute('aria-invalid')).toBe(null);
+    expect(textarea().getAttribute('aria-invalid')).toBe(null);
+  });
+
   it('submits the trimmed title and description with the exact app, type and idempotency key, then closes', async () => {
     const { onSubmit, onOpenChange } = renderForm({ app: 'todos' });
     fireEvent.click(within(typeGroup()).getByRole('button', { name: 'Bug report' }));
