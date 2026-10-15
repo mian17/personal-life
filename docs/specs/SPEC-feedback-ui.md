@@ -8,6 +8,13 @@ All work follows AGENTS.md Contract 1 (Shared UI Contract): every visual element
 existing `@life/ui` primitive; anything missing goes upstream to `packages/ui` (spec first),
 never into `apps/*` as a fork.
 
+**Amendment 2026-10-15 (user-authorized):** the form gains a **required title** above the
+description (`Input`, `aria-label="Title"`, `FEEDBACK_TITLE_MAX` = 200) and the inbox row
+splits into title (`ListItem` `title`) + description (`ListItem` `snippet`). This is the
+map-locked "change to `feedback-service`'s wire contract" the `## Boundaries` section
+requires asking first; `docs/specs/MAP-feedback.md` and `SPEC-feedback-service.md` record
+the same change.
+
 ## Objective
 
 One reusable submit-feedback form reachable from the top toolbar of every frontend app, and
@@ -16,8 +23,10 @@ newest-first.
 
 - Notes/Todos/Feedback toolbars get a **Send feedback** item (`IconButton`); tapping it
   opens a `Dialog` with a three-way type picker (feature request / enhancement / bug
-  report) and a **required description**; submit persists the entry through the BFF to
-  `feedback-service`.
+  report), a **required title** (one-line summary) and a **required description**; submit
+  persists the entry through the BFF to `feedback-service`.
+- The inbox row shows the entry's `title` with its `description` beneath it (`ListItem`
+  `title` + `snippet`), so a long list stays scannable.
 - `/feedback` is its own top-level app (own PWA identity, per lesson 0005) rendering the
   owner's entries grouped **app → type**, newest-first.
 - A retry or double-tap produces exactly one row (client idempotency key, locked intent 5).
@@ -65,6 +74,7 @@ npx playwright test --config apps/app/playwright.config.ts feedback.spec.ts -g "
 ```unknown
 packages/shared/src/index.ts               # + FeedbackApp, FeedbackType, FeedbackDto,
                                            #   CreateFeedbackInput, FeedbackSubmitResult,
+                                           #   FEEDBACK_TITLE_MAX (= 200),
                                            #   FEEDBACK_DESCRIPTION_MAX (= 2000)
 packages/ui/src/components/feedback-form.tsx      # FeedbackForm + FEEDBACK_TYPES (new)
 packages/ui/src/components/feedback-nav-item.tsx  # FeedbackNavItem (new)
@@ -103,6 +113,7 @@ no new app CSS, tokens only.
 | Toolbar feedback trigger | `IconButton` (`<button aria-label="Send feedback">` + `MessageSquare size={20} aria-hidden />`) |
 | Dialog container (modal, title, close) | `Dialog` (its `body`/`footer` slots) |
 | Type selector (3 options) | `PillGroup role="group" aria-label="Feedback type"` + `Pill as="button"` with `aria-pressed` |
+| Title field | `Input` (`aria-label` / `aria-required` / `aria-invalid` / `maxLength` passthrough) |
 | Description field | `Textarea` (`aria-label` / `aria-required` / `aria-invalid` passthrough) |
 | Error surface (client + server) | `AlertBanner` with `role="alert"` |
 | Submit control | `Button` (`type="button"`, `disabled` while pending) |
@@ -129,8 +140,8 @@ worked around in the app.
    documented in `SPEC-ui-list-shell.md` in the same change, one assertion added to
    `list-shell.test.tsx`. This is chosen over an app-level bespoke shell, which would fork
    the page rhythm (lesson 0006).
-2. **No label primitive for fields** — none needed: `Textarea` spreads native props, and
-   the in-repo precedent is an `aria-label` on the control
+2. **No label primitive for fields** — none needed: `Input` and `Textarea` spread native
+   props, and the in-repo precedent is an `aria-label` on the control
    (`recurrence-dialog.tsx` renders `Select aria-label="Frequency"`). No new atom.
 3. **`AlertBanner`'s tone union is `'warning'` only** — the error banner reuses the existing
    warning tone plus `role="alert"` (semantic error, not a new visual). No upstream change
@@ -184,13 +195,19 @@ state internally (the app never manages dialog state), composing `FeedbackForm` 
             aria-pressed={type === t.value} onClick={() => setType(t.value)}>{t.label}</Pill>
     ))}
   </PillGroup>
-  <Textarea aria-label="Description" aria-required aria-invalid={error != null || undefined}
+  <Input aria-label="Title" aria-required aria-invalid={errorField === 'title' || undefined}
+         maxLength={FEEDBACK_TITLE_MAX}
+         value={title} onChange={(e) => setTitle(e.target.value)} />
+  <Textarea aria-label="Description" aria-required
+            aria-invalid={errorField === 'description' || undefined}
             value={description} onChange={(e) => setDescription(e.target.value)} />
 </Dialog>
 ```
 
 New frozen-surface strings introduced here (recorded so a later frozen suite can rely on
-them): `aria-label="Send feedback"`, `aria-label="Feedback type"`, `aria-label="Description"`,
+them): `aria-label="Send feedback"`, `aria-label="Feedback type"`, `aria-label="Title"`,
+`aria-label="Description"`, the client validation messages `Title is required.` /
+`Description is required.`,
 the labels `Feature request` / `Enhancement` / `Bug report`, `Send` / `Sending…` / `Cancel`,
 the dialog title `Send feedback`, and the page title `Feedback`.
 
@@ -224,14 +241,15 @@ Wire values are fixed here; `feedback-service`'s spec and validation must accept
 
 ### Validation
 
-- **Client rule (exact):** `description.trim().length === 0` is invalid. On invalid: no
-  request is sent, `error = 'Description is required.'` renders in the `AlertBanner`
-  (`role="alert"`, which announces it), the `Textarea` gets `aria-invalid="true"`, and focus
-  moves to the textarea. The submit button is *not* disabled beforehand — an inert button
-  hides the reason; pressing it teaches the rule.
-- **Server-side surface:** the service validates again (`400` for a missing/blank
-  description, one over `FEEDBACK_DESCRIPTION_MAX` (2000) characters, or an unknown
-  type/app — there is no `422`). The server action maps any non-OK response
+- **Client rules (exact):** `title.trim().length === 0` → `'Title is required.'` (checked
+  first); otherwise `description.trim().length === 0` → `'Description is required.'`. On
+  either: no request is sent, the message renders in the `AlertBanner` (`role="alert"`, which
+  announces it), the offending control gets `aria-invalid="true"` (`errorField`), and focus
+  moves to it. The submit button is *not* disabled beforehand — an inert button hides the
+  reason; pressing it teaches the rule.
+- **Server-side surface:** the service validates again (`400` for a missing/blank title or
+  description, one over `FEEDBACK_TITLE_MAX` (200) / `FEEDBACK_DESCRIPTION_MAX` (2000)
+  characters, or an unknown type/app — there is no `422`). The server action maps any non-OK response
   to `{ ok: false, message: "Couldn't send feedback. Try again." }`, which renders in the
   same `AlertBanner`; the dialog stays open and the id is kept for the retry. The happy path
   never reaches it because the client rule mirrors it.
@@ -277,7 +295,7 @@ forwards the caller's token — no client-side auth of any kind.
 
 ```unknown
 submitFeedbackAction(input: CreateFeedbackInput): Promise<FeedbackSubmitResult>
-  → POST $FEEDBACK_API_URL/api/feedback  { id, app, type, description }  → 201 { id }
+  → POST $FEEDBACK_API_URL/api/feedback  { id, app, type, title, description }  → 201 { id }
   → catch ApiError → { ok: false, message }   (duplicates return 201, never 409)
   → on ok: revalidatePath('/feedback')
 ```
@@ -312,13 +330,15 @@ ListShell (title="Feedback", navTrailing=FeedbackNavItem, fab omitted)
 └─ Section (h2, app label)            per app with ≥1 entry
    └─ Section (h3, type label)        per type with ≥1 entry
       └─ List
-         └─ ListItem                  title = description, meta = <LocalTime dateTime=createdAt>
+         └─ ListItem                  title = title, snippet = description,
+                                     meta = <LocalTime dateTime=createdAt>
 ```
 
 One row type: plain `ListItem` — no `variant`, no leading control, no href (v1 has no detail
-route), no sibling row component (lesson 0018). The `title` renders the full description
-with the CSS clamp; `meta` is the created timestamp through `LocalTime`, which renders dates
-through the one `@life/ui` helper (lesson 0003). There is no today/overdue/relative-date
+route), no sibling row component (lesson 0018). The `title` renders the entry title; the
+`snippet` renders the description (the primitive's own second line). `meta` is the created
+timestamp through `LocalTime`, which renders dates through the one `@life/ui` helper
+(lesson 0003). There is no today/overdue/relative-date
 logic in this module, so lesson 0019 does not apply.
 
 **Empty states:**
@@ -399,9 +419,11 @@ frozen spec file is edited.
 
 - `packages/ui/test/feedback-form.test.tsx` — dialog opens/closes through `open` /
   `onOpenChange`; three type pills render with `aria-pressed`, clicking selects;
-  blank-description submit sends **no** request and shows `'Description is required.'` with
-  `aria-invalid` on the textarea; a valid submit calls `onSubmit` with
-  `{ id, app, type, description }` (trimmed) and closes; a rejected submit shows the error
+  blank-title submit sends **no** request and shows `'Title is required.'` with `aria-invalid`
+  on the title input and focus moved to it; with a title but blank description, no request is
+  sent and `'Description is required.'` shows with `aria-invalid` on the textarea; a valid
+  submit calls `onSubmit` with `{ id, app, type, title, description }` (both trimmed) and
+  closes; a rejected submit shows the error
   message, keeps the dialog open, and the **retry carries the same `id`**; reopening mints a
   **new** `id`; the button is disabled while pending; `onSubmit` receives the exact `app`
   passed in.
@@ -421,11 +443,12 @@ frozen spec file is edited.
 **E2E — exactly one targeted run** (profile `e2e-run`, ≤ 2 runs total):
 
 - New file `apps/app/test/e2e/feedback.spec.ts`, one test
-  (`-g "submit feedback"`): on `/notes` open the item → try a blank description (assert the
-  error, no row created) → pick a type, write a description, submit → `/feedback` shows the
-  entry under the right app group and type group. It uses only its **own new** selectors
-  (`getByLabel('Send feedback')`, the three type pills, the description textarea, the
-  heading `Feedback`) — nothing shared with the frozen suites, which are not edited.
+  (`-g "submit feedback"`): on `/notes` open the item → try a blank title (assert the error,
+  no row created) → pick a type, write a title and a description, submit → `/feedback` shows
+  the entry under the right app group and type group, with both lines visible. It uses only
+  its **own new** selectors (`getByLabel('Send feedback')`, the three type pills, the title
+  input, the description textarea, the heading `Feedback`) — nothing shared with the frozen
+  suites, which are not edited.
 - The harness (`test/e2e/services.ts` + `global-setup.ts` / `global-teardown.ts`) gains
   `feedback-service` alongside the existing services; the single run happens only once the
   `feedback-infra` stack is up.
@@ -433,7 +456,8 @@ frozen spec file is edited.
 ## Boundaries
 
 - **Always:** compose existing primitives (plan above); tokens only; one row type per list;
-  the idempotency key per open, reused for every retry; description required on both sides;
+  the idempotency key per open, reused for every retry; title and description required on
+  both sides;
   `@life/shared` as the single home of the wire types; new PWA files only; new e2e selectors
   only; update `SPEC-ui-list-shell.md` in the same change as the optional-fab edit.
 - **Ask first:** editing the frozen e2e suites; running E2E beyond the one targeted run;
@@ -451,9 +475,10 @@ frozen spec file is edited.
 ## Success Criteria
 
 1. From `/notes` and `/todos`, tapping **Send feedback** opens the dialog; submitting with a
-   blank description shows `'Description is required.'` and creates no row; a valid submit
-   closes the dialog and the entry appears on `/feedback` under the right app and type
-   group, newest-first (verified by the one targeted e2e run).
+   blank title shows `'Title is required.'` (a blank description with a title shows
+   `'Description is required.'`) and creates no row; a valid submit closes the dialog and the
+   entry appears on `/feedback` under the right app and type group, newest-first, showing the
+   title with the description beneath it (verified by the one targeted e2e run).
 2. A double-tap or a retry after failure yields exactly one feedback row and one event —
    unit-proven (same `id` on retry, fresh `id` only on reopen) plus the service's unique
    index.
@@ -480,7 +505,7 @@ frozen spec file is edited.
 |---|---|
 | One shared submit form + shared toolbar item, each app passes its `app` id | *Component contracts*, *Toolbar integration* |
 | Type = feature request / enhancement / bug report (three types) | `FEEDBACK_TYPES` in *Component contracts* |
-| Description is required | *Validation* |
+| Title and description are required; both stay out of the event payload | *Validation*, *Primitive reuse plan* (locked intent 10) |
 | `/feedback` is a new top-level route, its own app (own PWA identity) | */feedback owner inbox*, *PWA identity* (lesson 0005) |
 | Inbox grouped by app, then type, newest-first | */feedback owner inbox — Grouping* |
 | Client-supplied idempotency key → one row / one event on retry | *Idempotency key* (locked intent 5) |

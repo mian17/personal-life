@@ -10,9 +10,10 @@ decisions without naming new evidence.
 
 One reusable submit-feedback form, reachable from the top toolbar of every frontend app.
 Tapping the feedback icon opens a dialog: choose a type — **feature request / enhancement /
-bug report** — and write a **required description**, then submit. Submissions are persisted
-and each one durably emits a `feedback.submitted` event. The owner reviews everything in one
-owner-only inbox grouped by app, then by type.
+bug report** — and write a **required title and description**, then submit. Submissions are
+persisted and each one durably emits a `feedback.submitted` event. The owner reviews
+everything in one owner-only inbox grouped by app, then by type; each inbox row shows the
+entry's title with its description beneath it.
 
 ## User
 
@@ -27,8 +28,8 @@ first durable, push-on-write event stream.
 
 ## Success
 
-- From Notes or Todos, tap feedback → pick type + write description → submit → the entry
-  appears in the `/feedback` inbox, grouped by app then type.
+- From Notes or Todos, tap feedback → pick type + write title and description → submit →
+  the entry appears in the `/feedback` inbox, grouped by app then type.
 - A retry / double-tap produces exactly one feedback row and one event.
 - A consumer service added later can replay every event submitted before it existed.
 - The Postgres backup/restore scripts work standalone against the feedback database.
@@ -68,6 +69,12 @@ first durable, push-on-write event stream.
    pre-restore snapshot before overwrite). `pg_dump -Fc` + `pg_restore --list` verification
    replaces `quick_check`. Host has no `psql`/`pg_dump`, so the scripts execute the client
    **inside the Postgres container**. One version, PostgreSQL only.
+10. **Title + description (amended 2026-10-15, user request).** An entry carries a required
+    `title` (a one-line summary, max 200) *and* a required `description`. Both are content:
+    encrypted at rest with `@life/crypto` (`enc.v1.`, one AAD per field) and neither ever
+    appears in the `feedback.submitted` payload. The form refuses to submit without either;
+    the inbox row shows the title with the description beneath it. This extends decisions
+    1 (contracts) and 5 only — no other locked decision moves.
 
 ## Shape
 
@@ -78,8 +85,9 @@ first durable, push-on-write event stream.
   persistent volume).
 - **`/feedback`** — new top-level route in `apps/app`, treated as its own app (own PWA
   manifest/icon) hosting the owner inbox grouped by app then type.
-- **Shared submit form** — a `@life/ui` block (dialog + type select + textarea + submit)
-  plus a shared toolbar feedback item, reused by every app; each app passes its `app` id.
+- **Shared submit form** — a `@life/ui` block (dialog + type select + title input +
+  description textarea + submit) plus a shared toolbar feedback item, reused by every app;
+  each app passes its `app` id.
 
 ## Out of scope (v1)
 

@@ -5,8 +5,15 @@ Module id: `feedback-service` (see `MAP-feedback.md`). New workspace app
 `@life/cache` + `@life/crypto` + IdP JWKS auth), with Postgres as its store and
 a NOTIFY-push event stream to RabbitMQ.
 
-Traces to intent: `docs/intent/feedback-service.md` (confirmed intent — locked
+Traceability to intent: `docs/intent/feedback-service.md` (confirmed intent — locked
 decisions are consumed here, never re-litigated).
+
+**Amendment 2026-10-15 (user-authorized):** every entry carries a **required `title`**
+(one-line summary, `FEEDBACK_TITLE_MAX` = 200) alongside the **required `description`**.
+Both are content: `enc.v1.` envelopes at rest, each AAD-bound to its own field name and the
+entry id, and both excluded from the event payload. `docs/specs/MAP-feedback.md` and
+`docs/specs/SPEC-feedback-ui.md` record the same interface change (this is the map-locked
+"HTTP/DTO shape change" the `## Boundaries` section requires asking first).
 
 ## Objective
 
@@ -89,6 +96,7 @@ feedback(
   owner_sub   TEXT NOT NULL,
   app         TEXT NOT NULL,         -- caller-supplied app id ('notes', 'todos', …)
   type        TEXT NOT NULL CHECK (type IN ('feature_request','enhancement','bug_report')),
+  title       TEXT NOT NULL,         -- enc.v1. envelope, AAD life.v1|<sub>|feedback|title|<id>
   description TEXT NOT NULL,         -- enc.v1. envelope, AAD life.v1|<sub>|feedback|description|<id>
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 )
@@ -109,8 +117,8 @@ feedback_cursor(
 )
 ```
 
-The event payload never carries the description — neither plaintext nor
-ciphertext. `feedback_event` rows are metadata only.
+**The event payload never carries the title or the description — neither plaintext nor
+ciphertext. `feedback_event` rows are metadata only.**
 
 **Idempotency (exact behavior):** `UNIQUE` on `feedback.id` (the PK) plus
 `UNIQUE` on `feedback_event.event_id` (set to the feedback `id`). `POST` with
@@ -128,9 +136,10 @@ The controller is `@Controller('api/feedback')` — the repo convention
 `@Controller('api/lists')`) that the BFF's `/api/notes` / `/api/lists` calls
 mirror. Both routes live under `/api/feedback`.
 
-- `POST /api/feedback` — body `{ id, app, type, description }` (`id`: UUID v4,
-  client-supplied; `type` ∈ the three locked values; `description`: required,
-  non-empty after trim, `@MaxLength(2000)`; owner from `principal.sub`, never
+- `POST /api/feedback` — body `{ id, app, type, title, description }` (`id`: UUID v4,
+  client-supplied; `type` ∈ the three locked values; `title`: required, non-empty after
+  trim, `@MaxLength(FEEDBACK_TITLE_MAX)`; `description`: required, non-empty after trim,
+  `@MaxLength(FEEDBACK_DESCRIPTION_MAX)`; owner from `principal.sub`, never
   the body). Inserts `feedback` + `feedback_event` in **one Postgres
   transaction**, bumps the owner's generation counter after commit, returns
   `201 { id }`. A repeat of an already-owned `id` returns the same
@@ -138,15 +147,18 @@ mirror. Both routes live under `/api/feedback`.
 - `GET /api/feedback` — owner-scoped; `200` with a **bare `FeedbackDto[]`**
   (no envelope — the `listNoteTagUsage(): Promise<TagUsage[]>` precedent),
   ordered `createdAt DESC, id DESC`. Grouping by app then type is the UI's job
-  over this flat newest-first list.
-- **Wire types have one home:** `FeedbackDto` (`{ id, app, type, description,
-  createdAt }`, description decrypted in the request path only) and
+  over this flat newest-first list. `title` and `description` are decrypted
+  per row in the request path only.
+- **Wire types have one home:** `FeedbackDto` (`{ id, app, type, title, description,
+  createdAt }`, title and description decrypted in the request path only) and
   `FeedbackType` (`'feature_request' | 'enhancement' | 'bug_report'`) are
   imported from `@life/shared` — never redeclared here. `feedback/dto/`
   holds only the Nest validation class `CreateFeedbackDto` (class-validator:
   `@IsUUID('4')` id, `@IsString()` app, `@IsIn([...FeedbackType values])`
-  type, `@IsNotEmpty()` + `@MaxLength(FEEDBACK_DESCRIPTION_MAX)` description,
-  where `FEEDBACK_DESCRIPTION_MAX = 2000` lives in `@life/shared` alongside the
+  type, `@IsNotEmpty()` + `@MaxLength(FEEDBACK_TITLE_MAX)` title, and
+  `@IsNotEmpty()` + `@MaxLength(FEEDBACK_DESCRIPTION_MAX)` description,
+  where `FEEDBACK_TITLE_MAX` and `FEEDBACK_DESCRIPTION_MAX = 2000` live in
+  `@life/shared` alongside the
   wire types), mirroring `@life/shared`'s `CreateFeedbackInput`, exactly as
   note-service mirrors its shared input types in `notes/dto/`.
 - Errors: `401` unauthenticated; `404` for foreign and missing ids alike;
@@ -220,7 +232,7 @@ and replays from the cursor. `/health/ready` checks DB + key custody only
 
 - **Cached shapes (ciphertext rows as persisted):** one shape —
   `feedback:list` → the owner's full `feedback` row set serialized exactly as
-  stored (`description` an `enc.v1.` envelope). No DTOs, no plaintext.
+  stored (`title` and `description` both `enc.v1.` envelopes). No DTOs, no plaintext.
 - **Key composition:** `feedback:<owner_sub>:v<gen>:list` (map-locked).
   Filters/pagination never enter the key — one entry serves every read variant.
 - **Invalidation:** per-owner generation counter `feedback:gen:<owner_sub>`,
@@ -244,7 +256,7 @@ async findAll(sub: string): Promise<FeedbackDto[]> {
     const found = await this.feedback.find({
       where: { ownerSub: sub }, order: { createdAt: 'DESC', id: 'DESC' },
     });
-    return found.map(toCachedRow); // description stays an enc.v1. envelope
+    return found.map(toCachedRow); // title + description stay enc.v1. envelopes
   }, { decode: decodeCiphertextList, cacheable: (r) => r.every(isCiphertextRow) });
   const dek = await this.readDek(sub, rows);
   return rows.map((row) => toDto(row, sub, dek)); // decrypt + assemble after the hit
@@ -266,9 +278,9 @@ a data directory):
 3. Dispatcher: notify → publish (fake AMQP sink recording confirms) → cursor
    advances; restart replays `seq > cursor` in order; replayed `event_id`
    dedups on the consumer fake.
-4. Ciphertext assertion (note-service pattern): raw `description` column and
+4. Ciphertext assertion (note-service pattern): raw `title` and `description` columns and
    every cached value contain `enc.v1.` and no known plaintext; event rows and
-   message bodies contain neither plaintext nor ciphertext description.
+   message bodies contain neither plaintext nor ciphertext title or description.
 5. Cache: gen-bump invalidation after write, fail-open with a broken client,
    read path without `REDIS_URL` (direct DB).
 6. Health: `/health/live` 200 with the DB down; `/health/ready` 503 on DB down
@@ -285,10 +297,12 @@ Max 2 test executions per verification (project profile).
 - Always: kernel contracts as written (global guard + whitelist pipe, 404 for
   foreign/missing, health dialect); content encrypted (`enc.v1.` only in
   cache/DB); cursor advance only after broker confirm; tests before commits.
-- Ask first: any HTTP/DTO/event-body shape change (map-locked); any new table
-  or column; a second RabbitMQ instance; changing the trigger channel.
+- Ask first: any HTTP/DTO/event-body shape change (map-locked) — *the 2026-10-15 `title`
+  addition was asked and authorized; it is recorded here, in `MAP-feedback.md`, and in the
+  intent's decision 10*; any new table or column; a second RabbitMQ instance; changing the
+  trigger channel.
 - Never: a polling selector over business rows; plaintext or ciphertext
-  description in events/logs/cache; tag names or any per-app visual concern
+  title or description in events/logs/cache; tag names or any per-app visual concern
   (service owns no UI); SQL content matching over encrypted columns;
   production deploy or production data migration — those are hard-line
   human-run steps (compose wiring and the run checklist are documented by the
@@ -307,6 +321,7 @@ Max 2 test executions per verification (project profile).
 | 7 Cache (read-through + gen counter + TTL + fail-open) | `## Cache Rules` |
 | 8 Broker + Postgres earn their place (cross-chapter, lesson 0012) | This spec + `MAP-feedback.md`; not re-argued |
 | 9 Postgres-only backup/restore | `feedback-infra` module spec (not here) |
+| 10 Title + description (required, encrypted, event-excluded) | `## Data model`, `## API / DTO contract`, `## Cache Rules`, `## Boundaries` |
 | Owner boundary (`principal.sub`) | `## API / DTO contract`, `## Data model` |
 
 ## Success Criteria
@@ -318,7 +333,7 @@ Max 2 test executions per verification (project profile).
 - [ ] Dispatcher restart replays every missed event in `seq` order; redelivery
   dedups on `event_id` (at-least-once delivery, exactly-once effect).
 - [ ] `GET /api/feedback` returns the owner's entries newest-first; no plaintext
-  or ciphertext description exists outside Postgres + the request path.
+  or ciphertext title or description exists outside Postgres + the request path.
 - [ ] Typecheck + the seven test groups green within the 2-run limit; no file
   outside this spec touched.
 
