@@ -69,18 +69,19 @@ USDA URL into chat, an issue, or this doc.
 - [ ] Record the images you are about to replace (rollback target):
       `docker images --format '{{.ID}}  {{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | grep personal-life`
 - [ ] Baseline health: `docker compose ps` — `meal-service`, `app`, `idp` healthy.
-- [ ] **Back up `meal.db` by hand.** The repo tool does **not** cover it:
-      `packages/db/src/paths.ts` lists `life | tags | todo | idp` only, so
-      `npm run db:backup -w @life/db` silently skips the meal database — the one
-      holding the whole food catalog and every logged entry. `meal.db` is a
-      bind-mounted file, not a volume, so it is also not covered by any volume
-      backup. With the service stopped (never `docker compose down`):
+- [ ] **Back up `meal.db` — pinned, because this is a deliberate pre-deploy
+      snapshot.** `meal.db` holds the whole food catalog and every logged entry,
+      and it is a bind-mounted file, not a volume, so no volume backup covers it.
+      The repo tool now covers it, so use it (pinned):
 
       ```bash
-      docker compose stop meal-service
-      cp apps/meal-service/data/meal.db apps/meal-service/data/meal.db.bak
-      sqlite3 apps/meal-service/data/meal.db.bak 'PRAGMA integrity_check;'   # → ok
+      npm run db:backup -w @life/db -- --pin --only meal
       ```
+
+      The tool reads the source read-only, so this is safe with `meal-service` up.
+      Stop the service first (`docker compose stop meal-service`) only if you also
+      intend to restore in this window — `db:restore` fail-closes on a stack that
+      probes up.
 
 - [ ] If `apps/meal-service/data/meal.db` does not exist yet, this is the
       service's first boot on this stack: there is nothing to back up, and §1's
@@ -142,8 +143,13 @@ estimate → catalog-create → grams-log path this chapter ships, against
       (same as §7 of deploy-meal-nutrition.md).
 - [ ] **Data:** `meal.db` from this chapter stays readable by the previous ref —
       no new entity was added — so a code-only rollback needs no restore. If a
-      restore is needed anyway, it comes from §3's in-place copy; the repo
-      `db:restore` tool does not know `meal.db`.
+      restore is needed anyway, it comes from §3's pinned `meal` snapshot; the
+      repo tool restores it only with the stack stopped (its `3002`/`3003` probe
+      fail-closes), which is the `docker compose down` hard line below:
+
+      ```bash
+      npm run db:restore -w @life/db -- --from backup/<dir>-pinned --only meal
+      ```
 - [ ] **Never** rotate or regenerate `MEAL_MASTER_KEY`; **never**
       `docker compose down` — both are hard lines (see below).
 

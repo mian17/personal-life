@@ -56,6 +56,7 @@ function makeRestoreFixture(): RestoreFixture {
     tags: join(root, 'apps', 'tags-service', 'data', 'tags.db'),
     todo: join(root, 'apps', 'todo-service', 'data', 'todo.db'),
     idp: join(root, 'apps', 'idp', 'data', 'idp.db'),
+    meal: join(root, 'apps', 'meal-service', 'data', 'meal.db'),
   };
   return { root, backupRoot: join(root, 'backup'), targets };
 }
@@ -65,13 +66,14 @@ function snapshotPath(fx: RestoreFixture, name: DatabaseName, stamp = STAMP): st
   return join(fx.backupRoot, stamp, `${name}.db`);
 }
 
-function envFor(fx: RestoreFixture, names: DatabaseName[] = ['life', 'tags', 'todo', 'idp']) {
+function envFor(fx: RestoreFixture, names: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal']) {
   const env: NodeJS.ProcessEnv = { INIT_CWD: fx.root };
   const vars: Record<DatabaseName, string> = {
     life: 'NOTE_DB_PATH',
     tags: 'TAGS_DB_PATH',
     todo: 'TODO_DB_PATH',
     idp: 'IDP_DB_PATH',
+    meal: 'MEAL_DB_PATH',
   };
   for (const name of names) env[vars[name]] = fx.targets[name];
   return env;
@@ -171,6 +173,27 @@ describe('db:restore run', () => {
     expect(result.replaced.map((r) => r.name)).toEqual(['idp']);
     expect(countOf(fx.targets.idp)).toBe(7);
     expect(countOf(fx.targets.life)).toBe(1);
+  });
+
+  it('--only meal replaces the live meal.db from the snapshot and passes quick_check', async () => {
+    const fx = makeRestoreFixture();
+    seed(fx.targets.meal, 1);
+    seed(snapshotPath(fx, 'meal'), 9);
+
+    const result = await runRestore({
+      from: SNAPSHOT_DIR,
+      only: ['meal'],
+      env: envFor(fx, ['meal']),
+      probe: down,
+      now: at,
+    });
+
+    expect(result.replaced.map((r) => r.name)).toEqual(['meal']);
+    expect(countOf(fx.targets.meal)).toBe(9);
+    expect(result.replaced[0].preRestore).toBe(
+      join(fx.backupRoot, `pre-restore-${STAMP}`, 'meal.db'),
+    );
+    expect(countOf(join(fx.backupRoot, `pre-restore-${STAMP}`, 'meal.db'))).toBe(1);
   });
 
   it('removes stale -wal/-shm siblings of the target', async () => {
