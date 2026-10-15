@@ -23,6 +23,21 @@ import {
 } from '../../src/photo/gemini.client';
 import { gradeRead, passAtK, type ExpectedMeal } from './grade';
 
+/** The two metrics a run may headline; `PROMPT_EVAL_METRIC` names one, unset names neither. */
+const HEADLINED_METRICS = ['pass1', 'pass5'] as const;
+type HeadlinedMetric = (typeof HEADLINED_METRICS)[number];
+
+/** One fixture's photo score, as the summary line and the headline both read it. */
+interface PhotoScore {
+  id: string;
+  sampleCount: number;
+  pass1: number;
+  pass5: number;
+}
+
+/** The metric the report headlines, from `PROMPT_EVAL_METRIC`; null prints no headline. */
+let headlinedMetric: HeadlinedMetric | null = null;
+
 const live = process.env.PROMPT_EVAL === '1';
 (live ? describe : describe.skip)('prompt eval (live)', () => {
   const coordinates: NodeJS.ProcessEnv = {};
@@ -30,6 +45,7 @@ const live = process.env.PROMPT_EVAL === '1';
   let samplesPerFixture = 20;
 
   beforeAll(() => {
+    headlinedMetric = selectedMetric();
     requireEnvCoordinate('GEMINI_API_KEY');
     requireEnvCoordinate('GEMINI_MODEL');
     requireEnvCoordinate('GEMINI_API_BASE');
@@ -171,10 +187,18 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
       `item pass@1=${itemPass1.toFixed(3)} pass@5=${itemPass5.toFixed(3)} ` +
       `merged=${merged} split=${split} id-binding-failures=${idBindingFailures}`,
   );
+  printHeadlinedMetric({ id: expected.id, sampleCount: outcomes.length, pass1: photoPass1, pass5: photoPass5 });
   for (const [failure, count] of failureCounts(outcomes)) {
     // eslint-disable-next-line no-console
     console.log(`[prompt-eval]   ${count}x ${failure}`);
   }
+}
+
+/** Print the one line for the metric `PROMPT_EVAL_METRIC` selected, or nothing when none was selected. */
+function printHeadlinedMetric(score: PhotoScore): void {
+  if (headlinedMetric === null) return;
+  // eslint-disable-next-line no-console
+  console.log(`[prompt-eval] ${score.id}: ${headlinedMetric}=${score[headlinedMetric].toFixed(3)} (n=${score.sampleCount})`);
 }
 
 function failureCounts(outcomes: SampleOutcome[]): [string, number][] {
@@ -191,4 +215,16 @@ function failureCounts(outcomes: SampleOutcome[]): [string, number][] {
 function requireEnvCoordinate(name: string): void {
   if (process.env[name]) return;
   throw new Error(`${name} is not set — load .env.development first (set -a; . ./.env.development; set +a)`);
+}
+
+/**
+ * The metric `PROMPT_EVAL_METRIC` asks the report to headline: `pass1` or
+ * `pass5`. Unset prints no headline, exactly as before. Any other value throws,
+ * so a typo cannot silently headline the wrong metric.
+ */
+function selectedMetric(): HeadlinedMetric | null {
+  const raw = process.env.PROMPT_EVAL_METRIC;
+  if (raw === undefined) return null;
+  if (HEADLINED_METRICS.includes(raw as HeadlinedMetric)) return raw as HeadlinedMetric;
+  throw new Error(`PROMPT_EVAL_METRIC must be ${HEADLINED_METRICS.join(' or ')}, got "${raw}"`);
 }

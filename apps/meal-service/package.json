@@ -10,7 +10,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest",
-    "eval:prompt": "PROMPT_EVAL=1 jest test/eval/prompt-eval.test.ts --runInBand"
+    "eval:pass1": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass1 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand",
+    "eval:pass5": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass5 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand"
   },
   "dependencies": {
     "@life/nutrition": "*",

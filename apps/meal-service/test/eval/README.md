@@ -18,13 +18,29 @@ catalog/USDA ranking.
 
 ## Run
 
+Load the env first, then pick the metric to headline:
+
 ```sh
 set -a; . ./.env.development; set +a
-npm run eval:prompt -w apps/meal-service
+npm run eval:pass1 -w apps/meal-service
+npm run eval:pass5 -w apps/meal-service
 ```
 
-`PROMPT_EVAL_SAMPLES` overrides the sample count (default 20). Unset
-`PROMPT_EVAL`, the suite skips — the normal suite stays green and offline.
+| Command | Metric it headlines |
+|---|---|
+| `npm run eval:pass1 -w apps/meal-service` | `pass@1` — the one-shot number a user actually gets. |
+| `npm run eval:pass5 -w apps/meal-service` | `pass@5` — the ceiling if a retry were ever added. |
+
+Both commands sample the same way (`PROMPT_EVAL_SAMPLES=20`) and differ only in
+which metric they headline; a run prints the full report line either way.
+
+The run is live: it calls the API, costs money, and is non-deterministic. An n=20
+baseline takes about seven minutes. Measured 2026-10-15 at n=20:
+`photo pass@1=0.950 pass@5=1.000`.
+
+`PROMPT_EVAL_SAMPLES` overrides the sample count. Unset `PROMPT_EVAL`, the suite
+skips — the normal suite stays green and offline. An unrecognised
+`PROMPT_EVAL_METRIC` fails the run loudly rather than headline the wrong metric.
 
 ## Fixture format — `expected.json`
 
@@ -44,7 +60,7 @@ npm run eval:prompt -w apps/meal-service
    `photo.jpg`, write `expected.json` per the table above.
 2. Tick the scenario row below. `grade.ts` reads fixtures generically — no code
    change is needed for a new fixture.
-3. `npm run eval:prompt -w apps/meal-service`.
+3. `npm run eval:pass1 -w apps/meal-service`.
 
 ## Scenario matrix
 
