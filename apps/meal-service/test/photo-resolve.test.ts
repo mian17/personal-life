@@ -668,9 +668,9 @@ describe('PhotoService — the search cap degrades, never discards', () => {
       const query = url.searchParams.get('query');
       return usdaResponse(searchPayload(query === 'chicken' ? FDC_ID : OTHER_FDC_ID, query ?? ''));
     };
-    // The model searches five real foods, then a sixth (the overflow) it never
-    // gets a result for — the cap is five tool rounds.
-    const searches = ['chicken', 'rice', 'beans', 'tofu', 'kale', 'lentils'];
+    // The model searches MAX_TOOL_ROUNDS real foods, then one overflow query it
+    // never gets a result for — the cap stops the tool from running again.
+    const searches = ['chicken', ...Array.from({ length: MAX_TOOL_ROUNDS }, (_, i) => `filler-${i}`)];
     const gemini = new FakeGemini();
     gemini.reply = (call) => {
       const answers = answersSoFar(call);

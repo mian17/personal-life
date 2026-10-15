@@ -94,16 +94,16 @@ const METHOD = 'generateContent';
 const SEARCH_TOOL_NAME = 'search_food';
 
 /**
- * Task 2's bounds (SPEC-photo-identity § Bounds: "5 tool rounds, 45 s wall
+ * Task 2's bounds (SPEC-photo-identity § Bounds: "10 tool rounds, 45 s wall
  * clock"): a meal photo holds a handful of foods, so a model still searching
- * after five rounds is looping, not reading; forty-five seconds is three of
+ * after ten rounds is looping, not reading; forty-five seconds is three of
  * this client's per-request timeouts. Hitting the round cap no longer discards
  * the read: the loop answers the outstanding call with an empty result and lets
  * the model answer with the foods it already found (see `readWithSearch`).
  * ponytail: fixed budget for every read; make it per-call only if a real model
  * needs longer.
  */
-export const MAX_TOOL_ROUNDS = 5;
+export const MAX_TOOL_ROUNDS = 10;
 const TOOL_LOOP_WALL_CLOCK_MS = 45_000;
 
 /** The answer to a call we will not run: it offers no candidate, so no id can resolve through it. */

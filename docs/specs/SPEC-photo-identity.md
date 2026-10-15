@@ -264,8 +264,10 @@ refusal, so the suite catches a regression instead of a live read failing closed
 the client executes it and sends a `functionResponse` part in the next request. The
 terminal turn is the one whose part is `text`, which is what `responseSchema` shapes.
 
-**Bounds: 5 tool rounds, 45 s wall clock.** A meal photo holds a handful of distinct
-foods, so a model still searching after 5 rounds is looping, not reading; 45 s is 3 ×
+**Bounds: 10 tool rounds, 45 s wall clock.** A meal photo holds a handful of distinct
+foods, so a model still searching after 10 rounds is looping, not reading; the higher cap
+tolerates the model re-searching a food it wants to confirm without changing the loop's
+shape; 45 s is 3 ×
 the client's existing 15 s per-request timeout (`gemini.client.ts`) — an estimate cannot
 sit for minutes while a diner waits. The wall clock is a hard stop: the turn at hand is
 treated as the model's final answer, and if no usable JSON arrived, the result is
@@ -340,7 +342,7 @@ rule: any logged URL *is* a leaked key, and data.gov deactivates keys it finds p
    fetch path is **batched**: one `GET /v1/foods?fdcIds=` request per estimate (chunked
    at 20 ids) supplies every food's vector, and its list entries share the fetch-by-id
    row shape, so one mapper reads both. See `SPEC-usda-source.md`.
-3. **Loop bounds.** **Chosen 2026-10-05** — 5 tool rounds and 45 s wall clock, recorded in
+3. **Loop bounds.** **Chosen 2026-10-05, raised to 10 rounds 2026-10-15** — 10 tool rounds and 45 s wall clock, recorded in
    §"The tool loop" → *The verified envelope*. The wall clock is a hard stop (`COULD_NOT_READ`
    if no usable JSON followed); the round cap **degrades** — the outstanding call is
    answered empty, one further turn is allowed, and the foods already found still return.
