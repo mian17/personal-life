@@ -266,7 +266,7 @@ describe('one saved meal detail', () => {
     expect(mockedNotFound).toHaveBeenCalled();
   });
 
-  it('leads with a back control to the saved list', async () => {
+  it('leads with a back control to the saved list, and no nav actions', async () => {
     mockedGetSavedMeal.mockResolvedValue(savedMeal());
 
     const el = await SavedMealPage({ params: Promise.resolve({ id: 's1' }) });
@@ -274,6 +274,8 @@ describe('one saved meal detail', () => {
 
     expect(html).toContain('aria-label="Back"');
     expect(html).toContain('href="/meals/saved"');
+    expect(html).not.toContain('aria-label="Daily target"');
+    expect(html).not.toContain('aria-label="Settings"');
   });
 });
 
