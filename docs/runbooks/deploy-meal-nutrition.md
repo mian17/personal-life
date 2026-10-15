@@ -34,7 +34,7 @@ schema sync — booting `meal-service` creates `meal.db`. **Never regenerate
 `MEAL_MASTER_KEY`** on a stack where it already exists: it is write-once, and changing it
 makes every existing encrypted meal row undecryptable.
 
-## 2. Env surface (all eight names)
+## 2. Env surface (all ten names)
 
 `.env` values never touch a doc — only the **names** and safe examples are here.
 
@@ -48,6 +48,8 @@ makes every existing encrypted meal row undecryptable.
 | `GEMINI_API_KEY` | Gemini key for the photo estimate | from Google AI Studio; never commit. Unset ⇒ estimate answers its explicit failure shape, service still boots |
 | `GEMINI_MODEL` | Gemini model id — **from env, never hardcoded** (Decision log, Task 12) | unset ⇒ photo estimate off, service boots |
 | `GEMINI_API_BASE` | Gemini API base — **from env, never hardcoded** (Decision log, Task 12) | unset ⇒ photo estimate off, service boots |
+| `USDA_API_KEY` | FoodData Central key — the photo estimate's USDA-side resolution (meal-ingredients chapter, `SPEC-usda-source.md`). Fail-closed at the first lookup, never at boot | from https://fdc.nal.usda.gov/api-key; unset ⇒ that item falls to the absent vector and the service still boots |
+| `USDA_API_BASE` | Optional USDA base override | defaults to `https://api.nal.usda.gov/fdc`; only a proxy sets it |
 
 **Fail-fast `MEAL_MASTER_KEY`:** compose interpolates it as
 `${MEAL_MASTER_KEY:?MEAL_MASTER_KEY is required (openssl rand -base64 32)}` — `docker
