@@ -140,6 +140,18 @@ naming one catalog `id` per food when it matched the catalog, else one `fdcId`. 
 backend, not the model, resolves the vector by that id (an existing catalog food reuses its
 stored vector; else `usda-source` fetches the authoritative vector by `fdcId` and maps it).
 
+**One item per food, never a dish name.** The prompt requires the model to list each
+distinct food it can identify as its own item, and forbids a dish, recipe, or menu name:
+`name` is a single food as a catalog name (`chicken`, `tofu`, `yardlong beans`), never a
+combination (`chicken and tofu soup`) and never a preparation (`grilled chicken salad`).
+A composed dish is therefore **decomposed into its foods** — a bowl of chicken, tofu, and
+yardlong beans is **three** items, not one — and each food is searched separately
+(one `search_food` call per food, with that food's own name as the query) so the id it
+names is bound to its own search. One food is not split into its parts (an egg is one
+item, not `egg white` + `egg yolk`). This is what the Objective means by "photographing a
+pot yields `chicken`, `broth`, `green beans` as separate rows": the decomposition lives in
+the instruction, not in post-processing, because a dish name cannot be split reliably.
+
 Why the model picks rather than the backend taking the top hit: for USDA, `search "chicken"`
 returns "Chicken, broilers or fryers, breast, meat only, raw" alongside "Chicken, nuggets,
 frozen, prepared". The score field does not know which one is on the plate. Seeing the

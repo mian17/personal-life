@@ -116,6 +116,18 @@ describe('GeminiClient', () => {
     expect(JSON.stringify(bare.lastRequestBody())).not.toContain(HINT);
   });
 
+  it('asks for one item per food and forbids a dish name', async () => {
+    const fake = new FakeGemini();
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+
+    // The rule must be in the request the client actually sends: one item per
+    // distinct food, no dish or recipe name, and the worked three-item example.
+    const firstText = fake.lastParts().find((part) => typeof part.text === 'string')?.text as string;
+    expect(firstText).toMatch(/one item per distinct food/i);
+    expect(firstText).toMatch(/never (answer with )?a dish/i);
+    expect(firstText).toMatch(/chicken, tofu, and yardlong beans is three items/i);
+  });
+
   it('addresses the request as <GEMINI_API_BASE>/models/<GEMINI_MODEL>:generateContent', async () => {
     const fake = new FakeGemini();
     await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
