@@ -74,7 +74,8 @@ export function FeedbackInbox({
                     {typeEntries.map((entry) => (
                       <ListItem
                         key={entry.id}
-                        title={entry.description}
+                        title={entry.title}
+                        snippet={entry.description}
                         meta={<LocalTime dateTime={entry.createdAt} />}
                       />
                     ))}
