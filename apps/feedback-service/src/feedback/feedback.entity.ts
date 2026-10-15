@@ -2,10 +2,12 @@ import { Check, Column, Entity, Index, PrimaryColumn } from 'typeorm';
 import { FEEDBACK_TYPE_VALUES, type FeedbackType } from '@life/shared';
 
 /**
- * The feedback row (`SPEC-feedback-service` Data model). `description` is an
- * `enc.v1.` envelope with AAD `life.v1|<sub>|feedback|description|<id>`; every
- * other column is metadata. `id` is the client-supplied idempotency key, never
- * generated — the AAD binds it, so it exists before the ciphertext is produced.
+ * The feedback row (`SPEC-feedback-service` Data model). `title` and
+ * `description` are `enc.v1.` envelopes with AADs
+ * `life.v1|<sub>|feedback|title|<id>` and
+ * `life.v1|<sub>|feedback|description|<id>`; every other column is metadata.
+ * `id` is the client-supplied idempotency key, never generated — the AAD binds
+ * it, so it exists before the ciphertext is produced.
  *
  * `IDX_feedback_owner_created` backs the one list read. The spec's DDL is
  * `(owner_sub, created_at DESC, id DESC)`; TypeORM's `@Index` has no per-column
@@ -30,6 +32,10 @@ export class Feedback {
 
   @Column({ type: 'text' })
   type: FeedbackType;
+
+  /** `enc.v1.` envelope; never plaintext. */
+  @Column({ type: 'text' })
+  title: string;
 
   /** `enc.v1.` envelope; never plaintext. */
   @Column({ type: 'text' })

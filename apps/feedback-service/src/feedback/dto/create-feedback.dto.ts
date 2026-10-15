@@ -2,6 +2,7 @@ import { IsIn, IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
 import {
   FEEDBACK_APPS,
   FEEDBACK_DESCRIPTION_MAX,
+  FEEDBACK_TITLE_MAX,
   FEEDBACK_TYPE_VALUES,
   type FeedbackApp,
   type FeedbackType,
@@ -27,6 +28,10 @@ export class CreateFeedbackDto {
 
   @IsIn(FEEDBACK_TYPE_VALUES)
   type: FeedbackType;
+
+  @IsNotEmpty()
+  @MaxLength(FEEDBACK_TITLE_MAX)
+  title: string;
 
   @IsNotEmpty()
   @MaxLength(FEEDBACK_DESCRIPTION_MAX)

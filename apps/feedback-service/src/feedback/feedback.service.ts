@@ -9,6 +9,15 @@ import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
 import { KeysService } from '../keys/keys.service';
 
 /**
+ * AAD for a feedback title (`SPEC-feedback-service` Data model). Byte-exact:
+ * the identical string must be reconstructed at encrypt and decrypt, and the
+ * id it binds is client-supplied, so it is known up front.
+ */
+function titleAad(ownerSub: string, feedbackId: string): string {
+  return `life.v1|${ownerSub}|feedback|title|${feedbackId}`;
+}
+
+/**
  * AAD for a feedback description (`SPEC-feedback-service` Data model).
  * Byte-exact: the identical string must be reconstructed at encrypt and
  * decrypt, and the id it binds is client-supplied, so it is known up front.
@@ -18,13 +27,14 @@ function descriptionAad(ownerSub: string, feedbackId: string): string {
 }
 
 /**
- * The cached shape: a `feedback` row **as persisted** — `description` is an
- * `enc.v1.` envelope, never plaintext (Contract 2 Rule 2).
+ * The cached shape: a `feedback` row **as persisted** — `title` and
+ * `description` are `enc.v1.` envelopes, never plaintext (Contract 2 Rule 2).
  */
 interface CachedFeedbackRow {
   id: string;
   app: string;
   type: string;
+  title: string;
   description: string;
   createdAt: string;
 }
@@ -35,19 +45,25 @@ function toCachedRow(feedback: Feedback): CachedFeedbackRow {
     id: feedback.id,
     app: feedback.app,
     type: feedback.type,
+    title: feedback.title,
     description: feedback.description,
     createdAt: feedback.createdAt.toISOString(),
   };
 }
 
 /**
- * True when the serialized row's content field is an `enc.v1.` envelope, so the
- * populate may touch Redis. A non-envelope row must never be cached (Redis is
- * AOF-persistent), so it refuses (`cacheable`) and is served straight from the
- * DB instead.
+ * True when the serialized row's content fields are `enc.v1.` envelopes, so
+ * the populate may touch Redis. A non-envelope row must never be cached (Redis
+ * is AOF-persistent), so it refuses (`cacheable`) and is served straight from
+ * the DB instead.
  */
 function isCiphertextRow(row: CachedFeedbackRow): boolean {
-  return typeof row?.description === 'string' && row.description.startsWith(ENC_PREFIX);
+  return (
+    typeof row?.title === 'string' &&
+    row.title.startsWith(ENC_PREFIX) &&
+    typeof row?.description === 'string' &&
+    row.description.startsWith(ENC_PREFIX)
+  );
 }
 
 /** Reject a hit whose serialized rows are not all `enc.v1.` ciphertext. */
@@ -101,8 +117,10 @@ export class FeedbackService {
    */
   async create(sub: string, input: CreateFeedbackInput): Promise<{ id: string }> {
     // "required, non-empty after trim" (`SPEC-feedback-service` API contract):
-    // a whitespace-only body never reaches the store, and `400` is the only
-    // validation status the service answers.
+    // a whitespace-only title or body never reaches the store, and `400` is the
+    // only validation status the service answers.
+    const title = input.title.trim();
+    if (!title) throw new BadRequestException('title must not be empty');
     const description = input.description.trim();
     if (!description) throw new BadRequestException('description must not be empty');
 
@@ -120,6 +138,7 @@ export class FeedbackService {
           ownerSub: sub,
           app: input.app,
           type: input.type,
+          title: encryptField(dek, title, titleAad(sub, input.id)),
           description: encryptField(dek, description, descriptionAad(sub, input.id)),
         });
         await manager.insert(FeedbackEvent, {
@@ -178,18 +197,24 @@ export class FeedbackService {
    * tampered envelope throws — never ciphertext, never garbage.
    */
   private toDto(row: CachedFeedbackRow, sub: string, dek: Buffer): FeedbackDto {
+    let title: string;
+    if (!row.title.startsWith(ENC_PREFIX)) {
+      this.logger.error(`decrypt failed for feedback ${row.id}`);
+      throw new CryptoError('stored feedback title is not an enc.v1 envelope');
+    }
     let description: string;
     if (!row.description.startsWith(ENC_PREFIX)) {
       this.logger.error(`decrypt failed for feedback ${row.id}`);
       throw new CryptoError('stored feedback description is not an enc.v1 envelope');
     }
     try {
+      title = decryptField(dek, row.title, titleAad(sub, row.id));
       description = decryptField(dek, row.description, descriptionAad(sub, row.id));
     } catch (err) {
       // Ids only — never content, keys, or AAD.
       this.logger.error(`decrypt failed for feedback ${row.id}`);
       throw err;
     }
-    return { id: row.id, app: row.app, type: row.type, description, createdAt: row.createdAt };
+    return { id: row.id, app: row.app, type: row.type, title, description, createdAt: row.createdAt };
   }
 }

@@ -118,6 +118,17 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, token, validBody(feedbackId(), '   ')).expect(400);
     });
 
+    it('rejects a missing, blank or over-long title with 400', async () => {
+      await post(app, token, {
+        id: feedbackId(),
+        app: 'notes',
+        type: 'bug_report',
+        description: 'has no title',
+      }).expect(400);
+      await post(app, token, validBody(feedbackId(), 'blank title', '   ')).expect(400);
+      await post(app, token, validBody(feedbackId(), 'long title', 'x'.repeat(201))).expect(400);
+    });
+
     it('rejects validation failures with 400: unknown field, bad uuid, bad type, over-length', async () => {
       await post(app, token, { ...validBody(feedbackId(), 'x'), ownerSub: 'spoofed' }).expect(400);
       await post(app, token, validBody('not-a-uuid', 'x')).expect(400);
@@ -160,6 +171,7 @@ describeDb('Feedback API (e2e)', () => {
     let app: FeedbackApp;
     let token: string;
     const redis = new FakeRedisClient();
+    const TITLE = 'TOPSECRET-FEEDBACK-TITLE';
     const PLAINTEXT = 'TOPSECRET-FEEDBACK-DESCRIPTION';
 
     beforeAll(async () => {
@@ -171,23 +183,31 @@ describeDb('Feedback API (e2e)', () => {
       await app.close();
     });
 
-    it('the raw column, every cached value, the event rows and the message bodies are free of plaintext', async () => {
+    it('the raw columns, every cached value, the event rows and the message bodies are free of plaintext', async () => {
       const id = feedbackId();
-      await post(app, token, { id, app: 'todos', type: 'enhancement', description: PLAINTEXT })
-        .expect(201);
+      await post(app, token, {
+        id,
+        app: 'todos',
+        type: 'enhancement',
+        title: TITLE,
+        description: PLAINTEXT,
+      }).expect(201);
 
       // Decrypts in the request path only — plaintext never exists beyond it.
       const listed = await get(app, token).expect(200);
-      expect((listed.body as FeedbackDto[]).find((entry) => entry.id === id)?.description).toBe(
-        PLAINTEXT,
-      );
+      const entry = (listed.body as FeedbackDto[]).find((row) => row.id === id);
+      expect(entry?.title).toBe(TITLE);
+      expect(entry?.description).toBe(PLAINTEXT);
 
-      // 1. The raw `description` column is an `enc.v1.` envelope, not plaintext.
+      // 1. The raw `title` and `description` columns are `enc.v1.` envelopes.
       const rows = await app.dataSource.query(
-        'SELECT description FROM feedback WHERE id = $1',
+        'SELECT title, description FROM feedback WHERE id = $1',
         [id],
       );
+      const titleCiphertext = rows[0].title as string;
       const ciphertext = rows[0].description as string;
+      expect(titleCiphertext.startsWith(ENC_PREFIX)).toBe(true);
+      expect(titleCiphertext).not.toContain(TITLE);
       expect(ciphertext.startsWith(ENC_PREFIX)).toBe(true);
       expect(ciphertext).not.toContain(PLAINTEXT);
 
@@ -195,20 +215,25 @@ describeDb('Feedback API (e2e)', () => {
       expect(redis.written.length).toBeGreaterThan(0);
       for (const { value } of redis.written) {
         expect(value).toContain(ENC_PREFIX);
+        expect(value).not.toContain(TITLE);
         expect(value).not.toContain(PLAINTEXT);
       }
 
       // 3. Event rows are metadata only: neither plaintext nor ciphertext.
       const events = await app.dataSource.query('SELECT * FROM feedback_event');
       const eventJson = JSON.stringify(events);
+      expect(eventJson).not.toContain(TITLE);
       expect(eventJson).not.toContain(PLAINTEXT);
+      expect(eventJson).not.toContain(titleCiphertext);
       expect(eventJson).not.toContain(ciphertext);
 
       // 4. The published message body carries metadata only, exactly as specified.
       await waitFor(() => app.sink.eventIds.includes(id), 'feedback.submitted publish');
       const body = app.sink.published.find((entry) => entry.event_id === id)!;
       const bodyJson = JSON.stringify(body);
+      expect(bodyJson).not.toContain(TITLE);
       expect(bodyJson).not.toContain(PLAINTEXT);
+      expect(bodyJson).not.toContain(titleCiphertext);
       expect(bodyJson).not.toContain(ciphertext);
       expect(Object.keys(body).sort()).toEqual([
         'app',

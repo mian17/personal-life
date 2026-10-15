@@ -452,8 +452,12 @@ export function feedbackId(): string {
 }
 
 /** A minimal valid `POST /api/feedback` body. */
-export function feedbackBody(id: string, description: string): Record<string, unknown> {
-  return { id, app: 'notes', type: 'bug_report', description };
+export function feedbackBody(
+  id: string,
+  description: string,
+  title = 'A feedback title',
+): Record<string, unknown> {
+  return { id, app: 'notes', type: 'bug_report', title, description };
 }
 
 type RequestTest = request.Test;
