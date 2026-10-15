@@ -1198,3 +1198,23 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   container, so the server must be up). Spec now names only 3002/3003 and says the
   connection count covers postgres. Docs only; no code touched. Merge awaits the user's
   explicit request.
+- 2026-10-15: **PWA icons are generated from Lucide, and the feedback icon is its own.**
+  User report: the feedback Home Screen icon was identical to notes; then (after the first
+  generated version) "the glyph is too big". Confirmed cause in the artifacts — `icon-feedback.png`
+  and `icon-notes.png` were byte-identical (md5 `183339028a90ae2d…`), all four PNGs were
+  hand-scaled copies of `icon.svg`, and no generator existed. New
+  `apps/app/scripts/generate-icons.mjs` (`node apps/app/scripts/generate-icons.mjs`) draws
+  each route icon as a full-bleed background + a centred white Lucide glyph read from the
+  installed package (`lucide-react/dist/esm/icons/<name>.mjs` → `__iconData`), so the glyphs
+  are genuinely Lucide-derived, not hand-drawn path strings: notes `text-align-start`
+  `#5b8cff`, todos `check` `#34c759`, meals `utensils` `#ff9500`, feedback
+  `message-square-text` `#af52de` (Apple systemPurple — the first distinct feedback icon).
+  Glyph box 24 units × 12 (288px) with a 32px stroke, ink ≈44–53% of the canvas; the first
+  pass used ×18 (≈72% ink) and was shrunk after the user saw it oversized. `manifests.test.ts`
+  hardened: every icon a manifest declares must exist, and the four icons must be pairwise
+  byte-distinct — both would have caught the original bug. Spec records corrected
+  (`SPEC-feedback-ui.md` no longer claims the icons are hand-drawn binaries with no build
+  step; `SPEC-app-rp.md` lists all four and points at the script). Non-feature (asset
+  generation + test hardening, no behavior change): the lesson-0015 path, direct §5
+  delegation. Verification: `apps/app` typecheck clean; `manifests.test.ts` 7/7 pass. Merge
+  awaits the user's explicit request.

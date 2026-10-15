@@ -46,12 +46,25 @@ describe('per-route PWA manifests', () => {
     expect(meals.icons[0].src).toBe('/icon-meals.png');
   });
 
-  it('ships every icon the /meals manifest declares', () => {
-    const meals = readManifest('manifest-meals.json');
-    const missingIcons = meals.icons
-      .map((icon: { src: string }) => icon.src.replace(/^\//, ''))
-      .filter((file: string) => !fs.existsSync(path.join(publicDir, file)));
+  it('ships every icon the per-route manifests declare', () => {
+    const manifests = [
+      'manifest-notes.json',
+      'manifest-todos.json',
+      'manifest-meals.json',
+      'manifest-feedback.json',
+    ];
+    const missingIcons = manifests.flatMap((manifest) =>
+      readManifest(manifest)
+        .icons.map((icon: { src: string }) => icon.src.replace(/^\//, ''))
+        .filter((file: string) => !fs.existsSync(path.join(publicDir, file))),
+    );
     expect(missingIcons).toEqual([]);
+  });
+
+  it('ships a byte-distinct icon per route', () => {
+    const files = ['icon-notes.png', 'icon-todos.png', 'icon-meals.png', 'icon-feedback.png'];
+    const bodies = files.map((file) => fs.readFileSync(path.join(publicDir, file)).toString('base64'));
+    expect(new Set(bodies).size).toBe(files.length);
   });
 
   it('links each manifest from its route segment layout', () => {

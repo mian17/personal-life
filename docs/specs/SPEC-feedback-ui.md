@@ -418,10 +418,12 @@ logic in this module, so lesson 0019 does not apply.
   `display: standalone`, icon `/icon-feedback.png` (512×512, `purpose: any`), and the same
   light-app palette the sibling manifests use (`#0f1115`), copied as *values inside a new
   file*.
-- **New** `apps/app/public/icon-feedback.png` — 512×512 PNG checked in as a binary asset,
-  exactly like `icon-notes.png` / `icon-todos.png` (which are checked-in binaries, not
-  generated). There is no per-route SVG and no rasterize/build step; the file is added to
-  the repo as-is. iOS ignores SVG for the Home Screen, hence the PNG.
+- **New** `apps/app/public/icon-feedback.png` — 512×512 PNG: a full-bleed `#af52de`
+  background with a centred white Lucide `message-square-text` glyph. It is **generated, not
+  hand-drawn** — `apps/app/scripts/generate-icons.mjs` rasterises all four route icons from
+  their Lucide glyph data (`node apps/app/scripts/generate-icons.mjs`). Each route keeps its
+  own icon; the four files are byte-distinct and a test enforces it. iOS ignores SVG for the
+  Home Screen, hence the PNG.
 - **New** `apps/app/app/feedback/layout.tsx` — `routeLayoutMetadata('/manifest-feedback.json',
   'Feedback', '/icon-feedback.png')` + `export default RouteLayout`, mirroring
   `notes/layout.tsx`.
