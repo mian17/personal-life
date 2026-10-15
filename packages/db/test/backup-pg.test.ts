@@ -120,6 +120,15 @@ describe('runBackupPg naming + manifest', () => {
       '-f',
       `/tmp/db-backup-${STAMP}/${DB}.dump`,
     ]);
+
+    // `pg_dump -f` never creates its parent directory, so the backup must `mkdir -p`
+    // the container dump directory *before* it dumps (`restore-pg.ts` does the same).
+    const mkdir = runner.calls.findIndex(
+      (argv) => argv[0] === 'mkdir' && argv[1] === '-p' && argv[2] === `/tmp/db-backup-${STAMP}`,
+    );
+    const dumpIndex = runner.calls.findIndex((argv) => argv[0] === 'pg_dump');
+    expect(mkdir).toBeGreaterThanOrEqual(0);
+    expect(mkdir).toBeLessThan(dumpIndex);
   });
 
   it('records the SQLite-parity manifest shape with pgRestoreList + tables', () => {

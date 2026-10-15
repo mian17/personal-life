@@ -100,8 +100,6 @@ describeDocker('pg backup/restore against a throwaway container', () => {
     sql('CREATE TABLE public."items" (id serial PRIMARY KEY, note text NOT NULL);');
     sql("INSERT INTO public.\"items\" (note) VALUES ('a'), ('b'), ('c');");
 
-    // `pg_dump -f` does not create its parent directory in the container.
-    runner.exec(['mkdir', '-p', `/tmp/db-backup-${BACKUP_STAMP}`]);
     const backup = runBackupPg({
       argv: [],
       env: env(),

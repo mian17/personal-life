@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { dirname, join, resolve } from 'path';
 import { pruneRoutineSnapshots } from './backup';
 import {
   createComposePgRunner,
@@ -88,6 +88,7 @@ export function runBackupPg(options: {
     options.runner ?? createComposePgRunner({ composeFile: join(root, 'compose.yaml') });
   const file = `${db.database}.dump`;
   const containerPath = `/tmp/db-backup-${stamp}/${db.database}.dump`;
+  runner.exec(['mkdir', '-p', dirname(containerPath)]);
   pgDump(runner, containerPath, db);
   if (!pgRestoreListOk(runner, containerPath)) {
     throw new Error(`pg_restore --list failed for ${containerPath}`);

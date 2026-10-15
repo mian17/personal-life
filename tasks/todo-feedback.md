@@ -1251,3 +1251,22 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   `postgres-feedback`/`rabbitmq-feedback`. Nothing is deployed and no secret exists in any
   environment, so there is no secret migration. Verification: `docker compose config` clean,
   `@life/db` build + typecheck clean. Merge awaits the user's explicit request.
+
+- 2026-10-15: **`db:backup:pg` failed on every run: the container dump directory was never created.**
+  Reported error: `pg_dump: error: could not open output file "/tmp/db-backup-<stamp>/feedback.dump":
+  No such file or directory`. Cause: `runBackupPg` dumps to the nested
+  `/tmp/db-backup-<stamp>/<db>.dump` via `pg_dump -f`, but `pg_dump -f` never creates parent
+  directories, and nothing in the backup path created the container-side directory — the sibling
+  `restore-pg.ts` already does (`mkdir -p dirname(containerPath)` before both its verify and
+  pre-restore dumps). Fix: one line in `packages/db/src/backup-pg.ts` —
+  `runner.exec(['mkdir', '-p', dirname(containerPath)]);` immediately before `pgDump(runner,
+  containerPath, db)`, plus `dirname` added to the existing `path` import. No refactor, `pgDump`
+  untouched. Tests made able to catch the class: `backup-pg.test.ts` now asserts on the recorded
+  call sequence that the `mkdir -p` for the dump dir precedes the `pg_dump` call (order, not
+  presence — demonstrated failing on the reverted one-liner, passing restored);
+  `pg-integration.test.ts` dropped the hand-rolled `runner.exec(['mkdir', '-p', …])` that masked
+  the bug, so the throwaway-`postgres:17-alpine` end-to-end proof exercises the real production
+  path. Verification: `@life/shared` build + `@life/db` typecheck clean; `backup-pg.test.ts`
+  11/11, `pg-integration.test.ts` 1/1 (Docker present, real container), `restore-pg.test.ts`
+  13/13. Non-feature (bug fix + test hardening, no behavior added): the lesson-0015 path, direct
+  §5 delegation. Merge awaits the user's explicit request.
