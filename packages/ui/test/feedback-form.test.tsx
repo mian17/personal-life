@@ -57,6 +57,7 @@ function Harness({ onSubmit }: { onSubmit: FeedbackFormProps['onSubmit'] }) {
   );
 }
 
+const titleInput = () => screen.getByLabelText('Title') as HTMLInputElement;
 const textarea = () => screen.getByLabelText('Description') as HTMLTextAreaElement;
 const typeGroup = () => screen.getByRole('group', { name: 'Feedback type' });
 const send = () => screen.getByRole('button', { name: 'Send' });
@@ -111,23 +112,41 @@ describe('FeedbackForm', () => {
     ]);
   });
 
-  it('sends no request for a blank description, shows the error and focuses the field', async () => {
+  it('sends no request for a blank title, shows the error and focuses the field', async () => {
     const { onSubmit, onOpenChange } = renderForm();
-    fireEvent.change(textarea(), { target: { value: '   ' } });
+    fireEvent.change(titleInput(), { target: { value: '   ' } });
+    fireEvent.change(textarea(), { target: { value: 'a description' } });
 
     expect((send() as HTMLButtonElement).disabled).toBe(false);
     await submitForm();
 
     expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toBe('Title is required.');
+    expect(titleInput().getAttribute('aria-invalid')).toBe('true');
+    expect(textarea().getAttribute('aria-invalid')).toBe(null);
+    expect(document.activeElement).toBe(titleInput());
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('with a title but a blank description, blocks with the description error and focuses it', async () => {
+    const { onSubmit, onOpenChange } = renderForm();
+    fireEvent.change(titleInput(), { target: { value: 'a title' } });
+    fireEvent.change(textarea(), { target: { value: '   ' } });
+
+    await submitForm();
+
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe('Description is required.');
     expect(textarea().getAttribute('aria-invalid')).toBe('true');
+    expect(titleInput().getAttribute('aria-invalid')).toBe(null);
     expect(document.activeElement).toBe(textarea());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it('submits the trimmed description with the exact app, type and idempotency key, then closes', async () => {
+  it('submits the trimmed title and description with the exact app, type and idempotency key, then closes', async () => {
     const { onSubmit, onOpenChange } = renderForm({ app: 'todos' });
     fireEvent.click(within(typeGroup()).getByRole('button', { name: 'Bug report' }));
+    fireEvent.change(titleInput(), { target: { value: '  dark mode  ' } });
     fireEvent.change(textarea(), { target: { value: '  dark mode please  ' } });
 
     await submitForm();
@@ -136,6 +155,7 @@ describe('FeedbackForm', () => {
       id: expect.any(String),
       app: 'todos',
       type: 'bug_report',
+      title: 'dark mode',
       description: 'dark mode please',
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -149,6 +169,7 @@ describe('FeedbackForm', () => {
       }),
     );
     const { onOpenChange } = renderForm({ onSubmit });
+    fireEvent.change(titleInput(), { target: { value: 'a title' } });
     fireEvent.change(textarea(), { target: { value: 'a bug' } });
 
     await submitForm();
@@ -167,6 +188,7 @@ describe('FeedbackForm', () => {
       throw new Error('Network down.');
     });
     renderForm({ onSubmit });
+    fireEvent.change(titleInput(), { target: { value: 'a title' } });
     fireEvent.change(textarea(), { target: { value: 'a bug' } });
 
     await submitForm();
@@ -184,6 +206,7 @@ describe('FeedbackForm', () => {
         }),
     );
     const { onOpenChange } = renderForm({ onSubmit });
+    fireEvent.change(titleInput(), { target: { value: 'a title' } });
     fireEvent.change(textarea(), { target: { value: 'a bug' } });
 
     await submitForm();
@@ -204,11 +227,13 @@ describe('FeedbackForm', () => {
     render(<Harness onSubmit={onSubmit} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open feedback' }));
+    fireEvent.change(titleInput(), { target: { value: 'first title' } });
     fireEvent.change(textarea(), { target: { value: 'first' } });
     await submitForm();
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open feedback' }));
+    expect(titleInput().value).toBe('');
     expect(textarea().value).toBe('');
     expect(
       within(typeGroup())
@@ -216,6 +241,7 @@ describe('FeedbackForm', () => {
         .map((pill) => pill.getAttribute('aria-pressed')),
     ).toEqual(['true', 'false', 'false']);
 
+    fireEvent.change(titleInput(), { target: { value: 'second title' } });
     fireEvent.change(textarea(), { target: { value: 'second' } });
     await submitForm();
 
