@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal, listMealFoods, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
+import { MealsNav } from '../../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function SavedMealPage({ params }: { params: Promise<{ id: 
             <ArrowLeft size={20} aria-hidden />
           </IconLink>
         }
+        trailing={<MealsNav />}
       />
       <PageTitle>{meal.name}</PageTitle>
       <Card>Re-log {total} in one tap — the corrected numbers, not a new guess.</Card>
