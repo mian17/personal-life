@@ -328,6 +328,34 @@ describe('GeminiClient', () => {
     expect(modeOf(fake.calls[1])).toBe('AUTO');
   });
 
+  it('omits the response schema on the forced round and sends it once the mode relaxes to AUTO', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem()] })
+        : functionCallTurn('chicken');
+
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    // The forced round is illegal with a response mime type — the live API
+    // answers 400 — so the request the client actually sent must carry neither
+    // the mime type nor the schema, and still force the tool call.
+    const forced = JSON.parse(String(fake.calls[0].init.body)) as Record<string, unknown>;
+    expect(toolModeOf(forced)).toBe('ANY');
+    expect(forced).not.toHaveProperty('generationConfig.responseMimeType');
+    expect(forced).not.toHaveProperty('generationConfig.responseSchema');
+    expect(forced).not.toHaveProperty('generationConfig');
+
+    // The AUTO round carries the schema, because that is the round whose text
+    // turn the identity JSON must satisfy.
+    const relaxed = JSON.parse(String(fake.calls[1].init.body)) as {
+      generationConfig?: { responseMimeType?: unknown; responseSchema?: unknown };
+    };
+    expect(relaxed.generationConfig?.responseMimeType).toBe('application/json');
+    expect(relaxed.generationConfig?.responseSchema).toBeDefined();
+  });
+
   it('degrades past the search cap: the overflow call is answered empty and the foods already found still read', async () => {
     const fake = new FakeGemini();
     const queries: string[] = [];

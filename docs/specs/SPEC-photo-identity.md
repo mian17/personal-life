@@ -247,6 +247,18 @@ and the `search_food` declaration ride in the same `GenerateContentRequest`. The
 consequence: `responseSchema` constrains the **final text turn**, while a tool call
 arrives as a `functionCall` part, not as schema-constrained text.
 
+**A forced request must not carry a response mime type or schema.** Verified live
+2026-10-10 against `gemini-3.8-flash`: `mode: "ANY"` together with
+`generationConfig.responseMimeType: "application/json"` is rejected with HTTP 400
+*"Forced function calling (ANY mode) with a response mime type: 'application/json' is
+unsupported"*; the same request with no `generationConfig` answers 200 with the
+`functionCall`. The constraint is the pair, not either half — `AUTO` with the schema, and
+`ANY` without it, both answer 200. So the identity schema applies only to the **`AUTO`
+rounds**, which is exactly where the terminal text turn lands: the forced round asks for a
+`functionCall`, needs no response schema, and is sent schema-less (`gemini.client.ts`
+`loopBody` keys the `generationConfig` off `callingMode`). `FakeGemini` mirrors the
+refusal, so the suite catches a regression instead of a live read failing closed.
+
 **Termination, stated from the shape, not inferred.** A turn ends when the candidate's
 `parts` contain **no** `functionCall`. A `functionCall` part means the loop continues —
 the client executes it and sends a `functionResponse` part in the next request. The

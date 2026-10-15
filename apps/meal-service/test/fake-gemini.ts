@@ -24,7 +24,8 @@ export class FakeGemini {
   readonly handler: GeminiTransport = (url, init) => {
     const call: GeminiCall = { url: String(url), init: init ?? {} };
     this.calls.push(call);
-    return Promise.resolve(this.reply(call));
+    const rejection = forcedModeWithResponseMimeType(call);
+    return Promise.resolve(rejection ?? this.reply(call));
   };
 
   /** Parsed JSON of the most recent request body, for assertions on what was sent. */
@@ -38,6 +39,36 @@ export class FakeGemini {
     const contents = (this.lastRequestBody() as { contents?: Array<{ parts?: unknown }> }).contents;
     return (contents?.[0]?.parts ?? []) as Array<Record<string, unknown>>;
   }
+}
+
+/**
+ * Mirror the live API's own refusal, so a request that pairs forced function
+ * calling with a response mime type fails here instead of in production: the
+ * API answers HTTP 400 "Forced function calling (ANY mode) with a response mime
+ * type: 'application/json' is unsupported". Every other request is unaffected.
+ */
+function forcedModeWithResponseMimeType(call: GeminiCall): Response | undefined {
+  const body = JSON.parse(String(call.init.body ?? '')) as {
+    toolConfig?: { functionCallingConfig?: { mode?: unknown } };
+    generationConfig?: { responseMimeType?: unknown };
+  };
+  const forced = body.toolConfig?.functionCallingConfig?.mode === 'ANY';
+  const hasMimeType = body.generationConfig?.responseMimeType !== undefined;
+  return forced && hasMimeType ? unsupportedPairingResponse() : undefined;
+}
+
+function unsupportedPairingResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code: 400,
+        message:
+          "Forced function calling (ANY mode) with a response mime type: 'application/json' is unsupported",
+        status: 'INVALID_ARGUMENT',
+      },
+    }),
+    { status: 400 },
+  );
 }
 
 /** Wrap a model JSON payload in the API's response envelope, as a real `Response`. */

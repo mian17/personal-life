@@ -352,13 +352,17 @@ export class GeminiClient {
     };
   }
 
-  /** One search-loop request: the conversation so far, plus the tool the model may call. */
+  /** One search-loop request: the conversation so far, plus the tool the model may call.
+   * The forced round carries no response schema: the live API answers 400 when
+   * forced function calling (mode ANY) meets a response mime type, and the
+   * forced turn must return a `functionCall` rather than schema-shaped text.
+   * The terminal text turn always arrives on an AUTO round, which keeps the schema. */
   private loopBody(turns: ConversationTurn[], toolsUsed: number): unknown {
     return {
       contents: turns,
       tools: [{ functionDeclarations: [SEARCH_FOOD_DECLARATION] }],
       toolConfig: functionCallingConfig(toolsUsed),
-      generationConfig: generationConfig(),
+      ...(callingMode(toolsUsed) === 'ANY' ? {} : { generationConfig: generationConfig() }),
     };
   }
 
@@ -422,11 +426,25 @@ function generationConfig(): unknown {
  * every later request lets it choose (`AUTO`), so it can answer once it has
  * them. `ANY` cannot be held for the whole loop — it forbids the terminal text
  * turn, so a loop that never relaxes could never end.
+ *
+ * The mode also decides whether the request may carry the response schema: the
+ * live API rejects forced function calling paired with a response mime type
+ * (HTTP 400, "Forced function calling (ANY mode) with a response mime type:
+ * 'application/json' is unsupported"). `loopBody` therefore omits the
+ * `generationConfig` on the forced round, which needs no schema — it asks for a
+ * `functionCall` — while the AUTO round that carries the terminal text turn
+ * keeps it.
  */
 function functionCallingConfig(toolsUsed: number): unknown {
   return { functionCallingConfig: { mode: callingMode(toolsUsed) } };
 }
 
+/**
+ * The mode for the round after `toolsUsed` searches: the first round is forced
+ * (`ANY`), every later round automatic. The forced round must not carry a
+ * response schema — the API rejects that pair — so `loopBody` keys the schema
+ * off this same answer.
+ */
 function callingMode(toolsUsed: number): FunctionCallingMode {
   return toolsUsed === 0 ? 'ANY' : 'AUTO';
 }
