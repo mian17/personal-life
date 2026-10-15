@@ -1141,3 +1141,22 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   `feedback-test-*` containers, cleaned then re-run once per the profile, green). QA passed in the
   first round and did not need a re-run — it was included by mistake; its result stands as
   confirmatory evidence. No blockers. Merge awaits the user's explicit request.
+- 2026-10-15: **form UX polish (user feedback; lesson 0029).** Both feedback fields now render
+  a visible label above the control plus a placeholder, and both required fields carry a
+  visible `*` marker with one `* Required field` legend (`feedback-form.tsx`; `blocks.css`
+  rules `.ui-field`, `.ui-field-label__required`, `.ui-field-legend`, existing tokens only).
+  Ids come from `useId()` and are bound with `htmlFor`; `aria-label="Title"` /
+  `aria-label="Description"` removed. The resolved accessible names stay `Title` /
+  `Description`, so the frozen selector surface — including the e2e `getByLabel` queries —
+  does not move. No new atom; no token change. Button geometry was raised in the same user
+  message and then **reverted by the user** ("preserve the current width and height"): the
+  dialog footer keeps its current size, `SPEC-ui-blocks.md` is untouched. Classified
+  non-feature (visual polish, no behavior change), so the lesson-0015 path applies: direct
+  §5 delegation with no §6 plan gate and no five-lane gate. Verification: `@life/ui`
+  typecheck clean; `test/feedback-form.test.tsx` + `test/feedback-nav-item.test.tsx` 16/16
+  pass. The nav-item suite's two `getByLabelText` queries were migrated to accessible-name
+  queries — testing-library matches raw `textContent` (now `"Title *"`), while the accessible
+  name correctly stays `Title`. No E2E run: no spec was created/removed/modified and the
+  accessible names (the frozen surface) are unchanged, verified at the DOM level by an
+  accessible-name assertion in the form suite. Spec: `SPEC-feedback-ui.md` amendment;
+  lesson 0029 committed with this change. Merge awaits the user's explicit request.

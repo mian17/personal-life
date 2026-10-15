@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type {
   CreateFeedbackInput,
   FeedbackApp,
@@ -55,6 +55,10 @@ export function FeedbackForm({
   const [pending, setPending] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  // Label-to-control association is by construction: the SAME id is handed to the
+  // `<label htmlFor>` and the control, so a label can never drift from its field.
+  const titleId = useId();
+  const descriptionId = useId();
   // Idempotency key (SPEC-feedback-ui, locked intent 5): one per open, reused by
   // every attempt of that open, regenerated on a fresh open. Request path only —
   // never persisted, logged, or cached.
@@ -139,23 +143,42 @@ export function FeedbackForm({
           </Pill>
         ))}
       </PillGroup>
-      <Input
-        ref={titleRef}
-        aria-label="Title"
-        aria-required
-        maxLength={FEEDBACK_TITLE_MAX}
-        aria-invalid={errorField === 'title' || undefined}
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-      />
-      <Textarea
-        ref={descriptionRef}
-        aria-label="Description"
-        aria-required
-        aria-invalid={errorField === 'description' || undefined}
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-      />
+      <p className="ui-field-legend">* Required field</p>
+      <div className="ui-field">
+        <label className="ui-field-label" htmlFor={titleId}>
+          Title{' '}
+          <span className="ui-field-label__required" aria-hidden="true">
+            *
+          </span>
+        </label>
+        <Input
+          ref={titleRef}
+          id={titleId}
+          placeholder="Short summary of your feedback"
+          aria-required
+          maxLength={FEEDBACK_TITLE_MAX}
+          aria-invalid={errorField === 'title' || undefined}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </div>
+      <div className="ui-field">
+        <label className="ui-field-label" htmlFor={descriptionId}>
+          Description{' '}
+          <span className="ui-field-label__required" aria-hidden="true">
+            *
+          </span>
+        </label>
+        <Textarea
+          ref={descriptionRef}
+          id={descriptionId}
+          placeholder="What happened, and what did you expect?"
+          aria-required
+          aria-invalid={errorField === 'description' || undefined}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </div>
     </Dialog>
   );
 }

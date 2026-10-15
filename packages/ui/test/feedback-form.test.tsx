@@ -57,8 +57,9 @@ function Harness({ onSubmit }: { onSubmit: FeedbackFormProps['onSubmit'] }) {
   );
 }
 
-const titleInput = () => screen.getByLabelText('Title') as HTMLInputElement;
-const textarea = () => screen.getByLabelText('Description') as HTMLTextAreaElement;
+const titleInput = () =>
+  screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement;
+const textarea = () => screen.getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
 const typeGroup = () => screen.getByRole('group', { name: 'Feedback type' });
 const send = () => screen.getByRole('button', { name: 'Send' });
 
@@ -269,5 +270,36 @@ describe('FeedbackForm', () => {
     renderForm({ title: 'Custom', submitLabel: 'Send it' });
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Custom');
     expect(screen.getByRole('button', { name: 'Send it' })).toBeTruthy();
+  });
+
+  it('renders visible labels bound to their controls with placeholders and the required legend', () => {
+    renderForm();
+
+    const titleLabel = titleInput().labels?.[0] as HTMLLabelElement;
+    const descriptionLabel = textarea().labels?.[0] as HTMLLabelElement;
+
+    expect(titleLabel).toBeTruthy();
+    expect(descriptionLabel).toBeTruthy();
+    expect(titleLabel.getAttribute('for')).toBe(titleInput().id);
+    expect(titleLabel.getAttribute('for')).not.toBe('');
+    expect(descriptionLabel.getAttribute('for')).toBe(textarea().id);
+    expect(descriptionLabel.getAttribute('for')).not.toBe('');
+
+    expect(titleLabel.textContent).toContain('Title');
+    expect(descriptionLabel.textContent).toContain('Description');
+
+    expect(titleInput().placeholder).toBe('Short summary of your feedback');
+    expect(textarea().placeholder).toBe('What happened, and what did you expect?');
+
+    expect(screen.getByText('* Required field').className.split(/\s+/)).toContain(
+      'ui-field-legend',
+    );
+
+    const markers = document.querySelectorAll('.ui-field-label__required');
+    expect(markers).toHaveLength(2);
+    markers.forEach((marker) => expect(marker.getAttribute('aria-hidden')).toBe('true'));
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toBe(titleInput());
+    expect(screen.getByRole('textbox', { name: 'Description' })).toBe(textarea());
   });
 });

@@ -51,8 +51,12 @@ describe('FeedbackNavItem', () => {
     expect(showModal).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Send feedback');
 
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'a title' } });
-    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'an idea' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'a title' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+      target: { value: 'an idea' },
+    });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Send' }));
     });
