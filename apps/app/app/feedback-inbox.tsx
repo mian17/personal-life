@@ -11,7 +11,7 @@ import {
   Section,
 } from '@life/ui';
 
-const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', feedback: 'Feedback' };
+const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', meals: 'Meals', feedback: 'Feedback' };
 const APP_ORDER = FEEDBACK_APPS;
 const TYPE_ORDER = FEEDBACK_TYPES.map((t) => t.value);
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(

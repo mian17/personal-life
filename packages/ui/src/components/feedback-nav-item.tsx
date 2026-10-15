@@ -7,7 +7,7 @@ import { FeedbackForm } from './feedback-form';
 import { IconButton } from './icon-button';
 
 export interface FeedbackNavItemProps {
-  /** Which app the entry belongs to (`'notes' | 'todos' | 'feedback'`). */
+  /** Which app the entry belongs to (`'notes' | 'todos' | 'meals' | 'feedback'`). */
   app: string;
   /** Submit seam: the app passes its server action. Receives the idempotency key. */
   onSubmit: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
