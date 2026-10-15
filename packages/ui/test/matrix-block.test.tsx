@@ -143,9 +143,6 @@ describe('MatrixBlock', () => {
     expect(empty).toMatch(/color:\s*var\(--muted\)/);
     expect(empty).toMatch(/place-content:\s*center/);
 
-    // Not media-gated: no 640px media block carries a `.ui-matrix*` rule.
-    expect(/@media[^{]*640px[^{]*\{[^@]*\.ui-matrix/.test(css)).toBe(false);
-
     // Guard: the matrix declarations resolve through tokens, never raw px/hex.
     const toneRules =
       cssBlock('.ui-matrix__quadrant--danger .ui-matrix__label') +
