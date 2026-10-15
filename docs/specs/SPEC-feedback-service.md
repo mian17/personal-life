@@ -52,8 +52,8 @@ sibling compose pattern),
 `FEEDBACK_TEST_DB_URL` (throwaway Postgres for tests only), and `PORT`
 (default `3008`; `3108` in dev — main.ts binds it, mirroring note-service's
 bootstrap). Addressing: production uses the internal compose network —
-`FEEDBACK_DB_URL=postgresql://…@postgres:5432/feedback`,
-`RABBITMQ_URL=amqp://…@rabbitmq:5672`; dev runs the service on the host (`3108`)
+`FEEDBACK_DB_URL=postgresql://…@postgres-feedback:5432/feedback`,
+`RABBITMQ_URL=amqp://…@rabbitmq-feedback:5672`; dev runs the service on the host (`3108`)
 and reaches the same compose services through their host-loopback publishes —
 `FEEDBACK_DB_URL=postgresql://feedback:<password>@127.0.0.1:5432/feedback`,
 `RABBITMQ_URL=amqp://feedback:<password>@127.0.0.1:5672` (infra spec §Compose

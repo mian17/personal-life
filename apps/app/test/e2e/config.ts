@@ -64,7 +64,7 @@ export const devPidsFile = 'service-pids-dev.json';
 /**
  * The throwaway Postgres feedback-service gets in the harness: a fixed-name
  * `postgres:17-alpine` container on an ephemeral loopback port, never the
- * compose `postgres` and never a service's real `data/` directory.
+ * compose `postgres-feedback` and never a service's real `data/` directory.
  */
 export const FEEDBACK_PG_CONTAINER =
   process.env.E2E_FEEDBACK_PG_CONTAINER?.trim() || 'feedback-pg-e2e';

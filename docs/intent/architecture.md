@@ -47,7 +47,7 @@ Source: `docs/intent/feedback-service.md` decision 8.
 
 - **"message brokers … until a real need shows up"** — the feedback chapter's durable
   push-on-write event stream is that real need. It earns the repo's **first broker,
-  RabbitMQ** (`rabbitmq` compose service) and its **first Postgres store** (`postgres`
+  RabbitMQ** (`rabbitmq-feedback` compose service) and its **first Postgres store** (`postgres-feedback`
   compose service) for `feedback-service`.
 - **SQLite is not abandoned.** The existing four services — `note-service`, `tags-service`,
   `todo-service`, `idp` — stay on SQLite; the SQLite→Postgres data-tier migration is

@@ -31,13 +31,13 @@ npm install                                       # new workspace apps/feedback-
 - [ ] `npm install` completed at the repo root.
 
 Until this merge lands, do not deploy: `master` has **no** `feedback-service`, no
-`postgres`/`rabbitmq`/`redis-feedback` compose services, and no `db:backup:pg`.
+`postgres-feedback`/`rabbitmq-feedback`/`redis-feedback` compose services, and no `db:backup:pg`.
 
 ## 1. What this deploy changes on the host
 
 One chapter arrives, and it has never run here:
 
-1. **feedback-infra** — `postgres` and `rabbitmq`, the **first Postgres store and the first
+1. **feedback-infra** — `postgres-feedback` and `rabbitmq-feedback`, the **first Postgres store and the first
    message broker on this host**, each with its own named volume, plus `redis-feedback`.
 2. **feedback-service** — the ingest service (`POST`/`GET /api/feedback`) that owns them.
 3. **feedback-ui** — the shared submit dialog (`FeedbackNavItem` in the Notes/Todos/Meals
@@ -45,8 +45,8 @@ One chapter arrives, and it has never run here:
 
 Facts that decide the steps below:
 
-- **Four new containers** (`feedback-service`, `postgres`, `rabbitmq`, `redis-feedback`) and
-  **two new named volumes** (`postgres-data`, `rabbitmq-data`). No existing block moves
+- **Four new containers** (`feedback-service`, `postgres-feedback`, `rabbitmq-feedback`, `redis-feedback`) and
+  **two new named volumes** (`postgres-feedback-data`, `rabbitmq-feedback-data`). No existing block moves
   except `app`, which gains `FEEDBACK_API_URL: http://feedback-service:3008` and
   `depends_on: feedback-service`.
 - **No migration files exist repo-wide.** The database named by `FEEDBACK_DB_URL` exists
@@ -59,7 +59,7 @@ Facts that decide the steps below:
   nothing to declare, seed, or create by hand in RabbitMQ or Postgres.
 - **The feedback store starts empty.** The rows created while testing the form live in the
   *worktree's* Compose project (`app-feedback_postgres-data`); this checkout's project is
-  `personal-life`, so its `personal-life_postgres-data` is a fresh volume. Dev feedback is
+  `personal-life`, so its `personal-life_postgres-feedback-data` is a fresh volume. Dev feedback is
   throwaway — it is not migrated, and nothing needs to be.
 - The Postgres backup/restore pair (`db:backup:pg` / `db:restore:pg` in `@life/db`) already
   exists, is unit-tested, and is proven against a throwaway container
@@ -76,8 +76,8 @@ Facts that decide the steps below:
 | Var | Required? | Notes |
 |---|---|---|
 | `FEEDBACK_MASTER_KEY` | **yes — hard fail-fast** | 32-byte base64 content key, own custody. Compose refuses to start without it (`${FEEDBACK_MASTER_KEY:?…}`) and the service also refuses to boot. Generate: `openssl rand -base64 32`. Verify before pasting: `printf '%s' "$K" \| base64 -d \| wc -c` → `32`. **Write-once.** `title` and `description` are stored as `enc.v1.` envelopes; losing this key loses every feedback entry permanently, and regenerating it makes existing rows undecryptable. Back it up outside the repo with the other master keys. |
-| `FEEDBACK_DB_PASSWORD` | **yes — hard fail-fast** | Password for Postgres' `feedback` role. It is used **both** to build `FEEDBACK_DB_URL` and as `POSTGRES_PASSWORD`, so the server initialises the role with it — **set it before the first boot**. Changing it after `postgres-data` exists does not change the role's stored password: the service would then fail to authenticate, and you would have to run `ALTER USER` inside the container. Generate: `openssl rand -hex 32`. |
-| `RABBITMQ_PASSWORD` | **yes — hard fail-fast** | Password for the `feedback` broker user (`RABBITMQ_DEFAULT_PASS`). Same first-boot rule as above. Generate: `openssl rand -hex 32`. |
+| `FEEDBACK_DB_PASSWORD` | **yes — hard fail-fast** | Password for Postgres' `feedback` role. It is used **both** to build `FEEDBACK_DB_URL` and as `POSTGRES_PASSWORD`, so the server initialises the role with it — **set it before the first boot**. Changing it after `postgres-feedback-data` exists does not change the role's stored password: the service would then fail to authenticate, and you would have to run `ALTER USER` inside the container. Generate: `openssl rand -hex 32`. |
+| `FEEDBACK_RABBITMQ_PASSWORD` | **yes — hard fail-fast** | Password for the `feedback` broker user (`RABBITMQ_DEFAULT_PASS`). Same first-boot rule as above. Generate: `openssl rand -hex 32`. |
 
 - [ ] **No `OIDC_AUDIENCE_MAP` change is needed.** The app requests one resource
       (`OIDC_APP_RESOURCE`, default `https://note-service`) and holds a single shared
@@ -87,7 +87,7 @@ Facts that decide the steps below:
       unnecessary; it is not a missing prerequisite.
 - [ ] **No `FEEDBACK_DB_URL` entry is needed either.** Compose builds it from
       `FEEDBACK_DB_PASSWORD`; the backup tool only parses it for the database identity and
-      falls back to the same `postgresql://feedback@postgres:5432/feedback` default.
+      falls back to the same `postgresql://feedback@postgres-feedback:5432/feedback` default.
 - [ ] Redis needs no keys: compose injects `REDIS_URL` (`redis://redis-feedback:6379`).
 - [ ] Leak discipline: these three values are secrets. Names in the doc, values only in
       `.env` — never in a log, an issue, or a chat.
@@ -112,7 +112,7 @@ cd /home/night/WebstormProjects/personal-life
       if it dies on a missing workspace, add the missing `COPY <path>/package.json <path>/`
       line to `apps/feedback-service/Dockerfile` and rebuild. `npm run build -w
       @life/feedback-service` in the build stage is the second failure point.
-- [ ] **Host loopback ports free:** `postgres` and `rabbitmq` publish `127.0.0.1:5432` and
+- [ ] **Host loopback ports free:** `postgres-feedback` and `rabbitmq-feedback` publish `127.0.0.1:5432` and
       `127.0.0.1:5672`. A stray container from another Compose project holding either would
       make the new ones fail to start:
       `docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E '5432|5672'`
@@ -136,7 +136,7 @@ npm run db:backup -w @life/db -- --pin
       `PINNED` marker. Rollback of the existing chapters depends entirely on this.
 - [ ] Do **not** continue otherwise.
 - [ ] Postgres is deliberately **not** covered here: `db:backup:pg` targets a live
-      `postgres` container, and this deploy is about to create an empty one. Its first
+      `postgres-feedback` container, and this deploy is about to create an empty one. Its first
       real snapshot is §7.
 
 ## 5. Deploy
@@ -146,12 +146,12 @@ docker compose up -d --build app feedback-service
 ```
 
 Only `app` and `feedback-service` are named: `app` changed and `feedback-service` is new.
-`postgres`, `rabbitmq`, and `redis-feedback` come up with them through `depends_on`
-(feedback-service waits on `postgres` + `rabbitmq` + `redis-feedback` being healthy; `app`
+`postgres-feedback`, `rabbitmq-feedback`, and `redis-feedback` come up with them through `depends_on`
+(feedback-service waits on `postgres-feedback` + `rabbitmq-feedback` + `redis-feedback` being healthy; `app`
 waits on `feedback-service`). `redis-app` (the session store, AOF + named volume) is never
 touched, so **existing logins survive** — nothing forces a re-login.
 
-- [ ] `docker compose ps` — the existing services plus `postgres`, `rabbitmq`,
+- [ ] `docker compose ps` — the existing services plus `postgres-feedback`, `rabbitmq-feedback`,
       `redis-feedback`, and `feedback-service` (new) all up, healthchecks green
       (`/health/ready` on 3001/3004/3005/3106/3008, 3003 idp).
 - [ ] `docker compose logs feedback-service --since 3m` — `FEEDBACK_MASTER_KEY` accepted,
@@ -159,11 +159,11 @@ touched, so **existing logins survive** — nothing forces a re-login.
       unhandled exception. A RabbitMQ retry line while the broker finishes booting is
       expected; a permanent failure is not.
 - [ ] `docker compose logs app --since 2m` — no `/feedback` BFF error.
-- [ ] `personal-life_postgres-data` and `personal-life_rabbitmq-data` now exist:
-      `docker volume ls | grep -E 'postgres-data|rabbitmq-data'`.
+- [ ] `personal-life_postgres-feedback-data` and `personal-life_rabbitmq-feedback-data` now exist:
+      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`.
 
 If `up` fails on `FEEDBACK_MASTER_KEY is required`, `FEEDBACK_DB_PASSWORD is required`, or
-`RABBITMQ_PASSWORD is required`, §2 was not applied — fix `.env` and re-run the same `up`.
+`FEEDBACK_RABBITMQ_PASSWORD is required`, §2 was not applied — fix `.env` and re-run the same `up`.
 If Postgres starts but `feedback-service` cannot authenticate, `FEEDBACK_DB_PASSWORD` was
 changed after the volume was first created (§2).
 
@@ -186,19 +186,19 @@ New surface:
       request*.
 - [ ] **Durability (the reason for the broker):** the row is in Postgres —
       ```bash
-      docker compose exec postgres psql -U feedback -d feedback -c 'SELECT count(*) FROM feedback;'
+      docker compose exec postgres-feedback psql -U feedback -d feedback -c 'SELECT count(*) FROM feedback;'
       ```
       → `1`; the event landed too (`SELECT count(*) FROM feedback_event;` → `1`). Then
       restart the service, hard-reload `/feedback`, and the row is still there.
 - [ ] **No plaintext at rest:** the stored `title` reads as an `enc.v1.` envelope, not your
       words —
       ```bash
-      docker compose exec postgres psql -U feedback -d feedback -tAc "SELECT left(title, 7) FROM feedback LIMIT 1;"
+      docker compose exec postgres-feedback psql -U feedback -d feedback -tAc "SELECT left(title, 7) FROM feedback LIMIT 1;"
       ```
       → `enc.v1.`.
 - [ ] **Idempotency:** the row you submitted has exactly one `feedback_event` —
       ```bash
-      docker compose exec postgres psql -U feedback -d feedback -tAc "SELECT count(*) FROM feedback_event WHERE feedback_id = '<the id>';"
+      docker compose exec postgres-feedback psql -U feedback -d feedback -tAc "SELECT count(*) FROM feedback_event WHERE feedback_id = '<the id>';"
       ```
       → `1`. A submit retry with the same `id` is a no-op (still one row, still one event).
 - [ ] **Per-route PWA:** `/feedback` loads its own manifest
@@ -237,7 +237,7 @@ Existing surface (prove the deploy did not regress what already worked):
       only way to know the undo path works before you need it.
       1. Submit a **second**, throwaway entry from the toolbar, then confirm count `2`:
          ```bash
-         docker compose exec postgres psql -U feedback -d feedback -tAc 'SELECT count(*) FROM feedback;'
+         docker compose exec postgres-feedback psql -U feedback -d feedback -tAc 'SELECT count(*) FROM feedback;'
          ```
       2. Stop the stack — **without `-v`** (`-v` would also remove `redis-app-data`,
          the session store):
@@ -245,12 +245,12 @@ Existing surface (prove the deploy did not regress what already worked):
          docker compose down
          ```
       3. Start the database server **alone**. The restore tool runs `pg_restore` *inside*
-         the postgres container (`docker compose exec postgres …`), so the container must
+         the postgres container (`docker compose exec postgres-feedback …`), so the container must
          be up while every client is gone. `down` already guarantees the clients are gone;
          the tool's own probe fail-closes (exit 2) if anything answers on 3002/3003 or any
          other connection reaches the `feedback` database.
          ```bash
-         docker compose up -d postgres
+         docker compose up -d postgres-feedback
          npm run db:restore:pg -w @life/db -- --from backup/<the §7-stamp>
          ```
          The tool banks a verified, pinned pre-restore dump of the 2-row state first (the
@@ -260,7 +260,7 @@ Existing surface (prove the deploy did not regress what already worked):
          is the PASS signal:
          ```bash
          docker compose up -d
-         docker compose exec postgres psql -U feedback -d feedback -tAc 'SELECT count(*) FROM feedback;'
+         docker compose exec postgres-feedback psql -U feedback -d feedback -tAc 'SELECT count(*) FROM feedback;'
          ```
          → `1`. The §6 entry is back; the drill entry is not.
 - [ ] Keep §4's pinned SQLite snapshot until a routine `db:backup` lands on top of this
@@ -269,7 +269,7 @@ Existing surface (prove the deploy did not regress what already worked):
 ## 8. Rollback
 
 Do the data steps **before** the code step: the pre-merge `compose.yaml` knows no
-`postgres` service, so `db:restore:pg` can only run on this tree.
+`postgres-feedback` service, so `db:restore:pg` can only run on this tree.
 
 - [ ] **Stack stopped:** `docker compose down` — **never `-v`** (volumes keep the current
       data intact while you work). Every container is gone; sessions, SQLite files, and
@@ -278,7 +278,7 @@ Do the data steps **before** the code step: the pre-merge `compose.yaml` knows n
       `npm run db:restore -w @life/db -- --from backup/<§4-stamp>-pinned`.
 - [ ] **Data (feedback):** start the database server alone, restore, stop again:
       ```bash
-      docker compose up -d postgres
+      docker compose up -d postgres-feedback
       npm run db:restore:pg -w @life/db -- --from backup/<§7-stamp>
       docker compose down
       ```
@@ -287,7 +287,7 @@ Do the data steps **before** the code step: the pre-merge `compose.yaml` knows n
 - [ ] **Code:** `git checkout <the pre-merge ref recorded in §0>`, then
       `docker compose up -d --build app`. The five SQLite databases were never converted
       and the feedback store only ever gained rows, so older code reads current data.
-- [ ] **`postgres-data` / `rabbitmq-data`:** the `down`s never removed them — named
+- [ ] **`postgres-feedback-data` / `rabbitmq-feedback-data`:** the `down`s never removed them — named
       volumes persist unless `-v` is passed. The restored feedback store sits in them,
       inert, ignored by the old stack. To retire the chapter entirely you would remove
       the compose blocks and the volumes by hand; that is out of scope here and is a

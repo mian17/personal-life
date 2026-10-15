@@ -32,7 +32,7 @@ import {
  *     tick, in order, with the same `event_id` dedup on the consumer.
  *
  * Skipped — never failed — when Docker is absent and no `FEEDBACK_TEST_DB_URL`
- * is configured; never touches a data directory or the compose `postgres`.
+ * is configured; never touches a data directory or the compose `postgres-feedback`.
  */
 
 jest.setTimeout(180_000);

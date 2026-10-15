@@ -138,8 +138,8 @@ services:
       HOST: 0.0.0.0
       # Postgres + RabbitMQ (feedback-infra). Compose injects the connection
       # strings over the internal network; .env keeps only the passwords.
-      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback
-      RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres-feedback:5432/feedback
+      RABBITMQ_URL: amqp://feedback:${FEEDBACK_RABBITMQ_PASSWORD}@rabbitmq-feedback:5672
       # JWT-only auth, same offline-JWKS pattern as note/tags/todo: `iss` must
       # equal the IdP's browser-facing issuer, while the JWKS is fetched over the
       # internal compose network.
@@ -152,9 +152,9 @@ services:
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-feedback:6379
     depends_on:
-      postgres:
+      postgres-feedback:
         condition: service_healthy
-      rabbitmq:
+      rabbitmq-feedback:
         condition: service_healthy
       redis-feedback:
         condition: service_healthy
@@ -456,12 +456,14 @@ services:
     restart: unless-stopped
 
   # --- feedback infra (feedback-infra chapter) --------------------------------
-  # `postgres` + `rabbitmq` publish their main ports on host loopback only so the
-  # host-run dev service (3108) can reach them — the same posture as `app`/`idp`.
-  # Production uses the internal compose network (`postgres:5432`, `rabbitmq:5672`).
+  # `postgres-feedback` + `rabbitmq-feedback` publish their main ports on host
+  # loopback only so the host-run dev service (3108) can reach them — the same
+  # posture as `app`/`idp`.
+  # Production uses the internal compose network (`postgres-feedback:5432`,
+  # `rabbitmq-feedback:5672`).
   # `redis-feedback` stays internal-only, like the other Redis instances above.
   # See docs/specs/SPEC-feedback-infra.md "compose.yaml additions".
-  postgres:
+  postgres-feedback:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: feedback
@@ -469,12 +471,12 @@ services:
       # Fail-fast, like NOTE_MASTER_KEY: compose refuses to start with no password.
       POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?FEEDBACK_DB_PASSWORD is required}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-feedback-data:/var/lib/postgresql/data
     networks:
       - life
     ports:
       # Host loopback only: the host-run dev service (3108) reaches Postgres here.
-      # Production uses the internal compose network (`postgres:5432`).
+      # Production uses the internal compose network (`postgres-feedback:5432`).
       - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U feedback -d feedback"]
@@ -484,19 +486,19 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  rabbitmq:
+  rabbitmq-feedback:
     image: rabbitmq:4.1-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-feedback}
+      RABBITMQ_DEFAULT_USER: ${FEEDBACK_RABBITMQ_USER:-feedback}
       # Fail-fast, like POSTGRES_PASSWORD.
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_DEFAULT_PASS: ${FEEDBACK_RABBITMQ_PASSWORD:?FEEDBACK_RABBITMQ_PASSWORD is required}
     volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-feedback-data:/var/lib/rabbitmq
     networks:
       - life
     ports:
       # Host loopback only: the host-run dev service (3108) reaches the broker here.
-      # Production uses the internal compose network (`rabbitmq:5672`).
+      # Production uses the internal compose network (`rabbitmq-feedback:5672`).
       - "127.0.0.1:5672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -571,6 +573,6 @@ networks:
 volumes:
   # Sessions are state: AOF + named volume so they survive restarts/rebuilds.
   redis-app-data:
-  postgres-data:
-  rabbitmq-data:
+  postgres-feedback-data:
+  rabbitmq-feedback-data:
   redis-feedback-data:

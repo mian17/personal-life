@@ -21,7 +21,7 @@ export interface PgIdentity {
   database: string;
 }
 
-export const DEFAULT_FEEDBACK_DB_URL = 'postgresql://feedback@postgres:5432/feedback';
+export const DEFAULT_FEEDBACK_DB_URL = 'postgresql://feedback@postgres-feedback:5432/feedback';
 
 /** Parse a `postgresql://` URL into `{ user, database }` via `new URL()`. */
 export function parseFeedbackDbUrl(raw: string): PgIdentity {
@@ -73,7 +73,7 @@ export function createComposePgRunner(options: {
   composeFile: string;
   service?: string;
 }): PgRunner {
-  const service = options.service ?? 'postgres';
+  const service = options.service ?? 'postgres-feedback';
   return {
     exec: (argv: string[]): ExecResult =>
       runCmd('docker', ['compose', '-f', options.composeFile, 'exec', '-T', service, ...argv]),

@@ -24,7 +24,7 @@ import { FEEDBACK_NOTIFY_CHANNEL } from '../src/event/trigger-ddl';
  * suite runs against a **throwaway** database — a per-run `feedback_t<random>`
  * schema created either on the operator's `FEEDBACK_TEST_DB_URL` server or on a
  * short-lived `postgres:17-alpine` container published on an ephemeral loopback
- * port. Never a data directory, never the compose `postgres`.
+ * port. Never a data directory, never the compose `postgres-feedback`.
  *
  * A host with neither gets the suites **skipped, never failed**.
  *

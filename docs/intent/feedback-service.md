@@ -81,7 +81,7 @@ first durable, push-on-write event stream.
 - **`feedback-service`** — new NestJS workspace, kernel copy. Postgres store with
   `feedback` + `feedback_event` tables, NOTIFY trigger, LISTEN dispatcher, RabbitMQ
   producer. Own Redis (`redis-feedback`) for the read-through cache. Owner-scoped.
-- **`postgres` + `rabbitmq`** — new services in `compose.yaml` (each its own instance and
+- **`postgres-feedback` + `rabbitmq-feedback`** — new services in `compose.yaml` (each its own instance and
   persistent volume).
 - **`/feedback`** — new top-level route in `apps/app`, treated as its own app (own PWA
   manifest/icon) hosting the owner inbox grouped by app then type.

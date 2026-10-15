@@ -25,11 +25,11 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
 ### Infrastructure / env
 - Postgres: own compose service + persistent named volume, publishing
   `127.0.0.1:5432:5432` (host loopback only, so the host-run dev service reaches it;
-  production addresses stay on the compose network, `postgres:5432`). Service reads
+  production addresses stay on the compose network, `postgres-feedback:5432`). Service reads
   `FEEDBACK_DB_URL`.
   Tests read `FEEDBACK_TEST_DB_URL`.
 - RabbitMQ: own compose service, publishing `127.0.0.1:5672:5672` (host loopback only;
-  production `rabbitmq:5672`; management UI never published). Producer reads `RABBITMQ_URL`.
+  production `rabbitmq-feedback:5672`; management UI never published). Producer reads `RABBITMQ_URL`.
 - Redis: `redis-feedback`, own instance (per-service isolation), `REDIS_URL` as elsewhere.
   Internal-only: no published host port, fail-open in dev.
 

@@ -38,7 +38,7 @@ describeDocker('pg backup/restore against a throwaway container', () => {
   let runner: PgRunner;
   const env = () => ({
     INIT_CWD: root,
-    FEEDBACK_DB_URL: 'postgresql://postgres@postgres:5432/feedback',
+    FEEDBACK_DB_URL: 'postgresql://postgres@postgres-feedback:5432/feedback',
   });
 
   beforeAll(async () => {

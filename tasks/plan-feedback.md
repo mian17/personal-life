@@ -108,7 +108,7 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
   `.env.development`: `FEEDBACK_DB_URL=postgresql://feedback:<password>@127.0.0.1:5432/feedback`
   and `RABBITMQ_URL=amqp://feedback:<password>@127.0.0.1:5672` (the compose `postgres`/`rabbitmq`
   host-loopback publishes), and the service refuses to boot without the DB URL + master key
-  (service spec); the local bring-up is `docker compose up -d postgres rabbitmq`, documented
+  (service spec); the local bring-up is `docker compose up -d postgres-feedback rabbitmq-feedback`, documented
   in README by T10. Redis stays optional in dev: cache fail-open is the spec's own failure
   mode (broker-down reconnect/backoff still covers transient broker loss). The e2e harness starts a throwaway Postgres container (`docker run --rm`, the
   `pg-integration.test.ts` pattern), waits for `pg_isready`, and passes `FEEDBACK_DB_URL` to
@@ -163,7 +163,7 @@ Decisions taken in planning (recorded here so no task re-opens them silently):
 - [ ] `docker compose config` shows the three new services with named volumes, healthchecks,
       and published ports only on host loopback (`127.0.0.1:5432:5432`, `127.0.0.1:5672:5672`;
       `redis-feedback` publishes none).
-- [ ] `docker compose up -d postgres rabbitmq redis-feedback` → all healthchecks green (tech lead, once).
+- [ ] `docker compose up -d postgres-feedback rabbitmq-feedback redis-feedback` → all healthchecks green (tech lead, once).
 - [ ] `npm run typecheck -w packages/db` clean; `backup-pg`/`restore-pg` unit suites green; `pg-integration` green or Docker-absent-skipped.
 
 ### Phase 3 — feedback-service

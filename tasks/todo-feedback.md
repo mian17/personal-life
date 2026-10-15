@@ -55,9 +55,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   - Dependencies: none. Size: S.
 
 - [ ] T2: compose infra — module `feedback-infra`
-  - [TASK OBJECTIVE] Add the `postgres`, `rabbitmq`, and `redis-feedback` compose services
-    with named volumes, healthchecks, and the confirmed publish policy (`postgres`/
-    `rabbitmq` publish host loopback `127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`;
+  - [TASK OBJECTIVE] Add the `postgres-feedback`, `rabbitmq-feedback`, and `redis-feedback` compose services
+    with named volumes, healthchecks, and the confirmed publish policy (`postgres-feedback`/
+    `rabbitmq-feedback` publish host loopback `127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`;
     `redis-feedback` publishes none), plus the two password names in `.env.example`.
   - [SCOPE & REPOSITORY CONTEXT]
     - Allowed files to edit/create: `compose.yaml`, `.env.example`.
@@ -67,28 +67,28 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Strictly prohibited files: everything else — NOT `.env.development.example` (T10's per P1; T2
       owns only `.env.example`), NOT the `feedback-service` compose block (T10's), NOT `apps/**`.
   - [IMPLEMENTATION REQUIREMENTS]
-    - `postgres`: image `postgres:17-alpine`; `POSTGRES_DB: feedback`; `POSTGRES_USER:
+    - `postgres-feedback`: image `postgres:17-alpine`; `POSTGRES_DB: feedback`; `POSTGRES_USER:
       feedback`; `POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?FEEDBACK_DB_PASSWORD is
       required}` (fail-fast, the `NOTE_MASTER_KEY` pattern); volume
-      `postgres-data:/var/lib/postgresql/data`; joins the existing `life` network; the
+      `postgres-feedback-data:/var/lib/postgresql/data`; joins the existing `life` network; the
       healthcheck from the spec (`pg_isready -U feedback -d feedback`, interval 10s,
       timeout 3s, retries 5, start_period 10s); `restart: unless-stopped`; **`ports:`
       `127.0.0.1:5432:5432`** — host loopback only (the `app`/`idp` comment pattern, so the
-      host-run dev service on 3108 reaches it; production stays `postgres:5432`).
-    - `rabbitmq`: image `rabbitmq:4.1-alpine` (confirm the minor tag against Docker Hub at
-      implementation); `RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-feedback}`;
-      `RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}`; volume
-      `rabbitmq-data:/var/lib/rabbitmq`; the `rabbitmq-diagnostics -q ping` healthcheck;
+      host-run dev service on 3108 reaches it; production stays `postgres-feedback:5432`).
+    - `rabbitmq-feedback`: image `rabbitmq:4.1-alpine` (confirm the minor tag against Docker Hub at
+      implementation); `RABBITMQ_DEFAULT_USER: ${FEEDBACK_RABBITMQ_USER:-feedback}`;
+      `RABBITMQ_DEFAULT_PASS: ${FEEDBACK_RABBITMQ_PASSWORD:?FEEDBACK_RABBITMQ_PASSWORD is required}`; volume
+      `rabbitmq-feedback-data:/var/lib/rabbitmq`; the `rabbitmq-diagnostics -q ping` healthcheck;
       `restart: unless-stopped`; **`ports:` `127.0.0.1:5672:5672`** — host loopback only
-      (dev reachability on 3108; production stays `rabbitmq:5672`); network `life`.
+      (dev reachability on 3108; production stays `rabbitmq-feedback:5672`); network `life`.
       The management UI stays off: image without `-management`, `15672` never published.
     - `redis-feedback`: a sixth internal-only Redis instance mirroring the existing five
       exactly (same image/tag, `redis-feedback-data` named volume, `life` network, same
       healthcheck, no host ports) — its own instance, never a namespaced tenant
       (lesson 0011). No other service points at it.
-    - Bottom `volumes:` block gains `postgres-data:`, `rabbitmq-data:`, `redis-feedback-data:`.
+    - Bottom `volumes:` block gains `postgres-feedback-data:`, `rabbitmq-feedback-data:`, `redis-feedback-data:`.
     - `.env.example` gains the two documented **names** (values never committed), matching
-      the `NOTE_MASTER_KEY` comment style: `FEEDBACK_DB_PASSWORD=` and `RABBITMQ_PASSWORD=`.
+      the `NOTE_MASTER_KEY` comment style: `FEEDBACK_DB_PASSWORD=` and `FEEDBACK_RABBITMQ_PASSWORD=`.
       No `FEEDBACK_MASTER_KEY`/`FEEDBACK_API_URL` here (T10 owns service wiring), no
       `.env.development.example` change in this task.
   - [VERIFICATION & TESTING RULES]
@@ -98,7 +98,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Strict constraints: NO full suites, NO E2E; max test executions: 2.
   - [DEFINITION OF DONE]
     - [ ] `docker compose config` parses and shows the three services with named volumes,
-          healthchecks, `postgres`/`rabbitmq` publishing host loopback only
+          healthchecks, `postgres-feedback`/`rabbitmq-feedback` publishing host loopback only
           (`127.0.0.1:5432:5432`/`127.0.0.1:5672:5672`), `redis-feedback` publishing none.
     - [ ] `.env.example` documents both password names; `.env.development.example` untouched by this task (T10's per P1).
     - [ ] No `feedback-service` compose block added; no file outside scope modified.
@@ -131,8 +131,8 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
         copyOut(containerPath: string, hostPath: string): void;
       }
       ```
-    - `createComposePgRunner({ composeFile, service: 'postgres' })`: runs
-      `docker compose -f <repo-anchored compose.yaml> exec -T postgres …` and
+    - `createComposePgRunner({ composeFile, service: 'postgres-feedback' })`: runs
+      `docker compose -f <repo-anchored compose.yaml> exec -T postgres-feedback …` and
       `docker compose -f <compose.yaml> cp …`; `-T` disables TTY (nothing reads stdin).
     - `createDockerPgRunner(containerName)`: `docker exec …` / `docker cp …` (the
       integration harness).
@@ -147,7 +147,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - `packages/db/src/backup.ts`: add the `export` keyword to the existing `readManifest`
       (one-word diff, no logic change) so the PG restore core reads pre-restore manifests
       through it instead of reimplementing; `pruneRoutineSnapshots` stays an import.
-    - Default URL when unset: `postgresql://feedback@postgres:5432/feedback`. Secrets never
+    - Default URL when unset: `postgresql://feedback@postgres-feedback:5432/feedback`. Secrets never
       appear in argv or logs (A7).
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `npm run typecheck -w packages/db`.
@@ -501,9 +501,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       via `FEEDBACK_TEST_DB_URL`, skipped when Docker is absent, fake cache/AMQP seams),
       `apps/feedback-service/Dockerfile` (new — per-workspace explicit `COPY … package.json`
       lines, mirroring the sibling services), `compose.yaml` (add the `feedback-service`
-      service block: build, `depends_on` healthy for `postgres`/`rabbitmq`/`redis-feedback`,
-      env `FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback`,
-      `RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672`,
+      service block: build, `depends_on` healthy for `postgres-feedback`/`rabbitmq-feedback`/`redis-feedback`,
+      env `FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres-feedback:5432/feedback`,
+      `RABBITMQ_URL: amqp://feedback:${FEEDBACK_RABBITMQ_PASSWORD}@rabbitmq-feedback:5672`,
       `REDIS_URL: redis://redis-feedback:6379`, fail-fast `FEEDBACK_MASTER_KEY`, the verifier
       pair `IDP_ISSUER: ${IDP_ISSUER:-}` +
       `FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}` (the
@@ -551,7 +551,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Compose block mirrors the tags/todo services exactly (image/build, no unnecessary host
       port beyond the sibling pattern, `/health/ready` healthcheck, fail-fast master key).
     - README records the P1 dev posture: `npm run dev` starts feedback-service on 3108; dev
-      needs a local Postgres (compose `postgres`) + `FEEDBACK_DB_URL` and `FEEDBACK_MASTER_KEY`
+      needs a local Postgres (compose `postgres-feedback`) + `FEEDBACK_DB_URL` and `FEEDBACK_MASTER_KEY`
       in `.env.development` or the service exits fail-closed at boot.
   - [VERIFICATION & TESTING RULES]
     - Permitted command: `npm run build -w @life/shared` then
@@ -1099,7 +1099,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
 
 - After T1 (Governing docs): the two greps non-empty; architecture.md records the deliberate
   revision.
-- After T5 (Infra up): `docker compose config` clean; `docker compose up -d postgres rabbitmq
+- After T5 (Infra up): `docker compose config` clean; `docker compose up -d postgres-feedback rabbitmq-feedback
   redis-feedback` healthchecks green (tech lead, once); `packages/db` typecheck + unit suites
   green; integration green-or-skipped.
 - After T10 (Service API + event proven): the spec's seven groups green; duplicate `id` →
@@ -1180,13 +1180,13 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
 - 2026-10-15: **deploy runbook + Postgres backup/restore ops (chapter close-out).** Wrote
   `docs/runbooks/deploy-feedback-stack.md`, mirroring the newest full-stack template
   (`deploy-meal-stack.md`, same day): merge prerequisite, what changes on the host
-  (4 containers — `feedback-service`, `postgres`, `rabbitmq`, `redis-feedback` — 2 new named
+  (4 containers — `feedback-service`, `postgres-feedback`, `rabbitmq-feedback`, `redis-feedback` — 2 new named
   volumes, `app` reconfigured), the three new env names (`FEEDBACK_MASTER_KEY`,
-  `FEEDBACK_DB_PASSWORD`, `RABBITMQ_PASSWORD` — all write-once, first-boot-bound), pre-flight
+  `FEEDBACK_DB_PASSWORD`, `FEEDBACK_RABBITMQ_PASSWORD` — all write-once, first-boot-bound), pre-flight
   (build the image first; host loopback `5432`/`5672` free), the pinned SQLite snapshot,
   deploy/verify, steady state (install the documented pg cron; take the first pinned Postgres
   snapshot; run a destructive restore drill), and rollback (data before code, because the
-  pre-merge compose has no `postgres` service for `db:restore:pg` to target).
+  pre-merge compose has no `postgres-feedback` service for `db:restore:pg` to target).
   **No backup/restore code was needed** — `packages/db/src/backup-pg.ts` + `restore-pg.ts` +
   the root `db:backup:pg`/`db:restore:pg` scripts already exist and are unit-tested
   (`backup-pg.test.ts`, `restore-pg.test.ts`, `pg-integration.test.ts`); the remaining work is
@@ -1218,3 +1218,36 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   generation + test hardening, no behavior change): the lesson-0015 path, direct §5
   delegation. Verification: `apps/app` typecheck clean; `manifests.test.ts` 7/7 pass. Merge
   awaits the user's explicit request.
+
+- 2026-10-15: **feedback compose services renamed to the `<kind>-<owner>` convention.** `postgres`
+  → `postgres-feedback`, `rabbitmq` → `rabbitmq-feedback`, and their volumes `postgres-data`
+  → `postgres-feedback-data`, `rabbitmq-data` → `rabbitmq-feedback-data` — the bare names were
+  the only ownerless entries in `compose.yaml` (every backing store is `redis-<owner>` etc.).
+  Rename only, no runtime behavior change: `depends_on` keys, the two injected URLs
+  (`FEEDBACK_DB_URL`/`RABBITMQ_URL` hosts), the volume mounts, the `# --- feedback infra ---`
+  comment block and the two inline `ports:` comments all updated to the new names;
+  PostgreSQL-level names stay untouched (the `feedback` role/database, the `postgres`
+  maintenance DB and superuser, `postgres:17-alpine`, the `type: 'postgres'` driver string).
+  `packages/db/src/pg-client.ts` defaults follow (`DEFAULT_FEEDBACK_DB_URL` host and
+  `createComposePgRunner`'s `?? 'postgres-feedback'`); docs, runbook, specs, maps and the
+  comment-only references in the e2e/integration harnesses updated. Nothing is deployed and no
+  `personal-life_*` volume exists yet, so there is no data migration. Verification:
+  `docker compose config` clean, `@life/db` typecheck clean, `pg-integration.test.ts` green.
+  Merge awaits the user's explicit request.
+
+- 2026-10-15: **feedback broker env names brought onto the owner-first convention.** `RABBITMQ_PASSWORD`
+  → `FEEDBACK_RABBITMQ_PASSWORD` and `RABBITMQ_USER` → `FEEDBACK_RABBITMQ_USER` — every
+  feedback-service-facing var is now `FEEDBACK_*`, matching `NOTE_MASTER_KEY` /
+  `MEAL_MASTER_KEY` / `FEEDBACK_DB_URL`; the compose default
+  `${FEEDBACK_RABBITMQ_USER:-feedback}` keeps the broker user `feedback`. Rename only:
+  `FEEDBACK_DB_PASSWORD`/`FEEDBACK_MASTER_KEY` unchanged, and `RABBITMQ_URL`/`FEEDBACK_DB_URL`
+  stay literal because `apps/feedback-service/src` reads those exact names
+  (`publisher.service.ts` `process.env.RABBITMQ_URL`, `app.module.ts`
+  `process.env.FEEDBACK_DB_URL`). Updated `compose.yaml` (the two `RABBITMQ_DEFAULT_*`
+  interpolations and the injected `RABBITMQ_URL`), both `.env*.example` files, the
+  runbook's §2 env table and its fail-fast paragraph, `SPEC-feedback-infra.md`, and the
+  ledger/plan; the three leftover `docker compose up -d postgres rabbitmq` references
+  (`README.md`, `.env.development.example`, `tasks/plan-feedback.md`) now name
+  `postgres-feedback`/`rabbitmq-feedback`. Nothing is deployed and no secret exists in any
+  environment, so there is no secret migration. Verification: `docker compose config` clean,
+  `@life/db` build + typecheck clean. Merge awaits the user's explicit request.

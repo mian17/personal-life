@@ -129,7 +129,7 @@ inside Docker it binds `0.0.0.0` so the web container can reach `http://note-ser
 
 Dev `feedback-service` runs on host port 3108 against the real compose Postgres and
 RabbitMQ (published on host loopback): start them once with
-`docker compose up -d postgres rabbitmq`, then set `FEEDBACK_DB_URL` and
+`docker compose up -d postgres-feedback rabbitmq-feedback`, then set `FEEDBACK_DB_URL` and
 `FEEDBACK_MASTER_KEY` in `.env.development` (keys in `.env.development.example`).
 The service exits **fail-closed** at boot without them. Without `RABBITMQ_URL` it still
 boots — writes keep committing to the `feedback_event` log and the dispatcher retries

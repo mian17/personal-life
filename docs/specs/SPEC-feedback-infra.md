@@ -10,10 +10,10 @@ and `docs/lessons/0011-cache-contract-and-stale-maps.md` (per-service isolation)
 
 Give `feedback-service` (and every later Postgres service) the infrastructure it stands on:
 
-- two dedicated `compose.yaml` services — `postgres` (the feedback store, with
-  `pg_notify`/`LISTEN` for the change-log dispatcher) and `rabbitmq` (the AMQP 0-9-1
+- two dedicated `compose.yaml` services — `postgres-feedback` (the feedback store, with
+  `pg_notify`/`LISTEN` for the change-log dispatcher) and `rabbitmq-feedback` (the AMQP 0-9-1
   broker) — each with its own named volume, each publishing its port on host
-  loopback only (`postgres` → `127.0.0.1:5432:5432`, `rabbitmq` →
+  loopback only (`postgres-feedback` → `127.0.0.1:5432:5432`, `rabbitmq-feedback` →
   `127.0.0.1:5672:5672`, so the host-run dev service on 3108 can reach them — the
   same host-loopback posture as `app`/`idp`), and a
   healthcheck the app layer can `depends_on` (the Redis instances stay internal-only);
@@ -28,19 +28,19 @@ isolation) and is specified by the `feedback-service` module. See `## Cache Rule
 
 | Intent decision / map interface | Encoded in |
 |---|---|
-| Intent 2 — feedback-service is the first Postgres-backed service | `compose.yaml` `postgres` service, `FEEDBACK_DB_URL` |
-| Intent 3 — `pg_notify` on commit + persistent `LISTEN` | `postgres` uses a stock Postgres image (NOTIFY/LISTEN need no extra config) |
-| Intent 4 — RabbitMQ, open AMQP 0-9-1, self-hosted, no vendor lock | `compose.yaml` `rabbitmq` service, `RABBITMQ_URL` |
+| Intent 2 — feedback-service is the first Postgres-backed service | `compose.yaml` `postgres-feedback` service, `FEEDBACK_DB_URL` |
+| Intent 3 — `pg_notify` on commit + persistent `LISTEN` | `postgres-feedback` uses a stock Postgres image (NOTIFY/LISTEN need no extra config) |
+| Intent 4 — RabbitMQ, open AMQP 0-9-1, self-hosted, no vendor lock | `compose.yaml` `rabbitmq-feedback` service, `RABBITMQ_URL` |
 | Intent 9 — Postgres-only backup/restore mirroring the SQLite contract | `## PostgreSQL-only backup/restore tooling` (commands, naming, manifest, retention, flags, probe, exit codes) |
-| MAP infra — Postgres own service + volume; service reads `FEEDBACK_DB_URL` | `compose.yaml` `postgres`, `FEEDBACK_DB_URL` default |
+| MAP infra — Postgres own service + volume; service reads `FEEDBACK_DB_URL` | `compose.yaml` `postgres-feedback`, `FEEDBACK_DB_URL` default |
 | MAP infra — tests read `FEEDBACK_TEST_DB_URL` | `## Testing Strategy` (integration harness) |
-| MAP infra — RabbitMQ own service; producer reads `RABBITMQ_URL` | `compose.yaml` `rabbitmq`, `RABBITMQ_URL` |
+| MAP infra — RabbitMQ own service; producer reads `RABBITMQ_URL` | `compose.yaml` `rabbitmq-feedback`, `RABBITMQ_URL` |
 | MAP infra — `redis-feedback` own instance, `REDIS_URL` as elsewhere | Out of scope here; owned by `feedback-service`, referenced only in `depends_on` |
 | Intent 8 / lesson 0012 — governing docs revised as a cross-chapter decision | This spec is the record `docs/intent/architecture.md` (no brokers/SQLite) is revised against |
 
 ## Scope
 
-- **In scope:** the `postgres` and `rabbitmq` compose services, their named volumes, their
+- **In scope:** the `postgres-feedback` and `rabbitmq-feedback` compose services, their named volumes, their
   env vars and healthchecks; the two password/URL entries in `.env.example`; the
   PostgreSQL backup/restore commands, flags, files, and tests in `packages/db`.
 - **Out of scope:** `feedback-service` itself (tables, NOTIFY trigger, LISTEN dispatcher,
@@ -54,8 +54,8 @@ isolation) and is specified by the `feedback-service` module. See `## Cache Rule
 ## Tech Stack
 
 - Compose services from stock images: `postgres:17-alpine` and `rabbitmq:4.1-alpine`
-  (both support the required features with no custom build; `postgres` supports
-  `pg_notify`/`LISTEN`, `rabbitmq` speaks AMQP 0-9-1).
+  (both support the required features with no custom build; `postgres-feedback` supports
+  `pg_notify`/`LISTEN`, `rabbitmq-feedback` speaks AMQP 0-9-1).
 - The PG backup/restore reuses `packages/db`'s existing `ts-node` CLI convention
   (`db:backup`, `db:restore`) and the shared `pruneRoutineSnapshots` retention function —
   no new workspace, no new third-party dependency.
@@ -66,14 +66,14 @@ isolation) and is specified by the `feedback-service` module. See `## Cache Rule
 
 Named services, networks, and volumes only; no existing service moves. Both new services
 join the existing `life` network and publish their main port on **host loopback only**
-(`postgres` → `127.0.0.1:5432:5432`, `rabbitmq` → `127.0.0.1:5672:5672`) so the host-run
+(`postgres-feedback` → `127.0.0.1:5432:5432`, `rabbitmq-feedback` → `127.0.0.1:5672:5672`) so the host-run
 dev feedback-service (port 3108) can reach them — the same host-loopback posture as `app`
-and `idp`. Production addresses stay on the internal compose network (`postgres:5432`,
-`rabbitmq:5672`). The five (now six) Redis instances stay internal-only, as today
+and `idp`. Production addresses stay on the internal compose network (`postgres-feedback:5432`,
+`rabbitmq-feedback:5672`). The five (now six) Redis instances stay internal-only, as today
 (`compose.yaml:227-356`).
 
 ```yaml
-  postgres:
+  postgres-feedback:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: feedback
@@ -81,12 +81,12 @@ and `idp`. Production addresses stay on the internal compose network (`postgres:
       # Fail-fast, like NOTE_MASTER_KEY: compose refuses to start with no password.
       POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?FEEDBACK_DB_PASSWORD is required}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-feedback-data:/var/lib/postgresql/data
     networks:
       - life
     ports:
       # Host loopback only: the host-run dev service (3108) reaches Postgres here.
-      # Production uses the internal compose network (`postgres:5432`).
+      # Production uses the internal compose network (`postgres-feedback:5432`).
       - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U feedback -d feedback"]
@@ -96,19 +96,19 @@ and `idp`. Production addresses stay on the internal compose network (`postgres:
       start_period: 10s
     restart: unless-stopped
 
-  rabbitmq:
+  rabbitmq-feedback:
     image: rabbitmq:4.1-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-feedback}
+      RABBITMQ_DEFAULT_USER: ${FEEDBACK_RABBITMQ_USER:-feedback}
       # Fail-fast, like POSTGRES_PASSWORD.
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_DEFAULT_PASS: ${FEEDBACK_RABBITMQ_PASSWORD:?FEEDBACK_RABBITMQ_PASSWORD is required}
     volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-feedback-data:/var/lib/rabbitmq
     networks:
       - life
     ports:
       # Host loopback only: the host-run dev service (3108) reaches the broker here.
-      # Production uses the internal compose network (`rabbitmq:5672`).
+      # Production uses the internal compose network (`rabbitmq-feedback:5672`).
       - "127.0.0.1:5672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -119,13 +119,13 @@ and `idp`. Production addresses stay on the internal compose network (`postgres:
     restart: unless-stopped
 ```
 
-Add `postgres-data:` and `rabbitmq-data:` to the bottom `volumes:` block
+Add `postgres-feedback-data:` and `rabbitmq-feedback-data:` to the bottom `volumes:` block
 (`compose.yaml:362`), alongside `redis-app-data:`.
 
-- **`ports:` is host-loopback only on the main ports.** `postgres` publishes
-  `127.0.0.1:5432:5432` and `rabbitmq` publishes `127.0.0.1:5672:5672` — reachable
+- **`ports:` is host-loopback only on the main ports.** `postgres-feedback` publishes
+  `127.0.0.1:5432:5432` and `rabbitmq-feedback` publishes `127.0.0.1:5672:5672` — reachable
   from the host-run dev service (3108) only; production traffic uses the internal
-  compose network names (`postgres:5432`, `rabbitmq:5672`). `redis-feedback` stays
+  compose network names (`postgres-feedback:5432`, `rabbitmq-feedback:5672`). `redis-feedback` stays
   internal-only with no `ports:` at all.
 - **RabbitMQ management UI is not exposed.** The image is the plain `rabbitmq:4.1-alpine`
   (not a `-management` tag) and `15672` is not published: a single producer with no
@@ -141,9 +141,9 @@ definition is the `feedback-service` module's):
 ```yaml
   feedback-service:
     depends_on:
-      postgres:
+      postgres-feedback:
         condition: service_healthy
-      rabbitmq:
+      rabbitmq-feedback:
         condition: service_healthy
       redis-feedback:
         condition: service_healthy
@@ -153,8 +153,8 @@ Compose injects the two connection vars into that service (the `REDIS_URL` patte
 `.env` unchanged, `compose.yaml:22` / `:64`):
 
 ```yaml
-      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback
-      RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres-feedback:5432/feedback
+      RABBITMQ_URL: amqp://feedback:${FEEDBACK_RABBITMQ_PASSWORD}@rabbitmq-feedback:5672
 ```
 
 `.env.example` gains two documented **names** (values never committed), matching the
@@ -165,13 +165,13 @@ Compose injects the two connection vars into that service (the `REDIS_URL` patte
 # Postgres (feedback-infra). Compose fails fast without it.
 FEEDBACK_DB_PASSWORD=
 # RabbitMQ (feedback-infra). Compose fails fast without it.
-RABBITMQ_PASSWORD=
+FEEDBACK_RABBITMQ_PASSWORD=
 ```
 
 `.env.development.example` gains the dev-side names (values never committed): `FEEDBACK_DB_URL`
 (pointing at host loopback `127.0.0.1:5432`), `RABBITMQ_URL` (host loopback
 `127.0.0.1:5672`), and `FEEDBACK_MASTER_KEY` — dev runs against the real compose
-`postgres` + `rabbitmq` (`docker compose up -d postgres rabbitmq`, then `npm run dev`).
+`postgres-feedback` + `rabbitmq-feedback` (`docker compose up -d postgres-feedback rabbitmq-feedback`, then `npm run dev`).
 The e2e harness still starts its own throwaway Postgres; the `feedback-service` module
 owns the fallback story when the broker is down.
 
@@ -219,8 +219,8 @@ differs from `/home/night/WebstormProjects/personal-life`:
 ### Connection env and `--only` mapping
 
 - **`FEEDBACK_DB_URL`** carries the connection: a `postgresql://` URL
-  (`postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback` in production).
-  When unset the tooling defaults to `postgresql://feedback@postgres:5432/feedback`.
+  (`postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres-feedback:5432/feedback` in production).
+  When unset the tooling defaults to `postgresql://feedback@postgres-feedback:5432/feedback`.
 - **`FEEDBACK_TEST_DB_URL`** is the map's service/harness test var
   (`docs/specs/MAP-feedback.md:27`). The integration suite points the **tooling** at its
   throwaway container by passing `FEEDBACK_DB_URL` explicitly in the core's `env`; the
@@ -316,27 +316,27 @@ application **ports** and the Postgres **container**:
 - **Ports:** open a plain TCP connection to `127.0.0.1:3002` (`app`) and
   `127.0.0.1:3003` (`idp`) with a one-second timeout, the same probe as the SQLite
   variant (`compose.yaml:159,211`). Accepted → `up`; `ECONNREFUSED` → `down`; any other
-  error or timeout → `unknown`. `postgres`' own published `127.0.0.1:5432` is
+  error or timeout → `unknown`. `postgres-feedback`' own published `127.0.0.1:5432` is
   deliberately **not** a probe port: the restore runs its client inside that container,
   so the server has to be up — the connection count below is what covers it.
-- **Container:** inside the `postgres` container, count other backends on the target
+- **Container:** inside the `postgres-feedback` container, count other backends on the target
   database —
   `SELECT count(*) FROM pg_stat_activity WHERE datname = 'feedback' AND pid <> pg_backend_pid()`
   via `psql -d feedback`. `0` → `down`; non-zero → `up`; the query failing (container not
   running) → `unknown`. This stays the authoritative "database in use" signal:
   `feedback-service` itself publishes no host port, but it holds a Postgres connection —
-  and now that `postgres` publishes `127.0.0.1:5432`, any host-side client (dev service,
+  and now that `postgres-feedback` publishes `127.0.0.1:5432`, any host-side client (dev service,
   stray `psql`) shows up here too, so the count is the signal that cannot be bypassed.
 - **Fails closed:** any port `up`, any probe `unknown`, or the connection count
   unavailable → print the reason and exit 2, touching nothing. Only "both ports refused
   **and** the database has no other client" is treated as stopped.
 
-Because the client runs inside the DB container, the documented procedure leaves `postgres`
+Because the client runs inside the DB container, the documented procedure leaves `postgres-feedback`
 up and everything else down:
 
 ```bash
 docker compose down
-docker compose up -d postgres
+docker compose up -d postgres-feedback
 npm run db:restore:pg -w @life/db -- --from backup/<stamp>
 docker compose up -d
 ```
@@ -355,8 +355,8 @@ export interface PgRunner {
 }
 ```
 
-- `createComposePgRunner({ composeFile, service: 'postgres' })` is the production default:
-  it runs `docker compose -f <repo-anchored compose.yaml> exec -T postgres …` and
+- `createComposePgRunner({ composeFile, service: 'postgres-feedback' })` is the production default:
+  it runs `docker compose -f <repo-anchored compose.yaml> exec -T postgres-feedback …` and
   `docker compose -f <compose.yaml> cp …`. `-T` disables TTY allocation, so nothing reads
   stdin.
 - `createDockerPgRunner(containerName)` is used by the integration harness against its
@@ -378,8 +378,8 @@ Archives cross the boundary as files via `copyIn`/`copyOut` on unique container 
 ## Cache Rules (AGENTS.md Contract 2 — N/A, with rationale)
 
 This module has **no cache of its own**. `feedback-service` owns `redis-feedback` and its
-read-through cache; this spec defines only the store (`postgres`), the broker
-(`rabbitmq`), and the operator backup/restore tooling.
+read-through cache; this spec defines only the store (`postgres-feedback`), the broker
+(`rabbitmq-feedback`), and the operator backup/restore tooling.
 
 - **Cached shapes / key composition / invalidation / failure mode:** not applicable — no
   module in this spec reads or writes Redis. The backup/restore tooling opens the Postgres
@@ -412,7 +412,7 @@ Supporting edits (same change):
 - `packages/db/package.json`: the two `ts-node` scripts above.
 - `packages/db/src/index.ts`: re-export `runBackupPg`, `runRestorePg`, `PgRunner`,
   `createComposePgRunner`.
-- `compose.yaml`: the `postgres` + `rabbitmq` services and their two named volumes.
+- `compose.yaml`: the `postgres-feedback` + `rabbitmq-feedback` services and their two named volumes.
 - `.env.example`: the two documented secret **names**.
 - `pruneRoutineSnapshots` and `readManifest` in `src/backup.ts` are **reused, not
   copied**; `src/backup-pg.ts` imports `pruneRoutineSnapshots` unchanged.
@@ -480,8 +480,8 @@ workspace's CLI; no UI code, no selectors, no tokens, no PWA constants.
 
 ## Boundaries
 
-- **Always:** give each component its own instance and named volume; expose `postgres` /
-  `rabbitmq` on host loopback only (`127.0.0.1:5432`, `127.0.0.1:5672`) and keep every
+- **Always:** give each component its own instance and named volume; expose `postgres-feedback` /
+  `rabbitmq-feedback` on host loopback only (`127.0.0.1:5432`, `127.0.0.1:5672`) and keep every
   Redis instance internal-only (no host port);
   keep the exact var names `FEEDBACK_DB_URL`, `FEEDBACK_TEST_DB_URL`, `RABBITMQ_URL`;
   verify every snapshot with `pg_restore --list` and every restore with a row-count
@@ -489,7 +489,7 @@ workspace's CLI; no UI code, no selectors, no tokens, no PWA constants.
   closed on a missing/invalid input or an up/unknown probe; run every Postgres client
   inside a container; reuse `pruneRoutineSnapshots` (no fork); be non-interactive with
   exit codes 0/1/2; keep secrets out of logs and out of host argv.
-- **Ask first:** exposing `postgres`/`rabbitmq` beyond host loopback or enabling the RabbitMQ
+- **Ask first:** exposing `postgres-feedback`/`rabbitmq-feedback` beyond host loopback or enabling the RabbitMQ
   management plugin; changing the retention count or the `backup/` root; extending the
   `--only` name set beyond the URL's database; adding a second Postgres or broker instance.
 - **Never:** fork the snapshot or retention logic; run `pg_dump`/`pg_restore` from the host;
@@ -503,8 +503,8 @@ Production deploy and any production data migration (including the SQLite→Post
 data-tier move deferred by the intent) are hard lines. This spec documents the checklist;
 the human runs it. At minimum:
 
-- [ ] Stop the stack: `docker compose down` (NO `-v`). Bring `postgres` up for the tooling:
-      `docker compose up -d postgres`.
+- [ ] Stop the stack: `docker compose down` (NO `-v`). Bring `postgres-feedback` up for the tooling:
+      `docker compose up -d postgres-feedback`.
 - [ ] Take a deliberate backup: `npm run db:backup:pg -w @life/db -- --pin`, and confirm
       `pg_restore --list` reported `ok`. Rollback depends on it.
 - [ ] Apply the migration (if any) with dry-run first, read the counts, then apply.
@@ -514,14 +514,14 @@ the human runs it. At minimum:
 
 ## Success Criteria
 
-1. `docker compose up -d postgres rabbitmq` starts both services with green healthchecks,
+1. `docker compose up -d postgres-feedback rabbitmq-feedback` starts both services with green healthchecks,
    each with its own named volume, and neither publishes a host port
    (`docker compose ps`/`docker compose config` confirm).
-2. `compose.yaml` injects `FEEDBACK_DB_URL=postgresql://feedback:…@postgres:5432/feedback`
-   and `RABBITMQ_URL=amqp://feedback:…@rabbitmq:5672` into `feedback-service`, and
+2. `compose.yaml` injects `FEEDBACK_DB_URL=postgresql://feedback:…@postgres-feedback:5432/feedback`
+   and `RABBITMQ_URL=amqp://feedback:…@rabbitmq-feedback:5672` into `feedback-service`, and
    `feedback-service` declares `depends_on` with `condition: service_healthy` for
-   `postgres`, `rabbitmq`, and `redis-feedback`.
-3. The `postgres` service accepts `pg_notify`/`LISTEN` (a stock Postgres image; no custom
+   `postgres-feedback`, `rabbitmq-feedback`, and `redis-feedback`.
+3. The `postgres-feedback` service accepts `pg_notify`/`LISTEN` (a stock Postgres image; no custom
    config) so the `feedback-service` change-log dispatcher can hold a persistent listen.
 4. `npm run db:backup:pg -w @life/db` writes `backup/2026-10-01T12-34-56-789Z/feedback.dump`
    plus `manifest.json` (`mode: routine`, `pgRestoreList: 'ok'`) and exits 0; `--pin` writes

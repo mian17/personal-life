@@ -227,7 +227,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
 /**
  * A throwaway Postgres for feedback-service (the `pg-integration.test.ts`
  * pattern): fixed-name `postgres:17-alpine` container, ephemeral loopback port,
- * never the compose `postgres`. A host without Docker fails fast — this e2e is
+ * never the compose `postgres-feedback`. A host without Docker fails fast — this e2e is
  * the feedback chapter's final proof, so a silent skip would hide it.
  */
 async function startThrowawayPostgres(): Promise<string> {
