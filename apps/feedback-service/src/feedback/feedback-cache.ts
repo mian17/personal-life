@@ -10,8 +10,9 @@ import { createCache, ReadThroughCache, type CacheClient, type CacheHitOptions }
  *
  * Key shapes (`SPEC-feedback-service` Cache Rules):
  * - `feedback:<sub>:v<gen>:list` — the owner's full `feedback` row set
- *   serialized **as persisted** (`description` an `enc.v1.` envelope). Filters
- *   and pagination never enter the key, so one entry serves every read.
+ *   serialized **as persisted** (`title` and `description` both `enc.v1.`
+ *   envelopes). Filters and pagination never enter the key, so one entry serves
+ *   every read.
  * - `feedback:gen:<sub>` — the per-owner counter, `INCR`ed after each write.
  *   60s TTL is the backstop; any client error fails open to the direct loader.
  */

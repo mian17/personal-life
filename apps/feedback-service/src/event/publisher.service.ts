@@ -9,8 +9,8 @@ const EXCHANGE = 'feedback';
 const ROUTING_KEY = 'feedback.submitted';
 
 /**
- * The wire body of a `feedback.submitted` message. **Metadata only** — the
- * description never travels, neither as plaintext nor as ciphertext, so a
+ * The wire body of a `feedback.submitted` message. **Metadata only** — neither
+ * the title nor the description travels, as plaintext or as ciphertext, so a
  * broker (or its management UI) sits outside the at-rest boundary and never
  * learns content.
  */

@@ -87,6 +87,7 @@ export function FeedbackForm({
     }
     setPending(true);
     setError(null);
+    setErrorField(null);
     try {
       const result = await onSubmit({
         id: idRef.current,

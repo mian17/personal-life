@@ -17,11 +17,6 @@ function titleAad(ownerSub: string, feedbackId: string): string {
   return `life.v1|${ownerSub}|feedback|title|${feedbackId}`;
 }
 
-/**
- * AAD for a feedback description (`SPEC-feedback-service` Data model).
- * Byte-exact: the identical string must be reconstructed at encrypt and
- * decrypt, and the id it binds is client-supplied, so it is known up front.
- */
 function descriptionAad(ownerSub: string, feedbackId: string): string {
   return `life.v1|${ownerSub}|feedback|description|${feedbackId}`;
 }

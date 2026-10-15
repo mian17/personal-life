@@ -5,8 +5,8 @@ import { Feedback } from './feedback.entity';
 /**
  * The transactional event log (`SPEC-feedback-service` Event stream). One row
  * per `feedback` insert, written in the same transaction. **Metadata only** —
- * the event payload never carries the description, neither plaintext nor
- * ciphertext.
+ * the event payload never carries the title or the description, as plaintext or
+ * as ciphertext.
  *
  * - `seq` is the total order of the log (`BIGSERIAL`); the dispatcher's cursor
  *   resumes strictly after it. pg surfaces `bigint` as `string`; T9 compares
