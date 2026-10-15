@@ -1,5 +1,5 @@
 import type { List, Todo, TodoCompletion } from '@life/shared';
-import { dueDateLabel, ListShell, Tab, TabBar, todayIso } from '@life/ui';
+import { dueDateLabel, FeedbackNavItem, ListShell, Tab, TabBar, todayIso } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
@@ -128,6 +128,19 @@ describe('/todos list page wiring', () => {
     expect(labels).toEqual(
       expect.arrayContaining(['Manage tags', 'Manage lists', 'Trash', 'Settings']),
     );
+  });
+
+  it('places the feedback item for this app before the Settings link', () => {
+    const kids = asArray(TodosNav() as unknown as { props: { children: unknown } });
+
+    const feedback = kids.filter((k) => k.type === FeedbackNavItem);
+    expect(feedback.length).toBe(1);
+    expect(feedback[0].props.app).toBe('todos');
+
+    // Settings stays the trailing nav item, feedback immediately before it.
+    const last = kids[kids.length - 1];
+    expect(last.props.label).toBe('Settings');
+    expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
   });
 
   it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {

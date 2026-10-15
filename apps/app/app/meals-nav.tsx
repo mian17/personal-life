@@ -1,6 +1,7 @@
 import { settingsHref } from '@life/app-kit';
-import { IconLink } from '@life/ui';
+import { FeedbackNavItem, IconLink } from '@life/ui';
 import { Bookmark, Settings, Target } from 'lucide-react';
+import { submitFeedbackAction } from './feedback-actions';
 
 /**
  * The Meals toolbar nav icons, rendered by the day route. The target route is a
@@ -15,6 +16,7 @@ export function MealsNav() {
       <IconLink href="/meals/saved" label="Saved meals">
         <Bookmark size={20} aria-hidden />
       </IconLink>
+      <FeedbackNavItem app="meals" onSubmit={submitFeedbackAction} />
       <IconLink href={settingsHref('/meals')} label="Settings">
         <Settings size={20} aria-hidden />
       </IconLink>

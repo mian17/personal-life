@@ -508,6 +508,25 @@
   font-size: var(--space-0-85);
 }
 
+/* A stacked field caption (label above its control) reads as text, not as the
+   quiet chip-row caption above. Same class, stronger variant. */
+.ui-field-label--strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Label + control as one group: the label sits directly above its field. */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-4);
+}
+
+.ui-field-label__required {
+  margin-left: var(--space-0-3);
+  color: var(--danger);
+}
+
 /* ---------------------------------------------------------- PillGroup */
 
 .ui-pill-group {

@@ -22,9 +22,11 @@ const PUBLIC_EXACT = new Set([
   '/favicon.ico',
   '/manifest-notes.json',
   '/manifest-todos.json',
+  '/manifest-feedback.json',
   '/manifest-meals.json',
   '/icon-notes.png',
   '/icon-todos.png',
+  '/icon-feedback.png',
   '/icon-meals.png',
   '/icon.svg',
 ]);

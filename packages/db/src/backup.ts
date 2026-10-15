@@ -67,7 +67,7 @@ interface SnapshotManifest {
 }
 
 /** Fail-safe: an unreadable or unparseable manifest leaves provenance unknown → never pruned. */
-function readManifest(dir: string): SnapshotManifest | null {
+export function readManifest(dir: string): SnapshotManifest | null {
   try {
     return JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as SnapshotManifest;
   } catch {

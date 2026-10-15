@@ -28,12 +28,12 @@ export interface ListShellProps {
   filters?: ReactNode;
   /** Empty-state OR list body. The app decides which it passes. */
   body: ReactNode;
-  /** Fixed action button (`FabLink` href + label, e.g. `/notes/new` / "New note"). */
-  fabHref: string;
-  /** Fab aria-label; frozen visible/accessible text, e.g. "New note". */
-  fabLabel: string;
-  /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). */
-  fabIcon: ReactNode;
+  /** Fixed action button (`FabLink` href + label + icon, e.g. `/notes/new` / "New note"). Omit and no `FabLink` renders — a page with no create action (the feedback inbox). */
+  fabHref?: string;
+  /** Fab aria-label; frozen visible/accessible text, e.g. "New note". Used only when `fabHref` is given. */
+  fabLabel?: string;
+  /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). Used only when `fabHref` is given. */
+  fabIcon?: ReactNode;
   /** Opt into a full-viewport-height page: the `body` slot grows to fill the
    * remaining space (for a full-height body such as the matrix). Off by default. */
   fill?: boolean;
@@ -52,13 +52,30 @@ Rendered structure, in order:
   {search}
   {filters}
   {fill ? <div className="ui-list-shell__body">{body}</div> : body}
-  <FabLink href={fabHref} label={fabLabel}>{fabIcon}</FabLink>
+  {fabHref != null && (
+    <FabLink href={fabHref} label={fabLabel ?? ''}>
+      {fabIcon}
+    </FabLink>
+  )}
 </PageShell>
 ```
 
 Optional slots (`navTrailing`, `tabs`, `search`, `filters`) render nothing when omitted, so
 a simpler list page composes the same shell. When `tabs` is omitted the render is
 byte-identical to today's pages (no wrapper element is added).
+
+The fab is optional as a set: **`fabHref` is the gate**. Given it, the shell renders the
+`FabLink` last, with `fabLabel` as its aria-label and `fabIcon` as its child; omitted, no
+`FabLink` node exists in the DOM (a page with no create action — the feedback inbox, which
+submits from its toolbar instead). `/notes` and `/todos` always pass all three and are
+unchanged; the omitted-fab case is covered by `packages/ui/test/list-shell.test.tsx`.
+
+New frozen strings introduced by `SPEC-feedback-ui` (recorded here, not in the selector list
+below, which is unchanged): `getByRole('heading', { name: 'Feedback' })` → the inbox
+`PageTitle` (from `title`), `getByLabel('Send feedback')` → the toolbar `IconButton` from
+`FeedbackNavItem` (in `navTrailing`), the dialog title `Send feedback`,
+`aria-label="Feedback type"`, the type labels `Feature request` / `Enhancement` /
+`Bug report`, `aria-label="Description"`, and `Send` / `Sending…` / `Cancel`.
 
 ### Semantics and edge cases
 
@@ -191,7 +208,8 @@ Fetching, grouping, href building and the list components stay in `apps/app`.
 
 Unit tests only (jest, `packages/ui`). Cover: slot render order (title → tabs → search →
 filters → body → fab); omitted optional slots render nothing; `fabLabel` becomes the
-`FabLink` aria-label; `title` becomes the `h1`; `body` passes through unmodified. No URL or
+`FabLink` aria-label; no `FabLink` renders when the fab props are omitted (the feedback
+inbox shape); `title` becomes the `h1`; `body` passes through unmodified. No URL or
 fetch behavior — that is `app-kit`'s suite. E2E is not run by this module; `segment-port`
 runs the journey unchanged.
 

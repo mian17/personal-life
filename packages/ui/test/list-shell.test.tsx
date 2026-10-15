@@ -85,6 +85,14 @@ describe('ListShell', () => {
     expect(heading.textContent).toBe('Todos');
   });
 
+  it('renders no FabLink when the fab props are omitted', () => {
+    const { container } = render(<ListShell title="Feedback" body={<span data-testid="body" />} />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(container.querySelector('.ui-fab-link')).toBeNull();
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'h1', 'body']);
+  });
+
   it('passes fabLabel/fabHref to the FabLink aria-label and href', () => {
     render(
       <ListShell

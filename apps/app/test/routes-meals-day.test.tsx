@@ -5,18 +5,28 @@ import { renderToStaticMarkup } from 'react-dom/server';
 jest.mock('@/lib/meal-api', () => ({
   listDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
+  listMealFoods: jest.fn(),
+  restoredFoodName: jest.fn(),
 }));
 jest.mock('@/lib/today', () => ({
   getToday: jest.fn(),
 }));
 
 import { ApiError } from '@/lib/api-error';
-import { listDayEntries, getMealTarget, type MealEntry } from '@/lib/meal-api';
+import {
+  listDayEntries,
+  getMealTarget,
+  listMealFoods,
+  restoredFoodName,
+  type MealEntry,
+} from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import MealsPage from '@/app/(meals)/meals/page';
 
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
+const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
+const mockedRestoredFoodName = restoredFoodName as jest.MockedFunction<typeof restoredFoodName>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
@@ -43,6 +53,8 @@ describe('/meals day route wiring', () => {
     jest.clearAllMocks();
     mockedGetToday.mockResolvedValue('2026-10-03');
     mockedListDayEntries.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue([]);
+    mockedRestoredFoodName.mockImplementation((foodId: string) => foodId);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
   });
 

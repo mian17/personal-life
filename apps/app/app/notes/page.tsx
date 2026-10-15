@@ -1,8 +1,9 @@
 import { listNoteTagUsage, listNotes } from '@/lib/api';
+import { submitFeedbackAction } from '../feedback-actions';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
-import { IconLink, ListShell, TagFilterNav } from '@life/ui';
+import { FeedbackNavItem, IconLink, ListShell, TagFilterNav } from '@life/ui';
 import { ListTodo, Plus, Settings, Tags, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,7 @@ export default async function NotesPage({
           <IconLink href="/notes/trash" label="Trash">
             <Trash2 size={20} aria-hidden />
           </IconLink>
+          <FeedbackNavItem app="notes" onSubmit={submitFeedbackAction} />
           <IconLink href={settingsHref('/notes')} label="Settings">
             <Settings size={20} aria-hidden />
           </IconLink>

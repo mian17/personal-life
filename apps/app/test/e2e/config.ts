@@ -16,6 +16,7 @@ export function testPorts() {
     tagsPort: Number(process.env.E2E_TAGS_PORT ?? 3104),
     todoPort: Number(process.env.E2E_TODO_PORT ?? 3105),
     mealPort: Number(process.env.E2E_MEAL_PORT ?? 3106),
+    feedbackPort: Number(process.env.E2E_FEEDBACK_PORT ?? 3107),
     appPort: Number(process.env.E2E_APP_PORT ?? 3100),
   };
 }
@@ -28,6 +29,7 @@ export function devPorts() {
     tagsPort: Number(process.env.E2E_DEV_TAGS_PORT ?? 3204),
     todoPort: Number(process.env.E2E_DEV_TODO_PORT ?? 3205),
     mealPort: Number(process.env.E2E_DEV_MEAL_PORT ?? 3206),
+    feedbackPort: Number(process.env.E2E_DEV_FEEDBACK_PORT ?? 3207),
     appPort: Number(process.env.E2E_DEV_APP_PORT ?? 3200),
   };
 }
@@ -58,6 +60,14 @@ export function testRedisUrl(): string | undefined {
 /** Where global-setup records the spawned PIDs for global-teardown. */
 export const prodPidsFile = 'service-pids-prod.json';
 export const devPidsFile = 'service-pids-dev.json';
+
+/**
+ * The throwaway Postgres feedback-service gets in the harness: a fixed-name
+ * `postgres:17-alpine` container on an ephemeral loopback port, never the
+ * compose `postgres` and never a service's real `data/` directory.
+ */
+export const FEEDBACK_PG_CONTAINER =
+  process.env.E2E_FEEDBACK_PG_CONTAINER?.trim() || 'feedback-pg-e2e';
 
 export function repoRoot(): string {
   return process.env.E2E_REPO_ROOT ?? join(__dirname, '..', '..', '..', '..');

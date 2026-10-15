@@ -156,6 +156,14 @@ export type { SnackbarApi, SnackbarOptions } from './components/snackbar-provide
 export { Dialog } from './components/dialog';
 export type { DialogProps } from './components/dialog';
 
+export { FeedbackForm } from './components/feedback-form';
+export type { FeedbackFormProps } from './components/feedback-form';
+
+export { FEEDBACK_TYPES } from './components/feedback-types';
+
+export { FeedbackNavItem } from './components/feedback-nav-item';
+export type { FeedbackNavItemProps } from './components/feedback-nav-item';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 

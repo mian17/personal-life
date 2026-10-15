@@ -1,4 +1,4 @@
-import { TODO_REPEAT_DAYS, TODO_REPEATS } from '../src/index';
+import { FEEDBACK_DESCRIPTION_MAX, FEEDBACK_TITLE_MAX, TODO_REPEAT_DAYS, TODO_REPEATS } from '../src/index';
 
 describe('todo repeat vocabulary', () => {
   it('includes the custom repeat', () => {
@@ -7,5 +7,12 @@ describe('todo repeat vocabulary', () => {
 
   it('exposes the ISO weekday domain 1..7', () => {
     expect(TODO_REPEAT_DAYS).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+});
+
+describe('feedback title limit', () => {
+  it('caps titles at 200 below the description max', () => {
+    expect(FEEDBACK_TITLE_MAX).toBe(200);
+    expect(FEEDBACK_TITLE_MAX).toBeLessThan(FEEDBACK_DESCRIPTION_MAX);
   });
 });

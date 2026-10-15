@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "apps/note-service",
+    "apps/feedback-service",
     "apps/tags-service",
     "apps/todo-service",
     "apps/app",
@@ -19,14 +20,16 @@
   ],
   "scripts": {
     "dev:seed": "SEED_LOAD_DEV_ENV=1 npm run seed -w apps/idp",
-    "dev": "npm run dev:seed && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,meal-service,app,idp -c blue,yellow,cyan,green,magenta,white \"npm:dev -w apps/note-service\" \"PORT=3104 npm run dev -w apps/tags-service\" \"PORT=3105 npm run dev -w apps/todo-service\" \"PORT=3106 npm run dev -w apps/meal-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",
-    "dev:build": "npm run dev:seed && npm run build && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,meal-service,app,idp -c blue,yellow,cyan,green,magenta,white \"PORT=3101 npm run start -w apps/note-service\" \"PORT=3104 npm run start -w apps/tags-service\" \"PORT=3105 npm run start -w apps/todo-service\" \"PORT=3106 npm run start -w apps/meal-service\" \"WEB_PORT=3100 APP_DEV_SKIP_ACCESS_GATE=1 npm run start -w apps/app\" \"PORT=3102 npm run start -w apps/idp\"",
+    "dev": "npm run dev:seed && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,meal-service,feedback-service,app,idp -c blue,yellow,cyan,green,magenta,white,red \"npm:dev -w apps/note-service\" \"PORT=3104 npm run dev -w apps/tags-service\" \"PORT=3105 npm run dev -w apps/todo-service\" \"PORT=3106 npm run dev -w apps/meal-service\" \"PORT=3108 npm run dev -w apps/feedback-service\" \"npm:dev -w apps/app\" \"PORT=3102 npm run dev -w apps/idp\"",
+    "dev:build": "npm run dev:seed && npm run build && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,meal-service,feedback-service,app,idp -c blue,yellow,cyan,green,magenta,white,red \"PORT=3101 npm run start -w apps/note-service\" \"PORT=3104 npm run start -w apps/tags-service\" \"PORT=3105 npm run start -w apps/todo-service\" \"PORT=3106 npm run start -w apps/meal-service\" \"PORT=3108 npm run start -w apps/feedback-service\" \"WEB_PORT=3100 APP_DEV_SKIP_ACCESS_GATE=1 npm run start -w apps/app\" \"PORT=3102 npm run start -w apps/idp\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:backup": "npm run db:backup -w @life/db --",
-    "db:restore": "npm run db:restore -w @life/db --"
+    "db:restore": "npm run db:restore -w @life/db --",
+    "db:backup:pg": "npm run db:backup:pg -w @life/db --",
+    "db:restore:pg": "npm run db:restore:pg -w @life/db --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -127,6 +127,53 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  feedback-service:
+    build:
+      context: .
+      dockerfile: apps/feedback-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3008"
+      HOST: 0.0.0.0
+      # Postgres + RabbitMQ (feedback-infra). Compose injects the connection
+      # strings over the internal network; .env keeps only the passwords.
+      FEEDBACK_DB_URL: postgresql://feedback:${FEEDBACK_DB_PASSWORD}@postgres:5432/feedback
+      RABBITMQ_URL: amqp://feedback:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      # JWT-only auth, same offline-JWKS pattern as note/tags/todo: `iss` must
+      # equal the IdP's browser-facing issuer, while the JWKS is fetched over the
+      # internal compose network.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      FEEDBACK_IDP_JWKS_URL: ${FEEDBACK_IDP_JWKS_URL:-http://idp:3003/jwks}
+      FEEDBACK_SERVICE_AUDIENCE: ${FEEDBACK_SERVICE_AUDIENCE:-life-api}
+      # Content-encryption master key (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      FEEDBACK_MASTER_KEY: ${FEEDBACK_MASTER_KEY:?FEEDBACK_MASTER_KEY is required (openssl rand -base64 32)}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-feedback:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis-feedback:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3008/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   meal-service:
     build:
       context: .
@@ -238,6 +285,7 @@ services:
       # call dies inside the app container.
       TAGS_API_URL: http://tags-service:3004
       TODO_API_URL: http://todo-service:3005
+      FEEDBACK_API_URL: http://feedback-service:3008
       # Without this the meals BFF falls back to container-local loopback and
       # every meal call dies inside the app container.
       MEAL_API_URL: http://meal-service:3106
@@ -264,6 +312,8 @@ services:
         condition: service_healthy
       todo-service:
         condition: service_healthy
+      feedback-service:
+        condition: service_healthy
       meal-service:
         condition: service_healthy
       idp:
@@ -275,8 +325,8 @@ services:
     restart: unless-stopped
 
   # --- Redis (Task 6) ---------------------------------------------------------
-  # One instance per service (app, idp, note, tags, todo, meal): app is the persisted
-  # session store; the five others are unpersisted read-through caches. Internal
+  # One instance per service (app, idp, note, tags, todo, meal, feedback): app is the
+  # persisted session store; the six others are unpersisted read-through caches. Internal
   # network only — NO published host ports. See README "Auth model" and
   # tasks/plan-redis.md decisions 2/6.
   redis-app:
@@ -405,6 +455,87 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # --- feedback infra (feedback-infra chapter) --------------------------------
+  # `postgres` + `rabbitmq` publish their main ports on host loopback only so the
+  # host-run dev service (3108) can reach them — the same posture as `app`/`idp`.
+  # Production uses the internal compose network (`postgres:5432`, `rabbitmq:5672`).
+  # `redis-feedback` stays internal-only, like the other Redis instances above.
+  # See docs/specs/SPEC-feedback-infra.md "compose.yaml additions".
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: feedback
+      POSTGRES_USER: feedback
+      # Fail-fast, like NOTE_MASTER_KEY: compose refuses to start with no password.
+      POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?FEEDBACK_DB_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - life
+    ports:
+      # Host loopback only: the host-run dev service (3108) reaches Postgres here.
+      # Production uses the internal compose network (`postgres:5432`).
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feedback -d feedback"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-feedback}
+      # Fail-fast, like POSTGRES_PASSWORD.
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - life
+    ports:
+      # Host loopback only: the host-run dev service (3108) reaches the broker here.
+      # Production uses the internal compose network (`rabbitmq:5672`).
+      - "127.0.0.1:5672:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  redis-feedback:
+    image: redis:8-alpine
+    # Cache only, owned by feedback-service (one instance per service, intent
+    # decision 3, lesson 0011). `--save ""` + `--appendonly no` turn off both RDB
+    # and AOF: feedback ciphertext must not hit a second disk, and the image's
+    # default snapshot points would otherwise write it to /data/dump.rdb.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes:
+      - redis-feedback-data:/data
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   redis-meal:
     image: redis:8-alpine
     # Cache only, owned by meal-service (one instance per service, intent decision 3).
@@ -440,3 +571,6 @@ networks:
 volumes:
   # Sessions are state: AOF + named volume so they survive restarts/rebuilds.
   redis-app-data:
+  postgres-data:
+  rabbitmq-data:
+  redis-feedback-data:

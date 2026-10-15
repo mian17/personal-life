@@ -19,6 +19,7 @@ COPY packages/cache/package.json packages/cache/
 COPY packages/db/package.json packages/db/
 COPY apps/tags-service/package.json apps/tags-service/
 COPY apps/todo-service/package.json apps/todo-service/
+COPY apps/feedback-service/package.json apps/feedback-service/
 RUN npm ci
 
 COPY tsconfig.base.json ./

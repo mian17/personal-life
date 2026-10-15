@@ -142,8 +142,11 @@ apps, and an unadorned path (e.g. an error page) declares none.
   `routeLayoutMetadata(manifest, title, icon)`, so iOS shows a standalone Home Screen web
   app with a route-specific name. iOS ignores SVG for the Home Screen, so each route
   declares its own PNG `apple-touch-icon` (`/icon-notes.png` / `/icon-todos.png` /
-  `/icon-meals.png`, 512×512, rasterized from a per-route SVG) and the same PNG as its
-  manifest icon.
+  `/icon-meals.png` / `/icon-feedback.png`, 512×512) and the same PNG as its manifest
+  icon. The four icons are generated, not hand-drawn: `apps/app/scripts/generate-icons.mjs`
+  renders each route's Lucide glyph (`text-align-start`, `check`, `utensils`,
+  `message-square-text`) as a white stroke on the route's full-bleed background colour,
+  centred at roughly half the canvas.
 - **Mechanism:** nested `manifest.ts` file-convention routes are **NOT used** — in the
   installed Next.js the `manifest` metadata convention is anchored to the app root, so a
   colocated `app/<segment>/manifest.ts` is not a route. The verified mechanism is a

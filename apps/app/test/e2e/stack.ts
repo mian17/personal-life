@@ -7,6 +7,7 @@ import {
   E2E_OWNER,
   E2E_PASSWORD,
   E2E_USER,
+  FEEDBACK_PG_CONTAINER,
   hopPorts,
   repoRoot,
 } from './config';
@@ -47,6 +48,12 @@ export interface StackConfig {
   notePort: number;
   tagsPort: number;
   todoPort: number;
+  /**
+   * feedback-service: 31xx in the test harness (3107), never the dev stack's
+   * 3207. Optional — omitting it leaves feedback-service (and its throwaway
+   * Postgres) out of the stack, which is how the dev harness starts unchanged.
+   */
+  feedbackPort?: number;
   mealPort: number;
   /** Browser origin the app is reached on (`localhost` or `127.0.0.1`). */
   appOrigin: string;
@@ -164,6 +171,21 @@ function todoEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
+function feedbackEnv(cfg: StackConfig, feedbackPort: number, dbUrl: string): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(feedbackPort),
+    HOST: '127.0.0.1',
+    FEEDBACK_DB_URL: dbUrl,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    FEEDBACK_IDP_JWKS_URL: `http://127.0.0.1:${cfg.idpPort}/jwks`,
+    FEEDBACK_SERVICE_AUDIENCE: 'life-api',
+    FEEDBACK_MASTER_KEY: HARNESS_MASTER_KEY,
+    REDIS_URL: undefined,
+    RABBITMQ_URL: undefined,
+  };
+}
+
 function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'production',
@@ -185,6 +207,9 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     API_URL: `http://127.0.0.1:${cfg.notePort}`,
     TAGS_API_URL: `http://127.0.0.1:${cfg.tagsPort}`,
     TODO_API_URL: `http://127.0.0.1:${cfg.todoPort}`,
+    ...(cfg.feedbackPort !== undefined
+      ? { FEEDBACK_API_URL: `http://127.0.0.1:${cfg.feedbackPort}` }
+      : {}),
     MEAL_API_URL: `http://127.0.0.1:${cfg.mealPort}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
@@ -197,6 +222,77 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     // access gate is skipped by contract, so OWNER_LOGIN is irrelevant.
     ...(cfg.mode === 'production' ? { OWNER_LOGIN: E2E_OWNER } : {}),
   };
+}
+
+/**
+ * A throwaway Postgres for feedback-service (the `pg-integration.test.ts`
+ * pattern): fixed-name `postgres:17-alpine` container, ephemeral loopback port,
+ * never the compose `postgres`. A host without Docker fails fast — this e2e is
+ * the feedback chapter's final proof, so a silent skip would hide it.
+ */
+async function startThrowawayPostgres(): Promise<string> {
+  const docker = (args: string[], capture = false): string =>
+    execFileSync('docker', args, {
+      encoding: 'utf8',
+      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
+    });
+
+  try {
+    docker(['version']);
+  } catch {
+    throw new Error(
+      'e2e needs Docker to run feedback-service against a throwaway Postgres (postgres:17-alpine)',
+    );
+  }
+
+  docker(['rm', '-f', FEEDBACK_PG_CONTAINER]);
+  docker([
+    'run',
+    '--rm',
+    '-d',
+    '--name',
+    FEEDBACK_PG_CONTAINER,
+    '-e',
+    'POSTGRES_PASSWORD=test-only',
+    '-e',
+    'POSTGRES_DB=feedback',
+    '-p',
+    '127.0.0.1::5432',
+    'postgres:17-alpine',
+  ]);
+
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    try {
+      docker(['exec', FEEDBACK_PG_CONTAINER, 'pg_isready', '-U', 'postgres'], true);
+      break;
+    } catch {
+      if (Date.now() > deadline) {
+        stopThrowawayPostgres();
+        throw new Error('throwaway Postgres never became ready');
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  const mapped = docker(['port', FEEDBACK_PG_CONTAINER, '5432/tcp'], true)
+    .trim()
+    .split('\n')[0] ?? '';
+  const port = /:(\d+)$/.exec(mapped)?.[1];
+  if (!port) {
+    stopThrowawayPostgres();
+    throw new Error('throwaway Postgres never published a port');
+  }
+  return `postgresql://postgres:test-only@127.0.0.1:${port}/feedback`;
+}
+
+/** Force-remove the throwaway Postgres container (best-effort). */
+export function stopThrowawayPostgres(): void {
+  try {
+    execFileSync('docker', ['rm', '-f', FEEDBACK_PG_CONTAINER], { stdio: 'ignore' });
+  } catch {
+    // Already gone, or Docker unavailable at teardown.
+  }
 }
 
 /**
@@ -268,6 +364,23 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     }),
   );
 
+  // The throwaway Postgres first: feedback-service fails closed without a DB.
+  // Skipped when the stack has no feedback port (the dev harness).
+  const feedbackPort = cfg.feedbackPort;
+  if (feedbackPort !== undefined) {
+    const feedbackDbUrl = await startThrowawayPostgres();
+    await build('apps/feedback-service');
+    services.push(
+      await spawnService({
+        name: 'feedback-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/feedback-service`,
+        env: feedbackEnv(cfg, feedbackPort, feedbackDbUrl),
+      }),
+    );
+  }
+
   const app = await spawnApp(cfg);
   services.push(app);
 
@@ -276,6 +389,9 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.mealPort}/health`);
+  if (cfg.feedbackPort !== undefined) {
+    await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
+  }
   await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
 
   return services;

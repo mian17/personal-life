@@ -1,0 +1,18 @@
+{
+  "id": "/feedback",
+  "name": "Personal Life — Feedback",
+  "short_name": "Feedback",
+  "start_url": "/feedback",
+  "scope": "/feedback",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    {
+      "src": "/icon-feedback.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

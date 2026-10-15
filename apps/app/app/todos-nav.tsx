@@ -1,6 +1,7 @@
 import { settingsHref } from '@life/app-kit';
-import { IconLink } from '@life/ui';
+import { FeedbackNavItem, IconLink } from '@life/ui';
 import { List, Settings, Tags, Trash2 } from 'lucide-react';
+import { submitFeedbackAction } from './feedback-actions';
 
 /** The Todos toolbar nav icons, shared by `/todos` and its lenses. */
 export function TodosNav() {
@@ -15,6 +16,7 @@ export function TodosNav() {
       <IconLink href="/todos/trash" label="Trash">
         <Trash2 size={20} aria-hidden />
       </IconLink>
+      <FeedbackNavItem app="todos" onSubmit={submitFeedbackAction} />
       <IconLink href={settingsHref('/todos')} label="Settings">
         <Settings size={20} aria-hidden />
       </IconLink>
