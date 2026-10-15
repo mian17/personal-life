@@ -36,6 +36,14 @@ describe('per-route PWA manifests', () => {
     expect(meals.icons[0].src).toBe('/icon-meals.png');
   });
 
+  it('ships every icon the /meals manifest declares', () => {
+    const meals = readManifest('manifest-meals.json');
+    const missingIcons = meals.icons
+      .map((icon: { src: string }) => icon.src.replace(/^\//, ''))
+      .filter((file: string) => !fs.existsSync(path.join(publicDir, file)));
+    expect(missingIcons).toEqual([]);
+  });
+
   it('links each manifest from its route segment layout', () => {
     expect(notesMetadata.manifest).toBe('/manifest-notes.json');
     expect(todosMetadata.manifest).toBe('/manifest-todos.json');
