@@ -1,0 +1,13 @@
+{
+  "id": "example-meal",
+  "scenario": "A3 - a pot of separable foods decomposes into one item per food",
+  "photo": "photo.jpg",
+  "itemCount": 3,
+  "foods": [
+    { "any": ["chicken"], "requireId": true },
+    { "any": ["tofu", "bean curd"], "requireId": true },
+    { "any": ["yardlong bean", "long bean", "snake bean", "asparagus bean"], "requireId": true }
+  ],
+  "forbiddenInName": [" and ", "soup", " with "],
+  "note": "Live-observed 2026-10-15 against the shipped prompt: three items, chicken 80 g, tofu 130 g, yardlong beans 65 g, each fdcId bound to its own searchQuery. The reported defect was one item named 'Chicken and Tofu Soup with Yardlong Beans'."
+}

@@ -9,7 +9,8 @@ Implements: the operator commands that replace the manual
 
 Give the operator two commands over one shared, verified snapshot mechanism:
 
-- **`db:backup`** — snapshot all four production SQLite databases into
+- **`db:backup`** — snapshot all five production SQLite databases (`life.db`,
+  `tags.db`, `todo.db`, `idp.db`, `meal.db`) into
   `backup/2026-10-01T12-34-56-789Z/` (one directory per run, one file per
   database), each snapshot independently verified with `PRAGMA quick_check`.
   Read-only against its inputs, so it is safe with the stack up; a daily cron
@@ -28,24 +29,25 @@ the backup/restore tooling a third copy.
 | # | Decision | Encoded in |
 |---|---|---|
 | D1 | Destination `backup/2026-10-01T12-34-56-789Z/` (one UTC-stamped directory per run; singular `backup/`, already in `.gitignore:12`) | Commands, Backup behavior |
-| D2 | Four databases — `life.db`, `tags.db`, `todo.db`, `idp.db`; Redis out of scope | Scope, Cache Rules |
+| D2 | Four databases — `life.db`, `tags.db`, `todo.db`, `idp.db`; Redis out of scope. **Amendment 2026-10-15:** the meal-nutrition chapter introduced `meal-service` with its own `apps/meal-service/data/meal.db`; scope extended to five databases (`life.db`, `tags.db`, `todo.db`, `idp.db`, `meal.db`). Records scope only — no other decision is re-opened. | Scope, Cache Rules |
 | D3 | No third copy of the snapshot logic — one shared home | Single home for the snapshot logic |
 | D4 | Backup writes nothing to a source DB; works against a live database | Backup behavior |
 | D5 | Restore refuses unless the stack is stopped; pre-restore snapshot first; no prompt | Restore behavior, Restore safety check |
 | D6 | Keep newest 10 routine snapshots; pinned snapshots never auto-pruned | Retention |
 | D7 | Routine vs deliberate is readable from the name and metadata | Modes and naming |
 | D8 | Daily cron entry; crontab line documented for the human | Commands |
-| D9 | `NOTE_DB_PATH`/`TAGS_DB_PATH`/`TODO_DB_PATH`/`IDP_DB_PATH` honoured; repo-anchored defaults | Scope, Backup behavior |
+| D9 | `NOTE_DB_PATH`/`TAGS_DB_PATH`/`TODO_DB_PATH`/`IDP_DB_PATH`/`MEAL_DB_PATH` honoured; repo-anchored defaults | Scope, Backup behavior |
 | D10 | A missing input database aborts before any snapshot is written | Backup behavior |
 | D11 | Cron-clean: non-interactive, deterministic exit codes, no prompt | Commands, Backup behavior, Restore behavior |
 
 ## Scope
 
-- **In scope (D2):** the four compose-host SQLite files and nothing else:
+- **In scope (D2):** the five compose-host SQLite files and nothing else:
   - note — `apps/note-service/data/life.db` (compose bind mount `./apps/note-service/data:/data`)
   - tags — `apps/tags-service/data/tags.db` (bind mount `./apps/tags-service/data:/data`)
   - todo — `apps/todo-service/data/todo.db` (bind mount `./apps/todo-service/data:/data`)
   - idp — `apps/idp/data/idp.db` (bind mount `./apps/idp/data:/data`)
+  - meal — `apps/meal-service/data/meal.db` (compose bind mount `./apps/meal-service/data:/data`)
 - **Out of scope (D2):** Redis (`redis-app`, `redis-idp`, `redis-note`, `redis-tags`,
   `redis-todo` — caches and a
   session store, never a source of truth per Contract 2); copies off this machine;
@@ -57,7 +59,7 @@ the backup/restore tooling a third copy.
 
 - Node + `better-sqlite3` (already every service's driver), plain TypeScript steps —
   no Nest context, no new third-party dependency.
-- `@life/shared`'s `resolveDbPath` for the four `*_DB_PATH` overrides (D9).
+- `@life/shared`'s `resolveDbPath` for the five `*_DB_PATH` overrides (D9).
 - One new workspace, `packages/db` (`@life/db`), the single home for the snapshot
   helper and the two operator CLIs (see below).
 - Run via `ts-node` from a workspace script, matching
@@ -290,16 +292,17 @@ The human installs it with `crontab -e` (paste the line above).
 
 ## Backup behavior (D1, D2, D4, D9, D10, D11)
 
-1. Resolve the four paths (D9): `NOTE_DB_PATH`, `TAGS_DB_PATH`, `TODO_DB_PATH`,
-   `IDP_DB_PATH`, each through `resolveDbPath(envName, defaultPath)` from
+1. Resolve the five paths (D9): `NOTE_DB_PATH`, `TAGS_DB_PATH`, `TODO_DB_PATH`,
+   `IDP_DB_PATH`, `MEAL_DB_PATH`, each through `resolveDbPath(envName, defaultPath)` from
    `@life/shared`. Defaults are repo-anchored from `packages/db/src/paths.ts`'s own
    directory — `join(__dirname, '..', '..', '..', 'apps', 'note-service', 'data', 'life.db')`,
    `join(__dirname, '..', '..', '..', 'apps', 'tags-service', 'data', 'tags.db')`,
    `join(__dirname, '..', '..', '..', 'apps', 'todo-service', 'data', 'todo.db')`,
-   `join(__dirname, '..', '..', '..', 'apps', 'idp', 'data', 'idp.db')` — so the
+   `join(__dirname, '..', '..', '..', 'apps', 'idp', 'data', 'idp.db')`,
+   `join(__dirname, '..', '..', '..', 'apps', 'meal-service', 'data', 'meal.db')` — so the
    documented repo-root command opens the right files regardless of `npm -w` setting
    the script cwd to the workspace (`packages/shared/src/db-path.ts:24-35`).
-2. Select the set: default all four, or the comma-separated `--only` list.
+2. Select the set: default all five, or the comma-separated `--only` list.
    Unknown names are rejected before anything is written.
 3. **Fail closed (D10):** check `existsSync` for every database in the selected set
    before creating the snapshot directory or writing any file. If any is missing,
@@ -360,7 +363,7 @@ metadata record.
 
 1. Parse `--from` (required; a directory under `backup/`, resolved against
    `INIT_CWD ?? cwd` like the backup destination) and `--only`
-   (optional, comma-separated subset of `life,tags,todo,idp`; default = every
+   (optional, comma-separated subset — `life`, `tags`, `todo`, `idp`, `meal`; default = every
    database file present in the snapshot directory). Missing `--from`, an unknown
    `--only` name, or a `--from` directory that does not exist exits 1 before any
    write.
@@ -394,8 +397,8 @@ The check is read-only and never kills or stops anything.
 
 - The compose stack publishes exactly two host-loopback ports: `app` on
   `127.0.0.1:3002` and `idp` on `127.0.0.1:3003` (`compose.yaml:150-153`, `:201-202`).
-  `note-service`, `tags-service`, and `todo-service` publish no host ports and
-  cannot be probed from the host.
+  `note-service`, `tags-service`, `todo-service`, and `meal-service` publish no host
+  ports and cannot be probed from the host.
 - For each of `3002` and `3003`, open a plain TCP connection to `127.0.0.1:port`
   with a one-second timeout:
   - connection accepted → the stack is up;
@@ -405,9 +408,10 @@ The check is read-only and never kills or stops anything.
   without touching a database. Only "all probes refused" is treated as stopped.
 - The documented procedure remains `docker compose down` (`docs/runbooks/production-deploy.md:65`),
   which stops every service; the probe is the guard against restoring on a running
-  stack. Because `note-service`/`tags-service`/`todo-service` are unpublished on the
-  host, the probe cannot observe a state where only `app`/`idp` are down — this is the
-  accepted, fail-closed state recorded in the Decisions section below.
+  stack. Because `note-service`/`tags-service`/`todo-service`/`meal-service` are
+  unpublished on the host, the probe cannot observe a state where only `app`/`idp` are
+  down — this is the accepted, fail-closed state recorded in the Decisions section
+  below.
 
 ## No silent data loss (D5)
 
@@ -498,7 +502,7 @@ Cover:
   existing path; `VACUUM INTO` refuses an existing target; `rowCountTables` mismatch
   throws; a missing source throws.
 - **backup:** a missing selected database aborts before the destination directory is
-  created (D10); all four fixtures produce one verified file each plus
+  created (D10); all five fixtures produce one verified file each plus
   `manifest.json`; a run is routine and `--pin` is deliberate, distinguishable from
   name and manifest (D7); retention keeps the newest 10 routine snapshots, prunes the
   rest, and never prunes a pinned or pre-existing-manifest-less directory (D6); the
@@ -525,14 +529,14 @@ only; no UI code, no selectors, no tokens, no PWA constants.
 
 ## Boundaries
 
-- **Always:** resolve the four `*_DB_PATH` overrides through `@life/shared` (D9);
+- **Always:** resolve the five `*_DB_PATH` overrides through `@life/shared` (D9);
   fail closed on a missing selected input before any write (D10); open every source
   read-only (D4); verify both source and copy with `PRAGMA quick_check` (D3); take and
   verify a pre-restore snapshot before overwriting a live file (D5); keep newest 10
   routine snapshots and never auto-prune pinned ones (D6); be non-interactive with
   deterministic exit codes (D11); keep exactly one snapshot implementation (D3).
 - **Ask first:** changing the destination away from `backup/` (D1); changing the
-  retention count (D6); changing the scope beyond the four databases (D2); adding a
+  retention count (D6); changing the scope beyond the five databases (D2); adding a
   host-port probe beyond `3002`/`3003`.
 - **Never:** write to a source database during backup; touch Redis (Cache Rules);
   kill, stop, or restart a service from the script; install the crontab (the human

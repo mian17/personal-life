@@ -19,7 +19,7 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
                                                    //   deleteAction?,
-                                                   //   variant?="todo",
+                                                   //   variant?="todo" | "nested",
                                                    //   size?="default|dense",
                                                    //   tone?="danger|amber|accent",
                                                    //   done?, collapsing?,
@@ -96,6 +96,8 @@ and the notes app's current pages map onto these one-to-one.
         title: ReactNode                            //   → .ui-dialog__title
         children: ReactNode                         //   → .ui-dialog__body
         footer?: ReactNode                          //   → .ui-dialog__footer (action row)
+        size?="default|full"                        //   "full" → .ui-dialog--full: edge-to-edge,
+                                                    //   100dvh, square corners (a full-screen sheet)
         className? />                               // native backdrop/top-layer/Escape
 ```
 
@@ -113,9 +115,17 @@ export interface DialogProps {
   title: ReactNode;                       // heading (rendered in .ui-dialog__title)
   children: ReactNode;                    // body
   footer?: ReactNode;                     // action row (Confirm/Cancel), right-aligned
+  size?: 'default' | 'full';              // 'full' → .ui-dialog--full (full-screen sheet)
   className?: string;
 }
 ```
+
+- `size="full"` adds `.ui-dialog--full`: `width: 100%; height: 100dvh; max-width: none;
+  border-radius: 0` (plus `margin: 0` so it fills the viewport, not the native centred
+  box). It is the **full-screen sheet** — a surface that takes over the screen rather than
+  floating (e.g. a long optional field group opened from a row). Default `size` (omitted)
+  keeps the centred panel: `width: min(100% - var(--space-2), var(--content-width))`.
+  Both sizes are token-only; no colour literal is introduced.
 
 - `'use client'`. A ref effect on `open` calls the native `showModal()` / `close()`; a `close`
   listener maps the native `close` event to `onOpenChange(false)` — that is the **Escape** path.
@@ -265,6 +275,27 @@ to full height (`align-self: stretch`) so the tap/hover area is unchanged. The r
 also carries a token-derived `min-height` floor equal to one two-line row (title +
 sub, ~75.6px at the frozen base), so a row with empty `meta`/`snippet` cannot
 collapse.
+
+The **`nested`** variant (`variant="nested"`, off by default; adds `.ui-list-item--nested`)
+presents a row that owns an indented child region — a parent line (its `title`) with a stack
+of children below it, one level in. It exists because the base row renders `title` and
+`children` as siblings in a horizontal flex row (`.ui-list-item__link`, `align-items: center`),
+so a row whose children are a *vertical field body* lays them out side by side. The variant
+overrides the row link to a column (`flex-direction: column; align-items: stretch`) so the
+title reads as the parent line and `children` stack beneath it. The indent is a token step on
+the nested body (`padding-left: var(--space-1)`), not app CSS; a future tree spine would be a
+left border on the same class. The area owns `.ui-list-item--nested` and the child body's
+padding — no app-level indentation. It composes `Stack` and other blocks inside the body; it
+adds no markup of its own beyond the wrapper the base row already renders.
+
+The nested variant also takes an optional **`titleAction`** slot: a control rendered on the
+parent line beside `title` (e.g. a row's delete affordance, so it sits against the title
+control rather than beside the whole child body — a `deleteAction` sibling would steal
+horizontal width from every child row). When set, `.ui-list-item__title` becomes a
+horizontal flex line (`display: flex; align-items: stretch; gap: var(--space-0-5)`) whose
+`title` content grows (`flex: 1; min-width: 0`) and whose `titleAction` stretches to the
+line's height — so a button in the slot matches the height of a control in the title. The
+slot is `nested`-only; without it the title line keeps the base block layout.
 
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title

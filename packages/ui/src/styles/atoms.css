@@ -17,6 +17,9 @@
  * | danger    | bare    | `.trash-empty`                                      |
  * | quiet     | default | `.trash-restore`                                    |
  * | quiet     | bare    | (new) compact quiet button, no legacy counterpart   |
+ * ButtonLink (new — no legacy counterpart): the same visual classes on a
+ * `next/link` anchor; adds no CSS of its own, only `.ui-btn`'s
+ * `text-decoration: none` (a no-op for `<button>`).
  *
  * IconButton (sole owner of the 40x40 bordered square controls)
  * | variant | legacy class(es)                    |
@@ -76,6 +79,9 @@
   font-weight: 600;
   cursor: pointer;
   min-height: var(--tap-height);
+  /* Anchor form (ButtonLink) must not inherit the UA underline; a no-op on
+     `<button>`. Same treatment every anchor atom already carries. */
+  text-decoration: none;
 }
 
 /* default size — the 48px tap target (global button geometry) */
@@ -199,6 +205,15 @@
   color: var(--text);
 }
 
+/* Disabled: a gated control must not look live (the meal editor's Save as meal
+   gave zero feedback otherwise). Attribute selector outranks the base
+   `cursor: pointer`, so it wins the cascade. The literal 0.5 is the file's
+   existing disabled precedent (.ui-switch:disabled, .ui-pill--button:disabled). */
+.ui-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* --------------------------------------------------------- IconButton */
 
 .ui-icon-btn {
@@ -226,6 +241,12 @@
 .ui-icon-btn--ghost {
   background: transparent;
   border-color: transparent;
+}
+
+/* Same disabled treatment as .ui-btn[disabled] — one look for every gated control. */
+.ui-icon-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* --------------------------------------------------------- Checkbox */
@@ -507,6 +528,54 @@
 }
 
 .ui-switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* --------------------------------------------------------- FilePicker */
+
+/* Generic file-upload field: the native `<input type="file">` is the control
+   (visually hidden, focused via the surface), and `.ui-file-picker__surface`
+   is the visible affordance — the same field shell as a form control. The
+   label is rendered visibly inside the surface, so the atom is never
+   aria-label-only (lesson 0014). The input is clipped rather than
+   `display:none` so it keeps its place in the tab order and stays focusable;
+   focus is drawn on the surface through `:focus-within`. */
+.ui-file-picker {
+  display: block;
+}
+
+.ui-file-picker__input {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ui-file-picker__surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-25);
+  padding: var(--space-0-75);
+  border-radius: var(--radius-md);
+  border: var(--border-width) dashed var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ui-file-picker__label {
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+.ui-file-picker__input:focus-visible + .ui-file-picker__surface,
+.ui-file-picker__input:focus + .ui-file-picker__surface {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-file-picker__input:disabled + .ui-file-picker__surface {
   cursor: default;
   opacity: 0.5;
 }

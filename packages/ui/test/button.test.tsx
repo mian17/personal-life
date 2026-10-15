@@ -70,6 +70,20 @@ describe('Button', () => {
     expect(fallback).not.toMatch(/line-height/);
   });
 
+  it('renders the disabled treatment at the cascade level — not just the attribute', () => {
+    render(<Button disabled>x</Button>);
+    const button = screen.getByRole('button') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    // Rendered contract: the rule is emitted and wins, so a disabled control
+    // cannot look live (lesson 0020). A prop assertion alone would pass while
+    // the button still looked clickable — the exact bug this fixes.
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    const block = (css.match(/\.ui-btn\[disabled\]\s*\{([^}]*)\}/) ?? [])[1] ?? '';
+    expect(block).toMatch(/opacity:\s*0?\.5/);
+    expect(block).toMatch(/cursor:\s*not-allowed/);
+  });
+
   it('merges className instead of replacing it', () => {
     render(<Button className="legacy-hook">x</Button>);
     const classes = classesOf(screen.getByRole('button'));

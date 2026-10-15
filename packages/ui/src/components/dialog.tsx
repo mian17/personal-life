@@ -12,10 +12,20 @@ export interface DialogProps {
   title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** `full` renders an edge-to-edge full-screen sheet instead of the centred panel. */
+  size?: 'default' | 'full';
   className?: string;
 }
 
-export function Dialog({ open, onOpenChange, title, children, footer, className }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  children,
+  footer,
+  size = 'default',
+  className,
+}: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -52,7 +62,7 @@ export function Dialog({ open, onOpenChange, title, children, footer, className 
   return (
     <dialog
       ref={ref}
-      className={cx('ui-dialog', className)}
+      className={cx('ui-dialog', size === 'full' && 'ui-dialog--full', className)}
       aria-labelledby={titleId}
       onClick={handleBackdropClick}
     >

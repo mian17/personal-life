@@ -12,6 +12,7 @@ COPY apps/note-service/package.json apps/note-service/
 COPY apps/app/package.json apps/app/
 COPY apps/idp/package.json apps/idp/
 COPY packages/shared/package.json packages/shared/
+COPY packages/nutrition/package.json packages/nutrition/
 COPY packages/ui/package.json packages/ui/
 COPY packages/crypto/package.json packages/crypto/
 COPY packages/cache/package.json packages/cache/
@@ -22,11 +23,13 @@ RUN npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
+COPY packages/nutrition ./packages/nutrition
 COPY packages/ui ./packages/ui
 COPY packages/app-kit ./packages/app-kit
 COPY apps/app ./apps/app
 
 RUN npm run build -w @life/shared \
+  && npm run build -w @life/nutrition \
   && npm run build -w @life/app
 
 FROM node:22-bookworm-slim AS runtime
@@ -45,6 +48,9 @@ COPY --from=build /repo/apps/app/public ./apps/app/public
 # into the bundle, so the standalone server can always require it.
 COPY --from=build /repo/packages/shared/package.json ./node_modules/@life/shared/package.json
 COPY --from=build /repo/packages/shared/dist ./node_modules/@life/shared/dist
+# Same safety net for @life/nutrition (built artifact, transpiled into the bundle).
+COPY --from=build /repo/packages/nutrition/package.json ./node_modules/@life/nutrition/package.json
+COPY --from=build /repo/packages/nutrition/dist ./node_modules/@life/nutrition/dist
 # Same safety net for @life/ui (source-shipped and transpiled into the bundle).
 COPY --from=build /repo/packages/ui/package.json ./node_modules/@life/ui/package.json
 COPY --from=build /repo/packages/ui/src ./node_modules/@life/ui/src

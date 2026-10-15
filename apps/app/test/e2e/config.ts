@@ -15,6 +15,7 @@ export function testPorts() {
     notePort: Number(process.env.E2E_NOTE_PORT ?? 3101),
     tagsPort: Number(process.env.E2E_TAGS_PORT ?? 3104),
     todoPort: Number(process.env.E2E_TODO_PORT ?? 3105),
+    mealPort: Number(process.env.E2E_MEAL_PORT ?? 3106),
     appPort: Number(process.env.E2E_APP_PORT ?? 3100),
   };
 }
@@ -26,6 +27,7 @@ export function devPorts() {
     notePort: Number(process.env.E2E_DEV_NOTE_PORT ?? 3201),
     tagsPort: Number(process.env.E2E_DEV_TAGS_PORT ?? 3204),
     todoPort: Number(process.env.E2E_DEV_TODO_PORT ?? 3205),
+    mealPort: Number(process.env.E2E_DEV_MEAL_PORT ?? 3206),
     appPort: Number(process.env.E2E_DEV_APP_PORT ?? 3200),
   };
 }

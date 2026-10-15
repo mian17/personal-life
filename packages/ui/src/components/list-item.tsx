@@ -4,7 +4,7 @@ import { cx } from '../lib/cx';
 
 export type ListItemTone = 'danger' | 'amber' | 'accent';
 export type ListItemSize = 'default' | 'dense';
-export type ListItemVariant = 'todo';
+export type ListItemVariant = 'todo' | 'nested';
 
 export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'> {
   href?: string;
@@ -15,7 +15,9 @@ export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'
   leading?: ReactNode;
   trailing?: ReactNode;
   deleteAction?: ReactNode;
-  /** Todo presentation (leading square checkbox + 2-line title). Opt-in. */
+  /** Nested only: a control on the title line beside `title`, not beside the child body. */
+  titleAction?: ReactNode;
+  /** Presentation: a todo row, or a nested row whose `title` is the parent line. Opt-in. */
   variant?: ListItemVariant;
   /** Row scale for the todo variant. No effect without variant="todo". Defaults to 'default'. */
   size?: ListItemSize;
@@ -35,6 +37,7 @@ export function ListItem({
   leading,
   trailing,
   deleteAction,
+  titleAction,
   variant,
   size = 'default',
   tone,
@@ -44,10 +47,24 @@ export function ListItem({
   children,
   ...rest
 }: ListItemProps) {
+  const titleNode = (
+    <span
+      className={cx(
+        'ui-list-item__title',
+        variant === 'nested' && titleAction != null && 'ui-list-item__title--with-action',
+      )}
+    >
+      {title}
+      {variant === 'nested' && titleAction != null && (
+        <span className="ui-list-item__title-action">{titleAction}</span>
+      )}
+    </span>
+  );
+
   const body = (
     <>
       <span className="ui-list-item__text">
-        <span className="ui-list-item__title">{title}</span>
+        {titleNode}
         <span className="ui-list-item__sub">
           {meta}
           {snippet != null && snippet !== false && (
@@ -58,7 +75,11 @@ export function ListItem({
           )}
         </span>
       </span>
-      {children}
+      {variant === 'nested' ? (
+        <span className="ui-list-item__nested-body">{children}</span>
+      ) : (
+        children
+      )}
     </>
   );
 
@@ -68,6 +89,7 @@ export function ListItem({
         'ui-list-item',
         variant === 'todo' && 'ui-list-item--todo',
         variant === 'todo' && size === 'dense' && 'ui-list-item--dense',
+        variant === 'nested' && 'ui-list-item--nested',
         done && 'ui-list-item--done',
         collapsing && 'ui-list-item--collapsing',
         tone && `ui-list-item--${tone}`,

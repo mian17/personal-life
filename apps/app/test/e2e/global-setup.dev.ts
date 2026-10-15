@@ -9,13 +9,14 @@ import { devPidsFile, devPorts, repoRoot } from './config';
  * where the dev server's middleware loopback-host normalization exists.
  */
 export default async function globalSetup(): Promise<void> {
-  const { idpPort, notePort, tagsPort, todoPort, appPort } = devPorts();
+  const { idpPort, notePort, tagsPort, todoPort, mealPort, appPort } = devPorts();
   const cfg: StackConfig = {
     mode: 'development',
     idpPort,
     notePort,
     tagsPort,
     todoPort,
+    mealPort,
     appPort,
     // Dev is reached on 127.0.0.1 (the human's URL and the app's default).
     appOrigin: `http://127.0.0.1:${appPort}`,
