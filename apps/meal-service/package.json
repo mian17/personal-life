@@ -9,7 +9,8 @@
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "jest"
+    "test:unit": "jest",
+    "eval:prompt": "PROMPT_EVAL=1 jest test/eval/prompt-eval.test.ts --runInBand"
   },
   "dependencies": {
     "@life/nutrition": "*",
