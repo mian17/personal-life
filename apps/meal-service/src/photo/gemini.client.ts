@@ -85,9 +85,6 @@ interface ConversationTurn {
   parts: unknown[];
 }
 
-/** The tool-calling mode one loop request sends: forced first, auto after. */
-type FunctionCallingMode = 'ANY' | 'AUTO';
-
 /** The API method; the request path is `<base>/models/<model>:<method>`. */
 const METHOD = 'generateContent';
 
@@ -97,8 +94,8 @@ const SEARCH_TOOL_NAME = 'search_food';
  * Task 2's bounds (SPEC-photo-identity § Bounds: "10 tool rounds, 45 s wall
  * clock"): a meal photo holds a handful of foods, so a model still searching
  * after ten rounds is looping, not reading; forty-five seconds is three of
- * this client's per-request timeouts. Hitting the round cap no longer discards
- * the read: the loop answers the outstanding call with an empty result and lets
+ * this client's per-request timeouts. Hitting the search cap no longer discards
+ * the read: the loop answers every outstanding call with an empty result and lets
  * the model answer with the foods it already found (see `readWithSearch`).
  * ponytail: fixed budget for every read; make it per-call only if a real model
  * needs longer.
@@ -138,7 +135,7 @@ const PROMPT = [
   'Do not split one food into its parts: an egg is one item, not "egg white"',
   'plus "egg yolk".',
   'Call the search_food tool once per food you list, with that food’s own name',
-  'as the query, before you answer. When it',
+  'as the query, searching every food before you give the final answer. When it',
   'returns candidates, choose the one that best represents the food in the',
   'photo and put that candidate id in your answer; an id that did not come',
   'from that food’s own search result must be null.',
@@ -265,12 +262,13 @@ export class GeminiClient {
    * The editor renders manual entry for either, and a different banner for each.
    *
    * Without a search tool this is Task 6's single shot: one request, and the
-   * terminal turn is model JSON text. With a tool, each `functionCall` turn
-   * runs the caller's search and answers with a `functionResponse` turn, until
-   * a text turn arrives or a bound stops the loop — five tool rounds, forty-
-   * five seconds of wall clock. Past the wall clock the turn at hand is treated
-   * as the final answer; past the round cap the call is answered empty for one
-   * further turn. A turn with no usable JSON is `COULD_NOT_READ`.
+   * terminal turn is model JSON text. With a tool, each `functionCall` part in
+   * a turn runs the caller's search and is answered with its own
+   * `functionResponse` part, until a text turn arrives or a bound stops the
+   * loop — `MAX_TOOL_ROUNDS` executed searches, forty-five seconds of wall
+   * clock. Past the wall clock the turn at hand is treated as the final answer;
+   * past the search cap every pending call is answered empty for one further
+   * turn. A turn with no usable JSON is `COULD_NOT_READ`.
    */
   async readPhoto(
     image: PhotoImage,
@@ -299,15 +297,18 @@ export class GeminiClient {
   }
 
   /**
-   * The `search_food` turn loop. The conversation grows two turns per round —
-   * the model's `functionCall`, then our `functionResponse` — and ends on the
-   * first text turn. Either bound stops it: five tool rounds, or forty-five
-   * seconds since the photo first went out. The first request forces a call,
-   * later ones leave the choice to the model. Past the round cap a call is not
-   * run: the loop answers it with an empty result and allows one further turn,
-   * so the model can answer with the foods it already found instead of losing
-   * the whole estimate. The foods it could not search take the absent vector
-   * through the existing path 3 — they are not special-cased here.
+   * The `search_food` turn loop. The conversation grows by two turns per loop —
+   * the model's `functionCall` parts, then our `functionResponse` parts, one
+   * answer per call — and ends on the first text turn. Either bound stops it:
+   * `MAX_TOOL_ROUNDS` executed searches, or forty-five seconds since the photo
+   * first went out. Every request goes out with mode `AUTO` and the identity
+   * schema, so the model chooses when to search and when to answer. The cap
+   * counts searches, not turns: a turn carrying three calls spends three rounds
+   * and runs all three. Past the cap no call is run — the loop answers every
+   * pending call with an empty result and allows one further turn, so the model
+   * can answer with the foods it already found instead of losing the whole
+   * estimate. The foods it could not search take the absent vector through the
+   * existing path 3 — they are not special-cased here.
    */
   private async readWithSearch(
     image: PhotoImage,
@@ -316,32 +317,33 @@ export class GeminiClient {
   ): Promise<PhotoReadResult> {
     const turns: ConversationTurn[] = [{ role: 'user', parts: this.firstParts(image, hint) }];
     const deadline = Date.now() + TOOL_LOOP_WALL_CLOCK_MS;
-    let toolsUsed = 0;
+    let searchesRun = 0;
     let exhaustedReplySent = false;
     for (;;) {
       if (Date.now() >= deadline) return readFailure(COULD_NOT_READ);
-      const response = await this.send(JSON.stringify(this.loopBody(turns, toolsUsed)));
+      const response = await this.send(JSON.stringify(this.loopBody(turns)));
       if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
       const parts = candidateParts(parseJson(await response.text()));
       if (!parts) return readFailure(COULD_NOT_READ);
-      const rawCall = findToolCall(parts);
-      if (rawCall === undefined) return finishReading(parts);
-      if (toolsUsed >= MAX_TOOL_ROUNDS) {
+      const rawCalls = findToolCalls(parts);
+      if (rawCalls.length === 0) return finishReading(parts);
+      const calls = readToolCalls(rawCalls);
+      if (!calls) return readFailure(COULD_NOT_READ);
+      if (searchesRun >= MAX_TOOL_ROUNDS) {
         if (exhaustedReplySent) return finishReading(parts);
         exhaustedReplySent = true;
-        const call = readToolCall(rawCall);
-        if (!call) return readFailure(COULD_NOT_READ);
         // The cap is spent: no tool runs, so this turn costs no USDA call — and
-        // the empty answer offers no id, so the stranded foods take path 3.
-        turns.push({ role: 'model', parts }, { role: 'user', parts: [toolResultPart(call.id, NO_SEARCH_RESULT)] });
+        // the empty answers offer no id, so the stranded foods take path 3.
+        turns.push({ role: 'model', parts }, { role: 'user', parts: emptyAnswers(calls) });
         continue;
       }
-      const call = readToolCall(rawCall);
-      if (!call) return readFailure(COULD_NOT_READ);
-      const found = await runSearchTool(searchTool, call.query, deadline);
-      if (!found) return readFailure(COULD_NOT_READ);
-      toolsUsed += 1;
-      turns.push({ role: 'model', parts }, { role: 'user', parts: [toolResultPart(call.id, found)] });
+      // Each result is remembered against its own query by the caller's closure
+      // (`PhotoService.searchFoodAndRemember`), so every call keeps its own id
+      // binding — no id crosses from one food's search onto another's.
+      const answers = await runSearchTools(searchTool, calls, deadline);
+      if (!answers) return readFailure(COULD_NOT_READ);
+      searchesRun += calls.length;
+      turns.push({ role: 'model', parts }, { role: 'user', parts: answers });
     }
   }
 
@@ -352,17 +354,20 @@ export class GeminiClient {
     };
   }
 
-  /** One search-loop request: the conversation so far, plus the tool the model may call.
-   * The forced round carries no response schema: the live API answers 400 when
-   * forced function calling (mode ANY) meets a response mime type, and the
-   * forced turn must return a `functionCall` rather than schema-shaped text.
-   * The terminal text turn always arrives on an AUTO round, which keeps the schema. */
-  private loopBody(turns: ConversationTurn[], toolsUsed: number): unknown {
+  /**
+   * One search-loop request: the conversation so far, the tool the model may
+   * call, and the identity schema. The mode is `AUTO` on every round — no round
+   * is forced — so the model decides when to search and when to answer, and
+   * every request carries the schema the terminal text turn must satisfy.
+   * Searching before answering is asked for by the prompt's per-food
+   * instruction, not enforced by the API.
+   */
+  private loopBody(turns: ConversationTurn[]): unknown {
     return {
       contents: turns,
       tools: [{ functionDeclarations: [SEARCH_FOOD_DECLARATION] }],
-      toolConfig: functionCallingConfig(toolsUsed),
-      ...(callingMode(toolsUsed) === 'ANY' ? {} : { generationConfig: generationConfig() }),
+      toolConfig: functionCallingConfig(),
+      generationConfig: generationConfig(),
     };
   }
 
@@ -421,38 +426,25 @@ function generationConfig(): unknown {
 }
 
 /**
- * The tool config for one search-loop request. The first request forces a call
- * (`ANY`), so the model cannot answer before the tool has shown it candidates;
- * every later request lets it choose (`AUTO`), so it can answer once it has
- * them. `ANY` cannot be held for the whole loop — it forbids the terminal text
- * turn, so a loop that never relaxes could never end.
+ * The tool config for one search-loop request: mode `AUTO`, on every round. The
+ * model is never forced to call the tool — it decides when to search and when
+ * to answer, and the prompt's per-food instruction is what asks it to search
+ * before answering.
  *
- * The mode also decides whether the request may carry the response schema: the
- * live API rejects forced function calling paired with a response mime type
- * (HTTP 400, "Forced function calling (ANY mode) with a response mime type:
- * 'application/json' is unsupported"). `loopBody` therefore omits the
- * `generationConfig` on the forced round, which needs no schema — it asks for a
- * `functionCall` — while the AUTO round that carries the terminal text turn
- * keeps it.
+ * Forcing the call (`ANY`) is what the loop used to do on its first round, and
+ * it cannot be paired with a response mime type: the live API answers 400
+ * ("Forced function calling (ANY mode) with a response mime type:
+ * 'application/json' is unsupported"). With `AUTO` every round carries the
+ * identity schema, and the schema is what the terminal text turn must satisfy.
  */
-function functionCallingConfig(toolsUsed: number): unknown {
-  return { functionCallingConfig: { mode: callingMode(toolsUsed) } };
-}
-
-/**
- * The mode for the round after `toolsUsed` searches: the first round is forced
- * (`ANY`), every later round automatic. The forced round must not carry a
- * response schema — the API rejects that pair — so `loopBody` keys the schema
- * off this same answer.
- */
-function callingMode(toolsUsed: number): FunctionCallingMode {
-  return toolsUsed === 0 ? 'ANY' : 'AUTO';
+function functionCallingConfig(): unknown {
+  return { functionCallingConfig: { mode: 'AUTO' } };
 }
 
 /**
  * A candidate's `parts`, or null for a body that is not the documented
  * envelope (`candidates[].content.parts`). The text answer is found by
- * `finishReading`; a `functionCall` part is found by `findToolCall`.
+ * `finishReading`; the `functionCall` parts are found by `findToolCalls`.
  */
 function candidateParts(envelope: unknown): unknown[] | null {
   const candidates = record(envelope)?.candidates;
@@ -483,28 +475,70 @@ function finishReading(parts: unknown[]): PhotoReadResult {
 }
 
 /**
- * The turn's loop condition from the shape (Task 2's termination): a
- * `functionCall` part means the loop continues — the caller runs the tool and
- * answers it with a `functionResponse` turn. No such part ends the loop.
+ * Every `functionCall` part in the turn, in order (Task 2's termination: no
+ * such part ends the loop). A turn may carry several — one per food — and each
+ * is answered with its own `functionResponse`.
  */
-function findToolCall(parts: unknown[]): Record<string, unknown> | undefined {
+function findToolCalls(parts: unknown[]): Record<string, unknown>[] {
+  const found: Record<string, unknown>[] = [];
   for (const part of parts) {
     const call = record(record(part)?.functionCall);
-    if (call) return call;
+    if (call) found.push(call);
   }
-  return undefined;
+  return found;
 }
 
 /**
- * The one `functionCall` this loop answers: ours, with a usable `args.query`.
- * Anything else — another name, a missing query — is a bad envelope, the one
- * failure. The `id` rides back on the matching `functionResponse`.
+ * One `functionCall` validated: ours, with a usable `args.query`. Anything else
+ * — another name, a missing query — is a bad envelope, the one failure. The
+ * `id` rides back on the matching `functionResponse`.
  */
 function readToolCall(call: Record<string, unknown>): { id?: string; query: string } | null {
   if (call.name !== SEARCH_TOOL_NAME) return null;
   const query = record(call.args)?.query;
   if (typeof query !== 'string' || query.trim() === '') return null;
   return typeof call.id === 'string' ? { id: call.id, query } : { query };
+}
+
+/**
+ * Every call in the turn, validated. One bad call fails the whole turn with the
+ * single failure — a turn is answered whole or not at all, never in part.
+ */
+function readToolCalls(
+  rawCalls: Record<string, unknown>[],
+): { id?: string; query: string }[] | null {
+  const calls: { id?: string; query: string }[] = [];
+  for (const raw of rawCalls) {
+    const call = readToolCall(raw);
+    if (!call) return null;
+    calls.push(call);
+  }
+  return calls;
+}
+
+/**
+ * Run every search of the turn, in order, answering each call with its own
+ * id-matched result. A tool that throws (USDA 429, catalog error) answers null,
+ * and the whole turn collapses to the could-not-read failure — a typed result,
+ * never a hang.
+ */
+async function runSearchTools(
+  searchTool: SearchFood,
+  calls: { id?: string; query: string }[],
+  deadline: number,
+): Promise<unknown[] | null> {
+  const answers: unknown[] = [];
+  for (const call of calls) {
+    const found = await runSearchTool(searchTool, call.query, deadline);
+    if (!found) return null;
+    answers.push(toolResultPart(call.id, found));
+  }
+  return answers;
+}
+
+/** Every pending call answered with the empty result: no search runs, so the turn costs no USDA call. */
+function emptyAnswers(calls: { id?: string; query: string }[]): unknown[] {
+  return calls.map((call) => toolResultPart(call.id, NO_SEARCH_RESULT));
 }
 
 /**

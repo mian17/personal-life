@@ -134,9 +134,11 @@ repeat photos free — the second `chicken` resolves against the catalog with no
 (intent "Amendment 2026-10-04 — search order"; `usda-source` keeps no cache of its own, the
 catalog *is* the cache).
 
-Turns: photo + prompt → model returns `functionCall` → backend runs the catalog-first search
-→ backend sends `functionResponse` with the candidates → model returns the final JSON,
-naming one catalog `id` per food when it matched the catalog, else one `fdcId`. Then the
+Turns: photo + prompt → model returns `functionCall` parts (one turn may carry
+several — one per food) → backend runs the catalog-first search for **every**
+call, in order, answering each with its own `functionResponse` (matched by
+`functionCall.id`) → model returns the final JSON, naming one catalog `id`
+per food when it matched the catalog, else one `fdcId`. Then the
 backend, not the model, resolves the vector by that id (an existing catalog food reuses its
 stored vector; else `usda-source` fetches the authoritative vector by `fdcId` and maps it).
 
@@ -159,9 +161,10 @@ candidates and judging is the one thing the model is genuinely better at here. C
 plainly: this is a multi-turn call — slower and more tokens than the single call it
 replaces; a catalog hit spends none of it on USDA.
 
-**Enforcement is two-sided.** The loop's first turn is forced (`functionCallingConfig.mode:
-"ANY"`, §"The verified envelope"), so the model cannot answer before the tool has shown it
-candidates; later turns relax to `AUTO` so it can answer once it has them. And the backend
+**Enforcement is two-sided.** The prompt asks for a `search_food` call per food before the
+final answer (§"The verified envelope"), and the tool declaration puts the ids in
+front of the model — so it selects from what it was shown rather than inventing.
+And the backend
 trusts only an id that the query the answer names as its `searchQuery` actually offered: an
 answer's `foodId` or `fdcId` that the named query did not return is not resolved — the item
 keeps its name and grams and takes the absent vector (path 3), and the person fills the
@@ -232,14 +235,13 @@ terminating role, and the convention is `role: "user"` on the turn carrying the
 `functionResponse`. (The `Tool.functionDeclarations` prose mentions a role "function";
 the `Content` schema permits only 'user'/'model' — the schema wins.)
 
-**`functionCallingConfig.mode`: `ANY` first, `AUTO` after.** `ToolConfig.functionCallingConfig`
+**`functionCallingConfig.mode`: `AUTO` on every round.** `ToolConfig.functionCallingConfig`
 takes `mode` ∈ `MODE_UNSPECIFIED | AUTO | ANY | NONE | VALIDATED`, plus optional
-`allowedFunctionNames: string[]`. The loop's **first** request sends `ANY`, which forbids a
-terminal text turn: the model must call `search_food` before it can answer, so an answer can
-never be given without candidates. Every **later** request sends `AUTO`, the default, so the
-model may answer with the final JSON once it has them. `ANY` cannot be held for the whole
-loop — it forces a call on the final turn too, so the loop could never terminate on text;
-`VALIDATED` buys constrained decoding one function does not need.
+`allowedFunctionNames: string[]`. The loop sends `AUTO` — the default — on **every** request,
+so the model may call `search_food` when it needs to and answer with the final JSON when it
+is ready; no round is forced. Searching before answering is asked for by the prompt's
+per-food instruction, not enforced by the API. `VALIDATED` buys constrained decoding one
+function does not need.
 
 **Schema and tools coexist in one request.** `GenerationConfig` carries `responseSchema`,
 `responseMimeType`, `responseJsonSchema`, `thinkingConfig` — so the identity JSON schema
@@ -247,22 +249,25 @@ and the `search_food` declaration ride in the same `GenerateContentRequest`. The
 consequence: `responseSchema` constrains the **final text turn**, while a tool call
 arrives as a `functionCall` part, not as schema-constrained text.
 
-**A forced request must not carry a response mime type or schema.** Verified live
+**Every request carries the identity schema; no round is forced.** Verified live
 2026-10-10 against `gemini-3.8-flash`: `mode: "ANY"` together with
 `generationConfig.responseMimeType: "application/json"` is rejected with HTTP 400
 *"Forced function calling (ANY mode) with a response mime type: 'application/json' is
-unsupported"*; the same request with no `generationConfig` answers 200 with the
-`functionCall`. The constraint is the pair, not either half — `AUTO` with the schema, and
-`ANY` without it, both answer 200. So the identity schema applies only to the **`AUTO`
-rounds**, which is exactly where the terminal text turn lands: the forced round asks for a
-`functionCall`, needs no response schema, and is sent schema-less (`gemini.client.ts`
-`loopBody` keys the `generationConfig` off `callingMode`). `FakeGemini` mirrors the
-refusal, so the suite catches a regression instead of a live read failing closed.
+unsupported"*. That rejection is why no round is forced any more — the trade used to be a
+schema-less forced first round, and measured live 2026-10-15 on the fixture photo it turned
+out unnecessary: `AUTO` + schema on round 0 searches on its own 20/20 times, while
+`ANY` + schema 400s 20/20. So the identity schema rides **every** round — the tool call
+arrives as a `functionCall` part, not as schema-constrained text, and the terminal text turn
+is what the schema shapes. `FakeGemini` keeps mirroring the refusal, so the suite catches a
+regression (any re-pairing of `ANY` with a mime type) instead of a live read failing closed.
 
 **Termination, stated from the shape, not inferred.** A turn ends when the candidate's
 `parts` contain **no** `functionCall`. A `functionCall` part means the loop continues —
-the client executes it and sends a `functionResponse` part in the next request. The
-terminal turn is the one whose part is `text`, which is what `responseSchema` shapes.
+the client executes it and sends a `functionResponse` part in the next request. A turn may
+carry several `functionCall` parts, and **every** one is answered, in order, by a
+`functionResponse` matched by its `functionCall.id` — the loop never runs only the first and
+drops the rest. The terminal turn is the one whose part is `text`, which is what
+`responseSchema` shapes.
 
 **Bounds: 10 tool rounds, 45 s wall clock.** A meal photo holds a handful of distinct
 foods, so a model still searching after 10 rounds is looping, not reading; the higher cap
@@ -271,11 +276,13 @@ shape; 45 s is 3 ×
 the client's existing 15 s per-request timeout (`gemini.client.ts`) — an estimate cannot
 sit for minutes while a diner waits. The wall clock is a hard stop: the turn at hand is
 treated as the model's final answer, and if no usable JSON arrived, the result is
-`COULD_NOT_READ`. The round cap **degrades instead of discarding**: when the model
-returns a `functionCall` with the budget spent, the loop does **not** run the tool — it
-answers the outstanding call with an empty result (`{ catalog: [], usda: [] }`, which
-offers no id) and allows **exactly one** further turn for the model to answer with the
-foods it already found. A second over-cap `functionCall` ends the loop as before. So the
+`COULD_NOT_READ`. The round cap counts **executed searches, not turns** — a turn carrying
+three `functionCall` parts spends three rounds — and it **degrades instead of discarding**:
+when the model returns `functionCall` parts with the budget spent, the loop does **not** run
+the tool — it answers **every** pending call of the turn with an empty result
+(`{ catalog: [], usda: [] }`, which offers no id) and allows **exactly one** further turn
+for the model to answer with the foods it already found. A second over-cap turn of
+`functionCall` parts ends the loop as before. So the
 foods a model could not search take `zeroVector()` through path 3, and a photo that
 merely needed more searches still returns its foods — never `could-not-read` for that
 reason alone. The overflow turn runs no tool, so it costs no USDA call

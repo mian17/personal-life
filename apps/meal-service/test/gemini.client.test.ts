@@ -47,6 +47,36 @@ function functionCallTurn(query: string): Response {
   );
 }
 
+/** A turn carrying several `functionCall` parts — one per food the model names. */
+function functionCallTurnFor(calls: { query: string; id: string }[]): Response {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: calls.map((call) => ({
+              functionCall: { name: 'search_food', args: { query: call.query }, id: call.id },
+            })),
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/** Every `functionResponse` part the most recent request carries, in order. */
+function receivedAnswers(fake: FakeGemini): { id?: string; response?: SearchFoodResult }[] {
+  const contents = (fake.lastRequestBody() as {
+    contents?: { parts?: { functionResponse?: { id?: string; response?: SearchFoodResult } }[] }[];
+  }).contents;
+  return (contents ?? [])
+    .flatMap((turn) => turn.parts ?? [])
+    .map((part) => part.functionResponse)
+    .filter(
+      (answer): answer is { id?: string; response?: SearchFoodResult } => answer !== undefined,
+    );
+}
+
 /** True when this request already carries our tool's answer — the turn to reply with JSON. */
 function alreadyAnswered(call: { init: RequestInit }): boolean {
   const body = JSON.parse(String(call.init.body)) as {
@@ -310,7 +340,7 @@ describe('GeminiClient', () => {
     expect(fake.calls).toHaveLength(0);
   });
 
-  it('forces the first turn to search and lets later ones answer', async () => {
+  it('sends AUTO on every turn and lets the prompt ask for search-before-answer', async () => {
     const fake = new FakeGemini();
     const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
     fake.reply = (call) =>
@@ -324,11 +354,11 @@ describe('GeminiClient', () => {
     expect(fake.calls).toHaveLength(2);
     const modeOf = (call: { init: RequestInit }): unknown =>
       toolModeOf(JSON.parse(String(call.init.body)) as Record<string, unknown>);
-    expect(modeOf(fake.calls[0])).toBe('ANY');
+    expect(modeOf(fake.calls[0])).toBe('AUTO');
     expect(modeOf(fake.calls[1])).toBe('AUTO');
   });
 
-  it('omits the response schema on the forced round and sends it once the mode relaxes to AUTO', async () => {
+  it('carries the identity schema on every round and never pairs ANY with a mime type', async () => {
     const fake = new FakeGemini();
     const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
     fake.reply = (call) =>
@@ -338,22 +368,17 @@ describe('GeminiClient', () => {
 
     await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
 
-    // The forced round is illegal with a response mime type — the live API
-    // answers 400 — so the request the client actually sent must carry neither
-    // the mime type nor the schema, and still force the tool call.
-    const forced = JSON.parse(String(fake.calls[0].init.body)) as Record<string, unknown>;
-    expect(toolModeOf(forced)).toBe('ANY');
-    expect(forced).not.toHaveProperty('generationConfig.responseMimeType');
-    expect(forced).not.toHaveProperty('generationConfig.responseSchema');
-    expect(forced).not.toHaveProperty('generationConfig');
-
-    // The AUTO round carries the schema, because that is the round whose text
-    // turn the identity JSON must satisfy.
-    const relaxed = JSON.parse(String(fake.calls[1].init.body)) as {
-      generationConfig?: { responseMimeType?: unknown; responseSchema?: unknown };
-    };
-    expect(relaxed.generationConfig?.responseMimeType).toBe('application/json');
-    expect(relaxed.generationConfig?.responseSchema).toBeDefined();
+    // Every request — round 0 included — must carry the identity schema, and
+    // none may force a call: the live API answers 400 when ANY meets a
+    // response mime type.
+    for (const call of fake.calls) {
+      const body = JSON.parse(String(call.init.body)) as {
+        generationConfig?: { responseMimeType?: unknown; responseSchema?: unknown };
+      };
+      expect(toolModeOf(body)).toBe('AUTO');
+      expect(body.generationConfig?.responseMimeType).toBe('application/json');
+      expect(body.generationConfig?.responseSchema).toBeDefined();
+    }
   });
 
   it('degrades past the search cap: the overflow call is answered empty and the foods already found still read', async () => {
@@ -411,5 +436,62 @@ describe('GeminiClient', () => {
 
     expect(fake.calls).toHaveLength(2);
     expect(result).toEqual(SERVICE_UNAVAILABLE);
+  });
+
+  it('runs every search in a multi-call turn and answers each call by its own id', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [{ id: `food-${query}`, name: query, servingGrams: 100 }], usda: [] };
+    };
+    const foods = ['chicken', 'tofu', 'broth'];
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({
+            readable: true,
+            items: foods.map((name) => boundItem({ name, foodId: `food-${name}`, searchQuery: name })),
+          })
+        : functionCallTurnFor(foods.map((name, index) => ({ query: name, id: `call-${index + 1}` })));
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    // All three searches ran, in the order the model asked for them.
+    expect(queries).toEqual(['chicken', 'tofu', 'broth']);
+    // Each call is answered once, matched by its own id, with the result its own
+    // query produced — no call is dropped and none answers another's id.
+    const answers = receivedAnswers(fake);
+    expect(answers.map((answer) => answer.id)).toEqual(['call-1', 'call-2', 'call-3']);
+    expect(answers.map((answer) => answer.response?.catalog[0]?.id)).toEqual([
+      'food-chicken',
+      'food-tofu',
+      'food-broth',
+    ]);
+  });
+
+  it('reaches the answer in one round when a turn asks for several foods', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [], usda: [] };
+    };
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem({ name: 'Chicken' })] })
+        : functionCallTurnFor([
+            { query: 'chicken', id: 'call-1' },
+            { query: 'tofu', id: 'call-2' },
+            { query: 'broth', id: 'call-3' },
+          ]);
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    // Every food was searched before the model's first text turn, so the answer
+    // needs two requests — not the four a first-call-only loop would spend.
+    expect(queries).toEqual(['chicken', 'tofu', 'broth']);
+    expect(fake.calls).toHaveLength(2);
   });
 });
