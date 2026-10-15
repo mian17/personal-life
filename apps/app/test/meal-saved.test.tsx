@@ -162,7 +162,7 @@ describe('saved meals list', () => {
     expect(html).not.toContain('No saved meals yet');
   });
 
-  it('leads with a back control to /meals', async () => {
+  it('leads with a back control to /meals and carries no nav actions', async () => {
     mockedListSavedMeals.mockResolvedValue([savedMeal()]);
 
     const el = await SavedMealsPage();
@@ -170,6 +170,8 @@ describe('saved meals list', () => {
 
     expect(html).toContain('aria-label="Back"');
     expect(html).toContain('href="/meals"');
+    expect(html).not.toContain('aria-label="Daily target"');
+    expect(html).not.toContain('aria-label="Settings"');
   });
 
   it('gives each row a delete control wired to the server action', async () => {

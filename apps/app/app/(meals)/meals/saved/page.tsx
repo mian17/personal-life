@@ -3,7 +3,6 @@ import { Button, EmptyState, IconLink, List, ListItem, NavBar, PageShell, PageTi
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { listSavedMeals } from '@/lib/meal-api';
 import { deleteSavedMealAction } from './actions';
-import { MealsNav } from '../../../meals-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +24,6 @@ export default async function SavedMealsPage() {
             <ArrowLeft size={20} aria-hidden />
           </IconLink>
         }
-        trailing={<MealsNav />}
       />
       <PageTitle>Saved meals</PageTitle>
       {saved.length === 0 ? (

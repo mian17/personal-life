@@ -3,8 +3,8 @@ import { IconLink } from '@life/ui';
 import { Bookmark, Settings, Target } from 'lucide-react';
 
 /**
- * The Meals toolbar nav icons, shared by the list and day routes. The target
- * route is a full-screen editor that renders its own chrome, so it has no nav.
+ * The Meals toolbar nav icons, rendered by the day route. The target route is a
+ * full-screen editor that renders its own chrome, so it has no nav.
  */
 export function MealsNav() {
   return (
