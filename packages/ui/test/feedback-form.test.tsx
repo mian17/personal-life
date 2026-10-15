@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { useState } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { CreateFeedbackInput, FeedbackSubmitResult } from '@life/shared';
@@ -272,7 +274,7 @@ describe('FeedbackForm', () => {
     expect(screen.getByRole('button', { name: 'Send it' })).toBeTruthy();
   });
 
-  it('renders visible labels bound to their controls with placeholders and the required legend', () => {
+  it('renders visible labels bound to their controls with placeholders and required markers', () => {
     renderForm();
 
     const titleLabel = titleInput().labels?.[0] as HTMLLabelElement;
@@ -291,9 +293,23 @@ describe('FeedbackForm', () => {
     expect(titleInput().placeholder).toBe('Short summary of your feedback');
     expect(textarea().placeholder).toBe('What happened, and what did you expect?');
 
-    expect(screen.getByText('* Required field').className.split(/\s+/)).toContain(
-      'ui-field-legend',
-    );
+    expect(titleLabel.className.split(/\s+/)).toEqual([
+      'ui-field-label',
+      'ui-field-label--strong',
+    ]);
+    expect(descriptionLabel.className.split(/\s+/)).toEqual([
+      'ui-field-label',
+      'ui-field-label--strong',
+    ]);
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    const baseAt = css.indexOf('.ui-field-label {');
+    const strongAt = css.indexOf('.ui-field-label--strong');
+    expect(baseAt).toBeGreaterThanOrEqual(0);
+    expect(strongAt).toBeGreaterThan(baseAt);
+    const strongBlock = css.slice(strongAt, css.indexOf('}', strongAt));
+    expect(strongBlock).toContain('color: var(--text)');
+    expect(strongBlock).toContain('font-weight: 600');
 
     const markers = document.querySelectorAll('.ui-field-label__required');
     expect(markers).toHaveLength(2);

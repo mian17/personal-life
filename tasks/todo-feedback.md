@@ -1160,3 +1160,20 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   accessible names (the frozen surface) are unchanged, verified at the DOM level by an
   accessible-name assertion in the form suite. Spec: `SPEC-feedback-ui.md` amendment;
   lesson 0029 committed with this change. Merge awaits the user's explicit request.
+- 2026-10-15: **form UX polish, round 2 (user feedback).** Two corrections on the same surface.
+  (1) The stacked labels were reusing `.ui-field-label`, whose documented purpose is the *quiet
+  chip-row caption* (shared by `TagPicker` / `TagFilterNav`) — muted, 13.6px — so the field
+  captions read unlike the app's other row labels. Fixed with a same-class variant
+  `.ui-field-label--strong` (`color: var(--text)`, `font-weight: 600`, declared after the base
+  rule so it wins the equal-specificity cascade) instead of changing the base rule, so the
+  chip-row consumers render unchanged (regression-checked). (2) The `* Required field` legend
+  was **removed entirely** — rendered line, CSS rule, test assertion and spec record (user
+  decision; it supersedes lesson 0029's "pair the asterisk with a stated convention"
+  preference — the `*` marker and the control's `aria-required` remain the signal). Also
+  renamed the stale test title ("…and the required legend" → "…and required markers").
+  Verification: `@life/ui` typecheck clean; `feedback-form.test.tsx` + `tag-picker.test.tsx` +
+  `tag-filter-nav.test.tsx` 29/29 pass; `grep -rn "ui-field-legend\|Required field"` over
+  `packages/ui/src packages/ui/test` returns zero matches. Non-feature (visual polish, no
+  behavior change): the lesson-0015 path again — direct §5 delegation, no §6 plan gate, no
+  five-lane. No E2E run: no spec created/removed/modified and the frozen accessible names are
+  unchanged. Merge awaits the user's explicit request.

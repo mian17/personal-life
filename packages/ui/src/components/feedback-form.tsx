@@ -143,9 +143,8 @@ export function FeedbackForm({
           </Pill>
         ))}
       </PillGroup>
-      <p className="ui-field-legend">* Required field</p>
       <div className="ui-field">
-        <label className="ui-field-label" htmlFor={titleId}>
+        <label className="ui-field-label ui-field-label--strong" htmlFor={titleId}>
           Title{' '}
           <span className="ui-field-label__required" aria-hidden="true">
             *
@@ -163,7 +162,7 @@ export function FeedbackForm({
         />
       </div>
       <div className="ui-field">
-        <label className="ui-field-label" htmlFor={descriptionId}>
+        <label className="ui-field-label ui-field-label--strong" htmlFor={descriptionId}>
           Description{' '}
           <span className="ui-field-label__required" aria-hidden="true">
             *

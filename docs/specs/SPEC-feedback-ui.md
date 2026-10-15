@@ -17,15 +17,23 @@ the same change.
 
 **Amendment 2026-10-15 (user-authorized, form UX — supersedes the `aria-label`-only
 decision):** every field renders a **visible label** above it and a **`placeholder`** inside
-it; each label carries a visible **required marker** (`*`, with a `* Required field` legend
-stating the convention) and the control keeps `aria-required`. Rationale (lesson 0029): an
+it; each required label carries a visible **required marker** (`*`) and the control keeps
+`aria-required`. Rationale (lesson 0029): an
 `aria-label` is an accessible *name*, invisible to a sighted user; a field the DB requires
 must read as required to the user, not only to the validator. The label markup stays in this
-block using the existing `.ui-field-label` class (+ `.ui-field-label__required`,
-`.ui-field-legend`) — **no new atom**; see *Fit problems* 2, which supersedes the previous
+block using the existing `.ui-field-label` class (+ `.ui-field-label--strong`,
+`.ui-field-label__required`) — **no new atom**; see *Fit problems* 2, which supersedes the previous
 "no label primitive for fields" note. The general automation — publishing the field contract
 from `@life/shared` so one `Field` block derives label/marker/`maxLength`/invalid state with
 no hand-placed markup — is **deferred** (user shelved it for a future plan).
+
+**Follow-up (user-authorized, same day):** the stacked labels render in the app's **primary
+text colour and bold** — `.ui-field-label--strong` (`color: var(--text)`,
+`font-weight: 600`) — because the shared base class is the *quiet chip-row caption* (muted,
+13.6px) used by `TagPicker` / `TagFilterNav`, which is the wrong treatment for a caption above
+a field. The base rule is untouched, so those consumers render unchanged. The
+`* Required field` legend was **removed entirely** (line, rule, test, spec record): the `*`
+marker plus the control's `aria-required` carry the signal.
 
 ## Objective
 
@@ -125,7 +133,7 @@ no new app CSS, tokens only.
 | Toolbar feedback trigger | `IconButton` (`<button aria-label="Send feedback">` + `MessageSquare size={20} aria-hidden />`) |
 | Dialog container (modal, title, close) | `Dialog` (its `body`/`footer` slots) |
 | Type selector (3 options) | `PillGroup role="group" aria-label="Feedback type"` + `Pill as="button"` with `aria-pressed` |
-| Field labels (title + description) | existing `.ui-field-label` class as a `<label>` (`htmlFor` → control `id`); title label text `Title`, description label text `Description`, each followed by a visible `*` marker (class `.ui-field-label__required`, `aria-hidden`); one `* Required field` legend above the fields (class `.ui-field-legend`) |
+| Field labels (title + description) | existing `.ui-field-label` class as a `<label>` (`htmlFor` → control `id`), strengthened with `.ui-field-label--strong` (`color: var(--text)`, `font-weight: 600`) so a stacked caption reads as text instead of the quiet chip-row caption the base class carries; title label text `Title`, description label text `Description`, each followed by a visible `*` marker (class `.ui-field-label__required`, `aria-hidden`, `--danger`) |
 | Title field | `Input` (`id` / `placeholder` / `aria-required` / `aria-invalid` / `maxLength` passthrough) |
 | Description field | `Textarea` (`id` / `placeholder` / `aria-required` / `aria-invalid` passthrough) |
 | Error surface (client + server) | `AlertBanner` with `role="alert"` |
@@ -157,7 +165,7 @@ worked around in the app.
 2. **A field needs a visible label** — the form's fields are captioned by a visible label
    above the control plus a `placeholder` inside it, and required labels carry the marker.
    Fixed **in this block** with the existing `.ui-field-label` class plus two small additions
-   in `blocks.css` (`.ui-field-label__required`, `.ui-field-legend`) — no new atom, no new
+   in `blocks.css` (`.ui-field-label--strong`, `.ui-field-label__required`) — no new atom, no new
    spec, no `SPEC-ui-atoms.md` change. The earlier decision ("no label primitive; an
    `aria-label` on the control is enough", citing `recurrence-dialog.tsx`) is **superseded**:
    an accessible name is not a visible one, and a required field must read as required to the
@@ -221,9 +229,8 @@ state internally (the app never manages dialog state), composing `FeedbackForm` 
             aria-pressed={type === t.value} onClick={() => setType(t.value)}>{t.label}</Pill>
     ))}
   </PillGroup>
-  <p className="ui-field-legend">* Required field</p>
   <div className="ui-field">
-    <label className="ui-field-label" htmlFor={titleId}>
+    <label className="ui-field-label ui-field-label--strong" htmlFor={titleId}>
       Title <span className="ui-field-label__required" aria-hidden="true">*</span>
     </label>
     <Input id={titleId} placeholder="Short summary of your feedback"
@@ -232,7 +239,7 @@ state internally (the app never manages dialog state), composing `FeedbackForm` 
            value={title} onChange={(e) => setTitle(e.target.value)} />
   </div>
   <div className="ui-field">
-    <label className="ui-field-label" htmlFor={descriptionId}>
+    <label className="ui-field-label ui-field-label--strong" htmlFor={descriptionId}>
       Description <span className="ui-field-label__required" aria-hidden="true">*</span>
     </label>
     <Textarea id={descriptionId} placeholder="What happened, and what did you expect?"
@@ -253,8 +260,7 @@ Field ids come from React's `useId()` (`titleId` / `descriptionId`), bound to th
 New frozen-surface strings introduced here (recorded so a later frozen suite can rely on
 them): `aria-label="Send feedback"`, `aria-label="Feedback type"`, the visible field labels
 `Title` / `Description` (each with its required marker), the placeholders `Short summary of
-your feedback` / `What happened, and what did you expect?`, the required-field legend
-`* Required field`, the client validation messages
+your feedback` / `What happened, and what did you expect?`, the client validation messages
 `Title is required.` / `Description is required.`,
 the labels `Feature request` / `Enhancement` / `Bug report`, `Send` / `Sending…` / `Cancel`,
 the dialog title `Send feedback`, and the page title `Feedback`.
@@ -290,9 +296,9 @@ Wire values are fixed here; `feedback-service`'s spec and validation must accept
 ### Validation
 
 - **At-rest signal (lesson 0029):** both fields are required and **say so before the user
-  submits** — each visible label carries the `*` required marker (convention stated once in
-  the `* Required field` legend), the control carries `aria-required`, and the `placeholder`
-  shows the expected shape. Validation on submit is the second line, never the only one.
+  submits** — each visible label carries the `*` required marker, the control carries
+  `aria-required`, and the `placeholder` shows the expected shape. Validation on submit is
+  the second line, never the only one.
 - **Client rules (exact):** `title.trim().length === 0` → `'Title is required.'` (checked
   first); otherwise `description.trim().length === 0` → `'Description is required.'`. On
   either: no request is sent, the message renders in the `AlertBanner` (`role="alert"`, which
