@@ -84,6 +84,31 @@ migrated from `globals.css` — the user explicitly approved touching this froze
 surface. They are pinned by `MOTION_TOKENS` in `packages/ui/test/tokens.test.ts`
 and are neither rem nor px, so the frozen length inventories are untouched.
 
+### Breakpoints (app-wide)
+
+The app uses **one documented breakpoint scale**, matching Tailwind CSS's published
+values. This is the app-wide responsive contract: any component that reflows (currently
+`SettingsRow` below) uses a breakpoint from this scale, never an ad-hoc width.
+
+| Name | Value | Meaning |
+|---|---|---|
+| `sm` | `640px` | phone → large phone / small tablet |
+| `md` | `768px` | tablet |
+| `lg` | `1024px` | laptop |
+| `xl` | `1280px` | desktop |
+| `2xl` | `1536px` | wide desktop |
+
+`sm` is the only breakpoint in use today. The scale lives in this table and is pinned
+by a `BREAKPOINTS` map in `packages/ui/test/tokens.test.ts`, so the values have one
+owner and cannot drift; `tokens.css` holds only a pointer comment (writing the literals
+there would put a second owner on the same values and break the frozen px inventory).
+Media queries cannot read CSS custom properties, so each `@media` writes the literal
+value and carries a comment naming its breakpoint (`/* sm — 640px */`); that is the
+documented exemption to the raw-length rule (Contract 1's mechanical check allows
+lengths inside `@media` only when they match a documented breakpoint). **No Tailwind
+dependency is added** — this adopts the scale's values, not the framework (the
+package's Tech Stack already fixes plain CSS).
+
 Three color tokens were likewise added to the frozen token surface with explicit user
 approval — `--danger-soft`, `--amber`, and `--green`. They back the `DueDate` atom's
 `signal` tone (overdue = `--danger`, any future date = `--danger-soft`).

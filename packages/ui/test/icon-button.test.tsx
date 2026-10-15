@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { IconButton } from '../src/components/icon-button';
 
@@ -44,6 +46,21 @@ describe('IconButton', () => {
       'legacy-hook',
       'ui-icon-btn',
     ]);
+  });
+
+  it('forwards disabled and renders its treatment at the cascade level', () => {
+    render(
+      <IconButton label="Save" disabled>
+        {<span />}
+      </IconButton>,
+    );
+    const button = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    const block = (css.match(/\.ui-icon-btn\[disabled\]\s*\{([^}]*)\}/) ?? [])[1] ?? '';
+    expect(block).toMatch(/opacity:\s*0?\.5/);
+    expect(block).toMatch(/cursor:\s*not-allowed/);
   });
 
   it('forwards onClick and arbitrary attributes', () => {

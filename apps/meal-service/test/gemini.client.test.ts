@@ -1,0 +1,497 @@
+import { NUTRIENTS } from '@life/nutrition';
+import { GeminiClient, MAX_TOOL_ROUNDS, type SearchFoodResult } from '../src/photo/gemini.client';
+import {
+  FakeGemini,
+  geminiResponse,
+  item,
+  readablePayload,
+} from './fake-gemini';
+
+/**
+ * The Gemini boundary (`SPEC-meal-service` Testing Strategy: "Gemini client: hint
+ * passthrough, failure mapping, no key in output — unit, the risky external
+ * boundary"). Driven entirely by `fake-gemini.ts`; no network call is made.
+ *
+ * The claims proved here are the ones the pipeline stands on: the hint reaches
+ * the model as steering input, the request is addressed by env and not by a
+ * hardcoded host, and *every* way the call can go wrong collapses onto a typed
+ * failure owned by either the photo or the service — never a partial guess.
+ */
+
+const KEY = 'test-key-DO-NOT-LOG-7f3a';
+const MODEL = 'test-model-id';
+const BASE = 'https://gemini.test/v1beta';
+const HINT = 'leftover from last night, in the blue bowl';
+const MIME = 'image/jpeg';
+const BYTES = Buffer.from('not really a photo', 'utf8');
+
+const COULD_NOT_READ = { readable: false, reason: 'could-not-read' } as const;
+const SERVICE_UNAVAILABLE = { readable: false, reason: 'service-unavailable' } as const;
+
+function envOf(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return { GEMINI_API_KEY: KEY, GEMINI_MODEL: MODEL, GEMINI_API_BASE: BASE, ...overrides };
+}
+
+function clientFor(fake: FakeGemini, env: NodeJS.ProcessEnv = envOf(), timeoutMs?: number) {
+  return new GeminiClient(env, fake.handler, timeoutMs);
+}
+
+/** A `functionCall` turn: the model asking `search_food` for `query`. */
+function functionCallTurn(query: string): Response {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        { content: { parts: [{ functionCall: { name: 'search_food', args: { query }, id: 'call-1' } }] } },
+      ],
+    }),
+  );
+}
+
+/** A turn carrying several `functionCall` parts — one per food the model names. */
+function functionCallTurnFor(calls: { query: string; id: string }[]): Response {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: calls.map((call) => ({
+              functionCall: { name: 'search_food', args: { query: call.query }, id: call.id },
+            })),
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/** Every `functionResponse` part the most recent request carries, in order. */
+function receivedAnswers(fake: FakeGemini): { id?: string; response?: SearchFoodResult }[] {
+  const contents = (fake.lastRequestBody() as {
+    contents?: { parts?: { functionResponse?: { id?: string; response?: SearchFoodResult } }[] }[];
+  }).contents;
+  return (contents ?? [])
+    .flatMap((turn) => turn.parts ?? [])
+    .map((part) => part.functionResponse)
+    .filter(
+      (answer): answer is { id?: string; response?: SearchFoodResult } => answer !== undefined,
+    );
+}
+
+/** True when this request already carries our tool's answer — the turn to reply with JSON. */
+function alreadyAnswered(call: { init: RequestInit }): boolean {
+  const body = JSON.parse(String(call.init.body)) as {
+    contents?: { parts?: { functionResponse?: unknown }[] }[];
+  };
+  return (body.contents ?? []).some((turn) =>
+    (turn.parts ?? []).some((part) => part.functionResponse !== undefined),
+  );
+}
+
+/** One identified food carrying the search binding the response schema requires. */
+function boundItem(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...item(), searchQuery: null, ...overrides };
+}
+
+/** How many `functionResponse` turns this request already carries. */
+function answersSoFar(call: { init: RequestInit }): number {
+  const body = JSON.parse(String(call.init.body)) as {
+    contents?: { parts?: { functionResponse?: unknown }[] }[];
+  };
+  return (body.contents ?? []).reduce(
+    (count, turn) =>
+      count + (turn.parts ?? []).filter((part) => part.functionResponse !== undefined).length,
+    0,
+  );
+}
+
+/** The `response` payload of the last `functionResponse` the most recent request carries. */
+function lastToolResult(fake: FakeGemini): unknown {
+  const contents = (fake.lastRequestBody() as {
+    contents?: { parts?: { functionResponse?: { response?: unknown } }[] }[];
+  }).contents;
+  const responses = (contents ?? [])
+    .flatMap((turn) => turn.parts ?? [])
+    .filter((part) => part.functionResponse !== undefined)
+    .map((part) => part.functionResponse?.response);
+  return responses[responses.length - 1];
+}
+
+/** The tool-calling mode a request body carried, read from the parsed body. */
+function toolModeOf(body: Record<string, unknown>): unknown {
+  const toolConfig = body.toolConfig as
+    | { functionCallingConfig?: { mode?: unknown } }
+    | undefined;
+  return toolConfig?.functionCallingConfig?.mode;
+}
+
+describe('GeminiClient', () => {
+  it('sends the hint as a separate steering input alongside the image', async () => {
+    const fake = new FakeGemini();
+    fake.reply = () => geminiResponse({ readable: true, items: [boundItem()] });
+    const withHint = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, HINT);
+    expect(withHint.readable).toBe(true);
+
+    const parts = fake.lastParts();
+    const textParts = parts.filter((part) => typeof part.text === 'string').map((p) => p.text as string);
+    expect(textParts).toHaveLength(2);
+    // The hint rides in the request, labelled as steering — it cannot read as a
+    // correction of an estimate that does not exist yet.
+    expect(textParts[1]).toContain(HINT);
+    expect(textParts[1]).toMatch(/steering|not a correction/i);
+
+    // Without a hint the request is byte-identical in shape: no empty hint part.
+    const bare = new FakeGemini();
+    await clientFor(bare).readPhoto({ mimeType: MIME, bytes: BYTES });
+    expect(bare.lastParts().filter((part) => typeof part.text === 'string')).toHaveLength(1);
+    expect(JSON.stringify(bare.lastRequestBody())).not.toContain(HINT);
+  });
+
+  it('asks for one item per food and forbids a dish name', async () => {
+    const fake = new FakeGemini();
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+
+    // The rule must be in the request the client actually sends: one item per
+    // distinct food, no dish or recipe name, and the worked three-item example.
+    const firstText = fake.lastParts().find((part) => typeof part.text === 'string')?.text as string;
+    expect(firstText).toMatch(/one item per distinct food/i);
+    expect(firstText).toMatch(/never (answer with )?a dish/i);
+    expect(firstText).toMatch(/chicken, tofu, and yardlong beans is three items/i);
+  });
+
+  it('addresses the request as <GEMINI_API_BASE>/models/<GEMINI_MODEL>:generateContent', async () => {
+    const fake = new FakeGemini();
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0].url).toBe(`${BASE}/models/${MODEL}:generateContent`);
+    expect(fake.calls[0].init.method).toBe('POST');
+
+    // Both coordinates are read from env: changing either moves the URL, which a
+    // hardcoded host could not do.
+    const other = new FakeGemini();
+    await clientFor(
+      other,
+      envOf({ GEMINI_API_BASE: 'https://proxy.internal/genai', GEMINI_MODEL: 'other-model' }),
+    ).readPhoto({ mimeType: MIME, bytes: BYTES });
+    expect(other.calls[0].url).toBe('https://proxy.internal/genai/models/other-model:generateContent');
+    expect(other.calls[0].url).not.toContain('googleapis.com');
+
+    // A trailing slash on the base must not double up.
+    const slashed = new FakeGemini();
+    await clientFor(slashed, envOf({ GEMINI_API_BASE: `${BASE}/` })).readPhoto({
+      mimeType: MIME,
+      bytes: BYTES,
+    });
+    expect(slashed.calls[0].url).toBe(`${BASE}/models/${MODEL}:generateContent`);
+  });
+
+  it('returns the read foods when the answer satisfies the schema', async () => {
+    const fake = new FakeGemini();
+    fake.reply = () => geminiResponse({ readable: true, items: [boundItem()] });
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+    expect(result).toEqual({ readable: true, items: [boundItem()] });
+
+    // The model's answer carries identity only: a name, a weight, the two ids
+    // it chose (here: neither), and the query that offered them. A chosen id —
+    // a catalog string, a USDA integer — rides through unchanged.
+    const identified = new FakeGemini();
+    identified.reply = () =>
+      geminiResponse({ readable: true, items: [boundItem({ foodId: 'food-1', fdcId: 12345 })] });
+    expect(await clientFor(identified).readPhoto({ mimeType: MIME, bytes: BYTES })).toEqual({
+      readable: true,
+      items: [{ name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345, searchQuery: null }],
+    });
+  });
+
+  it('asks for identity only: the request body names no nutrient field', async () => {
+    const fake = new FakeGemini();
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES });
+
+    // The schema's item asks for exactly the five identity fields — the model
+    // cannot answer a field the schema does not request.
+    const body = fake.lastRequestBody() as {
+      generationConfig: {
+        responseSchema: {
+          properties: { items: { items: { properties: Record<string, unknown>; required: string[] } } };
+        };
+      };
+    };
+    const itemSchema = body.generationConfig.responseSchema.properties.items.items;
+    expect(Object.keys(itemSchema.properties).sort()).toEqual([
+      'fdcId',
+      'foodId',
+      'grams',
+      'name',
+      'searchQuery',
+    ]);
+    expect([...itemSchema.required].sort()).toEqual([
+      'fdcId',
+      'foodId',
+      'grams',
+      'name',
+      'searchQuery',
+    ]);
+
+    // Not one of the 27 nutrient keys appears anywhere in the request.
+    const serialised = JSON.stringify(body);
+    for (const { key } of NUTRIENTS) expect(serialised).not.toContain(key);
+  });
+
+  it('classifies each failure by its owner: the service for non-2xx and timeout, the photo for a bad body', async () => {
+    const readWith = async (fake: FakeGemini, timeoutMs?: number) =>
+      clientFor(fake, envOf(), timeoutMs).readPhoto({ mimeType: MIME, bytes: BYTES });
+
+    // 1. non-2xx — the service failing to answer (rate limit, bad key, block).
+    const rejected = new FakeGemini();
+    rejected.reply = () => geminiResponse(readablePayload(), 429);
+    const on429 = await readWith(rejected);
+    expect(on429).toEqual(SERVICE_UNAVAILABLE);
+
+    // 2. timeout — the request outlives the deadline and is aborted.
+    const hanging = new FakeGemini();
+    hanging.reply = (call) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = call.init.signal;
+        signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    const onTimeout = await readWith(hanging, 5);
+    expect(onTimeout).toEqual(SERVICE_UNAVAILABLE);
+
+    // 3. schema violations — eight shapes of "do not guess", one result.
+    const violating: unknown[] = [
+      { readable: true, items: [boundItem({ fdcId: 123.5 })] },
+      { readable: true, items: [boundItem({ foodId: 12 })] },
+      { readable: true, items: [boundItem({ grams: '250 g' })] },
+      { readable: true, items: [boundItem({ grams: -1 })] },
+      { readable: true, items: [boundItem({ grams: Infinity })] },
+      { readable: true, items: [boundItem({ searchQuery: 12 })] },
+      { readable: true, items: [{ ...boundItem(), searchQuery: undefined }] },
+      { readable: true, items: [] },
+    ];
+    for (const payload of violating) {
+      const fake = new FakeGemini();
+      fake.reply = () => geminiResponse(payload);
+      expect(await readWith(fake)).toEqual(COULD_NOT_READ);
+    }
+
+    // An envelope that is not the documented shape, and a model that says it
+    // could not read the photo, land on the same result too.
+    const notAnEnvelope = new FakeGemini();
+    notAnEnvelope.reply = () => new Response('{"items":[]}', { status: 200 });
+    expect(await readWith(notAnEnvelope)).toEqual(COULD_NOT_READ);
+
+    const refused = new FakeGemini();
+    refused.reply = () => geminiResponse({ readable: false, items: [] });
+    expect(await readWith(refused)).toEqual(COULD_NOT_READ);
+  });
+
+  it('keeps the key and the image bytes out of the URL and out of every log line', async () => {
+    const fake = new FakeGemini();
+    const logs: string[] = [];
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) =>
+      jest.spyOn(console, level).mockImplementation((...args: unknown[]) => {
+        logs.push(args.map(String).join(' '));
+      }),
+    );
+
+    try {
+      const ok = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, HINT);
+      const failing = new FakeGemini();
+      failing.reply = () => geminiResponse(null, 500);
+      const failed = await clientFor(failing).readPhoto({ mimeType: MIME, bytes: BYTES }, HINT);
+
+      // The key rides in a header — never in the URL, which proxies and access
+      // logs would otherwise capture.
+      const headers = fake.calls[0].init.headers as Record<string, string>;
+      expect(headers['x-goog-api-key']).toBe(KEY);
+      expect(fake.calls[0].url).not.toContain(KEY);
+
+      // Nothing observable carries the key or the image.
+      const observable = [
+        JSON.stringify(ok),
+        JSON.stringify(failed),
+        fake.calls[0].url,
+        logs.join('\n'),
+      ].join('\n');
+      expect(observable).not.toContain(KEY);
+      expect(observable).not.toContain(BYTES.toString('base64'));
+      expect(logs.join('\n')).not.toContain(HINT);
+
+      // The image is inlined in the body (that is how the model sees it) and
+      // nowhere else.
+      expect(JSON.stringify(fake.lastRequestBody())).toContain(BYTES.toString('base64'));
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it('fails closed at construction when a coordinate is missing', () => {
+    for (const missing of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GEMINI_API_BASE'] as const) {
+      const env = envOf();
+      delete env[missing];
+      expect(() => new GeminiClient(env, new FakeGemini().handler)).toThrow(missing);
+      expect(() => new GeminiClient(env, new FakeGemini().handler)).not.toThrow(KEY);
+    }
+  });
+
+  it('rejects an unsupported image type without calling the API', async () => {
+    const fake = new FakeGemini();
+    const result = await clientFor(fake).readPhoto({ mimeType: 'image/tiff', bytes: BYTES });
+    expect(result).toEqual(COULD_NOT_READ);
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it('sends AUTO on every turn and lets the prompt ask for search-before-answer', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem()] })
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    expect(fake.calls).toHaveLength(2);
+    const modeOf = (call: { init: RequestInit }): unknown =>
+      toolModeOf(JSON.parse(String(call.init.body)) as Record<string, unknown>);
+    expect(modeOf(fake.calls[0])).toBe('AUTO');
+    expect(modeOf(fake.calls[1])).toBe('AUTO');
+  });
+
+  it('carries the identity schema on every round and never pairs ANY with a mime type', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem()] })
+        : functionCallTurn('chicken');
+
+    await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    // Every request — round 0 included — must carry the identity schema, and
+    // none may force a call: the live API answers 400 when ANY meets a
+    // response mime type.
+    for (const call of fake.calls) {
+      const body = JSON.parse(String(call.init.body)) as {
+        generationConfig?: { responseMimeType?: unknown; responseSchema?: unknown };
+      };
+      expect(toolModeOf(body)).toBe('AUTO');
+      expect(body.generationConfig?.responseMimeType).toBe('application/json');
+      expect(body.generationConfig?.responseSchema).toBeDefined();
+    }
+  });
+
+  it('degrades past the search cap: the overflow call is answered empty and the foods already found still read', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [], usda: [] };
+    };
+    // The model keeps calling search_food; only after the overflow answer does it
+    // finally name the food it found.
+    fake.reply = (call) =>
+      answersSoFar(call) > MAX_TOOL_ROUNDS
+        ? geminiResponse({ readable: true, items: [boundItem({ name: 'Chicken' })] })
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result).toEqual({ readable: true, items: [boundItem({ name: 'Chicken' })] });
+    // The cap allowed exactly MAX_TOOL_ROUNDS searches; the overflow turn ran the
+    // tool zero times, so it cost no USDA call.
+    expect(queries).toHaveLength(MAX_TOOL_ROUNDS);
+    // The overflow turn reached the model as one more request whose last tool
+    // answer was the empty result — it offered no id, so the stranded foods
+    // take the absent vector.
+    expect(fake.calls).toHaveLength(MAX_TOOL_ROUNDS + 2);
+    expect(lastToolResult(fake)).toEqual({ catalog: [], usda: [] });
+  });
+
+  it('maps a non-2xx on the request after a tool round to service-unavailable', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ error: { code: 429 } }, 429)
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    // The tool round succeeded; the failure is the second request, so the loop
+    // path's own non-2xx branch (not the single-shot one) is what runs.
+    expect(fake.calls).toHaveLength(2);
+    expect(result).toEqual(SERVICE_UNAVAILABLE);
+  });
+
+  it('maps a transport throw on the request after a tool round to service-unavailable', async () => {
+    const fake = new FakeGemini();
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? Promise.reject(new Error('fetch failed'))
+        : functionCallTurn('chicken');
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(fake.calls).toHaveLength(2);
+    expect(result).toEqual(SERVICE_UNAVAILABLE);
+  });
+
+  it('runs every search in a multi-call turn and answers each call by its own id', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [{ id: `food-${query}`, name: query, servingGrams: 100 }], usda: [] };
+    };
+    const foods = ['chicken', 'tofu', 'broth'];
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({
+            readable: true,
+            items: foods.map((name) => boundItem({ name, foodId: `food-${name}`, searchQuery: name })),
+          })
+        : functionCallTurnFor(foods.map((name, index) => ({ query: name, id: `call-${index + 1}` })));
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    // All three searches ran, in the order the model asked for them.
+    expect(queries).toEqual(['chicken', 'tofu', 'broth']);
+    // Each call is answered once, matched by its own id, with the result its own
+    // query produced — no call is dropped and none answers another's id.
+    const answers = receivedAnswers(fake);
+    expect(answers.map((answer) => answer.id)).toEqual(['call-1', 'call-2', 'call-3']);
+    expect(answers.map((answer) => answer.response?.catalog[0]?.id)).toEqual([
+      'food-chicken',
+      'food-tofu',
+      'food-broth',
+    ]);
+  });
+
+  it('reaches the answer in one round when a turn asks for several foods', async () => {
+    const fake = new FakeGemini();
+    const queries: string[] = [];
+    const tool = async (query: string): Promise<SearchFoodResult> => {
+      queries.push(query);
+      return { catalog: [], usda: [] };
+    };
+    fake.reply = (call) =>
+      alreadyAnswered(call)
+        ? geminiResponse({ readable: true, items: [boundItem({ name: 'Chicken' })] })
+        : functionCallTurnFor([
+            { query: 'chicken', id: 'call-1' },
+            { query: 'tofu', id: 'call-2' },
+            { query: 'broth', id: 'call-3' },
+          ]);
+
+    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+
+    expect(result.readable).toBe(true);
+    // Every food was searched before the model's first text turn, so the answer
+    // needs two requests — not the four a first-call-only loop would spend.
+    expect(queries).toEqual(['chicken', 'tofu', 'broth']);
+    expect(fake.calls).toHaveLength(2);
+  });
+});

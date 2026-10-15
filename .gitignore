@@ -11,3 +11,4 @@ data/
 .playwright-cli/
 backup/
 *.db
+.worktrees/

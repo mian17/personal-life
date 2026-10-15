@@ -566,7 +566,7 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - [ ] `docker compose config` shows the `feedback-service` block with both URL
           injections, healthy `depends_on`, `REDIS_URL`, fail-fast master key, and the app's
           `FEEDBACK_API_URL`; both env injections (`FEEDBACK_DB_URL`, `RABBITMQ_URL`);
-          the app gets no 3108/3008 leak (dev 3108 is the dev stack's; harness uses 3106/3206);
+          the app gets no 3108/3008 leak (dev 3108 is the dev stack's; harness uses 3107/3207);
           Dockerfiles carry the new manifest; lockfile updated.
     - [ ] Dev wiring is live: root `dev` script contains `"PORT=3108 npm run dev -w
           apps/feedback-service"` next to the tags `3104` / todo `3105` entries;
@@ -791,8 +791,8 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       postgres:17-alpine`), wait for `pg_isready`; spawn `feedback-service` with
       `FEEDBACK_DB_URL` → the throwaway, a test `FEEDBACK_MASTER_KEY`, the harness's
       `FEEDBACK_IDP_JWKS_URL`/audience, `PORT` on the harness's own scheme — never
-      3008/3108: add `feedbackPort` to `testPorts()` (`E2E_FEEDBACK_PORT ?? 3106`) and to
-      `devPorts()` (`E2E_DEV_FEEDBACK_PORT ?? 3206`), mirroring the existing 31xx/32xx
+      3008/3108: add `feedbackPort` to `testPorts()` (`E2E_FEEDBACK_PORT ?? 3107`) and to
+      `devPorts()` (`E2E_DEV_FEEDBACK_PORT ?? 3207`), mirroring the existing 31xx/32xx
       entries in `apps/app/test/e2e/config.ts`; **no `REDIS_URL`**
       (fail-open direct DB) and **no `RABBITMQ_URL`** (the spec's broker-down tolerance);
       the app gets `FEEDBACK_API_URL` → the spawned service (harness port, never 3008/3108).

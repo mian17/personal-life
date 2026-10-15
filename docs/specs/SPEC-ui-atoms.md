@@ -19,9 +19,14 @@ for these without any visible change.
 <Button children: ReactNode
         variant="primary" | "ghost" | "danger" | "quiet" size="default" | "bare" | "icon"
         type="submit" | "button" onClick? formAction? aria-label? title?>
+        // `disabled` forwards to the native control AND renders a disabled look:
+        //   `.ui-btn[disabled]` — cursor: not-allowed + opacity 0.5 (one gated-control
+        //   treatment, matching the existing .ui-switch/.ui-pill--button precedent).
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
             children: ReactNode      // the icon
-            variant="default" | "ghost">
+            variant="default" | "ghost"
+            disabled?>               // forwards to the control; `.ui-icon-btn[disabled]`
+                                     //   is the same not-allowed/0.5 treatment
 <Checkbox checked?: boolean />       // presentational done-toggle glyph: a rounded square
                                      //   (radius --space-0-2 — the panel-box rounding feel),
                                      //   fills with the row's currentColor and reveals a
@@ -31,6 +36,14 @@ for these without any visible change.
                                      //   var(--space-0-75) = 0.75rem = 12px; the todo row
                                      //   sets 1.25rem normal / 0.75rem dense)
 <IconLink href label>children</IconLink>  // <a>/<Link> with the 40×40 bordered visual
+<ButtonLink href variant="primary" | "ghost" | "danger" | "quiet"
+            size="default" | "bare" | "icon">children</ButtonLink>
+   // <a>/<Link> carrying Button's exact visual classes
+   //   (`ui-btn ui-btn--{variant} ui-btn--{size}`) — the link form of a Button.
+   //   Element semantics stay split: Button stays <button>, ButtonLink is the
+   //   anchor; there is no `as`-prop and no element swapping (the "an atom never
+   //   swaps the element type" freeze above). For a door/navigation that should
+   //   read as a button, not a tag.
 <Input type? placeholder? aria-label? name? defaultValue? onChange? />
 <Textarea aria-label? placeholder? rows? name? defaultValue? onChange?
           variant="default" | "editor" />   // "editor" reproduces .editor-body values
@@ -72,6 +85,14 @@ for these without any visible change.
                                      //   feeds it from the client's tz (lesson 0019).
                                      //   Renders <time dateTime> for dated states; the
                                      //   empty state renders `emptyLabel` with no <time>.
+<FilePicker label: string            // generic upload field: native <input type="file">
+            accept?: string          //   with `label` as the visible text and the
+            capture? multiple? name? //   control's accessible name (never aria-only —
+            disabled? onFiles? onChange? />
+                                     //   lesson 0014). `accept` defaults to "image/*";
+                                     //   capture/multiple/name/disabled forward as-is.
+                                     //   onFiles receives the selected FileList, onChange
+                                     //   the raw event. Owns `.ui-file-picker*`, token-only.
 ```
 
 Mapping from today (each rule has exactly one owner): `Button` absorbs the global
@@ -86,14 +107,21 @@ rule and the bare `textarea` rule (globals.css:139-152); `Select` (new) owns
 bordered square classes `.theme-toggle`, `.editor-back`, `.editor-save` — all three
 render as `<button>` today (note-editor.tsx:346, :352); `IconLink` absorbs
 `.header-icon` — which in the app is used **only on `next/link` anchors**
-(page.tsx:30, trash/page.tsx:17), so it must render a link; `StatusText` owns
+(page.tsx:30, trash/page.tsx:17), so it must render a link; `ButtonLink` (new) has
+no legacy counterpart and introduces no new CSS: it renders a `next/link` anchor
+wearing `Button`'s exact classes (`ui-btn ui-btn--{variant} ui-btn--{size}`) for a
+navigation that should read as a button rather than a tag — the anchor half of the
+`IconLink`/`IconButton` pair at button scale; `StatusText` owns
 `.editor-status` (span `role="status"`, note-editor.tsx:349); `ConfirmButton`
 owns the frozen `trash-delete` hook (on `ConfirmSubmit`, trash/page.tsx:59-64);
 `Pill` owns `.tag-chip`, `.tag-chip-remove` (the remove affordance is part of the
 chip), the `.filters a` pill, and the `.active` active-state values; `Textarea`
 variant `editor` absorbs `.editor-body`; `LocalTime` / `ConfirmButton` /
 `ThemeToggle` are direct generalizations of `app/local-time.tsx`,
-`app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `DueDatePill` (T7, `todo-ui`) is a
+`app/confirm-submit.tsx`, `app/theme-toggle.tsx`. `FilePicker` (new) has no legacy
+counterpart: a generic upload field — native `<input type="file">` plus a visible
+`label` surface — owning `.ui-file-picker*` (token-only; focus ring on the surface
+via `:focus-within`). `DueDatePill` (T7, `todo-ui`) is a
 new atom with **no** legacy counterpart: it owns `.ui-due-pill` and its state
 modifiers (`.ui-due-pill--overdue|today`, colours from `--danger`/`--accent`); the
 `none`/`later` states need no extra declaration. `Checkbox` is the presentational

@@ -174,6 +174,51 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  meal-service:
+    build:
+      context: .
+      dockerfile: apps/meal-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3106"
+      HOST: 0.0.0.0
+      DB_PATH: /data/meal.db
+      # JWT-only auth, same offline-JWKS pattern as note-service.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      MEAL_IDP_JWKS_URL: ${MEAL_IDP_JWKS_URL:-http://idp:3003/jwks}
+      MEAL_SERVICE_AUDIENCE: ${MEAL_SERVICE_AUDIENCE:-life-api}
+      # Content-encryption master key (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      MEAL_MASTER_KEY: ${MEAL_MASTER_KEY:?MEAL_MASTER_KEY is required (openssl rand -base64 32)}
+      # Gemini photo pipeline (photo-plan chapter). Unset keeps the photo
+      # estimate off (explicit failure shape); the service still boots.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_API_BASE: ${GEMINI_API_BASE:-}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-meal:6379
+    volumes:
+      - ./apps/meal-service/data:/data
+    depends_on:
+      redis-meal:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3106/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   idp:
     build:
       context: .
@@ -197,7 +242,7 @@ services:
       OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
       # Every registered resource maps to the shared ecosystem audience; each
       # service verifies `life-api` via its own *_SERVICE_AUDIENCE knob.
-      OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api}
+      OIDC_AUDIENCE_MAP: ${OIDC_AUDIENCE_MAP:-https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-idp:6379
     ports:
@@ -241,6 +286,9 @@ services:
       TAGS_API_URL: http://tags-service:3004
       TODO_API_URL: http://todo-service:3005
       FEEDBACK_API_URL: http://feedback-service:3008
+      # Without this the meals BFF falls back to container-local loopback and
+      # every meal call dies inside the app container.
+      MEAL_API_URL: http://meal-service:3106
       # The app's fallback "today" zone, before the browser's `tz` cookie lands.
       # Must match the backend's TODO_TIMEZONE so SSR today agrees with storage.
       TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -266,6 +314,8 @@ services:
         condition: service_healthy
       feedback-service:
         condition: service_healthy
+      meal-service:
+        condition: service_healthy
       idp:
         condition: service_healthy
       redis-app:
@@ -275,8 +325,8 @@ services:
     restart: unless-stopped
 
   # --- Redis (Task 6) ---------------------------------------------------------
-  # One instance per service (app, idp, note, tags, todo): app is the persisted
-  # session store; the four others are unpersisted read-through caches. Internal
+  # One instance per service (app, idp, note, tags, todo, meal, feedback): app is the
+  # persisted session store; the six others are unpersisted read-through caches. Internal
   # network only — NO published host ports. See README "Auth model" and
   # tasks/plan-redis.md decisions 2/6.
   redis-app:
@@ -409,7 +459,7 @@ services:
   # `postgres` + `rabbitmq` publish their main ports on host loopback only so the
   # host-run dev service (3108) can reach them — the same posture as `app`/`idp`.
   # Production uses the internal compose network (`postgres:5432`, `rabbitmq:5672`).
-  # `redis-feedback` stays internal-only, like the five Redis instances above.
+  # `redis-feedback` stays internal-only, like the other Redis instances above.
   # See docs/specs/SPEC-feedback-infra.md "compose.yaml additions".
   postgres:
     image: postgres:17-alpine
@@ -476,6 +526,34 @@ services:
       ]
     volumes:
       - redis-feedback-data:/data
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-meal:
+    image: redis:8-alpine
+    # Cache only, owned by meal-service (one instance per service, intent decision 3).
+    # `--save ""` + `--appendonly no` turn off both RDB and AOF: meal ciphertext must
+    # not hit a second disk, and the image's default snapshot points would otherwise
+    # write it to /data/dump.rdb. See compose decision 6.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     networks:
       - life
     healthcheck:

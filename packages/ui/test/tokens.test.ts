@@ -101,6 +101,21 @@ const MOTION_TOKENS = {
   '--ease-standard': 'ease-out',
 } as const;
 
+/**
+ * The app-wide breakpoint scale (Tailwind's published values). This map is the
+ * single owner of the five values: media queries cannot read custom properties
+ * and re-listing the literals in `tokens.css` would break the frozen px
+ * inventory, so a component's `@media` literal is checked against this map
+ * instead of against a duplicate comment.
+ */
+const BREAKPOINTS = {
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1280px',
+  '2xl': '1536px',
+} as const;
+
 /** Spacing scale — exactly the 20 distinct rem literals in globals.css. */
 const SPACING_REM = {
   '--space-0-15': '0.15rem',
@@ -165,6 +180,15 @@ describe('tokens.css — frozen token contract', () => {
   it('defines the motion tokens at their approved values', () => {
     const decls = declarations(tokens, ':root');
     expect(decls).toMatchObject(MOTION_TOKENS);
+  });
+
+  it('keeps the app-wide breakpoint scale out of the token declarations', () => {
+    // The scale is pinned by BREAKPOINTS, never duplicated into `tokens.css`:
+    // a `--sm`-style declaration would put a second owner on the values and
+    // re-introduce raw px literals into the frozen inventory.
+    for (const name of Object.keys(BREAKPOINTS)) {
+      expect(tokens).not.toMatch(new RegExp(`--${name}\\s*:`));
+    }
   });
 
   it('keeps the four theme selectors with the light/dark/media shape', () => {

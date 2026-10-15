@@ -55,4 +55,28 @@ describe('SettingsRow', () => {
       'ui-settings-row',
     ]);
   });
+
+  // The narrow-screen rule lives in a `@media` block — jsdom never applies
+  // media queries, so the emitted rule text is the assertion surface (lesson
+  // 0025): the CSS is what a narrow device renders.
+  describe('responsive stacking', () => {
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+
+    it('emits the two-column default and the sm stacking override', () => {
+      // Default (>= sm): label left, control right, row stays a row.
+      const base = cssBlock('.ui-settings-row');
+      expect(base).toMatch(/display:\s*flex/);
+      expect(base).not.toMatch(/flex-direction:\s*column/);
+
+      // Below sm (640px): the row stacks — label above a full-width control.
+      const media = css.match(/@media\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}/)!;
+      expect(media).not.toBeNull();
+      const stacked = media[1];
+      expect(stacked).toMatch(/\.ui-settings-row\s*\{/);
+      expect(stacked).toMatch(/flex-direction:\s*column/);
+      expect(stacked).toMatch(/align-items:\s*stretch/);
+      // The breakpoint is the documented sm value, named in the CSS.
+      expect(css).toMatch(/sm — 640px/);
+    });
+  });
 });

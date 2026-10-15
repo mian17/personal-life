@@ -3,6 +3,7 @@ import * as path from 'path';
 import { metadata as notesMetadata } from '@/app/notes/layout';
 import { metadata as todosMetadata } from '@/app/todos/layout';
 import { metadata as feedbackMetadata } from '@/app/feedback/layout';
+import { metadata as mealsMetadata } from '@/app/(meals)/meals/layout';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const readManifest = (file: string) =>
@@ -36,9 +37,27 @@ describe('per-route PWA manifests', () => {
     expect(feedback.icons[0].src).toBe('/icon-feedback.png');
   });
 
+  it('gives /meals its own identity', () => {
+    const meals = readManifest('manifest-meals.json');
+    expect(meals.id).toBe('/meals');
+    expect(meals.start_url).toBe('/meals');
+    expect(meals.scope).toBe('/meals');
+    expect(meals.short_name).toBe('Meals');
+    expect(meals.icons[0].src).toBe('/icon-meals.png');
+  });
+
+  it('ships every icon the /meals manifest declares', () => {
+    const meals = readManifest('manifest-meals.json');
+    const missingIcons = meals.icons
+      .map((icon: { src: string }) => icon.src.replace(/^\//, ''))
+      .filter((file: string) => !fs.existsSync(path.join(publicDir, file)));
+    expect(missingIcons).toEqual([]);
+  });
+
   it('links each manifest from its route segment layout', () => {
     expect(notesMetadata.manifest).toBe('/manifest-notes.json');
     expect(todosMetadata.manifest).toBe('/manifest-todos.json');
     expect(feedbackMetadata.manifest).toBe('/manifest-feedback.json');
+    expect(mealsMetadata.manifest).toBe('/manifest-meals.json');
   });
 });

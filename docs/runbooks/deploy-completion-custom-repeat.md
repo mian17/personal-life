@@ -94,7 +94,7 @@ docker compose down            # NO -v : -v also removes redis-app-data (your se
 npm run db:backup -w @life/db -- --pin
 ```
 
-- [ ] All four databases snapshot — `life.db`, `tags.db`, `todo.db`, `idp.db` — and every
+- [ ] All five databases snapshot — `life.db`, `tags.db`, `todo.db`, `idp.db`, `meal.db` — and every
       line reports `quick_check=ok`. Do not continue otherwise; rollback depends on it.
 - [ ] Backups are readable: `sqlite3 apps/todo-service/data/todo.db 'PRAGMA integrity_check;'` → `ok`.
 - [ ] Optional subset form: `npm run db:backup -w @life/db -- --only todo` (this delta only
@@ -170,7 +170,7 @@ Regressions this delta can touch (shared `@life/shared` wire types + `@life/ui`)
       npm run db:restore -w @life/db -- --from backup/<dir> --only todo
       docker compose up -d --build app todo-service     # or the previous ref's images
 
-      Valid `--only` names: `life`, `tags`, `todo`, `idp`. There is no down-migration — a
+      Valid `--only` names: `life`, `tags`, `todo`, `idp`, `meal`. There is no down-migration — a
       restore overwrites, so snapshot first if you might want today's state back.
 - [ ] If anything looks stale after a rollback: `docker compose restart todo-service` (cache
       generation is bumped on every successful write; TTL is the backstop).

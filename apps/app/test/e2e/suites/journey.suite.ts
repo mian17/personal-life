@@ -171,6 +171,11 @@ export function registerJourney(options: JourneyOptions): void {
         'href',
         '/manifest-todos.json',
       );
+      await page.goto('/meals');
+      await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+        'href',
+        '/manifest-meals.json',
+      );
     });
   });
 }

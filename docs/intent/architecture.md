@@ -58,6 +58,7 @@ Source: `docs/intent/feedback-service.md` decision 8.
 ## Layout (2026-09-24 rename)
 
 - `apps/note-service` — NestJS REST API, SQLite (`@life/note-service`). Was `apps/api`.
+- `apps/meal-service` — NestJS REST API on `:3106`, SQLite via `@life/db`, owner-scoped (`@life/meal-service`).
 - `apps/app` — Next.js UI + PWA, server-side BFF, the only API caller (`@life/app`). Was `apps/web`.
 - `packages/shared` — shared DTO/types (`@life/shared`).
 - Compose services are named `note-service` and `app`; the app calls `http://note-service:3001`.

@@ -31,6 +31,14 @@ export async function middleware(req: NextRequest) {
 
   const decision = decideGate({
     isProduction: process.env.NODE_ENV === 'production',
+    // `next start` forces NODE_ENV=production on its own process, so a prod-mode
+    // build served locally (`npm run dev:build`) would run the Tailscale owner
+    // check and 403 header-less localhost. This explicit opt-out makes that
+    // bypass deliberate: it is set ONLY on the `dev:build` command line, never in
+    // a deployed service's environment. See the warning below — this switch must
+    // never reach production, which is why it is a command-line flag and not a
+    // value in `.env` / compose.
+    accessGate: process.env.APP_DEV_SKIP_ACCESS_GATE === '1' ? false : undefined,
     pathname: req.nextUrl.pathname,
     hasForwardedHost: req.headers.has('x-forwarded-host'),
     tailscaleLogin: req.headers.get('tailscale-user-login'),

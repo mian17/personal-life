@@ -107,4 +107,17 @@ describe('Dialog', () => {
     expect(screen.getByTestId('footer')).toBeTruthy();
     expect(document.querySelector('.ui-dialog__footer')).not.toBeNull();
   });
+
+  it('leaves the full-screen sheet class off the default size', () => {
+    setup();
+    expect(document.querySelector('.ui-dialog--full')).toBeNull();
+  });
+
+  it('emits ui-dialog--full for size="full" — the full-screen sheet', () => {
+    setup({ open: true, size: 'full' });
+    const dialog = document.querySelector('.ui-dialog')!;
+    expect(dialog.classList.contains('ui-dialog--full')).toBe(true);
+    // It is still a native modal dialog, not a div wrapper.
+    expect(dialog.tagName).toBe('DIALOG');
+  });
 });

@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
+import { join } from 'node:path';
 import { spawnService, waitForHttp, type SpawnedService } from './services';
 import {
   E2E_APP_SECRET,
@@ -49,11 +49,12 @@ export interface StackConfig {
   tagsPort: number;
   todoPort: number;
   /**
-   * feedback-service: 31xx in the test harness, never the dev stack's 3206.
-   * Optional — omitting it leaves feedback-service (and its throwaway Postgres)
-   * out of the stack, which is how the dev harness starts unchanged.
+   * feedback-service: 31xx in the test harness (3107), never the dev stack's
+   * 3207. Optional — omitting it leaves feedback-service (and its throwaway
+   * Postgres) out of the stack, which is how the dev harness starts unchanged.
    */
   feedbackPort?: number;
+  mealPort: number;
   /** Browser origin the app is reached on (`localhost` or `127.0.0.1`). */
   appOrigin: string;
   /** Scratch directory for the IdP/note-service DBs and keys. */
@@ -74,6 +75,33 @@ function build(workspace: string): Promise<void> {
       (err) => (err ? reject(err) : resolve()),
     );
   });
+}
+
+/**
+ * Find the app's standalone server directory under `.next/standalone`. Next
+ * mirrors the monorepo layout there, so `server.js` sits under some prefix of
+ * `apps/app` — exactly `apps/app` from the primary checkout, but
+ * `.worktrees/<slug>/apps/app` when the checkout is a git worktree. Walk to
+ * whichever `apps/app/server.js` exists rather than assuming the depth.
+ */
+function findStandaloneAppDir(standaloneRoot: string): string {
+  const stack = [standaloneRoot];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    if (existsSync(join(dir, 'server.js')) && dir.endsWith(join('apps', 'app'))) return dir;
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== 'node_modules') {
+        stack.push(join(dir, entry.name));
+      }
+    }
+  }
+  throw new Error(`no standalone app server found under ${standaloneRoot}`);
 }
 
 function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
@@ -143,12 +171,6 @@ function todoEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
-/**
- * feedback-service on the harness's own port. Postgres-only on purpose: no
- * `REDIS_URL` (the cache's fail-open direct-DB path) and no `RABBITMQ_URL` (the
- * spec's broker-down tolerance — the submit still succeeds). `undefined` drops a
- * value inherited from the caller's env rather than passing `"undefined"`.
- */
 function feedbackEnv(cfg: StackConfig, feedbackPort: number, dbUrl: string): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'production',
@@ -164,6 +186,18 @@ function feedbackEnv(cfg: StackConfig, feedbackPort: number, dbUrl: string): Nod
   };
 }
 
+function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(cfg.mealPort),
+    HOST: '127.0.0.1',
+    DB_PATH: `${cfg.stateDir}/meal-service.db`,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    MEAL_SERVICE_AUDIENCE: 'life-api',
+    MEAL_MASTER_KEY: HARNESS_MASTER_KEY,
+  };
+}
+
 function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   const origin = cfg.appOrigin;
   return {
@@ -176,6 +210,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     ...(cfg.feedbackPort !== undefined
       ? { FEEDBACK_API_URL: `http://127.0.0.1:${cfg.feedbackPort}` }
       : {}),
+    MEAL_API_URL: `http://127.0.0.1:${cfg.mealPort}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
@@ -318,6 +353,17 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     }),
   );
 
+  await build('apps/meal-service');
+  services.push(
+    await spawnService({
+      name: 'meal-service',
+      command: 'node',
+      args: ['dist/main.js'],
+      cwd: `${repoRoot()}/apps/meal-service`,
+      env: mealEnv(cfg),
+    }),
+  );
+
   // The throwaway Postgres first: feedback-service fails closed without a DB.
   // Skipped when the stack has no feedback port (the dev harness).
   const feedbackPort = cfg.feedbackPort;
@@ -342,6 +388,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   await waitForHttp(`http://127.0.0.1:${cfg.notePort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
   await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
+  await waitForHttp(`http://127.0.0.1:${cfg.mealPort}/health`);
   if (cfg.feedbackPort !== undefined) {
     await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
   }
@@ -350,51 +397,27 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   return services;
 }
 
-/**
- * Locates the emitted standalone server. Next infers `outputFileTracingRoot`
- * from the git root, so in a worktree the traced prefix nests the app under
- * `.next/standalone/.worktrees/<slug>/apps/app/server.js` instead of the
- * `.next/standalone/apps/app/server.js` a primary checkout emits. Walk the
- * standalone tree for a `server.js` whose path ends in `apps/app/server.js`
- * and resolve the app root from it, so both layouts work.
- */
-function findStandaloneServer(): string {
-  const standalone = `${repoRoot()}/apps/app/.next/standalone`;
-  const suffix = join('apps', 'app', 'server.js');
-  if (!existsSync(standalone)) {
-    throw new Error(
-      `No standalone build at ${standalone} — build the app first (npm run build -w @life/app).`,
-    );
-  }
-  const stack: string[] = [standalone];
-  while (stack.length > 0) {
-    const dir = stack.pop()!;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) stack.push(full);
-      else if (entry.name === 'server.js' && full.endsWith(suffix)) return full;
-    }
-  }
-  throw new Error(
-    `No server.js ending in ${suffix} under ${standalone} — build the app first (npm run build -w @life/app).`,
-  );
-}
-
 async function spawnApp(cfg: StackConfig): Promise<SpawnedService> {
   if (cfg.mode === 'production') {
     await build('apps/app');
-    // `output: 'standalone'` omits static assets; Docker copies them in. Do the
-    // same so the built app serves CSS/JS exactly like production.
-    const serverJs = findStandaloneServer();
-    const standalone = dirname(serverJs);
-    mkdirSync(join(standalone, '.next'), { recursive: true });
-    cpSync(`${repoRoot()}/apps/app/.next/static`, join(standalone, '.next/static'), { recursive: true });
-    mkdirSync(join(standalone, 'public'), { recursive: true });
-    cpSync(`${repoRoot()}/apps/app/public`, join(standalone, 'public'), { recursive: true });
+    // `output: 'standalone'` mirrors the monorepo layout below
+    // `apps/app/.next/standalone/`, so the app's server lands under
+    // `<...>/apps/app/server.js`. From the primary checkout that prefix is just
+    // `apps/app`; run from a git worktree and Next nests the worktree's relative
+    // path in between (`.worktrees/<slug>/apps/app`). Locate it instead of
+    // assuming the depth, so the same harness serves both.
+    const standaloneRoot = `${repoRoot()}/apps/app/.next/standalone`;
+    const appDir = findStandaloneAppDir(standaloneRoot);
+    // The build omits static assets; Docker copies them in. Do the same so the
+    // built app serves CSS/JS exactly like production.
+    mkdirSync(`${appDir}/.next`, { recursive: true });
+    cpSync(`${repoRoot()}/apps/app/.next/static`, `${appDir}/.next/static`, { recursive: true });
+    mkdirSync(`${appDir}/public`, { recursive: true });
+    cpSync(`${repoRoot()}/apps/app/public`, `${appDir}/public`, { recursive: true });
     return spawnService({
       name: 'app',
       command: 'node',
-      args: [serverJs],
+      args: [join(appDir, 'server.js')],
       cwd: `${repoRoot()}/apps/app`,
       env: appEnv(cfg),
     });

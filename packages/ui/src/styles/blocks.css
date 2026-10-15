@@ -382,6 +382,62 @@
   font-size: var(--space-0-7);
 }
 
+/* Nested row: the title is the parent line, `children` stack indented beneath
+   it. The base row lays title and children side by side (the link is a
+   horizontal flex row); the nested variant turns the link into a column so the
+   title keeps its own line and the child body stacks below it, one token step
+   in. The row top-aligns so the delete slot sits with the parent line instead
+   of centring against the tall body; the slot drops one row-padding step to
+   meet the title line. */
+.ui-list-item--nested {
+  align-items: flex-start;
+}
+
+.ui-list-item--nested .ui-list-item__link {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ui-list-item--nested .ui-list-item__nested-body {
+  display: grid;
+  gap: var(--space-0-5);
+  padding-left: var(--space-1);
+}
+
+/* Title line carrying a `titleAction` (a row delete affordance): a horizontal
+   flex line, so the action sits against the title control instead of beside the
+   whole child body — a `deleteAction` sibling would steal horizontal width from
+   every child row. Nested-only, and only when the slot is filled, so a nested
+   row without it keeps the base title block. */
+.ui-list-item--nested .ui-list-item__title--with-action {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-0-5);
+}
+
+/* The line's height comes from the title control (an `Input`); the title child
+   grows to fill the leftover width, so `min-width: 0` lets it shrink and the
+   control ellipsize rather than push the action off the line. */
+.ui-list-item--nested .ui-list-item__title--with-action > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The action is a size-less slot, so it takes the line's height: `stretch`
+   aligns its top and bottom to the line (already stretched by the title control),
+   and the control inside centres in that box. It sets no height of its own — the
+   line is the single owner of this row's height. */
+.ui-list-item__title-action {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ui-list-item--nested > .ui-icon-btn,
+.ui-list-item--nested > form {
+  margin-top: var(--space-0-9);
+}
+
 /* Row tone: tint the leading done toggle of an OPEN coloured-lens row (matrix
    quadrants). A completed row is muted (title + icons) regardless of tone, so
    the tone rules exclude done — the `.ui-list-item--done .ui-icon-btn` rule
@@ -568,6 +624,15 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+/* sm — 640px: below the app's `sm` breakpoint the row becomes a labelled field
+   (label above a full-width control), so the two-column flex stops clipping it. */
+@media (max-width: 640px) {
+  .ui-settings-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* -------------------------------------------------------------- Stack */
@@ -884,4 +949,17 @@
   justify-content: flex-end;
   gap: var(--space-0-5);
   margin-top: var(--space-1);
+}
+
+/* Full-screen sheet: edge-to-edge and square-cornered. `margin: 0` undoes the
+   native centred box so it fills the viewport; `100dvh` tracks the dynamic
+   viewport height on mobile. The percent/dvh literals are structural
+   fill-the-viewport lengths no token describes — not theme values. */
+.ui-dialog--full {
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  margin: 0;
 }
