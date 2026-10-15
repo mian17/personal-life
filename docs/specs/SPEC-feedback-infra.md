@@ -313,11 +313,12 @@ guarantee).
 The check is read-only; it never kills, stops, or restarts anything. It observes the
 application **ports** and the Postgres **container**:
 
-- **Ports:** open a plain TCP connection to `127.0.0.1:3002` (`app`),
-  `127.0.0.1:3003` (`idp`), and `127.0.0.1:5432` (`postgres` — now host-loopback
-  published) with a one-second timeout, the same probe as the SQLite
+- **Ports:** open a plain TCP connection to `127.0.0.1:3002` (`app`) and
+  `127.0.0.1:3003` (`idp`) with a one-second timeout, the same probe as the SQLite
   variant (`compose.yaml:159,211`). Accepted → `up`; `ECONNREFUSED` → `down`; any other
-  error or timeout → `unknown`.
+  error or timeout → `unknown`. `postgres`' own published `127.0.0.1:5432` is
+  deliberately **not** a probe port: the restore runs its client inside that container,
+  so the server has to be up — the connection count below is what covers it.
 - **Container:** inside the `postgres` container, count other backends on the target
   database —
   `SELECT count(*) FROM pg_stat_activity WHERE datname = 'feedback' AND pid <> pg_backend_pid()`

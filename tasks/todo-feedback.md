@@ -1177,3 +1177,24 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   behavior change): the lesson-0015 path again — direct §5 delegation, no §6 plan gate, no
   five-lane. No E2E run: no spec created/removed/modified and the frozen accessible names are
   unchanged. Merge awaits the user's explicit request.
+- 2026-10-15: **deploy runbook + Postgres backup/restore ops (chapter close-out).** Wrote
+  `docs/runbooks/deploy-feedback-stack.md`, mirroring the newest full-stack template
+  (`deploy-meal-stack.md`, same day): merge prerequisite, what changes on the host
+  (4 containers — `feedback-service`, `postgres`, `rabbitmq`, `redis-feedback` — 2 new named
+  volumes, `app` reconfigured), the three new env names (`FEEDBACK_MASTER_KEY`,
+  `FEEDBACK_DB_PASSWORD`, `RABBITMQ_PASSWORD` — all write-once, first-boot-bound), pre-flight
+  (build the image first; host loopback `5432`/`5672` free), the pinned SQLite snapshot,
+  deploy/verify, steady state (install the documented pg cron; take the first pinned Postgres
+  snapshot; run a destructive restore drill), and rollback (data before code, because the
+  pre-merge compose has no `postgres` service for `db:restore:pg` to target).
+  **No backup/restore code was needed** — `packages/db/src/backup-pg.ts` + `restore-pg.ts` +
+  the root `db:backup:pg`/`db:restore:pg` scripts already exist and are unit-tested
+  (`backup-pg.test.ts`, `restore-pg.test.ts`, `pg-integration.test.ts`); the remaining work is
+  human-run ops (cron install, first snapshot, drill), all hard lines.
+  Also corrected a doc-vs-code defect found while grounding the runbook:
+  `SPEC-feedback-infra.md` listed `127.0.0.1:5432` as a restore probe port, but the
+  implementation's `STACK_PORTS` is `[3002, 3003]` — and probing 5432 would make the
+  documented procedure impossible (the restore runs its client *inside* the postgres
+  container, so the server must be up). Spec now names only 3002/3003 and says the
+  connection count covers postgres. Docs only; no code touched. Merge awaits the user's
+  explicit request.
