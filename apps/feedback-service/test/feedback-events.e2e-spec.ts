@@ -107,8 +107,8 @@ describeDb('Feedback event stream (e2e)', () => {
       try {
         await client.query('BEGIN');
         await client.query(
-          'INSERT INTO feedback (id, "ownerSub", app, type, description) VALUES ($1,$2,$3,$4,$5)',
-          [rolledBack, OWNER, 'notes', 'bug_report', 'enc.v1.probe'],
+          'INSERT INTO feedback (id, "ownerSub", app, type, title, description) VALUES ($1,$2,$3,$4,$5,$6)',
+          [rolledBack, OWNER, 'notes', 'bug_report', 'enc.v1.probe-title', 'enc.v1.probe'],
         );
         await client.query(
           'INSERT INTO feedback_event ("eventId","feedbackId","ownerSub",app,type) VALUES ($1,$1,$2,$3,$4)',
