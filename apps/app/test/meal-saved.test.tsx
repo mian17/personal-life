@@ -11,10 +11,12 @@ const mockEstimatePhoto = jest.fn();
 jest.mock('@/lib/meal-api', () => ({
   listSavedMeals: jest.fn(),
   getSavedMeal: jest.fn(),
+  listMealFoods: jest.fn(),
   createMealEntry: jest.fn(),
   deleteSavedMeal: jest.fn(),
   estimatePhoto: mockEstimatePhoto,
   FOOD_ID_MAX: 64,
+  restoredFoodName: jest.requireActual('@/lib/meal-api').restoredFoodName,
 }));
 
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
@@ -31,7 +33,9 @@ import {
   createMealEntry,
   deleteSavedMeal,
   getSavedMeal,
+  listMealFoods,
   listSavedMeals,
+  type MealFood,
   type SavedMeal,
 } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
@@ -43,6 +47,7 @@ import { deleteSavedMealAction } from '@/app/(meals)/meals/saved/actions';
 
 const mockedListSavedMeals = listSavedMeals as jest.MockedFunction<typeof listSavedMeals>;
 const mockedGetSavedMeal = getSavedMeal as jest.MockedFunction<typeof getSavedMeal>;
+const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
 const mockedCreateMealEntry = createMealEntry as jest.MockedFunction<typeof createMealEntry>;
 const mockedDeleteSavedMeal = deleteSavedMeal as jest.MockedFunction<typeof deleteSavedMeal>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
@@ -61,6 +66,20 @@ function savedMeal(overrides: Partial<SavedMeal> = {}): SavedMeal {
     name: 'Overnight oats',
     mealGroup: 'breakfast',
     items: [{ id: 'i1', foodId: 'oats', quantity: 1, nutrients: vector({ calories: 380 }) }],
+    version: 0,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function food(overrides: Partial<MealFood> = {}): MealFood {
+  return {
+    id: 'food-1',
+    name: 'Food',
+    servingGrams: 100,
+    nutrients: vector(),
+    servings: [],
     version: 0,
     createdAt: '2026-10-01T00:00:00.000Z',
     updatedAt: '2026-10-01T00:00:00.000Z',
@@ -185,7 +204,10 @@ describe('saved meals list', () => {
 });
 
 describe('one saved meal detail', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedListMealFoods.mockResolvedValue([]);
+  });
 
   it('renders the frozen items from the stored snapshot, never a re-derivation', async () => {
     mockedGetSavedMeal.mockResolvedValue(savedMeal());
@@ -197,6 +219,22 @@ describe('one saved meal detail', () => {
     expect(html).toContain('Overnight oats');
     expect(html).toContain(format('calories', 380));
     expect(find(el, ListItem)).toBeDefined();
+  });
+
+  it('titles each item with the catalog food name, never the raw id', async () => {
+    const uuid = '8bac894d-9a96-4102-8c49-ad9978ddfde4';
+    mockedGetSavedMeal.mockResolvedValue(
+      savedMeal({
+        items: [{ id: 'i1', foodId: uuid, quantity: 1, nutrients: vector({ calories: 380 }) }],
+      }),
+    );
+    mockedListMealFoods.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
+
+    const el = await SavedMealPage({ params: Promise.resolve({ id: 's1' }) });
+    const html = renderToStaticMarkup(el);
+
+    expect(html).toContain('Chicken');
+    expect(html).not.toContain(uuid);
   });
 
   it('offers the one-tap re-log as a server-action form around a primitive Button', async () => {

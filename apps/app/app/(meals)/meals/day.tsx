@@ -17,7 +17,13 @@ import {
 import { Camera } from 'lucide-react';
 import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';
-import { getMealTarget, listDayEntries, type MealEntry } from '@/lib/meal-api';
+import {
+  getMealTarget,
+  listDayEntries,
+  listMealFoods,
+  restoredFoodName,
+  type MealEntry,
+} from '@/lib/meal-api';
 
 /**
  * The shared meals day view. It lives in a plain module — NOT a Next `page`
@@ -72,7 +78,11 @@ async function loadTarget(date: string) {
  * the entry editor — the photo door opens it, it is not composed here.
  */
 export async function mealDay(day: string, emptyBody: string) {
-  const [entries, target] = await Promise.all([listDayEntries(day), loadTarget(day)]);
+  const [entries, target, catalog] = await Promise.all([
+    listDayEntries(day),
+    loadTarget(day),
+    listMealFoods(),
+  ]);
   const totalCalories = sum(entries.map((entry) => entry.nutrients)).calories;
 
   return (
@@ -101,15 +111,19 @@ export async function mealDay(day: string, emptyBody: string) {
             <Section key={group.key} label={`${group.label} — ${subtotal}`}>
               <List>
                 {items.map((entry) => {
-                  // Blank dish (only a caller that bypasses the editor's non-empty
-                  // rule) falls back to the old calories-title row, never blank.
-                  const dish = entry.foodId.trim();
+                  // The catalog resolves the stored id to a name; an id matching
+                  // no row is a pre-feature entry whose stored value is itself
+                  // the dish (restoredFoodName). A deleted catalog food would
+                  // fall back to its id the same way — out of scope here.
+                  // Blank (only a caller bypassing the editor's non-empty rule)
+                  // falls back to the old calories-title row, never blank.
+                  const label = restoredFoodName(entry.foodId, catalog).trim();
                   const calories = format('calories', entry.nutrients.calories);
                   return (
                     <ListItem
                       key={entry.id}
-                      title={dish || calories}
-                      meta={dish ? `${calories} × ${entry.quantity}` : `× ${entry.quantity}`}
+                      title={label || calories}
+                      meta={label ? `${calories} × ${entry.quantity}` : `× ${entry.quantity}`}
                     />
                   );
                 })}

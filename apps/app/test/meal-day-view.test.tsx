@@ -5,15 +5,25 @@ import { renderToStaticMarkup } from 'react-dom/server';
 jest.mock('@/lib/meal-api', () => ({
   listDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
+  listMealFoods: jest.fn(),
+  restoredFoodName: jest.requireActual('@/lib/meal-api').restoredFoodName,
 }));
 
 import { ApiError } from '@/lib/api-error';
-import { listDayEntries, getMealTarget, type MealEntry, type MealTarget } from '@/lib/meal-api';
+import {
+  listDayEntries,
+  getMealTarget,
+  listMealFoods,
+  type MealEntry,
+  type MealFood,
+  type MealTarget,
+} from '@/lib/meal-api';
 import { mealDay } from '@/app/(meals)/meals/day';
 import MealDatePage from '@/app/(meals)/meals/[date]/page';
 
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
+const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
 
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
   return { ...(Object.fromEntries(NUTRIENTS.map((n) => [n.key, 0])) as NutrientVector), ...overrides };
@@ -30,6 +40,20 @@ function entry(overrides: Partial<MealEntry> = {}): MealEntry {
     version: 0,
     createdAt: '2026-10-03T00:00:00.000Z',
     updatedAt: '2026-10-03T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function food(overrides: Partial<MealFood> = {}): MealFood {
+  return {
+    id: 'food-1',
+    name: 'Food',
+    servingGrams: 100,
+    nutrients: vector(),
+    servings: [],
+    version: 0,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -61,6 +85,7 @@ describe('meals day view', () => {
     jest.clearAllMocks();
     mockedListDayEntries.mockResolvedValue([]);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
+    mockedListMealFoods.mockResolvedValue([]);
   });
 
   it('renders the day total as the sum of confirmed entries, against the target', async () => {
@@ -137,7 +162,7 @@ describe('meals day view', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('titles each entry with its dish and keeps calories + quantity in meta', async () => {
+  it('titles a pre-feature entry (no catalog match) with its stored value, and keeps calories + quantity in meta', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: 'Toast', quantity: 2, nutrients: vector({ calories: 123 }) }),
     ]);
@@ -148,6 +173,21 @@ describe('meals day view', () => {
     expect(html).toMatch(
       /ui-list-item__title">Toast<\/span><span class="ui-list-item__sub">123 kcal × 2</,
     );
+  });
+
+  it('titles a catalog entry with the resolved food name, never the raw id', async () => {
+    const uuid = '8bac894d-9a96-4102-8c49-ad9978ddfde4';
+    mockedListDayEntries.mockResolvedValue([
+      entry({ id: 'a', foodId: uuid, quantity: 2, nutrients: vector({ calories: 123 }) }),
+    ]);
+    mockedListMealFoods.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toMatch(
+      /ui-list-item__title">Chicken<\/span><span class="ui-list-item__sub">123 kcal × 2</,
+    );
+    expect(html).not.toContain(uuid);
   });
 
   it('falls back to calories as the title when a dish is blank', async () => {
