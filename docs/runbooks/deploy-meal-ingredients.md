@@ -72,7 +72,8 @@ USDA URL into chat, an issue, or this doc.
 - [ ] **Back up `meal.db` — pinned, because this is a deliberate pre-deploy
       snapshot.** `meal.db` holds the whole food catalog and every logged entry,
       and it is a bind-mounted file, not a volume, so no volume backup covers it.
-      The repo tool now covers it, so use it (pinned):
+      The repo tool now covers it, so use it (pinned) — **only when the file
+      exists** (see the first-boot bullet below):
 
       ```bash
       npm run db:backup -w @life/db -- --pin --only meal
@@ -83,9 +84,13 @@ USDA URL into chat, an issue, or this doc.
       intend to restore in this window — `db:restore` fail-closes on a stack that
       probes up.
 
-- [ ] If `apps/meal-service/data/meal.db` does not exist yet, this is the
-      service's first boot on this stack: there is nothing to back up, and §1's
-      verdict applies unchanged.
+- [ ] **Only when `apps/meal-service/data/meal.db` already exists.** On this
+      service's first boot it does not, and the command above then fails closed
+      (`db:backup: missing …/meal.db`) before writing anything — that exit is
+      expected, not a defect. Take the pinned pre-deploy snapshot of the four
+      databases the host does have instead, and let the deploy create `meal.db`:
+      `npm run db:backup -w @life/db -- --pin --only life,tags,todo,idp`. §1's
+      verdict applies unchanged either way.
 
 ## 4. Deploy
 
@@ -163,6 +168,8 @@ generating or rotating `MEAL_MASTER_KEY`, and any merge to `master`. A key's
 ## Related
 
 - Baseline: `docs/runbooks/production-deploy.md`
+- Full-stack procedure: `docs/runbooks/deploy-meal-stack.md` (this chapter inlined,
+  for a deploy that runs from the primary checkout)
 - Meal service + its env table: `docs/runbooks/deploy-meal-nutrition.md` (its
   §2 table now carries the full USDA pair — this file's §2 is the excerpt)
 - Local rehearsal: `docs/runbooks/dev-meal-ingredients.md`

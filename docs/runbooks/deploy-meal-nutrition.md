@@ -129,6 +129,8 @@ against production, generating or rotating `MEAL_MASTER_KEY`, and any merge to `
 ## Related
 
 - Baseline: `docs/runbooks/production-deploy.md`
+- Full-stack procedure: `docs/runbooks/deploy-meal-stack.md` (this chapter inlined,
+  for a deploy that runs from the primary checkout)
 - Spec: `docs/specs/MAP-meal-nutrition.md`, `docs/specs/SPEC-meal-service.md`,
   `docs/specs/SPEC-notes-at-rest.md`
 - Cache: `docs/specs/MAP-redis.md` (`meal-cache`, `redis-deploy`)
