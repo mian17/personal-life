@@ -1132,3 +1132,12 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   backfill); (3) lock A8 still pinned the description-only `POST` body — updated to include
   `title` and annotated as superseded by the Phase 6 title amendment (intent decision 10). Fix-only
   round; failed lanes re-run pending.
+- 2026-10-15: **title amendment five-lane gate: N/N PASS** on revision `418b0a3`. Fix round
+  `4d71332` (clear `errorField` on a valid submit; name both content fields in the
+  event/cache/entity comments; reduce the duplicate AAD docblock) + `65a1a7c` (the three lane-5
+  ledger repairs) + `418b0a3` (the `aria-invalid`-clearing test). Re-run lanes: correctness PASS,
+  code-quality PASS, security PASS, plan-conformance PASS, QA PASS (suite gate: 3 shared + 15 ui +
+  17 app + 15 feedback-service tests, four typechecks, all green; one infra flake from stale
+  `feedback-test-*` containers, cleaned then re-run once per the profile, green). QA passed in the
+  first round and did not need a re-run — it was included by mistake; its result stands as
+  confirmatory evidence. No blockers. Merge awaits the user's explicit request.
