@@ -900,7 +900,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
       `apps/feedback-service/src/feedback/dto/create-feedback.dto.ts`,
       `apps/feedback-service/src/feedback/feedback.service.ts`,
       `apps/feedback-service/test/feedback.e2e-spec.ts`,
-      `apps/feedback-service/test/feedback-harness.ts` (only if its POST-body builder needs `title`).
+      `apps/feedback-service/test/feedback-harness.ts` (only if its POST-body builder needs `title`),
+      `apps/feedback-service/test/feedback-events.e2e-spec.ts` (**probe-INSERT line only** — the
+      raw-SQL seed gains `title` for NOT NULL parity; the events suite itself is not run here).
     - Reference files (read-only): `docs/specs/SPEC-feedback-service.md` (data model, API/DTO,
       cache, test group 4, traceability), `apps/feedback-service/src/event/**` (the **unchanged**
       event contract — read only to confirm no title leaks in),
@@ -936,7 +938,9 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
     - Permitted commands: `npm run typecheck -w @life/feedback-service` and
       `npm run test:unit -w @life/feedback-service -- test/feedback.e2e-spec.ts`.
     - Strict constraints: NO full suite, NO E2E, and no `feedback-events.e2e-spec.ts` run (the
-      event path must not change); max test executions: 2.
+      event path must not change; that file's only edit is the probe-INSERT line gaining
+      `title`, so the raw-SQL seed stays consistent with the NOT NULL column); max test
+      executions: 2.
   - [DEFINITION OF DONE]
     - [ ] Raw `title` + every cached row are `enc.v1.`; a blank/over-long title → `400`; a valid
           POST round-trips both title and description through `GET`.
@@ -1119,3 +1123,12 @@ before any downstream `npm run typecheck -w @life/feedback-service`, `-w @life/u
   cache row, test group 4, traceability, amendment note), `SPEC-feedback-ui.md` (form field +
   ordered validation + frozen strings, inbox row mapping, tests, amendment note). Phase 6 +
   T16–T21 appended; pending the §6 gate on the amended plan before T16 is delegated.
+- 2026-10-15: **lane-5 (plan-conformance) FAIL → repair.** Three ledger defects caught: (1) the
+  `feedback-events.e2e-spec.ts` probe-INSERT edit (commit 55db29a) was out of scope — T17's
+  allowed list now authorizes that file for the probe-INSERT line only, its suite run staying
+  outside T17's prescribed test command; (2) the title-amendment checkpoint box 5 claimed a
+  pre-amendment row still reads back, contradicting the risk row — corrected to the fail-closed
+  truth (pre-amendment rows fail closed; dev-only remedy is dropped-and-resynced; no production
+  backfill); (3) lock A8 still pinned the description-only `POST` body — updated to include
+  `title` and annotated as superseded by the Phase 6 title amendment (intent decision 10). Fix-only
+  round; failed lanes re-run pending.

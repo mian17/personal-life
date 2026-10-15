@@ -86,11 +86,13 @@ Locked by the confirmed intent/map — traced here, not re-decided:
   dev port `3108` (dev wiring per P1); internal-only in compose — no published host
   port, like note/tags/todo; `FEEDBACK_API_URL` names the app-side base URL (default
   `http://127.0.0.1:3008`);
-  `POST` body `{ id, app, type, description }` (owner from `principal.sub`); validation
+  `POST` body `{ id, app, type, title, description }` (owner from `principal.sub`); validation
   failures `400` only; `GET` returns a bare `FeedbackDto[]` newest-first;
   wire types live in `@life/shared` (`FeedbackApp`, `FeedbackType`, `FeedbackDto`,
-  `CreateFeedbackInput`, `FeedbackSubmitResult`, `FEEDBACK_DESCRIPTION_MAX = 2000`) —
-  one home, never redeclared.
+  `CreateFeedbackInput`, `FeedbackSubmitResult`, `FEEDBACK_DESCRIPTION_MAX = 2000`,
+  `FEEDBACK_TITLE_MAX = 200`) — one home, never redeclared. The `title` field supersedes this
+  lock's original description-only body: the Phase 6 title amendment (2026-10-15, intent
+  decision 10) carries the change in T16–T21.
 - **A9 (intent 8, lesson 0012):** `docs/intent/architecture.md`'s no-brokers/SQLite
   lines and `docs/specs/MAP-redis.md` are revised deliberately as a recorded
   cross-chapter decision (T1), before infra code.
@@ -221,7 +223,7 @@ row mapping, tests). These tasks implement them and add no spec text.
 - [ ] The raw `title` column and every cached row hold `enc.v1.` envelopes; no plaintext **or ciphertext** title exists in `feedback_event` rows or published message bodies.
 - [ ] The form refuses a blank title (`'Title is required.'`, **no** request) and, with a title present, a blank description (`'Description is required.'`).
 - [ ] The inbox renders the title line with the description beneath it (`ListItem` `title` + `snippet`).
-- [ ] A row submitted before the amendment (no title) still reads back — `synchronize` migration path proven (see risk row).
+- [ ] Pre-amendment rows (no `title`) **fail closed** on read; there is no production backfill — the dev-only remedy is dropped-and-resynced (see risk row).
 - [ ] The one targeted e2e passed (T20).
 
 ## Ordered index (tasks in `tasks/todo-feedback.md`)
