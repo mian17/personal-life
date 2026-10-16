@@ -57,6 +57,10 @@ per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `comp
       changing it makes every existing encrypted note undecryptable. These keys are
       write-once; losing one loses that service's data.
 - [ ] Record current image tags/digests: `docker compose images`.
+- [ ] Build preflight: `bash scripts/preflight-build.sh` → `preflight: ok`. It asserts the
+      seven `apps/*/Dockerfile` dependency blocks are byte-identical (the shared `npm ci`
+      layer), plus host disk headroom and daemon reachability. Without dedupe the build runs
+      six concurrent monorepo installs and takes >30 minutes. See `SPEC-compose-build.md`.
 - [ ] Baseline the running stack's health so you know what "healthy" looked like before.
 
 ## 2. Stop and back up (destructive-window protection)
@@ -126,3 +130,8 @@ checklist; it is not authority to run it.
 `docs/intent/docker-deploy.md:35-45` still claims a two-service stack and "zero
 migration". It predates the ecosystem chapter and is misleading for this deploy — treat
 this runbook as authoritative instead.
+
+The build path is specced by `docs/specs/SPEC-compose-build.md` (one shared dependency
+layer across the seven Dockerfiles). The operational half of that spec — bounded BuildKit
+cache, 4 CPU / 8 GB VM, one stack at a time — is Docker Desktop config, not repository
+content, and is applied by hand.
