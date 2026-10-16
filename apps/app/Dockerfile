@@ -7,20 +7,15 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
+# --- shared dependency layer (SPEC-compose-build) ------------------------------
+# The same instructions in all seven apps/*/Dockerfile files. Do not edit one
+# without editing all seven: a different block is a different layer key, which
+# un-dedupes `npm ci` and costs ~30 minutes of build. `scripts/preflight-build.sh`
+# asserts the seven blocks match.
 COPY package.json package-lock.json ./
-COPY apps/note-service/package.json apps/note-service/
-COPY apps/app/package.json apps/app/
-COPY apps/idp/package.json apps/idp/
-COPY packages/shared/package.json packages/shared/
-COPY packages/nutrition/package.json packages/nutrition/
-COPY packages/ui/package.json packages/ui/
-COPY packages/crypto/package.json packages/crypto/
-COPY packages/cache/package.json packages/cache/
-COPY packages/app-kit/package.json packages/app-kit/
-COPY apps/tags-service/package.json apps/tags-service/
-COPY apps/todo-service/package.json apps/todo-service/
-COPY apps/feedback-service/package.json apps/feedback-service/
-RUN npm ci
+COPY --parents apps/*/package.json packages/*/package.json ./
+
+RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
