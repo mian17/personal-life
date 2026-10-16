@@ -2,6 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
+import type { Note as NoteDto } from '@life/shared';
+import { Note } from '../src/notes/note.entity';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
 
 const TEST_DB = join(__dirname, 'test-life.db');
@@ -287,5 +290,251 @@ describe('Notes API (e2e)', () => {
 
     const trash = await auth(request(app.getHttpServer()).get('/api/notes/trash')).expect(200);
     expect(trash.body.notes).toHaveLength(0);
+  });
+
+  describe('content order', () => {
+    const oldestRank = '2020-01-01T00:00:00.000Z';
+    const middleRank = '2020-01-02T00:00:00.000Z';
+    const newestRank = '2020-01-03T00:00:00.000Z';
+
+    it('moves an edited note above a newer one and leaves a retag in place', async () => {
+      const older = await postNote('order older');
+      const newer = await postNote('order newer');
+      await pinContentEdit(older.id, oldestRank);
+      await pinContentEdit(newer.id, middleRank);
+
+      expect(await listedOrderOf([older.id, newer.id])).toEqual([newer.id, older.id]);
+
+      const edited = await patchNote(older.id, { body: 'order older edited' });
+      expect(edited.version).toBe(1);
+      expect(await listedOrderOf([older.id, newer.id])).toEqual([older.id, newer.id]);
+
+      const retagged = await patchNote(older.id, { tagIds: [3] });
+      expect(retagged.version).toBe(2);
+      expect(await listedOrderOf([older.id, newer.id])).toEqual([older.id, newer.id]);
+    });
+
+    it('ranks a fresh create above an earlier create without pinning (AC3)', async () => {
+      const first = await postNote('fresh first');
+      // `createdAt`/`updatedAt` come from SQLite CURRENT_TIMESTAMP (whole-second
+      // truncated) while the create stamp keeps milliseconds, so cross the next
+      // second boundary: the case must prove create() stamped the column, not
+      // that a clock tie was broken by the id DESC rule.
+      await waitForClockPast(first.createdAt);
+      const second = await postNote('fresh second');
+
+      const firstStamp = await contentUpdatedAtOf(first.id);
+      const secondStamp = await contentUpdatedAtOf(second.id);
+      expect(firstStamp).not.toBeNull();
+      expect(secondStamp).not.toBeNull();
+      expect(secondStamp!.getTime()).toBeGreaterThan(firstStamp!.getTime());
+      expect(await listedOrderOf([first.id, second.id])).toEqual([second.id, first.id]);
+    });
+
+    it('ranks a legacy NULL contentUpdatedAt row by its createdAt, neither last nor newest (AC5)', async () => {
+      const legacy = await postNote('legacy null');
+      const old = await postNote('legacy old');
+      const fresh = await postNote('legacy future');
+      await pinContentEdit(old.id, oldestRank);
+      await pinContentEdit(fresh.id, '2030-01-01T00:00:00.000Z');
+      // A pre-backfill row keeps NULL in the real DB; its createdAt (now) sits
+      // between the 2020 and 2030 pinned ranks, so a correct fallback lands it in
+      // the middle — NULL-as-min would put it last, NULL-as-max first.
+      await noteRepository().update(legacy.id, { contentUpdatedAt: null });
+
+      expect(await contentUpdatedAtOf(legacy.id)).toBeNull();
+      expect(await listedOrderOf([old.id, legacy.id, fresh.id])).toEqual([
+        fresh.id,
+        legacy.id,
+        old.id,
+      ]);
+    });
+
+    it('leaves updatedAt a generic row timestamp while contentUpdatedAt tracks content (AC6)', async () => {
+      const created = await postNote('updatedAt probe');
+      await pinContentEdit(created.id, middleRank);
+      const before = await rowTimestampsOf(created.id);
+
+      // A tag-only write still advances `updatedAt` (generic row timestamp) but
+      // must not move `contentUpdatedAt` — the two fields are not the same field.
+      await waitForClockPast(before.updatedAt.toISOString());
+      const retagged = await patchNote(created.id, { tagIds: [4] });
+      expect(retagged.version).toBe(1);
+      const afterRetag = await rowTimestampsOf(created.id);
+      expect(afterRetag.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
+      expect(afterRetag.contentUpdatedAt!.toISOString()).toBe(middleRank);
+
+      await waitForClockPast(afterRetag.updatedAt.toISOString());
+      await deleteNote(created.id);
+      const afterTrash = await rowTimestampsOf(created.id);
+      expect(afterTrash.updatedAt.getTime()).toBeGreaterThan(afterRetag.updatedAt.getTime());
+      expect(afterTrash.contentUpdatedAt!.toISOString()).toBe(middleRank);
+
+      await waitForClockPast(afterTrash.updatedAt.toISOString());
+      await restoreNote(created.id);
+      const afterRestore = await rowTimestampsOf(created.id);
+      expect(afterRestore.updatedAt.getTime()).toBeGreaterThan(afterTrash.updatedAt.getTime());
+      expect(afterRestore.contentUpdatedAt!.toISOString()).toBe(middleRank);
+    });
+
+    it('leaves list position unchanged through trash and restore', async () => {
+      const older = await postNote('restore older');
+      const newer = await postNote('restore newer');
+      await pinContentEdit(older.id, oldestRank);
+      await pinContentEdit(newer.id, newestRank);
+      expect(await listedOrderOf([older.id, newer.id])).toEqual([newer.id, older.id]);
+
+      await deleteNote(newer.id);
+      await restoreNote(newer.id);
+
+      expect(await listedOrderOf([older.id, newer.id])).toEqual([newer.id, older.id]);
+    });
+
+    it('returns every note exactly once when walking limit=1 pages', async () => {
+      const oldest = await postNote('page oldest');
+      const middle = await postNote('page middle');
+      const newest = await postNote('page newest');
+      await pinContentEdit(oldest.id, oldestRank);
+      await pinContentEdit(middle.id, middleRank);
+      await pinContentEdit(newest.id, newestRank);
+
+      const walked = await walkNoteIds(1);
+      expect([...new Set(walked)]).toHaveLength(walked.length);
+
+      const listed = await listedNoteIds();
+      expect([...walked].sort()).toEqual([...listed].sort());
+
+      const walkedOrder = walked.filter((id) => [oldest.id, middle.id, newest.id].includes(id));
+      expect(walkedOrder).toEqual([newest.id, middle.id, oldest.id]);
+    });
+
+    it('breaks an equal rank by id descending', async () => {
+      const left = await postNote('tie left');
+      const right = await postNote('tie right');
+      await pinContentEdit(left.id, middleRank);
+      await pinContentEdit(right.id, middleRank);
+
+      const expected = [left.id, right.id].sort((a, b) => b.localeCompare(a));
+      expect(await listedOrderOf([left.id, right.id])).toEqual(expected);
+    });
+
+    it('lists trash by newest deletion first', async () => {
+      const deletedEarlier = await postNote('trash order earlier');
+      const deletedLater = await postNote('trash order later');
+      await deleteNote(deletedEarlier.id);
+      await deleteNote(deletedLater.id);
+      await pinDeletion(deletedEarlier.id, oldestRank);
+      await pinDeletion(deletedLater.id, newestRank);
+
+      const ourTrash = (await listedTrashIds()).filter((id) =>
+        [deletedEarlier.id, deletedLater.id].includes(id),
+      );
+      expect(ourTrash).toEqual([deletedLater.id, deletedEarlier.id]);
+    });
+
+    /** Prior cases share this DB, so a case narrows the list to the ids it created. */
+    async function listedOrderOf(ids: string[]): Promise<string[]> {
+      const listed = await listedNoteIds();
+      return listed.filter((id) => ids.includes(id));
+    }
+
+    async function listedNoteIds(): Promise<string[]> {
+      const listed = await apiGet('/api/notes?limit=200').expect(200);
+      return listed.body.notes.map((note: { id: string }) => note.id);
+    }
+
+    async function listedTrashIds(): Promise<string[]> {
+      const listed = await apiGet('/api/notes/trash?limit=200').expect(200);
+      return listed.body.notes.map((note: { id: string }) => note.id);
+    }
+
+    async function walkNoteIds(limit: number): Promise<string[]> {
+      const walked: string[] = [];
+      let cursor: string | null = null;
+      for (;;) {
+        const page = await fetchNotePage(limit, cursor);
+        walked.push(...page.ids);
+        if (page.nextCursor === null) return walked;
+        cursor = page.nextCursor;
+      }
+    }
+
+    async function fetchNotePage(
+      limit: number,
+      cursor: string | null,
+    ): Promise<{ ids: string[]; nextCursor: string | null }> {
+      const query = cursor === null ? `limit=${limit}` : `limit=${limit}&cursor=${encodeURIComponent(cursor)}`;
+      const page = await apiGet(`/api/notes?${query}`).expect(200);
+      return {
+        ids: page.body.notes.map((note: { id: string }) => note.id),
+        nextCursor: page.body.nextCursor,
+      };
+    }
+
+    async function postNote(body: string, tagIds?: number[]): Promise<NoteDto> {
+      const created = await auth(
+        request(app.getHttpServer()).post('/api/notes').send({ body, tagIds }),
+      ).expect(201);
+      return created.body;
+    }
+
+    async function patchNote(
+      id: string,
+      fields: { body?: string; tagIds?: number[] },
+    ): Promise<NoteDto> {
+      const updated = await auth(
+        request(app.getHttpServer()).patch(`/api/notes/${id}`).send(fields),
+      ).expect(200);
+      return updated.body;
+    }
+
+    async function deleteNote(id: string): Promise<void> {
+      await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
+    }
+
+    async function restoreNote(id: string): Promise<void> {
+      await auth(request(app.getHttpServer()).post(`/api/notes/${id}/restore`)).expect(201);
+    }
+
+    function apiGet(path: string): request.Test {
+      return auth(request(app.getHttpServer()).get(path));
+    }
+
+    /** Two creates can share a millisecond, so a case pins the rank instead of trusting the clock. */
+    async function pinContentEdit(id: string, contentUpdatedAt: string): Promise<void> {
+      await noteRepository().update(id, { contentUpdatedAt: new Date(contentUpdatedAt) });
+    }
+
+    async function pinDeletion(id: string, deletedAt: string): Promise<void> {
+      await noteRepository().update(id, { deletedAt: new Date(deletedAt) });
+    }
+
+    async function contentUpdatedAtOf(id: string): Promise<Date | null> {
+      return (await noteRepository().findOne({ where: { id } }))!.contentUpdatedAt;
+    }
+
+    async function rowTimestampsOf(
+      id: string,
+    ): Promise<{ updatedAt: Date; contentUpdatedAt: Date | null }> {
+      const row = (await noteRepository().findOne({ where: { id } }))!;
+      return { updatedAt: row.updatedAt, contentUpdatedAt: row.contentUpdatedAt };
+    }
+
+    /**
+     * Spin until the wall clock is at least one second past `iso`. `createdAt`
+     * and `updatedAt` are written by SQLite `CURRENT_TIMESTAMP`, which truncates
+     * to a whole second, so only crossing the next second boundary guarantees a
+     * later stored timestamp (a sub-second wait can round back to the same value).
+     */
+    async function waitForClockPast(iso: string): Promise<void> {
+      const deadline = Date.parse(iso) + 1000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+
+    function noteRepository() {
+      return app.get(DataSource).getRepository(Note);
+    }
   });
 });
