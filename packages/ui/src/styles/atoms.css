@@ -338,7 +338,12 @@
 
 /* ------------------------------------------------------------- Pill */
 
+/* Normalize the UA border away. A `Pill as="button"` (the filter pills) otherwise
+kept the browser's default `outset` border, which read as a metallic bevel — the
+pill is a text affordance, not a filled button. `--chip` below re-adds its own
+intentional border; `--filter` stays borderless. */
 .ui-pill {
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--panel);
   color: var(--muted);
