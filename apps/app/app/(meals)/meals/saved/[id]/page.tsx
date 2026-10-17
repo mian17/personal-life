@@ -2,7 +2,7 @@ import { format, sum } from '@life/nutrition';
 import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
 import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
-import { getSavedMeal, listMealFoods, restoredFoodName } from '@/lib/meal-api';
+import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,9 @@ export const dynamic = 'force-dynamic';
 export default async function SavedMealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const meal = await loadOrNotFound(() => getSavedMeal(id));
-  const catalog = await listMealFoods();
+  // Name resolution reads the whole catalog (soft-deleted rows included): the
+  // item's dish name must survive the food being deleted (AC5).
+  const catalog = await listMealFoodsIncludingDeleted();
   const total = format('calories', sum(meal.items.map((item) => item.nutrients)).calories);
 
   return (
@@ -38,11 +40,12 @@ export default async function SavedMealPage({ params }: { params: Promise<{ id: 
           {meal.items.map((item) => (
             <ListItem
               key={item.id}
-              // The same catalog join the entry page does: an id matching no
-              // row is a pre-feature value shown as stored; null means the item
-              // was saved without a catalog food, so the meal name labels it.
-              // A deleted catalog food would fall back to its id the same way
-              // — out of scope here.
+              // The same catalog join the entry page does, over a catalog read
+              // that includes soft-deleted foods: an item whose food the owner
+              // has since deleted still shows the dish name. An id matching no
+              // row — active or deleted — is a pre-feature value shown as
+              // stored; null means the item was saved without a catalog food,
+              // so the meal name labels it.
               title={item.foodId ? restoredFoodName(item.foodId, catalog) : meal.name}
               meta={`× ${item.quantity} · ${format('calories', item.nutrients.calories)}`}
             />

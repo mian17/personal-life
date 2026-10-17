@@ -27,6 +27,12 @@ and the notes app's current pages map onto these one-to-one.
 <TagFilterNav items: {name, href, active}[]        // .filters pill nav; label? sits BESIDE the pills
                                                    //   (shared .ui-field-label; also the nav's aria-label)
 <FabLink href label>children</FabLink>             // .add-note fixed action
+<FabMenu label: string                             // FabLink's fixed corner + a panel of link options;
+         icon: ReactNode                            //   controlled (open/onOpenChange), closes on Escape /
+         open: boolean                              //   outside pointerdown; anchors inside role="menu"
+         onOpenChange: (open: boolean) => void      //   panel keep their own hrefs (meals FAB doors)
+         children: ReactNode
+         className? />
 <EditorToolbar back={{label, onBack: () => void}}  // back is a BUTTON (frozen:
                status?: ReactNode                  //   onBack is leave(), which
                actions?: ReactNode />              //   flushes autosave) — never an href
@@ -164,6 +170,13 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
   and an outside `pointerdown`). The panel is intentionally INLINE, not a floating layer:
   the managers sit inside `Card`, whose `.ui-card { overflow: hidden }` would clip an
   absolutely/fixed-positioned panel.
+- **`FabMenu`** — the fixed bottom-right action that opens a panel of link options
+  (the meals day view's two entry doors). Reuses `FabLink`'s fixed-corner trigger
+  visuals for its trigger (`aria-haspopup="menu"`, `aria-expanded`) and `Menu`'s
+  semantics: **controlled**, closes on Escape and an outside `pointerdown`. The
+  panel renders the app's own anchors (each with its own `href`), so the block bakes
+  no route and no domain copy. Distinct from `Menu` (a per-row disclosure, inline
+  panel) and from `FabLink` (a single link, no panel).
 
 #### Composition (element by element)
 
@@ -221,6 +234,36 @@ supplied by the app.
   politely. Styling is token-only: panel/text/border colors, radius/shadow tokens, spacing
   tokens, and the motion tokens (`--duration-base`, `--ease-standard`) for the enter
   animation and the fade/slide transition.
+
+### FabMenu (the doors' FAB)
+
+`FabMenu` fills the one gap the manual-log spec surfaced (`SPEC-manual-log-ui.md` §4):
+`FabLink` is a single link and `Menu` is a per-row disclosure, and neither opens a
+panel of link options from the fixed corner. The block reuses `FabLink`'s fixed
+bottom-right corner (`right/bottom: calc(var(--space-1) + env(safe-area-inset-*))`,
+`--fab-size` pill, accent background, `--shadow-fab`, `z-index: 10`) and `Menu`'s
+open semantics: **controlled** (`open` / `onOpenChange`; the block stores no open
+state), `aria-haspopup="menu"` + `aria-expanded` on the trigger, and the panel closes
+on Escape and an outside `pointerdown`. The panel is a column anchored to the corner
+(`flex-direction: column-reverse` on the root so the panel sits ABOVE the trigger,
+`align-items: flex-end` so it hugs the right edge), carrying the `Menu` panel's
+surface (border/panel/radius tokens + `--shadow-fab`). Only the trigger's chrome is
+owned here — the options are the app's own anchors (each with its own `href`), which
+the app marks `role="menuitem"`; the block bakes no route and no domain copy. The
+trigger is a real `<button>` (a panel needs toggling, not navigation), so it takes
+the trigger styles inline rather than forking `FabLink`'s anchor rule. The icon is a
+prop (`icon`), not a baked `Plus` glyph — the app keeps its door icon.
+
+```tsx
+export interface FabMenuProps {
+  label: string;                          // trigger accessible name
+  icon: ReactNode;                        // the trigger glyph (app-supplied)
+  children: ReactNode;                    // panel content: the link options
+  open: boolean;                          // controlled; the block stores no open state
+  onOpenChange: (open: boolean) => void;  // trigger toggle / Escape / outside pointerdown
+  className?: string;
+}
+```
 
 ### MatrixBlock (Eisenhower quadrants)
 

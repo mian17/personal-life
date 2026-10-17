@@ -1,164 +1,470 @@
-# Production runbook — Lane B deploy (`master..refactor/notes-todos-shared-ui`)
+# Production runbook — full stack (deploy `master` @ `963e859`)
 
-Scope: 102 commits — the `feature/todo-ecosystem` chapter (todo-service, tags-service,
-per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `compose.yaml`
-(frontend `app` on `127.0.0.1:3002`, `idp` on `127.0.0.1:3003`).
+Authoritative deploy procedure for this host. Replaces the earlier
+`master..refactor/notes-todos-shared-ui` runbook, which predates `feedback-service`,
+`meal-service` and the `Autosuggest`/food-catalog work and would stop a stack that now
+fails fast on secrets it never mentions.
 
-**Run by a human. Deploy and migration are hard lines.**
+Run entirely in the **primary checkout** — `/home/night/WebstormProjects/personal-life` —
+where `.env`, `apps/*/data/*.db`, `backup/` and `compose.yaml` live. Every command below is
+copy-pasteable from that directory:
+
+```bash
+cd /home/night/WebstormProjects/personal-life
+```
+
+Ref: `master` @ `963e859` (`merge: production deploy runbook for the 16-service stack`).
+`compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
+`note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`) plus 7
+Redis instances, `postgres-feedback` and `rabbitmq-feedback`.
+
+**Run by a human. Deploy and every data migration are hard lines.** This document is the
+checklist; it is not authority to run it.
 
 ## 0. Migration verdict
 
-- **No schema/DDL migration files exist** anywhere in the repo: no `migrations/`, no
-  `*.sql`, no prisma/knex/typeorm/drizzle config. Schema is created at boot by TypeORM
-  `synchronize: true` (`apps/note-service/src/app.module.ts:13-18`, same pattern in
-  `tags-service`, `todo-service`, `idp`). Booting a service creates its tables.
-- **One human-run data migration exists**, and it is the reason "migration first?" is
-  *yes* for this lane: `import-tags` moves note-DB tag rows into the new `tags-service`
-  registry, re-encrypts them, and drops the legacy `tag` table. Without it, `/notes`
-  tag data is absent from the new registry and `TagRef` finds nothing.
-- **A second human-run migration belongs to the content-order lane**, not this one: the
-  `contentUpdatedAt` ALTER + backfill in §3. Run it only when that lane ships in the same
-  window.
-- The shared-page-blocks refactor (the latest 18 commits) needs **no** migration — it is
-  frontend only.
+- **No migration framework or DDL files exist anywhere in the repo** — no `migrations/`
+  directory, no `*.sql` outside `docs/reference-repo/`, no ormconfig, no migration
+  `DataSource`. (Ad-hoc `new DataSource({...})` *does* appear in one-off note-service
+  scripts — `scripts/encrypt-backfill.ts`, `scripts/rotate-master-key.ts`,
+  `src/keys/backfill.ts` — none of which is a migration.) Schema is created at boot by
+  TypeORM `synchronize: true` in all
+  six data services: `apps/note-service/src/app.module.ts:17`,
+  `apps/tags-service/src/app.module.ts:16`, `apps/todo-service/src/app.module.ts:25`,
+  `apps/meal-service/src/app.module.ts:25`, `apps/feedback-service/src/app.module.ts:24`,
+  `apps/idp/src/app.module.ts:18`.
+- **Human-run data migrations exist, and the one-shot ones below have already run on this
+  host:**
 
-**Ordering is therefore: backup → migrate → boot. Never migrate after boot.**
+| Migration | Command | Status here |
+|---|---|---|
+| `import-tags` | `npm run import-tags -w @life/tags-service` (`apps/tags-service/package.json:13`) | **Applied.** `tags.db` holds 13 `tag` rows and `life.db` 15 `note_tag` refs; `backup/2026-10-01T11-38-29-059Z-pinned` (29 rows) brackets the import. Re-running is idempotent but pointless — do not. |
+| `cleanup-tags` | `npm run cleanup-tags -w @life/tags-service` (`apps/tags-service/package.json:14`) | **Applied, after the pinned backup.** `tags.db.pre-cleanup-2026-10-01T11-41-59-916Z` holds the 29 pre-cleanup rows; the live table has 13. Do not re-run, and **do not restore `backup/2026-10-01T11-38-29-059Z-pinned`** expecting current tags — it predates the cleanup and would resurrect 16 orphans. |
+| `backfill-content-updated-at` | `npm run backfill-content-updated-at -w @life/note-service` (`apps/note-service/package.json:11`) | **Applied.** `note.contentUpdatedAt` exists and no row is NULL. A re-run prints `stamped=0`. |
 
-## 1. Pre-flight
+  Note-service also ships three more one-shot scripts that leave no dated artifact and are
+  not part of a deploy: `scripts/encrypt-backfill.ts`, `scripts/rotate-master-key.ts`,
+  `scripts/backfill-owner.ts` (`apps/note-service/package.json:9-12`). Never run
+  `rotate-master-key` as a deploy step — see the write-once rule in §2.
 
-- [ ] Decide the ref: `refactor/notes-todos-shared-ui` at `a333dd4` (unmerged; merging to
-      `master` is a separate, deliberate decision).
-- [ ] **Frontend image must carry `@life/app-kit`** — fixed in `a333dd4`
-      (`apps/app/Dockerfile` two `COPY` stages + runtime safety net;
-      `apps/app/next.config.mjs` `transpilePackages`). Without it `next build` fails on
-      `Cannot find module '@life/app-kit'`.
-- [ ] `.env` has these **NAMES** set (values never touch a doc):
-      `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`, `IDP_ISSUER`,
-      `OIDC_APP_CLIENT_SECRET`, `OIDC_APP_REDIRECT_URI`, `REDIS_URL`.
-- [ ] **`OIDC_AUDIENCE_MAP` must be UPDATED, not just present** — a `.env` carried over
-      from the pre-ecosystem deploy holds the stale `…=note-service` map, and because
-      `.env` beats the compose default (`compose.yaml:147`) the IdP keeps minting
-      `aud: note-service` while every service now requires `life-api`
-      (`compose.yaml:20`, `SPEC-service-kernel.md:81-96`). Symptom: the stack boots
-      clean, then `/notes` renders a repeating `ApiError: API 401 on /api/notes`
-      (the app forwards the session token — `apps/app/lib/client.ts:27,34` — and
-      note-service maps every verification failure to a bare 401 with no log line,
-      `apps/note-service/src/auth/auth.guard.ts:85-88`). Set it to the comma-separated
-      value from `.env.example:43`:
-      `https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api`
-      (separator is a **comma** — `apps/idp/src/oidc/access-token.policy.ts:17,25`).
-      Verify the two sides agree:
-      `docker compose config | grep -E 'OIDC_AUDIENCE_MAP|NOTE_SERVICE_AUDIENCE'`
-      → the map's value for `https://note-service` must equal `NOTE_SERVICE_AUDIENCE`.
-- [ ] **New secrets this lane requires:** `TAGS_MASTER_KEY` and `TODO_MASTER_KEY`, 32-byte
-      base64 — `openssl rand -base64 32`, run **once per service** (two distinct values;
-      independent custody per MAP M3). Compose fails fast without them
-      (`compose.yaml:63`, `compose.yaml:101`). Validated by `loadMasterKeyFromEnv`
-      (`packages/crypto/src/keys.ts:110-128`): standard base64 decoding to exactly 32 bytes.
-      Verify unquoted in `.env` with `printf '%s' "$K" | base64 -d | wc -c` → `32`.
-- [ ] **Do NOT regenerate `NOTE_MASTER_KEY`** — it already exists on a running stack, and
-      changing it makes every existing encrypted note undecryptable. These keys are
-      write-once; losing one loses that service's data.
-- [ ] Record current image tags/digests: `docker compose images`.
-- [ ] Build preflight: `bash scripts/preflight-build.sh` → `preflight: ok`. It asserts the
-      seven `apps/*/Dockerfile` dependency blocks are byte-identical (the shared `npm ci`
-      layer), plus host disk headroom and daemon reachability. Without dedupe the build runs
-      six concurrent monorepo installs and takes >30 minutes. See `SPEC-compose-build.md`.
-- [ ] Baseline the running stack's health so you know what "healthy" looked like before.
+- **One schema change lands with *this* deploy, by boot-time sync, not by hand:**
+  `food.unit` (`apps/meal-service/src/foods/food.entity.ts:45-46`, `text NOT NULL DEFAULT
+  'g'`) is absent from the live `meal.db`. It is additive-with-default only — no backfill,
+  and the table currently holds 0 rows.
+- **`db:backup:pg` is a working, already-used path.** `backup/` holds four pinned
+  `feedback.dump` snapshots and two `pre-restore-*` snapshots; the newest pinned pair is
+  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) beside `…12-34-39-247Z-pinned` (SQLite). So
+  feedback Postgres has been deployed before and dumped before — the dump is part of a
+  normal deploy, never a step to skip. Its schema is still boot-ensured rather than
+  migrated: compose's `POSTGRES_DB: feedback` makes the database, `synchronize` makes its
+  four tables (`feedback`, `feedback_event`, `feedback_cursor`, `user_keys`), and the
+  `feedback_events` NOTIFY trigger is re-ensured idempotently every boot
+  (`apps/feedback-service/src/event/trigger-ddl.ts`). Nothing to declare, seed or create by
+  hand.
+- **No crontab is installed.** `backup/cron.log` does not exist, so neither §8 backup line
+  has ever fired here. Scheduled backups are a first-time setup, not a running fixture.
 
-## 2. Stop and back up (destructive-window protection)
+**Ordering is therefore: back up → migrate → boot. Never migrate after boot.**
+
+## 1. What this deploy changes on the host
+
+| Service | Build image | Host port | Store |
+|---|---|---|---|
+| `app` | `apps/app/Dockerfile` | **published** `127.0.0.1:3002` | `redis-app` sessions (AOF volume) |
+| `idp` | `apps/idp/Dockerfile` | **published** `127.0.0.1:3003` | `apps/idp/data/idp.db` |
+| `note-service` | `apps/note-service/Dockerfile` | internal `3001` | `apps/note-service/data/life.db` |
+| `tags-service` | `apps/tags-service/Dockerfile` | internal `3004` | `apps/tags-service/data/tags.db` |
+| `todo-service` | `apps/todo-service/Dockerfile` | internal `3005` | `apps/todo-service/data/todo.db` |
+| `feedback-service` | `apps/feedback-service/Dockerfile` | internal `3008` | `postgres-feedback` (Postgres) |
+| `meal-service` | `apps/meal-service/Dockerfile` | internal `3106` | `apps/meal-service/data/meal.db` |
+| `postgres-feedback` | `postgres:17-alpine` | **published** `127.0.0.1:5432` | volume `postgres-feedback-data` |
+| `rabbitmq-feedback` | `rabbitmq:4.1-alpine` | **published** `127.0.0.1:5672` | volume `rabbitmq-feedback-data` |
+| `redis-app` | `redis:8-alpine` | — | volume `redis-app-data` (session store, AOF) |
+| `redis-idp`, `redis-note`, `redis-tags`, `redis-todo`, `redis-meal` | `redis:8-alpine` | — | none (caches; RDB+AOF off) |
+| `redis-feedback` | `redis:8-alpine` | — | volume `redis-feedback-data` (cache; RDB+AOF off) |
+
+Facts that decide the steps below:
+
+- **Five SQLite bind mounts**: `./apps/{note,tags,todo,meal}-service/data:/data` and
+  `./apps/idp/data:/data`. `meal-service` writes `meal.db` (compose sets `DB_PATH:
+  /data/meal.db` — the app module's `life.db` default is dev-only).
+- **Only four ports leave the host**: `3002` (app), `3003` (idp), `5432`
+  (postgres-feedback), `5672` (rabbitmq-feedback) — all `127.0.0.1`-only. `tailscale serve`
+  proxies 443 → `127.0.0.1:3002` and 8443 → `127.0.0.1:3003`; the other four app services
+  and every Redis are compose-network only.
+- **Named volumes are never removed** by an ordinary `docker compose down`/`up`; only `-v`
+  destroys them, and `-v` takes `redis-app-data` (sessions) with it.
+- `app` is rebuilt by every deploy here: it carries the BFF base URLs
+  (`TAGS_API_URL`, `TODO_API_URL`, `FEEDBACK_API_URL`, `MEAL_API_URL`) and
+  `depends_on` all five backends.
+- **New surface in this ref**: `feedback-service` + its three infra containers and two
+  named volumes; the meals food catalog (`/meals/foods`, `/meals/foods/new`,
+  `/meals/foods/[id]`), the manual-log door (`/meals/entry/new?door=food`) and the
+  `Autosuggest` block in `packages/ui`; per-route PWA identity for `/meals` and
+  `/feedback`.
+
+## 2. Env (names only)
+
+`.env` values never touch a doc, a log or a chat — only the **names** are here. Compose
+reads the primary checkout's `.env` via `env_file: .env` (all seven built services).
+
+**Compose refuses to start without these seven** (`${VAR:?…}`, `grep -n ':?' compose.yaml`):
+
+| Var | Line | Notes |
+|---|---|---|
+| `NOTE_MASTER_KEY` | `compose.yaml:26` | 32-byte base64, own custody |
+| `TAGS_MASTER_KEY` | `compose.yaml:63` | idem |
+| `TODO_MASTER_KEY` | `compose.yaml:101` | idem |
+| `FEEDBACK_MASTER_KEY` | `compose.yaml:151` | idem |
+| `MEAL_MASTER_KEY` | `compose.yaml:193` | idem |
+| `FEEDBACK_DB_PASSWORD` | `compose.yaml:472` | Postgres role password (`POSTGRES_PASSWORD`) |
+| `FEEDBACK_RABBITMQ_PASSWORD` | `compose.yaml:494` | broker `feedback` user password |
+
+Master-key rules, all five alike:
+
+- Generate with `openssl rand -base64 32` — **once per service**, five distinct values,
+  independent custody.
+- Verify before pasting: `printf '%s' "$K" | base64 -d | wc -c` → `32`. The loader
+  (`packages/crypto/src/keys.ts:110-128`) fails closed on anything else.
+- **Write-once.** Changing a key makes that service's existing encrypted rows permanently
+  undecryptable. Losing one loses that service's data.
+- Never regenerate `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`,
+  `MEAL_MASTER_KEY` or `FEEDBACK_MASTER_KEY` on the running stack.
+
+Passwords generated the same way (`openssl rand -hex 32`) must be set **before the first
+boot** of `postgres-feedback`/`rabbitmq-feedback`: both are used as the server's
+initialisation values, and changing them once `postgres-feedback-data` exists does not
+change the stored role password.
+
+Every other variable compose interpolates (names only):
+
+`FEEDBACK_IDP_JWKS_URL`, `FEEDBACK_RABBITMQ_USER`, `FEEDBACK_SERVICE_AUDIENCE`,
+`GEMINI_API_BASE`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `IDP_ISSUER`, `MEAL_IDP_JWKS_URL`,
+`MEAL_SERVICE_AUDIENCE`, `NOTE_SERVICE_AUDIENCE`, `NOTE_SERVICE_IDP_JWKS_URL`,
+`OIDC_APP_CLIENT_ID`, `OIDC_APP_CLIENT_SECRET`, `OIDC_APP_REDIRECT_URI`,
+`OIDC_APP_RESOURCE`, `OIDC_AUDIENCE_MAP`, `OIDC_DEFAULT_RESOURCE`, `TAGS_IDP_JWKS_URL`,
+`TAGS_SERVICE_AUDIENCE`, `TODO_IDP_JWKS_URL`, `TODO_SERVICE_AUDIENCE`, `TODO_TIMEZONE`,
+`TODO_VAPID_PRIVATE_KEY`, `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_SUBJECT`.
+
+Two more reach containers through `env_file` without a compose default, so they are not in
+the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path) and
+`OWNER_LOGIN` (app access gate, `apps/app/middleware.ts:45`).
+
+- [ ] All seven fail-fast names are set in `.env`.
+- [ ] Five master keys generated and verified as 32 decoded bytes, each distinct.
+- [ ] **`OIDC_AUDIENCE_MAP` contains `https://meal-service=life-api`** — the compose
+      default at `compose.yaml:245` now carries note/tags/todo/meal; a `.env` carried from
+      an older deploy stops at `todo-service` and every meal API call answers 401. Value
+      form (a **comma**-separated list) is at `.env.example:43`.
+- [ ] The optional trios are present if you want the features: `GEMINI_API_KEY`,
+      `GEMINI_MODEL`, `GEMINI_API_BASE` (all three, or the photo door answers
+      `service-unavailable`) and `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_PRIVATE_KEY`,
+      `TODO_VAPID_SUBJECT` (unset keeps the reminder sweep off). The VAPID trio is in
+      `.env.example:79-81`, commented out; **the `GEMINI_*` trio is not in
+      `.env.example`** — its names appear in `docs/specs/SPEC-photo-identity.md:328` and in
+      the `docs/runbooks/deploy-meal-{stack,nutrition,ingredients}.md` trio.
+- [ ] Redis needs no keys: compose injects `REDIS_URL` per service.
+- [ ] Leak discipline: a key's **value** never enters a doc, a log, an issue or a chat —
+      names only. `USDA_API_KEY` rides a query string, so a logged URL is a leaked key.
+
+## 3. Pre-flight
 
 ```bash
-docker compose down            # NO -v : -v also removes redis-app-data (sessions)
+cd /home/night/WebstormProjects/personal-life
+```
+
+- [ ] Ref pinned: `git log -1 --oneline` → `963e859`; `git status --short` shows only
+      untracked `docs/reference-repo/`, `pictures/`, `.pi/`.
+- [ ] Record the images you are about to replace (rollback reference):
+      `docker compose images`.
+- [ ] Baseline the running stack: `docker compose ps` — the services you expect healthy
+      before the change.
+- [ ] Build preflight: `bash scripts/preflight-build.sh` → `preflight: ok — 1 dependency
+      block across 7 Dockerfiles`. It asserts the seven Dockerfiles' `npm ci` dependency
+      block hashes identically (one shared BuildKit layer; without dedupe the build runs
+      seven monorepo installs and takes >30 minutes), that the daemon is reachable, and
+      that the host has headroom (`PREFLIGHT_MIN_DISK_GB`, default `30`).
+- [ ] Check whether the feedback volumes survive from the last deploy — this decides whether
+      §6 continues the old Postgres/RabbitMQ store or initialises a fresh empty one:
+      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`. Compose
+      prefixes its own name (`docker compose config` → `name: personal-life`), so the real
+      volume names are `personal-life_postgres-feedback-data` and
+      `…_rabbitmq-feedback-data`. If they are absent, the store is **new**: the pinned
+      `feedback.dump` snapshots become the only copy of any older rows (every manifest so far
+      records `feedback: 0`, `feedback_event: 0`, so none is at risk), and no client holds
+      stale cursor state.
+- [ ] `.env` satisfies §2 — in particular a value in every fail-fast slot.
+- [ ] Compose interpolation resolves before building anything:
+      `docker compose config >/dev/null` → exits 0 (it fails fast on a missing secret).
+- [ ] The five SQLite `data/` directories exist (`apps/note-service/data`,
+      `apps/tags-service/data`, `apps/todo-service/data`, `apps/meal-service/data`,
+      `apps/idp/data`). Create any missing one yourself so Docker does not create it
+      root-owned: `mkdir -p apps/meal-service/data` is the one that matters here.
+- [ ] Published ports free on loopback: 3002, 3003, 5432, 5672 —
+      `docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E '3002|3003|5432|5672'` shows
+      only containers you know about.
+- [ ] Seeded IdP: `apps/idp/data/idp.db` already carries your user, so no `seed` step
+      (§6) is needed. Seed only on a fresh host.
+
+## 4. Stop and back up — destructive-window protection
+
+The Postgres dump needs its server **up**; the SQLite dumps want their writers stopped. So
+run them in that order — Postgres first, then stop everything, then the files.
+
+```bash
+# 1. Feedback Postgres, while the server can still serve it
+npm run db:backup:pg -w @life/db -- --pin
+
+# 2. Stop the stack. NO -v : -v also removes redis-app-data (your sessions)
+docker compose down
+
+# 3. The five SQLite files, now quiescent
 npm run db:backup -w @life/db -- --pin
-# back up a subset instead with --only (e.g. --only life,idp)
 ```
 
-- [ ] Backups are **readable** (`sqlite3 life.db 'PRAGMA integrity_check;'` → `ok`).
-      Do not continue otherwise. Rollback depends entirely on this.
+- `db:backup:pg` dumps the database named by `FEEDBACK_DB_URL`
+  (`postgresql://feedback@postgres-feedback:5432/feedback`) with `pg_dump -Fc --no-owner`
+  **inside** the `postgres-feedback` container, verifies the archive with `pg_restore
+  --list`, and records per-table counts. The host deliberately has no `pg_dump` of its own,
+  so this fails unless `postgres-feedback` is running — bring up just that service
+  (`docker compose up -d postgres-feedback`) and let it reach `(healthy)` first.
+- `db:backup` snapshots the **five** SQLite databases (`life`, `tags`, `todo`, `idp`,
+  `meal`) into `backup/<stamp>-pinned/`, each verified with `PRAGMA quick_check`. It is
+  read-only against its inputs. `--only life,tags,todo,idp` narrows the set (needed only
+  before `meal.db` exists — it does now).
+- Each run writes its own UTC-stamped directory, and `--pin` appends `-pinned` to the name.
+  The two kinds land seconds apart in separate directories — the newest pair here is
+  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) and `…12-34-39-247Z-pinned` (SQLite).
+- [ ] From `db:backup:pg`: a `feedback.dump -> … pg_restore_list=ok` line, and a new
+      `backup/<stamp>-pinned/` holding `feedback.dump` + `manifest.json` + a `PINNED`
+      marker.
+- [ ] From `db:backup`: five `quick_check=ok` lines, and a second `backup/<stamp>-pinned/`.
+- [ ] Retained until a routine backup lands on top of this stack. Rollback depends
+      entirely on this — do not continue otherwise.
+- [ ] **The one permitted skip.** Only if `postgres-feedback` cannot be started at all,
+      `db:backup:pg` is skipped, and the run says so out loud: the store is created empty
+      in §6 and its first real snapshot is §8. That is a deliberate, named gap — not the
+      default. On this host Postgres *can* run, so take the dump.
 
-## 3. Migration
+## 5. Migration
 
-Dry-run first and read the counts — `import-tags` is idempotent, and a zero-tag stack
-means a no-op.
+Nothing must be migrated by hand in this ref. Do the two checks below so the claim is
+verified rather than assumed, and do **not** re-run a migration that is already applied.
 
 ```bash
-NOTE_MASTER_KEY=<key> TAGS_MASTER_KEY=<key> \
-NOTE_DB_PATH=$PWD/apps/note-service/data/life.db \
-TAGS_DB_PATH=$PWD/apps/tags-service/data/tags.db \
-  npm run import-tags -w @life/tags-service -- --dry-run
+# 1. tags registry already migrated (rows, not an empty table)
+node -e "const D=require('better-sqlite3');const db=new D('apps/tags-service/data/tags.db',{readonly:true});console.log(db.prepare('select count(*) c from tag').get())"
+
+# 2. content-order backfill already stamped (expect 0 NULLs, then no-op on re-run)
+node -e "const D=require('better-sqlite3');const db=new D('apps/note-service/data/life.db',{readonly:true});console.log(db.prepare('select count(*) c from note where contentUpdatedAt is null').get())"
 ```
 
-- [ ] Counts look right. Then re-run the same command **without** `--dry-run`.
-- [ ] Script's own backups + `PRAGMA quick_check` reported ok
-      (`apps/tags-service/scripts/import-tags.ts:11-24`).
+- [ ] `tag` count > 0 and `contentUpdatedAt` NULL count `0` — the migrations have already
+      run on this host. Leave them alone.
+- [ ] If a **fresh host** were being stood up, the order would be: §4 backup →
+      `NOTE_MASTER_KEY=<key> TAGS_MASTER_KEY=<key> npm run import-tags -w
+      @life/tags-service -- --dry-run`, then the same line without `--dry-run` →
+      `npm run backfill-content-updated-at -w @life/note-service` → §6 boot. (Both resolve
+      their DB paths from the repo root; `NOTE_DB_PATH`/`TAGS_DB_PATH` are optional
+      overrides.) Not this run.
+- [ ] `food.unit` needs no step: it is additive-with-default (`default 'g'`) and arrives
+      with `synchronize` at `meal-service`'s first boot.
+- [ ] Feedback schema and the NOTIFY trigger need no step: both are boot-ensured.
 
-### The `contentUpdatedAt` ALTER + backfill (content-order lane)
-
-The notes list orders by `note.contentUpdatedAt` — the time the body last changed —
-instead of `note.createdAt` (`docs/specs/SPEC-notes-content-order.md`). A database
-booted before this column existed lacks it until TypeORM `synchronize` adds it, and the
-list then reads every old row as its `createdAt`, so the deploy changes no order. Apply
-the column and backfill yourself **before** boot via the one-time script
-(`apps/note-service/scripts/backfill-content-updated-at.ts`, `backfill-owner.ts` shape)
-rather than leaning on `synchronize`.
-
-**Human-run. A migration is a hard line.**
+## 6. Deploy
 
 ```bash
-npm run backfill-content-updated-at -w apps/note-service
+docker compose up -d --build
 ```
 
-- [ ] Run the script after the Step 2 backup and before `docker compose up`. It takes
-      its own verified `VACUUM INTO` backup as its first action, adds the column when
-      missing, then backfills; a re-run is a no-op (prints `stamped=0`).
-- [ ] The backfill copies `createdAt`, **not** `updatedAt`. Retag, trash, and restore
-      each bump `updatedAt`, so copying it would reshuffle every touched note at deploy;
-      copying `createdAt` leaves the pre-deploy order in place, and only a note whose body
-      is edited afterwards moves.
+- [ ] Ordering is enforced by `depends_on` + healthchecks: `redis-*` → the five backends
+      plus `idp` → `app`. Do not start `app` ahead of its backends.
+- [ ] Fresh host only: seed the IdP before booting the app —
+      `NODE_ENV=production SEED_USERNAME=… SEED_PASSWORD=… npm run seed -w @life/idp`.
+      On this host the identity DB is already seeded; the script refuses to overwrite an
+      existing user.
+- [ ] `docker compose ps` — all 16 services up; every service that declares a healthcheck
+      reports `(healthy)`. `app` declares none (it is the last dependency, not a target).
+- [ ] Any failure naming a `* is required` secret means §2 was not applied — fix `.env`
+      and re-run the same `up`.
 
-## 4. Boot
+## 7. Verify
 
-- [ ] IdP only if not already seeded on this stack:
-      `NODE_ENV=production SEED_USERNAME=… SEED_PASSWORD=… npm run seed -w apps/idp`
-- [ ] `docker compose up -d --build`
-- [ ] Ordering is enforced by `depends_on` + healthchecks: Redis → services → `app`.
-      Do **not** deploy the frontend before its backends are healthy.
+### Health and wiring
 
-## 5. Verify
+```bash
+for s in note-service:3001 tags-service:3004 todo-service:3005 feedback-service:3008 meal-service:3106; do
+  n=${s%%:*}; p=${s##*:}; printf '%s ' "$n"
+  docker compose exec -T "$n" node -e "fetch('http://127.0.0.1:$p/health/ready').then(r=>console.log(r.status)).catch(()=>console.log('fail'))"
+done
+curl -fsS http://127.0.0.1:3002/ -o /dev/null -w 'app %{http_code}\n'
+curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n'
+```
 
-- [ ] `docker compose ps` — every healthcheck green (`/health/ready`; ports 3001/3004/3005
-      services, 3003 idp, 3002 app).
-- [ ] Logs clean for `tags-service`, `todo-service`, `app` — no boot/`synchronize` errors.
-- [ ] Log in, then: **tags still render in `/notes`** (the migration's success signal).
-- [ ] `/todos` list → status pills → tag/list filters → search → create → edit → save.
-- [ ] `/notes` create → open → save → trash → restore → permanent delete.
-- [ ] Per-route PWA: `/notes` and `/todos` each load their own manifest
-      (`/manifest-notes.json`, `/manifest-todos.json`) and a signed-out visit returns to
-      **that same route**.
-- [ ] Frontend still builds the UI from the shared blocks — no visual drift in the shells.
+- [ ] Every readiness endpoint answers `200`; `app` answers on 3002.
+- [ ] `docker compose ps` shows `postgres-feedback`, `rabbitmq-feedback`, `redis-feedback`
+      and `feedback-service` healthy.
+- [ ] Volume state after boot — confirm both feedback volumes now exist (compose prefixes its
+      project name, so the real names are `personal-life_postgres-feedback-data` and
+      `personal-life_rabbitmq-feedback-data`):
+      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`.
+      If §3 found them absent, they are created here for the first time.
+- [ ] **Auth is on**: a tokenless internal request is 401 —
+      `docker compose exec -T meal-service node -e "fetch('http://127.0.0.1:3106/api/foods').then(r=>console.log(r.status))"`
+      → `401`.
+- [ ] `docker compose logs feedback-service --since 3m` — master key accepted, Postgres
+      connected, exchange `feedback` created, no JWKS/audience error. A short RabbitMQ
+      retry while the broker finishes booting is expected; a permanent failure is not.
+- [ ] `docker compose logs app --since 2m` — no BFF error for `/feedback`, `/meals`,
+      `/todos` or `/notes`.
 
-## 6. Rollback
+### Notes (the ordering change is a real regression risk)
 
-- [ ] Images: `docker compose up -d` with the previous recorded tags.
-- [ ] Data: restore `life.db` (and `tags.db` if the migration ran) from Step 2 — **old code
-      cannot read the new arrangement**, so code and data roll back together
-      (`docs/specs/SPEC-tags-extraction.md:102-103`).
-- [ ] There is no down-migration. A restore overwrites current state.
+- [ ] `/notes`: create → open → save → trash → restore → permanent delete.
+- [ ] **List ordered by last body edit**: create note A, create note B (B first), edit A's
+      body, reload `/notes` → A is first (`notes.service.ts` ranks by
+      `contentUpdatedAt ?? createdAt`).
+- [ ] Tags still render in `/notes` (the earlier lane's data survived).
+- [ ] Signed-out visit to `/notes` returns to `/notes`.
+
+### Todos
+
+- [ ] `/todos` list → status pills → list/tag filters → search → create → edit → save.
+- [ ] Trash → restore → permanent delete on one todo.
+- [ ] Signed-out visit to `/todos` returns to `/todos`.
+
+### Meals
+
+- [ ] `/meals/foods` → create a food (unit `g` or `ml`, per-100 facts, one named measure)
+      → edit it: the unit renders read-only and a `PATCH` carrying `unit` is a 400 →
+      delete it behind the confirm button; the food leaves the list.
+- [ ] Manual multi-add: `/meals` → *Log food* (`/meals/entry/new?door=food`) → type ≥3
+      characters (the `Autosuggest` `minChars` gate) → pick a row, pick a second row →
+      two items in the editor → save. Row labels are food names, never UUIDs.
+- [ ] Grams edit: change one item's amount, save, and the entry's nutrients scale with it.
+- [ ] Logging a picked food adds an **entry**, not a catalog row: `/meals/foods` still
+      lists the same number of foods.
+- [ ] Photo door still works: `/meals/entry/new?door=photo` with an image resolves at
+      least one item — or opens one empty row with a banner. With `GEMINI_*` unset the
+      first estimate throws while building its client (a 500 the BFF maps to
+      `service-unavailable`), so photo is expected unusable until §2's trio is set;
+      manual entry must still work in that state.
+- [ ] `/meals` day list and saved meals render; a target day renders.
+- [ ] Cache sanity: a second identical list read is served by `redis-meal`, and the
+      surface still works with `redis-meal` stopped (fail-open).
+
+### Feedback
+
+- [ ] Toolbar feedback button → blank title blocks with `Title is required.`; a filled
+      title + description submits, the dialog closes, the row appears in `/feedback`.
+- [ ] Durable and non-plaintext:
+      `docker compose exec -T postgres-feedback psql -U feedback -d feedback -tAc "SELECT left(title,7) FROM feedback LIMIT 1;"`
+      → `enc.v1.`; `SELECT count(*) FROM feedback_event;` equals the number of submitted
+      rows (one event per row).
+- [ ] Cache sanity: a second `/feedback` load is served by `redis-feedback`, and the inbox
+      still works with `redis-feedback` stopped.
+- [ ] Signed-out visit to `/feedback` returns to `/feedback`.
+
+### Per-route PWA identity
+
+```bash
+for m in notes todos meals feedback; do
+  printf '%s ' "$m"; curl -fsS "http://127.0.0.1:3002/manifest-$m.json" | head -c 60; echo
+done
+```
+
+- [ ] All four manifests answer with their own `id`/`start_url`/`scope` (`/notes`,
+      `/todos`, `/meals`, `/feedback`), and a signed-out visit to each returns to that
+      same route.
+- [ ] Hard-reload before concluding against a stale cached shell.
+
+## 8. Steady state
+
+- [ ] Install both backup crons, pointing at the primary checkout — **they are not installed
+      yet** (`backup/cron.log` does not exist, so neither line has ever fired here). Two
+      lines, added by hand with `crontab -e` (never auto-installed):
+      ```cron
+      0 3 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
+      0 4 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup:pg -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
+      ```
+      The first covers the five SQLite databases, the second the feedback dump.
+- [ ] Take a feedback Postgres snapshot once the stack is healthy, so the newly installed
+      cron is not the first thing that ever exercises `db:backup:pg`:
+      `npm run db:backup:pg -w @life/db -- --pin`.
+- [ ] Retention: newest 10 routine snapshots per kind; pinned and pre-restore snapshots
+      never auto-pruned.
+- [ ] Routine deploys from here on are §3 → §7 from the repo root with `--pin` on both
+      backups. Keep §4's pinned snapshot until a routine backup lands on top of this stack.
+
+## 9. Rollback
+
+Code and data roll back together: older code cannot read an arrangement it never wrote.
+
+- [ ] **Stop the stack first.** `db:restore` and `db:restore:pg` both probe ports
+      3002/3003 and fail closed (**exit 2**, `StackRunningError`) on a live stack, so the
+      SQLite restore cannot run while `app` and `idp` are up — and it would replace
+      nothing. `docker compose down` (no `-v`) before any restore line below.
+- [ ] **SQLite data** (all five databases):
+      `npm run db:restore -w @life/db -- --from backup/<§4-stamp>-pinned`. It banks a pinned
+      pre-restore snapshot of its own before overwriting anything.
+- [ ] **Feedback Postgres data**, when that store is in scope — the only step that needs a
+      server *up*: `docker compose up -d postgres-feedback` →
+      `npm run db:restore:pg -w @life/db -- --from backup/<§8-stamp>-pinned` →
+      `docker compose down`. The `pg_restore` runs **inside** the container, so
+      `postgres-feedback` must be up while every client is down. The `--pin` in §8 means the
+      snapshot directory always carries a `-pinned` suffix; `<§8-stamp>` without it does not
+      exist and the restore exits 1.
+- [ ] **Code**: `git checkout <the pre-merge ref you recorded in §3>`, then
+      `docker compose up -d --build`.
+- [ ] `meal.db` is additive on the way in, **not on the way back**: this deploy only adds
+      the `food.unit` column, but TypeORM `synchronize` reconciles *down* as well, so older
+      code booting against the new file drops it again. No user data is at risk (the live
+      `food` table holds 0 rows). Leave the file in place; do not delete it, and do not
+      delete `postgres-feedback-data` / `rabbitmq-feedback-data`.
+- [ ] **There is no down-migration.** A restore replaces the whole file/database; it
+      overwrites current state. That is the undo path.
+- [ ] If §6 initialised a **fresh** Postgres (the volume had been removed), an older
+      `feedback.dump` in `backup/` restores into it with
+      `docker compose up -d postgres-feedback` → `db:restore:pg` → `docker compose down`,
+      and the pinned pre-restore snapshot that command takes is the undo path if the counts
+      do not match.
+- [ ] **Never** rotate or regenerate a master key during rollback; **never**
+      `docker compose down -v`; **never** delete `apps/*/data/`, `backup/` or `.env`.
 
 ## Hard lines
 
-No one else does these: stopping the stack, running `import-tags`, restoring backups,
-`docker compose up` against production, and any merge to `master`. This document is the
-checklist; it is not authority to run it.
+No one else does these: merging to `master`, stopping the stack, running `import-tags` or
+any backfill, `db:backup` / `db:backup:pg`, `db:restore` / `db:restore:pg`, `docker compose
+up` against production, installing the crontab, and generating a master key. A key's
+**value** never enters a doc, a log or a chat — names only.
 
-## Known doc debt
+## Superseded / historical runbooks
 
-`docs/intent/docker-deploy.md:35-45` still claims a two-service stack and "zero
-migration". It predates the ecosystem chapter and is misleading for this deploy — treat
-this runbook as authoritative instead.
+Per-chapter runbooks kept for their chapter-level detail, superseded by this one where they
+disagree (they predate `master`'s current service set):
 
-The build path is specced by `docs/specs/SPEC-compose-build.md` (one shared dependency
-layer across the seven Dockerfiles). The operational half of that spec — bounded BuildKit
-cache, 4 CPU / 8 GB VM, one stack at a time — is Docker Desktop config, not repository
-content, and is applied by hand.
+- `docs/runbooks/deploy-feedback-stack.md` — feedback-service + Postgres/RabbitMQ/Redis.
+  Superseded by §2, §4, §6–§9 here; still the deepest drill detail for the feedback store.
+- `docs/runbooks/deploy-meal-stack.md` — the meal stack chapter (meal-service, Redis, the
+  3106 port). Superseded by §1, §4, §6–§9 here.
+- `docs/runbooks/deploy-meal-nutrition.md` — the meal-service chapter before the unit
+  change; the `food.unit` column this ref adds is in §0 here, not there.
+- `docs/runbooks/deploy-meal-ingredients.md` — the photo→foods door. Its §2 no longer
+  matches the picker (now `Autosuggest`, `minChars` 3) or the `/meals/foods` catalog UI.
+- `docs/runbooks/deploy-completion-custom-repeat.md` — todo completion history + custom
+  repeat. UI/chapter detail only.
+- `docs/runbooks/deploy-done-reshape.md` — the Done reshape (`apps/app` + `packages/ui`).
+- `docs/runbooks/deploy-timezone-today.md` — client-timezone today. UI/chapter detail only.
+- `docs/runbooks/deploy-todos-ux-refinements.md` — Done ordering/quadrant/debounced search.
+- `docs/runbooks/dev-meal-ingredients.md` — laptop rehearsal (`dev:seed`, `SEED_LOAD_DEV_ENV`),
+  not a production path.
+- `docs/intent/docker-deploy.md` — the original two-service intent (`api` 3003 + `web`
+  3002, `API_TOKEN`/`OWNER_LOGIN` secrets, "zero migration"). **Stale**: it describes 2
+  containers where compose.yaml now defines 16, and its "zero migration" claim misses both
+  human-run migrations of §0. Keep for history; do not follow.
+
+Contracts: `docs/specs/SPEC-compose-build.md` (the shared build layer this runbook's
+preflight pins), `docs/specs/SPEC-db-backup-restore.md` (SQLite backup/restore),
+`docs/specs/SPEC-feedback-infra.md` (`db:*:pg`, Postgres/RabbitMQ, the cron lines),
+`docs/specs/SPEC-service-kernel.md` (the shared `life-api` audience), and
+`docs/specs/SPEC-food-units.md` (the `food.unit` change).

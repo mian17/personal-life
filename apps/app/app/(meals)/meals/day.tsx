@@ -3,7 +3,6 @@ import {
   ButtonLink,
   Card,
   EmptyState,
-  FabLink,
   formatDate,
   List,
   ListItem,
@@ -14,13 +13,13 @@ import {
   Stack,
   StatusText,
 } from '@life/ui';
-import { Camera } from 'lucide-react';
+import { MealDoors } from './meal-doors';
 import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';
 import {
   getMealTarget,
   listDayEntries,
-  listMealFoods,
+  listMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
 } from '@/lib/meal-api';
@@ -81,7 +80,7 @@ export async function mealDay(day: string, emptyBody: string) {
   const [entries, target, catalog] = await Promise.all([
     listDayEntries(day),
     loadTarget(day),
-    listMealFoods(),
+    listMealFoodsIncludingDeleted(),
   ]);
   const totalCalories = sum(entries.map((entry) => entry.nutrients)).calories;
 
@@ -112,9 +111,10 @@ export async function mealDay(day: string, emptyBody: string) {
               <List>
                 {items.map((entry) => {
                   // The catalog resolves the stored id to a name; an id matching
-                  // no row is a pre-feature entry whose stored value is itself
-                  // the dish (restoredFoodName). A deleted catalog food would
-                  // fall back to its id the same way — out of scope here.
+                  // no row — active or deleted — is a pre-feature entry whose
+                  // stored value is itself the dish (restoredFoodName). The read
+                  // includes soft-deleted foods, so a food deleted after logging
+                  // still names the entry it was logged as.
                   // Blank (only a caller bypassing the editor's non-empty rule)
                   // falls back to the old calories-title row, never blank.
                   const label = restoredFoodName(entry.foodId, catalog).trim();
@@ -132,9 +132,7 @@ export async function mealDay(day: string, emptyBody: string) {
           );
         })
       )}
-      <FabLink href="/meals/entry/new?door=photo" label="Log meal from photo">
-        <Camera size={28} strokeWidth={2.5} aria-hidden />
-      </FabLink>
+      <MealDoors />
     </PageShell>
   );
 }

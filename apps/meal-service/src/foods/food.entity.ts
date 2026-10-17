@@ -10,13 +10,23 @@ import {
 import { Serving } from './serving.entity';
 
 /**
+ * The canonical unit a food's amounts are in, chosen once at creation and
+ * immutable after (`SPEC-food-units`). A unit literal is display data, not
+ * content, so it is deliberately plaintext in the DB and the cache.
+ */
+export const FOOD_UNITS = ['g', 'ml'] as const;
+export type FoodUnit = (typeof FOOD_UNITS)[number];
+
+/**
  * One owner-scoped catalog food (`SPEC-meal-service` foods): what a serving
  * weighs and what that serving provides. The id is service-generated
  * (`randomUUID`) before insert so the at-rest AAD that binds it is
  * reconstructible; `ownerSub` is stamped from `@Principal()`, never the body.
  *
  * Two content fields are `enc.v1.` envelopes: `name` (searched post-decrypt, so
- * it is never matched in SQL) and the optional base `nutrients` vector.
+ * it is never matched in SQL) and the optional base `nutrients` vector. `unit`
+ * is the one plaintext literal: it names the unit every amount on this food is
+ * in.
  */
 @Entity('food')
 @Index('IDX_food_owner_sub', ['ownerSub'])
@@ -31,7 +41,11 @@ export class Food {
   @Column({ type: 'text' })
   name: string;
 
-  /** Grams in one base serving — the unit `scale()` scales a portion against. */
+  /** The food's canonical unit (`'g'` or `'ml'`); every amount below is in it. */
+  @Column({ type: 'text', default: 'g' })
+  unit: FoodUnit;
+
+  /** Amount in one base serving, in `unit` — what `scale()` scales against. */
   @Column({ type: 'real' })
   servingGrams: number;
 
