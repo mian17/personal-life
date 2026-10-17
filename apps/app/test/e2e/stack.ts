@@ -195,6 +195,14 @@ function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     MEAL_SERVICE_AUDIENCE: 'life-api',
     MEAL_MASTER_KEY: HARNESS_MASTER_KEY,
+    // The Gemini client fails closed at construction without all three
+    // coordinates, which would turn every estimate into a 500 — so the harness
+    // hands over obviously-fake ones. No journey uploads a photo the client
+    // would actually send: the unreadable-photo fixture is refused by type at
+    // the client's mime gate, before any network call.
+    GEMINI_API_KEY: 'not-a-real-key',
+    GEMINI_MODEL: 'harness-unreachable',
+    GEMINI_API_BASE: 'http://127.0.0.1:9',
   };
 }
 

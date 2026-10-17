@@ -1,15 +1,17 @@
 import 'server-only';
 import { loadOrNotFound } from '@life/app-kit';
 import {
+  format,
   NUTRIENT_LABELS,
   NUTRIENTS,
   UNKNOWN,
   type Nutrient,
   type NutrientVector,
 } from '@life/nutrition';
-import { getMealEntry, listMealFoods, restoredFoodName } from '@/lib/meal-api';
+import { getMealEntry, listMealFoods, restoredFoodName, type MealFood } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import { MealEditor, type NutritionFields } from './editor';
+import type { PickerFood } from './food-picker';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +61,18 @@ const NUTRITION: NutritionFields = {
 };
 
 /**
+ * The catalog the `door=food` picker offers, with the per-100 facts formatted
+ * here so the client needs no `@life/nutrition` (same row rule as the catalog
+ * page's own list).
+ */
+function pickerFoods(foods: MealFood[]): PickerFood[] {
+  return foods.map((food) => ({
+    food,
+    per100Calories: `per 100 ${food.unit} · ${format('calories', food.nutrients.calories)}`,
+  }));
+}
+
+/**
  * The review-correct editor for one entry (`SPEC-meal-capture-ui` project
  * structure). `new` is the photo/manual create door the day view links to, so
  * it opens an empty, pre-opened editor; any other id is the entry being
@@ -66,12 +80,31 @@ const NUTRITION: NutritionFields = {
  * owner (lesson 0019) for a new entry, and from the entry itself when editing —
  * this route never derives a day of its own.
  */
-export default async function MealEntryPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MealEntryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ door?: string }>;
+}) {
   const { id } = await params;
 
   if (id === 'new') {
+    // The door query picks how `new` opens: the photo editor or the catalog
+    // picker. Any value the day view does not send opens the empty editor —
+    // never a broken door.
+    const mealDoor = (await searchParams).door === 'food' ? ('food' as const) : null;
     const date = await getToday();
-    return <MealEditor entry={null} date={date} nutrition={NUTRITION} />;
+    const foods = mealDoor === 'food' ? pickerFoods(await listMealFoods()) : [];
+    return (
+      <MealEditor
+        entry={null}
+        date={date}
+        nutrition={NUTRITION}
+        door={mealDoor}
+        foods={foods}
+      />
+    );
   }
 
   const entry = await loadOrNotFound(() => getMealEntry(id));

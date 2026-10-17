@@ -216,18 +216,42 @@ export function updateMealEntry(
   return call<MealEntry>(`/api/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
+/** The canonical unit a food's amounts are in (`SPEC-food-units`); chosen once. */
+export type FoodUnit = 'g' | 'ml';
+
+/**
+ * The food-write bounds declared by `CreateFoodDto` on the service. The app
+ * mirrors the values here — it may not import `apps/meal-service`, and a second
+ * respell would drift (lesson 0016: one owner for the value).
+ */
+export const FOOD_NAME_MAX = 120;
+export const SERVING_LABEL_MAX = 60;
+export const PORTIONS_MAX = 20;
+export const AMOUNT_MAX = 5000;
+
 /** The wire shape of one serving (`FoodsService.ServingDto`). */
 export interface ServingDto {
   id: string;
   label: string;
-  grams: number;
+  amount: number;
   nutrients: NutrientVector;
+}
+
+/**
+ * One measure a write sends: its label and its amount in the food's own unit.
+ * The vector is never client input — the service derives it with `scale()`
+ * (`SPEC-food-units`).
+ */
+export interface ServingInput {
+  label: string;
+  amount: number;
 }
 
 /** The wire shape of one catalog food (`FoodsService.FoodDto`). */
 export interface MealFood {
   id: string;
   name: string;
+  unit: FoodUnit;
   servingGrams: number;
   nutrients: NutrientVector;
   servings: ServingDto[];
@@ -237,25 +261,58 @@ export interface MealFood {
 }
 
 /**
- * `GET /api/foods` — the owner's whole catalog. The names arrive decrypted, so
- * the log path can compare them in memory; the catalog is single-user and small,
- * so one list beats a round trip per name.
+ * `GET /api/foods?q=` — the owner's whole catalog, or the foods whose decrypted
+ * name matches `q`. The service filters after the cache hit, so the search never
+ * enters the cache key (`SPEC-meal-service` Cache Rules); the names arrive
+ * decrypted, so the log path can compare them in memory.
  */
-export function listMealFoods(): Promise<MealFood[]> {
-  return call<MealFood[]>('/api/foods');
+export function listMealFoods(q?: string): Promise<MealFood[]> {
+  return call<MealFood[]>(`/api/foods${q ? `?${new URLSearchParams({ q })}` : ''}`);
+}
+
+/** `GET /api/foods/:id` — one catalog food by id (owner-scoped; a foreign id is a 404). */
+export function getMealFood(id: string): Promise<MealFood> {
+  return call<MealFood>(`/api/foods/${id}`);
+}
+
+/** Body of `POST /api/foods` — the base facts plus the measures the food starts with. */
+export interface CreateMealFoodInput {
+  name: string;
+  unit?: FoodUnit;
+  servingGrams: number;
+  nutrients: NutrientVector;
+  portions?: ServingInput[];
 }
 
 /**
  * `POST /api/foods` — create the catalog food one logged item is missing.
  * `servingGrams` is 100 and `nutrients` is the confirmed vector un-scaled back
- * to that base (`SPEC-meal-capture-grams § The log-time create path`).
+ * to that base (`SPEC-meal-capture-grams § The log-time create path`); an
+ * omitted `unit` is the service's `'g'`.
  */
-export function createMealFood(input: {
-  name: string;
-  servingGrams: number;
-  nutrients: NutrientVector;
-}): Promise<MealFood> {
+export function createMealFood(input: CreateMealFoodInput): Promise<MealFood> {
   return call<MealFood>('/api/foods', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/**
+ * Body of `PATCH /api/foods/:id`. `unit` is deliberately absent: the unit is
+ * chosen once and the service's whitelist rejects a change (`SPEC-food-units`).
+ */
+export interface UpdateMealFoodInput {
+  name?: string;
+  nutrients?: NutrientVector;
+  portions?: ServingInput[];
+  expectedVersion?: number;
+}
+
+/** `PATCH /api/foods/:id` — rewrite the fields a body carries; omitted ones stay. */
+export function updateMealFood(id: string, input: UpdateMealFoodInput): Promise<MealFood> {
+  return call<MealFood>(`/api/foods/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+/** `DELETE /api/foods/:id` — soft delete (owner-scoped; a foreign id is a 404). */
+export function deleteMealFood(id: string): Promise<void> {
+  return call<void>(`/api/foods/${id}`, { method: 'DELETE' });
 }
 
 /**

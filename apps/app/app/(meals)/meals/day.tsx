@@ -3,7 +3,6 @@ import {
   ButtonLink,
   Card,
   EmptyState,
-  FabLink,
   formatDate,
   List,
   ListItem,
@@ -14,7 +13,7 @@ import {
   Stack,
   StatusText,
 } from '@life/ui';
-import { Camera } from 'lucide-react';
+import { MealDoors } from './meal-doors';
 import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';
 import {
@@ -132,9 +131,7 @@ export async function mealDay(day: string, emptyBody: string) {
           );
         })
       )}
-      <FabLink href="/meals/entry/new?door=photo" label="Log meal from photo">
-        <Camera size={28} strokeWidth={2.5} aria-hidden />
-      </FabLink>
+      <MealDoors />
     </PageShell>
   );
 }

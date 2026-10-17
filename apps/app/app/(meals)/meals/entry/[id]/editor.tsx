@@ -22,8 +22,9 @@ import {
   Textarea,
   useSnackbar,
 } from '@life/ui';
-import type { MealEntry, MealGroup, PhotoEstimateItem, PhotoFailureReason } from '@/lib/meal-api';
+import type { MealEntry, MealFood, MealGroup, PhotoEstimateItem, PhotoFailureReason } from '@/lib/meal-api';
 import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './actions';
+import { FoodPicker, type PickerFood } from './food-picker';
 
 /**
  * The review-correct editor (`SPEC-meal-capture-ui`): the photo door's
@@ -67,6 +68,9 @@ export interface NutritionFields {
   /** The unit the run total renders in (the calories unit on the server). */
   totalUnit: string;
 }
+
+/** The two doors the day view's FAB offers: photo capture and the manual catalog picker. */
+export type MealDoor = 'photo' | 'food';
 
 /** The meal groups, in display order (`SPEC-meal-service` entries vocabulary). */
 const GROUPS: { value: MealGroup; label: string }[] = [
@@ -188,15 +192,25 @@ export function MealEditor({
   date,
   nutrition,
   foodName,
+  door = null,
+  foods = [],
 }: {
   entry: MealEntry | null;
   date: string;
   nutrition: NutritionFields;
   /** A restored entry's dish name, resolved against the catalog by the page. */
   foodName?: string;
+  /** Which manual door opened this editor; `'food'` starts on the catalog picker. */
+  door?: MealDoor | null;
+  /** The catalog the `'food'` door picks from, with per-100 facts the page formatted. */
+  foods?: PickerFood[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  // The food door's pick step: the picker owns the screen until a food is
+  // confirmed, then `confirmFood` hands over to the review step.
+  const [picked, setPicked] = useState(false);
+  const picking = door === 'food' && entry === null && !picked;
   const [items, setItems] = useState<EditorItem[]>(
     entry
       ? [
@@ -216,7 +230,9 @@ export function MealEditor({
             known: nutrition.fields.map(({ key }) => key),
           },
         ]
-      : [{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }],
+      : picking
+        ? []
+        : [{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }],
   );
   const [mealGroup, setMealGroup] = useState<MealGroup>(entry?.mealGroup ?? 'lunch');
   const [hint, setHint] = useState('');
@@ -318,6 +334,31 @@ export function MealEditor({
     setItems((previous) => [
       ...previous,
       { dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] },
+    ]);
+  }
+
+  /**
+   * The manual-log door's one seeding path (`SPEC-manual-log-ui`): the picked
+   * food × amount becomes one confirmed item — catalog facts the user already
+   * trusted, snapshotted at the confirmed quantity — so the review step carries
+   * real numbers with `known` at headline depth. Saving runs the single
+   * existing path; there is no second save route for this door.
+   */
+  function confirmFood(food: MealFood, quantity: number): void {
+    // The entry stores the **per-serving** vector scaled by the logged quantity;
+    // `scaleVector` is the same linear rule `@life/nutrition`'s `scale()` runs,
+    // kept local so the package never enters the browser bundle (plan Task 14).
+    const nutrients = scaleVector(food.nutrients, quantity);
+    setPicked(true);
+    setItems([
+      {
+        dish: food.name,
+        foodId: food.id,
+        servingGrams: food.servingGrams,
+        quantity,
+        nutrients,
+        known: nutrition.fields.map(({ key }) => key),
+      },
     ]);
   }
 
@@ -531,6 +572,9 @@ export function MealEditor({
         />
       </Section>
 
+      {picking ? (
+        <FoodPicker foods={foods} onPick={confirmFood} />
+      ) : (
       <Section label="Items" actions={<Button size="bare" onClick={addItem}>Add item</Button>}>
         <StatusText>Grams scale the numbers below; a blank value means unknown, not zero.</StatusText>
         {items.length === 0 ? (
@@ -539,6 +583,7 @@ export function MealEditor({
           <List>{items.map(itemForm)}</List>
         )}
       </Section>
+      )}
 
       <Section label="Total">
         <StatusText>{total}</StatusText>

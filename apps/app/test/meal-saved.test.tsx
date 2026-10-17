@@ -77,6 +77,7 @@ function food(overrides: Partial<MealFood> = {}): MealFood {
   return {
     id: 'food-1',
     name: 'Food',
+    unit: 'g',
     servingGrams: 100,
     nutrients: vector(),
     servings: [],

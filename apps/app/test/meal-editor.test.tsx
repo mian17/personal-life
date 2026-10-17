@@ -443,7 +443,7 @@ describe('MealEditor save persists corrected values', () => {
     const harness = stateHarness();
     // The log path lists the catalog first, then creates the missing food — the
     // create returns the id the entry POST carries.
-    const createdFood = { id: 'created-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'created-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -483,7 +483,7 @@ describe('MealEditor log-time catalog', () => {
 
   it('creates the food at 100 g with the base vector before logging a foodId:null item', async () => {
     const harness = stateHarness();
-    const createdFood = { id: 'new-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'new-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -562,7 +562,7 @@ describe('MealEditor log-time catalog', () => {
     // case (case-fold). Only a real `nameKey` comparison reuses the row — a plain
     // `food.name === dish` creates a duplicate.
     const typedDish = '  chicken   breast  ';
-    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
       return Promise.resolve({});
@@ -596,7 +596,7 @@ describe('MealEditor log-time catalog', () => {
     // The plain exact-match case: the typed `Chicken` equals the stored `Chicken`,
     // no normalization required. Kept separate from the normalized-key case so the
     // fixture that discriminates normalization is not the one that does not.
-    const existing = { id: 'chicken-id', name: 'Chicken', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const existing = { id: 'chicken-id', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
       return Promise.resolve({});
@@ -632,7 +632,7 @@ describe('MealEditor log-time catalog', () => {
     // (keyed by the normalized key), not await a second create: exactly one
     // `POST /api/foods`, two `POST /api/entries` carrying that one created id.
     const secondDish = '  chicken  ';
-    const createdFood = { id: 'created-chicken', name: 'Chicken', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'created-chicken', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -954,6 +954,7 @@ describe('restored entry display name', () => {
     return {
       id: 'f-oat',
       name: 'Oatmeal',
+      unit: 'g',
       servingGrams: 100,
       nutrients: vector(),
       servings: [],

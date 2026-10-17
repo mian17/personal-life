@@ -21,17 +21,17 @@ import {
   servingNutrientsAad,
   zeroVector,
 } from './content';
-import { Food } from './food.entity';
+import { Food, type FoodUnit } from './food.entity';
 import { Serving } from './serving.entity';
 import type { CreateFoodDto, ServingInputDto } from './dto/create-food.dto';
 import type { UpdateFoodDto } from './dto/update-food.dto';
 import { FoodsCache, toCachedFoodRow, toCachedServing, type CachedFoodRow } from './foods-cache';
 
-/** The wire shape of a serving: label, grams, and its complete per-serving vector. */
+/** The wire shape of a serving: label, amount (in the food's unit), and its complete per-serving vector. */
 export interface ServingDto {
   id: string;
   label: string;
-  grams: number;
+  amount: number;
   nutrients: NutrientVector;
 }
 
@@ -42,6 +42,7 @@ export interface ServingDto {
 export interface FoodDto {
   id: string;
   name: string;
+  unit: FoodUnit;
   servingGrams: number;
   nutrients: NutrientVector;
   servings: ServingDto[];
@@ -54,12 +55,13 @@ export interface FoodDto {
  * Derive a serving's own per-serving vector from the food's base vector. The
  * model's `scale()` owns the arithmetic (`SPEC-meal-service` Nutrient semantics);
  * this helper only adapts the row into the model's `Food` shape so the service
- * and the UI can never disagree on a number (lesson 0016 — one owner).
+ * and the UI can never disagree on a number (lesson 0016 — one owner). The
+ * amount is in the food's canonical unit, so the factor is `amount / servingGrams`.
  */
 function servingVector(
   base: NutrientVector,
   servingGrams: number,
-  serving: { grams: number },
+  amount: number,
 ): NutrientVector {
   const model: FoodModel = {
     id: 'derive',
@@ -68,18 +70,18 @@ function servingVector(
     nutrients: base,
     portions: [],
   };
-  return scale(model, serving.grams / servingGrams);
+  return scale(model, amount / servingGrams);
 }
 
-/** Dedupe the portions a write carries (label+grams identity), preserving order. */
+/** Dedupe the portions a write carries (label+amount identity), preserving order. */
 function normalizePortions(portions: ServingInputDto[] | undefined): ServingInputDto[] {
   const seen = new Set<string>();
   const out: ServingInputDto[] = [];
   for (const portion of portions ?? []) {
-    const key = portion.label + ' ' + portion.grams;
+    const key = portion.label + ' ' + portion.amount;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ label: portion.label, grams: portion.grams });
+    out.push({ label: portion.label, amount: portion.amount });
   }
   return out;
 }
@@ -151,12 +153,13 @@ export class FoodsService {
     return {
       id: row.id,
       name: this.openField(row.name, dek, foodNameAad(sub, row.id), row.id),
+      unit: row.unit,
       servingGrams: row.servingGrams,
       nutrients,
       servings: row.servings.map((serving) => ({
         id: serving.id,
         label: this.openField(serving.label, dek, servingLabelAad(sub, serving.id), serving.id),
-        grams: serving.grams,
+        amount: serving.grams,
         nutrients: readStoredVector(
           this.openField(serving.nutrients, dek, servingNutrientsAad(sub, serving.id), serving.id),
         ),
@@ -232,6 +235,7 @@ export class FoodsService {
       id,
       ownerSub: sub,
       name: encryptField(dek, dto.name, foodNameAad(sub, id)),
+      unit: dto.unit ?? 'g',
       servingGrams: dto.servingGrams,
       nutrients: base === null ? null : this.sealVector(dek, base, foodNutrientsAad(sub, id)),
       version: 0,
@@ -355,15 +359,22 @@ export class FoodsService {
         ownerSub: sub,
         foodId: food.id,
         label: encryptField(dek, portion.label, servingLabelAad(sub, servingId)),
-        grams: portion.grams,
+        // Wire `amount` → the persisted `grams` column (`Food.unit` says which
+        // unit that amount is): `ponytail:` rename the column with the next
+        // migration, no behavior change until then.
+        grams: portion.amount,
         nutrients: this.sealVector(
           dek,
-          servingVector(base, food.servingGrams, portion),
+          servingVector(base, food.servingGrams, portion.amount),
           servingNutrientsAad(sub, servingId),
         ),
       });
     });
-    if (rows.length > 0) await this.servings.insert(rows);
+    // `insert()` reuses one entity reference for bulk rows, crossing ids
+    // between in-memory rows (~40% of multi-portion writes); the DB stays
+    // correct but the returned DTO is built from the crossed copies. `save()`
+    // keeps each row's id with its ciphertext. Small batch, fine per write.
+    if (rows.length > 0) await this.servings.save(rows);
     rows.sort((a, b) => a.id.localeCompare(b.id));
     return rows;
   }
@@ -395,7 +406,7 @@ export class FoodsService {
     for (const serving of existing) {
       serving.nutrients = this.sealVector(
         dek,
-        servingVector(base, food.servingGrams, serving),
+        servingVector(base, food.servingGrams, serving.grams),
         servingNutrientsAad(sub, serving.id),
       );
     }

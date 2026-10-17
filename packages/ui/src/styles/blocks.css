@@ -11,6 +11,7 @@
  * | NavBar         | `.nav-bar` + `.header-actions`    |
  * | PageTitle      | bare `h1` + `.page-title`         |
  * | FabLink        | `.add-note` (+ its `:focus-visible`) |
+ * | FabMenu        | (new) fixed trigger + link-option panel; no legacy class |
  * | EditorToolbar  | `.editor-toolbar` (back control visuals are IconButton's) |
  * | EditorScreen   | `.editor-screen`                  |
  * | EmptyState     | `.empty` + `.empty p`             |
@@ -118,6 +119,52 @@
 .ui-fab-link:focus-visible {
   outline: var(--focus-ring) solid var(--accent);
   outline-offset: var(--focus-ring);
+}
+
+/* ---------------------------------------------------------- FabMenu */
+
+/* FabLink's fixed bottom-right corner with a panel of link options above the
+   trigger (Menu's controlled open/Escape/outside-click semantics). Only the
+   trigger's chrome lives here; the options are anchors the app supplies. */
+.ui-fab-menu {
+  position: fixed;
+  right: calc(var(--space-1) + env(safe-area-inset-right));
+  bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: var(--space-0-5);
+}
+
+.ui-fab-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-fab);
+  cursor: pointer;
+}
+
+.ui-fab-menu__trigger:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-fab-menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-4);
+  padding: var(--space-0-5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-fab);
 }
 
 /* ---------------------------------------------------- EditorToolbar */

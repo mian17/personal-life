@@ -48,6 +48,7 @@ function food(overrides: Partial<MealFood> = {}): MealFood {
   return {
     id: 'food-1',
     name: 'Food',
+    unit: 'g',
     servingGrams: 100,
     nutrients: vector(),
     servings: [],
@@ -127,12 +128,15 @@ describe('meals day view', () => {
     expect(html).not.toContain('Set target');
   });
 
-  it('keeps the photo door on an empty day, with no redundant body doors', async () => {
+  it('keeps the log doors behind the FAB on an empty day, with no redundant body doors', async () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('No meals logged today.');
-    expect(html).toContain('href="/meals/entry/new?door=photo"');
-    expect(html).toContain('Log meal from photo');
+    // The two doors live in the FAB menu's panel: the trigger ships, the closed
+    // panel ships no hrefs (the open-panel options are covered by
+    // test/meal-log.test.tsx and the e2e journey).
+    expect(html).toContain('aria-label="Log a meal"');
+    expect(html).toContain('aria-haspopup="menu"');
     // Manual entry is the photo door's own fallback, never a second body door.
     expect(html).not.toContain('Log manually');
     expect(html).not.toContain('href="/meals/entry/new"');
@@ -210,7 +214,7 @@ describe('meals day view', () => {
     expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-02');
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-02');
     expect(html).toContain(`Meals — ${formatDate('2026-10-02')}`);
-    expect(html).toContain('href="/meals/entry/new?door=photo"');
+    expect(html).toContain('aria-label="Log a meal"');
     expect(html).toContain('No meals logged on this day.');
   });
 });

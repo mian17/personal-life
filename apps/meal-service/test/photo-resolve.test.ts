@@ -95,6 +95,7 @@ function usdaResponse(payload: unknown, status = 200): Response {
 /** A catalog food wire shape with the fields the estimate reads filled in. */
 function foodDto(overrides: Partial<FoodDto> & Pick<FoodDto, 'id' | 'name'>): FoodDto {
   return {
+    unit: 'g',
     servingGrams: 100,
     nutrients: zeroVector(),
     servings: [],

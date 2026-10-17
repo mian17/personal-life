@@ -2,7 +2,16 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createMealEntry, FOOD_ID_MAX, getSavedMeal } from '@/lib/meal-api';
+import {
+  createMealEntry,
+  createMealFood,
+  deleteMealFood,
+  FOOD_ID_MAX,
+  getSavedMeal,
+  updateMealFood,
+  type CreateMealFoodInput,
+  type UpdateMealFoodInput,
+} from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 
 /**
@@ -35,4 +44,37 @@ export async function relogMealAction(id: string): Promise<void> {
   }
   revalidatePath('/meals');
   redirect(`/meals/${date}`);
+}
+
+/**
+ * Create one catalog food (`SPEC-food-catalog-ui` AC2): a single
+ * `POST /api/foods` with the hand-typed per-100 vector at `servingGrams: 100`
+ * and the typed measures. Nothing is model-filled — the facts came from the
+ * form's `Input`s, and a measure's vector is derived at the service
+ * (`SPEC-food-units`), never sent from here.
+ */
+export async function createFoodAction(input: CreateMealFoodInput): Promise<void> {
+  await createMealFood(input);
+  revalidatePath('/meals/foods');
+}
+
+/**
+ * Rewrite the editable fields of one catalog food (`SPEC-food-catalog-ui`
+ * AC4). `unit` is not among them: it was chosen once at creation and the
+ * service's whitelist rejects a change, so this action can never send it.
+ * Past entries are immutable snapshots and are untouched by this write.
+ */
+export async function updateFoodAction(id: string, input: UpdateMealFoodInput): Promise<void> {
+  await updateMealFood(id, input);
+  revalidatePath('/meals/foods');
+}
+
+/**
+ * Soft-delete one catalog food (`SPEC-food-catalog-ui` AC5). The service marks
+ * the row; the entries already logged from it keep their stored numbers, so
+ * this action revalidates only the catalog — no entry row is read or written.
+ */
+export async function deleteFoodAction(id: string): Promise<void> {
+  await deleteMealFood(id);
+  revalidatePath('/meals/foods');
 }
