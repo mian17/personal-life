@@ -303,15 +303,19 @@ export function FoodForm({
       </form>
 
       {food !== null ? (
-        <Section label="Delete">
-          <ConfirmButton
-            variant="danger"
-            message={`Delete ${food.name}? Past entries keep their logged numbers.`}
-            onClick={remove}
-          >
-            Delete food
-          </ConfirmButton>
-        </Section>
+        <Section
+          label="Delete"
+          actions={
+            <ConfirmButton
+              variant="danger"
+              size="bare"
+              message={`Delete ${food.name}? Past entries keep their logged numbers.`}
+              onClick={remove}
+            >
+              Delete food
+            </ConfirmButton>
+          }
+        />
       ) : null}
     </EditorChrome>
   );

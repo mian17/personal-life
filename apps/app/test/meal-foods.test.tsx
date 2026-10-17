@@ -315,6 +315,8 @@ describe('edit food page', () => {
     expect(html).toContain('value="1 carton"');
     expect(html).toContain('value="1000"');
     expect(html).toContain('Delete food');
+    expect(html).toContain('ui-btn--danger ui-btn--bare');
+    expect(html).toContain('ui-section__actions');
   });
 
   it('turns a missing food into the route 404', async () => {
