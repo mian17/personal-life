@@ -91,6 +91,9 @@ export type { AlertBannerProps, AlertBannerTone } from './components/alert-banne
 export { SearchField } from './components/search-field';
 export type { SearchFieldProps } from './components/search-field';
 
+export { Autosuggest } from './components/autosuggest';
+export type { AutosuggestOption, AutosuggestProps } from './components/autosuggest';
+
 export { PillGroup } from './components/pill-group';
 export type { PillGroupProps } from './components/pill-group';
 

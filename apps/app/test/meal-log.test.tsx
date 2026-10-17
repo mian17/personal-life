@@ -8,7 +8,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, ButtonLink, EmptyState, Input, SearchField } from '@life/ui';
+import { Autosuggest, ButtonLink, EmptyState, Input, type AutosuggestOption } from '@life/ui';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -210,22 +210,23 @@ describe('manual-log door', () => {
       onPick: () => undefined,
     });
     try {
-      // An empty query lists no row at all — the whole catalog is not dumped.
+      // An empty query offers no row at all — the whole catalog is not dumped.
       const blank = harness.renderPicker(pickProps());
-      expect(find(blank, SearchField)).toBeDefined();
-      expect(find(blank, Button, (el) => el.props['aria-label'] === 'Log Milk')).toBeUndefined();
-      expect(find(blank, Button, (el) => el.props['aria-label'] === 'Log Oats')).toBeUndefined();
+      expect(find(blank, Autosuggest)).toBeDefined();
+      expect(find(blank, Autosuggest)!.props.options).toEqual([]);
 
       // The emitted query filters the rows in memory — Milk drops, Oats stays.
-      (find(blank, SearchField)!.props.onQueryChange as (q: string) => void)('oats');
+      (find(blank, Autosuggest)!.props.onQueryChange as (q: string) => void)('oats');
       const narrowed = harness.renderPicker(pickProps());
-      expect(find(narrowed, Button, (el) => el.props['aria-label'] === 'Log Milk')).toBeUndefined();
-      expect(find(narrowed, Button, (el) => el.props['aria-label'] === 'Log Oats')).toBeDefined();
+      expect(find(narrowed, Autosuggest)!.props.options).toEqual([
+        { id: 'f2', label: 'Oats', meta: 'per 100 g · 389 kcal' },
+      ]);
 
-      // A query matching nothing swaps the list for the empty-match state.
-      (find(narrowed, SearchField)!.props.onQueryChange as (q: string) => void)('zzz');
+      // A query matching nothing offers nothing and shows the block's empty-match label.
+      (find(narrowed, Autosuggest)!.props.onQueryChange as (q: string) => void)('zzz');
       const miss = harness.renderPicker(pickProps());
-      expect(find(miss, EmptyState, (el) => typeof el.props.body === 'string' && el.props.body.includes('No food name contains'))).toBeDefined();
+      expect(find(miss, Autosuggest)!.props.options).toEqual([]);
+      expect(find(miss, Autosuggest)!.props.emptyLabel).toBe('No food name contains “zzz”.');
     } finally {
       harness.restore();
     }
@@ -241,15 +242,21 @@ describe('manual-log door', () => {
     try {
       // One serving for the canonical 100 g base: 100 / servingGrams = 1.
       const first = harness.renderPicker(pickProps());
-      (find(first, SearchField)!.props.onQueryChange as (q: string) => void)('milk');
+      (find(first, Autosuggest)!.props.onQueryChange as (q: string) => void)('milk');
       const listed = harness.renderPicker(pickProps());
-      (find(listed, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      // A pick is the block reporting the catalog row it rendered — its id resolves
+      // back to the food here.
+      const milkRow: AutosuggestOption = { id: 'f1', label: 'Milk', meta: 'per 100 ml · 60 kcal' };
+      (find(listed, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(milkRow);
       expect(picked).toEqual([{ food: food(), quantity: 1 }]);
 
-      // The query survives the pick, so the row is still there for a second tap.
+      // The query survives the pick, so the row is still offered for a second tap.
+      // The field text now lives in the block's own state; `clearOnSelect={false}`
+      // is the app's half of that contract, and the block's suite owns the text.
       const again = harness.renderPicker(pickProps());
-      expect(find(again, SearchField)!.props.value).toBe('milk');
-      (find(again, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      expect(find(again, Autosuggest)!.props.clearOnSelect).toBe(false);
+      expect(find(again, Autosuggest)!.props.options).toEqual([milkRow]);
+      (find(again, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(milkRow);
       expect(picked).toEqual([
         { food: food(), quantity: 1 },
         { food: food(), quantity: 1 },
@@ -258,7 +265,7 @@ describe('manual-log door', () => {
       // The default is one 100-unit serving in the food's own unit, not one serving:
       // a 50 g base food is 100 / 50 = 2.
       const halfBase = harness.renderPicker(pickProps({ servingGrams: 50 }));
-      (find(halfBase, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      (find(halfBase, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(milkRow);
       expect(picked[2].quantity).toBe(2);
     } finally {
       harness.restore();

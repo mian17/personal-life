@@ -35,11 +35,12 @@ Acceptance criteria:
 - AC1 The day view's FAB opens a dropdown with the two options; the photo door and its
   e2e journey work unchanged (`PHOTO_DOOR` name intact).
 - AC2 The manual door is search-first and multi-add on one screen. While the search query
-  is empty nothing is listed (a catalog can hold 100+ foods); while it is non-empty the
-  matching foods appear in-flow under the field, and tapping a row's `Log` appends that
-  food at the default amount 100 in the food's **canonical unit**. No amount screen, no
-  unit toggle, no conversion — the amount is in the food's own unit.
-- AC3 Each `Log` appends one editor item at `quantity = 100 / food.servingGrams` (a
+  is empty nothing is listed (a catalog can hold 100+ foods); once it reaches the field's
+  `minChars` (3) the matching foods appear in the field's popup, and tapping a row — the
+  row is the option, there is no per-row `Log` button — appends that food at the default
+  amount 100 in the food's **canonical unit**. No amount screen, no unit toggle, no
+  conversion — the amount is in the food's own unit.
+- AC3 Each row pick appends one editor item at `quantity = 100 / food.servingGrams` (a
   per-100 food: 1) with the confirmed snapshot `scale(food, quantity)`, and the query is
   kept so the next food can be added. The create path saves `POST /api/entries` once per
   item. The amount is then adjusted inline in the item row's `Grams` field
@@ -90,9 +91,10 @@ Primitive reuse plan (element by element, Contract 1):
   trigger visuals + a panel of link options, `Menu`'s open/Escape/outside-click
   semantics, spec'd in `SPEC-ui-blocks.md` and registered in `MAP-ui-primitives.md`).
   Composed in `meal-doors.tsx`; never hand-rolled in `apps/app`.
-- **Food search** — `SearchField` + in-flow `List`/`ListItem` (name + per-100 calories
-  meta) with a `Button size="bare"` `Log` per row; nothing renders until the query is
-  non-empty.
+- **Food search** — the upstream `Autosuggest` block (`SPEC-ui-autosuggest.md`), one
+  option per matching food (name as `label`, per-100 calories as `meta`); a row carries
+  no nested control and the row tap is the pick. `clearOnSelect={false}` keeps the query
+  and popup for multi-add; nothing renders until the query reaches `minChars` (3).
 - **Amount** — no separate amount picker: the pick applies the default
   (`100 / food.servingGrams`), and the item row's inline `Grams` `Input` adjusts it
   (`quantity = grams / servingGrams`).

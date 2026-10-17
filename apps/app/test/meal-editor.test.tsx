@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, Dialog, EmptyState, FilePicker, IconButton, Input, ListItem, SearchField, SettingsRow, StatusText, Textarea } from '@life/ui';
+import { Autosuggest, Button, Dialog, EmptyState, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -430,9 +430,10 @@ describe('MealEditor manual door — search-first multi-add', () => {
   const oat = pickerFood({ id: 'f-oat', name: 'Oatmeal', nutrients: vector({ calories: 389 }) });
   const chicken = pickerFood({ id: 'f-chicken', name: 'Chicken', nutrients: vector({ calories: 165 }) });
 
-  /** The frozen `FoodSearch` DOM: its "Log <name>" row button. */
-  function logButton(node: unknown, name: string) {
-    return find(node, Button, (el) => el.props['aria-label'] === `Log ${name}`);
+  /** The row `FoodSearch` offers for `name` — the `Autosuggest` option the block renders. */
+  function listedRow(node: unknown, name: string) {
+    const options = (find(node, Autosuggest)?.props.options ?? []) as AutosuggestOption[];
+    return options.find((option) => option.label === name);
   }
 
   it('hides the photo section on the manual door and keeps it when the door is null', () => {
@@ -467,8 +468,8 @@ describe('MealEditor manual door — search-first multi-add', () => {
       const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
       const search = harness.renderSearch([oat, chicken], onPick);
       // Nothing is listed while the query is empty — the catalog would bury the field.
-      expect(logButton(search, 'Oatmeal')).toBeUndefined();
-      expect(logButton(search, 'Chicken')).toBeUndefined();
+      expect(listedRow(search, 'Oatmeal')).toBeUndefined();
+      expect(listedRow(search, 'Chicken')).toBeUndefined();
     } finally {
       harness.restore();
     }
@@ -481,18 +482,25 @@ describe('MealEditor manual door — search-first multi-add', () => {
       const tree = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
       const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
 
-      // Tap `Log Oatmeal` through the frozen row button: type, then click.
+      // Pick `Oatmeal` through the block: type, then select the row it offers.
       const idle = harness.renderSearch(foods, onPick);
-      (find(idle, SearchField)!.props.onQueryChange as (q: string) => void)('oa');
-      (logButton(harness.renderSearch(foods, onPick), 'Oatmeal')!.props.onClick as () => void)();
+      (find(idle, Autosuggest)!.props.onQueryChange as (q: string) => void)('oa');
+      const offered = harness.renderSearch(foods, onPick);
+      (find(offered, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(
+        listedRow(offered, 'Oatmeal')!,
+      );
 
       const one = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
       expect(field(one, 'Food for item 1').props.value).toBe('Oatmeal');
       expect(field(one, 'Calories for Oatmeal').props.value).toBe('389');
 
-      // Tap `Log Chicken` — the first item stays.
-      (find(harness.renderSearch(foods, onPick), SearchField)!.props.onQueryChange as (q: string) => void)('chicken');
-      (logButton(harness.renderSearch(foods, onPick), 'Chicken')!.props.onClick as () => void)();
+      // Pick `Chicken` — the first item stays.
+      const idleAgain = harness.renderSearch(foods, onPick);
+      (find(idleAgain, Autosuggest)!.props.onQueryChange as (q: string) => void)('chicken');
+      const offeredAgain = harness.renderSearch(foods, onPick);
+      (find(offeredAgain, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(
+        listedRow(offeredAgain, 'Chicken')!,
+      );
 
       const two = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
       expect(field(two, 'Food for item 1').props.value).toBe('Oatmeal');

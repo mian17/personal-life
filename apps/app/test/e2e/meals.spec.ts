@@ -242,14 +242,15 @@ test.describe('meals manual log', () => {
     // The manual door: FAB menu → search-first picker → appended review item.
     await openDoor(page, FOOD_DOOR);
     // The search opens empty: the catalog is not dumped, so no food is offered
-    // until the user types (`SPEC-manual-log-ui`).
+    // until the user types (`SPEC-manual-log-ui`). The suggestion list is not
+    // rendered at all, so there is no row for the staple.
     await expect(page.getByLabel('Search foods')).toBeVisible();
-    await expect(page.getByRole('button', { name: `Log ${FOOD}`, exact: true })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: FOOD })).toHaveCount(0);
 
-    // Type the staple's name; its suggestion row appears, and its `Log` control
-    // appends the pick to the review below.
+    // Type the staple's name; its suggestion row appears, and the row itself is
+    // the whole tap target that appends the pick to the review below.
     await page.getByLabel('Search foods').fill(FOOD);
-    await page.getByRole('button', { name: `Log ${FOOD}`, exact: true }).click();
+    await page.getByRole('option', { name: FOOD }).click();
 
     // The pick appends one review item at the default 100 ml — one serving over
     // the 100 base — carrying the catalog's own numbers, never the unknown dash

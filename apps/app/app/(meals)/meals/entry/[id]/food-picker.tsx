@@ -1,15 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Button,
-  ButtonLink,
-  EmptyState,
-  List,
-  ListItem,
-  SearchField,
-  Section,
-} from '@life/ui';
+import { Autosuggest, ButtonLink, EmptyState, Section, type AutosuggestOption } from '@life/ui';
 import type { MealFood } from '@/lib/meal-api';
 
 /** One catalog row the picker can offer, with the per-100 facts the page formatted server-side. */
@@ -24,14 +16,16 @@ type OnPick = (food: MealFood, quantity: number) => void;
 const DEFAULT_UNIT_AMOUNT = 100;
 
 /**
- * The manual-log door's food search: type a name, tap a row's `Log`, and the
- * pick is handed to the editor — then the query stays put so the next food can
- * be logged immediately (multi-add is the point). The candidates arrive from
- * the server page already decrypted, so the match is an in-memory substring —
- * the service's own `q` filter would cost a round trip per keystroke.
+ * The manual-log door's food search: type a name, tap a row, and the pick is
+ * handed to the editor — then the query stays put so the next food can be
+ * logged immediately (multi-add is the point). The candidates arrive from the
+ * server page already decrypted, so the match is an in-memory substring — the
+ * service's own `q` filter would cost a round trip per keystroke.
  *
- * Nothing is listed while the query is empty: a catalog can hold 100+ foods,
- * and dumping it would bury the field.
+ * The combobox semantics (field text, the `minChars` gate, the popup, the
+ * keyboard list) belong to the `Autosuggest` block; this file owns only the
+ * filtering and the row → food meaning. Nothing is listed while the query is
+ * empty: a catalog can hold 100+ foods, and dumping it would bury the field.
  */
 export function FoodSearch({ foods, onPick }: { foods: PickerFood[]; onPick: OnPick }) {
   const [query, setQuery] = useState('');
@@ -46,43 +40,36 @@ export function FoodSearch({ foods, onPick }: { foods: PickerFood[]; onPick: OnP
   }
 
   const shown = foods.filter(({ food }) => matches(food.name, query));
-  const searching = query.trim() !== '';
+
+  /** The rows as the block's own vocabulary: the food's id is its React key and lookup handle, its name the label, the per-100 facts the quiet meta. */
+  const options: AutosuggestOption[] = shown.map(({ food, per100Calories }) => ({
+    id: food.id,
+    label: food.name,
+    meta: per100Calories,
+  }));
+
+  /** A row tap logs the food at the default amount — the block reports the row, this file knows it is a catalog row. */
+  function select(option: AutosuggestOption) {
+    const hit = foods.find(({ food }) => food.id === option.id);
+    if (hit) onPick(hit.food, DEFAULT_UNIT_AMOUNT / hit.food.servingGrams);
+  }
 
   return (
     <Section label="Log food">
-      <SearchField
+      <Autosuggest
         label="Search foods"
         placeholder="Search your foods"
-        value={query}
+        options={options}
+        emptyLabel={`No food name contains “${query}”.`}
+        clearOnSelect={false}
+        minChars={3}
         onQueryChange={setQuery}
+        onSelect={select}
       />
-      {searching &&
-        (shown.length === 0 ? (
-          <EmptyState body={`No food name contains “${query.trim()}”.`} />
-        ) : (
-          <List>
-            {shown.map(({ food, per100Calories }) => (
-              <ListItem
-                key={food.id}
-                title={food.name}
-                meta={per100Calories}
-                trailing={
-                  <Button
-                    size="bare"
-                    aria-label={`Log ${food.name}`}
-                    onClick={() => onPick(food, DEFAULT_UNIT_AMOUNT / food.servingGrams)}
-                  >
-                    Log
-                  </Button>
-                }
-              />
-            ))}
-          </List>
-        ))}
     </Section>
   );
 }
 
 function matches(name: string, query: string): boolean {
-  return name.toLowerCase().includes(query.trim().toLowerCase());
+  return query !== '' && name.toLowerCase().includes(query.toLowerCase());
 }
