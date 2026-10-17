@@ -164,6 +164,9 @@ export { FEEDBACK_TYPES } from './components/feedback-types';
 export { FeedbackNavItem } from './components/feedback-nav-item';
 export type { FeedbackNavItemProps } from './components/feedback-nav-item';
 
+export { FEEDBACK_STATUSES, feedbackStatusOption } from './components/feedback-status';
+export type { FeedbackStatusOption, FeedbackStatusToken } from './components/feedback-status';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 

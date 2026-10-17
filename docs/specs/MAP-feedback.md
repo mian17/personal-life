@@ -6,6 +6,16 @@ module id here; do not add a module spec without adding its row here first.
 **Date:** 2026-10-03
 **Source:** `docs/intent/feedback-service.md` (confirmed intent).
 
+**Amendment 2026-10-16 (user-authorized):** the confirmed intent
+`docs/intent/feedback-status.md` gives every feedback entry a fixed **status workflow** and
+supersedes this map's "feedback status workflow" out-of-scope line. Three additive flags
+follow; nothing else is re-decided, and the full contract lives in
+`docs/specs/SPEC-feedback-status.md`:
+
+1. `FeedbackDto` gains a required `status` (wire vocabulary owned by `@life/shared`).
+2. A new owner-scoped route `PATCH /api/feedback/:id` sets it.
+3. `POST /api/feedback`, the event contract, and the cache key shape stay byte-identical.
+
 ## Modules
 
 | Module id | Responsibility | Depends on |
@@ -42,7 +52,8 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
 
 ### Service HTTP contract
 - Routes live under the repo's `/api/<resource>` prefix (as `api/notes`, `api/lists`):
-  `POST /api/feedback`, `GET /api/feedback`. Service port `3008` (dev `3108`).
+  `POST /api/feedback`, `GET /api/feedback`, `PATCH /api/feedback/:id`. Service port `3008`
+  (dev `3108`).
 - `POST /api/feedback` — body `{ id, app, type, title, description }` where `id` is the
   client-supplied idempotency key (UUID); owner taken from the JWT (`principal.sub`).
   Returns `201 { id }`. A repeat of an already-owned `id` is the same no-op `201 { id }` —
@@ -51,10 +62,17 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
   newest-first, for in-memory grouping by app then type. Cache key shape
   `feedback:<owner_sub>:v<gen>:list` (filters/pagination never in the key, per
   Contract 2 Rule 3).
+- `PATCH /api/feedback/:id` — body `{ status }` where `status ∈ FEEDBACK_STATUS_VALUES`;
+  owner from the JWT (`principal.sub`), never the body. Returns `200 { id, status }`; a
+  repeat of the current status is the same no-op `200`, never `409`. A missing or foreign
+  id is `404` (byte-identical, never `403` — existence must not leak), an invalid status is
+  `400`. A status change writes no `feedback_event` row and emits no event, and it bumps the
+  owner's cache generation like any successful write.
 - Wire types live in `@life/shared` (`feedback/dto/`): `FeedbackDto = { id, app, type,
-  title, description, createdAt }` (title and description decrypted in the request path
-  only), `FeedbackType`, `CreateFeedbackInput`, `FEEDBACK_TITLE_MAX`, and
-  `FEEDBACK_DESCRIPTION_MAX` (2000).
+  title, description, status, createdAt }` (title and description decrypted in the request
+  path only; `status` is plaintext metadata like `app`/`type`), `FeedbackType`,
+  `FeedbackStatus` / `FEEDBACK_STATUS_VALUES`, `CreateFeedbackInput`, `FEEDBACK_TITLE_MAX`,
+  and `FEEDBACK_DESCRIPTION_MAX` (2000).
 
 ### Cache contract (Contract 2)
 - Read-through, per-owner generation counter bumped on successful writes, TTL backstop,
@@ -63,5 +81,11 @@ These are fixed by the confirmed intent; module specs must not re-decide them.
 
 ## Out of scope (whole map)
 
-The consuming service; SQLite↔Postgres reconciliation and data-tier migration; feedback
-status workflow; attachments; notifications; edit/delete; anonymous submission.
+The consuming service; SQLite↔Postgres reconciliation and data-tier migration;
+attachments; notifications; edit/delete; anonymous submission.
+
+**Superseded 2026-10-16:** "feedback status workflow" was listed here, out of scope; the
+confirmed intent `docs/intent/feedback-status.md` brings it in as the additive `status`
+field and `PATCH /api/feedback/:id` above (`docs/specs/SPEC-feedback-status.md`). The
+workflow's own limits stay out of scope: board/column view, custom statuses, status
+history/audit trail, per-status count badges, and status palette theming.

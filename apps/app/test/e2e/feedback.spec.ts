@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { logIn } from './journey';
 
 /**
@@ -50,3 +50,54 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await expect(row.getByText(title)).toBeVisible();
   await expect(row.getByText(description)).toBeVisible();
 });
+
+/**
+ * The status story of SPEC-feedback-status: a new entry opens with an Open
+ * pill; the row dropdown flips it to Done with no reload, so the client-side
+ * filter state survives; Open then hides the row and Done brings it back
+ * under its Done pill.
+ *
+ * Only feedback-owned selectors — the frozen selector surface is untouched.
+ */
+test('flipping an entry to Done removes it from Open and returns it under Done', async ({ page }) => {
+  const entry = {
+    title: `e2e feedback status ${Date.now()}`,
+    description: `e2e status body ${Date.now()}`,
+  };
+
+  await logIn(page);
+  await page.goto('/feedback');
+  await submitFeedback(page, entry);
+
+  const row = page.locator('li', { hasText: entry.title });
+  await expect(entryPill(row)).toHaveText('Open');
+
+  const statusDropdown = row.getByLabel(`Set status for ${entry.title}`);
+  await statusDropdown.selectOption('done');
+  await expect(entryPill(row)).toHaveText('Done');
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await expect(row).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(entryPill(row)).toHaveText('Done');
+});
+
+/** Sends one entry from /feedback's own toolbar dialog as the picked type. */
+async function submitFeedback(
+  page: Page,
+  entry: { title: string; description: string },
+): Promise<void> {
+  await page.getByRole('button', { name: 'Send feedback' }).click();
+  const form = page.getByRole('dialog');
+  await form.getByRole('button', { name: 'Enhancement' }).click();
+  await form.getByLabel('Title').fill(entry.title);
+  await form.getByLabel('Description').fill(entry.description);
+  await form.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(form).toBeHidden();
+}
+
+/** The row's one status pill; its text is the entry's visible status. */
+function entryPill(row: Locator) {
+  return row.locator('.ui-pill');
+}

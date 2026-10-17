@@ -415,10 +415,26 @@
   gap: var(--space-0-5);
 }
 
+/* The feedback title line is the same flex line: the status pill sits against
+   the title, never beside the dropdown below it. Feedback-only, and only when
+   the slot is filled, so a pill-less feedback row keeps the base title block. */
+.ui-list-item--feedback .ui-list-item__title--with-action {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-0-5);
+}
+
 /* The line's height comes from the title control (an `Input`); the title child
    grows to fill the leftover width, so `min-width: 0` lets it shrink and the
    control ellipsize rather than push the action off the line. */
 .ui-list-item--nested .ui-list-item__title--with-action > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The feedback title grows the same way: the pill keeps its width while the
+   title shrinks and ellipsizes beside it. */
+.ui-list-item--feedback .ui-list-item__title--with-action > :first-child {
   flex: 1;
   min-width: 0;
 }
@@ -436,6 +452,17 @@
 .ui-list-item--nested > .ui-icon-btn,
 .ui-list-item--nested > form {
   margin-top: var(--space-0-9);
+}
+
+/* Feedback row: title on its own line, then the description snippet, meta line,
+   and status dropdown stacked beneath it as `children`. The link becomes a column
+   (the nested precedent); `.ui-list-item__text` already stacks the title, snippet,
+   and meta line at the token gap. Both the status pill (`titleAction`) and the
+   dropdown (`children`) are data-in slots: the app passes a `Pill` and a `Select`,
+   never raw markup. */
+.ui-list-item--feedback .ui-list-item__link {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* Row tone: tint the leading done toggle of an OPEN coloured-lens row (matrix

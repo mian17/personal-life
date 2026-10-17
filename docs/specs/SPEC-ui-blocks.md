@@ -19,7 +19,7 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
                                                    //   deleteAction?,
-                                                   //   variant?="todo" | "nested",
+                                                   //   variant?="todo" | "nested" | "feedback",
                                                    //   size?="default|dense",
                                                    //   tone?="danger|amber|accent",
                                                    //   done?, collapsing?,
@@ -246,8 +246,10 @@ layout — the legacy class rode the row `li`, now carried by `ListItem`), `.not
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`, and the todo variants `.ui-list-item--todo*` / `.ui-list-item--dense*`.
 `ListItem`'s optional slots are `leading?` (a control rendered before the row body, e.g. a
-done toggle), `variant?="todo"` (todo presentation, off by default; adds
-`.ui-list-item--todo`) and `size?="default|dense"` (the todo row's scale, no effect
+done toggle), `variant?="todo" | "nested" | "feedback"` (todo presentation, nested
+child-body layout, or the feedback row below — each off by default; adding
+`.ui-list-item--todo`, `.ui-list-item--nested`, or `.ui-list-item--feedback`) and
+`size?="default|dense"` (the todo row's scale, no effect
 without the variant; `"dense"` adds `.ui-list-item--dense`). The todo variant owns the
 leading anatomy: the DEFAULT size centres the row (the leading checkbox and the action
 slots) through the base `align-items: center`; the leading toggle box is `width/height:
@@ -289,13 +291,27 @@ padding — no app-level indentation. It composes `Stack` and other blocks insid
 adds no markup of its own beyond the wrapper the base row already renders.
 
 The nested variant also takes an optional **`titleAction`** slot: a control rendered on the
-parent line beside `title` (e.g. a row's delete affordance, so it sits against the title
-control rather than beside the whole child body — a `deleteAction` sibling would steal
-horizontal width from every child row). When set, `.ui-list-item__title` becomes a
-horizontal flex line (`display: flex; align-items: stretch; gap: var(--space-0-5)`) whose
-`title` content grows (`flex: 1; min-width: 0`) and whose `titleAction` stretches to the
-line's height — so a button in the slot matches the height of a control in the title. The
-slot is `nested`-only; without it the title line keeps the base block layout.
+parent line beside `title` (a row's delete affordance, or a feedback row's status
+pill, so either sits against the title control rather than beside the whole child
+body — a `deleteAction` sibling would steal horizontal width from the row). When
+set, `.ui-list-item__title` becomes a horizontal flex line (`display: flex;
+align-items: stretch; gap: var(--space-0-5)`) whose `title` content grows (`flex: 1;
+min-width: 0`) and whose `titleAction` stretches to the line's height — so a button in
+the slot matches the height of a control in the title. The feedback variant shares
+the same title-line treatment for its pill; the slot is `nested`- and
+`feedback`-only — without it the title line keeps the base block layout.
+
+The **`feedback`** variant (`variant="feedback"`, off by default; adds
+`.ui-list-item--feedback`) presents a feedback entry on three lines: title, description
+snippet, then the meta line — and the status dropdown passed as `children` stacks
+beneath them (`flex-direction: column; align-items: stretch` on the link, the nested
+column precedent). It is the one variant that reroutes the base row's sub: the base row
+renders meta and snippet on a single line separated by a `|`, so the feedback branch
+gives the snippet its own `__sub` line above the meta line and drops the separator —
+both lines keep the base typography.
+Both the status pill (`titleAction`) and the status dropdown (`children`) are data-in
+slots — the app passes a `Pill` and a `Select`, never raw markup — so the area owns
+`.ui-list-item--feedback` and the column flow, no app-level row layout.
 
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title

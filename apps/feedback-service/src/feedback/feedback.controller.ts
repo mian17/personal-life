@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { Principal } from '../auth/principal';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { FeedbackService } from './feedback.service';
 
 /**
@@ -22,5 +23,18 @@ export class FeedbackController {
   @Get()
   findAll(@Principal() principal: Principal) {
     return this.feedback.findAll(principal.sub);
+  }
+
+  /** `200 { id, status }`; `404` for a foreign or missing id, `400` a bad status or id. */
+  @Patch(':id')
+  updateStatus(
+    @Principal() principal: Principal,
+    // Same UUID rule `POST`'s `@IsUUID('4')` enforces (`SPEC-feedback-status` §4:
+    // `400` is the only validation status): a malformed id must never reach the
+    // driver, where Postgres 22P02 on the uuid column would surface as a 500.
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateFeedbackStatusDto,
+  ) {
+    return this.feedback.updateStatus(principal.sub, id, dto.status);
   }
 }

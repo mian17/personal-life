@@ -370,6 +370,27 @@
   color: var(--on-accent);
 }
 
+/* Status pills color the chip with the vocabulary's token — the mapping the
+   feedback-status vocabulary owns (`FEEDBACK_STATUSES`), pinned against tokens.css
+   by STATUS_TOKENS in tokens.test.ts. Each class reads one existing semantic
+   token and nothing else: no new colors, no raw values. A distinct wont_do hue
+   is a user decision (SPEC-feedback-status.md open question 1). */
+.ui-pill--open {
+  color: var(--accent);
+}
+
+.ui-pill--in_progress {
+  color: var(--amber);
+}
+
+.ui-pill--done {
+  color: var(--green);
+}
+
+.ui-pill--wont_do {
+  color: var(--muted);
+}
+
 /* Interactive chip (Pill as="button"): same shell, reset the button chrome so
    only the pill geometry/active pair above carries the visual. */
 /* Interactive pill: strip ONLY the UA button chrome (appearance, font family,

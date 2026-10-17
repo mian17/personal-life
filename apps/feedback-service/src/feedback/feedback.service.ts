@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import type { CreateFeedbackInput, FeedbackDto } from '@life/shared';
+import type { CreateFeedbackInput, FeedbackDto, FeedbackStatus } from '@life/shared';
 import { Feedback } from './feedback.entity';
 import { FeedbackEvent } from './feedback-event.entity';
 import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
@@ -23,12 +23,15 @@ function descriptionAad(ownerSub: string, feedbackId: string): string {
 
 /**
  * The cached shape: a `feedback` row **as persisted** — `title` and
- * `description` are `enc.v1.` envelopes, never plaintext (Contract 2 Rule 2).
+ * `description` are `enc.v1.` envelopes, never plaintext (Contract 2 Rule 2),
+ * while `status` is plaintext workflow metadata cached beside `app`/`type`
+ * (`SPEC-feedback-status` Cache Rules).
  */
 interface CachedFeedbackRow {
   id: string;
   app: string;
   type: string;
+  status: FeedbackStatus;
   title: string;
   description: string;
   createdAt: string;
@@ -40,6 +43,7 @@ function toCachedRow(feedback: Feedback): CachedFeedbackRow {
     id: feedback.id,
     app: feedback.app,
     type: feedback.type,
+    status: feedback.status,
     title: feedback.title,
     description: feedback.description,
     createdAt: feedback.createdAt.toISOString(),
@@ -186,6 +190,30 @@ export class FeedbackService {
   }
 
   /**
+   * `PATCH /api/feedback/:id` (`SPEC-feedback-status` Service API).
+   *
+   * Owner-scoped: the row must belong to `sub`, so a foreign id reads exactly
+   * like a missing one — the same `404`, byte-identical, never `403` (the
+   * `POST` rule: existence must not leak). Setting the current status again is
+   * a no-op write returning the same `200 { id, status }`, never `409`. A
+   * status change writes the `feedback` row and bumps the owner's generation
+   * after the write commits; it writes no `feedback_event` row and emits no
+   * event, so the published `feedback.submitted` contract is untouched.
+   */
+  async updateStatus(
+    sub: string,
+    id: string,
+    status: FeedbackStatus,
+  ): Promise<{ id: string; status: FeedbackStatus }> {
+    const owned = { id, ownerSub: sub };
+    const written = await this.feedback.update(owned, { status });
+    if (!written.affected) throw new NotFoundException('Feedback not found');
+    // Bump AFTER the committed write: a thrown write must never invalidate.
+    await this.cache.bumpGeneration(sub);
+    return { id, status };
+  }
+
+  /**
    * Assemble one wire DTO from a stored row. Decrypts in the request path only
    * and fails closed: an unprefixed value is corruption (every feedback row is
    * encrypted from day one, so there is no dual-read), a missing key or a
@@ -210,6 +238,6 @@ export class FeedbackService {
       this.logger.error(`decrypt failed for feedback ${row.id}`);
       throw err;
     }
-    return { id: row.id, app: row.app, type: row.type, title, description, createdAt: row.createdAt };
+    return { id: row.id, app: row.app, type: row.type, status: row.status, title, description, createdAt: row.createdAt };
   }
 }

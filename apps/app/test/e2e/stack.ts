@@ -1,7 +1,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
-import { spawnService, waitForHttp, type SpawnedService } from './services';
+import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
 import {
   E2E_APP_SECRET,
   E2E_OWNER,
@@ -300,6 +300,22 @@ export function stopThrowawayPostgres(): void {
  * start order so the caller can record/stop them. State is reset first.
  */
 export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
+  // Before touching a build, prove every stack port is actually free. A stale
+  // listener is the one harness failure that tests the WRONG build instead of
+  // erroring: the fresh server dies with EADDRINUSE while `waitForHttp` happily
+  // answers against the stale process — whose chunk hashes are gone from disk
+  // (ChunkLoadError on the page — never a product bug).
+  const host = new URL(cfg.appOrigin).hostname;
+  await ensurePortFree(cfg.appPort, 'app', host);
+  await ensurePortFree(cfg.idpPort, 'idp', host);
+  await ensurePortFree(cfg.notePort, 'note-service', host);
+  await ensurePortFree(cfg.tagsPort, 'tags-service', host);
+  await ensurePortFree(cfg.todoPort, 'todo-service', host);
+  await ensurePortFree(cfg.mealPort, 'meal-service', host);
+  if (cfg.feedbackPort !== undefined) {
+    await ensurePortFree(cfg.feedbackPort, 'feedback-service', host);
+  }
+
   rmSync(cfg.stateDir, { recursive: true, force: true });
   mkdirSync(cfg.stateDir, { recursive: true });
 
@@ -310,91 +326,99 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   });
 
   const services: SpawnedService[] = [];
-  services.push(
-    await spawnService({
-      name: 'idp',
-      command: 'node',
-      args: ['dist/main.js'],
-      cwd: `${repoRoot()}/apps/idp`,
-      env: idpEnv(cfg),
-    }),
-  );
-
-  await build('apps/note-service');
-  services.push(
-    await spawnService({
-      name: 'note-service',
-      command: 'node',
-      args: ['dist/main.js'],
-      cwd: `${repoRoot()}/apps/note-service`,
-      env: noteEnv(cfg),
-    }),
-  );
-
-  await build('apps/tags-service');
-  services.push(
-    await spawnService({
-      name: 'tags-service',
-      command: 'node',
-      args: ['dist/main.js'],
-      cwd: `${repoRoot()}/apps/tags-service`,
-      env: tagsEnv(cfg),
-    }),
-  );
-
-  await build('apps/todo-service');
-  services.push(
-    await spawnService({
-      name: 'todo-service',
-      command: 'node',
-      args: ['dist/main.js'],
-      cwd: `${repoRoot()}/apps/todo-service`,
-      env: todoEnv(cfg),
-    }),
-  );
-
-  await build('apps/meal-service');
-  services.push(
-    await spawnService({
-      name: 'meal-service',
-      command: 'node',
-      args: ['dist/main.js'],
-      cwd: `${repoRoot()}/apps/meal-service`,
-      env: mealEnv(cfg),
-    }),
-  );
-
-  // The throwaway Postgres first: feedback-service fails closed without a DB.
-  // Skipped when the stack has no feedback port (the dev harness).
-  const feedbackPort = cfg.feedbackPort;
-  if (feedbackPort !== undefined) {
-    const feedbackDbUrl = await startThrowawayPostgres();
-    await build('apps/feedback-service');
+  try {
     services.push(
       await spawnService({
-        name: 'feedback-service',
+        name: 'idp',
         command: 'node',
         args: ['dist/main.js'],
-        cwd: `${repoRoot()}/apps/feedback-service`,
-        env: feedbackEnv(cfg, feedbackPort, feedbackDbUrl),
+        cwd: `${repoRoot()}/apps/idp`,
+        env: idpEnv(cfg),
       }),
     );
+
+    await build('apps/note-service');
+    services.push(
+      await spawnService({
+        name: 'note-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/note-service`,
+        env: noteEnv(cfg),
+      }),
+    );
+
+    await build('apps/tags-service');
+    services.push(
+      await spawnService({
+        name: 'tags-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/tags-service`,
+        env: tagsEnv(cfg),
+      }),
+    );
+
+    await build('apps/todo-service');
+    services.push(
+      await spawnService({
+        name: 'todo-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/todo-service`,
+        env: todoEnv(cfg),
+      }),
+    );
+
+    await build('apps/meal-service');
+    services.push(
+      await spawnService({
+        name: 'meal-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/meal-service`,
+        env: mealEnv(cfg),
+      }),
+    );
+
+    // The throwaway Postgres first: feedback-service fails closed without a DB.
+    // Skipped when the stack has no feedback port (the dev harness).
+    const feedbackPort = cfg.feedbackPort;
+    if (feedbackPort !== undefined) {
+      const feedbackDbUrl = await startThrowawayPostgres();
+      await build('apps/feedback-service');
+      services.push(
+        await spawnService({
+          name: 'feedback-service',
+          command: 'node',
+          args: ['dist/main.js'],
+          cwd: `${repoRoot()}/apps/feedback-service`,
+          env: feedbackEnv(cfg, feedbackPort, feedbackDbUrl),
+        }),
+      );
+    }
+
+    const app = await spawnApp(cfg);
+    services.push(app);
+
+    await waitForHttp(`http://127.0.0.1:${cfg.idpPort}/jwks`);
+    await waitForHttp(`http://127.0.0.1:${cfg.notePort}/health`);
+    await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
+    await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
+    await waitForHttp(`http://127.0.0.1:${cfg.mealPort}/health`);
+    if (cfg.feedbackPort !== undefined) {
+      await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
+    }
+    await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
+
+    return services;
+  } catch (err) {
+    // A setup that fails after some services are up must not leak them: the
+    // next run would then boot against this run's stale server — the exact
+    // EADDRINUSE + stale-chunk class the port preflight above guards.
+    for (const service of services) await service.stop();
+    throw err;
   }
-
-  const app = await spawnApp(cfg);
-  services.push(app);
-
-  await waitForHttp(`http://127.0.0.1:${cfg.idpPort}/jwks`);
-  await waitForHttp(`http://127.0.0.1:${cfg.notePort}/health`);
-  await waitForHttp(`http://127.0.0.1:${cfg.tagsPort}/health`);
-  await waitForHttp(`http://127.0.0.1:${cfg.todoPort}/health`);
-  await waitForHttp(`http://127.0.0.1:${cfg.mealPort}/health`);
-  if (cfg.feedbackPort !== undefined) {
-    await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
-  }
-  await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
-
-  return services;
 }
 
 async function spawnApp(cfg: StackConfig): Promise<SpawnedService> {

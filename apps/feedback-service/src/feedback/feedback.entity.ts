@@ -1,5 +1,10 @@
 import { Check, Column, Entity, Index, PrimaryColumn } from 'typeorm';
-import { FEEDBACK_TYPE_VALUES, type FeedbackType } from '@life/shared';
+import {
+  FEEDBACK_STATUS_VALUES,
+  FEEDBACK_TYPE_VALUES,
+  type FeedbackStatus,
+  type FeedbackType,
+} from '@life/shared';
 
 /**
  * The feedback row (`SPEC-feedback-service` Data model). `title` and
@@ -14,11 +19,13 @@ import { FEEDBACK_TYPE_VALUES, type FeedbackType } from '@life/shared';
  * direction, so this emits an ASC btree — Postgres scans a btree backward for
  * `ORDER BY created_at DESC, id DESC`, so the plan is identical.
  *
- * `CHK_feedback_type` is built from the shared vocabulary so the DB CHECK and
- * the DTO's `@IsIn` can never drift (lesson 0016: one owner per rule).
+ * `CHK_feedback_type` and `CHK_feedback_status` are built from the shared
+ * vocabularies so each DB CHECK and its DTO's `@IsIn` can never drift
+ * (lesson 0016: one owner per rule).
  */
 @Entity('feedback')
 @Check('CHK_feedback_type', `type IN (${FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',')})`)
+@Check('CHK_feedback_status', `status IN (${FEEDBACK_STATUS_VALUES.map((v) => `'${v}'`).join(',')})`)
 @Index('IDX_feedback_owner_created', ['ownerSub', 'createdAt', 'id'])
 export class Feedback {
   @PrimaryColumn({ type: 'uuid' })
@@ -32,6 +39,15 @@ export class Feedback {
 
   @Column({ type: 'text' })
   type: FeedbackType;
+
+  /**
+   * Plaintext workflow metadata alongside `app`/`type`, never an `enc.v1.`
+   * envelope: a status is operational state, not content, so it carries no
+   * AAD (`SPEC-feedback-status` Data model). The DB fills `open` on insert, so
+   * the submit flow never sends a status.
+   */
+  @Column({ type: 'text', default: 'open' })
+  status: FeedbackStatus;
 
   /** `enc.v1.` envelope; never plaintext. */
   @Column({ type: 'text' })

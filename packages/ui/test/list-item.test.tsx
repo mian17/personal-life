@@ -333,6 +333,83 @@ describe('ListItem', () => {
     expect(document.querySelector('.ui-list-item__title-action')).toBeNull();
   });
 
+  it('adds the feedback variant: a column row whose title line carries the status pill', () => {
+    render(
+      <ul>
+        <ListItem
+          variant="feedback"
+          title="Dark mode flickers"
+          meta={<time dateTime="2026-10-16">Today</time>}
+          snippet="On cold load"
+          titleAction={<span data-testid="status-pill">Open</span>}
+        >
+          <span data-testid="status-dropdown" />
+        </ListItem>
+      </ul>,
+    );
+
+    expect(classesOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item',
+      'ui-list-item--feedback',
+    ]);
+
+    // The pill rides the title line; the dropdown is the row body below it.
+    const titleLine = document.querySelector('.ui-list-item__title')!;
+    expect(classesOf(titleLine)).toEqual(['ui-list-item__title', 'ui-list-item__title--with-action']);
+    const pillSlot = document.querySelector('.ui-list-item__title-action')!;
+    expect(pillSlot.contains(screen.getByTestId('status-pill'))).toBe(true);
+    expect(titleLine.contains(pillSlot)).toBe(true);
+
+    const link = document.querySelector('.ui-list-item__link')!;
+    expect(link.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+    expect(link.contains(titleLine)).toBe(true);
+
+    // Three lines: title, then the description line, then the meta line. The
+    // base row would put both on one line separated by a `|`, so a feedback row
+    // splits them into two `__sub` lines and drops the separator.
+    const text = document.querySelector('.ui-list-item__text')!;
+    const snippet = document.querySelector('.ui-list-item__snippet')!;
+    const subLines = text.querySelectorAll('.ui-list-item__sub');
+    expect(snippet.textContent).toBe('On cold load');
+    expect(subLines).toHaveLength(2);
+    expect(subLines[0].contains(snippet)).toBe(true);
+    expect(subLines[1].textContent).toBe('Today');
+    expect(text.firstElementChild).toBe(titleLine);
+    expect(titleLine.nextElementSibling).toBe(subLines[0]);
+    expect(subLines[0].nextElementSibling).toBe(subLines[1]);
+    expect(document.querySelector('.ui-list-item__sep')).toBeNull();
+
+    const css = blocksCss();
+    const linkFlow = cssBlock(css, '.ui-list-item--feedback .ui-list-item__link');
+    expect(linkFlow).toMatch(/flex-direction:\s*column/);
+    expect(linkFlow).toMatch(/align-items:\s*stretch/);
+
+    const line = cssBlock(css, '.ui-list-item--feedback .ui-list-item__title--with-action');
+    expect(line).toMatch(/display:\s*flex/);
+    expect(line).toMatch(/align-items:\s*stretch/);
+    expect(line).toMatch(/gap:\s*var\(--space-0-5\)/);
+
+    const titleChild = cssBlock(
+      css,
+      '.ui-list-item--feedback .ui-list-item__title--with-action > :first-child',
+    );
+    expect(titleChild).toMatch(/flex:\s*1/);
+    expect(titleChild).toMatch(/min-width:\s*0/);
+  });
+
+  it('leaves the feedback title a plain block when no pill is given', () => {
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers" />
+      </ul>,
+    );
+
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toEqual([
+      'ui-list-item__title',
+    ]);
+    expect(document.querySelector('.ui-list-item__title-action')).toBeNull();
+  });
+
   it('adds a tone class for a coloured lens row, and none without a tone', () => {
     const { unmount } = render(
       <ul>

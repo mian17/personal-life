@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { FEEDBACK_STATUSES } from '../src/components/feedback-status';
 
 const root = join(__dirname, '..');
 
@@ -116,6 +117,18 @@ const BREAKPOINTS = {
   '2xl': '1536px',
 } as const;
 
+/**
+ * New status colors stay off the frozen color surface: only `--accent` /
+ * `--amber` / `--green` / `--muted` appear here, and a distinct `wont_do`
+ * hue needs explicit user approval (SPEC-feedback-status.md open question 1).
+ */
+const STATUS_TOKENS = {
+  open: '--accent',
+  in_progress: '--amber',
+  done: '--green',
+  wont_do: '--muted',
+} as const;
+
 /** Spacing scale — exactly the 20 distinct rem literals in globals.css. */
 const SPACING_REM = {
   '--space-0-15': '0.15rem',
@@ -213,6 +226,24 @@ describe('tokens.css — frozen token contract', () => {
 
   it('uses exactly the frozen px inventory, no invented values', () => {
     expect(unitValues(tokens, 'px').sort()).toEqual([...FROZEN_PX].sort());
+  });
+});
+
+describe('status → token mapping', () => {
+  const tokensCss = read('src/styles/tokens.css');
+
+  it('pins every status to the frozen token table', () => {
+    const rendered = Object.fromEntries(
+      FEEDBACK_STATUSES.map(({ value, token }) => [value, token]),
+    );
+    expect(rendered).toEqual(STATUS_TOKENS);
+  });
+
+  it('reads four distinct tokens declared in tokens.css', () => {
+    const decls = declarations(tokensCss, ':root');
+    const mappedTokens = Object.values(STATUS_TOKENS);
+    for (const token of mappedTokens) expect(decls[token]).toBeDefined();
+    expect(new Set(mappedTokens).size).toBe(4);
   });
 });
 

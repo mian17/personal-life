@@ -122,6 +122,20 @@ approval — `--danger-soft`, `--amber`, and `--green`. They back the `DueDate` 
 They are pinned by `DARK_COLORS` / `LIGHT_COLORS` in
 `packages/ui/test/tokens.test.ts`.
 
+Feedback status pills reuse those same semantic tokens — one token per status, no new
+value on the frozen color surface. `wont_do` maps to `--muted`; a distinct hue would be
+a new value and needs explicit user approval (`SPEC-feedback-status.md` open question 1).
+This mapping is owned by `packages/ui/src/components/feedback-status.ts` and pinned by
+`STATUS_TOKENS` in `packages/ui/test/tokens.test.ts`, so a drift in the component fails
+the token suite.
+
+| Status | Label | Token | Dark | Light |
+|---|---|---|---|---|
+| `open` | Open | `--accent` | `#5b8cff` | `#2f6bff` |
+| `in_progress` | In Progress | `--amber` | `#f2b64c` | `#b45309` |
+| `done` | Done | `--green` | `#4cc38a` | `#15803d` |
+| `wont_do` | Won't Do | `--muted` | `#8b93a7` | `#5c6577` |
+
 Spacing/dimension tokens cover **exactly** the length literals present in
 `globals.css` (both inventories grep-derived and locked in the token-value test):
 rem values `0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9,

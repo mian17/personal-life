@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
-import type { CreateFeedbackInput, FeedbackSubmitResult } from '@life/shared';
-import { createFeedback } from '@/lib/feedback-api';
+import type { CreateFeedbackInput, FeedbackStatus, FeedbackSubmitResult } from '@life/shared';
+import { createFeedback, updateFeedbackStatus } from '@/lib/feedback-api';
 
 /**
  * The submit seam every app's toolbar item calls (SPEC-feedback-ui). Any
@@ -20,5 +20,24 @@ export async function submitFeedbackAction(
   } catch (error) {
     unstable_rethrow(error);
     return { ok: false, message: "Couldn't send feedback. Try again." };
+  }
+}
+
+/**
+ * The per-row status seam the inbox dropdown calls (SPEC-feedback-status). A
+ * failed write becomes one message the row renders, the failure contract
+ * `submitFeedbackAction` already sets.
+ */
+export async function setFeedbackStatusAction(
+  id: string,
+  status: FeedbackStatus,
+): Promise<FeedbackSubmitResult> {
+  try {
+    await updateFeedbackStatus(id, status);
+    revalidatePath('/feedback');
+    return { ok: true, id };
+  } catch (error) {
+    unstable_rethrow(error);
+    return { ok: false, message: "Couldn't update status. Try again." };
   }
 }
