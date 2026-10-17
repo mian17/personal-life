@@ -24,7 +24,7 @@ import {
 } from '@life/ui';
 import type { MealEntry, MealFood, MealGroup, PhotoEstimateItem, PhotoFailureReason } from '@/lib/meal-api';
 import { estimatePhotoAction, saveAsMealAction, saveEntryAction } from './actions';
-import { FoodPicker, type PickerFood } from './food-picker';
+import { FoodSearch, type PickerFood } from './food-picker';
 
 /**
  * The review-correct editor (`SPEC-meal-capture-ui`): the photo door's
@@ -194,23 +194,25 @@ export function MealEditor({
   foodName,
   door = null,
   foods = [],
+  defaultMealGroup,
 }: {
   entry: MealEntry | null;
   date: string;
   nutrition: NutritionFields;
   /** A restored entry's dish name, resolved against the catalog by the page. */
   foodName?: string;
-  /** Which manual door opened this editor; `'food'` starts on the catalog picker. */
+  /** Which manual door opened this editor; `'food'` logs by catalog search (no photo section). */
   door?: MealDoor | null;
+  /** The server-derived group a new entry starts on (the client's local hour); `'lunch'` outside a request scope. */
+  defaultMealGroup?: MealGroup;
   /** The catalog the `'food'` door picks from, with per-100 facts the page formatted. */
   foods?: PickerFood[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  // The food door's pick step: the picker owns the screen until a food is
-  // confirmed, then `confirmFood` hands over to the review step.
-  const [picked, setPicked] = useState(false);
-  const picking = door === 'food' && entry === null && !picked;
+  // The manual door logs by search: the editor starts empty and every confirmed
+  // pick appends, while every other door keeps its single pre-seeded review row.
+  const manual = door === 'food' && entry === null;
   const [items, setItems] = useState<EditorItem[]>(
     entry
       ? [
@@ -230,11 +232,13 @@ export function MealEditor({
             known: nutrition.fields.map(({ key }) => key),
           },
         ]
-      : picking
+      : manual
         ? []
         : [{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }],
   );
-  const [mealGroup, setMealGroup] = useState<MealGroup>(entry?.mealGroup ?? 'lunch');
+  const [mealGroup, setMealGroup] = useState<MealGroup>(
+    entry?.mealGroup ?? defaultMealGroup ?? 'lunch',
+  );
   const [hint, setHint] = useState('');
   const [mealName, setMealName] = useState('');
   const [estimating, setEstimating] = useState(false);
@@ -338,19 +342,20 @@ export function MealEditor({
   }
 
   /**
-   * The manual-log door's one seeding path (`SPEC-manual-log-ui`): the picked
-   * food × amount becomes one confirmed item — catalog facts the user already
-   * trusted, snapshotted at the confirmed quantity — so the review step carries
-   * real numbers with `known` at headline depth. Saving runs the single
-   * existing path; there is no second save route for this door.
+   * The manual-log door's seeding path (`SPEC-manual-log-ui`): each picked
+   * food × amount is appended as one confirmed item — catalog facts the user
+   * already trusted, snapshotted at the confirmed quantity — so the review step
+   * carries real numbers with `known` at headline depth. Appending is the point:
+   * the search stays open for the next food and the save path already writes one
+   * row per item.
    */
   function confirmFood(food: MealFood, quantity: number): void {
     // The entry stores the **per-serving** vector scaled by the logged quantity;
     // `scaleVector` is the same linear rule `@life/nutrition`'s `scale()` runs,
     // kept local so the package never enters the browser bundle (plan Task 14).
     const nutrients = scaleVector(food.nutrients, quantity);
-    setPicked(true);
-    setItems([
+    setItems((prev) => [
+      ...prev,
       {
         dish: food.name,
         foodId: food.id,
@@ -550,18 +555,20 @@ export function MealEditor({
         )
       }
     >
-      <Section label="Add from photo — optional steering hint, never a correction">
-        <FilePicker label="Choose a photo" accept="image/*" onFiles={onPhoto}>
-          <Camera size={20} aria-hidden />
-        </FilePicker>
-        <Textarea
-          aria-label="Photo hint (optional)"
-          placeholder="Steer the guess (optional), e.g. leftover from last night"
-          value={hint}
-          onChange={(event) => setHint(event.target.value)}
-        />
-        {estimating && <StatusText>Reading the photo…</StatusText>}
-      </Section>
+      {door !== 'food' && (
+        <Section label="Add from photo — optional steering hint, never a correction">
+          <FilePicker label="Choose a photo" accept="image/*" onFiles={onPhoto}>
+            <Camera size={20} aria-hidden />
+          </FilePicker>
+          <Textarea
+            aria-label="Photo hint (optional)"
+            placeholder="Steer the guess (optional), e.g. leftover from last night"
+            value={hint}
+            onChange={(event) => setHint(event.target.value)}
+          />
+          {estimating && <StatusText>Reading the photo…</StatusText>}
+        </Section>
+      )}
 
       <Section label="Meal">
         <Select
@@ -572,18 +579,22 @@ export function MealEditor({
         />
       </Section>
 
-      {picking ? (
-        <FoodPicker foods={foods} onPick={confirmFood} />
-      ) : (
+      {manual && <FoodSearch foods={foods} onPick={confirmFood} />}
+
       <Section label="Items" actions={<Button size="bare" onClick={addItem}>Add item</Button>}>
         <StatusText>Grams scale the numbers below; a blank value means unknown, not zero.</StatusText>
         {items.length === 0 ? (
-          <EmptyState body="Nothing to review yet. Add an item or send a photo." />
+          <EmptyState
+            body={
+              manual
+                ? 'Nothing logged yet. Search a food above to add it.'
+                : 'Nothing to review yet. Add an item or send a photo.'
+            }
+          />
         ) : (
           <List>{items.map(itemForm)}</List>
         )}
       </Section>
-      )}
 
       <Section label="Total">
         <StatusText>{total}</StatusText>

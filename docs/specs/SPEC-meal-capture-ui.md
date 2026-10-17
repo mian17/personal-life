@@ -4,8 +4,9 @@ Module id: `meal-capture-ui` (see `MAP-meal-nutrition.md`). Depends on: `meal-se
 
 ## Objective
 
-The user-facing surface: the photo entry door (whose editor also serves manual entry),
-the review-and-correct step, the day view with total vs target, and the saved-meals list.
+The user-facing surface: the photo entry door (whose editor also serves the manual
+catalog-search door, `SPEC-manual-log-ui`), the review-and-correct step, the day view with
+total vs target, and the saved-meals list.
 
 This module introduces **no visual language of its own**. Every element composes a `@life/ui`
 primitive; any gap is fixed upstream in `packages/ui` per Contract 1 Rule 3, never patched here.
@@ -69,7 +70,10 @@ or `PillGroup`, forms use `Input`/`Select`/`Textarea`.
 - Never show a fabricated `0` for an estimated-but-unknown value; render the model's
   "unknown" affordance (an em dash) — the intent doc's "must never invent numbers".
 - Any inline hint text on the photo door is `Textarea` (optional, clearly labelled as
-  steering the guess, not correcting it).
+  steering the guess, not correcting it). The editor's `Add from photo` section — the
+  `FilePicker` and that hint — renders only when the door is not the manual food door
+  (`door !== 'food'`), so it is present on the photo door and when editing an existing
+  entry, and absent on the catalog-search door.
 
 ## Date rules
 

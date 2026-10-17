@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { FabMenu, Pill } from '@life/ui';
-import { Camera } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 /**
  * The day view's two log doors (`SPEC-manual-log-ui`): photo capture and the
- * manual food picker. `FabMenu` is a controlled block that stores no open
+ * manual food search. `FabMenu` is a controlled block that stores no open
  * state, so the one bit of state lives in this client island — the day view
- * itself stays a server component. The photo option keeps the visible name the
- * e2e journey pins (`PHOTO_DOOR`).
+ * itself stays a server component. The plus icon is the "add a meal" affordance
+ * (a camera read as "photo only"); the option names are the frozen e2e strings
+ * (`PHOTO_DOOR` / `FOOD_DOOR`), so they stay verbatim.
  */
 export function MealDoors() {
   const [open, setOpen] = useState(false);
@@ -17,7 +18,7 @@ export function MealDoors() {
   return (
     <FabMenu
       label="Log a meal"
-      icon={<Camera size={28} strokeWidth={2.5} aria-hidden />}
+      icon={<Plus size={28} strokeWidth={2.5} aria-hidden />}
       open={open}
       onOpenChange={setOpen}
     >

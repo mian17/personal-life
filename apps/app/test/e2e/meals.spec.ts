@@ -219,8 +219,8 @@ test.describe('meals foods catalog', () => {
 
 /**
  * The manual-log act as one user sentence (`SPEC-manual-log-ui` Testing
- * Strategy): a saved staple, the FAB's manual door, the picker's amount, the
- * seeded review, the one save path — and then the history guard, because this
+ * Strategy): a saved staple, the FAB's manual door, the search-first picker's
+ * appended review, the one save path — and then the history guard, because this
  * journey owns the one logged entry. Rewriting the food's facts and deleting it
  * must leave that entry's row and the day total byte-identical.
  */
@@ -239,22 +239,33 @@ test.describe('meals manual log', () => {
     });
     await openDayView(page);
 
-    // The manual door: FAB menu → picker → amount → seeded review.
+    // The manual door: FAB menu → search-first picker → appended review item.
     await openDoor(page, FOOD_DOOR);
-    await page.getByRole('button', { name: `Log ${FOOD}`, exact: true }).click();
-    await page.getByLabel('Amount in ml').fill('250');
-    await page.getByRole('button', { name: 'Log food', exact: true }).click();
+    // The search opens empty: the catalog is not dumped, so no food is offered
+    // until the user types (`SPEC-manual-log-ui`).
+    await expect(page.getByLabel('Search foods')).toBeVisible();
+    await expect(page.getByRole('button', { name: `Log ${FOOD}`, exact: true })).toHaveCount(0);
 
-    // The picker seeds one review item with the catalog's own numbers: 250 ml
-    // at a per-100 ml base is 2.5 servings, so 52 kcal × 2.5 is 130 — real
-    // numbers, never the unknown dash (`SPEC-manual-log-ui` assumption 3).
+    // Type the staple's name; its suggestion row appears, and its `Log` control
+    // appends the pick to the review below.
+    await page.getByLabel('Search foods').fill(FOOD);
+    await page.getByRole('button', { name: `Log ${FOOD}`, exact: true }).click();
+
+    // The pick appends one review item at the default 100 ml — one serving over
+    // the 100 base — carrying the catalog's own numbers, never the unknown dash
+    // (`SPEC-manual-log-ui` assumption 3).
     await expect(page.getByLabel('Food for item 1')).toHaveValue(FOOD);
-    await expect(page.getByLabel(`Grams for ${FOOD}`)).toHaveValue('250');
+    await expect(page.getByLabel(`Grams for ${FOOD}`)).toHaveValue('100');
+    await expect(page.getByLabel(`Calories for ${FOOD}`)).toHaveValue('52');
+
+    // Correct the portion inline: 250 ml at a per-100 ml base is 2.5 servings,
+    // so 52 kcal × 2.5 rescales to 130 — real numbers, never a fabricated 0.
+    await page.getByLabel(`Grams for ${FOOD}`).fill('250');
     await expect(page.getByLabel(`Calories for ${FOOD}`)).toHaveValue('130');
 
     // Breakfast on today, then the one save path every door shares. The
     // group control is a native `select`, so scope by element to the label the
-    // editor owns — `getByLabel` alone matches the picker's `Amount` step too.
+    // editor owns.
     await page.locator('select[aria-label="Meal"]').selectOption('breakfast');
     await page.getByLabel('Save meal').click();
     await page.waitForURL(/\/meals$/, { timeout: 15_000 });

@@ -1,14 +1,14 @@
 /**
  * The manual-log door (`SPEC-manual-log-ui`): two FAB options on the day view,
- * the unit/count picker from a catalog row, and the editor seeding the review
- * from the confirmed pick. Node-env: `useState` is position-keyed and persists
- * across `renderTree` calls (the pattern `meal-editor.test.tsx` uses), and
- * handlers are exercised through the element tree, not a DOM.
+ * the search-first multi-add picker over a catalog row, and the editor seeding
+ * the review from the confirmed pick. Node-env: `useState` is position-keyed and
+ * persists across `renderTree` calls (the pattern `meal-editor.test.tsx` uses),
+ * and handlers are exercised through the element tree, not a DOM.
  */
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, ButtonLink, EmptyState, Input, Pill, SearchField } from '@life/ui';
+import { Button, ButtonLink, EmptyState, Input, SearchField } from '@life/ui';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -27,7 +27,7 @@ jest.mock('@/lib/client', () => ({
 
 import { MealDoors } from '@/app/(meals)/meals/meal-doors';
 import { MealEditor, type EditorItem, type NutritionFields } from '@/app/(meals)/meals/entry/[id]/editor';
-import { FoodPicker, loggedQuantity, type PickerFood } from '@/app/(meals)/meals/entry/[id]/food-picker';
+import { FoodSearch, type PickerFood } from '@/app/(meals)/meals/entry/[id]/food-picker';
 import type { MealEntry, MealFood } from '@/lib/meal-api';
 
 const ReactModule = jest.requireActual<typeof import('react')>('react');
@@ -114,15 +114,9 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    const top = FoodPicker(props) as ReactElement<Record<string, unknown>>;
-    // `FoodPicker` returns its step's element (`FoodChoices`/`AmountStep`), not
-    // raw fields — expand one level so the step's controls are observable. The
-    // inner call keeps consuming the same position-keyed store the hooks own.
-    const inner = top.type as unknown as ((p: Record<string, unknown>) => ReactElement) & { name?: string };
-    if (typeof inner === 'function' && (inner.name === 'FoodChoices' || inner.name === 'AmountStep' || inner.name === 'EmptyCatalog')) {
-      return inner(top.props);
-    }
-    return top;
+    // `FoodSearch` returns its `Section` tree outright, so the field and rows are
+    // observable through the element tree `find` walks.
+    return FoodSearch(props) as ReactElement;
   }
 
   return { renderTree, renderPicker, store, restore: () => { spy.mockRestore(); ctxSpy.mockRestore(); } };
@@ -170,44 +164,33 @@ describe('manual-log door', () => {
     }
   });
 
-  it('keeps the quantity rule linear with no conversion: unit value or count × measure over the base', () => {
-    const per100 = food({ servingGrams: 100 });
-    const carton = { id: 'carton', label: 'carton', amount: 1000, nutrients: vector({ calories: 600 }) };
-    // Half, one, and two of the food's own unit — the scale plan pins (0.5×, 1×, 2×).
-    expect(loggedQuantity(per100, { kind: 'unit', value: 50 })).toBe(0.5);
-    expect(loggedQuantity(per100, { kind: 'unit', value: 100 })).toBe(1);
-    expect(loggedQuantity(per100, { kind: 'unit', value: 200 })).toBe(2);
-    expect(loggedQuantity(per100, { kind: 'unit', value: 250 })).toBe(2.5);
-    // The counted branch is the same line with count as the multiplier.
-    expect(loggedQuantity(per100, { kind: 'measure', count: 0.5, measure: carton })).toBe(5);
-    expect(loggedQuantity(per100, { kind: 'measure', count: 1, measure: carton })).toBe(10);
-    expect(loggedQuantity(per100, { kind: 'measure', count: 2, measure: carton })).toBe(20);
-  });
-
-  it('shows the picker while unpicked, then swaps to the seeded review with the pick snapshotted', () => {
+  it('keeps the search picker open and appends each confirmed pick to the review', () => {
     const harness = stateHarness();
     try {
       const picking = harness.renderTree();
-      // The pick step owns the screen: the picker element is present and the
-      // review's own item rows are not.
-      const picker = find(picking, FoodPicker);
+      // The food door's review starts empty: the search is the only picker and
+      // no review row exists yet.
+      const picker = find(picking, FoodSearch);
       expect(picker).toBeDefined();
       expect(find(picking, Input, (el) => el.props['aria-label'] === 'Food for item 1')).toBeUndefined();
 
       (picker!.props.onPick as (f: MealFood, q: number) => void)(food(), 2.5);
 
       const reviewing = harness.renderTree();
-      expect(find(reviewing, FoodPicker)).toBeUndefined();
+      // The search stays mounted so the next food can be added straight away.
+      expect(find(reviewing, FoodSearch)).toBeDefined();
       const dish = find(reviewing, Input, (el) => el.props['aria-label'] === 'Food for item 1');
       expect(dish!.props.value).toBe('Milk');
       // The pick's per-100 vector scaled by the logged quantity: 60 kcal × 2.5.
       const calories = find(reviewing, Input, (el) => el.props['aria-label'] === 'Calories for Milk');
       expect(calories!.props.value).toBe('150');
 
-      // The seeded item carries the food's identity and its headline facts:
+      // The appended item carries the food's identity and its headline facts:
       // the catalog id, the per-100 vector scaled by 2.5 (60 kcal → 150), and a
       // `known` set at headline depth — never the 27-key estimate fingerprint.
-      const seeded = harness.store[1] as EditorItem[];
+      // `items` is the editor's first `useState`, so the position-keyed store
+      // holds the appended item at index 0.
+      const seeded = harness.store[0] as EditorItem[];
       expect(seeded).toHaveLength(1);
       expect(seeded[0].foodId).toBe('f1');
       expect(seeded[0].nutrients.calories).toBe(150);
@@ -217,42 +200,7 @@ describe('manual-log door', () => {
     }
   });
 
-  it('picks a catalog food, offers its named measure, and confirms the counted amount', () => {
-    const harness = stateHarness();
-    const picked: { food: MealFood; quantity: number }[] = [];
-    const pickProps = (): { foods: PickerFood[]; onPick: (f: MealFood, q: number) => void } => ({
-      foods: [{ food: food(), per100Calories: 'per 100 ml · 60 kcal' }],
-      onPick: (f: MealFood, q: number) => picked.push({ food: f, quantity: q }),
-    });
-    try {
-      // Step one: the catalog row logs on its own button.
-      const choose = harness.renderPicker(pickProps());
-      expect(find(choose, SearchField)).toBeDefined();
-      (find(choose, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
-
-      // Step two defaults (AC2): the unit box arrives at 100 of the food's own
-      // unit, so confirming without typing logs exactly that serving (100/100).
-      const amount = harness.renderPicker(pickProps());
-      expect(find(amount, Input, (el) => el.props['aria-label'] === 'Amount in ml')!.props.value).toBe('100');
-      (find(amount, Button, (el) => el.props.children === 'Log food')!.props.onClick as () => void)();
-      expect(picked).toEqual([{ food: food(), quantity: 1 }]);
-
-      // The named measure replaces the unit box and its count arrives at 1 —
-      // an untyped confirm logs one carton (1000/100 = 10).
-      const toggled = harness.renderPicker(pickProps());
-      (find(toggled, Pill, (el) => el.props.children === 'carton')!.props.onClick as () => void)();
-
-      const counted = harness.renderPicker(pickProps());
-      expect(find(counted, Input, (el) => el.props['aria-label'] === 'Number of carton')!.props.value).toBe('1');
-      (find(counted, Button, (el) => el.props.children === 'Log food')!.props.onClick as () => void)();
-
-      expect(picked).toEqual([{ food: food(), quantity: 1 }, { food: food(), quantity: 10 }]);
-    } finally {
-      harness.restore();
-    }
-  });
-
-  it('narrows the catalog rows in memory as the query changes and reports an empty match', () => {
+  it('lists nothing until a query arrives, then narrows to matching foods', () => {
     const harness = stateHarness();
     const pickProps = (): { foods: PickerFood[]; onPick: (f: MealFood, q: number) => void } => ({
       foods: [
@@ -262,21 +210,56 @@ describe('manual-log door', () => {
       onPick: () => undefined,
     });
     try {
-      const choose = harness.renderPicker(pickProps());
-      expect(find(choose, Button, (el) => el.props['aria-label'] === 'Log Milk')).toBeDefined();
-      expect(find(choose, Button, (el) => el.props['aria-label'] === 'Log Oats')).toBeDefined();
+      // An empty query lists no row at all — the whole catalog is not dumped.
+      const blank = harness.renderPicker(pickProps());
+      expect(find(blank, SearchField)).toBeDefined();
+      expect(find(blank, Button, (el) => el.props['aria-label'] === 'Log Milk')).toBeUndefined();
+      expect(find(blank, Button, (el) => el.props['aria-label'] === 'Log Oats')).toBeUndefined();
 
       // The emitted query filters the rows in memory — Milk drops, Oats stays.
-      (find(choose, SearchField)!.props.onQueryChange as (q: string) => void)('oats');
+      (find(blank, SearchField)!.props.onQueryChange as (q: string) => void)('oats');
       const narrowed = harness.renderPicker(pickProps());
       expect(find(narrowed, Button, (el) => el.props['aria-label'] === 'Log Milk')).toBeUndefined();
       expect(find(narrowed, Button, (el) => el.props['aria-label'] === 'Log Oats')).toBeDefined();
 
       // A query matching nothing swaps the list for the empty-match state.
       (find(narrowed, SearchField)!.props.onQueryChange as (q: string) => void)('zzz');
-      const empty = harness.renderPicker(pickProps());
-      const note = find(empty, EmptyState, (el) => typeof el.props.body === 'string' && el.props.body.includes('No food name contains'));
-      expect(note).toBeDefined();
+      const miss = harness.renderPicker(pickProps());
+      expect(find(miss, EmptyState, (el) => typeof el.props.body === 'string' && el.props.body.includes('No food name contains'))).toBeDefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('logs the tapped row at 100 over its base and keeps the query for the next pick', () => {
+    const harness = stateHarness();
+    const picked: { food: MealFood; quantity: number }[] = [];
+    const pickProps = (overrides: Partial<MealFood> = {}): { foods: PickerFood[]; onPick: (f: MealFood, q: number) => void } => ({
+      foods: [{ food: food(overrides), per100Calories: 'per 100 ml · 60 kcal' }],
+      onPick: (f: MealFood, q: number) => picked.push({ food: f, quantity: q }),
+    });
+    try {
+      // One serving for the canonical 100 g base: 100 / servingGrams = 1.
+      const first = harness.renderPicker(pickProps());
+      (find(first, SearchField)!.props.onQueryChange as (q: string) => void)('milk');
+      const listed = harness.renderPicker(pickProps());
+      (find(listed, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      expect(picked).toEqual([{ food: food(), quantity: 1 }]);
+
+      // The query survives the pick, so the row is still there for a second tap.
+      const again = harness.renderPicker(pickProps());
+      expect(find(again, SearchField)!.props.value).toBe('milk');
+      (find(again, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      expect(picked).toEqual([
+        { food: food(), quantity: 1 },
+        { food: food(), quantity: 1 },
+      ]);
+
+      // The default is one 100-unit serving in the food's own unit, not one serving:
+      // a 50 g base food is 100 / 50 = 2.
+      const halfBase = harness.renderPicker(pickProps({ servingGrams: 50 }));
+      (find(halfBase, Button, (el) => el.props['aria-label'] === 'Log Milk')!.props.onClick as () => void)();
+      expect(picked[2].quantity).toBe(2);
     } finally {
       harness.restore();
     }

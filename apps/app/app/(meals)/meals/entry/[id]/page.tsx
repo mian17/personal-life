@@ -15,7 +15,7 @@ import {
   restoredFoodName,
   type MealFood,
 } from '@/lib/meal-api';
-import { getToday } from '@/lib/today';
+import { getDefaultMealGroup, getToday } from '@/lib/today';
 import { MealEditor, type NutritionFields } from './editor';
 import type { PickerFood } from './food-picker';
 
@@ -101,6 +101,7 @@ export default async function MealEntryPage({
     // never a broken door.
     const mealDoor = (await searchParams).door === 'food' ? ('food' as const) : null;
     const date = await getToday();
+    const defaultMealGroup = await getDefaultMealGroup();
     const foods = mealDoor === 'food' ? pickerFoods(await listMealFoods()) : [];
     return (
       <MealEditor
@@ -109,6 +110,7 @@ export default async function MealEntryPage({
         nutrition={NUTRITION}
         door={mealDoor}
         foods={foods}
+        defaultMealGroup={defaultMealGroup}
       />
     );
   }

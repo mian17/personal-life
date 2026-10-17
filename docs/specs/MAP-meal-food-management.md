@@ -35,20 +35,22 @@ Correct me now or the specs below stand on them.
    portions and is untouched (out of scope).
 6. **Entry contract unchanged.** `CreateEntryDto` keeps `quantity` ("the number the
    snapshot was scaled by"). A manual amount `a` (food's unit) logs
-   `quantity = a / food.servingGrams`; a measure `m` × count `c` logs
-   `quantity = (m.amount × c) / food.servingGrams`. The snapshot is computed client-side
-   with `@life/nutrition`'s `scale()` before confirm, exactly as today.
+   `quantity = a / food.servingGrams` — the manual door picks at the default 100
+   (one serving) and adjusts it inline in the item row's `Grams` field, so no separate
+   amount or named-measure step exists there. The snapshot is computed client-side with
+   `@life/nutrition`'s `scale()` before confirm, exactly as today.
 7. **Day-view row meta stays `× {quantity}`** — visible text is the frozen e2e selector
    surface. Richer amount labels ("250 ml", "1 carton") are deferred to an open
    question, not silently changed.
-8. **The FAB becomes a two-option dropdown.** This changes frozen selectors; the
-   confirmed intent is the explicit approval for exactly this change. The photo option
-   keeps the exact visible name `Log meal from photo` (e2e `PHOTO_DOOR`), so only the
-   FAB's own selector moves from a bare link to a menu option.
-9. **The manual door reuses the existing entry editor** (`/meals/entry/new?door=food`):
-   the picker seeds one editor item, and the existing review/confirm/save path runs
-   unchanged (`SPEC-meal-capture-ui`: "keep the review step before any save"). No
-   bespoke wizard.
+8. **The FAB becomes a two-option dropdown** (`FabMenu`, trigger icon lucide `Plus` —
+   a camera read as "photo only"). This changes frozen selectors; the confirmed intent is
+   the explicit approval for exactly this change. Both option names stay verbatim —
+   `Log meal from photo` (e2e `PHOTO_DOOR`) and `Log food` — so only the FAB's own
+   selector/icon moves, never the option names.
+9. **The manual door reuses the existing entry editor** (`/meals/entry/new?door=food`),
+   search-first and multi-add: each catalog pick appends one editor item on the same
+   screen, and the existing review/confirm/save path runs unchanged
+   (`SPEC-meal-capture-ui`: "keep the review step before any save"). No bespoke wizard.
 10. **`@life/nutrition` is untouched** — its arithmetic is unit-agnostic numbers; the
     `g`/`ml` literal is display data carried on the food.
 11. **Deleting a food is the existing soft delete.** Entries and their confirmed
@@ -61,7 +63,7 @@ Correct me now or the specs below stand on them.
 |---|---|---|
 | `food-units` | The Lose It! unit contract on the **existing** `api/foods` surface: one canonical unit per food (`g`/`ml`) chosen at creation, per-100 base facts, named measures carrying explicit amounts in the food's unit (no g↔ml conversion anywhere), server-derived measure vectors via `scale()`, and the log-amount → entry-quantity semantics. Extends `apps/meal-service/src/foods/` + `apps/app/lib/meal-api.ts` types. No new backend service. | (extends `meal-service`, shipped) |
 | `food-catalog-ui` | The food-catalog management screen — list/search, create, edit, delete — behind a meals top-nav icon button, with per-100 facts typed by hand (never model-filled). | `food-units` |
-| `manual-log-ui` | The manual log door: the day-view FAB becomes a two-option dropdown (photo capture / log food), and "log food" runs pick catalog food × amount → seeds the entry editor → meal group + date → confirmed snapshot. | `food-units` |
+| `manual-log-ui` | The manual log door: the day-view FAB becomes a two-option dropdown (photo capture / log food), and "log food" runs search-first multi-add over the catalog → appends editor items → meal group + date → confirmed snapshot. | `food-units` |
 
 Build order: `food-units` → `food-catalog-ui` + `manual-log-ui` (the two UI modules are
 independent after the contract lands; end-to-end verification of `manual-log-ui` naturally
@@ -74,9 +76,9 @@ quantity semantics) — the UI specs consume it and never redefine it.
 ## 2. Notes on boundaries
 
 - Both UI modules touch `@life/ui` and introduce no visual language of their own
-  (Contract 1). The one real gap — a FAB with a dropdown of actions — is fixed upstream
-  in `packages/ui` (`FabMenu`), spec'd in `SPEC-ui-blocks.md` + `MAP-ui-primitives.md` in
-  the same change, never hand-rolled in the app.
+  (Contract 1). The one real gap — a FAB with a dropdown of actions — was fixed upstream
+  in `packages/ui` (`FabMenu`, registered in `MAP-ui-primitives.md` and spec'd in
+  `SPEC-ui-blocks.md`), never hand-rolled in the app.
 - `food-units` touches a backend service, so `SPEC-food-units.md` carries the mandatory
   `## Cache Rules` section (Contract 2, Rule 4) even though it adds no new cache: the
   cached food row shape gains the `unit` column.
@@ -94,5 +96,5 @@ quantity semantics) — the UI specs consume it and never redefine it.
   `day.tsx:116` comment): name snapshot on the entry vs. deleted-row name resolution —
   deferred; nutrient history is preserved either way.
 - Whether the photo-failure manual item (the `editor.tsx:79` dish-name stand-in) should
-  also gain the food picker: motivated by the intent's "why now" but adjacent to the
+  also gain the catalog search: motivated by the intent's "why now" but adjacent to the
   photo-capture path the intent keeps out of scope. Left open.
