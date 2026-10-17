@@ -43,7 +43,7 @@ const noopStatusAction = async (
 
 const STATUS_FAILURE = "Couldn't update status. Try again.";
 
-/** The plain string the server page assembles and hands across the boundary. */
+/** The settings path the inbox builds itself through `settingsHref('/feedback')`. */
 const SETTINGS_HREF = '/feedback/settings';
 
 function fb(
@@ -69,38 +69,19 @@ function rowSnippets(html: string): string[] {
   return [...html.matchAll(/ui-list-item__snippet">([^<]*)</g)].map((m) => m[1]);
 }
 
-function render(entries: FeedbackDto[]): string {
+/**
+ * The inbox render under a preset `status` — the same validated prop the server
+ * page hands down after reading `?status=` (`render(entries)` is All).
+ */
+function render(entries: FeedbackDto[], status?: FeedbackDto['status']): string {
   return renderToStaticMarkup(
     <FeedbackInbox
       entries={entries}
-      settingsHref={SETTINGS_HREF}
+      status={status}
       submitFeedbackAction={noopAction}
       setFeedbackStatusAction={noopStatusAction}
     />,
   );
-}
-
-/**
- * The same inbox render under a preset filter. `useState` is answered off the
- * raw react module (the push-toggle/meal-editor pattern): the first hook is the
- * filter, so seeding slot 0 sets it — the component code itself is exercised
- * untouched.
- */
-function renderWithFilter(entries: FeedbackDto[], filter: FeedbackDto['status'] | null): string {
-  const { spy, setIndex } = slotSpy(filter);
-  try {
-    setIndex(0);
-    return renderToStaticMarkup(
-      <FeedbackInbox
-        entries={entries}
-        settingsHref={SETTINGS_HREF}
-        submitFeedbackAction={noopAction}
-        setFeedbackStatusAction={noopStatusAction}
-      />,
-    );
-  } finally {
-    spy.mockRestore();
-  }
 }
 
 /**
@@ -201,33 +182,25 @@ describe('FeedbackInbox grouping', () => {
   });
 
   it('mounts the feedback toolbar item for this app on the empty inbox', () => {
-    // `FeedbackInbox` runs `useState` for the status filter, so the direct call
-    // goes through the same spy-backed react module the filter renders use —
-    // otherwise the raw `useState` throws outside a component (the
-    // meal-editor/meal-target pattern).
-    const spy = jest.spyOn(ReactModule, 'useState');
-    spy.mockImplementation(((initial: unknown) => [initial, () => initial]) as unknown as typeof ReactModule.useState);
-    try {
-      const el = FeedbackInbox({
-        entries: [],
-        settingsHref: SETTINGS_HREF,
-        submitFeedbackAction: noopAction,
-      }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
+    // `FeedbackInbox` is a server component (no hooks), so the direct call is
+    // safe: it builds the `FeedbackRow` elements without rendering them.
+    const el = FeedbackInbox({
+      entries: [],
+      submitFeedbackAction: noopAction,
+      setFeedbackStatusAction: noopStatusAction,
+    }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
 
-      // The gear joins this app's own toolbar item inside one fragment (the
-      // meals-nav shape): feedback first, Settings trailing.
-      type NavChild = { type?: unknown; props: { app?: unknown; label?: unknown; href?: unknown } };
-      const kids = el.props.navTrailing.props.children as NavChild[];
+    // The gear joins this app's own toolbar item inside one fragment (the
+    // meals-nav shape): feedback first, Settings trailing.
+    type NavChild = { type?: unknown; props: { app?: unknown; label?: unknown; href?: unknown } };
+    const kids = el.props.navTrailing.props.children as NavChild[];
 
-      const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
-      expect(feedback?.props.app).toBe('feedback');
+    const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
+    expect(feedback?.props.app).toBe('feedback');
 
-      const gear = kids[kids.length - 1];
-      expect(gear?.props.label).toBe('Settings');
-      expect(gear?.props.href).toBe(SETTINGS_HREF);
-    } finally {
-      spy.mockRestore();
-    }
+    const gear = kids[kids.length - 1];
+    expect(gear?.props.label).toBe('Settings');
+    expect(gear?.props.href).toBe(SETTINGS_HREF);
   });
 });
 
@@ -263,12 +236,10 @@ describe('FeedbackInbox rows', () => {
 });
 
 /**
- * The same inbox render under a preset filter. `useState` is answered off the
- * raw react module (the push-toggle/meal-editor pattern): the first hook is the
- * filter (`FeedbackInbox`'s own state), followed by each rendered row's two
- * (in-flight pick, failure message) — so handing the spy a preset only for the
- * first hook seeds the filter and the component code itself is exercised
- * untouched.
+ * Row hooks are answered off the raw react module (the push-toggle/meal-editor
+ * pattern): a rendered `FeedbackRow` calls `useState` twice (in-flight pick,
+ * failure message), so the slot spy keeps those values across re-renders and the
+ * component code itself is exercised untouched.
  */
 const ReactModule = jest.requireActual<typeof import('react')>('react');
 
@@ -404,21 +375,24 @@ function slotSpy(first: unknown): { spy: jest.SpyInstance; setIndex(at: number):
 }
 
 describe('FeedbackInbox filtering', () => {
-  it('renders the All + per-status pill bar with All active by default', () => {
+  it('renders the All + per-status pill bar as links, All active by default', () => {
     const html = render(ENTRIES);
 
     const bar = html.slice(html.indexOf('ui-pill-group'), html.indexOf('ui-section'));
-    expect(bar).toContain('>All</button>');
-    expect(bar).toContain('>Open</button>');
-    expect(bar).toContain('>In Progress</button>');
-    expect(bar).toContain('>Done</button>');
-    expect(bar).toContain('>Won&#x27;t Do</button>');
-    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--button ui-pill--active"/g) ?? [];
+    expect(bar).toContain('>All</a>');
+    expect(bar).toContain('>Open</a>');
+    expect(bar).toContain('>In Progress</a>');
+    expect(bar).toContain('>Done</a>');
+    expect(bar).toContain('>Won&#x27;t Do</a>');
+    // The filter is a navigation: All drops the param, each status carries it.
+    expect(bar).toContain('href="/feedback"');
+    expect(bar).toContain('href="/feedback?status=done"');
+    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active"/g) ?? [];
     expect(active.length).toBe(1);
   });
 
   it('shows only the Done rows under the Done filter, same grouping and order', () => {
-    const html = renderWithFilter(ENTRIES, 'done');
+    const html = render(ENTRIES, 'done');
 
     expect(rowTitles(html)).toEqual(['notes bug title']);
     expect(rowSnippets(html)).toEqual(['notes bug']);
@@ -431,7 +405,7 @@ describe('FeedbackInbox filtering', () => {
   });
 
   it('shows only the open rows under Open, grouped canonically', () => {
-    const html = renderWithFilter(ENTRIES, 'open');
+    const html = render(ENTRIES, 'open');
 
     expect(rowTitles(html)).toEqual([
       'notes feat title',
@@ -447,7 +421,7 @@ describe('FeedbackInbox filtering', () => {
   });
 
   it('hides groups with no visible rows instead of rendering empty sections', () => {
-    const html = renderWithFilter(ENTRIES, 'done');
+    const html = render(ENTRIES, 'done');
 
     expect(headings(html, 'h2')).toEqual(['Notes']);
     expect(html).not.toContain('Todos');
@@ -456,7 +430,7 @@ describe('FeedbackInbox filtering', () => {
 
   it('shows a filter-specific empty state when entries exist but none match', () => {
     const onlyOpen = [fb({ id: '1', app: 'notes', type: 'bug_report', title: 'still open', description: 'open', status: 'open' })];
-    const html = renderWithFilter(onlyOpen, 'done');
+    const html = render(onlyOpen, 'done');
 
     expect(html).toContain('No Done feedback.');
     expect(html).not.toContain('No feedback yet.');
@@ -464,7 +438,7 @@ describe('FeedbackInbox filtering', () => {
   });
 
   it('keeps the frozen empty state for a genuinely empty inbox under a filter', () => {
-    const html = renderWithFilter([], 'wont_do');
+    const html = render([], 'wont_do');
 
     expect(html).toContain('No feedback yet.');
     expect(html).not.toContain('<ul');
@@ -481,18 +455,15 @@ describe('FeedbackInbox filtering', () => {
     };
     const { spy, setIndex } = slotSpy(null);
     try {
-      setIndex(0);
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'wire me', description: 'w', status: 'open' })],
-        settingsHref: SETTINGS_HREF,
         submitFeedbackAction: noopAction,
         setFeedbackStatusAction: wiredAction,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      // The row's own hooks live past the inbox's filter hook (slot 0).
-      setIndex(1);
+      setIndex(0);
       const selects = findSelects(rows[0]!.render(rows[0]!.props));
       expect(selects).toHaveLength(1);
       expect(selects[0]?.value).toBe('open');
@@ -509,17 +480,15 @@ describe('FeedbackInbox filtering', () => {
       .fn(async (): Promise<FeedbackSubmitResult> => ({ ok: false, message: STATUS_FAILURE }));
     const { spy, setIndex } = slotSpy(null);
     try {
-      setIndex(0);
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'fail me', description: 'w', status: 'open' })],
-        settingsHref: SETTINGS_HREF,
         submitFeedbackAction: noopAction,
         setFeedbackStatusAction: action,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      setIndex(1);
+      setIndex(0);
       const first = rows[0]!.render(rows[0]!.props);
       findSelects(first)[0]!.onChange({ target: { value: 'done' } });
       await flushMicrotasks();
@@ -527,7 +496,7 @@ describe('FeedbackInbox filtering', () => {
       // Re-render the same row off the settled slots: the failure message the
       // seam documents is now rendered, and the dropdown falls back to the
       // server's status (the pill's value) instead of diverging from it.
-      const second = renderRow(rows[0]!, 1, { setIndex });
+      const second = renderRow(rows[0]!, 0, { setIndex });
       expect(collectBannerTexts(second)).toContain(STATUS_FAILURE);
       expect(findSelects(second)[0]!.value).toBe('open');
     } finally {
@@ -536,7 +505,7 @@ describe('FeedbackInbox filtering', () => {
   });
 
   it('All shows every row exactly as the unfiltered inbox.', () => {
-    const html = renderWithFilter(ENTRIES, null);
+    const html = render(ENTRIES);
     expect(rowTitles(html)).toEqual([
       'notes feat title',
       'notes bug title',

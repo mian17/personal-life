@@ -53,11 +53,13 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
 
 /**
  * The status story of SPEC-feedback-status: a new entry opens with an Open
- * pill; the row dropdown flips it to Done with no reload, so the client-side
- * filter state survives; Open then hides the row and Done brings it back
- * under its Done pill.
+ * pill; the row dropdown flips it to Done with no reload. The filter lives in
+ * the URL (`?status=`), so Open navigates to a view that hides the row and Done
+ * navigates back to one that shows it under its Done pill.
  *
- * Only feedback-owned selectors — the frozen selector surface is untouched.
+ * The filter pills are links now that the filter is a URL param, so this is the
+ * one deliberate change to the feedback selector surface (button -> link); the
+ * row dropdown, the entry pill and the toolbar selectors are untouched.
  */
 test('flipping an entry to Done removes it from Open and returns it under Done', async ({ page }) => {
   const entry = {
@@ -76,10 +78,10 @@ test('flipping an entry to Done removes it from Open and returns it under Done',
   await statusDropdown.selectOption('done');
   await expect(entryPill(row)).toHaveText('Done');
 
-  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await page.getByRole('link', { name: 'Open', exact: true }).click();
   await expect(row).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('link', { name: 'Done', exact: true }).click();
   await expect(entryPill(row)).toHaveText('Done');
 });
 

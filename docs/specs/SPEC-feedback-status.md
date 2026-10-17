@@ -44,9 +44,15 @@ ASSUMPTIONS I'M MAKING:
    in_progress→`--amber`, done→`--green`, wont_do→`--muted` — four distinct colors, no
    new values on the frozen color surface. The tripwires (`packages/ui/test/tokens.test.ts`
    + `SPEC-ui-tokens.md`'s value table) gain the status→token mapping in the same change.
-9. Filter state is in-memory client state over the already-loaded list (default "All");
-   no URL param, no refetch, no service-side filtering (Contract 2 Rule 3 keeps filters
-   out of the cache key regardless).
+9. Filter state lives in the URL (`/feedback?status=open`; absent/unknown = All), not in
+   client state. The filter is set by navigating a link, so `feedback/page.tsx` reads and
+   validates `searchParams.status`, and the inbox narrows the already-loaded list in
+   render — still no refetch and no service-side filtering (Contract 2 Rule 3 keeps
+   filters out of the cache key regardless). Rationale: an in-memory filter needs a
+   `useState`, which makes `feedback-inbox.tsx` a client component and drags `ListShell`
+   and `navTrailing` into the client graph; the URL makes the shell server-rendered and
+   the filter shareable/bookmarkable, matching the `/notes` filter-link pattern
+   (`filterHref`). The per-row dropdown stays a leaf `'use client'` island.
 10. A targeted e2e run is allowed by the repo profile (`e2e-run` knob, feedback-owned
     selectors only, one targeted run per chapter).
 → Correct me now or I'll proceed with these.
@@ -158,14 +164,19 @@ feedback(
   accessible name identifying the entry (e.g. `Set status for <title>`), current status
   as `value`, `onChange` → `setFeedbackStatusAction`.
 - Filter bar at the top of the inbox body, above the grouped sections: `PillGroup` of
-  `Pill as="button"` — All / Open / In Progress / Done / Won't Do, default All, active
-  state via `Pill`'s `active`. Filtering hides non-matching rows **and** any group that
-  ends up with zero visible rows; the grouping/ordering of what remains is untouched.
+  `Pill size="filter" as="a"` — All / Open / In Progress / Done / Won't Do, default All,
+  active state via `Pill`'s `active`. Each pill is a navigation to the filtered URL
+  (`filterHref`; All drops the `status` param). Filtering hides non-matching rows **and**
+  any group that ends up with zero visible rows; the grouping/ordering of what remains is
+  untouched.
   A filter that matches nothing shows an empty state with a filter-specific message —
   the existing `EMPTY_HEADING`/`EMPTY_BODY` strings ("No feedback yet." etc.) are
   untouched (frozen e2e selector surface).
-- `apps/app/app/feedback-inbox.tsx` composes the above; it keeps its "groups and
-  renders, never fetches" role (lesson 0018).
+- `apps/app/app/feedback/page.tsx` is the server shell: it reads and validates
+  `searchParams.status` and loads the list, then `apps/app/app/feedback-inbox.tsx`
+  composes the above server-rendered — it keeps its "groups and renders, never fetches"
+  role (lesson 0018). The one client island is `apps/app/app/feedback-row.tsx` (the row's
+  status dropdown, the `todo-item.tsx` precedent).
 
 ### Cache Rules (AGENTS.md Contract 2, Rule 4)
 
@@ -222,8 +233,11 @@ apps/feedback-service/test/feedback.e2e-spec.ts   → route semantics (extend)
 apps/feedback-service/test/feedback-harness.ts    → existing harness, reused
 apps/app/lib/feedback-api.ts                  → updateFeedbackStatus()
 apps/app/app/feedback-actions.ts              → setFeedbackStatusAction()
-apps/app/app/feedback-inbox.tsx               → filter bar + per-row Select + pill
+apps/app/app/feedback-inbox.tsx               → server shell: filter bar + grouping
+apps/app/app/feedback-row.tsx                 → leaf client island: pill + status Select
+apps/app/app/feedback/page.tsx                → reads ?status, validates, passes list down
 apps/app/test/feedback-inbox.test.tsx         → filter/grouping/pill rendering (extend)
+apps/app/test/routes-feedback-list.test.tsx   → page wiring (status parse + full list)
 apps/app/test/e2e/feedback.spec.ts            → one targeted flip→filter chapter
 docs/specs/SPEC-feedback-status.md            → this spec
 ```
@@ -344,8 +358,10 @@ Levels per concern:
 1. **Should "Won't Do" carry its own hue instead of `--muted` (gray)?** Spec'd as
    `--muted` to avoid adding a value to the frozen color surface; a distinct hue needs
    explicit user approval (assumption 8).
-2. **URL-persisted filter (`/feedback?status=open`)?** Spec'd as in-memory client state
-   only (assumption 9); a shareable/bookmarkable filter is a follow-up if wanted.
+2. **URL-persisted filter (`/feedback?status=open`) — resolved.** Adopted (assumption 9):
+   the filter is a URL search param, so the view is shareable/bookmarkable and the inbox
+   shell renders on the server. Earlier draft spec'd in-memory client state; that was
+   replaced because it forced the whole inbox into the client graph.
 3. **Status-change events for downstream consumers?** Spec'd as no event at all
    (assumption 5); if the event pipeline ever needs transitions, that is a new
    capability with its own event type — never a reuse of `feedback.submitted`.

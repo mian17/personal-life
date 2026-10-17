@@ -1,10 +1,6 @@
-'use client';
-
-import { useState } from 'react';
 import type { CreateFeedbackInput, FeedbackDto, FeedbackStatus, FeedbackSubmitResult } from '@life/shared';
 import { FEEDBACK_APPS } from '@life/shared';
 import {
-  AlertBanner,
   EmptyState,
   feedbackStatusOption,
   FEEDBACK_STATUSES,
@@ -12,15 +8,14 @@ import {
   FeedbackNavItem,
   IconLink,
   List,
-  ListItem,
   ListShell,
-  LocalTime,
   Pill,
   PillGroup,
-  Select,
   Section,
 } from '@life/ui';
+import { filterHref, settingsHref } from '@life/app-kit';
 import { Settings } from 'lucide-react';
+import { FeedbackRow } from './feedback-row';
 
 const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', meals: 'Meals', feedback: 'Feedback' };
 const APP_ORDER = FEEDBACK_APPS;
@@ -42,23 +37,6 @@ function matchesNothingState(status: FeedbackStatus): { heading: string; body: s
   return { heading: `No ${label} feedback.`, body: `Try another status or switch back to All.` };
 }
 
-/** The dropdown's choices: the same vocabulary, and the only place a `Select` needs building. */
-const STATUS_OPTIONS = FEEDBACK_STATUSES.map(({ value, label }) => ({ value, label }));
-
-/** What a failed status write says — the `submitFeedbackAction` failure contract, one string. */
-const STATUS_FAILURE = "Couldn't update status. Try again.";
-
-/**
- * The offline default for `setFeedbackStatusAction`: server-rendered rows get a
- * dropdown whose change resolves to the same result a failed write returns, so
- * no caller needs a null check and nothing posts from the server. Passing the
- * real action from the page replaces it — the app layer never branches on "is
- * there a seam".
- */
-function noStatusAction(): Promise<FeedbackSubmitResult> {
-  return Promise.resolve({ ok: false, message: STATUS_FAILURE });
-}
-
 /** Canonical ids first, unknown ids last (alphabetical). */
 function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
   const known = canonical.filter((key) => keys.includes(key));
@@ -68,28 +46,29 @@ function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
 
 /**
  * The filter bar: All plus one pill per status — data straight from
- * `FEEDBACK_STATUSES`, so a vocabulary change rerenders here too. All is active
- * by default (`active === null`); each click filters in memory.
+ * `FEEDBACK_STATUSES`, so a vocabulary change rerenders here too. Each pill is a
+ * navigation (the notes `TagFilterNav` shape): the filter lives in the URL
+ * (`?status=done`; All drops the param), so the view is shareable and the server
+ * renders the one the owner asked for.
  */
-function StatusFilter({
-  active,
-  onPick,
-}: {
-  active: FeedbackStatus | null;
-  onPick: (status: FeedbackStatus | null) => void;
-}) {
+function StatusFilter({ status }: { status: FeedbackStatus | undefined }) {
   return (
     <PillGroup label="Status">
-      <Pill size="filter" as="button" active={active === null} onClick={() => onPick(null)}>
+      <Pill
+        size="filter"
+        as="a"
+        href={filterHref({ path: '/feedback', overrides: { status: undefined } })}
+        active={status === undefined}
+      >
         All
       </Pill>
       {FEEDBACK_STATUSES.map(({ value, label }) => (
         <Pill
           key={value}
           size="filter"
-          as="button"
-          active={active === value}
-          onClick={() => onPick(value)}
+          as="a"
+          href={filterHref({ path: '/feedback', overrides: { status: value } })}
+          active={status === value}
         >
           {label}
         </Pill>
@@ -99,93 +78,35 @@ function StatusFilter({
 }
 
 /**
- * One feedback row: the status pill rides the title line (`titleAction`) and the
- * status dropdown stacks beneath the text (`children`) — both are
- * `ListItem variant="feedback"` slots, so the app passes data, never markup. The
- * pill's status class is the vocabulary value; `atoms.css` maps it to the status's
- * semantic token, and `tokens.test.ts` pins that mapping against `tokens.css`.
- */
-function FeedbackRow({
-  entry,
-  setStatusAction,
-}: {
-  entry: FeedbackDto;
-  setStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
-}) {
-  const { label } = feedbackStatusOption(entry.status);
-  /**
-   * `picked` is the value in flight: while the write is pending the dropdown
-   * shows the user's choice (`pickStatus` sets it synchronously); once the
-   * seam answers we drop it so the dropdown follows the row's pill again (on
-   * success via the re-rendered `entry.status`, on failure we keep the old
-   * value and surface the failure message the seam documents).
-   */
-  const [picked, setPicked] = useState<FeedbackStatus | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
-
-  function pickStatus(status: FeedbackStatus) {
-    setPicked(status);
-    setFailure(null);
-    void setStatusAction(entry.id, status).then((result) => {
-      setPicked(null);
-      if (!result.ok) {
-        setFailure(result.message);
-      }
-    });
-  }
-
-  return (
-    <ListItem
-      variant="feedback"
-      title={entry.title}
-      snippet={entry.description}
-      meta={<LocalTime dateTime={entry.createdAt} />}
-      titleAction={
-        <Pill className={`ui-pill--${entry.status}`} data-status={entry.status}>
-          {label}
-        </Pill>
-      }
-    >
-      <Select
-        aria-label={`Set status for ${entry.title}`}
-        value={picked ?? entry.status}
-        onChange={(event) => pickStatus(event.target.value as FeedbackStatus)}
-        options={STATUS_OPTIONS}
-      />
-      {failure != null && <AlertBanner role="alert">{failure}</AlertBanner>}
-    </ListItem>
-  );
-}
-
-/**
  * The `/feedback` owner inbox (app glue, like `note-list.tsx`): it groups and
- * renders, it never fetches. The status filter narrows the rendered list in
- * memory (`null` = All); buckets preserve encounter order — the service already
- * returns newest-first, so stable bucketing keeps every group newest-first
- * without a re-sort. One row type: `ListItem variant="feedback"` (lesson 0018).
+ * renders, it never fetches. The `status` filter arrives from the URL and narrows
+ * the already-loaded list in render (`undefined` = All) — no refetch, no
+ * service-side filtering (Contract 2 Rule 3 keeps filters out of the cache key
+ * regardless). Buckets preserve encounter order — the service already returns
+ * newest-first, so stable bucketing keeps every group newest-first without a
+ * re-sort. One row type: `ListItem variant="feedback"` (lesson 0018).
  */
 export function FeedbackInbox({
   entries,
-  settingsHref,
+  status,
   submitFeedbackAction,
-  setFeedbackStatusAction = noStatusAction,
+  setFeedbackStatusAction,
 }: {
   entries: FeedbackDto[];
-  /** `settingsHref('/feedback')`, assembled on the server — the app-kit barrel is server-only. */
-  settingsHref: string;
+  /** The validated `?status=` param; `undefined` (absent or unknown) is All. */
+  status?: FeedbackStatus;
   submitFeedbackAction: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
-  setFeedbackStatusAction?: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
+  setFeedbackStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
 }) {
-  const [statusFilter, setStatusFilter] = useState<FeedbackStatus | null>(null);
   const visible =
-    statusFilter === null ? entries : entries.filter((entry) => entry.status === statusFilter);
+    status === undefined ? entries : entries.filter((entry) => entry.status === status);
 
   const body = (() => {
     if (visible.length === 0) {
       // Only a non-empty inbox with an active filter can "match nothing"; an
       // empty inbox keeps the frozen copy (`SPEC-feedback-status` §4).
-      if (entries.length > 0 && statusFilter !== null) {
-        return <EmptyState {...matchesNothingState(statusFilter)} />;
+      if (entries.length > 0 && status !== undefined) {
+        return <EmptyState {...matchesNothingState(status)} />;
       }
       return <EmptyState heading={EMPTY_HEADING} body={EMPTY_BODY} />;
     }
@@ -238,12 +159,12 @@ export function FeedbackInbox({
       navTrailing={
         <>
           <FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />
-          <IconLink href={settingsHref} label="Settings">
+          <IconLink href={settingsHref('/feedback')} label="Settings">
             <Settings size={20} aria-hidden />
           </IconLink>
         </>
       }
-      filters={<StatusFilter active={statusFilter} onPick={setStatusFilter} />}
+      filters={<StatusFilter status={status} />}
       body={body}
     />
   );
