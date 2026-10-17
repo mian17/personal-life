@@ -8,6 +8,7 @@
     "start": "PORT=${PORT:-3001} node dist/main.js",
     "backfill-owner": "ts-node scripts/backfill-owner.ts",
     "backfill-encrypt": "ts-node scripts/encrypt-backfill.ts",
+    "backfill-content-updated-at": "ts-node scripts/backfill-content-updated-at.ts",
     "rotate-master-key": "ts-node scripts/rotate-master-key.ts",
     "test": "jest --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit",

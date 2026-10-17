@@ -60,6 +60,25 @@ function noteEntity(overrides: Record<string, unknown> = {}): any {
 }
 
 /**
+ * A ciphertext row as a pre-deploy Redis entry held it: ISO dates and no
+ * `contentUpdatedAt` field at all. Built from `noteEntity`, so `body` is a real
+ * `enc.v1.` envelope and the decoder's tolerance is exercised on genuine content.
+ */
+function cachedRowSeed(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const entity: any = noteEntity(overrides);
+  return {
+    id: entity.id,
+    ownerSub: entity.ownerSub,
+    body: entity.body,
+    version: entity.version,
+    createdAt: entity.createdAt.toISOString(),
+    updatedAt: entity.updatedAt.toISOString(),
+    deletedAt: entity.deletedAt ? entity.deletedAt.toISOString() : null,
+    tagIds: entity.noteTags.map((nt: any) => nt.tagId),
+  };
+}
+
+/**
  * A real `KeysService` over a spy `user_keys` repo that always resolves the same
  * DEK. Memoization is per-instance, so each harness gets its own — but the DEK is
  * identical, which is all the fixtures need.
@@ -296,9 +315,21 @@ describe('NotesCache (read-through + generation invalidation)', () => {
     it('applies q and tagId filtering to a cache hit (post-decrypt, one loader call)', async () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
+      // Distinct timestamps: the list now ranks in memory, so equal dates would
+      // hand the order to the `id DESC` tie-break instead of the fixture.
       h.state.noteRows = [
-        noteEntity({ id: 'n1', body: 'alpha note', tagIds: [1] }),
-        noteEntity({ id: 'n2', body: 'beta note', tagIds: [2] }),
+        noteEntity({
+          id: 'n1',
+          body: 'alpha note',
+          tagIds: [1],
+          createdAt: new Date('2024-01-02T00:00:00.000Z'),
+        }),
+        noteEntity({
+          id: 'n2',
+          body: 'beta note',
+          tagIds: [2],
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        }),
       ];
 
       const all = await h.service.findAll(SUB, {});
@@ -428,6 +459,122 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       expect(written).toHaveLength(1);
       expect(written[0].value).toContain(ENC_PREFIX);
       expect(written[0].value).not.toContain('old plaintext');
+    });
+  });
+
+  describe('content order: the cached row carries the ranking timestamp', () => {
+    const editedAt = '2024-05-01T00:00:00.000Z';
+
+    it('serializes contentUpdatedAt beside the ciphertext row it ranks', async () => {
+      const PLAINTEXT = 'CONTENT-ORDER-SECRET';
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      h.state.noteRows = [noteEntity({ body: PLAINTEXT, contentUpdatedAt: new Date(editedAt) })];
+
+      await h.service.findAll(SUB, {});
+
+      const written = client.values[0].value;
+      expect(JSON.parse(written)[0].contentUpdatedAt).toBe(editedAt);
+      // The ranking timestamp rides inside the same ciphertext-only payload: no
+      // new plaintext surface, the body envelope is still the only content.
+      expect(written).toContain(ENC_PREFIX);
+      expect(written).not.toContain(PLAINTEXT);
+    });
+
+    it('decodes a cached row missing contentUpdatedAt and ranks it by createdAt', async () => {
+      const client = new FakeRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      const key = `note:${SUB}:v0:list`;
+      client.store.set(
+        key,
+        JSON.stringify([
+          cachedRowSeed({ id: 'n-legacy', body: 'legacy birth' }),
+          {
+            ...cachedRowSeed({
+              id: 'n-newer',
+              body: 'newer birth',
+              createdAt: new Date('2024-01-02T00:00:00.000Z'),
+            }),
+            contentUpdatedAt: editedAt,
+          },
+        ]),
+      );
+
+      const page = await h.service.findAll(SUB, {});
+
+      expect(h.notes.createQueryBuilder).not.toHaveBeenCalled();
+      expect(page.notes.map((note) => note.id)).toEqual(['n-newer', 'n-legacy']);
+      expect(page.notes.find((note) => note.id === 'n-legacy')!.body).toBe('legacy birth');
+    });
+
+    it('serializes contentUpdatedAt on the trash and one entries too', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      const row = noteEntity({
+        id: 'n1',
+        body: 'trashed row',
+        deletedAt: new Date(editedAt),
+        contentUpdatedAt: new Date(editedAt),
+      });
+      h.state.noteRows = [row];
+      h.state.findOneResult = row;
+
+      await h.service.findTrash(SUB, {});
+      await h.service.findOne(SUB, 'n1');
+
+      const trashValue = client.values.find((v) => v.key === `note:${SUB}:v0:trash`)!.value;
+      const oneValue = client.values.find((v) => v.key === `note:${SUB}:v0:one:n1`)!.value;
+      expect(JSON.parse(trashValue)[0].contentUpdatedAt).toBe(editedAt);
+      expect(JSON.parse(oneValue).contentUpdatedAt).toBe(editedAt);
+      expect(trashValue).toContain(ENC_PREFIX);
+      expect(oneValue).toContain(ENC_PREFIX);
+    });
+
+    it('reorders a body-edited note to the top on the loader and cached paths after the generation bump', async () => {
+      const client = new FakeRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      const older = noteEntity({
+        id: 'n-older',
+        body: 'older',
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        contentUpdatedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const newer = noteEntity({
+        id: 'n-newer',
+        body: 'newer',
+        createdAt: new Date('2024-01-02T00:00:00.000Z'),
+        contentUpdatedAt: new Date('2024-01-02T00:00:00.000Z'),
+      });
+      h.state.noteRows = [older, newer];
+
+      // v0: the newer note leads, and that row set is cached.
+      const before = await h.service.findAll(SUB, {});
+      expect(before.notes.map((n) => n.id)).toEqual(['n-newer', 'n-older']);
+      expect(client.setCalls).toEqual([`note:${SUB}:v0:list`]);
+
+      // A body edit bumps to v1 and gives the older note the newest stamp.
+      h.state.findOneResult = older;
+      await h.service.update(SUB, 'n-older', 'older edited');
+      h.state.noteRows = [
+        noteEntity({
+          id: 'n-older',
+          body: 'older edited',
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          contentUpdatedAt: new Date('2024-03-01T00:00:00.000Z'),
+        }),
+        newer,
+      ];
+
+      // Loader path: v1 misses, the reload reorders, and the fresh set is cached.
+      const loaded = await h.service.findAll(SUB, {});
+      expect(loaded.notes.map((n) => n.id)).toEqual(['n-older', 'n-newer']);
+      expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(2);
+      expect(client.setCalls).toContain(`note:${SUB}:v1:list`);
+
+      // Cached path: the next read is a v1 hit that keeps the new order.
+      const cached = await h.service.findAll(SUB, {});
+      expect(cached.notes.map((n) => n.id)).toEqual(['n-older', 'n-newer']);
+      expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -49,6 +49,7 @@ interface CachedNoteRow {
   body: string;
   version: number;
   createdAt: string;
+  contentUpdatedAt: string | null;
   updatedAt: string;
   deletedAt: string | null;
   tagIds: number[];
@@ -62,6 +63,7 @@ function toCachedNoteRow(note: Note): CachedNoteRow {
     body: note.body,
     version: note.version,
     createdAt: note.createdAt.toISOString(),
+    contentUpdatedAt: note.contentUpdatedAt ? note.contentUpdatedAt.toISOString() : null,
     updatedAt: note.updatedAt.toISOString(),
     deletedAt: note.deletedAt ? note.deletedAt.toISOString() : null,
     tagIds: (note.noteTags ?? []).map((nt) => nt.tagId).sort((a, b) => a - b),
@@ -83,14 +85,23 @@ function isCiphertextNoteRow(row: CachedNoteRow): boolean {
 function decodeCiphertextNoteRow(raw: unknown): CachedNoteRow {
   const row = raw as CachedNoteRow;
   if (!isCiphertextNoteRow(row)) throw new Error('cache entry is not ciphertext');
-  return row;
+  return withContentUpdatedAtResolved(row);
 }
 
 function decodeCiphertextNoteList(raw: unknown): CachedNoteRow[] {
   if (!Array.isArray(raw) || !raw.every(isCiphertextNoteRow)) {
     throw new Error('cache entry is not ciphertext');
   }
-  return raw;
+  return raw.map(withContentUpdatedAtResolved);
+}
+
+/**
+ * A pre-deploy Redis entry predates the `contentUpdatedAt` field. Its absent
+ * timestamp reads as `null` — the same value a NULL column carries — so every
+ * read path resolves it to `createdAt` rather than tripping on `undefined`.
+ */
+function withContentUpdatedAtResolved(row: CachedNoteRow): CachedNoteRow {
+  return { ...row, contentUpdatedAt: row.contentUpdatedAt ?? null };
 }
 
 /**
@@ -150,8 +161,40 @@ function decodeCursor(cursor: string): { ts: string; id: string } {
 }
 
 /**
+ * A decoded note beside the timestamp that ranks it in the list. The wire DTO is
+ * frozen, so the ranking key travels outside it rather than on it; `id` is
+ * repeated here because the keyset cursor keys on it.
+ */
+interface RankedNote {
+  id: string;
+  listTimestamp: string;
+  note: NoteDto;
+}
+
+/**
+ * The list ranking key: a body-edit time when the row carries one, else the
+ * note's birth time. A pre-backfill row has neither a backfilled nor an edited
+ * `contentUpdatedAt`, so it ranks exactly where `createdAt` put it today.
+ */
+function listTimestampOf(row: CachedNoteRow): string {
+  return row.contentUpdatedAt ?? row.createdAt;
+}
+
+/** Newest content edit first; `id DESC` breaks a tie (`id`s are uuids). */
+function newestContentFirst(a: RankedNote, b: RankedNote): number {
+  return b.listTimestamp.localeCompare(a.listTimestamp) || b.id.localeCompare(a.id);
+}
+
+/** True when a note passes the list's tag and text filters. */
+function matchesListRequest(note: NoteDto, filters: { tagId?: number; q?: string }): boolean {
+  if (filters.tagId !== undefined && !note.tagIds.includes(filters.tagId)) return false;
+  if (filters.q && !likeMatch(note.body, `%${filters.q}%`)) return false;
+  return true;
+}
+
+/**
  * In-memory keyset pagination over a candidate list already ordered by
- * (`timestamp DESC`, `id DESC`) — today's exact order. Rows are kept only when
+ * (`timestamp DESC`, `id DESC`) — the list's exact order. Rows are kept only when
  * they fall strictly after the cursor
  * (`timestamp < cursor.ts OR (timestamp = cursor.ts AND id < cursor.id)`), so a
  * page boundary can neither repeat nor skip a row.
@@ -285,6 +328,7 @@ export class NotesService {
       ownerSub: sub,
       version: 0,
       deletedAt: null,
+      contentUpdatedAt: new Date(),
     });
     const saved = await this.notes.save(note);
     // Association rows are managed explicitly (TagRef joins, not a cascade
@@ -316,9 +360,9 @@ export class NotesService {
       async () => {
         // Metadata-only SQL: content (`q`) is an envelope, so it cannot be
         // matched in the DB, and the tag filter is applied in memory so one
-        // cached row set serves every variant. Fetch the owner's non-trashed
-        // rows in today's exact order (`createdAt DESC`, `id` DESC tie-break)
-        // and do all matching and pagination in memory after decryption.
+        // cached row set serves every variant. Matching, ranking, and
+        // pagination all run in memory after decryption, so the SQL order only
+        // keeps the cached row set stable; it is not the list contract.
         const found = await this.notes
           .createQueryBuilder('note')
           .leftJoinAndSelect('note.noteTags', 'noteTag')
@@ -334,16 +378,23 @@ export class NotesService {
     );
 
     const dek = await this.readDek(sub, rows);
-    const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openFieldCb));
+    const ranked = rows.map((row) => ({
+      id: row.id,
+      listTimestamp: listTimestampOf(row),
+      note: decodeCachedNoteRow(row, sub, dek, this.openFieldCb),
+    }));
 
-    const filtered = decoded.filter((note) => {
-      if (opts.tagId !== undefined && !note.tagIds.includes(opts.tagId)) return false;
-      if (opts.q && !likeMatch(note.body, `%${opts.q}%`)) return false;
-      return true;
-    });
+    const matching = ranked
+      .filter(({ note }) => matchesListRequest(note, opts))
+      .sort(newestContentFirst);
 
-    const { page, nextCursor } = paginate(filtered, limit, opts.cursor, (n) => n.createdAt);
-    return { notes: page, nextCursor };
+    const { page, nextCursor } = paginate(
+      matching,
+      limit,
+      opts.cursor,
+      (entry) => entry.listTimestamp,
+    );
+    return { notes: page.map((entry) => entry.note), nextCursor };
   }
 
   async findTrash(
@@ -418,7 +469,10 @@ export class NotesService {
     // Write path: always envelopes. Re-encrypting with a fresh nonce is correct
     // even when the plaintext is unchanged.
     const dek = await this.requireKeys().getOrCreateDek(sub);
-    if (body !== undefined) note.body = encryptField(dek, body, noteBodyAad(sub, note.id));
+    if (body !== undefined) {
+      note.body = encryptField(dek, body, noteBodyAad(sub, note.id));
+      note.contentUpdatedAt = new Date();
+    }
 
     let currentIds: number[];
     if (tagIds !== undefined) {
