@@ -55,8 +55,18 @@ wait_ready() { # name, then the readiness command
   return 1
 }
 
+running() { # container name -> 0 if it is up
+  [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "true" ]
+}
+
 up() {
-  # Idempotent: a stale pair from a previous run is removed first.
+  # Already up (a previous session, or an earlier `dev:infra:up`)? Reuse it:
+  # recreating would wipe whatever schema the running services built.
+  if running "$PG" && running "$MQ"; then
+    echo "dev-infra: reusing $PG $MQ"
+    return 0
+  fi
+  # Otherwise clear leftovers (stopped or half-started) and start fresh.
   docker rm -f "$PG" "$MQ" >/dev/null 2>&1 || true
   docker run --rm -d --name "$PG" \
     -e POSTGRES_DB=feedback \
