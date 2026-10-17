@@ -61,7 +61,12 @@ class CapturingRedisClient extends FakeRedisClient {
   }
 }
 
-/** Food repository fake: owner-scoped; the loader collects soft-deleted rows too. */
+/**
+ * Food repository fake: owner-scoped, and it honours a `deletedAt` predicate the
+ * way TypeORM does — only when the caller's `where` carries one. `find` is called
+ * without it (the list loader collects soft-deleted rows too, split in memory
+ * after the cache hit); `findOne` passes `deletedAt: IsNull()`.
+ */
 class FakeFoodRepo {
   rows: Array<Record<string, unknown>> = [];
 
@@ -80,15 +85,19 @@ class FakeFoodRepo {
     return row;
   });
 
-  find = jest.fn(async (opts: { where: { ownerSub: string } }) =>
+  find = jest.fn(async (opts: { where: { ownerSub: string; deletedAt?: unknown } }) =>
     this.rows
       .filter((r) => r.ownerSub === opts.where.ownerSub)
+      .filter((r) => !('deletedAt' in opts.where) || r.deletedAt == null)
       .map((r) => ({ ...r, servings: this.servingsFor(r.id as string) })),
   );
 
-  findOne = jest.fn(async (opts: { where: { id: string; ownerSub: string } }) => {
+  findOne = jest.fn(async (opts: { where: { id: string; ownerSub: string; deletedAt?: unknown } }) => {
     const row = this.rows.find(
-      (r) => r.id === opts.where.id && r.ownerSub === opts.where.ownerSub && !r.deletedAt,
+      (r) =>
+        r.id === opts.where.id &&
+        r.ownerSub === opts.where.ownerSub &&
+        (!('deletedAt' in opts.where) || r.deletedAt == null),
     );
     return row ? { ...row, servings: this.servingsFor(row.id as string) } : null;
   });

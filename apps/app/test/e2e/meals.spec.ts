@@ -294,8 +294,9 @@ test.describe('meals manual log', () => {
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
 
-    // And deleting the food rewrites no entry either — the row falls back to
-    // the stored id, but its logged numbers and the day total are untouched.
+    // And deleting the food rewrites no entry either — the catalog read includes
+    // soft-deleted rows, so the id-only join still resolves the dish name while
+    // the logged numbers and the day total are untouched.
     await page.goto('/meals/foods');
     await page.getByRole('link', { name: FOOD }).click();
     await page.waitForURL(/\/meals\/foods\/[^/]+$/, { timeout: 15_000 });
@@ -307,6 +308,10 @@ test.describe('meals manual log', () => {
     await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
       timeout: 15_000,
     });
+    // The row still renders the deleted food's dish name, not the raw id.
+    await expect(
+      page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal × 2.5' }),
+    ).toBeVisible({ timeout: 15_000 });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
   });

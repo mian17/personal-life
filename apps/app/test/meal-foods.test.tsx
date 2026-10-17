@@ -445,6 +445,7 @@ describe('food form behaviour', () => {
       const button = ConfirmButton(
         confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
       );
+      const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => true };
       try {
         (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
@@ -452,7 +453,7 @@ describe('food form behaviour', () => {
         // chain is settled by a macrotask flush before the assertions.
         await new Promise<void>((resolve) => setImmediate(resolve));
       } finally {
-        delete (globalThis as { window?: unknown }).window;
+        (globalThis as { window?: unknown }).window = previousWindow;
       }
 
       expect(mockedDeleteMealFood).toHaveBeenCalledWith('food-1');
@@ -473,12 +474,13 @@ describe('food form behaviour', () => {
       const button = ConfirmButton(
         confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
       );
+      const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => false };
       try {
         (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
         await new Promise<void>((resolve) => setImmediate(resolve));
       } finally {
-        delete (globalThis as { window?: unknown }).window;
+        (globalThis as { window?: unknown }).window = previousWindow;
       }
 
       expect(mockedDeleteMealFood).not.toHaveBeenCalled();
