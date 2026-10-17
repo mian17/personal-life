@@ -30,6 +30,13 @@ export class Note {
   @Column({ type: 'datetime', nullable: true })
   deletedAt: Date | null;
 
+  // Nullable so a legacy DB can `ALTER TABLE ADD COLUMN` safely; NULL rows are
+  // pre-deploy notes, read as `createdAt` until the human-run backfill runs.
+  // Bumped only by body writes (NotesService.update on `body`), never by
+  // retag/trash/restore.
+  @Column({ type: 'datetime', nullable: true })
+  contentUpdatedAt: Date | null;
+
   // Association-only (TagRefs by id). note-service owns no tag vocabulary;
   // tag names live in `tags-service` (SPEC-tags-extraction). The join rows are
   // managed explicitly by `NotesService` (replace-the-set on writes).
