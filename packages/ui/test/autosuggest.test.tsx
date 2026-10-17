@@ -399,4 +399,41 @@ describe('Autosuggest', () => {
 
     expect(screen.getByRole('listbox')).toBeTruthy();
   });
+
+  it('reopens the list when the field is pressed again after a pointer outside dismissed it', () => {
+    const { input } = setup();
+    type(input, 'app');
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('listbox')).toBeNull();
+    showPopover.mockClear();
+
+    fireEvent.pointerDown(input);
+
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    expect(input.value).toBe('app');
+    expect(showPopover).toHaveBeenCalledTimes(1);
+    expect(showPopover.mock.contexts[0]).toBe(screen.getByRole('listbox'));
+
+    // the press reset still respects minChars
+    type(input, 'ap');
+    fireEvent.pointerDown(input);
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('reopens the list when the field regains focus after Escape dismissed it', () => {
+    const { input } = setup();
+    type(input, 'app');
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    showPopover.mockClear();
+
+    input.blur();
+    act(() => input.focus());
+
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    expect(input.value).toBe('app');
+    expect(showPopover).toHaveBeenCalledTimes(1);
+  });
 });

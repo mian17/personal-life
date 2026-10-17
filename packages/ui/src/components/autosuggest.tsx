@@ -217,6 +217,10 @@ export function Autosuggest({
         value={text}
         onChange={(event) => change(event.target.value)}
         onKeyDown={handleKeyDown}
+        // A dismissed list comes back when the field is entered again: a press
+        // for a field that kept focus (Escape), a focus for one that did not.
+        onPointerDown={() => setDismissed(false)}
+        onFocus={() => setDismissed(false)}
       />
       {open && (
         <div
