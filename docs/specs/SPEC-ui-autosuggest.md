@@ -73,6 +73,8 @@ Rendered structure:
   value={text}
   onChange={…}
   onKeyDown={…}
+  onPointerDown={() => setDismissed(false)}   // a press on the field clears a light dismissal
+  onFocus={() => setDismissed(false)}         // so does returning focus after a blur
 />
 
 // The popup, rendered only while open — a native popover.
@@ -103,6 +105,10 @@ Rendered structure:
   )}
 </div>
 ```
+
+Two effects sit outside the markup: a `scrollIntoView({ block: 'nearest' })` on the highlighted row
+keeps it inside the popup's visible slice as the highlight moves, and a document `pointerdown`
+capture listener dismisses when the press lands outside both the popup and the field.
 
 ### Semantics and edge cases
 
@@ -136,7 +142,9 @@ Rendered structure:
   does nothing with none. `Home`/`End` jump to the first/last option. `Escape` closes the
   popup; the next `Escape` (popup already closed) clears the field. `Tab` accepts the
   highlight, closes the popup and lets focus move on.
-- **Dismissal.** Closing the popup does not touch the text, and typing again reopens it.
+- **Dismissal.** Closing the popup does not touch the text. Every way back into the field
+  clears the dismissal — typing a long-enough query, pressing the field that kept focus, or
+  focusing it again after a blur. Re-entry only re-opens; it never touches the text.
 - **Empty state.** With no options and no `emptyLabel`, nothing renders (no empty popup
   frame). With `emptyLabel`, the popup holds a `role="status"` paragraph instead of a
   `listbox` — there is nothing to select, and the announcement should not read as a list.
@@ -147,11 +155,11 @@ Rendered structure:
 
 | Element | Composed from |
 |---|---|
-| Query field | `Autosuggest label="Search foods" placeholder="Search foods" minChars={3}` |
+| Query field | `Autosuggest label="Search foods" placeholder="Search your foods" minChars={3} clearOnSelect={false}` |
 | Candidates | App state: the caller filters its catalog by the reported query and passes `options` |
 | Row | `AutosuggestOption { id, label, meta }` — `meta` carries the per-100 facts |
 | Empty query | `emptyLabel` (e.g. a "no foods match" line); the app passes no `options` |
-| Pick | `onSelect(option)` appends the editor item; `clearOnSelect` stays default so the field resets |
+| Pick | `onSelect(option)` appends the editor item; `clearOnSelect={false}` keeps the text and the popup up so the next food can be typed straight away |
 
 The catalog fetch, the match rule and what a pick does to the log stay in `apps/*`.
 
@@ -239,7 +247,9 @@ Unit tests only (jest + `@testing-library/react`, `packages/ui`; harness per
   `aria-selected`, row ids),
 - empty state (`emptyLabel` with no options; no popup without it),
 - popover call order (`showPopover` on open, `hidePopover` on unmount) and the
-  `maxVisible` custom property.
+  `maxVisible` custom property,
+- dismissal and re-entry (an outside press dismisses without clearing the text; then a press
+  on the still-focused field, and a re-focus after a blur, each bring the list back).
 
 No E2E here (the popup's top-layer placement is exercised by the consuming app's e2e).
 
@@ -283,3 +293,5 @@ No E2E here (the popup's top-layer placement is exercised by the consuming app's
 6. With more matches than `maxVisible`, moving the highlight scrolls the highlighted row
    into view; the highlight is never left outside the popup's visible slice.
 7. A press outside the popup and the field dismisses the list without clearing the text.
+8. After that dismissal, pressing the field or focusing it again brings the list back without
+   touching the text.
