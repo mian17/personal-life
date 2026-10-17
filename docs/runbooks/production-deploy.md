@@ -1,4 +1,4 @@
-# Production runbook — full stack (deploy `master` @ `eb3e152`)
+# Production runbook — full stack (deploy `master` @ `963e859`)
 
 Authoritative deploy procedure for this host. Replaces the earlier
 `master..refactor/notes-todos-shared-ui` runbook, which predates `feedback-service`,
@@ -13,8 +13,8 @@ copy-pasteable from that directory:
 cd /home/night/WebstormProjects/personal-life
 ```
 
-Ref: `master` @ `eb3e152` (`merge: meal food catalog, manual logging and the Autosuggest
-primitive`). `compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
+Ref: `master` @ `963e859` (`merge: production deploy runbook for the 16-service stack`).
+`compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`) plus 7
 Redis instances, `postgres-feedback` and `rabbitmq-feedback`.
 
@@ -51,11 +51,18 @@ checklist; it is not authority to run it.
   `food.unit` (`apps/meal-service/src/foods/food.entity.ts:45-46`, `text NOT NULL DEFAULT
   'g'`) is absent from the live `meal.db`. It is additive-with-default only — no backfill,
   and the table currently holds 0 rows.
-- **feedback Postgres is created on first boot.** Compose's `POSTGRES_DB: feedback` makes
-  the database; `synchronize` makes its four tables (`feedback`, `feedback_event`,
-  `feedback_cursor`, `user_keys`); the `feedback_events` NOTIFY trigger is re-ensured
-  idempotently every boot (`apps/feedback-service/src/event/trigger-ddl.ts`). Nothing to
-  declare, seed or create by hand.
+- **`db:backup:pg` is a working, already-used path.** `backup/` holds four pinned
+  `feedback.dump` snapshots and two `pre-restore-*` snapshots; the newest pinned pair is
+  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) beside `…12-34-39-247Z-pinned` (SQLite). So
+  feedback Postgres has been deployed before and dumped before — the dump is part of a
+  normal deploy, never a step to skip. Its schema is still boot-ensured rather than
+  migrated: compose's `POSTGRES_DB: feedback` makes the database, `synchronize` makes its
+  four tables (`feedback`, `feedback_event`, `feedback_cursor`, `user_keys`), and the
+  `feedback_events` NOTIFY trigger is re-ensured idempotently every boot
+  (`apps/feedback-service/src/event/trigger-ddl.ts`). Nothing to declare, seed or create by
+  hand.
+- **No crontab is installed.** `backup/cron.log` does not exist, so neither §8 backup line
+  has ever fired here. Scheduled backups are a first-time setup, not a running fixture.
 
 **Ordering is therefore: back up → migrate → boot. Never migrate after boot.**
 
@@ -166,7 +173,7 @@ the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path
 cd /home/night/WebstormProjects/personal-life
 ```
 
-- [ ] Ref pinned: `git log -1 --oneline` → `eb3e152`; `git status --short` shows only
+- [ ] Ref pinned: `git log -1 --oneline` → `963e859`; `git status --short` shows only
       untracked `docs/reference-repo/`, `pictures/`, `.pi/`.
 - [ ] Record the images you are about to replace (rollback reference):
       `docker compose images`.
@@ -177,6 +184,15 @@ cd /home/night/WebstormProjects/personal-life
       block hashes identically (one shared BuildKit layer; without dedupe the build runs
       seven monorepo installs and takes >30 minutes), that the daemon is reachable, and
       that the host has headroom (`PREFLIGHT_MIN_DISK_GB`, default `30`).
+- [ ] Check whether the feedback volumes survive from the last deploy — this decides whether
+      §6 continues the old Postgres/RabbitMQ store or initialises a fresh empty one:
+      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`. Compose
+      prefixes its own name (`docker compose config` → `name: personal-life`), so the real
+      volume names are `personal-life_postgres-feedback-data` and
+      `…_rabbitmq-feedback-data`. If they are absent, the store is **new**: the pinned
+      `feedback.dump` snapshots become the only copy of any older rows (every manifest so far
+      records `feedback: 0`, `feedback_event: 0`, so none is at risk), and no client holds
+      stale cursor state.
 - [ ] `.env` satisfies §2 — in particular a value in every fail-fast slot.
 - [ ] Compose interpolation resolves before building anything:
       `docker compose config >/dev/null` → exits 0 (it fails fast on a missing secret).
@@ -192,25 +208,43 @@ cd /home/night/WebstormProjects/personal-life
 
 ## 4. Stop and back up — destructive-window protection
 
+The Postgres dump needs its server **up**; the SQLite dumps want their writers stopped. So
+run them in that order — Postgres first, then stop everything, then the files.
+
 ```bash
-docker compose down                 # NO -v : -v also removes redis-app-data (sessions)
-npm run db:backup -w @life/db -- --pin
+# 1. Feedback Postgres, while the server can still serve it
 npm run db:backup:pg -w @life/db -- --pin
+
+# 2. Stop the stack. NO -v : -v also removes redis-app-data (your sessions)
+docker compose down
+
+# 3. The five SQLite files, now quiescent
+npm run db:backup -w @life/db -- --pin
 ```
 
+- `db:backup:pg` dumps the database named by `FEEDBACK_DB_URL`
+  (`postgresql://feedback@postgres-feedback:5432/feedback`) with `pg_dump -Fc --no-owner`
+  **inside** the `postgres-feedback` container, verifies the archive with `pg_restore
+  --list`, and records per-table counts. The host deliberately has no `pg_dump` of its own,
+  so this fails unless `postgres-feedback` is running — bring up just that service
+  (`docker compose up -d postgres-feedback`) and let it reach `(healthy)` first.
 - `db:backup` snapshots the **five** SQLite databases (`life`, `tags`, `todo`, `idp`,
   `meal`) into `backup/<stamp>-pinned/`, each verified with `PRAGMA quick_check`. It is
   read-only against its inputs. `--only life,tags,todo,idp` narrows the set (needed only
   before `meal.db` exists — it does now).
-- `db:backup:pg` dumps the feedback Postgres **from inside its container**, so it needs
-  `postgres-feedback` up. If it does not exist yet (feedback never deployed), start just
-  that service first (`docker compose up -d postgres-feedback`) or skip this line.
-- [ ] Five `quick_check=ok` lines, a new `backup/<stamp>-pinned/` with a `PINNED` marker,
-      or a `feedback.dump -> … pg_restore_list=ok` line from `db:backup:pg`.
+- Each run writes its own UTC-stamped directory, and `--pin` appends `-pinned` to the name.
+  The two kinds land seconds apart in separate directories — the newest pair here is
+  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) and `…12-34-39-247Z-pinned` (SQLite).
+- [ ] From `db:backup:pg`: a `feedback.dump -> … pg_restore_list=ok` line, and a new
+      `backup/<stamp>-pinned/` holding `feedback.dump` + `manifest.json` + a `PINNED`
+      marker.
+- [ ] From `db:backup`: five `quick_check=ok` lines, and a second `backup/<stamp>-pinned/`.
 - [ ] Retained until a routine backup lands on top of this stack. Rollback depends
       entirely on this — do not continue otherwise.
-- [ ] `npm run db:backup:pg` on a first feedback deploy is skipped deliberately: an empty
-      database is created in §6, and its first real snapshot is §8.
+- [ ] **The one permitted skip.** Only if `postgres-feedback` cannot be started at all,
+      `db:backup:pg` is skipped, and the run says so out loud: the store is created empty
+      in §6 and its first real snapshot is §8. That is a deliberate, named gap — not the
+      default. On this host Postgres *can* run, so take the dump.
 
 ## 5. Migration
 
@@ -270,8 +304,11 @@ curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n
 - [ ] Every readiness endpoint answers `200`; `app` answers on 3002.
 - [ ] `docker compose ps` shows `postgres-feedback`, `rabbitmq-feedback`, `redis-feedback`
       and `feedback-service` healthy.
-- [ ] Volume state after first feedback boot:
+- [ ] Volume state after boot — confirm both feedback volumes now exist (compose prefixes its
+      project name, so the real names are `personal-life_postgres-feedback-data` and
+      `personal-life_rabbitmq-feedback-data`):
       `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`.
+      If §3 found them absent, they are created here for the first time.
 - [ ] **Auth is on**: a tokenless internal request is 401 —
       `docker compose exec -T meal-service node -e "fetch('http://127.0.0.1:3106/api/foods').then(r=>console.log(r.status))"`
       → `401`.
@@ -343,15 +380,16 @@ done
 
 ## 8. Steady state
 
-- [ ] Both backup crons are installed and point at the primary checkout. Two lines, added
-      by hand with `crontab -e` (never auto-installed):
+- [ ] Install both backup crons, pointing at the primary checkout — **they are not installed
+      yet** (`backup/cron.log` does not exist, so neither line has ever fired here). Two
+      lines, added by hand with `crontab -e` (never auto-installed):
       ```cron
       0 3 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       0 4 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup:pg -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       ```
       The first covers the five SQLite databases, the second the feedback dump.
-- [ ] Take the first feedback Postgres snapshot now rather than letting the cron be the
-      first thing that ever exercises it:
+- [ ] Take a feedback Postgres snapshot once the stack is healthy, so the newly installed
+      cron is not the first thing that ever exercises `db:backup:pg`:
       `npm run db:backup:pg -w @life/db -- --pin`.
 - [ ] Retention: newest 10 routine snapshots per kind; pinned and pre-restore snapshots
       never auto-pruned.
@@ -385,6 +423,11 @@ Code and data roll back together: older code cannot read an arrangement it never
       delete `postgres-feedback-data` / `rabbitmq-feedback-data`.
 - [ ] **There is no down-migration.** A restore replaces the whole file/database; it
       overwrites current state. That is the undo path.
+- [ ] If §6 initialised a **fresh** Postgres (the volume had been removed), an older
+      `feedback.dump` in `backup/` restores into it with
+      `docker compose up -d postgres-feedback` → `db:restore:pg` → `docker compose down`,
+      and the pinned pre-restore snapshot that command takes is the undo path if the counts
+      do not match.
 - [ ] **Never** rotate or regenerate a master key during rollback; **never**
       `docker compose down -v`; **never** delete `apps/*/data/`, `backup/` or `.env`.
 
