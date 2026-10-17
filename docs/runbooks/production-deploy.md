@@ -16,6 +16,9 @@ per-route PWA identity) **plus** the shared-page-blocks refactor. Stack is `comp
   *yes* for this lane: `import-tags` moves note-DB tag rows into the new `tags-service`
   registry, re-encrypts them, and drops the legacy `tag` table. Without it, `/notes`
   tag data is absent from the new registry and `TagRef` finds nothing.
+- **A second human-run migration belongs to the content-order lane**, not this one: the
+  `contentUpdatedAt` ALTER + backfill in §3. Run it only when that lane ships in the same
+  window.
 - The shared-page-blocks refactor (the latest 18 commits) needs **no** migration — it is
   frontend only.
 
@@ -89,6 +92,30 @@ TAGS_DB_PATH=$PWD/apps/tags-service/data/tags.db \
 - [ ] Counts look right. Then re-run the same command **without** `--dry-run`.
 - [ ] Script's own backups + `PRAGMA quick_check` reported ok
       (`apps/tags-service/scripts/import-tags.ts:11-24`).
+
+### The `contentUpdatedAt` ALTER + backfill (content-order lane)
+
+The notes list orders by `note.contentUpdatedAt` — the time the body last changed —
+instead of `note.createdAt` (`docs/specs/SPEC-notes-content-order.md`). A database
+booted before this column existed lacks it until TypeORM `synchronize` adds it, and the
+list then reads every old row as its `createdAt`, so the deploy changes no order. Apply
+the column and backfill yourself **before** boot via the one-time script
+(`apps/note-service/scripts/backfill-content-updated-at.ts`, `backfill-owner.ts` shape)
+rather than leaning on `synchronize`.
+
+**Human-run. A migration is a hard line.**
+
+```bash
+npm run backfill-content-updated-at -w apps/note-service
+```
+
+- [ ] Run the script after the Step 2 backup and before `docker compose up`. It takes
+      its own verified `VACUUM INTO` backup as its first action, adds the column when
+      missing, then backfills; a re-run is a no-op (prints `stamped=0`).
+- [ ] The backfill copies `createdAt`, **not** `updatedAt`. Retag, trash, and restore
+      each bump `updatedAt`, so copying it would reshuffle every touched note at deploy;
+      copying `createdAt` leaves the pre-deploy order in place, and only a note whose body
+      is edited afterwards moves.
 
 ## 4. Boot
 
