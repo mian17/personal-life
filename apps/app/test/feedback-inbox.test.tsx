@@ -43,6 +43,9 @@ const noopStatusAction = async (
 
 const STATUS_FAILURE = "Couldn't update status. Try again.";
 
+/** The plain string the server page assembles and hands across the boundary. */
+const SETTINGS_HREF = '/feedback/settings';
+
 function fb(
   overrides: Partial<FeedbackDto> &
     Pick<FeedbackDto, 'id' | 'app' | 'type' | 'title' | 'description' | 'status'>,
@@ -70,6 +73,7 @@ function render(entries: FeedbackDto[]): string {
   return renderToStaticMarkup(
     <FeedbackInbox
       entries={entries}
+      settingsHref={SETTINGS_HREF}
       submitFeedbackAction={noopAction}
       setFeedbackStatusAction={noopStatusAction}
     />,
@@ -89,6 +93,7 @@ function renderWithFilter(entries: FeedbackDto[], filter: FeedbackDto['status'] 
     return renderToStaticMarkup(
       <FeedbackInbox
         entries={entries}
+        settingsHref={SETTINGS_HREF}
         submitFeedbackAction={noopAction}
         setFeedbackStatusAction={noopStatusAction}
       />,
@@ -205,12 +210,21 @@ describe('FeedbackInbox grouping', () => {
     try {
       const el = FeedbackInbox({
         entries: [],
+        settingsHref: SETTINGS_HREF,
         submitFeedbackAction: noopAction,
-      }) as unknown as { props: { navTrailing: unknown } };
+      }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
 
-      const nav = el.props.navTrailing as { type: unknown; props: { app: unknown } };
-      expect(nav.type).toBe(FeedbackNavItem);
-      expect(nav.props.app).toBe('feedback');
+      // The gear joins this app's own toolbar item inside one fragment (the
+      // meals-nav shape): feedback first, Settings trailing.
+      type NavChild = { type?: unknown; props: { app?: unknown; label?: unknown; href?: unknown } };
+      const kids = el.props.navTrailing.props.children as NavChild[];
+
+      const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
+      expect(feedback?.props.app).toBe('feedback');
+
+      const gear = kids[kids.length - 1];
+      expect(gear?.props.label).toBe('Settings');
+      expect(gear?.props.href).toBe(SETTINGS_HREF);
     } finally {
       spy.mockRestore();
     }
@@ -470,6 +484,7 @@ describe('FeedbackInbox filtering', () => {
       setIndex(0);
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'wire me', description: 'w', status: 'open' })],
+        settingsHref: SETTINGS_HREF,
         submitFeedbackAction: noopAction,
         setFeedbackStatusAction: wiredAction,
       });
@@ -497,6 +512,7 @@ describe('FeedbackInbox filtering', () => {
       setIndex(0);
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'fail me', description: 'w', status: 'open' })],
+        settingsHref: SETTINGS_HREF,
         submitFeedbackAction: noopAction,
         setFeedbackStatusAction: action,
       });

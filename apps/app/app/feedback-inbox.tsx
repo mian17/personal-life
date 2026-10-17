@@ -10,6 +10,7 @@ import {
   FEEDBACK_STATUSES,
   FEEDBACK_TYPES,
   FeedbackNavItem,
+  IconLink,
   List,
   ListItem,
   ListShell,
@@ -19,6 +20,7 @@ import {
   Select,
   Section,
 } from '@life/ui';
+import { Settings } from 'lucide-react';
 
 const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', meals: 'Meals', feedback: 'Feedback' };
 const APP_ORDER = FEEDBACK_APPS;
@@ -164,10 +166,13 @@ function FeedbackRow({
  */
 export function FeedbackInbox({
   entries,
+  settingsHref,
   submitFeedbackAction,
   setFeedbackStatusAction = noStatusAction,
 }: {
   entries: FeedbackDto[];
+  /** `settingsHref('/feedback')`, assembled on the server — the app-kit barrel is server-only. */
+  settingsHref: string;
   submitFeedbackAction: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
   setFeedbackStatusAction?: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
 }) {
@@ -230,7 +235,14 @@ export function FeedbackInbox({
   return (
     <ListShell
       title="Feedback"
-      navTrailing={<FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />}
+      navTrailing={
+        <>
+          <FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />
+          <IconLink href={settingsHref} label="Settings">
+            <Settings size={20} aria-hidden />
+          </IconLink>
+        </>
+      }
       filters={<StatusFilter active={statusFilter} onPick={setStatusFilter} />}
       body={body}
     />

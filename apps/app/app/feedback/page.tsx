@@ -1,3 +1,4 @@
+import { settingsHref } from '@life/app-kit';
 import { listFeedback } from '@/lib/feedback-api';
 import { setFeedbackStatusAction, submitFeedbackAction } from '../feedback-actions';
 import { FeedbackInbox } from '../feedback-inbox';
@@ -9,6 +10,7 @@ export default async function FeedbackPage() {
   return (
     <FeedbackInbox
       entries={entries}
+      settingsHref={settingsHref('/feedback')}
       submitFeedbackAction={submitFeedbackAction}
       setFeedbackStatusAction={setFeedbackStatusAction}
     />
