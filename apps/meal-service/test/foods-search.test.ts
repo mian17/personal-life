@@ -136,7 +136,7 @@ describe('Foods search `q` (e2e)', () => {
         name: 'Derived portions',
         servingGrams: 100,
         nutrients: vectorOf(200),
-        portions: [{ label: 'half', grams: 50 }],
+        portions: [{ label: 'half', amount: 50 }],
       },
       tokenA,
     ).expect(201);

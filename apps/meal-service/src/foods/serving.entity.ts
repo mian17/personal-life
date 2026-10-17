@@ -33,10 +33,17 @@ export class Serving {
   @Column({ type: 'text' })
   foodId: string;
 
-  /** `enc.v1.` envelope of the human-readable size, exactly as stored. */
+  /**
+   * `enc.v1.` envelope of the human-readable size, exactly as stored.
+   */
   @Column({ type: 'text' })
   label: string;
 
+  /**
+   * The amount of the food's canonical unit (`Food.unit`) this serving is.
+   * The wire calls this `amount`; the column keeps `grams` from before units
+   * existed (`SPEC-food-units` § 0.3), and for a `'ml'` food it holds ml.
+   */
   @Column({ type: 'real' })
   grams: number;
 
