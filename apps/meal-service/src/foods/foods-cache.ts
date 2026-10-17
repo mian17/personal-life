@@ -120,10 +120,10 @@ export class FoodsCache {
   constructor(@Inject(MEAL_CACHE) private readonly cache: MealCache) {}
 
   /**
-   * The owner's whole non-trashed food set.
-   * Key `meal:<sub>:v<gen>:food:list`. Content filters (`q`) and pagination are
-   * applied after the hit and never enter the key, so one entry serves every
-   * search variant.
+   * The owner's whole food set, soft-deleted rows included.
+   * Key `meal:<sub>:v<gen>:food:list`. Content filters (`q`) and the
+   * active-vs-all choice are applied after the hit and never enter the key, so
+   * one entry serves every search variant and the `?includeDeleted` read.
    */
   list(sub: string, loader: () => Promise<CachedFoodRow[]>): Promise<CachedFoodRow[]> {
     return this.cache.getThrough(sub, 'meal:food:list', loader, {

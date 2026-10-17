@@ -261,13 +261,23 @@ export interface MealFood {
 }
 
 /**
- * `GET /api/foods?q=` — the owner's whole catalog, or the foods whose decrypted
- * name matches `q`. The service filters after the cache hit, so the search never
- * enters the cache key (`SPEC-meal-service` Cache Rules); the names arrive
- * decrypted, so the log path can compare them in memory.
+ * `GET /api/foods?q=` — the owner's active (non-deleted) catalog, or the foods
+ * whose decrypted name matches `q`. The service filters after the cache hit, so
+ * the search never enters the cache key (`SPEC-meal-service` Cache Rules); the
+ * names arrive decrypted, so the log path can compare them in memory.
  */
 export function listMealFoods(q?: string): Promise<MealFood[]> {
   return call<MealFood[]>(`/api/foods${q ? `?${new URLSearchParams({ q })}` : ''}`);
+}
+
+/**
+ * `GET /api/foods?includeDeleted=1` — the owner's whole catalog, soft-deleted
+ * rows included (same DTO, same owner scoping). Only past-entry name resolution
+ * reads this: a deleted food still names the entries and saved-meal items that
+ * logged it (`SPEC-food-catalog-ui` AC5). Pickers and lists keep the active read.
+ */
+export function listMealFoodsIncludingDeleted(): Promise<MealFood[]> {
+  return call<MealFood[]>('/api/foods?includeDeleted=1');
 }
 
 /** `GET /api/foods/:id` — one catalog food by id (owner-scoped; a foreign id is a 404). */
@@ -316,12 +326,15 @@ export function deleteMealFood(id: string): Promise<void> {
 }
 
 /**
- * The dish name a restored entry shows. `foodId` carries a resolved catalog id
- * from this feature on, so the name comes from the catalog; an id matching no
- * catalog food is a pre-feature row whose `foodId` *is* the dish name, so that
- * stored value is the name — an unmatched id is never rendered as a label.
- * (`SPEC-meal-capture-grams` keeps `MealEntry` name-free and the service
- * unedited, so the join happens on the entry page, from this list.)
+ * The dish name a restored entry or saved-meal item shows. `foodId` carries a
+ * resolved catalog id from this feature on, so the name comes from the catalog —
+ * which callers read **including soft-deleted rows**, because a deleted food
+ * still names what it was logged as (`SPEC-food-catalog-ui` AC5). An id
+ * matching no row — active or deleted — is a pre-feature entry whose `foodId`
+ * *is* the dish name, so that stored value is the name; an unmatched id is
+ * never rendered as a label. (`SPEC-meal-capture-grams` keeps `MealEntry`
+ * name-free and the service unedited, so the join happens on the page, from
+ * this list.)
  */
 export function restoredFoodName(foodId: string, catalog: MealFood[]): string {
   return catalog.find((food) => food.id === foodId)?.name ?? foodId;

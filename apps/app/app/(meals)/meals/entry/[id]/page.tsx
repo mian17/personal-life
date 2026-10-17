@@ -8,7 +8,13 @@ import {
   type Nutrient,
   type NutrientVector,
 } from '@life/nutrition';
-import { getMealEntry, listMealFoods, restoredFoodName, type MealFood } from '@/lib/meal-api';
+import {
+  getMealEntry,
+  listMealFoods,
+  listMealFoodsIncludingDeleted,
+  restoredFoodName,
+  type MealFood,
+} from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import { MealEditor, type NutritionFields } from './editor';
 import type { PickerFood } from './food-picker';
@@ -108,7 +114,9 @@ export default async function MealEntryPage({
   }
 
   const entry = await loadOrNotFound(() => getMealEntry(id));
-  const catalog = await listMealFoods();
+  // Name resolution reads the whole catalog (soft-deleted rows included): the
+  // entry's dish name must survive the food being deleted (AC5).
+  const catalog = await listMealFoodsIncludingDeleted();
   return (
     <MealEditor
       entry={entry}

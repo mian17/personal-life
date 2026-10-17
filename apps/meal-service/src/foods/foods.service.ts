@@ -171,13 +171,19 @@ export class FoodsService {
   }
 
   /**
-   * The owner's non-trashed rows, in the catalog's stable order (`createdAt`
-   * ASC, `id` ASC tie-break). Metadata-only predicate: the name is an envelope,
-   * so no content ever reaches SQL.
+   * Every row the owner has, soft-deleted included, in the catalog's stable
+   * order (`createdAt` ASC, `id` ASC tie-break). Metadata-only predicate: the
+   * name is an envelope, so no content ever reaches SQL.
+   *
+   * The `deletedAt` predicate is deliberately absent: an id-only join from a
+   * past entry or a saved-meal item must resolve the dish name of a food the
+   * owner has since deleted, and the active-vs-all choice is a consumer filter
+   * applied after the hit (`SPEC-meal-service` Cache Rules: one entry serves
+   * every variant).
    */
   private async loadRows(sub: string): Promise<CachedFoodRow[]> {
     const found = await this.foods.find({
-      where: { ownerSub: sub, deletedAt: IsNull() },
+      where: { ownerSub: sub },
       relations: { servings: true },
       order: { createdAt: 'ASC', id: 'ASC' },
     });
@@ -188,18 +194,24 @@ export class FoodsService {
   }
 
   /**
-   * The owner's foods, optionally filtered by `q`.
+   * The owner's foods, optionally filtered by `q`, optionally including the
+   * soft-deleted rows.
    *
-   * Key `meal:<sub>:v<gen>:food:list`. The cached value is the whole non-trashed
-   * ciphertext row set, so `q` never enters the key and one entry serves every
-   * search variant. **Search runs post-decrypt, in memory** (`likeMatch` over
-   * the decrypted name) — never `LIKE` over the encrypted column
-   * (`SPEC-meal-service` Cache Rules).
+   * Key `meal:<sub>:v<gen>:food:list`. The cached value is the whole ciphertext
+   * row set — trashed rows included — so neither `q` nor the active-vs-all
+   * choice enters the key and one entry serves every variant. **Search runs
+   * post-decrypt, in memory** (`likeMatch` over the decrypted name) — never
+   * `LIKE` over the encrypted column (`SPEC-meal-service` Cache Rules).
+   *
+   * `includeDeleted` exists because a soft-deleted food still names the past
+   * entries and saved-meal items that logged it (`SPEC-food-catalog-ui` AC5):
+   * the id-only join has nowhere else to read the name from.
    */
-  async findAll(sub: string, q?: string): Promise<FoodDto[]> {
+  async findAll(sub: string, q?: string, includeDeleted = false): Promise<FoodDto[]> {
     const rows = await this.cache.list(sub, () => this.loadRows(sub));
-    const dek = await this.readDek(sub, rows);
-    const decoded = rows.map((row) => this.toDto(row, sub, dek));
+    const selected = includeDeleted ? rows : rows.filter((row) => row.deletedAt === null);
+    const dek = await this.readDek(sub, selected);
+    const decoded = selected.map((row) => this.toDto(row, sub, dek));
     if (!q) return decoded;
     return decoded.filter((food) => likeMatch(food.name, '%' + q + '%'));
   }

@@ -61,7 +61,7 @@ class CapturingRedisClient extends FakeRedisClient {
   }
 }
 
-/** Food repository fake: owner-scoped, honours the `IsNull()` deleted-at predicate. */
+/** Food repository fake: owner-scoped; the loader collects soft-deleted rows too. */
 class FakeFoodRepo {
   rows: Array<Record<string, unknown>> = [];
 
@@ -82,7 +82,7 @@ class FakeFoodRepo {
 
   find = jest.fn(async (opts: { where: { ownerSub: string } }) =>
     this.rows
-      .filter((r) => r.ownerSub === opts.where.ownerSub && !r.deletedAt)
+      .filter((r) => r.ownerSub === opts.where.ownerSub)
       .map((r) => ({ ...r, servings: this.servingsFor(r.id as string) })),
   );
 
@@ -194,6 +194,49 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       // The loader's result is returned, but nothing was written to Redis.
       expect(client.values).toHaveLength(0);
       expect(client.setCalls).toHaveLength(0);
+    });
+  });
+
+  describe('soft delete: one entry serves the active and include-deleted reads', () => {
+    it('a removed food leaves the default list but stays resolvable through the same key', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(client);
+      const created = await h.service.create(SUB, body());
+
+      const active = await h.service.findAll(SUB);
+      expect(active.map((food) => food.id)).toEqual([created.id]);
+
+      await h.service.remove(SUB, created.id);
+
+      // Post-hit in-memory split (`SPEC-meal-service` Cache Rules): one cache
+      // entry serves both read variants — no second key, no second loader shape.
+      // The read before the write warmed the v1 entry; the `remove()` bumped
+      // the generation, so the first post-write read is the miss that reloads
+      // the entry, and the second read hits it.
+      const loaderCallsBefore = h.foods.find.mock.calls.length;
+      const defaultList = await h.service.findAll(SUB);
+      const loaderCallsAfterFirst = h.foods.find.mock.calls.length;
+      const withDeleted = await h.service.findAll(SUB, undefined, true);
+
+      expect(defaultList).toEqual([]);
+      expect(withDeleted.map((food) => food.name)).toEqual(['Milk, Brand X']);
+      expect(loaderCallsAfterFirst).toBe(loaderCallsBefore + 1);
+      expect(h.foods.find.mock.calls.length).toBe(loaderCallsAfterFirst);
+
+      const written = client.values.find(
+        (v) => v.key === `meal:${SUB}:v2:food:list`,
+      )!;
+      expect(written).toBeDefined();
+      const [row] = JSON.parse(written.value) as Array<{ deletedAt: string | null }>;
+      expect(row.deletedAt).not.toBeNull();
+    });
+
+    it('owner scoping survives the include-deleted read', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(client);
+      await h.service.create(SUB, body());
+
+      expect(await h.service.findAll('someone-else', undefined, true)).toEqual([]);
     });
   });
 

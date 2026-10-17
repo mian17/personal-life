@@ -177,7 +177,7 @@ Rendering + behavior unit tests per atom. Harness: jest + `jest-environment-jsdo
 `@testing-library/react` (devDependencies of `packages/ui` only — the map's single
 dependency addition; fallback if disallowed: `renderToStaticMarkup` markup assertions
 in the node environment, behavior checks via stubbed globals). Cover: rendered DOM
-classes/roles/labels/element types, `ConfirmButton` cancel path does not submit,
+classes/roles/labels/element types, `ConfirmButton` cancel path fires neither the form submit nor the consumer's `onClick`,
 `ThemeToggle` cycling + `aria-pressed`, `LocalTime` empty-first render, `IconLink`
 renders an anchor, keyboard focusability.
 

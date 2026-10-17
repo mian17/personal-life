@@ -44,7 +44,9 @@ Acceptance criteria:
 - AC4 Edit: everything except `unit` is editable; the unit renders read-only; the form
   resubmits `PATCH /api/foods/:id` with `expectedVersion`.
 - AC5 Delete: confirm → `DELETE /api/foods/:id` → the food leaves the list; past entries
-  and day totals are untouched.
+  and day totals are untouched. The row is a soft delete, so a past entry's dish name still
+  resolves: name resolution reads `GET /api/foods?includeDeleted=1` (the picker keeps the
+  active-only read, so the deleted food never returns as a choice).
 - AC6 Every visual element composes `@life/ui` primitives; no raw HTML form controls.
 
 ## 2. Commands
@@ -67,7 +69,7 @@ apps/app/
   app/(meals)/meals/foods/[id]/page.tsx# edit + delete form
   app/(meals)/meals/foods/food-form.tsx# the shared create/edit form (client)
   app/(meals)/meals/actions.ts         # + createFood/updateFood/deleteFood server actions
-  lib/meal-api.ts                      # listMealFoods(q?), createMealFood/updateMealFood/deleteMealFood inputs (food-units owns the shapes)
+  lib/meal-api.ts                      # listMealFoods(q?), listMealFoodsIncludingDeleted(), create/update/deleteMealFood inputs (food-units owns the shapes)
   test/meal-foods.test.tsx             # route + form behaviour (jest, existing stub pattern)
   test/e2e/meals.spec.ts               # + a foods journey (-g target)
 ```

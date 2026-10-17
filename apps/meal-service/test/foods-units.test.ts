@@ -200,10 +200,41 @@ describe('Food units contract (e2e)', () => {
     // The day's entries and their totals are exactly what they were.
     expect(JSON.stringify(after.body)).toBe(JSON.stringify(before.body));
 
-    // The food itself is gone: reads like a missing row, absent from the list.
+    // The food itself is gone: reads like a missing row, absent from the default catalog.
     await one(created.body.id).expect(404);
     const catalog = await auth(request(app.getHttpServer()).get('/api/foods'), tokenA).expect(200);
     expect(catalog.body.map((food: { id: string }) => food.id)).not.toContain(created.body.id);
+
+    // ...but a past entry's dish name still resolves: the include-deleted read
+    // returns the soft-deleted row with the same DTO and owner scoping.
+    const withDeleted = await auth(
+      request(app.getHttpServer()).get('/api/foods?includeDeleted=1'),
+      tokenA,
+    ).expect(200);
+    const restored = withDeleted.body.find((food: { id: string }) => food.id === created.body.id);
+    expect(restored).toMatchObject({ name: 'Delete keeps history', unit: 'ml' });
+    // The pre-feature rows (an entry whose `foodId` is the dish name) never lose
+    // their fallback: an unknown id still matches no row here.
+    expect(restored).not.toMatchObject({ deletedAt: expect.anything() });
+  });
+
+  it('the include-deleted catalog is owner-scoped (a foreign soft-deleted food never leaks)', async () => {
+    const tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
+    const mine = await post({ name: 'Mine', servingGrams: 100 }).expect(201);
+    const theirs = await auth(request(app.getHttpServer()).post('/api/foods'), tokenB)
+      .send({ name: 'Theirs', servingGrams: 100 })
+      .expect(201);
+    await auth(request(app.getHttpServer()).delete(`/api/foods/${theirs.body.id}`), tokenB).expect(
+      200,
+    );
+
+    const mineWithDeleted = await auth(
+      request(app.getHttpServer()).get('/api/foods?includeDeleted=1'),
+      tokenA,
+    ).expect(200);
+    const ids = mineWithDeleted.body.map((food: { id: string }) => food.id);
+    expect(ids).toContain(mine.body.id);
+    expect(ids).not.toContain(theirs.body.id);
   });
 
   it('stores an ml amount verbatim, with no conversion anywhere (no g↔ml)', async () => {

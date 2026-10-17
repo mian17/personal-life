@@ -2,7 +2,7 @@ import { format, sum } from '@life/nutrition';
 import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
 import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
-import { getSavedMeal, listMealFoods, restoredFoodName } from '@/lib/meal-api';
+import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,9 @@ export const dynamic = 'force-dynamic';
 export default async function SavedMealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const meal = await loadOrNotFound(() => getSavedMeal(id));
-  const catalog = await listMealFoods();
+  // Name resolution reads the whole catalog (soft-deleted rows included): the
+  // item's dish name must survive the food being deleted (AC5).
+  const catalog = await listMealFoodsIncludingDeleted();
   const total = format('calories', sum(meal.items.map((item) => item.nutrients)).calories);
 
   return (

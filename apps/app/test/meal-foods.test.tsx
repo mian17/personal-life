@@ -440,10 +440,49 @@ describe('food form behaviour', () => {
       const confirm = find(tree, ConfirmButton);
       if (!confirm) throw new Error('no delete control');
 
-      await (confirm.props.onClick as () => Promise<void>)();
+      // The click goes through the real atom's guarded handler — the same code
+      // the DOM runs — so the confirm decision is what reaches the delete.
+      const button = ConfirmButton(
+        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
+      );
+      (globalThis as { window?: unknown }).window = { confirm: () => true };
+      try {
+        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
+        // The atom's guarded handler returns void, so the delete's own await
+        // chain is settled by a macrotask flush before the assertions.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } finally {
+        delete (globalThis as { window?: unknown }).window;
+      }
 
       expect(mockedDeleteMealFood).toHaveBeenCalledWith('food-1');
       expect(mockPush).toHaveBeenCalledWith('/meals/foods');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a Cancel confirm deletes nothing (the confirm is the only path to delete)', async () => {
+    mockedDeleteMealFood.mockResolvedValue(undefined);
+    const harness = formHarness();
+    try {
+      const tree = harness.renderTree(food());
+      const confirm = find(tree, ConfirmButton);
+      if (!confirm) throw new Error('no delete control');
+
+      const button = ConfirmButton(
+        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
+      );
+      (globalThis as { window?: unknown }).window = { confirm: () => false };
+      try {
+        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } finally {
+        delete (globalThis as { window?: unknown }).window;
+      }
+
+      expect(mockedDeleteMealFood).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
     } finally {
       harness.restore();
     }
