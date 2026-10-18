@@ -1,4 +1,4 @@
-# Production runbook — full stack (deploy `master` @ `963e859`)
+# Production runbook — full stack (deploy `master` @ `7305c97`)
 
 Authoritative deploy procedure for this host. Replaces the earlier
 `master..refactor/notes-todos-shared-ui` runbook, which predates `feedback-service`,
@@ -13,7 +13,10 @@ copy-pasteable from that directory:
 cd /home/night/WebstormProjects/personal-life
 ```
 
-Ref: `master` @ `963e859` (`merge: production deploy runbook for the 16-service stack`).
+Ref: `master` @ `7305c97` (`docs(runbooks): correct production-deploy for real feedback state`),
+**plus the `pi/wf/feedback-status` merge** — the feedback status workflow this revision
+adds steps for. Record the exact commit you deploy in §3: this runbook pins a hash, and the
+hash moves as master advances.
 `compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`) plus 7
 Redis instances, `postgres-feedback` and `rabbitmq-feedback`.
@@ -102,6 +105,12 @@ Facts that decide the steps below:
   `/meals/foods/[id]`), the manual-log door (`/meals/entry/new?door=food`) and the
   `Autosuggest` block in `packages/ui`; per-route PWA identity for `/meals` and
   `/feedback`.
+- **New in the feedback status workflow** (this revision's delta over `7305c97`): the
+  `feedback.status` column, the `PATCH /api/feedback/:id` status route, the row status
+  pill and dropdown in `/feedback`, the URL-param status filter
+  (`/feedback?status=<open|in_progress|done|wont_do>`) and the gear entry to
+  `/feedback/settings`. All additive: no new container, no new volume, no new env name,
+  no new published port.
 
 ## 2. Env (names only)
 
@@ -173,8 +182,12 @@ the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path
 cd /home/night/WebstormProjects/personal-life
 ```
 
-- [ ] Ref pinned: `git log -1 --oneline` → `963e859`; `git status --short` shows only
-      untracked `docs/reference-repo/`, `pictures/`, `.pi/`.
+- [ ] Ref pinned: `git log -1 --oneline` → record the commit you are deploying. It must
+      contain the feedback status workflow — check with
+      `git log --oneline -1 -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
+      "unknown revision"). On the revision this runbook was written against that is
+      `7305c97`; `git status --short` shows only untracked `docs/reference-repo/`,
+      `pictures/`, `.pi/`.
 - [ ] Record the images you are about to replace (rollback reference):
       `docker compose images`.
 - [ ] Baseline the running stack: `docker compose ps` — the services you expect healthy
@@ -269,6 +282,12 @@ node -e "const D=require('better-sqlite3');const db=new D('apps/note-service/dat
       overrides.) Not this run.
 - [ ] `food.unit` needs no step: it is additive-with-default (`default 'g'`) and arrives
       with `synchronize` at `meal-service`'s first boot.
+- [ ] `feedback.status` needs no step: it is additive-with-default (`default 'open'`, and
+      its `CHK_feedback_status` check is built from the same shared vocabulary), so
+      `synchronize` adds the column and the constraint at `feedback-service`'s first boot
+      and every existing row reads `open` — which is a member of the vocabulary, so the
+      check validates. No backfill and no manual `UPDATE`; a hand-written one would only
+      race the constraint.
 - [ ] Feedback schema and the NOTIFY trigger need no step: both are boot-ensured.
 
 ## 6. Deploy
@@ -364,6 +383,25 @@ curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n
 - [ ] Cache sanity: a second `/feedback` load is served by `redis-feedback`, and the inbox
       still works with `redis-feedback` stopped.
 - [ ] Signed-out visit to `/feedback` returns to `/feedback`.
+- [ ] **Status pill renders per row.** Every row carries a pill reading `Open`,
+      `In Progress`, `Done` or `Won't Do`, matching the row's stored status.
+- [ ] **Status dropdown writes through.** Change a row's status → the dropdown updates,
+      the pill above it re-renders with the new status, and a page reload keeps it.
+- [ ] **Filter is a URL, and a link.** Click `Open` / `In Progress` / `Done` / `Won't Do` →
+      the address becomes `/feedback?status=<value>` and only matching rows render; `All`
+      drops the param. Filter pills are **links** (they navigate), not buttons.
+- [ ] **Unknown or hand-typed status reads as All.** `/feedback?status=nonsense` renders
+      the unfiltered inbox rather than an empty page or an error.
+- [ ] **Gear opens settings.** The toolbar gear reaches `/feedback/settings`; back returns
+      to `/feedback`.
+- [ ] **Schema, one query** (proves the additive column and its check constraint arrived):
+      `docker compose exec -T postgres-feedback psql -U feedback -d feedback -tAc "SELECT count(*) FILTER (WHERE status = 'open'), count(*) FROM feedback;"`
+      → the first count equals the row count for a store never updated by hand (the
+      `default 'open'`). `\d feedback` shows the column with default `'open'` and
+      `CHK_feedback_status`.
+- [ ] **Status is plaintext metadata, not content** — it rides the cache as plaintext
+      alongside the `enc.v1.` payload, so `SELECT description FROM feedback` must still
+      never leave the envelope; the status column is the only readable one added here.
 
 ### Per-route PWA identity
 
@@ -421,6 +459,13 @@ Code and data roll back together: older code cannot read an arrangement it never
       code booting against the new file drops it again. No user data is at risk (the live
       `food` table holds 0 rows). Leave the file in place; do not delete it, and do not
       delete `postgres-feedback-data` / `rabbitmq-feedback-data`.
+- [ ] **`feedback.status` is not additive on the way back either**, and this one *does* drop
+      user-entered state: older code booting against the same Postgres makes `synchronize`
+      drop the column, taking every status with it (existing rows go back to "no such
+      column", not to `open`). Nothing else in the feedback store is affected — the
+      `enc.v1.` content columns and `feedback_event` rows survive. If statuses matter,
+      restore the Postgres snapshot from §4 instead of rolling code back alone, so code and
+      data go back together.
 - [ ] **There is no down-migration.** A restore replaces the whole file/database; it
       overwrites current state. That is the undo path.
 - [ ] If §6 initialised a **fresh** Postgres (the volume had been removed), an older
