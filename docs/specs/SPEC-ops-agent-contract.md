@@ -75,22 +75,51 @@ the CLI's argument surface, or moving the package's boundary.
   side channel; it is never the only trace of a bad line.
 - An unknown method keeps answering `-32601`.
 
-### 3.2 Tool annotations
+### 3.2 Tool annotations, and the destructiveness flag
 
-Every `tools/list` entry gains `title` and `annotations`, derived from the op kind
-already in the registry — no new descriptor field, no per-resource declaration:
+Every `tools/list` entry gains `title` and `annotations`. The hints derive from the
+op kind already in the registry, with one per-op override; no new descriptor for
+annotations themselves:
 
 | kind | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
 |---|---|---|---|
 | `get` | `true` | `false` | `true` |
 | `list` | `true` | `false` | `true` |
-| `create` | `false` | `false` | `false` |
-| `update` | `false` | `false` | `true` |
-| `delete` | `false` | `true` | `true` |
+| `create` | `false` | **`true`** | `false` |
+| `update` | `false` | **`true`** | `true` |
+| `delete` | `false` | **`true`** | `true` |
 
-All four hints are stated explicitly rather than relying on protocol defaults, so a
-consumer never has to know the defaults to gate a call. `title` is
-`"<Verb> <resource>"` (`Get note`, `Delete note`).
+A mutating op is destructive unless the resource author says otherwise:
+
+```ts
+export interface OpSpec {
+  kind: 'create' | 'get' | 'list' | 'update' | 'delete';
+  fields: Record<string, FieldSpec>;
+  /** Overrides the kind default. Defaults: true for create/update/delete,
+   *  false for get/list. `false` on a mutating op is an explicit statement
+   *  that this write may run without human approval. */
+  isDestructive?: boolean;
+}
+```
+
+The override wins where stated; an unstated op keeps the kind default. Both are
+frozen into the registry by `normalizeOp`, so a projection never re-derives it.
+
+Rationale: the resource author is the only one who knows whether a `delete` is a
+recoverable trash or a hard purge. A global kind table cannot, and a hand-maintained
+tool-name list in the consumer would drift. Defaulting mutating ops to destructive
+gives the fail-safe reading — writes interrupt until someone deliberately says
+they do not — and makes the opt-out the one place to review when auditing what an
+agent may do unattended.
+
+`title` is `"<Verb> <resource>"` (`Get note`, `Delete note`). All four hints are
+stated explicitly rather than relying on protocol defaults, so a consumer never has
+to know the defaults to gate a call.
+
+This is a **flag, not an enforcement**. The package publishes what a call may do;
+the human-in-the-loop gate that acts on it lives in the consuming agent, out of
+scope per §8. A consumer gates on `annotations.destructiveHint`, so it needs no
+name list of its own.
 
 ### 3.3 Structured tool output
 
@@ -140,8 +169,8 @@ which is the point.
 ### 3.7 User stories / acceptance criteria
 
 1. As an MCP client author, I connect with the official SDK and receive a tool list.
-2. As a HITL gate author, I read `annotations.readOnlyHint` and know without a name
-   list whether to interrupt.
+2. As a HITL gate author, I read `annotations.destructiveHint` and know without a
+   name list whether to interrupt.
 3. As a graph node author, I read `structuredContent` and branch on a value.
 4. As a package consumer, `import { defineResource } from '@life/ops'` resolves.
 5. As an agent operator, a backend that never answers fails the turn in 30s.
@@ -199,7 +228,9 @@ Hand-rolled stubs, no network, no framework beyond the package's existing jest.
   produces only JSON-RPC objects on stdout, asserted by parsing every line. This is
   the guard against the login URL printer reaching the stream.
 - **Annotations.** All five kinds mapped, asserted as a table so a new kind cannot
-  be added without a decision.
+  be added without a decision. An op with `isDestructive: false` reports
+  `destructiveHint: false`; an op with `isDestructive: true` on `get` reports
+  `true`, proving the override wins in both directions.
 - **Structured output.** Object body → `structuredContent` deep-equals the parsed
   body; empty body and scalar body → key absent; failure → `isError` and no
   `structuredContent`.
@@ -232,7 +263,8 @@ Hand-rolled stubs, no network, no framework beyond the package's existing jest.
 
 1. An official MCP SDK client (`StdioClientTransport`) completes `initialize` and
    lists tools against the built `dist` entry.
-2. `tools/list` carries `title` plus all four annotation hints for every op.
+2. `tools/list` carries `title` plus all four annotation hints for every op, with
+   `destructiveHint` true for every mutating op that did not opt out.
 3. `tools/call` returns `structuredContent` for an object body and the existing
    text rendering unchanged, so adapter parity still holds.
 4. `import { defineResource } from '@life/ops'` resolves from another workspace.
@@ -249,8 +281,12 @@ Hand-rolled stubs, no network, no framework beyond the package's existing jest.
 1. **`outputSchema`.** Deferred per assumption 5. Revisit only when the registry
    grows a response descriptor; inventing one now would restate the service
    contract this package deliberately does not own.
-2. **Gateway.** Still out of scope, as in the original SPEC §10. An in-repo agent
+2. **Annotations override.** The per-op `isDestructive` override is the first thing
+   a consumer's policy depends on. Revisit only if resources need a third state
+   ("destructive but pre-approved"); a boolean does not express that, and two
+   booleans would drift.
+3. **Gateway.** Still out of scope, as in the original SPEC §10. An in-repo agent
    that needs several services registers several servers; the fan-out belongs to
    the agent's client config, not to this package.
-3. **Deadline default.** `30_000` is a guess sized for interactive CLI use. If agent
+4. **Deadline default.** `30_000` is a guess sized for interactive CLI use. If agent
    turns routinely exceed it, the number moves — it is one constant and one env var.
