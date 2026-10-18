@@ -479,6 +479,18 @@ export function getFeedback(target: FeedbackApp, token: string): RequestTest {
     .set('Authorization', `Bearer ${token}`);
 }
 
+export function patchFeedbackStatus(
+  target: FeedbackApp,
+  token: string,
+  id: string,
+  body: Record<string, unknown>,
+): RequestTest {
+  return request(target.app.getHttpServer())
+    .patch(`/api/feedback/${id}`)
+    .set('Authorization', `Bearer ${token}`)
+    .send(body);
+}
+
 /** A raw pooled connection, for statements no repository express (BEGIN/ROLLBACK). */
 export interface RawQueryClient {
   query(text: string, params?: unknown[]): Promise<unknown>;

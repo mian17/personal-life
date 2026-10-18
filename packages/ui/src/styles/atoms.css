@@ -338,7 +338,12 @@
 
 /* ------------------------------------------------------------- Pill */
 
+/* Normalize the UA border away. A `Pill as="button"` (the filter pills) otherwise
+kept the browser's default `outset` border, which read as a metallic bevel — the
+pill is a text affordance, not a filled button. `--chip` below re-adds its own
+intentional border; `--filter` stays borderless. */
 .ui-pill {
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--panel);
   color: var(--muted);
@@ -368,6 +373,27 @@
 .ui-pill--active {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* Status pills color the chip with the vocabulary's token — the mapping the
+   feedback-status vocabulary owns (`FEEDBACK_STATUSES`), pinned against tokens.css
+   by STATUS_TOKENS in tokens.test.ts. Each class reads one existing semantic
+   token and nothing else: no new colors, no raw values. A distinct wont_do hue
+   is a user decision (SPEC-feedback-status.md open question 1). */
+.ui-pill--open {
+  color: var(--accent);
+}
+
+.ui-pill--in_progress {
+  color: var(--amber);
+}
+
+.ui-pill--done {
+  color: var(--green);
+}
+
+.ui-pill--wont_do {
+  color: var(--muted);
 }
 
 /* Interactive chip (Pill as="button"): same shell, reset the button chrome so

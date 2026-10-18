@@ -177,6 +177,16 @@ export type FeedbackType = (typeof FEEDBACK_TYPE_VALUES)[number];
 export const FEEDBACK_APPS = ['notes', 'todos', 'meals', 'feedback'] as const;
 export type FeedbackApp = (typeof FEEDBACK_APPS)[number];
 
+/**
+ * The feedback status workflow's fixed vocabulary (`SPEC-feedback-status`):
+ * `open` on submit, then any status to any other via the owner's dropdown — no
+ * transition graph. Status is plaintext workflow metadata like `app`/`type`,
+ * never `enc.v1.` content, so this constant is the one home the DB CHECK and the
+ * DTO's `@IsIn` both read (lesson 0016).
+ */
+export const FEEDBACK_STATUS_VALUES = ['open', 'in_progress', 'done', 'wont_do'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUS_VALUES)[number];
+
 export const FEEDBACK_TITLE_MAX = 200;
 export const FEEDBACK_DESCRIPTION_MAX = 2000;
 
@@ -184,6 +194,7 @@ export interface FeedbackDto {
   id: string;
   app: string;
   type: string;
+  status: FeedbackStatus;
   title: string;
   description: string;
   createdAt: string;

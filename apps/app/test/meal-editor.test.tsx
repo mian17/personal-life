@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Button, Dialog, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea } from '@life/ui';
+import { Autosuggest, Button, Dialog, EmptyState, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -22,12 +22,13 @@ jest.mock('@/lib/client', () => ({
 }));
 
 import { callService } from '@/lib/client';
-import { restoredFoodName, type MealEntry, type MealFood } from '@/lib/meal-api';
+import { restoredFoodName, type MealEntry, type MealFood, type MealGroup } from '@/lib/meal-api';
 import {
   MealEditor,
   type EditorItem,
   type NutritionFields,
 } from '@/app/(meals)/meals/entry/[id]/editor';
+import { FoodSearch, type PickerFood } from '@/app/(meals)/meals/entry/[id]/food-picker';
 
 const mockCallService = callService as unknown as jest.Mock;
 
@@ -117,6 +118,7 @@ function stateHarness() {
     initialEntry: MealEntry | null = null,
     date = '2026-10-03',
     foodName?: string,
+    extra: { door?: 'photo' | 'food' | null; foods?: PickerFood[]; defaultMealGroup?: MealGroup } = {},
   ): EditorTree {
     let index = 0;
     spy.mockImplementation(((initial: unknown) => {
@@ -129,11 +131,40 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    return MealEditor({ entry: initialEntry, date, nutrition: NUTRITION, foodName }) as unknown as EditorTree;
+    return MealEditor({
+      entry: initialEntry,
+      date,
+      nutrition: NUTRITION,
+      foodName,
+      ...extra,
+    }) as unknown as EditorTree;
+  }
+
+  // `FoodSearch` owns its own query state. It is rendered directly (not part of
+  // the editor tree) but shares this harness's spy and store — parked at a high
+  // index so its one `useState` never collides with the editor's positions.
+  const SEARCH_SLOT = 100;
+  function renderSearch(
+    foods: PickerFood[],
+    onPick: (food: MealFood, quantity: number) => void,
+  ): ReactElement<Record<string, unknown>> {
+    let index = SEARCH_SLOT;
+    spy.mockImplementation(((initial: unknown) => {
+      const i = index++;
+      if (i >= store.length) {
+        store[i] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
+      }
+      const set = (next: unknown) => {
+        store[i] = typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
+      };
+      return [store[i], set];
+    }) as unknown as typeof ReactModule.useState);
+    return FoodSearch({ foods, onPick }) as unknown as ReactElement<Record<string, unknown>>;
   }
 
   return {
     renderTree,
+    renderSearch,
     shown,
     restore: () => {
       spy.mockRestore();
@@ -374,6 +405,114 @@ describe('MealEditor photo door', () => {
   });
 });
 
+describe('MealEditor manual door — search-first multi-add', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function pickerFood(overrides: Partial<MealFood> = {}): PickerFood {
+    return {
+      food: {
+        id: 'f-food',
+        name: 'Food',
+        unit: 'g',
+        servingGrams: 100,
+        nutrients: vector(),
+        servings: [],
+        version: 0,
+        createdAt: '',
+        updatedAt: '',
+        ...overrides,
+      },
+      per100Calories: 'per 100 g · 0 kcal',
+    };
+  }
+
+  const DATE = '2026-10-03';
+  const oat = pickerFood({ id: 'f-oat', name: 'Oatmeal', nutrients: vector({ calories: 389 }) });
+  const chicken = pickerFood({ id: 'f-chicken', name: 'Chicken', nutrients: vector({ calories: 165 }) });
+
+  /** The row `FoodSearch` offers for `name` — the `Autosuggest` option the block renders. */
+  function listedRow(node: unknown, name: string) {
+    const options = (find(node, Autosuggest)?.props.options ?? []) as AutosuggestOption[];
+    return options.find((option) => option.label === name);
+  }
+
+  it('hides the photo section on the manual door and keeps it when the door is null', () => {
+    const harness = stateHarness();
+    try {
+      const manual = harness.renderTree(null, DATE, undefined, { door: 'food', foods: [oat] });
+      expect(find(manual, FilePicker)).toBeUndefined();
+      expect(
+        find(manual, Textarea, (el) => el.props['aria-label'] === 'Photo hint (optional)'),
+      ).toBeUndefined();
+
+      const photo = harness.renderTree();
+      expect(find(photo, FilePicker)).toBeDefined();
+      expect(
+        find(photo, Textarea, (el) => el.props['aria-label'] === 'Photo hint (optional)'),
+      ).toBeDefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('starts empty and shows no suggestion rows before the query is typed', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(null, DATE, undefined, { door: 'food', foods: [oat, chicken] });
+      // Search-first: no pre-seeded blank row waits to be corrected.
+      expect(findAll(tree, ListItem)).toHaveLength(0);
+      expect(text(find(tree, EmptyState)!.props.body)).toBe(
+        'Nothing logged yet. Search a food above to add it.',
+      );
+
+      const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
+      const search = harness.renderSearch([oat, chicken], onPick);
+      // Nothing is listed while the query is empty — the catalog would bury the field.
+      expect(listedRow(search, 'Oatmeal')).toBeUndefined();
+      expect(listedRow(search, 'Chicken')).toBeUndefined();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('appends a logged food and keeps an already-added item; two picks yield two items', () => {
+    const harness = stateHarness();
+    const foods = [oat, chicken];
+    try {
+      const tree = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
+      const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
+
+      // Pick `Oatmeal` through the block: type, then select the row it offers.
+      const idle = harness.renderSearch(foods, onPick);
+      (find(idle, Autosuggest)!.props.onQueryChange as (q: string) => void)('oa');
+      const offered = harness.renderSearch(foods, onPick);
+      (find(offered, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(
+        listedRow(offered, 'Oatmeal')!,
+      );
+
+      const one = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
+      expect(field(one, 'Food for item 1').props.value).toBe('Oatmeal');
+      expect(field(one, 'Calories for Oatmeal').props.value).toBe('389');
+
+      // Pick `Chicken` — the first item stays.
+      const idleAgain = harness.renderSearch(foods, onPick);
+      (find(idleAgain, Autosuggest)!.props.onQueryChange as (q: string) => void)('chicken');
+      const offeredAgain = harness.renderSearch(foods, onPick);
+      (find(offeredAgain, Autosuggest)!.props.onSelect as (option: AutosuggestOption) => void)(
+        listedRow(offeredAgain, 'Chicken')!,
+      );
+
+      const two = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
+      expect(field(two, 'Food for item 1').props.value).toBe('Oatmeal');
+      expect(field(two, 'Food for item 2').props.value).toBe('Chicken');
+      // The run total sums both confirmed picks.
+      expect(text(runTotal(two))).toBe(format('calories', 554));
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
 describe('MealEditor unknown affordance', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -443,7 +582,7 @@ describe('MealEditor save persists corrected values', () => {
     const harness = stateHarness();
     // The log path lists the catalog first, then creates the missing food — the
     // create returns the id the entry POST carries.
-    const createdFood = { id: 'created-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'created-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -483,7 +622,7 @@ describe('MealEditor log-time catalog', () => {
 
   it('creates the food at 100 g with the base vector before logging a foodId:null item', async () => {
     const harness = stateHarness();
-    const createdFood = { id: 'new-food', name: 'Toast', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'new-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -562,7 +701,7 @@ describe('MealEditor log-time catalog', () => {
     // case (case-fold). Only a real `nameKey` comparison reuses the row — a plain
     // `food.name === dish` creates a duplicate.
     const typedDish = '  chicken   breast  ';
-    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
       return Promise.resolve({});
@@ -596,7 +735,7 @@ describe('MealEditor log-time catalog', () => {
     // The plain exact-match case: the typed `Chicken` equals the stored `Chicken`,
     // no normalization required. Kept separate from the normalized-key case so the
     // fixture that discriminates normalization is not the one that does not.
-    const existing = { id: 'chicken-id', name: 'Chicken', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const existing = { id: 'chicken-id', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
       return Promise.resolve({});
@@ -632,7 +771,7 @@ describe('MealEditor log-time catalog', () => {
     // (keyed by the normalized key), not await a second create: exactly one
     // `POST /api/foods`, two `POST /api/entries` carrying that one created id.
     const secondDish = '  chicken  ';
-    const createdFood = { id: 'created-chicken', name: 'Chicken', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
+    const createdFood = { id: 'created-chicken', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
       if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
       return Promise.resolve({});
@@ -954,6 +1093,7 @@ describe('restored entry display name', () => {
     return {
       id: 'f-oat',
       name: 'Oatmeal',
+      unit: 'g',
       servingGrams: 100,
       nutrients: vector(),
       servings: [],

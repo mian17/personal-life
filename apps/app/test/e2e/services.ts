@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
 
 /**
  * Spawn a long-lived Node process and wait until it reports ready.
@@ -85,6 +86,28 @@ export async function spawnService(options: SpawnOptions): Promise<SpawnedServic
   };
 
   return { name: options.name, child, stop };
+}
+
+/**
+ * Assert nothing is already bound to `port`. A stale listener is the one harness
+ * failure that silently produces a WRONG result instead of an error: the fresh
+ * server dies with EADDRINUSE, `waitForHttp` then answers against the stale
+ * process, and the run tests a build whose chunk hashes are already gone from
+ * disk (ChunkLoadError on the page — never a product bug). Failing here keeps
+ * that failure loud and at setup, where it belongs.
+ */
+export async function ensurePortFree(port: number, name: string, host = '127.0.0.1'): Promise<void> {
+  const taken = await new Promise<boolean>((resolve) => {
+    const probe = createServer();
+    probe.once('error', () => resolve(true));
+    probe.once('listening', () => probe.close(() => resolve(false)));
+    probe.listen(port, host);
+  });
+  if (taken) {
+    throw new Error(
+      `e2e port ${port} (${name}) is already in use — stop the stale stack before running e2e`,
+    );
+  }
 }
 
 /** Poll a URL until it answers or the deadline passes. */

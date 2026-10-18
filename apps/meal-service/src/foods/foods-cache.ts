@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import type { Food } from './food.entity';
+import type { Food, FoodUnit } from './food.entity';
 import type { Serving } from './serving.entity';
 import type { StoredVector } from './content';
 
@@ -39,6 +39,8 @@ export interface CachedFoodRow {
   id: string;
   ownerSub: string | null;
   name: string;
+  /** Plaintext by design (a unit literal, not content), joins `servingGrams`. */
+  unit: FoodUnit;
   servingGrams: number;
   /** The sealed base vector, or null meaning "no nutrient data for this food". */
   nutrients: StoredVector;
@@ -67,6 +69,7 @@ export function toCachedFoodRow(row: Food): CachedFoodRow {
     id: row.id,
     ownerSub: row.ownerSub,
     name: row.name,
+    unit: row.unit,
     servingGrams: row.servingGrams,
     nutrients: row.nutrients,
     version: row.version,
@@ -117,10 +120,10 @@ export class FoodsCache {
   constructor(@Inject(MEAL_CACHE) private readonly cache: MealCache) {}
 
   /**
-   * The owner's whole non-trashed food set.
-   * Key `meal:<sub>:v<gen>:food:list`. Content filters (`q`) and pagination are
-   * applied after the hit and never enter the key, so one entry serves every
-   * search variant.
+   * The owner's whole food set, soft-deleted rows included.
+   * Key `meal:<sub>:v<gen>:food:list`. Content filters (`q`) and the
+   * active-vs-all choice are applied after the hit and never enter the key, so
+   * one entry serves every search variant and the `?includeDeleted` read.
    */
   list(sub: string, loader: () => Promise<CachedFoodRow[]>): Promise<CachedFoodRow[]> {
     return this.cache.getThrough(sub, 'meal:food:list', loader, {

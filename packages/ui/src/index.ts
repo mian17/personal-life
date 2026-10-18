@@ -59,6 +59,9 @@ export type { PageTitleProps } from './components/page-title';
 export { FabLink } from './components/fab-link';
 export type { FabLinkProps } from './components/fab-link';
 
+export { FabMenu } from './components/fab-menu';
+export type { FabMenuProps } from './components/fab-menu';
+
 export { EditorToolbar } from './components/editor-toolbar';
 export type { EditorToolbarProps, EditorToolbarBack } from './components/editor-toolbar';
 
@@ -87,6 +90,9 @@ export type { AlertBannerProps, AlertBannerTone } from './components/alert-banne
 
 export { SearchField } from './components/search-field';
 export type { SearchFieldProps } from './components/search-field';
+
+export { Autosuggest } from './components/autosuggest';
+export type { AutosuggestOption, AutosuggestProps } from './components/autosuggest';
 
 export { PillGroup } from './components/pill-group';
 export type { PillGroupProps } from './components/pill-group';
@@ -163,6 +169,9 @@ export { FEEDBACK_TYPES } from './components/feedback-types';
 
 export { FeedbackNavItem } from './components/feedback-nav-item';
 export type { FeedbackNavItemProps } from './components/feedback-nav-item';
+
+export { FEEDBACK_STATUSES, feedbackStatusOption } from './components/feedback-status';
+export type { FeedbackStatusOption, FeedbackStatusToken } from './components/feedback-status';
 
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';

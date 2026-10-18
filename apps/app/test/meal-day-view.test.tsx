@@ -6,6 +6,7 @@ jest.mock('@/lib/meal-api', () => ({
   listDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
   listMealFoods: jest.fn(),
+  listMealFoodsIncludingDeleted: jest.fn(),
   restoredFoodName: jest.requireActual('@/lib/meal-api').restoredFoodName,
 }));
 
@@ -14,6 +15,7 @@ import {
   listDayEntries,
   getMealTarget,
   listMealFoods,
+  listMealFoodsIncludingDeleted,
   type MealEntry,
   type MealFood,
   type MealTarget,
@@ -24,6 +26,9 @@ import MealDatePage from '@/app/(meals)/meals/[date]/page';
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
 const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
+const mockedListMealFoodsIncludingDeleted = listMealFoodsIncludingDeleted as jest.MockedFunction<
+  typeof listMealFoodsIncludingDeleted
+>;
 
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
   return { ...(Object.fromEntries(NUTRIENTS.map((n) => [n.key, 0])) as NutrientVector), ...overrides };
@@ -48,6 +53,7 @@ function food(overrides: Partial<MealFood> = {}): MealFood {
   return {
     id: 'food-1',
     name: 'Food',
+    unit: 'g',
     servingGrams: 100,
     nutrients: vector(),
     servings: [],
@@ -86,6 +92,7 @@ describe('meals day view', () => {
     mockedListDayEntries.mockResolvedValue([]);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
     mockedListMealFoods.mockResolvedValue([]);
+    mockedListMealFoodsIncludingDeleted.mockResolvedValue([]);
   });
 
   it('renders the day total as the sum of confirmed entries, against the target', async () => {
@@ -127,12 +134,15 @@ describe('meals day view', () => {
     expect(html).not.toContain('Set target');
   });
 
-  it('keeps the photo door on an empty day, with no redundant body doors', async () => {
+  it('keeps the log doors behind the FAB on an empty day, with no redundant body doors', async () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('No meals logged today.');
-    expect(html).toContain('href="/meals/entry/new?door=photo"');
-    expect(html).toContain('Log meal from photo');
+    // The two doors live in the FAB menu's panel: the trigger ships, the closed
+    // panel ships no hrefs (the open-panel options are covered by
+    // test/meal-log.test.tsx and the e2e journey).
+    expect(html).toContain('aria-label="Log a meal"');
+    expect(html).toContain('aria-haspopup="menu"');
     // Manual entry is the photo door's own fallback, never a second body door.
     expect(html).not.toContain('Log manually');
     expect(html).not.toContain('href="/meals/entry/new"');
@@ -180,7 +190,7 @@ describe('meals day view', () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: uuid, quantity: 2, nutrients: vector({ calories: 123 }) }),
     ]);
-    mockedListMealFoods.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
+    mockedListMealFoodsIncludingDeleted.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
@@ -188,6 +198,27 @@ describe('meals day view', () => {
       /ui-list-item__title">Chicken<\/span><span class="ui-list-item__sub">123 kcal × 2</,
     );
     expect(html).not.toContain(uuid);
+  });
+
+  it('resolves the day view through the include-deleted read (a deleted food still names the entry)', async () => {
+    const uuid = '8bac894d-9a96-4102-8c49-ad9978ddfde4';
+    const deletedUuid = '4c2a0000-1111-2222-3333-444455556666';
+    mockedListDayEntries.mockResolvedValue([
+      entry({ id: 'a', foodId: uuid, quantity: 2, nutrients: vector({ calories: 123 }) }),
+      entry({ id: 'b', foodId: deletedUuid, quantity: 1, nutrients: vector({ calories: 200 }) }),
+    ]);
+    mockedListMealFoodsIncludingDeleted.mockResolvedValue([
+      food({ id: uuid, name: 'Chicken' }),
+      food({ id: deletedUuid, name: 'Milk, Brand X' }),
+    ]);
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(mockedListMealFoodsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(mockedListMealFoods).not.toHaveBeenCalled();
+    expect(html).toContain('Chicken');
+    expect(html).toContain('Milk, Brand X');
+    expect(html).not.toContain(deletedUuid);
   });
 
   it('falls back to calories as the title when a dish is blank', async () => {
@@ -210,7 +241,7 @@ describe('meals day view', () => {
     expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-02');
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-02');
     expect(html).toContain(`Meals — ${formatDate('2026-10-02')}`);
-    expect(html).toContain('href="/meals/entry/new?door=photo"');
+    expect(html).toContain('aria-label="Log a meal"');
     expect(html).toContain('No meals logged on this day.');
   });
 });

@@ -109,14 +109,18 @@ per-owner isolation carried by the `<sub>` segment:
 
 | Shape cached | Key | Contents |
 |---|---|---|
-| Food rows, list/all | `meal:<sub>:v<gen>:food:<rest>` | rows as persisted, ciphertext |
+| Food rows, list/all | `meal:<sub>:v<gen>:food:<rest>` | rows as persisted, ciphertext (soft-deleted rows included) |
 | Entry rows for a date | `meal:<sub>:v<gen>:entries:<date>` | rows as persisted, ciphertext |
 | Saved-meal rows | `meal:<sub>:v<gen>:saved:<rest>` | rows as persisted, ciphertext |
 | Generation counter | `meal:gen:<sub>` | integer, bumped per successful write |
 
 - **Filters and pagination never enter the key.** A date is part of the *fetch identity* (one
   entry set per day per owner), so it is in the key; a meal-group filter is applied
-  **post-hit, in memory, after decrypt**.
+  **post-hit, in memory, after decrypt**. The foods list follows the same rule: its single
+  entry holds the owner's whole row set, soft-deleted rows included, and both the `q` search
+  and the `?includeDeleted=1` read
+  (`GET /api/foods?includeDeleted=1`, for past-entry name resolution) are applied post-hit,
+  in memory — one cache entry serves every variant, and no second key is added.
 - Content matching (search over food names) runs **post-decrypt, in memory** — never `LIKE`
   over encrypted columns.
 - **Invalidation:** bump the owner's generation on every successful write (create, update,

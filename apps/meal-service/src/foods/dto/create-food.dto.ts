@@ -1,5 +1,6 @@
-import { ArrayMaxSize, IsArray, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
+import { FOOD_UNITS, type FoodUnit } from '../food.entity';
 
 /** Wire bounds for the food catalog. */
 export const FOOD_NAME_MAX = 120;
@@ -8,20 +9,24 @@ export const PORTIONS_MAX = 20;
 export const GRAMS_MAX = 5000;
 
 /**
- * A pickable serving size: the human-readable label and how many grams it is.
- * Its nutrient vector is NOT client input — it is derived from the food's base
- * vector with `scale()` (`SPEC-meal-service` Nutrient semantics), so a client
- * can never disagree with the stored numbers.
+ * One pickable measure of a food ("1 carton", "1 tbsp") and how much of the
+ * food's canonical unit it is. The amount is explicit at creation — there is no
+ * g↔ml conversion anywhere (`docs/intent/meal-food-management.md`): an ml food's
+ * measures carry ml, a g food's measures carry g. Its nutrient vector is NOT
+ * client input — it is derived from the food's base vector with `scale()`
+ * (`SPEC-meal-service` Nutrient semantics), so a client can never disagree with
+ * the stored numbers.
  */
 export class ServingInputDto {
   @IsString()
   @MaxLength(SERVING_LABEL_MAX)
   label: string;
 
+  /** Amount in the food's canonical unit (`Food.unit`). */
   @IsNumber()
   @Min(1)
   @Max(GRAMS_MAX)
-  grams: number;
+  amount: number;
 }
 
 /**
@@ -33,6 +38,15 @@ export class CreateFoodDto {
   @IsString()
   @MaxLength(FOOD_NAME_MAX)
   name: string;
+
+  /**
+   * The food's one canonical unit, chosen here and immutable after: an edit
+   * carrying it is a 400 because `UpdateFoodDto` has no such field and the
+   * global pipe forbids non-whitelisted keys. Omitted means `'g'`.
+   */
+  @IsOptional()
+  @IsIn(FOOD_UNITS)
+  unit?: FoodUnit;
 
   @IsNumber()
   @Min(1)

@@ -19,7 +19,7 @@ and the notes app's current pages map onto these one-to-one.
 <List> <ListItem …> </List>                        // ul/li; ListItem: href?, title, meta,
                                                    //   snippet, leading?, trailing,
                                                    //   deleteAction?,
-                                                   //   variant?="todo" | "nested",
+                                                   //   variant?="todo" | "nested" | "feedback",
                                                    //   size?="default|dense",
                                                    //   tone?="danger|amber|accent",
                                                    //   done?, collapsing?,
@@ -27,6 +27,12 @@ and the notes app's current pages map onto these one-to-one.
 <TagFilterNav items: {name, href, active}[]        // .filters pill nav; label? sits BESIDE the pills
                                                    //   (shared .ui-field-label; also the nav's aria-label)
 <FabLink href label>children</FabLink>             // .add-note fixed action
+<FabMenu label: string                             // FabLink's fixed corner + a panel of link options;
+         icon: ReactNode                            //   controlled (open/onOpenChange), closes on Escape /
+         open: boolean                              //   outside pointerdown; anchors inside role="menu"
+         onOpenChange: (open: boolean) => void      //   panel keep their own hrefs (meals FAB doors)
+         children: ReactNode
+         className? />
 <EditorToolbar back={{label, onBack: () => void}}  // back is a BUTTON (frozen:
                status?: ReactNode                  //   onBack is leave(), which
                actions?: ReactNode />              //   flushes autosave) — never an href
@@ -164,6 +170,13 @@ callbacks. (`DueDatePill` is a leaf atom; its contract lives in `SPEC-ui-atoms`.
   and an outside `pointerdown`). The panel is intentionally INLINE, not a floating layer:
   the managers sit inside `Card`, whose `.ui-card { overflow: hidden }` would clip an
   absolutely/fixed-positioned panel.
+- **`FabMenu`** — the fixed bottom-right action that opens a panel of link options
+  (the meals day view's two entry doors). Reuses `FabLink`'s fixed-corner trigger
+  visuals for its trigger (`aria-haspopup="menu"`, `aria-expanded`) and `Menu`'s
+  semantics: **controlled**, closes on Escape and an outside `pointerdown`. The
+  panel renders the app's own anchors (each with its own `href`), so the block bakes
+  no route and no domain copy. Distinct from `Menu` (a per-row disclosure, inline
+  panel) and from `FabLink` (a single link, no panel).
 
 #### Composition (element by element)
 
@@ -222,6 +235,36 @@ supplied by the app.
   tokens, and the motion tokens (`--duration-base`, `--ease-standard`) for the enter
   animation and the fade/slide transition.
 
+### FabMenu (the doors' FAB)
+
+`FabMenu` fills the one gap the manual-log spec surfaced (`SPEC-manual-log-ui.md` §4):
+`FabLink` is a single link and `Menu` is a per-row disclosure, and neither opens a
+panel of link options from the fixed corner. The block reuses `FabLink`'s fixed
+bottom-right corner (`right/bottom: calc(var(--space-1) + env(safe-area-inset-*))`,
+`--fab-size` pill, accent background, `--shadow-fab`, `z-index: 10`) and `Menu`'s
+open semantics: **controlled** (`open` / `onOpenChange`; the block stores no open
+state), `aria-haspopup="menu"` + `aria-expanded` on the trigger, and the panel closes
+on Escape and an outside `pointerdown`. The panel is a column anchored to the corner
+(`flex-direction: column-reverse` on the root so the panel sits ABOVE the trigger,
+`align-items: flex-end` so it hugs the right edge), carrying the `Menu` panel's
+surface (border/panel/radius tokens + `--shadow-fab`). Only the trigger's chrome is
+owned here — the options are the app's own anchors (each with its own `href`), which
+the app marks `role="menuitem"`; the block bakes no route and no domain copy. The
+trigger is a real `<button>` (a panel needs toggling, not navigation), so it takes
+the trigger styles inline rather than forking `FabLink`'s anchor rule. The icon is a
+prop (`icon`), not a baked `Plus` glyph — the app keeps its door icon.
+
+```tsx
+export interface FabMenuProps {
+  label: string;                          // trigger accessible name
+  icon: ReactNode;                        // the trigger glyph (app-supplied)
+  children: ReactNode;                    // panel content: the link options
+  open: boolean;                          // controlled; the block stores no open state
+  onOpenChange: (open: boolean) => void;  // trigger toggle / Escape / outside pointerdown
+  className?: string;
+}
+```
+
 ### MatrixBlock (Eisenhower quadrants)
 
 Presentational only: `quadrants: MatrixQuadrant[]` where each quadrant is
@@ -246,8 +289,10 @@ layout — the legacy class rode the row `li`, now carried by `ListItem`), `.not
 `.note form`, `.note-text`, `.note-title`, `.note-sub`, `.note-sub time`, `.note-sep`,
 `.note-snippet`, and the todo variants `.ui-list-item--todo*` / `.ui-list-item--dense*`.
 `ListItem`'s optional slots are `leading?` (a control rendered before the row body, e.g. a
-done toggle), `variant?="todo"` (todo presentation, off by default; adds
-`.ui-list-item--todo`) and `size?="default|dense"` (the todo row's scale, no effect
+done toggle), `variant?="todo" | "nested" | "feedback"` (todo presentation, nested
+child-body layout, or the feedback row below — each off by default; adding
+`.ui-list-item--todo`, `.ui-list-item--nested`, or `.ui-list-item--feedback`) and
+`size?="default|dense"` (the todo row's scale, no effect
 without the variant; `"dense"` adds `.ui-list-item--dense`). The todo variant owns the
 leading anatomy: the DEFAULT size centres the row (the leading checkbox and the action
 slots) through the base `align-items: center`; the leading toggle box is `width/height:
@@ -289,13 +334,27 @@ padding — no app-level indentation. It composes `Stack` and other blocks insid
 adds no markup of its own beyond the wrapper the base row already renders.
 
 The nested variant also takes an optional **`titleAction`** slot: a control rendered on the
-parent line beside `title` (e.g. a row's delete affordance, so it sits against the title
-control rather than beside the whole child body — a `deleteAction` sibling would steal
-horizontal width from every child row). When set, `.ui-list-item__title` becomes a
-horizontal flex line (`display: flex; align-items: stretch; gap: var(--space-0-5)`) whose
-`title` content grows (`flex: 1; min-width: 0`) and whose `titleAction` stretches to the
-line's height — so a button in the slot matches the height of a control in the title. The
-slot is `nested`-only; without it the title line keeps the base block layout.
+parent line beside `title` (a row's delete affordance, or a feedback row's status
+pill, so either sits against the title control rather than beside the whole child
+body — a `deleteAction` sibling would steal horizontal width from the row). When
+set, `.ui-list-item__title` becomes a horizontal flex line (`display: flex;
+align-items: stretch; gap: var(--space-0-5)`) whose `title` content grows (`flex: 1;
+min-width: 0`) and whose `titleAction` stretches to the line's height — so a button in
+the slot matches the height of a control in the title. The feedback variant shares
+the same title-line treatment for its pill; the slot is `nested`- and
+`feedback`-only — without it the title line keeps the base block layout.
+
+The **`feedback`** variant (`variant="feedback"`, off by default; adds
+`.ui-list-item--feedback`) presents a feedback entry on three lines: title, description
+snippet, then the meta line — and the status dropdown passed as `children` stacks
+beneath them (`flex-direction: column; align-items: stretch` on the link, the nested
+column precedent). It is the one variant that reroutes the base row's sub: the base row
+renders meta and snippet on a single line separated by a `|`, so the feedback branch
+gives the snippet its own `__sub` line above the meta line and drops the separator —
+both lines keep the base typography.
+Both the status pill (`titleAction`) and the status dropdown (`children`) are data-in
+slots — the app passes a `Pill` and a `Select`, never raw markup — so the area owns
+`.ui-list-item--feedback` and the column flow, no app-level row layout.
 
 Declutter states (the completed-todo motion): `done?` adds
 `.ui-list-item--done`, striking and muting the title

@@ -60,4 +60,23 @@ describe('ConfirmButton', () => {
     expect(window.confirm).toHaveBeenCalledWith('Delete?');
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it('a dismissal fires neither the form submit nor the consumer onClick', () => {
+    const onSubmit = jest.fn((event: FormEvent) => event.preventDefault());
+    const onClick = jest.fn();
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(
+      <form onSubmit={onSubmit}>
+        <ConfirmButton message="Delete?" onClick={onClick}>
+          Delete
+        </ConfirmButton>
+      </form>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(window.confirm).toHaveBeenCalledWith('Delete?');
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

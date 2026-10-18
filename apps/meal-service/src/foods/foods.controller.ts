@@ -19,10 +19,12 @@ export class FoodsController {
     return this.foods.create(principal.sub, dto);
   }
 
-  /** The owner's foods; `q` filters decrypted names in memory, never in SQL. */
+  /** The owner's foods; `q` filters decrypted names in memory, never in SQL.
+   * `?includeDeleted=1` adds the soft-deleted rows (same DTO, same owner
+   * scoping) so past entries and saved-meal items keep resolving the dish name. */
   @Get()
   findAll(@Principal() principal: Principal, @Query() query: ListFoodsQuery) {
-    return this.foods.findAll(principal.sub, query.q);
+    return this.foods.findAll(principal.sub, query.q, query.includeDeleted ?? false);
   }
 
   @Get(':id')

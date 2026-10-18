@@ -11,6 +11,7 @@
  * | NavBar         | `.nav-bar` + `.header-actions`    |
  * | PageTitle      | bare `h1` + `.page-title`         |
  * | FabLink        | `.add-note` (+ its `:focus-visible`) |
+ * | FabMenu        | (new) fixed trigger + link-option panel; no legacy class |
  * | EditorToolbar  | `.editor-toolbar` (back control visuals are IconButton's) |
  * | EditorScreen   | `.editor-screen`                  |
  * | EmptyState     | `.empty` + `.empty p`             |
@@ -30,6 +31,7 @@
  * | TabBar / Tab   | (new) navigation row + tab links; no legacy class |
  * | MatrixBlock    | (new) responsive quadrant grid; no legacy class |
  * | Snackbar       | (new) transient bottom-left status toast; no legacy class |
+ * | Autosuggest    | (new) native-popover suggestion list (the field is Input's); no legacy class |
  *
  * Token policy: all lengths/colors/durations come from tokens.css custom
  * properties, matching atoms.css. Note the type sizes reuse the spacing scale
@@ -118,6 +120,52 @@
 .ui-fab-link:focus-visible {
   outline: var(--focus-ring) solid var(--accent);
   outline-offset: var(--focus-ring);
+}
+
+/* ---------------------------------------------------------- FabMenu */
+
+/* FabLink's fixed bottom-right corner with a panel of link options above the
+   trigger (Menu's controlled open/Escape/outside-click semantics). Only the
+   trigger's chrome lives here; the options are anchors the app supplies. */
+.ui-fab-menu {
+  position: fixed;
+  right: calc(var(--space-1) + env(safe-area-inset-right));
+  bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: var(--space-0-5);
+}
+
+.ui-fab-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-fab);
+  cursor: pointer;
+}
+
+.ui-fab-menu__trigger:focus-visible {
+  outline: var(--focus-ring) solid var(--accent);
+  outline-offset: var(--focus-ring);
+}
+
+.ui-fab-menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-4);
+  padding: var(--space-0-5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-fab);
 }
 
 /* ---------------------------------------------------- EditorToolbar */
@@ -383,19 +431,12 @@
 }
 
 /* Nested row: the title is the parent line, `children` stack indented beneath
-   it. The base row lays title and children side by side (the link is a
-   horizontal flex row); the nested variant turns the link into a column so the
-   title keeps its own line and the child body stacks below it, one token step
-   in. The row top-aligns so the delete slot sits with the parent line instead
-   of centring against the tall body; the slot drops one row-padding step to
-   meet the title line. */
+   it. The row top-aligns so the delete slot sits with the parent line instead of
+   centring against the tall body; the slot drops one row-padding step to meet
+   the title line. The link's column direction — parent line above the child
+   body — is the shared nested/feedback rule declared further down. */
 .ui-list-item--nested {
   align-items: flex-start;
-}
-
-.ui-list-item--nested .ui-list-item__link {
-  flex-direction: column;
-  align-items: stretch;
 }
 
 .ui-list-item--nested .ui-list-item__nested-body {
@@ -404,12 +445,14 @@
   padding-left: var(--space-1);
 }
 
-/* Title line carrying a `titleAction` (a row delete affordance): a horizontal
-   flex line, so the action sits against the title control instead of beside the
-   whole child body — a `deleteAction` sibling would steal horizontal width from
-   every child row. Nested-only, and only when the slot is filled, so a nested
-   row without it keeps the base title block. */
-.ui-list-item--nested .ui-list-item__title--with-action {
+/* Title line carrying a `titleAction`: a horizontal flex line, so the action sits
+   against the title control instead of beside the whole child body — a
+   `deleteAction` sibling would steal horizontal width from every child row — and
+   the feedback status pill sits against the title, never beside the dropdown
+   below it. Only when the slot is filled, so a row without it keeps the base
+   title block. */
+.ui-list-item--nested .ui-list-item__title--with-action,
+.ui-list-item--feedback .ui-list-item__title--with-action {
   display: flex;
   align-items: stretch;
   gap: var(--space-0-5);
@@ -417,8 +460,10 @@
 
 /* The line's height comes from the title control (an `Input`); the title child
    grows to fill the leftover width, so `min-width: 0` lets it shrink and the
-   control ellipsize rather than push the action off the line. */
-.ui-list-item--nested .ui-list-item__title--with-action > :first-child {
+   control ellipsize rather than push the action off the line — the feedback pill
+   keeps its width while the title ellipsizes beside it. */
+.ui-list-item--nested .ui-list-item__title--with-action > :first-child,
+.ui-list-item--feedback .ui-list-item__title--with-action > :first-child {
   flex: 1;
   min-width: 0;
 }
@@ -436,6 +481,17 @@
 .ui-list-item--nested > .ui-icon-btn,
 .ui-list-item--nested > form {
   margin-top: var(--space-0-9);
+}
+
+/* Feedback row: title on its own line, then the description snippet, meta line,
+   and status dropdown stacked beneath it as `children`. Both the status pill
+   (`titleAction`) and the dropdown (`children`) are data-in slots: the app passes
+   a `Pill` and a `Select`, never raw markup. `.ui-list-item__text` already stacks
+   the title, snippet, and meta line at the token gap. */
+.ui-list-item--nested .ui-list-item__link,
+.ui-list-item--feedback .ui-list-item__link {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* Row tone: tint the leading done toggle of an OPEN coloured-lens row (matrix
@@ -981,4 +1037,87 @@
   max-height: none;
   border-radius: 0;
   margin: 0;
+}
+
+/* ------------------------------------------------------- Autosuggest */
+
+/* Combobox field + suggestion list. The field is the `Input` atom (`.ui-input`
+   carries its visuals), so this file owns only the list. The list is a native
+   `popover`: the platform lifts it into the top layer — same escape from an
+   ancestor's `overflow: hidden` as `.ui-dialog`, with no portal and no JS
+   positioning — and CSS anchor positioning pins it under the field. Three of
+   its values are per instance and so ride inline on the elements (the field's
+   `anchor-name`, the list's `position-anchor` from that name, and
+   `--ui-autosuggest-rows` from the caller's `maxVisible`): no theme token can
+   describe them. `anchor-name` is a page-global ident, hence the generated
+   name rather than a fixed one. */
+.ui-autosuggest__popup {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-25);
+  width: anchor-size(width);
+  /* Exactly `--ui-autosuggest-rows` (caller's `maxVisible`) single-line rows: that many
+     `--tap-height`s, the gaps between them (one fewer), the padding and the borders.
+     Anything taller scrolls. A row that wraps its `meta` grows past its `min-height`, so
+     this is the cap on the list, not a promise about a wrapped row. */
+  max-height: calc(
+    var(--ui-autosuggest-rows, 8) * (var(--tap-height) + var(--space-0-25)) -
+      var(--space-0-25) + 2 * var(--space-0-4) + 2 * var(--border-width)
+  );
+  overflow-y: auto;
+  padding: var(--space-0-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-fab);
+  position-area: bottom span-right;
+  position-try-fallbacks: flip-block;
+}
+
+/* A row is the whole tap target: `--tap-height` tall, and it carries the
+   highlight for keyboard use through `aria-activedescendant` (the field keeps
+   DOM focus, so `.ui-autosuggest__option--active` is the visible half of that
+   pairing). */
+.ui-autosuggest__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0-5);
+  min-height: var(--tap-height);
+  padding: var(--space-0-3) var(--space-0-5);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ui-autosuggest__option--active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ui-autosuggest__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-autosuggest__meta {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--space-0-85);
+}
+
+.ui-autosuggest__option--active .ui-autosuggest__meta {
+  color: inherit;
+}
+
+.ui-autosuggest__empty {
+  margin: 0;
+  padding: var(--space-0-5) var(--space-0-75);
+  color: var(--muted);
 }

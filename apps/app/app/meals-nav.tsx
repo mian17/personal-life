@@ -1,6 +1,6 @@
 import { settingsHref } from '@life/app-kit';
 import { FeedbackNavItem, IconLink } from '@life/ui';
-import { Bookmark, Settings, Target } from 'lucide-react';
+import { Apple, Bookmark, Settings, Target } from 'lucide-react';
 import { submitFeedbackAction } from './feedback-actions';
 
 /**
@@ -15,6 +15,9 @@ export function MealsNav() {
       </IconLink>
       <IconLink href="/meals/saved" label="Saved meals">
         <Bookmark size={20} aria-hidden />
+      </IconLink>
+      <IconLink href="/meals/foods" label="Foods">
+        <Apple size={20} aria-hidden />
       </IconLink>
       <FeedbackNavItem app="meals" onSubmit={submitFeedbackAction} />
       <IconLink href={settingsHref('/meals')} label="Settings">

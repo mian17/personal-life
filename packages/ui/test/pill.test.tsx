@@ -18,6 +18,18 @@ describe('Pill', () => {
     expect(screen.getByText('T').classList.contains(`ui-pill--${size}`)).toBe(true);
   });
 
+  it('renders a tone modifier only when tone is set', () => {
+    const { rerender } = render(<Pill size="filter" tone="open">T</Pill>);
+    expect(classesOf(screen.getByText('T'))).toEqual([
+      'ui-pill',
+      'ui-pill--filter',
+      'ui-pill--open',
+    ]);
+
+    rerender(<Pill size="filter">T</Pill>);
+    expect(classesOf(screen.getByText('T'))).toEqual(['ui-pill', 'ui-pill--filter']);
+  });
+
   it('renders an anchor when as="a", preserving href', () => {
     render(
       <Pill as="a" href="/?tag=errand" size="filter">

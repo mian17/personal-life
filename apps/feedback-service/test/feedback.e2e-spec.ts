@@ -7,6 +7,7 @@ import {
   feedbackBody as validBody,
   feedbackId,
   getFeedback as get,
+  patchFeedbackStatus,
   postFeedback as post,
   sleep,
   startFeedbackApp,
@@ -159,11 +160,127 @@ describeDb('Feedback API (e2e)', () => {
       const list = mineRes.body as FeedbackDto[];
       const known = list.filter((entry) => mine.includes(entry.id));
       expect(known).toHaveLength(2);
+      for (const entry of known) expect(entry.status).toBe('open');
+
+      // The DB, not the client, supplies the default: the POST body never
+      // carried a status, yet the row reads back `open`.
+      const stored = await app.dataSource.query(
+        'SELECT status FROM feedback WHERE id = $1',
+        [mine[0]],
+      );
+      expect(stored[0].status).toBe('open');
+
       const [first, second] = known;
       expect(
         first.createdAt > second.createdAt ||
           (first.createdAt === second.createdAt && first.id > second.id),
       ).toBe(true);
+    });
+  });
+
+  describe('3. status updates', () => {
+    let app: FeedbackApp;
+    let token: string;
+    let otherToken: string;
+    const redis = new FakeRedisClient();
+    const OWNER_STATUS = 'owner-status';
+    const GEN_KEY = `feedback:gen:${OWNER_STATUS}`;
+
+    beforeAll(async () => {
+      app = await startFeedbackApp({ dbUrl, jwt, cache: redis });
+      token = await jwt.sign(OWNER_STATUS);
+      otherToken = await jwt.sign('owner-status-other');
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    const eventCount = async (id: string): Promise<number> => {
+      const rows = await app.dataSource.query(
+        'SELECT COUNT(*)::int AS n FROM feedback_event WHERE "eventId" = $1',
+        [id],
+      );
+      return rows[0].n as number;
+    };
+
+    const statusOf = async (id: string): Promise<string> => {
+      const rows = await app.dataSource.query('SELECT status FROM feedback WHERE id = $1', [id]);
+      return rows[0].status as string;
+    };
+
+    const create = async (description: string): Promise<string> => {
+      const id = feedbackId();
+      await post(app, token, validBody(id, description)).expect(201);
+      return id;
+    };
+
+    it('sets a status, returns 200 {id, status}, and bumps the owner generation', async () => {
+      const id = await create('flip me to done');
+      const generationsBefore = redis.incrCalls.filter((key) => key === GEN_KEY).length;
+
+      const updated = await patchFeedbackStatus(app, token, id, { status: 'done' }).expect(200);
+      expect(updated.body).toEqual({ id, status: 'done' });
+      expect(await statusOf(id)).toBe('done');
+      expect(redis.incrCalls.filter((key) => key === GEN_KEY)).toHaveLength(generationsBefore + 1);
+    });
+
+    it('serves the new status from GET after the generation bump, never the stale entry', async () => {
+      const id = await create('read back the status');
+      await get(app, token).expect(200);
+
+      await patchFeedbackStatus(app, token, id, { status: 'in_progress' }).expect(200);
+
+      const listed = await get(app, token).expect(200);
+      const entry = (listed.body as FeedbackDto[]).find((row) => row.id === id);
+      expect(entry?.status).toBe('in_progress');
+    });
+
+    it('repeats the same status as a no-op 200, creating no new row or event', async () => {
+      const id = await create('set it twice');
+      await patchFeedbackStatus(app, token, id, { status: 'wont_do' }).expect(200);
+      const eventsAfterFirst = await eventCount(id);
+
+      const again = await patchFeedbackStatus(app, token, id, { status: 'wont_do' }).expect(200);
+
+      expect(again.body).toEqual({ id, status: 'wont_do' });
+      expect(await eventCount(id)).toBe(eventsAfterFirst);
+      expect(eventsAfterFirst).toBe(1);
+    });
+
+    it('rejects a status outside the vocabulary with 400, never 422', async () => {
+      const id = await create('no such status');
+
+      await patchFeedbackStatus(app, token, id, { status: 'archived' }).expect(400);
+
+      expect(await statusOf(id)).toBe('open');
+    });
+
+    it('rejects a malformed id with 400, never a driver 500', async () => {
+      await patchFeedbackStatus(app, token, 'not-a-uuid', { status: 'done' }).expect(400);
+    });
+
+    it('answers 404 for a missing id and a foreign id, byte-identically', async () => {
+      const missing = await patchFeedbackStatus(app, token, feedbackId(), { status: 'done' });
+      expect(missing.status).toBe(404);
+      expect(missing.body.message).toBe('Feedback not found');
+
+      const id = await create('owned by the first owner');
+      const foreign = await patchFeedbackStatus(app, otherToken, id, { status: 'done' });
+      expect(foreign.status).toBe(404);
+      expect(foreign.body.message).toBe('Feedback not found');
+
+      // The owner's row is untouched: the 404 changed nothing.
+      expect(await statusOf(id)).toBe('open');
+    });
+
+    it('never writes a feedback_event row on a status change', async () => {
+      const id = await create('status is not an event');
+      const eventsAfterCreate = await eventCount(id);
+
+      await patchFeedbackStatus(app, token, id, { status: 'done' }).expect(200);
+
+      expect(await eventCount(id)).toBe(eventsAfterCreate);
     });
   });
 
@@ -286,10 +403,16 @@ describeDb('Feedback API (e2e)', () => {
       await get(app, token).expect(200);
       expect(redis.setCalls.filter((key) => key === listKey(1))).toHaveLength(setsSoFar);
 
-      // What Redis got is ciphertext, never the description it serves.
+      // What Redis got is ciphertext, never the description it serves — while
+      // `status` rides along as plaintext workflow metadata (`SPEC-feedback-status`
+      // Cache Rules), so a filtered read can group without a decrypt.
       const entry = redis.written.find((written) => written.key === listKey(1))!;
       expect(entry.value).toContain(ENC_PREFIX);
       expect(entry.value).not.toContain('cache alpha');
+      const cachedStatuses = (JSON.parse(entry.value) as Array<{ status: string }>).map(
+        (row) => row.status,
+      );
+      expect(cachedStatuses).toEqual(['open']);
     });
   });
 
