@@ -194,7 +194,7 @@ Repo testing policy applies: one suite per command, at most two runs.
 
 ## 5. Project structure
 
-Existing files change; three are new.
+Existing files change; four are new.
 
 ```
 packages/ops/
