@@ -12,3 +12,5 @@ data/
 backup/
 *.db
 .worktrees/
+# security scan artifacts (generated)
+vbsec-reports/
