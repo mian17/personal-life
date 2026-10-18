@@ -25,7 +25,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "redis": "^5.12.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "@life/pomodoro": "*"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

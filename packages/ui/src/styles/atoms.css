@@ -460,6 +460,10 @@ intentional border; `--filter` stays borderless. */
   font-size: var(--space-0-85);
 }
 
+.ui-status-text--display {
+  font-size: var(--space-3);
+}
+
 /* --------------------------------------------------------- IconLink */
 
 .ui-icon-link {

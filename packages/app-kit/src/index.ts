@@ -8,6 +8,11 @@ export { RouteLayout, routeLayoutMetadata } from './route-layout';
 export { PreservingSearchBox } from './preserving-search-box';
 export type { PreservingSearchBoxProps } from './preserving-search-box';
 export type { PrefKey } from './types';
-export { prefCookieName, parsePrefValue, readPref } from './preferences';
-export { setPref } from './preference-action';
+export {
+  prefCookieName,
+  parsePrefValue,
+  readPref,
+  readPrefNumber,
+} from './preferences';
+export { setPref, setPrefNumber } from './preference-action';
 export { settingsHref } from './settings-route';

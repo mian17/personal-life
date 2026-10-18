@@ -66,7 +66,11 @@ for these without any visible change.
                                    //   counterpart in the shipped app — the `.note`
                                    //   surface+row are owned by ListItem, whose `li`
                                    //   bore the class (see SPEC-ui-blocks)
-<StatusText role="status" aria-live="polite">children</StatusText> // owns .editor-status
+<StatusText role="status" aria-live="polite"
+            size="default" | "display">children</StatusText> // owns .editor-status
+   // size="display" adds `.ui-status-text--display` (font-size: var(--space-3))
+   //   for a short read-out at a glance — e.g. a countdown's digits. Default
+   //   renders `.ui-status-text` alone.
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)
 <ConfirmButton message: string>children</ConfirmButton>
    // window.confirm gate on submit; className passthrough carries frozen hooks

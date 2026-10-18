@@ -1,14 +1,28 @@
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
-export type StatusTextProps = ComponentPropsWithRef<'span'>;
+export type StatusTextSize = 'default' | 'display';
 
-export function StatusText({ className, children, ...rest }: StatusTextProps) {
+export interface StatusTextProps extends ComponentPropsWithRef<'span'> {
+  /** `'display'` scales a short read-out, e.g. a countdown's digits. */
+  size?: StatusTextSize;
+}
+
+export function StatusText({
+  size = 'default',
+  className,
+  children,
+  ...rest
+}: StatusTextProps) {
   return (
     <span
       role="status"
       aria-live="polite"
-      className={cx('ui-status-text', className)}
+      className={cx(
+        'ui-status-text',
+        size === 'display' && 'ui-status-text--display',
+        className,
+      )}
       {...rest}
     >
       {children}
