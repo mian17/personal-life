@@ -238,12 +238,13 @@ describe('FeedbackInbox rows', () => {
 /**
  * Row hooks are answered off the raw react module (the push-toggle/meal-editor
  * pattern): a rendered `FeedbackRow` calls `useState` twice (in-flight pick,
- * failure message), so the slot spy keeps those values across re-renders and the
- * component code itself is exercised untouched.
+ * failure message) and `useRef` once (the pick ticket), so the slot spy keeps
+ * those values across re-renders and the component code itself is exercised
+ * untouched.
  */
 const ReactModule = jest.requireActual<typeof import('react')>('react');
 
-interface FoundSelect { value: unknown; onChange: (event: unknown) => void }
+interface FoundSelect { value: unknown; options: unknown; onChange: (event: unknown) => void }
 interface FoundRow { render: (props: Record<string, unknown>) => unknown; props: Record<string, unknown> }
 interface El { type?: unknown; props?: Record<string, unknown> }
 
@@ -268,6 +269,7 @@ function findSelects(node: unknown): FoundSelect[] {
     ) {
       found.push({
         value: props.value as unknown,
+        options: props.options as unknown,
         onChange: props.onChange as (event: unknown) => void,
       });
       return;
@@ -353,15 +355,18 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 /**
- * One slot-store `useState` spy: hook call N answers slot N, so a test can place
- * a component's hooks at a chosen offset (`setIndex`) and re-render it against
- * the same values. `slot 0` is always pre-seeded with `first`.
+ * One slot-store `useState`/`useRef` spy: hook call N answers slot N, so a test
+ * can place a component's hooks at a chosen offset (`setIndex`) and re-render it
+ * against the same values. `slot 0` is always pre-seeded with `first`; refs keep
+ * one object per position, the identity React would keep across renders.
  */
-function slotSpy(first: unknown): { spy: jest.SpyInstance; setIndex(at: number): void } {
+function slotSpy(first: unknown): { mockRestore(): void; setIndex(at: number): void } {
   const store: unknown[] = [first];
   let index = 0;
-  const spy = jest.spyOn(ReactModule, 'useState');
-  spy.mockImplementation(((initial: unknown) => {
+  const refs: Array<{ current: unknown }> = [];
+  let refIndex = 0;
+  const stateSpy = jest.spyOn(ReactModule, 'useState');
+  stateSpy.mockImplementation(((initial: unknown) => {
     const at = index++;
     if (at >= store.length) {
       store[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
@@ -371,7 +376,22 @@ function slotSpy(first: unknown): { spy: jest.SpyInstance; setIndex(at: number):
     };
     return [store[at], set];
   }) as unknown as typeof ReactModule.useState);
-  return { spy, setIndex: (at: number) => { index = at; } };
+  const refSpy = jest.spyOn(ReactModule, 'useRef');
+  refSpy.mockImplementation(((initial: unknown) => {
+    const at = refIndex++;
+    refs[at] ??= { current: initial };
+    return refs[at];
+  }) as unknown as typeof ReactModule.useRef);
+  return {
+    mockRestore: () => {
+      stateSpy.mockRestore();
+      refSpy.mockRestore();
+    },
+    setIndex: (at: number) => {
+      index = at;
+      refIndex = 0;
+    },
+  };
 }
 
 describe('FeedbackInbox filtering', () => {
@@ -453,7 +473,7 @@ describe('FeedbackInbox filtering', () => {
       calls.push({ id, status });
       return { ok: true, id };
     };
-    const { spy, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy(null);
     try {
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'wire me', description: 'w', status: 'open' })],
@@ -467,18 +487,25 @@ describe('FeedbackInbox filtering', () => {
       const selects = findSelects(rows[0]!.render(rows[0]!.props));
       expect(selects).toHaveLength(1);
       expect(selects[0]?.value).toBe('open');
+      // The dropdown offers the whole vocabulary, in its canonical order.
+      expect(selects[0]?.options).toEqual([
+        { value: 'open', label: 'Open' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'done', label: 'Done' },
+        { value: 'wont_do', label: "Won't Do" },
+      ]);
 
       selects[0]?.onChange({ target: { value: 'done' } });
       expect(calls).toEqual([{ id: 'f1', status: 'done' }]);
     } finally {
-      spy.mockRestore();
+      mockRestore();
     }
   });
 
   it('renders the seam failure message in the row when a write fails.', async () => {
     const action = jest
       .fn(async (): Promise<FeedbackSubmitResult> => ({ ok: false, message: STATUS_FAILURE }));
-    const { spy, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy(null);
     try {
       const el = FeedbackInbox({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'fail me', description: 'w', status: 'open' })],
@@ -500,7 +527,7 @@ describe('FeedbackInbox filtering', () => {
       expect(collectBannerTexts(second)).toContain(STATUS_FAILURE);
       expect(findSelects(second)[0]!.value).toBe('open');
     } finally {
-      spy.mockRestore();
+      mockRestore();
     }
   });
 

@@ -28,9 +28,12 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await expect(dialog.getByText('Description is required.')).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
 
+  // Emptiness is not asserted here: chapter 2 seeds a row into the same
+  // persistent database, so this page is only empty on a fresh stack. The frozen
+  // empty-state copy is pinned in `apps/app/test/feedback-inbox.test.tsx`.
   await page.goto('/feedback');
   await expect(page.getByRole('heading', { level: 1, name: 'Feedback' })).toBeVisible();
-  await expect(page.getByText('No feedback yet.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'All', exact: true })).toBeVisible();
 
   // Valid submit from the notes toolbar → the entry belongs to the Notes app.
   await page.goto('/notes');

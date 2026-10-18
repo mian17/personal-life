@@ -110,7 +110,7 @@ describe('ListItem', () => {
   it('centres row action slots while the row link stretches to full height', () => {
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     const row = block('.ui-list-item');
@@ -151,7 +151,7 @@ describe('ListItem', () => {
 
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const denseBlock = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     for (const part of ['title', 'sub']) {
@@ -174,7 +174,7 @@ describe('ListItem', () => {
   it('puts the 2-line title clamp on the todo variant, not the dense scale', () => {
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     const todoTitle = block('.ui-list-item--todo .ui-list-item__title');
@@ -200,7 +200,7 @@ describe('ListItem', () => {
 
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     expect(block('.ui-list-item--todo')).toMatch(
@@ -253,7 +253,7 @@ describe('ListItem', () => {
 
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     const link = block('.ui-list-item--nested .ui-list-item__link');
@@ -299,7 +299,7 @@ describe('ListItem', () => {
 
     const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
     const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
         [])[1] ?? '';
 
     const line = block('.ui-list-item--nested .ui-list-item__title--with-action');
@@ -474,7 +474,7 @@ describe('ListItem', () => {
 
   const blocksCss = () => readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
   const cssBlock = (css: string, selector: string) =>
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
+    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`)) ??
       [])[1] ?? '';
 
   it('strikes and mutes the done title through tokens', () => {

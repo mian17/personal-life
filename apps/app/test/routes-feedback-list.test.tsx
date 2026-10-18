@@ -20,7 +20,9 @@ function entry(id: string): FeedbackDto {
   return {
     id,
     app: 'notes',
-    type: 'bug',
+    // A real `FEEDBACK_TYPE_VALUES` entry: the DTO types `type` as a plain string,
+    // so a stray value like 'bug' would typecheck and render under a raw label.
+    type: 'bug_report',
     title: id,
     description: `${id} body`,
     status: 'open',

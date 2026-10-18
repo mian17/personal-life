@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FeedbackDto, FeedbackStatus, FeedbackSubmitResult } from '@life/shared';
 import {
   AlertBanner,
@@ -19,7 +19,7 @@ const STATUS_OPTIONS = FEEDBACK_STATUSES.map(({ value, label }) => ({ value, lab
  * One feedback row: the status pill rides the title line (`titleAction`) and the
  * status dropdown stacks beneath the text (`children`) — both are
  * `ListItem variant="feedback"` slots, so the app passes data, never markup. The
- * pill's status class is the vocabulary value; `atoms.css` maps it to the status's
+ * pill's `tone` is the vocabulary value; `atoms.css` maps it to the status's
  * semantic token, and `tokens.test.ts` pins that mapping against `tokens.css`.
  *
  * The only client island on `/feedback` (the `todo-item.tsx` precedent): the
@@ -43,11 +43,19 @@ export function FeedbackRow({
    */
   const [picked, setPicked] = useState<FeedbackStatus | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * Every pick takes the next ticket, and only the newest ticket may settle the
+   * row: a slower earlier `PATCH` must not clear the dropdown or raise its banner
+   * over the result of the pick the user made after it.
+   */
+  const pickTicket = useRef(0);
 
   function pickStatus(status: FeedbackStatus) {
+    const ticket = ++pickTicket.current;
     setPicked(status);
     setFailure(null);
     void setStatusAction(entry.id, status).then((result) => {
+      if (ticket !== pickTicket.current) return;
       setPicked(null);
       if (!result.ok) {
         setFailure(result.message);
@@ -62,9 +70,7 @@ export function FeedbackRow({
       snippet={entry.description}
       meta={<LocalTime dateTime={entry.createdAt} />}
       titleAction={
-        <Pill className={`ui-pill--${entry.status}`} data-status={entry.status}>
-          {label}
-        </Pill>
+        <Pill tone={entry.status}>{label}</Pill>
       }
     >
       <Select

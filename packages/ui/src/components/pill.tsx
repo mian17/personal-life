@@ -9,6 +9,11 @@ export type PillButtonType = 'button' | 'submit' | 'reset';
 
 export interface PillProps extends ComponentPropsWithRef<'span'> {
   size?: PillSize;
+  /**
+   * Semantic modifier for a status/tone-coloured pill, e.g. `'open' | 'done'`.
+   * Must name an existing `.ui-pill--<tone>` rule in `atoms.css`.
+   */
+  tone?: string;
   active?: boolean;
   as?: PillTag;
   href?: string;
@@ -21,6 +26,7 @@ export interface PillProps extends ComponentPropsWithRef<'span'> {
 
 export function Pill({
   size = 'chip',
+  tone,
   active = false,
   as = 'span',
   href,
@@ -35,6 +41,7 @@ export function Pill({
   const classes = cx(
     'ui-pill',
     `ui-pill--${size}`,
+    tone != null && `ui-pill--${tone}`,
     as === 'button' && 'ui-pill--button',
     active && 'ui-pill--active',
     className,

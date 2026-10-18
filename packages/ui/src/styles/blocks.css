@@ -431,19 +431,12 @@
 }
 
 /* Nested row: the title is the parent line, `children` stack indented beneath
-   it. The base row lays title and children side by side (the link is a
-   horizontal flex row); the nested variant turns the link into a column so the
-   title keeps its own line and the child body stacks below it, one token step
-   in. The row top-aligns so the delete slot sits with the parent line instead
-   of centring against the tall body; the slot drops one row-padding step to
-   meet the title line. */
+   it. The row top-aligns so the delete slot sits with the parent line instead of
+   centring against the tall body; the slot drops one row-padding step to meet
+   the title line. The link's column direction — parent line above the child
+   body — is the shared nested/feedback rule declared further down. */
 .ui-list-item--nested {
   align-items: flex-start;
-}
-
-.ui-list-item--nested .ui-list-item__link {
-  flex-direction: column;
-  align-items: stretch;
 }
 
 .ui-list-item--nested .ui-list-item__nested-body {
@@ -452,20 +445,13 @@
   padding-left: var(--space-1);
 }
 
-/* Title line carrying a `titleAction` (a row delete affordance): a horizontal
-   flex line, so the action sits against the title control instead of beside the
-   whole child body — a `deleteAction` sibling would steal horizontal width from
-   every child row. Nested-only, and only when the slot is filled, so a nested
-   row without it keeps the base title block. */
-.ui-list-item--nested .ui-list-item__title--with-action {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-0-5);
-}
-
-/* The feedback title line is the same flex line: the status pill sits against
-   the title, never beside the dropdown below it. Feedback-only, and only when
-   the slot is filled, so a pill-less feedback row keeps the base title block. */
+/* Title line carrying a `titleAction`: a horizontal flex line, so the action sits
+   against the title control instead of beside the whole child body — a
+   `deleteAction` sibling would steal horizontal width from every child row — and
+   the feedback status pill sits against the title, never beside the dropdown
+   below it. Only when the slot is filled, so a row without it keeps the base
+   title block. */
+.ui-list-item--nested .ui-list-item__title--with-action,
 .ui-list-item--feedback .ui-list-item__title--with-action {
   display: flex;
   align-items: stretch;
@@ -474,14 +460,9 @@
 
 /* The line's height comes from the title control (an `Input`); the title child
    grows to fill the leftover width, so `min-width: 0` lets it shrink and the
-   control ellipsize rather than push the action off the line. */
-.ui-list-item--nested .ui-list-item__title--with-action > :first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-/* The feedback title grows the same way: the pill keeps its width while the
-   title shrinks and ellipsizes beside it. */
+   control ellipsize rather than push the action off the line — the feedback pill
+   keeps its width while the title ellipsizes beside it. */
+.ui-list-item--nested .ui-list-item__title--with-action > :first-child,
 .ui-list-item--feedback .ui-list-item__title--with-action > :first-child {
   flex: 1;
   min-width: 0;
@@ -503,11 +484,11 @@
 }
 
 /* Feedback row: title on its own line, then the description snippet, meta line,
-   and status dropdown stacked beneath it as `children`. The link becomes a column
-   (the nested precedent); `.ui-list-item__text` already stacks the title, snippet,
-   and meta line at the token gap. Both the status pill (`titleAction`) and the
-   dropdown (`children`) are data-in slots: the app passes a `Pill` and a `Select`,
-   never raw markup. */
+   and status dropdown stacked beneath it as `children`. Both the status pill
+   (`titleAction`) and the dropdown (`children`) are data-in slots: the app passes
+   a `Pill` and a `Select`, never raw markup. `.ui-list-item__text` already stacks
+   the title, snippet, and meta line at the token gap. */
+.ui-list-item--nested .ui-list-item__link,
 .ui-list-item--feedback .ui-list-item__link {
   flex-direction: column;
   align-items: stretch;

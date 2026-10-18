@@ -403,10 +403,16 @@ describeDb('Feedback API (e2e)', () => {
       await get(app, token).expect(200);
       expect(redis.setCalls.filter((key) => key === listKey(1))).toHaveLength(setsSoFar);
 
-      // What Redis got is ciphertext, never the description it serves.
+      // What Redis got is ciphertext, never the description it serves — while
+      // `status` rides along as plaintext workflow metadata (`SPEC-feedback-status`
+      // Cache Rules), so a filtered read can group without a decrypt.
       const entry = redis.written.find((written) => written.key === listKey(1))!;
       expect(entry.value).toContain(ENC_PREFIX);
       expect(entry.value).not.toContain('cache alpha');
+      const cachedStatuses = (JSON.parse(entry.value) as Array<{ status: string }>).map(
+        (row) => row.status,
+      );
+      expect(cachedStatuses).toEqual(['open']);
     });
   });
 

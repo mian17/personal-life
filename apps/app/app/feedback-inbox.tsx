@@ -132,19 +132,15 @@ export function FeedbackInbox({
             const typeEntries = byType.get(type) ?? [];
             return (
               <Section key={type} headingLevel="h3" label={TYPE_LABELS[type] ?? type}>
-                {typeEntries.length === 0 ? (
-                  <EmptyState heading={EMPTY_HEADING} body={EMPTY_BODY} />
-                ) : (
-                  <List>
-                    {typeEntries.map((entry) => (
-                      <FeedbackRow
-                        key={entry.id}
-                        entry={entry}
-                        setStatusAction={setFeedbackStatusAction}
-                      />
-                    ))}
-                  </List>
-                )}
+                <List>
+                  {typeEntries.map((entry) => (
+                    <FeedbackRow
+                      key={entry.id}
+                      entry={entry}
+                      setStatusAction={setFeedbackStatusAction}
+                    />
+                  ))}
+                </List>
               </Section>
             );
           })}

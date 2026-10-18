@@ -35,7 +35,9 @@ ASSUMPTIONS I'M MAKING:
    `feedback.submitted`, message `{ event_id, feedback_id, owner_sub, app, type,
    occurred_at }` — is untouched).
 6. Per-row dropdown = the existing `Select` atom (native `<select>`, options from data).
-   Filter bar = `PillGroup` of `Pill as="button"` over the list. Status pill = `Pill`
+   Filter bar is one control: `PillGroup` of `Pill size="filter" as="a"` links (All /
+   Open / In Progress / Done / Won't Do), each navigating to the filtered URL
+   (`filterHref`; All drops the `status` param) — no filter buttons. Status pill = `Pill`
    with status styling. All upstream in `packages/ui`.
 7. The row is a new `ListItem variant="feedback"` upstream in `packages/ui` (the
    `variant="todo"` precedent, `packages/ui/src/components/list-item.tsx`); apps compose
