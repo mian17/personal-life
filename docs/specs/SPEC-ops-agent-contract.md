@@ -81,13 +81,17 @@ Every `tools/list` entry gains `title` and `annotations`. The hints derive from 
 op kind already in the registry, with one per-op override; no new descriptor for
 annotations themselves:
 
-| kind | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
-|---|---|---|---|
-| `get` | `true` | `false` | `true` |
-| `list` | `true` | `false` | `true` |
-| `create` | `false` | **`true`** | `false` |
-| `update` | `false` | **`true`** | `true` |
-| `delete` | `false` | **`true`** | `true` |
+| kind | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
+|---|---|---|---|---|
+| `get` | `true` | `false` | `true` | `false` |
+| `list` | `true` | `false` | `true` | `false` |
+| `create` | `false` | **`true`** | `false` | `false` |
+| `update` | `false` | **`true`** | `true` | `false` |
+| `delete` | `false` | **`true`** | `true` | `false` |
+
+`openWorldHint` is `false` for every kind: each op reaches one in-repo service at a
+fixed base URL, so no call opens the agent's world beyond the package's own
+configured service.
 
 A mutating op is destructive unless the resource author says otherwise:
 
@@ -190,22 +194,28 @@ Repo testing policy applies: one suite per command, at most two runs.
 
 ## 5. Project structure
 
-Existing files change; two are new.
+Existing files change; three are new.
 
 ```
 packages/ops/
   package.json                       # + exports map
   src/
     auth/token-provider.ts           # NEW: expiry check + single-flight refresh
+    core/types.ts                    # + OpSpec.isDestructive, kindIsDestructive
+    core/registry.ts                 # + normalizeOp freezes the resolved flag
     core/schema.ts                   # + toolTitle, annotations per kind
     mcp/server.ts                    # + initialize, ping, -32700/-32600, structuredContent
     mcp/tools.ts                     # + title, annotations in McpTool
     transport/errors.ts              # + 'timeout' code
     transport/executor.ts            # + deadlineMs / AbortSignal.timeout
     index.ts                         # + export of the new provider
+   cli/run.ts                          # + currentAccessToken as the default readToken
   test/
     mcp-lifecycle.test.ts            # NEW: handshake, ping, parse errors, stdout purity
     token-provider.test.ts           # NEW: expiry, skew, single-flight, fallbacks
+    package-surface.test.ts          # NEW: exports keys, targets, main/types/bin
+    validation-schema.test.ts        # extended: kind table, hint table
+    transport.test.ts                # extended: deadline, timeout code
 ```
 
 ## 6. Code style
@@ -262,12 +272,20 @@ Hand-rolled stubs, no network, no framework beyond the package's existing jest.
 ## 9. Success criteria
 
 1. An official MCP SDK client (`StdioClientTransport`) completes `initialize` and
-   lists tools against the built `dist` entry.
+   lists tools against the built `dist` entry. **Deferred in this change** by
+   assumption 3 (`@modelcontextprotocol/sdk` needs Ask-first approval): this
+   criterion is met by the protocol-shaped handshake in
+   `test/mcp-lifecycle.test.ts`, and no task claims SDK conformance until the
+   dependency is approved.
 2. `tools/list` carries `title` plus all four annotation hints for every op, with
    `destructiveHint` true for every mutating op that did not opt out.
 3. `tools/call` returns `structuredContent` for an object body and the existing
    text rendering unchanged, so adapter parity still holds.
-4. `import { defineResource } from '@life/ops'` resolves from another workspace.
+4. `import { defineResource } from '@life/ops'` resolves from another workspace. **Narrowed in this change** by assumption 1
+   (no `apps/*`, no consumer workspace): no workspace depends on `@life/ops`, so
+   this criterion is met by runtime self-reference to the package's own built entry,
+   asserted in `test/package-surface.test.ts`. Cross-workspace resolution is
+   deferred until a consumer workspace exists.
 5. A non-answering backend yields `OpsError` code `timeout` at the deadline, in
    both adapters, with no leaked timer or socket.
 6. An expired stored token is rotated transparently by a single refresh; a token
