@@ -14,6 +14,12 @@ export interface OpSpec {
   /** create | get | list | update | delete — the closed op set (SPEC.md §3). */
   kind: 'create' | 'get' | 'list' | 'update' | 'delete';
   fields: Record<string, FieldSpec>;
+  /**
+   * Overrides the kind default. Defaults: true for create/update/delete,
+   * false for get/list. `false` on a mutating op is an explicit statement
+   * that this write may run without human approval (SPEC-ops-agent-contract §3.2).
+   */
+  isDestructive?: boolean;
 }
 
 export interface ResourceSpec {

@@ -34,5 +34,6 @@ export { login, resolveLoginOptions } from './auth/login';
 export type { IdpEndpoints, LoginOptions } from './auth/login';
 export { refresh } from './auth/refresh';
 export type { RefreshOptions } from './auth/refresh';
+export { currentAccessToken } from './auth/token-provider';
 export { clearTokens, credentialsPath, readToken, readTokens, storeTokens } from './auth/token-store';
 export type { StoredTokens } from './auth/token-store';

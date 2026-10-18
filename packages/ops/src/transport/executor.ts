@@ -9,6 +9,7 @@ import { findOp } from '../core/registry';
 import { validateInput } from '../core/validate';
 import { wireFor } from '../core/wire';
 import {
+  deadlineExceededError,
   failureFromResponse,
   invalidInputError,
   missingTokenError,
@@ -21,6 +22,24 @@ export interface ExecutorOptions {
   baseUrl: string;
   /** Reads the stored IdP access token; `undefined` means "run `life-ops login`". */
   readToken: () => Promise<string | undefined>;
+  /** Per-call deadline in ms; `0` (the default) waits for the service forever. */
+  deadlineMs?: number;
+}
+
+/** The MCP adapter's own budget per call; the CLI passes no option and stays unbounded (§3.4). */
+const DEFAULT_DEADLINE_MS = 30_000;
+
+/**
+ * `LIFE_OPS_DEADLINE_MS` sets the per-call deadline; `0` disables it, a broken value falls
+ * back to the default. A pure read of the environment, so the adapter owns the policy and
+ * the executor only ever receives a number.
+ */
+export function resolveDeadlineMs(env: NodeJS.ProcessEnv): number {
+  const configured = env.LIFE_OPS_DEADLINE_MS?.trim();
+  if (configured === undefined || configured === '') return DEFAULT_DEADLINE_MS;
+  const parsed = Number(configured);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_DEADLINE_MS;
+  return parsed;
 }
 
 export interface OpsResult {
@@ -42,6 +61,7 @@ interface OperationCall {
 interface ServiceEndpoint {
   baseUrl: string;
   readToken: () => Promise<string | undefined>;
+  deadlineMs: number;
 }
 
 interface AuthorizedWire {
@@ -49,9 +69,19 @@ interface AuthorizedWire {
   token: string;
 }
 
+/** The budget governing one call: the operation name it names and its millisecond deadline. */
+interface CallDeadline {
+  operation: string;
+  deadlineMs: number;
+}
+
 /** One executor per service endpoint; adapters share this call, never re-implement it. */
 export function createExecutor(options: ExecutorOptions): Executor {
-  const endpoint: ServiceEndpoint = { baseUrl: options.baseUrl, readToken: options.readToken };
+  const endpoint: ServiceEndpoint = {
+    baseUrl: options.baseUrl,
+    readToken: options.readToken,
+    deadlineMs: options.deadlineMs ?? 0,
+  };
   return {
     registry: options.registry,
     run: (kind, input) => execute(endpoint, { registry: options.registry, kind, input }),
@@ -60,6 +90,11 @@ export function createExecutor(options: ExecutorOptions): Executor {
 
 async function execute(endpoint: ServiceEndpoint, call: OperationCall): Promise<OpsResult> {
   rejectInvalidInput(call);
+  return await withinDeadline(deadlineFor(endpoint, call), exchange(endpoint, call));
+}
+
+/** The send plus its body read: one span, so a body that stalls mid-stream is timed out too. */
+async function exchange(endpoint: ServiceEndpoint, call: OperationCall): Promise<OpsResult> {
   const response = await sendCall(endpoint, call);
   return { status: response.status, body: await readBody(response) };
 }
@@ -73,9 +108,39 @@ function rejectInvalidInput(call: OperationCall): void {
 async function sendCall(endpoint: ServiceEndpoint, call: OperationCall): Promise<Response> {
   const token = await requireToken(endpoint, call);
   const wire = wireFor(call.registry, call.kind, call.input);
-  const response = await fetch(addressFor(endpoint.baseUrl, wire), requestFor({ wire, token }));
+  const response = await sendWire(endpoint, { wire, token });
   if (!response.ok) throw await failureFromResponse(labelFor(call), response);
   return response;
+}
+
+/** The one `fetch`: the deadline signal rides on this request and nothing polls it. */
+async function sendWire(endpoint: ServiceEndpoint, authorized: AuthorizedWire): Promise<Response> {
+  const address = addressFor(endpoint.baseUrl, authorized.wire);
+  return await fetch(address, requestFor(authorized, endpoint.deadlineMs));
+}
+
+/**
+ * The deadline covers the whole call — request, headers, and body stream — because
+ * `AbortSignal.timeout` also rejects a body read that outlives it. An abort leaves as the
+ * `timeout` OpsError; every other failure is rethrown untouched.
+ */
+async function withinDeadline<T>(budget: CallDeadline, work: Promise<T>): Promise<T> {
+  try {
+    return await work;
+  } catch (error) {
+    if (budget.deadlineMs === 0 || !isAbort(error)) throw error;
+    throw deadlineExceededError(budget.operation, budget.deadlineMs);
+  }
+}
+
+function deadlineFor(endpoint: ServiceEndpoint, call: OperationCall): CallDeadline {
+  return { operation: labelFor(call), deadlineMs: endpoint.deadlineMs };
+}
+
+/** Node throws a `DOMException` here, which is not an `Error` subclass, so only its name is reliable. */
+function isAbort(error: unknown): boolean {
+  const thrownName = (error as { name?: unknown } | null)?.name;
+  return thrownName === 'TimeoutError' || thrownName === 'AbortError';
 }
 
 async function requireToken(endpoint: ServiceEndpoint, call: OperationCall): Promise<string> {
@@ -103,12 +168,19 @@ function stripLeadingSlashes(path: string): string {
   return path.replace(/^\/+/, '');
 }
 
-function requestFor(authorized: AuthorizedWire): RequestInit {
+function requestFor(authorized: AuthorizedWire, deadlineMs: number): RequestInit {
+  const signal = signalFor(deadlineMs);
   return {
     method: authorized.wire.method,
     headers: headersFor(authorized),
     body: bodyText(authorized.wire),
+    ...(signal === undefined ? {} : { signal }),
   };
+}
+
+/** A zero deadline means unbounded, and `AbortSignal.timeout(0)` would abort at once. */
+function signalFor(deadlineMs: number): AbortSignal | undefined {
+  return deadlineMs > 0 ? AbortSignal.timeout(deadlineMs) : undefined;
 }
 
 function headersFor(authorized: AuthorizedWire): Record<string, string> {

@@ -18,7 +18,28 @@ export function defineResource(spec: ResourceSpec): ResourceRegistry {
 }
 
 function normalizeOp(operation: OpSpec): OpSpec {
-  return { kind: operation.kind, fields: normalizeFields(operation.fields) };
+  return {
+    kind: operation.kind,
+    fields: normalizeFields(operation.fields),
+    isDestructive: operation.isDestructive ?? kindIsDestructive(operation.kind),
+  };
+}
+
+const DESTRUCTIVE_KINDS: Readonly<Record<OpSpec['kind'], boolean>> = {
+  create: true,
+  get: false,
+  list: false,
+  update: true,
+  delete: true,
+};
+
+/**
+ * Whether an op of this kind may destroy data unless its author says otherwise
+ * (SPEC-ops-agent-contract §3.2). Writes default to destructive: fail-safe until
+ * the author who knows the write is recoverable opts out.
+ */
+export function kindIsDestructive(kind: OpSpec['kind']): boolean {
+  return DESTRUCTIVE_KINDS[kind];
 }
 
 function normalizeFields(fields: Record<string, FieldSpec>): Record<string, FieldSpec> {

@@ -1,17 +1,28 @@
 /**
- * The MCP stdio server (SPEC.md §3, §10.2): a hand-rolled JSON-RPC stdio loop
- * that answers `tools/list` and `tools/call` and nothing else — no SDK, no third
- * method was agreed. Every call routes through the one shared executor and the
- * one canonical render the CLI uses, so adapter parity is a string comparison,
- * not a convention.
+ * The MCP stdio server (SPEC.md §3, §10.2; SPEC-ops-agent-contract §3.1): a
+ * hand-rolled JSON-RPC stdio loop that answers the handshake a real MCP client
+ * needs (`initialize`, `ping`, the inert `notifications/initialized`), the two
+ * tool methods, and nothing else — no SDK, no third method was agreed. A line
+ * that is not JSON, or is JSON but not a request, still gets a JSON-RPC error
+ * reply, so one bad line cannot end the session. Every call routes through the
+ * one shared executor and the one canonical render the CLI uses, so adapter
+ * parity is a string comparison, not a convention.
  */
 import type { OpSpec, ResourceRegistry } from '../core/types';
-import { createExecutor } from '../transport/executor';
+import { createExecutor, resolveDeadlineMs } from '../transport/executor';
 import type { Executor } from '../transport/executor';
-import { readToken } from '../auth/token-store';
+import { currentAccessToken } from '../auth/token-provider';
 import { renderFailure, renderOpsResult } from '../cli/render';
 import { loadService } from '../cli/run';
 import { findTool, listTools } from './tools';
+
+const SERVER_NAME = 'life-ops';
+
+/** Highest first: the first entry is what an unknown requested version falls back to. */
+const PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25', '2025-06-18'];
+
+/** `serverInfo.version`, pinned to the published package version by `test/mcp-lifecycle.test.ts`. */
+const SERVER_VERSION: string = (require('../../package.json') as { version: string }).version;
 
 /** The stdio-facing server contract: registry + env + injected writers (tests drive stubs). */
 export interface McpServerOptions {
@@ -23,9 +34,13 @@ export interface McpServerOptions {
   stderr: (line: string) => void;
 }
 
-/** One in-process JSON-RPC handler; `null` is the no-answer shape for a notification. */
+/**
+ * One in-process JSON-RPC handler. `message` is what the transport delivered: a
+ * raw stdin line, which this server parses, or an already-parsed request, which
+ * an in-process caller passes. `null` is the no-answer shape for a notification.
+ */
 export interface McpServer {
-  handle(request: unknown): Promise<unknown>;
+  handle(message: unknown): Promise<unknown>;
 }
 
 export function createMcpServer(options: McpServerOptions): McpServer {
@@ -34,10 +49,11 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     executor: createExecutor({
       registry: options.registry,
       baseUrl: apiBase(options),
-      readToken,
+      readToken: currentAccessToken,
+      deadlineMs: resolveDeadlineMs(options.env),
     }),
   };
-  return { handle: (request) => answer(asRequest(request), session) };
+  return { handle: (message) => answer(message, session) };
 }
 
 /** Serve the session until stdin closes, answering every JSON-RPC request. */
@@ -82,18 +98,65 @@ function answerRequestsUntilStdinCloses(loop: ServerLoop): Promise<number> {
 
 async function respondToLine(loop: ServerLoop, line: string): Promise<void> {
   try {
-    const response = await loop.server.handle(parseLine(line));
+    const response = await loop.server.handle(line);
     if (response !== null) loop.options.stdout(JSON.stringify(response));
   } catch (error) {
     loop.options.stderr(renderFailure(error));
   }
 }
 
-async function answer(request: RpcRequest, session: Session): Promise<unknown> {
+async function answer(message: unknown, session: Session): Promise<unknown> {
+  const read = readMessage(message);
+  if (read.kind === 'unparseable') return unparseableLineAnswer(session);
+  if (read.kind === 'notARequest') return notARequestAnswer();
+  return answerRequest(read.request, session);
+}
+
+/** A bad line gets both answers: `-32700` on stdout and a diagnostic on stderr. */
+function unparseableLineAnswer(session: Session): unknown {
+  const diagnostic = 'parse error: incoming line is not valid JSON';
+  session.options.stderr(diagnostic);
+  return errorAnswer({ id: null, code: -32700, message: diagnostic });
+}
+
+function notARequestAnswer(): unknown {
+  return errorAnswer({
+    id: null,
+    code: -32600,
+    message: 'invalid request: not a JSON-RPC request object',
+  });
+}
+
+async function answerRequest(request: RpcRequest, session: Session): Promise<unknown> {
   if (request.id === undefined) return null; // a notification gets no answer
+  if (request.method === 'initialize') return initializeAnswer(request);
+  if (request.method === 'ping') return pingAnswer(request);
   if (request.method === 'tools/list') return listAnswer(request, session.options.registry);
   if (request.method === 'tools/call') return callAnswer(request, session);
-  return unhandledMethodAnswer(request);
+  return methodNotSupportedAnswer(request);
+}
+
+function initializeAnswer(request: RpcRequest): unknown {
+  return {
+    jsonrpc: '2.0',
+    id: idOf(request),
+    result: {
+      protocolVersion: negotiateVersion(requestedVersion(request)),
+      capabilities: { tools: {} },
+      serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+    },
+  };
+}
+
+/** Echo the requested version when we speak it; otherwise name the highest we speak. */
+function negotiateVersion(requested: string | undefined): string {
+  const highest = PROTOCOL_VERSIONS[0] as string;
+  if (requested !== undefined && PROTOCOL_VERSIONS.includes(requested)) return requested;
+  return highest;
+}
+
+function pingAnswer(request: RpcRequest): unknown {
+  return { jsonrpc: '2.0', id: idOf(request), result: {} };
 }
 
 function listAnswer(request: RpcRequest, registry: ResourceRegistry): unknown {
@@ -102,40 +165,66 @@ function listAnswer(request: RpcRequest, registry: ResourceRegistry): unknown {
 
 async function callAnswer(request: RpcRequest, session: Session): Promise<unknown> {
   try {
-    const outcome = await runTool(request, session);
-    const result: Record<string, unknown> = { content: [{ type: 'text', text: outcome.text }] };
-    if (outcome.failed) result['isError'] = true;
-    return { jsonrpc: '2.0', id: idOf(request), result };
+    return callResultAnswer(request, await runTool(request, session));
   } catch (error) {
     return invalidCallAnswer(request, error);
   }
 }
 
+/**
+ * The call's result object: the canonical text always, `structuredContent` when the
+ * body carries structure (an array wrapped as `{ items }`), `isError` when the call
+ * failed (and then nothing structured — a failure is not a payload an agent may branch
+ * on).
+ */
+function callResultAnswer(request: RpcRequest, outcome: ToolOutcome): unknown {
+  const result: Record<string, unknown> = { content: [{ type: 'text', text: outcome.text }] };
+  const structuredBody = structuredBodyOf(outcome);
+  if (structuredBody !== undefined) result['structuredContent'] = structuredBody;
+  if (outcome.failed) result['isError'] = true;
+  return { jsonrpc: '2.0', id: idOf(request), result };
+}
+
+/**
+ * The body as `structuredContent`, or `undefined` when it is neither an object nor an
+ * array. A bare array is wrapped as `{ items }`: MCP types `structuredContent` as a
+ * record at the root (`CallToolResultSchema`), and an array there makes a conformant SDK
+ * client throw `$ZodError` instead of returning data (SPEC-ops-agent-contract §3.3).
+ */
+function structuredBodyOf(outcome: ToolOutcome): Record<string, unknown> | undefined {
+  if (outcome.failed) return undefined;
+  if (Array.isArray(outcome.body)) return { items: outcome.body };
+  if (outcome.body !== null && typeof outcome.body === 'object') {
+    return outcome.body as Record<string, unknown>;
+  }
+  return undefined;
+}
+
 /** A malformed/unknown `tools/call` still gets a JSON-RPC error reply, never silence. */
 function invalidCallAnswer(request: RpcRequest, error: unknown): unknown {
-  return {
-    jsonrpc: '2.0',
-    id: idOf(request),
-    error: { code: -32602, message: renderFailure(error) },
-  };
+  return errorAnswer({ id: idOf(request), code: -32602, message: renderFailure(error) });
 }
 
 async function runTool(request: RpcRequest, session: Session): Promise<ToolOutcome> {
   const operation = nameOf(request, session.options.registry);
   try {
     const result = await session.executor.run(operation, inputOf(request));
-    return { text: renderOpsResult(result), failed: false };
+    return { text: renderOpsResult(result), body: result.body, failed: false };
   } catch (error) {
-    return { text: renderFailure(error), failed: true };
+    return { text: renderFailure(error), body: undefined, failed: true };
   }
 }
 
-function unhandledMethodAnswer(request: RpcRequest): unknown {
-  return {
-    jsonrpc: '2.0',
+function methodNotSupportedAnswer(request: RpcRequest): unknown {
+  return errorAnswer({
     id: idOf(request),
-    error: { code: -32601, message: `method not supported: ${request.method}` },
-  };
+    code: -32601,
+    message: `method not supported: ${request.method}`,
+  });
+}
+
+function errorAnswer(failure: RpcFailure): unknown {
+  return { jsonrpc: '2.0', id: failure.id, error: { code: failure.code, message: failure.message } };
 }
 
 interface Session {
@@ -149,7 +238,10 @@ interface ServerLoop {
 }
 
 interface ToolOutcome {
+  /** Exactly what the CLI prints for this result — the byte-identical part. */
   text: string;
+  /** The service body as the executor parsed it; `undefined` when there was none. */
+  body: unknown;
   failed: boolean;
 }
 
@@ -160,15 +252,41 @@ interface RpcRequest {
   params: unknown;
 }
 
-function parseLine(line: string): unknown {
-  return JSON.parse(line) as unknown;
+/** A JSON-RPC error reply's varying part; `null` id is what the protocol asks for a bad line. */
+interface RpcFailure {
+  id: string | number | null;
+  code: number;
+  message: string;
 }
 
-function asRequest(parsed: unknown): RpcRequest {
-  if (typeof parsed !== 'object' || parsed === null) throw new Error('request is not a JSON object');
+/** What one delivered message turned out to be. */
+type MessageRead =
+  | { kind: 'request'; request: RpcRequest }
+  | { kind: 'notARequest' }
+  | { kind: 'unparseable' };
+
+function readMessage(message: unknown): MessageRead {
+  if (typeof message !== 'string') return readRequest(message);
+  const parsed = parseLine(message);
+  return parsed.kind === 'unparseable' ? parsed : readRequest(parsed.value);
+}
+
+function parseLine(line: string): { kind: 'parsed'; value: unknown } | { kind: 'unparseable' } {
+  try {
+    return { kind: 'parsed', value: JSON.parse(line) as unknown };
+  } catch {
+    return { kind: 'unparseable' };
+  }
+}
+
+function readRequest(parsed: unknown): MessageRead {
+  if (typeof parsed !== 'object' || parsed === null) return { kind: 'notARequest' };
   const record = parsed as Record<string, unknown>;
-  if (typeof record['method'] !== 'string') throw new Error('request has no method string');
-  return { id: requestId(record), method: record['method'], params: record['params'] };
+  if (typeof record['method'] !== 'string') return { kind: 'notARequest' };
+  return {
+    kind: 'request',
+    request: { id: requestId(record), method: record['method'], params: record['params'] },
+  };
 }
 
 function requestId(record: Record<string, unknown>): string | number | undefined {
@@ -182,7 +300,7 @@ function idOf(request: RpcRequest): string | number | null {
 
 /** The op kind a `tools/call` names, or a thrown error when the registry has no such tool. */
 function nameOf(request: RpcRequest, registry: ResourceRegistry): OpSpec['kind'] {
-  const name = (request.params as Record<string, unknown> | undefined)?.['name'];
+  const name = paramsOf(request)?.['name'];
   if (typeof name !== 'string') throw new Error('tools/call has no tool name string');
   const operation = findTool(registry, name);
   if (operation === undefined) throw new Error(`unknown tool: ${name}`);
@@ -191,10 +309,22 @@ function nameOf(request: RpcRequest, registry: ResourceRegistry): OpSpec['kind']
 
 /** The `arguments` object of the call; an absent one behaves as an empty input. */
 function inputOf(request: RpcRequest): Record<string, unknown> {
-  const args = (request.params as Record<string, unknown> | undefined)?.['arguments'];
+  const args = paramsOf(request)?.['arguments'];
   return typeof args === 'object' && args !== null && !Array.isArray(args)
     ? (args as Record<string, unknown>)
     : {};
+}
+
+function requestedVersion(request: RpcRequest): string | undefined {
+  const version = paramsOf(request)?.['protocolVersion'];
+  return typeof version === 'string' ? version : undefined;
+}
+
+/** The `params` object of a request; anything else reads as absent. */
+function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
+  const params = request.params;
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) return undefined;
+  return params as Record<string, unknown>;
 }
 
 /** `service.apiBase` wins over `LIFE_OPS_API_BASE`, the same rule the CLI applies. */

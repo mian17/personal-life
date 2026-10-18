@@ -3,14 +3,23 @@
  * cursor-pagination passthrough, driven against the recording stub API
  * (`test/support/stub-api.ts`). No test contacts a real service.
  */
-import { failureFromResponse, type OpsErrorCode } from '../src/transport/errors';
-import { createExecutor } from '../src/transport/executor';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import {
+  failureFromResponse,
+  OpsError,
+  renderOpsError,
+  type OpsErrorCode,
+} from '../src/transport/errors';
+import { createExecutor, type Executor } from '../src/transport/executor';
 import { sampleRegistry } from '../src/fixtures/sample';
 import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
 
 const OPERATION = 'sample.get';
 const OWNER_SUBJECT = 'owner-a';
 const VALID_TOKEN = sampleApiToken;
+const SHORT_DEADLINE_MS = 100;
+const SHORT_WAIT_MS = 250;
 
 interface StatusCase {
   status: number;
@@ -81,7 +90,7 @@ describe('the executor token gate', () => {
   });
 
   it('refuses a call with no stored token before any socket opens', async () => {
-    const executor = executorWith(stub.baseUrl, undefined);
+    const executor = executorWith({ baseUrl: stub.baseUrl, token: undefined });
 
     await expect(executor.run('get', { id: SEEDED_IDS[0] })).rejects.toThrow(
       'sample.get failed (unauthenticated): no token found, run `life-ops login` first',
@@ -127,6 +136,88 @@ describe('cursor pagination', () => {
   });
 });
 
+describe('the per-call deadline', () => {
+  let stub: StubApi;
+
+  beforeEach(async () => {
+    stub = await startStubApi({ ownerSubject: OWNER_SUBJECT, rows: seededRows() });
+  });
+
+  afterEach(async () => {
+    await stub.stop();
+  });
+
+  it('sends the deadline signal on its one fetch', async () => {
+    const calls = await fetchCallsOf(() =>
+      executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN, deadlineMs: SHORT_WAIT_MS }).run(
+        'get',
+        { id: SEEDED_IDS[0] },
+      ),
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('sends no signal when the deadline is disabled', async () => {
+    const calls = await fetchCallsOf(() =>
+      executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN, deadlineMs: 0 }).run('get', {
+        id: SEEDED_IDS[0],
+      }),
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.signal).toBeUndefined();
+  });
+
+  it('keeps mapping a !response.ok reply through failureFromResponse', async () => {
+    const executor = executorWith({
+      baseUrl: stub.baseUrl,
+      token: VALID_TOKEN,
+      deadlineMs: SHORT_WAIT_MS,
+    });
+
+    await expect(executor.run('get', { id: 'missing-row' })).rejects.toThrow(
+      'sample.get failed (notFound):',
+    );
+  });
+
+  it('raises timeout naming the operation and the deadline', async () => {
+    const silentApi = await startSilentApi();
+    try {
+      const error = await executorWith({
+        baseUrl: silentApi.baseUrl,
+        token: VALID_TOKEN,
+        deadlineMs: SHORT_DEADLINE_MS,
+      })
+        .run('get', { id: SEEDED_IDS[0] })
+        .catch((thrown: unknown) => thrown);
+
+      expect(error).toBeInstanceOf(OpsError);
+      expect((error as OpsError).code).toBe('timeout');
+      expect((error as OpsError).status).toBeUndefined();
+      expect(renderOpsError(error as OpsError)).toBe(
+        `sample.get failed (timeout): sample.get did not answer within ${SHORT_DEADLINE_MS} ms`,
+      );
+    } finally {
+      await silentApi.stop();
+    }
+  });
+
+  it('stays in flight when the executor was built without a deadline, as the CLI builds it', async () => {
+    const silentApi = await startSilentApi();
+    try {
+      const pending = executorWith({ baseUrl: silentApi.baseUrl, token: VALID_TOKEN }).run('get', {
+        id: SEEDED_IDS[0],
+      });
+
+      expect(await settleWithin(pending, SHORT_WAIT_MS)).toBe('in flight');
+    } finally {
+      await silentApi.stop();
+    }
+  });
+});
+
 interface SamplePage {
   items: Record<string, unknown>[];
   nextCursor?: string;
@@ -142,19 +233,81 @@ function seededRows() {
   }));
 }
 
-function executorWith(baseUrl: string, token: string | undefined) {
+function executorWith(setup: ExecutorSetup): Executor {
   return createExecutor({
     registry: sampleRegistry,
-    baseUrl,
-    readToken: async () => token,
+    baseUrl: setup.baseUrl,
+    readToken: async () => setup.token,
+    deadlineMs: setup.deadlineMs,
   });
 }
 
+interface ExecutorSetup {
+  baseUrl: string;
+  token: string | undefined;
+  /** Absent is the CLI's construction: no deadline at all. */
+  deadlineMs?: number;
+}
+
 async function listSamples(stub: StubApi, input: Record<string, unknown>): Promise<SamplePage> {
-  const result = await executorWith(stub.baseUrl, VALID_TOKEN).run('list', input);
+  const result = await executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN }).run(
+    'list',
+    input,
+  );
   return result.body as SamplePage;
 }
 
 function nextCursorOf(page: SamplePage): string | undefined {
   return page.nextCursor;
+}
+
+interface FetchCall {
+  signal: AbortSignal | undefined;
+}
+
+/** The requests one call sent, recorded as each leaves, so a test reads the init it passed. */
+async function fetchCallsOf(call: () => Promise<unknown>): Promise<FetchCall[]> {
+  const calls: FetchCall[] = [];
+  const sendFetch = global.fetch;
+  jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+    calls.push({ signal: init?.signal ?? undefined });
+    return await sendFetch(input, init);
+  });
+  try {
+    await call();
+    return calls;
+  } finally {
+    jest.restoreAllMocks();
+  }
+}
+
+/** A loopback service that accepts the request and never answers it. */
+async function startSilentApi(): Promise<StubApi> {
+  const server = createServer(() => {});
+  await new Promise<void>((started) => server.listen(0, '127.0.0.1', started));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return { baseUrl, requestLog: [], stop: () => closeSilentApi(server) };
+}
+
+function closeSilentApi(server: Server): Promise<void> {
+  return new Promise((closed, fail) => {
+    server.closeAllConnections();
+    server.close((error) => (error === undefined ? closed() : fail(error)));
+  });
+}
+
+/** Whether the call settled inside `waitMs`; a call still waiting answers `in flight`. */
+async function settleWithin(
+  call: Promise<unknown>,
+  waitMs: number,
+): Promise<'settled' | 'in flight'> {
+  const settled = call.then(
+    () => 'settled' as const,
+    () => 'settled' as const,
+  );
+  return await Promise.race([settled, waitFor(waitMs)]);
+}
+
+function waitFor(waitMs: number): Promise<'in flight'> {
+  return new Promise((resolve) => setTimeout(() => resolve('in flight'), waitMs));
 }

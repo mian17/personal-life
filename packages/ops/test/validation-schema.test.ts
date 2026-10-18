@@ -8,7 +8,7 @@
  * (string, number, boolean, string[]) plus required fields, unknown fields, and
  * enums — the last through a local registry, since the sample declares no enum.
  */
-import { defineResource } from '../src/core/registry';
+import { defineResource, kindIsDestructive } from '../src/core/registry';
 import { deriveInputSchema, type JsonSchema } from '../src/core/schema';
 import { validateInput } from '../src/core/validate';
 import { fieldNames, findOp } from '../src/core/registry';
@@ -114,6 +114,62 @@ describe('the derived schema', () => {
   });
 });
 
+describe('the destructiveness flag', () => {
+  // SPEC-ops-agent-contract §3.2, row by row over the closed kind set.
+  const HINT_ROWS: Array<[
+    OpSpec['kind'],
+    { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean },
+  ]> = [
+    ['get', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
+    ['list', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
+    ['create', { readOnlyHint: false, destructiveHint: true, idempotentHint: false }],
+    ['update', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
+    ['delete', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
+  ];
+
+  for (const [kind, hints] of HINT_ROWS) {
+    it(`reports the ${kind} row of the hint table`, () => {
+      expect(kindIsDestructive(kind)).toBe(hints.destructiveHint);
+      expect(annotationsOf(sampleRegistry, kind)).toEqual({ ...hints, openWorldHint: false });
+    });
+  }
+
+  it('freezes the default onto every op of the registry', () => {
+    expect(sampleRegistry.ops.map((operation) => operation.isDestructive)).toEqual([
+      true,
+      false,
+      false,
+      true,
+      true,
+    ]);
+  });
+
+  it('keeps the registry deep-frozen with the flag in place', () => {
+    expect(Object.isFrozen(sampleRegistry.ops[0])).toBe(true);
+    expect(Object.isFrozen(sampleRegistry.ops[0]?.fields)).toBe(true);
+  });
+
+  it('reports a mutating op the author called safe as non-destructive', () => {
+    const safeRegistry = overriddenRegistry({ kind: 'delete', isDestructive: false });
+
+    expect(annotationsOf(safeRegistry, 'delete').destructiveHint).toBe(false);
+  });
+
+  it('reports a read the author called destructive as destructive', () => {
+    const armedRegistry = overriddenRegistry({ kind: 'get', isDestructive: true });
+
+    expect(annotationsOf(armedRegistry, 'get').destructiveHint).toBe(true);
+  });
+
+  it('leaves name, description, and inputSchema untouched by the flag', () => {
+    const tool = toolOf(sampleRegistry, 'delete');
+
+    expect(tool.name).toBe('sample_delete');
+    expect(tool.description).toBe('delete a sample record through /samples');
+    expect(tool.inputSchema).toEqual(deriveInputSchema(sampleRegistry, 'delete'));
+  });
+});
+
 describe('the MCP tool surface', () => {
   it('names one tool per registry op', () => {
     expect(listTools(sampleRegistry).map((tool) => tool.name)).toEqual([
@@ -131,7 +187,56 @@ describe('the MCP tool surface', () => {
       expect(Object.keys(tool.inputSchema.properties).length).toBeGreaterThan(0);
     }
   });
+
+  it('titles every tool as "<Verb> <registry.name>"', () => {
+    expect(listTools(sampleRegistry).map((tool) => tool.title)).toEqual([
+      'Create sample',
+      'Get sample',
+      'List sample',
+      'Update sample',
+      'Delete sample',
+    ]);
+  });
+
+  it('states all four hints on every tool', () => {
+    for (const tool of listTools(sampleRegistry)) {
+      expect(Object.keys(tool.annotations).sort()).toEqual([
+        'destructiveHint',
+        'idempotentHint',
+        'openWorldHint',
+        'readOnlyHint',
+      ]);
+    }
+  });
+
+  it('declares no outputSchema, since the registry models requests only', () => {
+    for (const tool of listTools(sampleRegistry)) {
+      expect(tool).not.toHaveProperty('outputSchema');
+    }
+  });
 });
+
+/** A one-op registry carrying an explicit `isDestructive`, for the override cases. */
+function overriddenRegistry(operation: {
+  kind: OpSpec['kind'];
+  isDestructive: boolean;
+}): ResourceRegistry {
+  return defineResource({
+    name: 'sample',
+    basePath: '/samples',
+    ops: [{ kind: operation.kind, isDestructive: operation.isDestructive, fields: {} }],
+  });
+}
+
+function toolOf(registry: ResourceRegistry, kind: OpSpec['kind']) {
+  const tool = listTools(registry).find((candidate) => candidate.name === `sample_${kind}`);
+  if (tool === undefined) throw new Error(`no tool for ${kind}`);
+  return tool;
+}
+
+function annotationsOf(registry: ResourceRegistry, kind: OpSpec['kind']) {
+  return toolOf(registry, kind).annotations;
+}
 
 /** True when `supplied` passes `schema` — the same judgement the validator makes. */
 function accepts(schema: JsonSchema, supplied: Record<string, unknown>): boolean {

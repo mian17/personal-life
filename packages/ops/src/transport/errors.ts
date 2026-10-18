@@ -11,7 +11,8 @@ export type OpsErrorCode =
   | 'unauthenticated'
   | 'notFound'
   | 'conflict'
-  | 'requestFailed';
+  | 'requestFailed'
+  | 'timeout';
 
 export interface OpsFailure {
   operation: string;
@@ -48,6 +49,15 @@ export function renderOpsError(error: OpsError): string {
 export function invalidInputError(operation: string, issues: ValidationIssue[]): OpsError {
   const detail = issues.map((issue) => `${issue.field}: ${issue.reason}`).join('; ');
   return new OpsError({ operation, code: 'invalidInput', detail });
+}
+
+/** The deadline firing: the service never answered, so there is no HTTP status to report. */
+export function deadlineExceededError(operation: string, deadlineMs: number): OpsError {
+  return new OpsError({
+    operation,
+    code: 'timeout',
+    detail: `${operation} did not answer within ${deadlineMs} ms`,
+  });
 }
 
 /** The 401-shaped local failure: no token, so the user must log in first. */
