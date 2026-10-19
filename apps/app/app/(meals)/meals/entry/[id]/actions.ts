@@ -48,7 +48,6 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   const hintRaw = formData.get('hint');
   const hint = typeof hintRaw === 'string' && hintRaw.trim() !== '' ? hintRaw : undefined;
   if (!isPhotoBlob(file) || file.size === 0) {
-    console.error(`[photo] no usable file: ${isPhotoBlob(file) ? `size=${file.size}` : `received ${file === null ? 'null' : typeof file}`}`);
     return { readable: false, reason: 'no-image' };
   }
   try {
@@ -58,7 +57,6 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
       { base64: bytes.toString('base64'), mimeType },
       hint,
     );
-    console.info(`[photo] estimate result: ${result.readable ? `readable, ${result.items.length} item(s)` : `unreadable (${result.reason})`}`);
     return result;
   } catch {
     return { readable: false, reason: 'service-unavailable' };
