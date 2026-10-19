@@ -51,10 +51,10 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   }
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    return await estimatePhoto(
-      { base64: bytes.toString('base64'), mimeType: file.type || 'image/jpeg' },
-      hint,
-    );
+    // The browser names the format. When it cannot, the name travels empty and the
+    // service's mime gate answers `could-not-read` — asserting JPEG here would label
+    // whatever bytes arrived as JPEG, turning an unnamed file into a false claim.
+    return await estimatePhoto({ base64: bytes.toString('base64'), mimeType: file.type }, hint);
   } catch {
     return { readable: false, reason: 'service-unavailable' };
   }

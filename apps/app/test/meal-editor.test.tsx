@@ -353,6 +353,30 @@ describe('MealEditor photo door', () => {
     }
   });
 
+  it('sends an unnamed file with its type empty, so the failure names the photo, not the service', async () => {
+    // A capture the browser could not name. Labelling its bytes JPEG made Gemini
+    // reject them, which reads to the editor as an outage; the empty type now reaches
+    // the service's mime gate, whose `could-not-read` names the photo instead.
+    const unnamed = new File(['heic bytes'], 'IMG_0001.HEIC', { type: '' });
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)(
+        [unnamed] as unknown as FileList,
+      );
+
+      expect(JSON.parse(mockCallService.mock.calls[0][2].body).mimeType).toBe('');
+      const failed = harness.renderTree();
+      expect(text(failed.props.banner)).toBe(
+        "Couldn't read that photo. Enter the meal by hand — nothing was guessed.",
+      );
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('opens manual mode empty — no invented numbers — when the photo cannot be read', async () => {
     const harness = stateHarness();
     mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
