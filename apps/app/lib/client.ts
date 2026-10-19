@@ -21,10 +21,6 @@ export async function callService<T>(
   init?: RequestInit,
 ): Promise<T> {
   const session = await requireSession();
-  const started = Date.now();
-  // Request/response logging for the photo-door diagnosis: sizes, statuses and
-  // the upstream's own error text only — never the body (it may be an image).
-  console.info(`[bff] -> ${init?.method ?? 'GET'} ${base}${path} (${bodyBytes(init)} body bytes)`);
   const res = await fetch(`${base}${path}`, {
     ...init,
     headers: {
@@ -35,17 +31,7 @@ export async function callService<T>(
     cache: 'no-store',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.error(
-      `[bff] <- ${res.status} ${init?.method ?? 'GET'} ${path} after ${Date.now() - started}ms: ${text.slice(0, 500) || '(empty body)'}`,
-    );
     throw new ApiError(res.status, `API ${res.status} on ${path}`);
   }
-  console.info(`[bff] <- ${res.status} ${init?.method ?? 'GET'} ${path} after ${Date.now() - started}ms`);
   return res.json() as Promise<T>;
-}
-
-/** The request body's byte length, for the log line — the body itself is never logged. */
-function bodyBytes(init?: RequestInit): number {
-  return typeof init?.body === 'string' ? Buffer.byteLength(init.body) : 0;
 }

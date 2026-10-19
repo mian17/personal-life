@@ -54,12 +54,6 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
     const mimeType = photoMimeType(bytes, file.type);
-    // The upload's own fingerprint: the size the browser sent, what the signature
-    // says the bytes are versus what the browser claimed, and enough leading hex to
-    // name an unrecognised container (an iPhone HEIC is the expected surprise).
-    console.info(
-      `[photo] file size=${file.size} declared="${file.type}" resolved="${mimeType}" first16=${bytes.subarray(0, 16).toString('hex')}`,
-    );
     const result = await estimatePhoto(
       { base64: bytes.toString('base64'), mimeType },
       hint,
