@@ -353,6 +353,53 @@ describe('MealEditor photo door', () => {
     }
   });
 
+  it('reads the format from the bytes, so a phone photo the browser could not name still arrives typed', async () => {
+    // The regression this pins: iOS camera capture and some library picks hand over
+    // bytes with an empty `type`. Sending that empty name failed the service's mime
+    // gate, which reads to the user as "couldn't read the photo". The JPEG signature
+    // is the fact; the browser's silence is not.
+    const unnamedJpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])], 'IMG_0002.jpg', {
+      type: '',
+    });
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)(
+        [unnamedJpeg] as unknown as FileList,
+      );
+
+      expect(JSON.parse(mockCallService.mock.calls[0][2].body).mimeType).toBe('image/jpeg');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('sends an unnamed file with its type empty, so the failure names the photo, not the service', async () => {
+    // A capture the browser could not name. Labelling its bytes JPEG made Gemini
+    // reject them, which reads to the editor as an outage; the empty type now reaches
+    // the service's mime gate, whose `could-not-read` names the photo instead.
+    const unnamed = new File(['heic bytes'], 'IMG_0001.HEIC', { type: '' });
+    const harness = stateHarness();
+    mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
+    try {
+      const first = harness.renderTree();
+      const picker = find(first, FilePicker);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)(
+        [unnamed] as unknown as FileList,
+      );
+
+      expect(JSON.parse(mockCallService.mock.calls[0][2].body).mimeType).toBe('');
+      const failed = harness.renderTree();
+      expect(text(failed.props.banner)).toBe(
+        "Couldn't read that photo. Enter the meal by hand — nothing was guessed.",
+      );
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('opens manual mode empty — no invented numbers — when the photo cannot be read', async () => {
     const harness = stateHarness();
     mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });

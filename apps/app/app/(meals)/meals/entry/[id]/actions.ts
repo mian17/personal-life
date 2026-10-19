@@ -14,6 +14,7 @@ import {
   type PhotoEstimate,
   type SavedMeal,
 } from '@/lib/meal-api';
+import { isPhotoBlob, photoMimeType } from '@/lib/photo-mime';
 
 /**
  * The review editor's server actions (`SPEC-meal-capture-ui`). The browser never
@@ -46,15 +47,17 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   const file = formData.get('image');
   const hintRaw = formData.get('hint');
   const hint = typeof hintRaw === 'string' && hintRaw.trim() !== '' ? hintRaw : undefined;
-  if (!(file instanceof File) || file.size === 0) {
+  if (!isPhotoBlob(file) || file.size === 0) {
     return { readable: false, reason: 'no-image' };
   }
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    return await estimatePhoto(
-      { base64: bytes.toString('base64'), mimeType: file.type || 'image/jpeg' },
+    const mimeType = photoMimeType(bytes, file.type);
+    const result = await estimatePhoto(
+      { base64: bytes.toString('base64'), mimeType },
       hint,
     );
+    return result;
   } catch {
     return { readable: false, reason: 'service-unavailable' };
   }
