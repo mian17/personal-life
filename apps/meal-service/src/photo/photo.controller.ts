@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
 import { Principal } from '../auth/principal';
 import { EstimatePhotoDto } from './dto/estimate-photo.dto';
 import { PhotoService } from './photo.service';
@@ -29,6 +29,13 @@ export class PhotoController {
   @Post('photo')
   @HttpCode(HttpStatus.OK)
   estimate(@Principal() owner: Principal, @Body() dto: EstimatePhotoDto) {
+    // The payload's own shape, before anything decodes it: size and mime label
+    // only — never the bytes. A wrong `mimeType` or a near-empty image is
+    // diagnosable from this line alone.
+    Logger.log(
+      `photo estimate received: mimeType="${dto.mimeType}" base64Length=${dto.imageBase64?.length ?? 0} hint=${dto.hint ? 'yes' : 'no'}`,
+      PhotoController.name,
+    );
     // The principal is read here because every route's owner is bound to it
     // (`SPEC-meal-service` Code Style), and forwarded as the scope of the
     // catalog reads the estimate resolves against — a per-owner read even

@@ -375,6 +375,12 @@ export function MealEditor({
   async function onPhoto(files: FileList) {
     const file = files[0];
     if (!file) return;
+    // Browser-side fingerprint of the picker's answer: the iPhone camera/library
+    // often hands over a HEIC with an empty `type`, and the size is what tells
+    // 413 apart from a read failure.
+    console.info(
+      `[photo] picked count=${files.length} name="${file.name}" type="${file.type}" size=${file.size} lastModified=${file.lastModified}`,
+    );
     const form = new FormData();
     form.set('image', file);
     if (hint.trim() !== '') form.set('hint', hint);
@@ -388,9 +394,10 @@ export function MealEditor({
         setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
         setPhotoFailure(result.reason);
       }
-    } catch {
+    } catch (error) {
       // `estimatePhotoAction` answers a typed failure rather than throwing, so
       // this is a defensive fallback: the call never completed.
+      console.error(`[photo] action call threw: ${error instanceof Error ? error.message : String(error)}`);
       setItems([{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }]);
       setPhotoFailure('service-unavailable');
     } finally {

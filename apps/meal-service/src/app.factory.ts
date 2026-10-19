@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { json } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AuthGuard } from './auth/auth.guard';
 
@@ -20,6 +21,17 @@ export async function createApp(): Promise<INestApplication> {
     recursive: true,
   });
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Request-level diagnosis: a photo upload can die before any controller runs
+  // (413 from the ceiling below, 400 from the validation pipe, 401 from the
+  // guard), and those never reach a service log line. Path + status only.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.on('finish', () => {
+      if (res.statusCode >= 400) {
+        Logger.warn(`${req.method} ${req.url.split('?')[0]} -> ${res.statusCode}`, 'HttpReject');
+      }
+    });
+    next();
+  });
   app.use(json({ limit: JSON_BODY_LIMIT }));
   app.useGlobalGuards(new AuthGuard());
   app.useGlobalPipes(

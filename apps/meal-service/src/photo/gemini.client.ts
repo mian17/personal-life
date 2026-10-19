@@ -275,7 +275,15 @@ export class GeminiClient {
     hint?: string,
     searchTool?: SearchFood,
   ): Promise<PhotoReadResult> {
-    if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return readFailure(COULD_NOT_READ);
+    if (!IMAGE_MIME_TYPES.includes(image.mimeType)) {
+      // The mime gate's own diagnosis: what was claimed, how big the bytes were,
+      // and the signature that should have named them. No bytes, no key.
+      logger.error(
+        `photo estimate rejected: unsupported mimeType="${image.mimeType}" bytes=${image.bytes.length} signature=${signature(image.bytes)}`,
+      );
+      return readFailure(COULD_NOT_READ);
+    }
+    logger.log(`photo estimate sent: mimeType=${image.mimeType} bytes=${image.bytes.length} hint=${hint ? 'yes' : 'no'}`);
     try {
       if (searchTool === undefined) return await this.readOnce(image, hint);
       return await this.readWithSearch(image, hint, searchTool);
@@ -418,6 +426,18 @@ function readFailure(reason: PhotoFailureReason, status?: number): PhotoReadResu
   const detail = status === undefined ? '' : ` (HTTP ${status})`;
   logger.error(`photo estimate failed: ${reason}${detail}`);
   return { readable: false, reason };
+}
+
+/** A still image's own format from its magic bytes — the label its bytes deserve, for the log. */
+function signature(bytes: Buffer): string {
+  if (bytes.length < 12) return `too-short(${bytes.length})`;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return 'image/png';
+  if (bytes.subarray(0, 4).toString('latin1') === 'RIFF') return 'image/webp';
+  if (bytes.subarray(4, 8).toString('latin1') === 'ftyp') {
+    return `iso-bmff(${bytes.subarray(8, 12).toString('latin1')})`;
+  }
+  return `unknown(${bytes.subarray(0, 8).toString('hex')})`;
 }
 
 /** The identity-only JSON shape the final text turn must satisfy. */
