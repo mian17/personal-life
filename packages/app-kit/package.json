@@ -18,7 +18,7 @@
     "@life/ui": "*"
   },
   "peerDependencies": {
-    "next": "^15.2.4",
+    "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

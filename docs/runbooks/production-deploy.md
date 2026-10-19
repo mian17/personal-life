@@ -368,6 +368,18 @@ curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n
       first estimate throws while building its client (a 500 the BFF maps to
       `service-unavailable`), so photo is expected unusable until §2's trio is set;
       manual entry must still work in that state.
+- [ ] **The photo body reaches `meal-service`.** Use a *phone* photo (2–5 MB), not a
+      test fixture: the BFF's Server Action ceiling in `apps/app/next.config.mjs` is
+      what an oversized upload dies on, and it only shows at real size. The editor
+      fills with items on success. If it instead shows `Photo service is unavailable.`,
+      the body never left the BFF: check `docker compose logs app --since 2m | grep -i
+      'body exceeded'` for the ceiling, and compare that number with `JSON_BODY_LIMIT` in
+      `apps/meal-service/src/app.factory.ts` — the two must stay equal. (`meal-service`
+      logs no successful request, so an absent line there proves nothing either way.)
+- [ ] The banner names the failure: `Couldn't read that photo. Enter the meal by hand —
+      nothing was guessed.` is a photo the model refused (send a better one);
+      `Photo service is unavailable. Enter the meal by hand — nothing was guessed.` is
+      the stack.
 - [ ] `/meals` day list and saved meals render; a target day renders.
 - [ ] Cache sanity: a second identical list read is served by `redis-meal`, and the
       surface still works with `redis-meal` stopped (fail-open).
