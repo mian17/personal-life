@@ -1,4 +1,4 @@
-import { photoMimeType, signatureMimeType } from '../lib/photo-mime';
+import { isPhotoBlob, photoMimeType, signatureMimeType } from '../lib/photo-mime';
 
 /** Bytes as a camera hands them over: signature first, filler after. */
 const withSignature = (...bytes: number[]): Buffer =>
@@ -41,6 +41,25 @@ describe('signatureMimeType', () => {
   it('answers undefined for bytes it does not know, never a guess', () => {
     expect(signatureMimeType(Buffer.from('not an image at all'))).toBeUndefined();
     expect(signatureMimeType(Buffer.alloc(0))).toBeUndefined();
+  });
+});
+
+describe('isPhotoBlob', () => {
+  it('accepts a File', () => {
+    expect(isPhotoBlob(new File(['x'], 'a.jpg', { type: 'image/jpeg' }))).toBe(true);
+  });
+
+  it('accepts a bare Blob, which is what the action decoder can rebuild', () => {
+    // The guard this replaces was `instanceof File`, and the action received
+    // something it rejected — bytes plus a type is all the door needs.
+    expect(isPhotoBlob(new Blob(['x'], { type: 'image/jpeg' }))).toBe(true);
+  });
+
+  it('rejects the empty form values, so no-image keeps its meaning', () => {
+    expect(isPhotoBlob(null)).toBe(false);
+    expect(isPhotoBlob(undefined)).toBe(false);
+    expect(isPhotoBlob('a string field')).toBe(false);
+    expect(isPhotoBlob({ not: 'a blob' })).toBe(false);
   });
 });
 

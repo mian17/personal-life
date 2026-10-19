@@ -47,6 +47,21 @@ export function photoMimeType(bytes: Buffer, declared: string): string {
   return signatureMimeType(bytes) ?? declared;
 }
 
+/**
+ * Whether `value` is a photo the action can read.
+ *
+ * Not `instanceof File`: the action receives whatever Next rebuilt from the
+ * multipart part, and `instanceof` compares class identity, not shape. A `Blob`
+ * from the decoder, or a `File` from another realm, both carry the bytes — and
+ * bytes plus a type is all this door ever needs. `null` (no file part at all)
+ * and a string still fail, so `no-image` keeps its meaning.
+ */
+export function isPhotoBlob(value: unknown): value is Blob {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Partial<Blob>;
+  return typeof candidate.arrayBuffer === 'function' && typeof candidate.size === 'number';
+}
+
 function startsWith(bytes: Buffer, prefix: readonly number[]): boolean {
   return prefix.every((byte, index) => bytes[index] === byte);
 }
