@@ -384,6 +384,14 @@ export function MealEditor({
     const form = new FormData();
     form.set('image', file);
     if (hint.trim() !== '') form.set('hint', hint);
+    // What the action is being handed, as names and types only: a `null` image on the
+    // server means this key never made the trip, so this line and the action's own
+    // key dump are read together.
+    console.info(
+      `[photo] sending ${[...form.entries()]
+        .map(([key, value]) => `${key}=${value instanceof Blob ? `blob(size=${value.size},type="${value.type}")` : typeof value}`)
+        .join(', ')}`,
+    );
     setEstimating(true);
     try {
       const result = await estimatePhotoAction(form);

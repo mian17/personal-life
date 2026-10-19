@@ -48,7 +48,16 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   const hintRaw = formData.get('hint');
   const hint = typeof hintRaw === 'string' && hintRaw.trim() !== '' ? hintRaw : undefined;
   if (!isPhotoBlob(file) || file.size === 0) {
-    console.error(`[photo] no usable file: ${isPhotoBlob(file) ? `size=${file.size}` : `received ${file === null ? 'null' : typeof file}`}`);
+    // The door's own answer: which keys actually arrived, what each holds, and the
+    // form's own type. `get('image')` null with other keys present means the part
+    // was renamed in flight, not that the guard rejected its class.
+    const entries = [...formData.entries()].map(
+      ([key, value]) =>
+        `${key}=${isPhotoBlob(value) ? `blob(size=${value.size},type="${value.type}")` : `${typeof value}(${String(value).slice(0, 40)})`}`,
+    );
+    console.error(
+      `[photo] no usable file: image=${file === null ? 'null' : isPhotoBlob(file) ? `size=${file.size}` : typeof file} keys=[${entries.join(', ')}]`,
+    );
     return { readable: false, reason: 'no-image' };
   }
   try {
