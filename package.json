@@ -17,6 +17,7 @@
     "packages/db",
     "packages/nutrition",
     "apps/meal-service",
+    "packages/ops",
     "apps/pomodoro"
   ],
   "scripts": {
