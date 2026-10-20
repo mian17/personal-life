@@ -77,7 +77,7 @@ function resolveFromOutsidePackage(): Resolution[] {
   const consumerDirectory = mkdtempSync(join(tmpdir(), 'life-ops-consumer-'));
   try {
     linkPackageInto(consumerDirectory);
-    return runResolverIn(consumerDirectory);
+    return runResolverIn(consumerDirectory).map((resolution) => normalizeResolved(resolution, consumerDirectory));
   } finally {
     rmSync(consumerDirectory, { recursive: true, force: true });
   }
@@ -87,6 +87,22 @@ function linkPackageInto(consumerDirectory: string): void {
   const scopeDirectory = join(consumerDirectory, 'node_modules', '@life');
   mkdirSync(scopeDirectory, { recursive: true });
   symlinkSync(packageDirectory, join(scopeDirectory, 'ops'), 'junction');
+}
+
+/**
+ * Node realpaths a resolved target only when that target exists. With no `dist`
+ * built the answer keeps the consumer's symlink prefix, so map that prefix back
+ * onto the package and the expectation is identical built or unbuilt.
+ */
+function normalizeResolved(resolution: Resolution, consumerDirectory: string): Resolution {
+  if (resolution.resolved === undefined) return resolution;
+  for (const base of new Set([consumerDirectory, realpathSync(consumerDirectory)])) {
+    const linkPrefix = join(base, 'node_modules', '@life', 'ops');
+    if (resolution.resolved.startsWith(linkPrefix)) {
+      return { ...resolution, resolved: packageDirectory + resolution.resolved.slice(linkPrefix.length) };
+    }
+  }
+  return resolution;
 }
 
 function runResolverIn(consumerDirectory: string): Resolution[] {

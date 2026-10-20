@@ -1,6 +1,6 @@
 /**
- * The refreshing token read (SPEC-ops-agent-contract §3.5): the MCP adapter's
- * default `readToken`. A stored token still outside the skew window is handed
+ * The refreshing token read (SPEC-ops-agent-contract §3.5): the default `readToken`
+ * for both adapters — MCP and CLI wire this same function. A stored token still outside the skew window is handed
  * over untouched; one inside it is rotated once through `refresh()`, which
  * persists the rotated pair itself — this module never writes the store.
  *

@@ -6,9 +6,9 @@
  * refused grant, a throwing issuer — reads as `undefined`, and concurrent readers
  * share one rotation.
  *
- * The suite is also the boundary check: `mcp/server` gets the refreshing read,
- * an executor wired as `cli/run.ts` wires it keeps the plain store read and never
- * rotates. No test contacts the real IdP.
+ * The suite is also the boundary check: both adapters get the refreshing read, so
+ * an executor wired as `cli/run.ts` wires it rotates exactly like the MCP one. No
+ * test contacts the real IdP.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -17,10 +17,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { login } from '../src/auth/login';
 import { currentAccessToken } from '../src/auth/token-provider';
-import { readToken, readTokens, storeTokens } from '../src/auth/token-store';
+import { readTokens, storeTokens } from '../src/auth/token-store';
 import { sampleRegistry } from '../src/fixtures/sample';
 import { createMcpServer } from '../src/mcp/server';
-import { createExecutor } from '../src/transport/executor';
+import { main as runCli } from '../src/cli/run';
 import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
 import { startStubIdp, type StubIdp } from './support/stub-idp';
 
@@ -176,14 +176,25 @@ describe('the adapters', () => {
     );
   });
 
-  it('sends the stale token, and rotates nothing, on an executor wired as cli/run.ts wires it', async () => {
+  it('has the CLI wire the same provider, so its calls rotate too', async () => {
     await storeExpiringTokens();
-    const executor = createExecutor({ registry: sampleRegistry, baseUrl: api.baseUrl, readToken });
+    const stderr: string[] = [];
 
-    await executor.run('list', {});
+    const exit = await runCli({
+      argv: ['sample', 'list'],
+      service: { registry: sampleRegistry },
+      env: { ...process.env, LIFE_OPS_API_BASE: api.baseUrl },
+      stdout: () => {},
+      stderr: (line) => stderr.push(line),
+      signIn: async () => {},
+    });
 
-    expect(idp.rotations()).toBe(0);
-    expect(api.requestLog[0]?.headers['authorization']).toBe(`Bearer ${sampleApiToken}`);
+    expect(stderr).toEqual([]);
+    expect(exit).toBe(0);
+    expect(idp.rotations()).toBe(1);
+    expect(api.requestLog[0]?.headers['authorization']).toBe(
+      `Bearer ${(await readTokens())?.accessToken}`,
+    );
   });
 });
 

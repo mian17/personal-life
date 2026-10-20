@@ -26,6 +26,9 @@ interface RotationReply {
 
 const FALLBACK_EXPIRY_S = 3600;
 
+/** The rotation's own budget: a hung IdP reads as "login required" instead of wedging the call. */
+const ROTATION_DEADLINE_MS = 30_000;
+
 /** Rotates the stored refresh token; returns the fresh pair, or `undefined` when login is required. */
 export async function refresh(partial?: Partial<RefreshOptions>): Promise<StoredTokens | undefined> {
   const options = defaults(partial);
@@ -40,8 +43,13 @@ function defaults(partial?: Partial<RefreshOptions>): RefreshOptions {
     issuer: partial?.issuer ?? resolved.issuer,
     clientId: partial?.clientId ?? resolved.clientId,
     resource: partial?.resource ?? resolved.resource,
-    request: partial?.request ?? ((url, init) => fetch(url, init)),
+    request: partial?.request ?? boundedRequest,
   };
+}
+
+/** The default channel: every IdP request carries the deadline signal, so a hang aborts. */
+function boundedRequest(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(ROTATION_DEADLINE_MS) });
 }
 
 async function rotate(options: RefreshOptions, refreshToken: string): Promise<StoredTokens | undefined> {

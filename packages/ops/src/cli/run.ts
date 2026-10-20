@@ -11,8 +11,9 @@
  * and `renderFailure`, so both adapters render through `./render`.
  */
 import type { ResourceRegistry } from '../core/types';
-import { createExecutor } from '../transport/executor';
-import { clearTokens, readToken } from '../auth/token-store';
+import { createExecutor, resolveDeadlineMs } from '../transport/executor';
+import { currentAccessToken } from '../auth/token-provider';
+import { clearTokens } from '../auth/token-store';
 import { login } from '../auth/login';
 import { renderFailure, renderOpsResult } from './render';
 import { commandName, parseCallCommand } from './parse';
@@ -72,7 +73,8 @@ async function runCall(options: MainOptions): Promise<number> {
   const executor = createExecutor({
     registry: options.service.registry,
     baseUrl: apiBase(options),
-    readToken,
+    readToken: currentAccessToken,
+    deadlineMs: resolveDeadlineMs(options.env),
   });
   options.stdout(renderOpsResult(await executor.run(command.operation.kind, command.input)));
   return SUCCESS_EXIT;

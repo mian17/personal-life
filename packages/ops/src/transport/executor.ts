@@ -22,11 +22,11 @@ export interface ExecutorOptions {
   baseUrl: string;
   /** Reads the stored IdP access token; `undefined` means "run `life-ops login`". */
   readToken: () => Promise<string | undefined>;
-  /** Per-call deadline in ms; `0` (the default) waits for the service forever. */
+  /** Per-call deadline in ms; defaults to `30_000`, and `0` waits for the service forever. */
   deadlineMs?: number;
 }
 
-/** The MCP adapter's own budget per call; the CLI passes no option and stays unbounded (§3.4). */
+/** The default budget both adapters inherit (§3.4); `0` from either seam disables it. */
 const DEFAULT_DEADLINE_MS = 30_000;
 
 /**
@@ -80,7 +80,7 @@ export function createExecutor(options: ExecutorOptions): Executor {
   const endpoint: ServiceEndpoint = {
     baseUrl: options.baseUrl,
     readToken: options.readToken,
-    deadlineMs: options.deadlineMs ?? 0,
+    deadlineMs: options.deadlineMs ?? DEFAULT_DEADLINE_MS,
   };
   return {
     registry: options.registry,

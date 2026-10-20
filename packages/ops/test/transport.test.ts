@@ -3,7 +3,10 @@
  * cursor-pagination passthrough, driven against the recording stub API
  * (`test/support/stub-api.ts`). No test contacts a real service.
  */
+import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import {
   failureFromResponse,
@@ -12,14 +15,18 @@ import {
   type OpsErrorCode,
 } from '../src/transport/errors';
 import { createExecutor, type Executor } from '../src/transport/executor';
+import { main as runCli } from '../src/cli/run';
 import { sampleRegistry } from '../src/fixtures/sample';
+import { storeTokens } from '../src/auth/token-store';
 import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
 
 const OPERATION = 'sample.get';
 const OWNER_SUBJECT = 'owner-a';
 const VALID_TOKEN = sampleApiToken;
-const SHORT_DEADLINE_MS = 100;
-const SHORT_WAIT_MS = 250;
+const ONE_SECOND_MS = 1_000;
+const ONE_HOUR_MS = 3_600_000;
+/** The `ExecutorOptions.deadlineMs` default (§3.4), asserted in the rendered timeout detail. */
+const DEFAULT_DEADLINE_MS = 30_000;
 
 interface StatusCase {
   status: number;
@@ -147,12 +154,11 @@ describe('the per-call deadline', () => {
     await stub.stop();
   });
 
-  it('sends the deadline signal on its one fetch', async () => {
+  it('sends the default deadline signal on its one fetch when the adapter passes no option', async () => {
     const calls = await fetchCallsOf(() =>
-      executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN, deadlineMs: SHORT_WAIT_MS }).run(
-        'get',
-        { id: SEEDED_IDS[0] },
-      ),
+      executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN }).run('get', {
+        id: SEEDED_IDS[0],
+      }),
     );
 
     expect(calls).toHaveLength(1);
@@ -171,51 +177,60 @@ describe('the per-call deadline', () => {
   });
 
   it('keeps mapping a !response.ok reply through failureFromResponse', async () => {
-    const executor = executorWith({
-      baseUrl: stub.baseUrl,
-      token: VALID_TOKEN,
-      deadlineMs: SHORT_WAIT_MS,
-    });
+    const executor = executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN });
 
     await expect(executor.run('get', { id: 'missing-row' })).rejects.toThrow(
       'sample.get failed (notFound):',
     );
   });
 
-  it('raises timeout naming the operation and the deadline', async () => {
-    const silentApi = await startSilentApi();
+  it('defaults the deadline to 30 s when the adapter passes no option', async () => {
+    const aborted = jest.spyOn(globalThis, 'fetch').mockRejectedValue(abortError());
     try {
-      const error = await executorWith({
-        baseUrl: silentApi.baseUrl,
-        token: VALID_TOKEN,
-        deadlineMs: SHORT_DEADLINE_MS,
-      })
+      const error = await executorWith({ baseUrl: stub.baseUrl, token: VALID_TOKEN })
         .run('get', { id: SEEDED_IDS[0] })
         .catch((thrown: unknown) => thrown);
 
-      expect(error).toBeInstanceOf(OpsError);
-      expect((error as OpsError).code).toBe('timeout');
-      expect((error as OpsError).status).toBeUndefined();
       expect(renderOpsError(error as OpsError)).toBe(
-        `sample.get failed (timeout): sample.get did not answer within ${SHORT_DEADLINE_MS} ms`,
+        `sample.get failed (timeout): sample.get did not answer within ${DEFAULT_DEADLINE_MS} ms`,
       );
     } finally {
-      await silentApi.stop();
+      aborted.mockRestore();
     }
   });
 
-  it('stays in flight when the executor was built without a deadline, as the CLI builds it', async () => {
+  it('honours LIFE_OPS_DEADLINE_MS at the CLI, so a hung call fails there after it', async () => {
     const silentApi = await startSilentApi();
+    const credentialHome = mkdtempSync(join(tmpdir(), 'life-ops-cli-deadline-'));
+    const savedCredentialsPath = process.env.LIFE_OPS_CREDENTIALS_PATH;
+    process.env.LIFE_OPS_CREDENTIALS_PATH = join(credentialHome, 'credentials.json');
+    await storeTokens({
+      accessToken: VALID_TOKEN,
+      refreshToken: 'stub.refresh.token',
+      expiresAt: Date.now() + ONE_HOUR_MS,
+    });
+    const stderr: string[] = [];
     try {
-      const pending = executorWith({ baseUrl: silentApi.baseUrl, token: VALID_TOKEN }).run('get', {
-        id: SEEDED_IDS[0],
+      const exit = await runCli({
+        argv: ['sample', 'get', '--id', 'row-a'],
+        service: { registry: sampleRegistry },
+        env: { LIFE_OPS_API_BASE: silentApi.baseUrl, LIFE_OPS_DEADLINE_MS: '100' },
+        stdout: () => {},
+        stderr: (line) => stderr.push(line),
+        signIn: async () => {},
       });
 
-      expect(await settleWithin(pending, SHORT_WAIT_MS)).toBe('in flight');
+      expect(exit).toBe(1);
+      expect(stderr.join('\n')).toBe(
+        'sample.get failed (timeout): sample.get did not answer within 100 ms',
+      );
     } finally {
+      if (savedCredentialsPath === undefined) delete process.env.LIFE_OPS_CREDENTIALS_PATH;
+      else process.env.LIFE_OPS_CREDENTIALS_PATH = savedCredentialsPath;
+      rmSync(credentialHome, { recursive: true, force: true });
       await silentApi.stop();
     }
-  });
+  }, ONE_SECOND_MS);
 });
 
 interface SamplePage {
@@ -245,7 +260,7 @@ function executorWith(setup: ExecutorSetup): Executor {
 interface ExecutorSetup {
   baseUrl: string;
   token: string | undefined;
-  /** Absent is the CLI's construction: no deadline at all. */
+  /** Absent means "take the 30 s default", which is what both adapters rely on. */
   deadlineMs?: number;
 }
 
@@ -282,6 +297,13 @@ async function fetchCallsOf(call: () => Promise<unknown>): Promise<FetchCall[]> 
 }
 
 /** A loopback service that accepts the request and never answers it. */
+/** Node's shape for an aborted fetch: a `DOMException`, not an `Error`. */
+function abortError(): Error {
+  const error = new Error('The operation was aborted due to timeout');
+  error.name = 'TimeoutError';
+  return error;
+}
+
 async function startSilentApi(): Promise<StubApi> {
   const server = createServer(() => {});
   await new Promise<void>((started) => server.listen(0, '127.0.0.1', started));
@@ -294,20 +316,4 @@ function closeSilentApi(server: Server): Promise<void> {
     server.closeAllConnections();
     server.close((error) => (error === undefined ? closed() : fail(error)));
   });
-}
-
-/** Whether the call settled inside `waitMs`; a call still waiting answers `in flight`. */
-async function settleWithin(
-  call: Promise<unknown>,
-  waitMs: number,
-): Promise<'settled' | 'in flight'> {
-  const settled = call.then(
-    () => 'settled' as const,
-    () => 'settled' as const,
-  );
-  return await Promise.race([settled, waitFor(waitMs)]);
-}
-
-function waitFor(waitMs: number): Promise<'in flight'> {
-  return new Promise((resolve) => setTimeout(() => resolve('in flight'), waitMs));
 }

@@ -189,7 +189,10 @@ function callResultAnswer(request: RpcRequest, outcome: ToolOutcome): unknown {
  * The body as `structuredContent`, or `undefined` when it is neither an object nor an
  * array. A bare array is wrapped as `{ items }`: MCP types `structuredContent` as a
  * record at the root (`CallToolResultSchema`), and an array there makes a conformant SDK
- * client throw `$ZodError` instead of returning data (SPEC-ops-agent-contract §3.3).
+ * client throw `$ZodError` instead of returning data — the conformance goal of §2
+ * assumption 3 and §9 criterion 1. This narrows §3.3's "verbatim" for array bodies only;
+ * the object case is the parsed body untouched. `test/sdk-client.test.ts` and
+ * `test/mcp-lifecycle.test.ts` both pin the wrapped shape.
  */
 function structuredBodyOf(outcome: ToolOutcome): Record<string, unknown> | undefined {
   if (outcome.failed) return undefined;
