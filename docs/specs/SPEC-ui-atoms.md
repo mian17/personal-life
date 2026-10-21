@@ -22,11 +22,6 @@ for these without any visible change.
         // `disabled` forwards to the native control AND renders a disabled look:
         //   `.ui-btn[disabled]` — cursor: not-allowed + opacity 0.5 (one gated-control
         //   treatment, matching the existing .ui-switch/.ui-pill--button precedent).
-        // `invisible` is not `disabled`: it hides the control with
-        //   `.ui-invisible` (visibility: hidden) while keeping its box in the
-        //   layout, so a caller that shows and hides it does not move its
-        //   neighbours. Hidden this way it is also unfocusable and out of the
-        //   accessibility tree, which is why it cannot stand in for disabled.
 <IconButton label: string            // <button>; renders aria-label={label} — frozen text
             children: ReactNode      // the icon
             variant="default" | "ghost"
@@ -84,8 +79,8 @@ for these without any visible change.
    //   renders `.ui-status-text` alone. `invisible` adds `.ui-invisible`: the
    //   line keeps its height, so a status that appears later does not move what
    //   is around it (and an empty `<span role="status">` announces nothing).
-   //   `.ui-invisible` is the one shared utility class: `Button` and `StatusText`
-   //   each expose it as `invisible?`, and no other class hides content.
+   //   `.ui-invisible` is the one shared utility class, and `StatusText` is its
+   //   only owner: no other class hides content.
    //   `display: none` stays the app's own business — it collapses the box and is
    //   therefore the wrong tool for a slot that must not shift.
 <LocalTime dateTime: string />       // renders empty pre-hydration (locale mismatch guard)

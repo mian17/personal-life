@@ -1,9 +1,9 @@
 'use client';
 
-import { Button, Card, StatusText, Stack } from '@life/ui';
+import { Button, Card, ConfirmButton, Row, StatusText, Stack } from '@life/ui';
 import { Countdown } from './countdown';
 import { SessionPills } from './session-pills';
-import type { Durations, Phase } from './timer';
+import type { Durations, Phase, Status } from './timer';
 import { useTimer } from './use-timer';
 
 const PHASE_LABELS: Record<Phase, string> = {
@@ -18,8 +18,7 @@ export interface PomodoroPageProps {
 
 export function PomodoroPage({ durations }: PomodoroPageProps) {
   const timer = useTimer(durations);
-
-  const running = timer.status === 'running';
+  const primed = timer.status !== 'idle';
 
   return (
     <Card fill>
@@ -29,14 +28,34 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
         <SessionPills phase={timer.phase} session={timer.session} />
         {/* Both waiting-state rows stay mounted and merely lose their paint:
             unmounting either one shrinks the card, and the centred stack pulls
-            the whole read-out down by half the row it lost. */}
+            the whole read-out down by half the row it lost. The action row needs
+            none of that: every status puts a button in the same slot. */}
         <StatusText invisible={timer.status !== 'boundary'}>{timer.titles.next}</StatusText>
-        <Button ref={timer.startRef} onClick={timer.startNext} invisible={running}>
-          {startLabel(timer.nextPhase)}
-        </Button>
+        <Row>
+          {/* Reset ends the whole cycle, so it asks first — and it cannot be
+              pressed before there is anything to lose. */}
+          <ConfirmButton
+            variant="quiet"
+            message="Reset the timer and start the cycle over at session 1?"
+            onClick={timer.resetCycle}
+            disabled={!primed}
+          >
+            Reset
+          </ConfirmButton>
+          <Button ref={timer.startRef} onClick={timer.primaryAction}>
+            {primaryLabel(timer.status, timer.nextPhase)}
+          </Button>
+        </Row>
       </Stack>
     </Card>
   );
+}
+
+/** Pause and resume say what they do; a stopped timer names the phase it begins. */
+function primaryLabel(status: Status, nextPhase: Phase): string {
+  if (status === 'running') return 'Pause';
+  if (status === 'paused') return 'Resume';
+  return startLabel(nextPhase);
 }
 
 /** The button names the phase it begins, so the owner reads the next step, not just "start". */

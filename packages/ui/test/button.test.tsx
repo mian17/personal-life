@@ -84,25 +84,6 @@ describe('Button', () => {
     expect(block).toMatch(/cursor:\s*not-allowed/);
   });
 
-  it('hides with visibility, keeping the box in the layout (invisible)', () => {
-    render(<Button invisible>x</Button>);
-    const button = screen.getByRole('button');
-    expect(button.classList.contains('ui-invisible')).toBe(true);
-
-    // The rule that makes it safe: hidden, not collapsed. `display: none` would
-    // remove the box, and the caller is hiding it precisely to keep the layout
-    // from moving — the assertion is the property, not just the class name.
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-    const block = (css.match(/\.ui-invisible\s*\{([^}]*)\}/) ?? [])[1] ?? '';
-    expect(block).toMatch(/visibility:\s*hidden/);
-    expect(block).not.toMatch(/display/);
-  });
-
-  it('does not set invisible by default', () => {
-    render(<Button>x</Button>);
-    expect(screen.getByRole('button').classList.contains('ui-invisible')).toBe(false);
-  });
-
   it('merges className instead of replacing it', () => {
     render(<Button className="legacy-hook">x</Button>);
     const classes = classesOf(screen.getByRole('button'));

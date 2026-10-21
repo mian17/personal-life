@@ -10,7 +10,10 @@ import {
   clampMinutes,
   initialState,
   parseMode,
+  pause,
   remainingMs,
+  reset,
+  resume,
   serializeMode,
   start,
   startNext,
@@ -148,6 +151,61 @@ describe('tick', () => {
   });
 });
 
+describe('pause and resume', () => {
+  it('freezes the remaining time the pause instant had', () => {
+    const paused = pause(startedTimer(), START + 5 * MINUTE_MS);
+
+    expect(paused.status).toBe('paused');
+    expect(paused.endsAt).toBe(startedTimer().endsAt);
+    expect(remainingMs(paused, START + 60 * MINUTE_MS)).toBe(FOCUS_MS - 5 * MINUTE_MS);
+  });
+
+  it('spends the frozen time from the resume instant', () => {
+    const paused = pause(startedTimer(), START + 5 * MINUTE_MS);
+    const resumed = resume(paused, START + 60 * MINUTE_MS);
+
+    expect(resumed.status).toBe('running');
+    expect(resumed.endsAt).toBe(START + 60 * MINUTE_MS + (FOCUS_MS - 5 * MINUTE_MS));
+    expect(remainingMs(resumed, START + 60 * MINUTE_MS)).toBe(FOCUS_MS - 5 * MINUTE_MS);
+  });
+
+  it('ignores a pause that is not running and a resume that is not paused', () => {
+    const running = startedTimer();
+
+    expect(pause(initialState(durations), START)).toEqual(initialState(durations));
+    expect(resume(running, START)).toEqual(running);
+  });
+
+  it('survives the stored-mode round trip with the held time', () => {
+    const paused = pause(startedTimer(), START + 5 * MINUTE_MS);
+
+    expect(parseMode(serializeMode(paused, START + 9 * MINUTE_MS), { durations, now: START + 9 * MINUTE_MS })).toEqual(paused);
+  });
+
+  it('reads a paused blob written before heldMs existed as unreadable, not as zero', () => {
+    const legacy =
+      '{"phase":"focus","session":1,"status":"paused","remainingMs":600000,"endsAt":0}';
+
+    expect(parseMode(legacy, { durations, now: START })).toEqual(initialState(durations));
+  });
+});
+
+describe('reset', () => {
+  it('starts the whole cycle over from the first focus', () => {
+    const ended = tick(startedTimer(), START + FOCUS_MS);
+
+    expect(reset(ended)).toEqual(initialState(durations));
+    expect(reset(pause(startedTimer(), START + MINUTE_MS))).toEqual(initialState(durations));
+  });
+
+  it('keeps the chosen durations, since they are a preference', () => {
+    const chosen: Durations = { focus: 40, short: 8, long: 20 };
+    const ended = tick(start(initialState(chosen), START), START + 40 * MINUTE_MS);
+
+    expect(reset(ended)).toEqual(initialState(chosen));
+  });
+});
+
 describe('applyDurations', () => {
   it('sizes the phase that starts next and leaves a running deadline alone', () => {
     const chosen: Durations = { focus: 40, short: 8, long: 20 };
@@ -201,6 +259,7 @@ describe('mode codec', () => {
         status: 'running',
         remainingMs: FOCUS_MS - 2 * MINUTE_MS,
         endsAt: START + FOCUS_MS,
+        heldMs: 0,
       }),
     );
     expect(parseMode(stored, { durations, now: START + 3 * MINUTE_MS })).toEqual(running);

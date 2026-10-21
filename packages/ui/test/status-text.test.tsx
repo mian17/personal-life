@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { StatusText } from '../src/components/status-text';
 
@@ -55,6 +57,14 @@ describe('StatusText', () => {
     const status = screen.getByRole('status');
     expect(classesOf(status)).toEqual(['ui-invisible', 'ui-status-text']);
     expect(status.textContent).toBe('Next: Short break');
+
+    // The rule that makes it safe: hidden, not collapsed. `display: none` would
+    // remove the box, and the caller is hiding it precisely to keep the layout
+    // from moving — the assertion is the property, not just the class name.
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
+    const block = (css.match(/\.ui-invisible\s*\{([^}]*)\}/) ?? [])[1] ?? '';
+    expect(block).toMatch(/visibility:\s*hidden/);
+    expect(block).not.toMatch(/display/);
   });
 
   it('forwards arbitrary attributes', () => {

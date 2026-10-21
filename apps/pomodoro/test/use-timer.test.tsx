@@ -32,13 +32,13 @@ function Probe(): null {
   return null;
 }
 
-/** The page keeps the button mounted and hidden while running; this probe keeps the
- *  unmounted shape so the hook's ref is still proven to tolerate null. */
+/** The page keeps the control mounted in a hidden row while running; this probe keeps
+ *  the unmounted shape so the hook's ref is still proven to tolerate null. */
 function StartButtonProbe(): ReactElement | null {
   hook = useTimer(durations);
   if (hook.status === 'running') return null;
   return (
-    <Button ref={hook.startRef} onClick={hook.startNext}>
+    <Button ref={hook.startRef} onClick={hook.primaryAction}>
       Start
     </Button>
   );
@@ -197,7 +197,7 @@ describe('useTimer boundary announcement', () => {
     jest.useFakeTimers();
     try {
       mountUnderStrictMode();
-      act(() => hook.startNext());
+      act(() => hook.primaryAction());
       act(() => {
         jest.advanceTimersByTime(FOCUS_MS + 1_000);
       });

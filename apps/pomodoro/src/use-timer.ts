@@ -7,7 +7,10 @@ import {
   applyDurations,
   initialState,
   parseMode,
+  pause,
   remainingMs,
+  reset,
+  resume,
   serializeMode,
   startNext,
   tick,
@@ -56,8 +59,18 @@ export interface Timer {
   nextPhase: Phase;
   remainingMs: number;
   titles: TimerTitles;
-  startNext(): void;
+  /** Start, pause or resume — whichever the current status makes the one useful control. */
+  primaryAction(): void;
+  /** Back to the first focus of a fresh cycle; the caller confirms it first. */
+  resetCycle(): void;
   startRef: RefObject<HTMLButtonElement | null>;
+}
+
+/** One control for start, pause and resume, so the card never grows a third button. */
+function primaryActionFor(status: Status, setState: SetTimerState): () => void {
+  if (status === 'running') return () => setState((current) => pause(current, Date.now()));
+  if (status === 'paused') return () => setState((current) => resume(current, Date.now()));
+  return () => setState((current) => startNext(current, Date.now()));
 }
 
 /** Owns the running timer: the pure machine below, plus the wall clock, the stored mode, its boundary effects. */
@@ -81,10 +94,12 @@ export function useTimer(durations: Durations): Timer {
     nextPhase,
     remainingMs: remainingMs(state, Date.now()),
     titles,
-    startNext: () => {
+    // The Start gesture unlocks the beep; a resume inside it needs nothing.
+    primaryAction: () => {
       primeBoundaryAudio();
-      setState((current) => startNext(current, Date.now()));
+      primaryActionFor(state.status, setState)();
     },
+    resetCycle: () => setState((current) => reset(current)),
     startRef,
   };
 }

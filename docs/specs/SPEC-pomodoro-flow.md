@@ -9,8 +9,8 @@ consumer (the owner): the phase boundary becomes a visible, deliberate step. The
 settings move, the toolbar, the pills, and reload resume are acceptance criteria of
 that one flow, not independently shippable capabilities — none has a consumer or data
 of its own. This spec supersedes `docs/specs/SPEC-pomodoro.md` where they conflict
-(auto-advance, pause/reset, "Session N of 4" text, durations on the timer page,
-reload behavior); that spec remains the base contract for the workspace shape, the
+(auto-advance, "Session N of 4" text, durations on the timer page, reload
+behavior); that spec remains the base contract for the workspace shape, the
 preference cookies, and the mount route.
 
 All work follows AGENTS.md Contract 1 (Shared UI Contract): every visual element maps
@@ -51,9 +51,9 @@ User stories / acceptance criteria:
 - `/pomodoro` carries the same toolbar as `/todos`: a feedback icon and a settings
   icon linking to `/pomodoro/settings`.
 
-Out of scope (intent, verbatim): pause and reset controls; skipping a break; browser
-`Notification` permission; tree/forest visuals; a nav entry pointing at `/pomodoro`;
-editing durations while a phase runs (see Assumption 5).
+Out of scope: skipping a phase; browser `Notification` permission; tree/forest
+visuals; a nav entry pointing at `/pomodoro`; editing durations while a phase runs
+(see Assumption 5), which is what `/pomodoro/settings` is for.
 
 ## 2. Tech Stack
 
@@ -115,8 +115,8 @@ packages/ui/src/components/stack.tsx # + align?: 'start' | 'center' | 'end' (ups
 docs/specs/SPEC-ui-blocks.md         # Stack align, spec-first, same change
 packages/ui/test/…                   # Stack align unit test
 apps/app/test/e2e/pomodoro.spec.ts   # rewritten for the boundary flow (its own
-                                     # selectors; Pause/Reset/"Session N of 4" copy
-                                     # ceases to exist)
+                                     # selectors: Start/Pause/Resume/Reset
+                                     # (pomodoro owns this copy)
 docs/specs/SPEC-pomodoro-flow.md     # this spec
 ```
 
@@ -194,7 +194,7 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 - **E2E (Playwright, prod harness)** — `apps/app/test/e2e/pomodoro.spec.ts`
   rewritten around the boundary flow, pomodoro-owned selectors only (the frozen e2e
   surface outside pomodoro is read-only; this module's own copy may change because
-  `Pause`/`Reset`/`Session N of 4` cease to exist). Cases: one boundary end to end
+  the flow now owns `Start`/`Pause`/`Resume`/`Reset`). Cases: one boundary end to end
   through the real UI (held `00:00`, `Next: Short break`, `Start break` focused,
   nothing counts until pressed); the beep (an init script stubs `AudioContext` and
   asserts one oscillator start at the boundary) and the flashing title (`page.title()`
@@ -224,7 +224,7 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 - **Never do:** raw HTML elements (`button`, `input`, `form` with styling, …) as
   visuals in `apps/*`; inline `style=` or ad-hoc CSS recreating primitive visuals;
   raw hex/rgb/px/rem outside `packages/ui/src/styles/tokens.css`; auto-advancing past
-  a boundary (the machine has no such transition); pause, reset, or skip controls;
+  a boundary (the machine has no such transition); skipping a phase;
   browser `Notification` or any sound asset/dependency (WebAudio only); visible
   "Session N of 4" text; a nav entry pointing at `/pomodoro`; editing frozen e2e
   selectors; a DB migration for `feedback.app`; touching `public/manifest-*.json` or
@@ -249,20 +249,35 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    both axes of a `Card fill` panel that spans the viewport-height page body, with
    no "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active, and
    a focused `Start focus`.
-6. Pressing that button moves nothing: the digits, the phase line and the pills keep
-   their exact position when the phase starts. The button and the `Next:` line are
-   never unmounted — they stay in the card as rows and only lose their paint
-   (`invisible`, `visibility: hidden`), because a row that leaves re-centres the
-   card and shifts everything by half its height. `apps/pomodoro`'s
-   `test/pomodoro-page.test.tsx` holds this: after the click both rows are the same
-   nodes, in the same slots, and the stack still has the same number of children.
-7. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
+6. Pressing a control moves nothing: the digits, the phase line and the pills keep
+   their exact position when a phase starts. No card row is ever unmounted — the
+   `Next:` line stays in place and only loses its paint (`invisible`,
+   `visibility: hidden`), because a row that leaves re-centres the card and shifts
+   everything by half its height. The action row needs no paint trick of its own:
+   every status puts a button in the same slot, so its box never changes.
+   `apps/pomodoro`'s `test/pomodoro-page.test.tsx` holds this: the same row and the
+   same button node serve start, pause and resume, in the same stack slot, with the
+   stack keeping the same number of children.
+
+7. **Pause** freezes the remaining time and **Resume** spends it from the resume
+   instant, so a long pause costs the phase nothing. One control carries the whole
+   lifecycle: `Pause` while running, `Resume` while paused, `Start focus` /
+   `Start break` when no phase is in flight.
+
+8. **Reset** asks first (`ConfirmButton`, `window.confirm`) and then puts the whole
+   cycle back at session 1, focus, full focus length, stopped; the confirm message
+   names that consequence. Declining leaves the timer untouched. Reset is disabled
+   before the cycle has begun, since there is nothing to lose yet.
+
+9. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to
    `/pomodoro/settings`, and the feedback icon submits with `app: 'pomodoro'`
    (`FEEDBACK_APPS` includes `'pomodoro'`).
-8. Contract 1 mechanical greps are clean for `apps/pomodoro`; `Stack` gained only
-   the `align` prop (documented in `docs/specs/SPEC-ui-blocks.md` with a test); no
-   frozen e2e selector outside pomodoro changed.
+
+10. Contract 1 mechanical greps are clean for `apps/pomodoro`; `Stack` gained only
+    the `align` prop (documented in `docs/specs/SPEC-ui-blocks.md` with a test); no
+    frozen e2e selector outside pomodoro changed.
+
 
 ## 9. Assumptions
 
@@ -279,8 +294,8 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    time that passed while the page was gone (the prior spec's "no countdown accuracy
    while the tab is closed" out-of-scope item is superseded by this intent).
 4. **Reload of a running phase resumes and keeps counting down** ("resumes the
-   remaining time"), not paused. A reload at a boundary or at idle restores the same
-   screen.
+   remaining time"), not paused; a phase paused before the reload comes back paused,
+   holding the same remaining time. A reload at a boundary or at idle restores the
 5. **Duration edits take effect at the next phase start.** Editing durations while a
    phase runs is out of scope; the minimal defined behavior is that the running
    phase's deadline is untouched and the new value sizes the phase that starts after
@@ -335,4 +350,4 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    phase kind.
 3. When a phase's deadline passed while the tab was closed for hours, land on the
    boundary screen as assumed (Assumption 3) — or is that a case for a "restart this
-   phase" affordance later (not pause/reset, which stay out of scope)?
+   phase" affordance later?

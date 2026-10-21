@@ -6,7 +6,7 @@ export type StatusTextSize = 'default' | 'display';
 export interface StatusTextProps extends ComponentPropsWithRef<'span'> {
   /** `'display'` scales a short read-out, e.g. a countdown's digits. */
   size?: StatusTextSize;
-  /** Hide the line but keep its height reserved; see `Button`'s `invisible`. */
+  /** Hide the line but keep its height reserved (`visibility: hidden`, not `display: none`). */
   invisible?: boolean;
 }
 
