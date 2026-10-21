@@ -24,6 +24,14 @@ const TITLE_FLASH_INTERVAL_MS = 1000;
 
 const MODE_STORAGE_KEY = 'pomodoro-mode';
 
+/**
+ * The deadline whose end has already been sounded. The beep belongs to the phase
+ * end, not to the mount, so a card that mounts again on the same `00:00` —
+ * returning from settings, a reload — stays silent; a deadline that passed while
+ * the page was gone was never sounded, and still is.
+ */
+const ANNOUNCED_DEADLINE_KEY = 'pomodoro-announced';
+
 const PINNED_TITLE = 'Pomodoro';
 
 const PHASE_NAMES: Record<Phase, string> = {
@@ -150,29 +158,42 @@ function useInitialFocus(startRef: RefObject<HTMLButtonElement | null>) {
   }, [startRef]);
 }
 
-/** Entering the boundary is announced once: a beep, the button focus, and a flashing tab title. */
+/** Entering the boundary announces once: a beep, the button focus, and a flashing tab title. */
 function useBoundaryAnnouncement(
   state: TimerState,
   startRef: RefObject<HTMLButtonElement | null>,
 ) {
-  const announcedDeadline = useRef<number | null>(null);
-
   useEffect(() => {
     if (state.status !== 'boundary') {
       document.title = PINNED_TITLE;
       return;
     }
 
-    // One deadline, one announcement: StrictMode replays this effect on mount, and a boundary
-    // the page was reloaded onto must not sound again when the replay reaches it.
-    if (announcedDeadline.current !== state.endsAt) {
-      announcedDeadline.current = state.endsAt;
-      playBoundaryBeep();
-      startRef.current?.focus();
-    }
+    startRef.current?.focus();
+    beepOnce(state.endsAt);
 
     return flashTitle(nextPhaseTitle(phaseStartedNext(state)));
   }, [state, startRef]);
+}
+
+/**
+ * The beep is the phase end, not the mount. The marker outlives the page, so the
+ * StrictMode replay and every later mount of the same `00:00` skip it.
+ */
+function beepOnce(endsAt: number): void {
+  if (readAnnouncedDeadline() === endsAt) return;
+
+  writeAnnouncedDeadline(endsAt);
+  playBoundaryBeep();
+}
+
+function readAnnouncedDeadline(): number | null {
+  const stored = Number(window.localStorage.getItem(ANNOUNCED_DEADLINE_KEY));
+  return Number.isFinite(stored) ? stored : null;
+}
+
+function writeAnnouncedDeadline(endsAt: number): void {
+  window.localStorage.setItem(ANNOUNCED_DEADLINE_KEY, String(endsAt));
 }
 
 /** Alternates the tab between its pinned name and the next phase, until the returned cleanup stops it. */

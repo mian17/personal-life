@@ -1,5 +1,5 @@
 import { StrictMode, type ReactElement } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { Button } from '@life/ui';
 import { DEFAULT_DURATIONS, MINUTE_MS } from '../src/timer';
 import { useTimer, type Timer } from '../src/use-timer';
@@ -175,6 +175,22 @@ describe('useTimer boundary announcement', () => {
 
     expect(hook.status).toBe('boundary');
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Start' }));
+  });
+
+  it('stays silent when the card mounts again on the boundary it already sounded', () => {
+    // The owner leaves for the settings page and comes back: the same dead
+    // phase, the same stored `endsAt`, a fresh mount. It was already announced,
+    // so the second card must not beep again.
+    storeMode(runningMode(Date.now() - 1_000));
+    mountUnderStrictMode();
+    expect(hook.status).toBe('boundary');
+    expect(oscillatorsStarted).toBe(1);
+
+    cleanup();
+    mountUnderStrictMode();
+
+    expect(hook.status).toBe('boundary');
+    expect(oscillatorsStarted).toBe(1);
   });
 
   it('sounds one beep for a boundary the running phase reached', () => {

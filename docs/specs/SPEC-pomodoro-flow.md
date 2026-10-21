@@ -296,7 +296,11 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    end boundary).
 8. **Beep** = one short (~180 ms, 880 Hz sine) `OscillatorNode` tone at each phase
    end, from an `AudioContext` created on the Start gesture; silent no-op where
-   WebAudio is unavailable. **Title flash** = `document.title` alternating `Pomodoro`
+   WebAudio is unavailable. **One deadline sounds once**, remembered in
+   `localStorage` (`pomodoro-announced`): the beep belongs to the phase end, not to
+   the mount, so walking to `/pomodoro/settings` and back — or reloading — on the
+   same `00:00` is silent, while a deadline that passed with the page gone was
+   never heard and still sounds. **Title flash** = `document.title` alternating `Pomodoro`
    and the `Next: …` line once per second while at a boundary, restored to `Pomodoro`
    when the next phase starts.
 9. **Toolbar shape** follows the `TodosNav`/`MealsNav` precedent exactly:
