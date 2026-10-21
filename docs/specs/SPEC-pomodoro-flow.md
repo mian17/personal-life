@@ -37,9 +37,10 @@ User stories / acceptance criteria:
   the next phase named ("Next: Short break"), a beep, a flashing tab title, and
   `Start break` focused. No countdown runs until I press it.
 - The screen reads the phase name, the digits, and four session pills — centred on
-  both axes of a page that fills the viewport, not a short card near the top. No
-  "Session N of 4" text; the pill row carries `aria-label="Session N of 4"` for
-  screen readers.
+  both axes of a page that fills the viewport, inside the same `--panel` card the
+  rest of the page uses, so the timer keeps its surface instead of sitting flat on
+  the page background. No "Session N of 4" text; the pill row carries
+  `aria-label="Session N of 4"` for screen readers.
 - The tab title keeps the countdown from drifting: a backgrounded tab counts down at
   wall-clock speed (~4× drift is gone).
 - A reload mid-phase shows the remaining time and keeps counting down; a phase whose
@@ -63,11 +64,11 @@ editing durations while a phase runs (see Assumption 5).
   and `/pomodoro/settings`; `apps/pomodoro` stays framework-agnostic React. No Next
   upgrade is part of this task.
 - `@life/ui` (workspace) — all visuals: `ListShell` (with its `fill` full-height
-  mode), `Stack`, `Button`, `StatusText`, `Pill`, `ManagerBlock`, `SettingsBlock`,
-  `SettingsRow`, `ThemeToggle`, `FeedbackNavItem`, `IconLink`, `Input`. `Stack`
-  gains one upstream prop (`align`) — spec-first in `docs/specs/SPEC-ui-blocks.md`
-  (where `Stack` is specified) in the same change; the layout revision adds its
-  block-axis twin `vAlign`.
+  mode), `Stack`, `Card`, `Button`, `StatusText`, `Pill`, `ManagerBlock`,
+  `SettingsBlock`, `SettingsRow`, `ThemeToggle`, `FeedbackNavItem`, `IconLink`,
+  `Input`. `Stack` gains one upstream prop (`align`) spec-first in
+  `docs/specs/SPEC-ui-blocks.md` (where `Stack` is specified) in the same change;
+  the layout revision adds its block-axis twin `vAlign`.
 - `@life/app-kit` (workspace) — `readPrefNumber` / `setPrefNumber` (existing),
   `settingsHref`.
 - `@life/shared` (workspace) — `FEEDBACK_APPS` gains `'pomodoro'`; `feedback.app` is
@@ -155,15 +156,19 @@ pure logic in `timer.ts` with no React imports. One real snippet in the repo's v
 export function PomodoroPage({ durations }: { durations: Durations }) {
   const timer = useTimer(durations);
   return (
-    <Stack align="center" vAlign="center">
-      <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
-      <Countdown remainingMs={timer.remainingMs} />
-      <SessionPills session={timer.session} />
-      {timer.status !== 'running' && (
-        <Button ref={startRef} onClick={timer.startNext}>
-          {startLabel(timer.nextPhase)}
-        </Button>
-      )}
+    <Stack vAlign="center">
+      <Card>
+        <Stack align="center">
+          <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
+          <Countdown remainingMs={timer.remainingMs} />
+          <SessionPills session={timer.session} />
+          {timer.status !== 'running' && (
+            <Button ref={startRef} onClick={timer.startNext}>
+              {startLabel(timer.nextPhase)}
+            </Button>
+          )}
+        </Stack>
+      </Card>
     </Stack>
   );
 }
@@ -244,8 +249,9 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 4. The same e2e's reload case passes: mid-phase reload shows the remaining time
    (e.g. 2 fake-minutes in → ~`23:00`) and the countdown continues.
 5. The timer screen shows phase name, digits, and four session pills, centred on
-   both axes of a viewport-height page, with no "Session N of 4" text; first use
-   shows `25:00`, `Focus`, no pills active, and a focused `Start focus`.
+   both axes of a viewport-height page and still on a `Card` (`--panel` surface),
+   with no "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active,
+   and a focused `Start focus`.
 6. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to
    `/pomodoro/settings`, and the feedback icon submits with `app: 'pomodoro'`
@@ -303,8 +309,10 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
     shell already owns the full-viewport column (`.ui-page.ui-list-shell--fill`,
     `.ui-list-shell__body`), `/todos/matrix` already relies on it, and the app-side
     visual language stays untouched. The body slot is a definite-height grid, so
-    the `vAlign` stack distributes inside it. The fill page's bottom padding still
-    reserves `--space-5` for a fab this page does not render, so the block sits
+    the `vAlign` stack distributes inside it. The `Card` stays: it owns the
+    `--panel` surface (`--bg` is the page behind it), and dropping it leaves the
+    timer reading as bare text with no panel. The fill page's bottom padding still
+    reserves `--space-5` for a fab this page does not render, so the card sits
     ~half that above the geometric centre — accepted rather than forking the shared
     shell rule.
 
