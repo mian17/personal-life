@@ -130,8 +130,8 @@ describe('PomodoroPage', () => {
     }
   });
 
-  it('cannot reset a boundary in the first session', () => {
-    storeMode({ phase: 'short', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+  it('cannot reset the first session\'s focus once it sits at its boundary', () => {
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
 
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
@@ -139,12 +139,35 @@ describe('PomodoroPage', () => {
     expect(resetButton()).toHaveProperty('disabled', true);
   });
 
-  it('can reset a boundary once the cycle has moved past its first session', () => {
-    storeMode({ phase: 'short', session: 2, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+  it('can reset a break boundary, because a finished focus is progress', () => {
+    storeMode({ phase: 'short', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
 
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
     expect(resetButton()).toHaveProperty('disabled', false);
+  });
+
+  it('can reset a break in progress once it is paused', () => {
+    storeMode({ phase: 'long', session: 4, status: 'paused', remainingMs: 5 * MINUTE_MS, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(resetButton()).toHaveProperty('disabled', false);
+  });
+
+  it('cannot reset a break while it counts down', () => {
+    storeMode({
+      phase: 'short',
+      session: 1,
+      status: 'running',
+      remainingMs: 4 * MINUTE_MS,
+      endsAt: Date.now() + 4 * MINUTE_MS,
+    });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(resetButton()).toHaveProperty('disabled', true);
   });
 
   it('keeps the next-phase line mounted, hidden, once a phase starts', () => {

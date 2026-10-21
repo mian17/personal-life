@@ -269,11 +269,12 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    names that consequence. Declining leaves the timer untouched.
 
    Reset is offered only where there is progress to discard: a **paused** phase,
-   whose frozen time is exactly what would be thrown away, or a **boundary** past
-   the first session. It is never offered while a phase counts down — a confirm
-   dialog ticking underneath is a trap — and not in the first session, where the
-   cycle already sits at its own start. `apps/pomodoro`'s `resetAllowed` holds the
-   rule and `test/pomodoro-page.test.tsx` pins all four states.
+   whose frozen time is exactly what would be thrown away, or a rest past the first
+   session's focus — a finished focus is progress, so a whole break qualifies. It is
+   never offered while a phase counts down — a confirm dialog ticking underneath is
+   a trap — and not on the first session's focus, where the cycle already sits at
+   its own start. `apps/pomodoro`'s `resetAllowed` holds the rule and
+   `test/pomodoro-page.test.tsx` pins every state it admits or refuses.
 
 9. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to

@@ -18,7 +18,7 @@ export interface PomodoroPageProps {
 
 export function PomodoroPage({ durations }: PomodoroPageProps) {
   const timer = useTimer(durations);
-  const canReset = resetAllowed(timer.status, timer.session);
+  const canReset = resetAllowed(timer.status, timer.phase, timer.session);
 
   return (
     <Card fill>
@@ -53,13 +53,14 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
 
 /**
  * Reset discards progress, so it is offered only where progress exists: a paused
- * phase (the frozen time is exactly what would be thrown away) or a boundary past
- * the first session. Not while a phase runs — a confirm dialog counting down
- * underneath is a trap — and not in the first session, where the cycle is already
- * at its start.
+ * phase (the frozen time is exactly what would be thrown away), or a rest past the
+ * first session's focus — a whole break counts, since a break is progress too. Not
+ * while a phase runs — a confirm dialog counting down underneath is a trap — and
+ * not on the first session's focus, where the cycle is already at its start.
  */
-function resetAllowed(status: Status, session: number): boolean {
-  return status === 'paused' || (status === 'boundary' && session > 1);
+function resetAllowed(status: Status, phase: Phase, session: number): boolean {
+  if (status === 'paused') return true;
+  return status !== 'running' && (phase !== 'focus' || session > 1);
 }
 
 /** Pause and resume say what they do; a stopped timer names the phase it begins. */
