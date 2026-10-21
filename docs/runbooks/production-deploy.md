@@ -435,14 +435,14 @@ curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:3002/pomodoro/setti
 ### Per-route PWA identity
 
 ```bash
-for m in notes todos meals feedback; do
+for m in notes todos meals feedback pomodoro; do
   printf '%s ' "$m"; curl -fsS "http://127.0.0.1:3002/manifest-$m.json" | head -c 60; echo
 done
 ```
 
-- [ ] All four manifests answer with their own `id`/`start_url`/`scope` (`/notes`,
-      `/todos`, `/meals`, `/feedback`), and a signed-out visit to each returns to that
-      same route.
+- [ ] All five manifests answer with their own `id`/`start_url`/`scope` (`/notes`,
+      `/todos`, `/meals`, `/feedback`, `/pomodoro`), and a signed-out visit to each
+      returns to that same route.
 - [ ] Hard-reload before concluding against a stale cached shell.
 
 ## 8. Steady state

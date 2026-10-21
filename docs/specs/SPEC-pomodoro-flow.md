@@ -109,6 +109,10 @@ apps/pomodoro/test/timer.test.ts     # unit: boundary semantics, deadline math
 apps/app/app/pomodoro/page.tsx       # mount route + NavBar trailing (PomodoroNav)
 apps/app/app/pomodoro/pomodoro-nav.tsx  # FeedbackNavItem + IconLink settingsHref('/pomodoro')
 apps/app/app/pomodoro/settings/page.tsx # NEW: ManagerBlock, three durations + ThemeToggle
+apps/app/app/pomodoro/layout.tsx     # PWA identity (routeLayoutMetadata), pass-through
+apps/app/public/manifest-pomodoro.json  # id/start_url/scope = /pomodoro
+apps/app/public/icon-pomodoro.png    # generated 512x512, hourglass on --amber
+apps/app/lib/auth/gate.ts            # PUBLIC_EXACT += the two pomodoro assets
 apps/app/app/pomodoro/actions.ts     # existing setPomodoroDurations server action
 packages/shared/src/index.ts         # FEEDBACK_APPS += 'pomodoro'
 packages/ui/src/components/stack.tsx # + align?: 'start' | 'center' | 'end' (upstream)
@@ -220,7 +224,7 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 - **Ask first:** any `@life/ui` change beyond the `Stack align` prop; the
   `FEEDBACK_APPS` / feedback-service vocabulary; any touch to the frozen e2e selector
   surface outside pomodoro; adding any dependency; anything touching data
-  directories, secrets, or ports; PWA manifest work; widening or replacing the
+  directories, secrets, or ports; widening or replacing the
   commands in §3.
 - **Never do:** raw HTML elements (`button`, `input`, `form` with styling, …) as
   visuals in `apps/*`; inline `style=` or ad-hoc CSS recreating primitive visuals;
@@ -228,7 +232,7 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
   a boundary (the machine has no such transition); skipping a phase;
   browser `Notification` or any sound asset/dependency (WebAudio only); visible
   "Session N of 4" text; a nav entry pointing at `/pomodoro`; editing frozen e2e
-  selectors; a DB migration for `feedback.app`; touching `public/manifest-*.json` or
+  selectors; a DB migration for `feedback.app`; touching another route's `public/manifest-*.json` or
   `viewport.themeColor`; inventing build commands.
 
 ## 8. Success Criteria
@@ -285,6 +289,12 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 10. Contract 1 mechanical greps are clean for `apps/pomodoro`; `Stack` gained only
     the `align` prop (documented in `docs/specs/SPEC-ui-blocks.md` with a test); no
     frozen e2e selector outside pomodoro changed.
+11. `/pomodoro` carries its own PWA identity: `manifest-pomodoro.json`
+   (`id`/`start_url`/`scope` all `/pomodoro`) linked from a pass-through
+   `app/pomodoro/layout.tsx`, a generated `icon-pomodoro.png` (512×512) it declares,
+   both fetchable without a session, and `apps/app/test/manifests.test.ts` +
+   `apps/app/test/gate.test.ts` cover the entry. No other route's manifest, no
+   `viewport.themeColor`, no root manifest.
 
 
 ## 9. Assumptions

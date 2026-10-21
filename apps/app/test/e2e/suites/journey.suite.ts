@@ -176,6 +176,11 @@ export function registerJourney(options: JourneyOptions): void {
         'href',
         '/manifest-meals.json',
       );
+      await page.goto('/pomodoro');
+      await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+        'href',
+        '/manifest-pomodoro.json',
+      );
     });
   });
 }

@@ -4,6 +4,7 @@ import { metadata as notesMetadata } from '@/app/notes/layout';
 import { metadata as todosMetadata } from '@/app/todos/layout';
 import { metadata as feedbackMetadata } from '@/app/feedback/layout';
 import { metadata as mealsMetadata } from '@/app/(meals)/meals/layout';
+import { metadata as pomodoroMetadata } from '@/app/pomodoro/layout';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const readManifest = (file: string) =>
@@ -46,12 +47,22 @@ describe('per-route PWA manifests', () => {
     expect(meals.icons[0].src).toBe('/icon-meals.png');
   });
 
+  it('gives /pomodoro its own identity', () => {
+    const pomodoro = readManifest('manifest-pomodoro.json');
+    expect(pomodoro.id).toBe('/pomodoro');
+    expect(pomodoro.start_url).toBe('/pomodoro');
+    expect(pomodoro.scope).toBe('/pomodoro');
+    expect(pomodoro.short_name).toBe('Pomodoro');
+    expect(pomodoro.icons[0].src).toBe('/icon-pomodoro.png');
+  });
+
   it('ships every icon the per-route manifests declare', () => {
     const manifests = [
       'manifest-notes.json',
       'manifest-todos.json',
       'manifest-meals.json',
       'manifest-feedback.json',
+      'manifest-pomodoro.json',
     ];
     const missingIcons = manifests.flatMap((manifest) =>
       readManifest(manifest)
@@ -62,7 +73,13 @@ describe('per-route PWA manifests', () => {
   });
 
   it('ships a byte-distinct icon per route', () => {
-    const files = ['icon-notes.png', 'icon-todos.png', 'icon-meals.png', 'icon-feedback.png'];
+    const files = [
+      'icon-notes.png',
+      'icon-todos.png',
+      'icon-meals.png',
+      'icon-feedback.png',
+      'icon-pomodoro.png',
+    ];
     const bodies = files.map((file) => fs.readFileSync(path.join(publicDir, file)).toString('base64'));
     expect(new Set(bodies).size).toBe(files.length);
   });
@@ -72,5 +89,6 @@ describe('per-route PWA manifests', () => {
     expect(todosMetadata.manifest).toBe('/manifest-todos.json');
     expect(feedbackMetadata.manifest).toBe('/manifest-feedback.json');
     expect(mealsMetadata.manifest).toBe('/manifest-meals.json');
+    expect(pomodoroMetadata.manifest).toBe('/manifest-pomodoro.json');
   });
 });

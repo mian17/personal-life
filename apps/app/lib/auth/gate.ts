@@ -24,10 +24,12 @@ const PUBLIC_EXACT = new Set([
   '/manifest-todos.json',
   '/manifest-feedback.json',
   '/manifest-meals.json',
+  '/manifest-pomodoro.json',
   '/icon-notes.png',
   '/icon-todos.png',
   '/icon-feedback.png',
   '/icon-meals.png',
+  '/icon-pomodoro.png',
   '/icon.svg',
 ]);
 export function isPublicPath(pathname: string): boolean {

@@ -133,10 +133,12 @@ describe('public paths', () => {
       '/manifest-todos.json',
       '/manifest-feedback.json',
       '/manifest-meals.json',
+      '/manifest-pomodoro.json',
       '/icon-notes.png',
       '/icon-todos.png',
       '/icon-feedback.png',
       '/icon-meals.png',
+      '/icon-pomodoro.png',
       '/icon.svg',
       '/favicon.ico',
     ]) {

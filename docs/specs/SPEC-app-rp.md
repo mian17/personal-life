@@ -128,6 +128,10 @@ apps, and an unadorned path (e.g. an error page) declares none.
   `id` / `start_url` / `scope` all `/todos`.
 - **`/meals`:** serves `apps/app/public/manifest-meals.json` with
   `id` / `start_url` / `scope` all `/meals`.
+- **`/feedback`:** serves `apps/app/public/manifest-feedback.json` with
+  `id` / `start_url` / `scope` all `/feedback`.
+- **`/pomodoro`:** serves `apps/app/public/manifest-pomodoro.json` with
+  `id` / `start_url` / `scope` all `/pomodoro`.
 - **No root manifest:** `apps/app/public/manifest.json` is removed and the root layout
   declares no `manifest`. A root manifest with no `scope` defaults to the whole origin,
   which made every install resolve to the root app (`/` → `/notes`); per the Web App
@@ -138,15 +142,16 @@ apps, and an unadorned path (e.g. an error page) declares none.
 - **Public access:** the manifest files are public — fetchable with no session
   (the gate serves them like `/icon.svg`).
 - **Apple install metadata:** each segment layout emits `apple-mobile-web-app-capable`
-  (`yes`) and `apple-mobile-web-app-title` ("Notes" / "Todos" / "Meals") via
+  (`yes`) and `apple-mobile-web-app-title` ("Notes" / "Todos" / "Meals" / "Feedback" /
+ "Pomodoro") via
   `routeLayoutMetadata(manifest, title, icon)`, so iOS shows a standalone Home Screen web
   app with a route-specific name. iOS ignores SVG for the Home Screen, so each route
   declares its own PNG `apple-touch-icon` (`/icon-notes.png` / `/icon-todos.png` /
-  `/icon-meals.png` / `/icon-feedback.png`, 512×512) and the same PNG as its manifest
-  icon. The four icons are generated, not hand-drawn: `apps/app/scripts/generate-icons.mjs`
+  `/icon-meals.png` / `/icon-feedback.png` / `/icon-pomodoro.png`, 512×512) and the same PNG as its manifest
+  icon. The five icons are generated, not hand-drawn: `apps/app/scripts/generate-icons.mjs`
   renders each route's Lucide glyph (`text-align-start`, `check`, `utensils`,
-  `message-square-text`) as a white stroke on the route's full-bleed background colour,
-  centred at roughly half the canvas.
+  `message-square-text`, `hourglass`) as a white stroke on the route's full-bleed
+  background colour, centred at roughly half the canvas.
 - **Mechanism:** nested `manifest.ts` file-convention routes are **NOT used** — in the
   installed Next.js the `manifest` metadata convention is anchored to the app root, so a
   colocated `app/<segment>/manifest.ts` is not a route. The verified mechanism is a

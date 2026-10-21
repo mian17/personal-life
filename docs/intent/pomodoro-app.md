@@ -24,6 +24,13 @@
 Assumed defaults unless corrected: 25 / 5 / 15 minutes, 4 sessions per cycle, all three
 durations editable on the page.
 
+## Scope additions (owner-approved after confirmation)
+
+- **2026-10-21 — per-route PWA identity for `/pomodoro`.** The owner asked for a
+  `manifest-pomodoro.json` + `icon-pomodoro.png`, reversing the "PWA manifest changes"
+  out-of-scope line above. Both frozen-surface rules still apply everywhere else: no
+  other route's manifest, and no `viewport.themeColor`.
+
 ## Confirmation
 
 Confirmed: yes — the user explicitly answered "yes" to the six-line restate above
