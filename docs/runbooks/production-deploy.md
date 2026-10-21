@@ -157,7 +157,7 @@ Every other variable compose interpolates (names only):
 
 Two more reach containers through `env_file` without a compose default, so they are not in
 the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path) and
-`OWNER_LOGIN` (app access gate, `apps/app/middleware.ts:45`).
+`OWNER_LOGIN` (app access gate, `apps/app/middleware.ts:42`).
 
 - [ ] All seven fail-fast names are set in `.env`.
 - [ ] Five master keys generated and verified as 32 decoded bytes, each distinct.

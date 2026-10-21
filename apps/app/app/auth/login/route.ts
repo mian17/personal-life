@@ -46,6 +46,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return identityUnavailable();
   }
 
+  // The dev-stack flag decides the cookie's `Secure` attribute: reading it here
+  // (not inside the cookie helper) keeps the decision at request time, because
+  // `next build` bakes `NODE_ENV` into the chunk while this flag stays runtime.
+  const secure = process.env.APP_DEV_SKIP_ACCESS_GATE !== '1';
   const returnTo = sanitizeReturnTo(req.nextUrl.searchParams.get('returnTo'));
   const res = NextResponse.redirect(attempt.url, { status: 303 });
   res.cookies.set(
@@ -56,7 +60,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       codeVerifier: attempt.codeVerifier,
       ...(returnTo ? { returnTo } : {}),
     }),
-    loginAttemptCookieOptions(),
+    loginAttemptCookieOptions(secure),
   );
   return res;
 }

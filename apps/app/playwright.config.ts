@@ -5,8 +5,9 @@ import { E2E_OWNER } from './test/e2e/config';
  * Playwright config for the cross-service login flow.
  *
  * The spec runs against the *production* build of the app (identity + access
- * gates active) with the dev IdP, because Task 8's middleware gate is skipped
- * under `NODE_ENV=development`. `globalSetup` builds and launches idp,
+ * gates active) with the dev IdP; the dev harness (`playwright.dev.config.ts`)
+ * runs the same specs against `next dev`, where the dev-stack flag
+ * (`APP_DEV_SKIP_ACCESS_GATE=1`) skips the access gate. `globalSetup` builds and launches idp,
  * note-service, and the app; `globalTeardown` stops them.
  *
  * `extraHTTPHeaders` supplies the Tailscale login header the real proxy would

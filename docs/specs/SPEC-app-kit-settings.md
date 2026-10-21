@@ -113,8 +113,9 @@ reference in a client bundle).
 - **Value encoding:** `'on' | 'off'` (internal `PrefValue`; not exported). The public
   surface is `boolean` — `readPref` returns it, `setPref` accepts it. Any value other
   than exactly `'on'` reads as OFF, so a corrupted/legacy cookie degrades safely.
-- **Attributes:** `path: '/'`, `sameSite: 'lax'`, `secure: process.env.NODE_ENV ===
-  'production'`, `maxAge: 365 * 24 * 60 * 60` (one year — long-lived; the user's
+- **Attributes:** `path: '/'`, `sameSite: 'lax'`, `secure` from the caller (the
+  dev-stack flag `APP_DEV_SKIP_ACCESS_GATE=1`; `NODE_ENV` is never consulted),
+  `maxAge: 365 * 24 * 60 * 60` (one year — long-lived; the user's
   preference is durable and the cookie is refreshed on each write).
 - **`httpOnly: true`** — chosen deliberately. The value is not secret, but **only the
   server reads it** (the route gate and the settings page render server-side), so

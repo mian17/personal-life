@@ -22,7 +22,7 @@ describe('setPref', () => {
       path: '/',
       sameSite: 'lax',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       maxAge: 365 * 24 * 60 * 60,
     });
   });
@@ -42,26 +42,30 @@ describe('setPref', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
   });
 
-  it('marks the cookie secure only in production', async () => {
-    const previous = process.env.NODE_ENV;
+  it('drops Secure only on the dev stack, never because of NODE_ENV', async () => {
+    const previousFlag = env.APP_DEV_SKIP_ACCESS_GATE;
+    const previousNodeEnv = env.NODE_ENV;
     try {
       env.NODE_ENV = 'production';
-      await setPref('matrix', true);
-      expect(mockSet).toHaveBeenLastCalledWith(
-        'pref_matrix',
-        'on',
-        expect.objectContaining({ secure: true }),
-      );
-
-      env.NODE_ENV = 'test';
+      env.APP_DEV_SKIP_ACCESS_GATE = '1';
       await setPref('matrix', true);
       expect(mockSet).toHaveBeenLastCalledWith(
         'pref_matrix',
         'on',
         expect.objectContaining({ secure: false }),
       );
+
+      delete env.APP_DEV_SKIP_ACCESS_GATE;
+      await setPref('matrix', true);
+      expect(mockSet).toHaveBeenLastCalledWith(
+        'pref_matrix',
+        'on',
+        expect.objectContaining({ secure: true }),
+      );
     } finally {
-      env.NODE_ENV = previous;
+      env.NODE_ENV = previousNodeEnv;
+      if (previousFlag === undefined) delete env.APP_DEV_SKIP_ACCESS_GATE;
+      else env.APP_DEV_SKIP_ACCESS_GATE = previousFlag;
     }
   });
 });

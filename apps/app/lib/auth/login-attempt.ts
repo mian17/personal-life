@@ -69,14 +69,12 @@ export function decodeLoginAttempt(value: string | undefined): LoginAttempt | un
   }
 }
 
-export function loginAttemptCookieOptions(
-  isProduction: boolean = process.env.NODE_ENV === 'production',
-) {
+export function loginAttemptCookieOptions(secure: boolean) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     path: LOGIN_ATTEMPT_PATH,
-    secure: isProduction,
+    secure,
     maxAge: LOGIN_ATTEMPT_TTL_S,
   };
 }

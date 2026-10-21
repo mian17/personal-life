@@ -23,6 +23,9 @@ export async function setPrefNumber<K extends string>(name: K, value: number): P
 
 async function writePref<K extends string>(name: K, raw: string): Promise<void> {
   const store = await cookies();
-  store.set(prefCookieName(name), raw, preferenceCookieAttributes());
+  // The dev-stack flag is read here, at the write site: cookie helpers take a
+  // plain boolean, so `NODE_ENV` (inlined by `next build`) can never decide it.
+  const secure = process.env.APP_DEV_SKIP_ACCESS_GATE !== '1';
+  store.set(prefCookieName(name), raw, preferenceCookieAttributes(secure));
   revalidatePath('/', 'layout');
 }

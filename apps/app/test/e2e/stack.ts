@@ -225,10 +225,13 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     // The browser origin the harness drives; byte-identical to one of the IdP's
     // registered redirect URIs.
     OIDC_APP_REDIRECT_URI: `${origin}/auth/callback`,
-    // Production build only: the access gate is exercised for real (Next sets
-    // x-forwarded-host and the context sends tailscale-user-login). In dev the
-    // access gate is skipped by contract, so OWNER_LOGIN is irrelevant.
-    ...(cfg.mode === 'production' ? { OWNER_LOGIN: E2E_OWNER } : {}),
+    // The access gate is skipped and cookies drop `Secure` only on the dev
+    // stack, marked by this flag (NODE_ENV cannot mark it: `next build` forces
+    // production). Production mode leaves it unset and exercises the gate for
+    // real: Next sets x-forwarded-host and the context sends tailscale-user-login.
+    ...(cfg.mode === 'production'
+      ? { OWNER_LOGIN: E2E_OWNER }
+      : { APP_DEV_SKIP_ACCESS_GATE: '1' }),
   };
 }
 

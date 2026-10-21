@@ -16,7 +16,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest): Promise<NextResponse> {
   await destroySession(req.cookies.get(SESSION_COOKIE)?.value);
 
+  // The dev-stack flag decides `Secure` on the cleared cookie (see the login route).
+  const secure = process.env.APP_DEV_SKIP_ACCESS_GATE !== '1';
   const res = NextResponse.redirect(buildIdpLogoutUrl(getIdpIssuer()), { status: 303 });
-  res.cookies.set(SESSION_COOKIE, '', clearedCookieOptions());
+  res.cookies.set(SESSION_COOKIE, '', clearedCookieOptions(secure));
   return res;
 }

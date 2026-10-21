@@ -8,9 +8,10 @@ import { devPorts } from './test/e2e/config';
  * Run separately from the production harness because `next dev` and `next build`
  * share `apps/app/.next`. `npm run test:e2e -w apps/app` runs both in sequence.
  *
- * The access gate is skipped in dev by contract, so no tailscale header is sent
- * (dev has no Tailscale header anyway); the identity login wall is exercised for
- * real, exactly as the human hits it.
+ * The access gate is skipped on the dev stack by the `APP_DEV_SKIP_ACCESS_GATE=1`
+ * flag (set by `stack.ts`), so no tailscale header is sent (dev has no Tailscale
+ * header anyway); the identity login wall is exercised for real, exactly as the
+ * human hits it.
  */
 export default defineConfig({
   testDir: './test/e2e/dev',

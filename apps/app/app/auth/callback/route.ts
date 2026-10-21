@@ -29,11 +29,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     ? NextResponse.redirect(absoluteUrl(req, outcome.returnTo ?? '/'), { status: 303 })
     : new NextResponse(outcome.message, { status: outcome.status });
 
+  // The dev-stack flag decides `Secure` on both cookies (see the login route).
+  const secure = process.env.APP_DEV_SKIP_ACCESS_GATE !== '1';
+
   // The attempt is single-use regardless of outcome.
-  res.cookies.set(LOGIN_ATTEMPT_COOKIE, '', { ...loginAttemptCookieOptions(), maxAge: 0 });
+  res.cookies.set(LOGIN_ATTEMPT_COOKIE, '', { ...loginAttemptCookieOptions(secure), maxAge: 0 });
 
   if (outcome.ok) {
-    res.cookies.set(SESSION_COOKIE, outcome.sessionId, sessionCookieOptions());
+    res.cookies.set(SESSION_COOKIE, outcome.sessionId, sessionCookieOptions(secure));
   }
   return res;
 }

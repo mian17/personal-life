@@ -4,7 +4,39 @@
  * same-origin absolute path — the sanitizer is the single gate.
  */
 
-import { sanitizeReturnTo, encodeLoginAttempt, decodeLoginAttempt, type LoginAttempt } from '@/lib/auth/login-attempt';
+import {
+  LOGIN_ATTEMPT_COOKIE,
+  LOGIN_ATTEMPT_PATH,
+  LOGIN_ATTEMPT_TTL_S,
+  loginAttemptCookieOptions,
+  sanitizeReturnTo,
+  encodeLoginAttempt,
+  decodeLoginAttempt,
+  type LoginAttempt,
+} from '@/lib/auth/login-attempt';
+
+describe('login attempt cookie options', () => {
+  it('is HttpOnly, SameSite=Lax, scoped to /auth, short-lived', () => {
+    const opts = loginAttemptCookieOptions(false);
+    expect(opts.httpOnly).toBe(true);
+    expect(opts.sameSite).toBe('lax');
+    expect(opts.path).toBe(LOGIN_ATTEMPT_PATH);
+    expect(opts.maxAge).toBe(LOGIN_ATTEMPT_TTL_S);
+    expect(LOGIN_ATTEMPT_COOKIE).toBe('app_auth_attempt');
+  });
+
+  it('sets Secure from the boolean it is given, not from NODE_ENV', () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previous = env.NODE_ENV;
+    try {
+      env.NODE_ENV = 'production';
+      expect(loginAttemptCookieOptions(true).secure).toBe(true);
+      expect(loginAttemptCookieOptions(false).secure).toBe(false);
+    } finally {
+      env.NODE_ENV = previous;
+    }
+  });
+});
 
 describe('sanitizeReturnTo', () => {
   it.each(['/', '/todos', '/todos?done=false', '/notes/abc'])('accepts %j', (value) => {

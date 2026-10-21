@@ -7,14 +7,15 @@ export function prefCookieName<K extends string>(name: K): string {
 
 /**
  * The attributes every preference cookie carries: one year, same site, never
- * readable from JavaScript, secure once the app runs in production.
+ * readable from JavaScript, `Secure` when the caller says so (the dev-stack flag
+ * decides — `NODE_ENV` does not, since `next build` forces it to production).
  */
-export function preferenceCookieAttributes() {
+export function preferenceCookieAttributes(secure: boolean) {
   return {
     path: '/',
     sameSite: 'lax' as const,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     maxAge: 365 * 24 * 60 * 60,
   };
 }
