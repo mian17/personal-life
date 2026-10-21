@@ -35,7 +35,7 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
           {/* Reset ends the whole cycle, so it asks first — and it cannot be
               pressed before there is anything to lose. */}
           <ConfirmButton
-            variant="quiet"
+            variant="ghost"
             message="Reset the timer and start the cycle over at session 1?"
             onClick={timer.resetCycle}
             disabled={!primed}
