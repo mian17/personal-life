@@ -22,6 +22,7 @@ COPY packages/shared ./packages/shared
 COPY packages/nutrition ./packages/nutrition
 COPY packages/ui ./packages/ui
 COPY packages/app-kit ./packages/app-kit
+COPY apps/pomodoro ./apps/pomodoro
 COPY apps/app ./apps/app
 
 RUN npm run build -w @life/shared \
@@ -53,6 +54,9 @@ COPY --from=build /repo/packages/ui/src ./node_modules/@life/ui/src
 # Same safety net for @life/app-kit (source-shipped and transpiled into the bundle).
 COPY --from=build /repo/packages/app-kit/package.json ./node_modules/@life/app-kit/package.json
 COPY --from=build /repo/packages/app-kit/src ./node_modules/@life/app-kit/src
+# Same safety net for @life/pomodoro (source-shipped and transpiled into the bundle).
+COPY --from=build /repo/apps/pomodoro/package.json ./node_modules/@life/pomodoro/package.json
+COPY --from=build /repo/apps/pomodoro/src ./node_modules/@life/pomodoro/src
 
 EXPOSE 3002
 CMD ["node", "apps/app/server.js"]
