@@ -111,7 +111,7 @@ apps/app/app/pomodoro/pomodoro-nav.tsx  # FeedbackNavItem + IconLink settingsHre
 apps/app/app/pomodoro/settings/page.tsx # NEW: ManagerBlock, three durations + ThemeToggle
 apps/app/app/pomodoro/layout.tsx     # PWA identity (routeLayoutMetadata), pass-through
 apps/app/public/manifest-pomodoro.json  # id/start_url/scope = /pomodoro
-apps/app/public/icon-pomodoro.png    # generated 512x512, hourglass on --amber
+apps/app/public/icon-pomodoro.png    # generated 512x512, hourglass on iOS red
 apps/app/lib/auth/gate.ts            # PUBLIC_EXACT += the two pomodoro assets
 apps/app/app/pomodoro/actions.ts     # existing setPomodoroDurations server action
 packages/shared/src/index.ts         # FEEDBACK_APPS += 'pomodoro'

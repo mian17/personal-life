@@ -21,7 +21,7 @@ const ICONS = [
   { file: 'icon-todos.png', color: '#34c759', icon: 'check' },
   { file: 'icon-meals.png', color: '#ff9500', icon: 'utensils' },
   { file: 'icon-feedback.png', color: '#af52de', icon: 'message-square-text' },
-  { file: 'icon-pomodoro.png', color: '#f2b64c', icon: 'hourglass' },
+  { file: 'icon-pomodoro.png', color: '#ff3b30', icon: 'hourglass' },
 ];
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
