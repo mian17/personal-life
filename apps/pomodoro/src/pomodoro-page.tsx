@@ -19,18 +19,21 @@ export interface PomodoroPageProps {
 export function PomodoroPage({ durations }: PomodoroPageProps) {
   const timer = useTimer(durations);
 
+  const running = timer.status === 'running';
+
   return (
     <Card fill>
       <Stack align="center">
         <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
         <Countdown remainingMs={timer.remainingMs} />
         <SessionPills phase={timer.phase} session={timer.session} />
-        {timer.status === 'boundary' && <StatusText>{timer.titles.next}</StatusText>}
-        {timer.status !== 'running' && (
-          <Button ref={timer.startRef} onClick={timer.startNext}>
-            {startLabel(timer.nextPhase)}
-          </Button>
-        )}
+        {/* Both waiting-state rows stay mounted and merely lose their paint:
+            unmounting either one shrinks the card, and the centred stack pulls
+            the whole read-out down by half the row it lost. */}
+        <StatusText invisible={timer.status !== 'boundary'}>{timer.titles.next}</StatusText>
+        <Button ref={timer.startRef} onClick={timer.startNext} invisible={running}>
+          {startLabel(timer.nextPhase)}
+        </Button>
       </Stack>
     </Card>
   );

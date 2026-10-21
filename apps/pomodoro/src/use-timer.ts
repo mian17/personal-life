@@ -141,7 +141,8 @@ function useModeSaved(state: TimerState) {
 
 /**
  * First paint lands on the only control, so the owner starts without tabbing.
- * A restored `running` phase renders no button, and the ref answers null.
+ * A restored `running` phase keeps that control mounted but invisible, and focus
+ * on a `visibility: hidden` element is a no-op, so nothing is grabbed.
  */
 function useInitialFocus(startRef: RefObject<HTMLButtonElement | null>) {
   useEffect(() => {

@@ -32,7 +32,8 @@ function Probe(): null {
   return null;
 }
 
-/** The page's shape: the button renders only while no phase is running, and the hook owns its ref. */
+/** The page keeps the button mounted and hidden while running; this probe keeps the
+ *  unmounted shape so the hook's ref is still proven to tolerate null. */
 function StartButtonProbe(): ReactElement | null {
   hook = useTimer(durations);
   if (hook.status === 'running') return null;

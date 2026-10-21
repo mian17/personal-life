@@ -50,6 +50,13 @@ describe('StatusText', () => {
     expect(screen.getByRole('status').getAttribute('aria-live')).toBe('off');
   });
 
+  it('reserves its height while invisible (invisible)', () => {
+    render(<StatusText invisible>Next: Short break</StatusText>);
+    const status = screen.getByRole('status');
+    expect(classesOf(status)).toEqual(['ui-invisible', 'ui-status-text']);
+    expect(status.textContent).toBe('Next: Short break');
+  });
+
   it('forwards arbitrary attributes', () => {
     render(
       <StatusText className="x" data-extra="1">

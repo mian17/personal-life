@@ -249,11 +249,18 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    both axes of a `Card fill` panel that spans the viewport-height page body, with
    no "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active, and
    a focused `Start focus`.
-6. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
+6. Pressing that button moves nothing: the digits, the phase line and the pills keep
+   their exact position when the phase starts. The button and the `Next:` line are
+   never unmounted — they stay in the card as rows and only lose their paint
+   (`invisible`, `visibility: hidden`), because a row that leaves re-centres the
+   card and shifts everything by half its height. `apps/pomodoro`'s
+   `test/pomodoro-page.test.tsx` holds this: after the click both rows are the same
+   nodes, in the same slots, and the stack still has the same number of children.
+7. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to
    `/pomodoro/settings`, and the feedback icon submits with `app: 'pomodoro'`
    (`FEEDBACK_APPS` includes `'pomodoro'`).
-7. Contract 1 mechanical greps are clean for `apps/pomodoro`; `Stack` gained only
+8. Contract 1 mechanical greps are clean for `apps/pomodoro`; `Stack` gained only
    the `align` prop (documented in `docs/specs/SPEC-ui-blocks.md` with a test); no
    frozen e2e selector outside pomodoro changed.
 

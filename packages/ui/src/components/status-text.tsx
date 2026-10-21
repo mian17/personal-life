@@ -6,10 +6,13 @@ export type StatusTextSize = 'default' | 'display';
 export interface StatusTextProps extends ComponentPropsWithRef<'span'> {
   /** `'display'` scales a short read-out, e.g. a countdown's digits. */
   size?: StatusTextSize;
+  /** Hide the line but keep its height reserved; see `Button`'s `invisible`. */
+  invisible?: boolean;
 }
 
 export function StatusText({
   size = 'default',
+  invisible,
   className,
   children,
   ...rest
@@ -21,6 +24,7 @@ export function StatusText({
       className={cx(
         'ui-status-text',
         size === 'display' && 'ui-status-text--display',
+        invisible && 'ui-invisible',
         className,
       )}
       {...rest}

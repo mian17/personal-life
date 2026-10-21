@@ -621,3 +621,16 @@ intentional border; `--filter` stays borderless. */
   opacity: 0.5;
 }
 
+
+/* ----------------------------------------------------------- Invisible */
+
+/*
+ * Kept in the layout, not painted: `visibility: hidden`, never `display: none`.
+ * A block that appears and disappears inside a centred stack re-centres the
+ * stack around the gap, so the rest of the content jumps by half its height.
+ * Hiding it this way reserves the box, and `hidden` elements are also skipped
+ * by focus and the accessibility tree.
+ */
+.ui-invisible {
+  visibility: hidden;
+}
