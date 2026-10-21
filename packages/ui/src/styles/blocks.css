@@ -742,18 +742,6 @@
   justify-items: end;
 }
 
-/* Distribution of the rows on the block axis, for a stack that is taller than its
-   content (the full-height /pomodoro screen). `safe` is load-bearing: plain
-   `center` clips the overflow above the scroll origin, unreachable; `safe center`
-   falls back to `start` when the content does not fit. `start` needs no rule. */
-.ui-stack--v-center {
-  align-content: safe center;
-}
-
-.ui-stack--v-end {
-  align-content: safe end;
-}
-
 /* --------------------------------------------------------------- Row */
 
 /* Horizontal companion to Stack: a flex row (wraps) with the same token gap

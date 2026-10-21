@@ -453,6 +453,15 @@ intentional border; `--filter` stays borderless. */
   padding: var(--space-0-9);
 }
 
+/* Opt-in full-height panel (Card `fill`): the card is the screen, so it takes the
+   height its parent hands it and centres its content in that box. `place-content`
+   with `safe` keeps an over-tall body scrollable from its first row instead of
+   clipping it above the scroll origin. */
+.ui-card--fill {
+  display: grid;
+  place-content: safe center;
+}
+
 /* ------------------------------------------------------- StatusText */
 
 .ui-status-text {

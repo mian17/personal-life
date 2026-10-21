@@ -37,10 +37,10 @@ User stories / acceptance criteria:
   the next phase named ("Next: Short break"), a beep, a flashing tab title, and
   `Start break` focused. No countdown runs until I press it.
 - The screen reads the phase name, the digits, and four session pills — centred on
-  both axes of a page that fills the viewport, inside the same `--panel` card the
-  rest of the page uses, so the timer keeps its surface instead of sitting flat on
-  the page background. No "Session N of 4" text; the pill row carries
-  `aria-label="Session N of 4"` for screen readers.
+  both axes of a card that fills the viewport-height page body, so the `--panel`
+  surface spans the screen instead of hugging a short block of text. No
+  "Session N of 4" text; the pill row carries `aria-label="Session N of 4"` for
+  screen readers.
 - The tab title keeps the countdown from drifting: a backgrounded tab counts down at
   wall-clock speed (~4× drift is gone).
 - A reload mid-phase shows the remaining time and keeps counting down; a phase whose
@@ -67,8 +67,7 @@ editing durations while a phase runs (see Assumption 5).
   mode), `Stack`, `Card`, `Button`, `StatusText`, `Pill`, `ManagerBlock`,
   `SettingsBlock`, `SettingsRow`, `ThemeToggle`, `FeedbackNavItem`, `IconLink`,
   `Input`. `Stack` gains one upstream prop (`align`) spec-first in
-  `docs/specs/SPEC-ui-blocks.md` (where `Stack` is specified) in the same change;
-  the layout revision adds its block-axis twin `vAlign`.
+  `docs/specs/SPEC-ui-blocks.md` (where `Stack` is specified) in the same change.
 - `@life/app-kit` (workspace) — `readPrefNumber` / `setPrefNumber` (existing),
   `settingsHref`.
 - `@life/shared` (workspace) — `FEEDBACK_APPS` gains `'pomodoro'`; `feedback.app` is
@@ -156,20 +155,18 @@ pure logic in `timer.ts` with no React imports. One real snippet in the repo's v
 export function PomodoroPage({ durations }: { durations: Durations }) {
   const timer = useTimer(durations);
   return (
-    <Stack vAlign="center">
-      <Card>
-        <Stack align="center">
-          <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
-          <Countdown remainingMs={timer.remainingMs} />
-          <SessionPills session={timer.session} />
-          {timer.status !== 'running' && (
-            <Button ref={startRef} onClick={timer.startNext}>
-              {startLabel(timer.nextPhase)}
-            </Button>
-          )}
-        </Stack>
-      </Card>
-    </Stack>
+    <Card fill>
+      <Stack align="center">
+        <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
+        <Countdown remainingMs={timer.remainingMs} />
+        <SessionPills session={timer.session} />
+        {timer.status !== 'running' && (
+          <Button ref={startRef} onClick={timer.startNext}>
+            {startLabel(timer.nextPhase)}
+          </Button>
+        )}
+      </Stack>
+    </Card>
   );
 }
 ```
@@ -249,9 +246,9 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 4. The same e2e's reload case passes: mid-phase reload shows the remaining time
    (e.g. 2 fake-minutes in → ~`23:00`) and the countdown continues.
 5. The timer screen shows phase name, digits, and four session pills, centred on
-   both axes of a viewport-height page and still on a `Card` (`--panel` surface),
-   with no "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active,
-   and a focused `Start focus`.
+   both axes of a `Card fill` panel that spans the viewport-height page body, with
+   no "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active, and
+   a focused `Start focus`.
 6. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to
    `/pomodoro/settings`, and the feedback icon submits with `app: 'pomodoro'`
@@ -301,20 +298,21 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 10. **`Stack align`** is the single upstream gap ("centred"), added as
     `align?: 'start' | 'center' | 'end'` (default unchanged) in `packages/ui`,
     spec-first in `SPEC-ui-blocks.md` where `Stack` lives — a prop, not a new
-    primitive. Vertical centring adds the block-axis twin `vAlign` on the same
-    terms; it is `align-content: safe center`, because plain `center` in a grid
-    that cannot fit its rows pushes the first row above the scroll origin, where
-    it cannot be scrolled back to.
-11. **Full height comes from `ListShell fill`, not from pomodoro CSS**: the page
-    shell already owns the full-viewport column (`.ui-page.ui-list-shell--fill`,
-    `.ui-list-shell__body`), `/todos/matrix` already relies on it, and the app-side
-    visual language stays untouched. The body slot is a definite-height grid, so
-    the `vAlign` stack distributes inside it. The `Card` stays: it owns the
-    `--panel` surface (`--bg` is the page behind it), and dropping it leaves the
-    timer reading as bare text with no panel. The fill page's bottom padding still
-    reserves `--space-5` for a fab this page does not render, so the card sits
-    ~half that above the geometric centre — accepted rather than forking the shared
-    shell rule.
+    primitive.
+11. **`Card fill` is the full-height opt-in, not page CSS and not a stretched
+    spacer.** The card is the screen, so the card takes the height: `Card` gains
+    `fill?: boolean`, which makes `.ui-card` a grid and centres its body with
+    `place-content: safe center` (`safe`, because plain `center` on a grid that
+    cannot fit its rows pushes the first row above the scroll origin, where it
+    cannot be scrolled back to). Height comes from the existing `ListShell fill`
+    column (`.ui-page.ui-list-shell--fill`, `.ui-list-shell__body`), which
+    `/todos/matrix` already uses, so the app-side visual language is untouched.
+    Centring the *stack* instead (a `vAlign` prop) was tried first and does not
+    work: grid rows are content-sized, so centring distributes the leftover space
+    around a card that never stretches. The fill page's bottom padding still
+    reserves `--space-5` for a fab this page does not render, so the card is that
+    much shorter than the viewport — accepted rather than forking the shared shell
+    rule.
 
 ## 10. Open Questions
 

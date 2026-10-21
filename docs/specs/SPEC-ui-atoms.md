@@ -61,11 +61,14 @@ for these without any visible change.
    //   control, not a label (TagPicker's tag toggles). `disabled`/`buttonType`
    //   apply only there; the interactive chip never renders onRemove (nesting a
    //   button inside a button is invalid HTML).
-<Card>children</Card>                // generic panel surface atom (token values match the
-                                   //   legacy .note surface); no legacy class
-                                   //   counterpart in the shipped app — the `.note`
-                                   //   surface+row are owned by ListItem, whose `li`
-                                   //   bore the class (see SPEC-ui-blocks)
+<Card fill?="false|true">children</Card>  // generic panel surface atom (token values match
+                                         //   the legacy .note surface); no legacy class
+                                         //   counterpart in the shipped app — the `.note`
+                                         //   surface+row are owned by ListItem, whose `li`
+                                         //   bore the class (see SPEC-ui-blocks). `fill`
+                                         //   makes the card the screen: it becomes a grid
+                                         //   taking the height its parent gives it, content
+                                         //   centred via `place-content: safe center`
 <StatusText role="status" aria-live="polite"
             size="default" | "display">children</StatusText> // owns .editor-status
    // size="display" adds `.ui-status-text--display` (font-size: var(--space-3))
