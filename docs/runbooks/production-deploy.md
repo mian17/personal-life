@@ -415,6 +415,23 @@ curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n
       alongside the `enc.v1.` payload, so `SELECT description FROM feedback` must still
       never leave the envelope; the status column is the only readable one added here.
 
+### Pomodoro
+
+```bash
+curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:3002/pomodoro"
+curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:3002/pomodoro/settings"
+```
+
+- [ ] Both answer `200` (signed-out visit redirects to the login route, same as
+  every other protected page — it is not public).
+- [ ] `/pomodoro` card fills the viewport, timer centred; `Start focus` starts it
+  and the action row does not move.
+- [ ] Settings page persists durations across a reload (stored as `pref_*` cookies,
+  no migration, no new env name).
+- [ ] Ships inside the `app` image — `apps/app/Dockerfile` copies
+  `apps/pomodoro` in its build stage. Without that COPY the app image fails with
+  `Module not found: Can't resolve '@life/pomodoro'`.
+
 ### Per-route PWA identity
 
 ```bash
