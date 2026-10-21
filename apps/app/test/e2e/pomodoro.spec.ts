@@ -53,9 +53,10 @@ test.describe('pomodoro timer', () => {
     await stubAudioContext(page);
     await openPomodoro(page);
 
-    // The controls the boundary card replaced are gone, not merely hidden.
+    // Nothing to pause or discard before the cycle begins: the primary control names
+    // the phase it starts, and the reset beside it has nothing to give up.
     await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Reset' })).toHaveCount(0);
+    await expect(resetButton(page)).toBeDisabled();
     await expect(page.getByText(/^Session \d of 4$/)).toHaveCount(0);
 
     await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES));
@@ -73,6 +74,10 @@ test.describe('pomodoro timer', () => {
     await page.clock.runFor(SHORT_BREAK_MINUTES * MINUTE_MS);
     await expectBoundary(page, 'Short break');
     await expectStartedOscillators(page, 1);
+
+    // A finished focus is progress, so the reset is live here even though the break
+    // it unlocks has not been started.
+    await expect(resetButton(page)).toBeEnabled();
 
     // The press is the only way forward, and it begins the break at its whole length.
     await startButton(page, 'Short break').click();
@@ -130,6 +135,47 @@ test.describe('pomodoro timer', () => {
 
     await startButton(page, 'Focus').click();
     await expectCountdownSeconds(page, minutesToSeconds(CHOSEN_MINUTES.focus));
+  });
+
+  test('pause holds the digits and resume spends only what is left', async ({ page }) => {
+    await openPomodoro(page);
+    await startButton(page, 'Focus').click();
+
+    await page.clock.runFor(5 * MINUTE_MS);
+    await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES - 5));
+
+    await pauseButton(page).click();
+    const held = await readCountdownSeconds(page);
+
+    // A paused phase spends nothing, however long the page sits there.
+    await page.clock.runFor(3 * MINUTE_MS);
+    await expectCountdownSeconds(page, held);
+
+    // Resume spends from the instant it is pressed, not from where the clock had run to.
+    await resumeButton(page).click();
+    await page.clock.runFor(MINUTE_MS);
+    await expectCountdownSeconds(page, held - minutesToSeconds(1));
+  });
+
+  test('reset asks first, then starts the cycle over', async ({ page }) => {
+    await openPomodoro(page);
+    await startButton(page, 'Focus').click();
+    await page.clock.runFor(5 * MINUTE_MS);
+    await pauseButton(page).click();
+    const held = await readCountdownSeconds(page);
+
+    // A dismissed confirm leaves the paused phase exactly where it was.
+    page.once('dialog', (dialog) => void dialog.dismiss());
+    await resetButton(page).click();
+    await expectCountdownSeconds(page, held);
+
+    // Accepting it returns the cycle to its start, stopped, with nothing left to discard.
+    page.once('dialog', (dialog) => void dialog.accept());
+    await resetButton(page).click();
+    await expect(phaseLine(page)).toHaveText('Focus');
+    await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES));
+    await expect(startButton(page, 'Focus')).toBeVisible();
+    await expect(resetButton(page)).toBeDisabled();
   });
 });
 
@@ -223,12 +269,27 @@ async function freezeClock(page: Page): Promise<void> {
   await page.clock.pauseAt(now + SECOND_MS);
 }
 
-/** The one control on the card: it names the phase it begins. */
+/** The primary control on the card: it names the phase it begins. */
 function startButton(page: Page, nextPhase: TimerPhase): Locator {
   return page.getByRole('button', {
     name: nextPhase === 'Focus' ? 'Start focus' : 'Start break',
     exact: true,
   });
+}
+
+/** The primary control while a phase counts down. */
+function pauseButton(page: Page): Locator {
+  return page.getByRole('button', { name: 'Pause', exact: true });
+}
+
+/** The primary control while a phase is held. */
+function resumeButton(page: Page): Locator {
+  return page.getByRole('button', { name: 'Resume', exact: true });
+}
+
+/** The secondary control: it discards the cycle's progress, after asking. */
+function resetButton(page: Page): Locator {
+  return page.getByRole('button', { name: 'Reset', exact: true });
 }
 
 /** A phase that ran out: `00:00` held, the next phase named, its start button focused. */
