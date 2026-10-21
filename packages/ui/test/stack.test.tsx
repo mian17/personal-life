@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
-import { Stack, type StackAlign, type StackGap } from '../src/components/stack';
+import { Stack, type StackAlign, type StackGap, type StackVAlign } from '../src/components/stack';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
@@ -72,6 +72,38 @@ describe('Stack', () => {
   it('uses display: grid and no outer margins on the base block', () => {
     expect(cssBlock('.ui-stack')).toMatch(/display:\s*grid/);
     expect(cssBlock('.ui-stack')).not.toMatch(/margin/);
+  });
+
+  it('defaults to no block-axis class, leaving the grid at its own start', () => {
+    render(<Stack>x</Stack>);
+    const stack = document.querySelector('.ui-stack')!;
+    expect(stack.classList.contains('ui-stack--v-center')).toBe(false);
+    expect(stack.classList.contains('ui-stack--v-end')).toBe(false);
+  });
+
+  it.each<[StackVAlign, string]>([
+    ['center', 'center'],
+    ['end', 'end'],
+  ])('maps vAlign="%s" to align-content: safe %s', (vAlign, content) => {
+    render(<Stack vAlign={vAlign}>x</Stack>);
+    const stack = document.querySelector('.ui-stack')!;
+    expect(stack.classList.contains(`ui-stack--v-${vAlign}`)).toBe(true);
+    // `safe` keeps an over-tall stack scrolled from its first row instead of
+    // clipping above the scroll origin, where it could not be reached.
+    expect(cssBlock(`.ui-stack--v-${vAlign}`)).toMatch(
+      new RegExp(`align-content:\\s*safe ${content}`),
+    );
+  });
+
+  it('keeps the block-axis class off the row-axis name', () => {
+    render(
+      <Stack align="center" vAlign="center">
+        x
+      </Stack>,
+    );
+    const classes = classesOf(document.querySelector('.ui-stack')!);
+    expect(classes).toContain('ui-stack--center');
+    expect(classes).toContain('ui-stack--v-center');
   });
 
   it('forwards role and aria-label verbatim (the New todo group contract)', () => {

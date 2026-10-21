@@ -108,7 +108,7 @@ export { Row } from './components/row';
 export { EditorStack } from './components/editor-stack';
 export type { EditorStackProps } from './components/editor-stack';
 export type { RowProps } from './components/row';
-export type { StackGap, StackProps } from './components/stack';
+export type { StackGap, StackProps, StackVAlign } from './components/stack';
 
 export { Section } from './components/section';
 export type { SectionHeadingLevel, SectionProps } from './components/section';

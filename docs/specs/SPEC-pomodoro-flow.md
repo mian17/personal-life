@@ -22,26 +22,28 @@ the existing preference cookies, timer state is client state).
 
 Rework the shipped `/pomodoro` timer so a phase boundary is impossible to miss and a
 reload never throws away progress. When a phase ends the countdown holds at `00:00`,
-the card announces the next phase in words, a short beep sounds, the tab title
+the screen announces the next phase in words, a short beep sounds, the tab title
 flashes, and one primary button — focused — starts the next phase. Nothing counts
-until that button is pressed. The card shows the phase name, the digits, and four
-session pills, centred, with no "Session N of 4" text. Durations move to
+until that button is pressed. The screen shows the phase name, the digits, and four
+session pills — centred in a full-viewport-height page, the way `/todos/matrix`
+fills one, with no "Session N of 4" text. Durations move to
 `/pomodoro/settings` (with the theme toggle). The page carries the same toolbar as
 every other app: feedback + settings icons. A reload mid-phase resumes the remaining
 time.
 
 User stories / acceptance criteria:
 
-- As the owner, a 25-minute focus ending is a visible boundary card: `00:00` held,
+- As the owner, a 25-minute focus ending is a visible boundary screen: `00:00` held,
   the next phase named ("Next: Short break"), a beep, a flashing tab title, and
   `Start break` focused. No countdown runs until I press it.
-- The card reads the phase name, the digits, and four session pills — centred. No
+- The screen reads the phase name, the digits, and four session pills — centred on
+  both axes of a page that fills the viewport, not a short card near the top. No
   "Session N of 4" text; the pill row carries `aria-label="Session N of 4"` for
   screen readers.
 - The tab title keeps the countdown from drifting: a backgrounded tab counts down at
   wall-clock speed (~4× drift is gone).
 - A reload mid-phase shows the remaining time and keeps counting down; a phase whose
-  deadline passed while the page was gone lands on the boundary card, not in a
+  deadline passed while the page was gone lands on the boundary screen, not in a
   silently running next phase.
 - `/pomodoro/settings` holds the three durations (focus / short break / long break)
   plus the theme toggle, and edits survive a reload.
@@ -60,11 +62,12 @@ editing durations while a phase runs (see Assumption 5).
   `^16.0.0` in `packages/ui` and `packages/app-kit`) — `apps/app` serves `/pomodoro`
   and `/pomodoro/settings`; `apps/pomodoro` stays framework-agnostic React. No Next
   upgrade is part of this task.
-- `@life/ui` (workspace) — all visuals: `NavBar`, `PageTitle`, `Stack`, `Card`,
-  `Button`, `StatusText`, `Pill`, `ManagerBlock`, `SettingsBlock`, `SettingsRow`,
-  `ThemeToggle`, `FeedbackNavItem`, `IconLink`, `Input`. `Stack` gains one upstream
-  prop (`align`) — spec-first in `docs/specs/SPEC-ui-blocks.md` (where `Stack`
-  is specified) in the same change.
+- `@life/ui` (workspace) — all visuals: `ListShell` (with its `fill` full-height
+  mode), `Stack`, `Button`, `StatusText`, `Pill`, `ManagerBlock`, `SettingsBlock`,
+  `SettingsRow`, `ThemeToggle`, `FeedbackNavItem`, `IconLink`, `Input`. `Stack`
+  gains one upstream prop (`align`) — spec-first in `docs/specs/SPEC-ui-blocks.md`
+  (where `Stack` is specified) in the same change; the layout revision adds its
+  block-axis twin `vAlign`.
 - `@life/app-kit` (workspace) — `readPrefNumber` / `setPrefNumber` (existing),
   `settingsHref`.
 - `@life/shared` (workspace) — `FEEDBACK_APPS` gains `'pomodoro'`; `feedback.app` is
@@ -96,8 +99,9 @@ apps/pomodoro/src/timer.ts           # pure machine: status idle|running|boundar
 apps/pomodoro/src/use-timer.ts       # hook: ticking derives remaining from the wall
                                      # clock deadline; boundary effects (beep, title
                                      # flash, focus the button); localStorage persist
-apps/pomodoro/src/pomodoro-page.tsx  # card: phase name, digits, session pills,
-                                     # boundary button — @life/ui only, centred
+apps/pomodoro/src/pomodoro-page.tsx  # full-height screen: phase name, digits,
+                                     # session pills, boundary button — @life/ui
+                                     # only, centred on both axes.
 apps/pomodoro/src/session-pills.tsx  # four pills, active = focus sessions completed
 apps/pomodoro/src/countdown.tsx      # existing digits, unchanged
 apps/pomodoro/src/beep.ts            # WebAudio oscillator tone (no asset)
@@ -132,7 +136,7 @@ State and storage:
   `{ phase, session, status, remainingMs, endsAt }` on every change. On restore:
   `running` → `remainingMs = max(0, endsAt - Date.now())`, resuming `running` if
   positive and landing on `boundary` if zero or negative; `boundary` → the boundary
-  card as left; `idle` → idle with the phase's full duration. Durations stay in the
+  screen as left; `idle` → idle with the phase's full duration. Durations stay in the
   existing `pref_pomodoro_*` cookies (unchanged from `SPEC-pomodoro`).
 - **Session pills** — four pills; `active` = a focus session completed this cycle
   (during focus N, N−1 are active; during a break, N; the long break fills all four;
@@ -151,18 +155,16 @@ pure logic in `timer.ts` with no React imports. One real snippet in the repo's v
 export function PomodoroPage({ durations }: { durations: Durations }) {
   const timer = useTimer(durations);
   return (
-    <Card>
-      <Stack align="center">
-        <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
-        <Countdown remainingMs={timer.remainingMs} />
-        <SessionPills session={timer.session} />
-        {timer.status !== 'running' && (
-          <Button ref={startRef} onClick={timer.startNext}>
-            {startLabel(timer.nextPhase)}
-          </Button>
-        )}
-      </Stack>
-    </Card>
+    <Stack align="center" vAlign="center">
+      <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
+      <Countdown remainingMs={timer.remainingMs} />
+      <SessionPills session={timer.session} />
+      {timer.status !== 'running' && (
+        <Button ref={startRef} onClick={timer.startNext}>
+          {startLabel(timer.nextPhase)}
+        </Button>
+      )}
+    </Stack>
   );
 }
 ```
@@ -235,15 +237,15 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    no advance without the button; the button starts the next phase at full duration;
    deadline math survives late ticks and reloads.
 3. `npx playwright test --config apps/app/playwright.config.ts apps/app/test/e2e/pomodoro.spec.ts -g "boundary"`
-   passes: a fake-clock 25-minute focus ends with the card at `00:00` reading
+   passes: a fake-clock 25-minute focus ends with the screen at `00:00` reading
    `Next: Short break`, `Start break` focused, one oscillator started, the tab title
    alternating `Pomodoro` / `Next: Short break`, and no phase change until the button
    is pressed.
 4. The same e2e's reload case passes: mid-phase reload shows the remaining time
    (e.g. 2 fake-minutes in → ~`23:00`) and the countdown continues.
-5. The timer card shows phase name, digits, and four session pills, centred, with no
-   "Session N of 4" text; first use shows `25:00`, `Focus`, no pills active, and a
-   focused `Start focus`.
+5. The timer screen shows phase name, digits, and four session pills, centred on
+   both axes of a viewport-height page, with no "Session N of 4" text; first use
+   shows `25:00`, `Focus`, no pills active, and a focused `Start focus`.
 6. `/pomodoro/settings` holds the three durations plus the theme toggle; edits
    survive a reload; the toolbar's settings icon (and only it) links to
    `/pomodoro/settings`, and the feedback icon submits with `app: 'pomodoro'`
@@ -263,12 +265,12 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 3. **Wall-clock deadlines** (Assumption-level fix for both the ~4× backgrounded drift
    and reload resume): remaining time is always `endsAt - now`, never accumulated
    ticks. A phase whose deadline passed while the tab was closed or reloading lands
-   on the boundary card — "nothing counts until the button is pressed" also covers
+   on the boundary screen — "nothing counts until the button is pressed" also covers
    time that passed while the page was gone (the prior spec's "no countdown accuracy
    while the tab is closed" out-of-scope item is superseded by this intent).
 4. **Reload of a running phase resumes and keeps counting down** ("resumes the
    remaining time"), not paused. A reload at a boundary or at idle restores the same
-   card.
+   screen.
 5. **Duration edits take effect at the next phase start.** Editing durations while a
    phase runs is out of scope; the minimal defined behavior is that the running
    phase's deadline is untouched and the new value sizes the phase that starts after
@@ -290,10 +292,21 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
 9. **Toolbar shape** follows the `TodosNav`/`MealsNav` precedent exactly:
    `FeedbackNavItem app="pomodoro"` + `IconLink href={settingsHref('/pomodoro')}`,
    in a `PomodoroNav` rendered into `NavBar`'s trailing slot.
-10. **`Stack align`** is the single upstream gap ("centred" card), added as
+10. **`Stack align`** is the single upstream gap ("centred"), added as
     `align?: 'start' | 'center' | 'end'` (default unchanged) in `packages/ui`,
     spec-first in `SPEC-ui-blocks.md` where `Stack` lives — a prop, not a new
-    primitive.
+    primitive. Vertical centring adds the block-axis twin `vAlign` on the same
+    terms; it is `align-content: safe center`, because plain `center` in a grid
+    that cannot fit its rows pushes the first row above the scroll origin, where
+    it cannot be scrolled back to.
+11. **Full height comes from `ListShell fill`, not from pomodoro CSS**: the page
+    shell already owns the full-viewport column (`.ui-page.ui-list-shell--fill`,
+    `.ui-list-shell__body`), `/todos/matrix` already relies on it, and the app-side
+    visual language stays untouched. The body slot is a definite-height grid, so
+    the `vAlign` stack distributes inside it. The fill page's bottom padding still
+    reserves `--space-5` for a fab this page does not render, so the block sits
+    ~half that above the geometric centre — accepted rather than forking the shared
+    shell rule.
 
 ## 10. Open Questions
 
@@ -301,8 +314,8 @@ durations form is a server-action `<form>` (structural exemption) whose visuals 
    want? It is chosen so the success line "`Start break` focused" holds verbatim;
    changing it changes the e2e strings.
 2. Should the button after focus 4 read `Start long break` instead of `Start break`
-   (the card already names "Next: Long break")? Current rule keeps one label per
+   (the screen already names "Next: Long break")? Current rule keeps one label per
    phase kind.
 3. When a phase's deadline passed while the tab was closed for hours, land on the
-   boundary card as assumed (Assumption 3) — or is that a case for a "restart this
+   boundary screen as assumed (Assumption 3) — or is that a case for a "restart this
    phase" affordance later (not pause/reset, which stay out of scope)?
