@@ -130,13 +130,16 @@ describe('PomodoroPage', () => {
     }
   });
 
-  it('cannot reset the first session\'s focus once it sits at its boundary', () => {
+  it('can reset a finished first focus while Start break sits unpressed', () => {
     storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
 
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
+    // The boundary this case is about: the read-out still says Focus, the break is
+    // only offered, and one session is already behind the timer.
     expect(screen.getByText(/^Next: /u)).toBeTruthy();
-    expect(resetButton()).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Start break' })).toBeTruthy();
+    expect(resetButton()).toHaveProperty('disabled', false);
   });
 
   it('can reset a break boundary, because a finished focus is progress', () => {

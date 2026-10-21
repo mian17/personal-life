@@ -18,7 +18,7 @@ export interface PomodoroPageProps {
 
 export function PomodoroPage({ durations }: PomodoroPageProps) {
   const timer = useTimer(durations);
-  const canReset = resetAllowed(timer.status, timer.phase, timer.session);
+  const canReset = resetAllowed(timer.status);
 
   return (
     <Card fill>
@@ -52,15 +52,15 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
 }
 
 /**
- * Reset discards progress, so it is offered only where progress exists: a paused
- * phase (the frozen time is exactly what would be thrown away), or a rest past the
- * first session's focus — a whole break counts, since a break is progress too. Not
- * while a phase runs — a confirm dialog counting down underneath is a trap — and
- * not on the first session's focus, where the cycle is already at its start.
+ * Reset discards progress, so it is offered wherever there is any: paused, a phase
+ * waiting at its boundary, mid-break. A finished focus is progress even while the
+ * break button sits unpressed, so the boundary right after session 1 qualifies.
+ * Only two states refuse it — a counting-down phase, because a confirm dialog
+ * ticking underneath is a trap, and the untouched start, where reset would be a
+ * no-op. `idle` is that start and nothing else: the machine never idles mid-cycle.
  */
-function resetAllowed(status: Status, phase: Phase, session: number): boolean {
-  if (status === 'paused') return true;
-  return status !== 'running' && (phase !== 'focus' || session > 1);
+function resetAllowed(status: Status): boolean {
+  return status !== 'running' && status !== 'idle';
 }
 
 /** Pause and resume say what they do; a stopped timer names the phase it begins. */
