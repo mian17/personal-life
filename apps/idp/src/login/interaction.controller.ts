@@ -4,6 +4,7 @@ import { errors } from 'oidc-provider';
 import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
 import { LoginDto } from './dto/login.dto';
 import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
+import { secureCookie } from './dev-stack';
 import { loginPage } from './login.view';
 import { SessionsService } from '../sessions/sessions.service';
 import { OidcService } from '../oidc/oidc.service';
@@ -81,7 +82,7 @@ export class InteractionController {
     // Establish the Task 3 session, then hand the account to the provider so the
     // authorization request resumes (303 back to the authorization endpoint).
     const token = await this.sessions.create(user);
-    res.cookie(SESSION_COOKIE, token, sessionCookieOptions());
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions(secureCookie()));
     await provider.interactionFinished(
       req,
       res,

@@ -30,13 +30,19 @@ export function readSessionToken(cookieHeader: string | undefined): string | und
   return readCookie(cookieHeader, SESSION_COOKIE);
 }
 
-/** Secure in production (HTTPS behind Tailscale Serve); plain http in dev on localhost. */
-export function sessionCookieOptions(): CookieOptions {
+/**
+ * Secure unless the caller says the dev stack is in charge — that flag, not
+ * `NODE_ENV`, is what marks a dev run (`next build` forces production on the
+ * app's dev stack, so the two are indistinguishable by environment). The helper
+ * reads no env itself: the flag is passed in, so a caller can never freeze the
+ * wrong answer into a build.
+ */
+export function sessionCookieOptions(secure: boolean): CookieOptions {
   return {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     maxAge: SESSION_TTL_MS,
   };
 }

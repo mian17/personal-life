@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
 import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
+import { secureCookie } from './dev-stack';
 import { homePage, loginPage, logoutPage } from './login.view';
 import { OidcAdapterService } from '../oidc/adapter/oidc-adapter.service';
 import { OidcService } from '../oidc/oidc.service';
@@ -32,7 +33,7 @@ export class LoginController {
     }
 
     const token = await this.sessions.create(user);
-    res.cookie(SESSION_COOKIE, token, sessionCookieOptions());
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions(secureCookie()));
     res.type('html').status(200).send(homePage(user.username));
   }
 
@@ -67,7 +68,7 @@ export class LoginController {
 
     // Cookie name comes from the provider API, never hardcoded.
     res.clearCookie(this.oidc.sessionCookieName(), { path: '/' });
-    res.clearCookie(SESSION_COOKIE, sessionCookieOptions());
+    res.clearCookie(SESSION_COOKIE, sessionCookieOptions(secureCookie()));
     res.redirect(303, '/login');
   }
 

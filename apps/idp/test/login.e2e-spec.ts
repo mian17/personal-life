@@ -75,15 +75,32 @@ describe('Login and sessions (e2e)', () => {
     expect(sessionCookie(wrong)).toBeUndefined();
   });
 
-  it('sets HttpOnly and SameSite=Lax and no Secure in dev', async () => {
+  it('sets HttpOnly and SameSite=Lax, and drops Secure only under the dev flag', async () => {
+    process.env.APP_DEV_SKIP_ACCESS_GATE = '1';
+    try {
+      const res = await login('alice', FIXTURE_PASSWORD).expect(200);
+      const header = (res.headers['set-cookie'] as unknown as string[]).find((c) =>
+        c.startsWith(`${COOKIE}=`),
+      );
+      expect(header).toContain('HttpOnly');
+      expect(header).toContain('SameSite=Lax');
+      expect(header).toContain('Path=/');
+      expect(header).not.toContain('Secure');
+    } finally {
+      delete process.env.APP_DEV_SKIP_ACCESS_GATE;
+    }
+  });
+
+  it('marks the cookie Secure without the dev flag, even under NODE_ENV=development', async () => {
     const res = await login('alice', FIXTURE_PASSWORD).expect(200);
     const header = (res.headers['set-cookie'] as unknown as string[]).find((c) =>
       c.startsWith(`${COOKIE}=`),
     );
-    expect(header).toContain('HttpOnly');
-    expect(header).toContain('SameSite=Lax');
-    expect(header).toContain('Path=/');
-    expect(header).not.toContain('Secure');
+    // A dev-stack run is identified by the flag, never by NODE_ENV: `next build`
+    // forces production on the dev stack, so an env-derived answer is wrong half
+    // the time and frozen into the bundle the other half.
+    expect(process.env.NODE_ENV).not.toBe('production');
+    expect(header).toContain('Secure');
   });
 
   it('logout clears the cookie and kills the server-side session', async () => {

@@ -129,6 +129,11 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     OIDC_DEFAULT_RESOURCE: 'https://note-service',
     OIDC_AUDIENCE_MAP:
       'https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api',
+    // The IdP's own `idp_session` cookie follows the same one dev-stack flag as
+    // the app's cookies (never NODE_ENV). Dev mode is plain loopback http, so
+    // without the flag the browser refuses the Secure cookie and every login
+    // silently fails. Production mode leaves it unset and gets Secure.
+    ...(cfg.mode === 'production' ? {} : { APP_DEV_SKIP_ACCESS_GATE: '1' }),
   };
 }
 

@@ -63,7 +63,16 @@ same distinction is the bug.
 - Moving `dev:build` to `NODE_ENV=development` (explicitly rejected: the build
   cannot run under development mode, and the owner wants the dev stack to keep
   serving a production build).
-- Any change to the IdP service, its own cookies, or the login flow.
+- ~~Any change to the IdP service, its own cookies, or the login flow.~~
+  **Amended 2026-10-21 (owner: "commit first then extend").** The IdP's
+  `idp_session` cookie moves to the same flag (`apps/idp/src/login/dev-stack.ts`
+  `secureCookie()`), so no cookie in the repo keys on `NODE_ENV`. The IdP is
+  `tsc`-compiled, so its old `process.env.NODE_ENV` read was a genuine runtime
+  read and was already non-`Secure` under `dev:build` (`.env.development` sets
+  `NODE_ENV=development`); the change is consistency and closes the case where a
+  shell-exported `NODE_ENV=production` marks loopback cookies `Secure`. Root `dev`
+  and `dev:build` now pass the flag to the IdP process. The IdP's `NODE_ENV` use
+  for DB path and OIDC secret enforcement is untouched.
 - `SameSite`, `HttpOnly`, `Path`, or TTL changes.
 - Redirecting or rewriting `OWNER_LOGIN` handling.
 - The uncommitted `pi/wf/pomodoro-app` work.
