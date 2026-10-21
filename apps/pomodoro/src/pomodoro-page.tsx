@@ -18,7 +18,7 @@ export interface PomodoroPageProps {
 
 export function PomodoroPage({ durations }: PomodoroPageProps) {
   const timer = useTimer(durations);
-  const primed = timer.status !== 'idle';
+  const canReset = resetAllowed(timer.status, timer.session);
 
   return (
     <Card fill>
@@ -32,13 +32,13 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
             none of that: every status puts a button in the same slot. */}
         <StatusText invisible={timer.status !== 'boundary'}>{timer.titles.next}</StatusText>
         <Row>
-          {/* Reset ends the whole cycle, so it asks first — and it cannot be
-              pressed before there is anything to lose. */}
+          {/* Reset ends the whole cycle, so it asks first — and only where there
+              is something to give up (see `resetAllowed`). */}
           <ConfirmButton
             variant="ghost"
             message="Reset the timer and start the cycle over at session 1?"
             onClick={timer.resetCycle}
-            disabled={!primed}
+            disabled={!canReset}
           >
             Reset
           </ConfirmButton>
@@ -49,6 +49,17 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
       </Stack>
     </Card>
   );
+}
+
+/**
+ * Reset discards progress, so it is offered only where progress exists: a paused
+ * phase (the frozen time is exactly what would be thrown away) or a boundary past
+ * the first session. Not while a phase runs — a confirm dialog counting down
+ * underneath is a trap — and not in the first session, where the cycle is already
+ * at its start.
+ */
+function resetAllowed(status: Status, session: number): boolean {
+  return status === 'paused' || (status === 'boundary' && session > 1);
 }
 
 /** Pause and resume say what they do; a stopped timer names the phase it begins. */

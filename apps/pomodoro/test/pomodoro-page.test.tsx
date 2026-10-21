@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { PomodoroPage } from '../src/pomodoro-page';
-import { DEFAULT_DURATIONS } from '../src/timer';
+import { DEFAULT_DURATIONS, MINUTE_MS } from '../src/timer';
 
 /**
  * The card centres its rows with `place-content`, so a row that unmounts makes
@@ -9,10 +9,43 @@ import { DEFAULT_DURATIONS } from '../src/timer';
  * not the class name: the row is still the same node, in the same position, and
  * the card still has the same number of children.
  */
+/** The mode the hook writes back on every settle, which is also what a reload restores. */
+function storeMode(mode: {
+  phase: string;
+  session: number;
+  status: string;
+  remainingMs: number;
+  endsAt: number;
+}): void {
+  window.localStorage.setItem('pomodoro-mode', JSON.stringify({ ...mode, heldMs: mode.remainingMs }));
+}
+
 describe('PomodoroPage', () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
+
+  /** Reset sits on the left of the one action row, whatever it is painted as. */
+  function resetButton(): HTMLElement {
+    return screen.getByRole('button', { name: 'Reset' });
+  }
+
+  /**
+   * A cycle only leaves its first session by running one out, and the machine has
+   * no seam to jump, so the state comes back from the stored mode a reload would
+   * read: paused, second session, 10 minutes still frozen.
+   */
+  function renderPausedLaterSession(): void {
+    storeMode({
+      phase: 'short',
+      session: 2,
+      status: 'paused',
+      remainingMs: 10 * MINUTE_MS,
+      endsAt: Date.now() + 10 * MINUTE_MS,
+    });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+  }
 
   /** The card's rows are the layout: a row that unmounts shrinks the centring. */
   function actionRow(button: HTMLElement): HTMLElement {
@@ -46,16 +79,37 @@ describe('PomodoroPage', () => {
     expect(stack?.children[4]).toBe(row);
   });
 
+  it('cannot reset before the cycle has begun', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(resetButton()).toHaveProperty('disabled', true);
+  });
+
+  it('cannot reset while the phase is counting down', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(resetButton()).toHaveProperty('disabled', true);
+  });
+
+  it('can reset a paused phase, because the frozen time is what it gives up', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+
+    expect(resetButton()).toHaveProperty('disabled', false);
+  });
+
   it('leaves the cycle alone when the reset confirmation is declined', () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
     try {
-      render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+      renderPausedLaterSession();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+      fireEvent.click(resetButton());
 
       expect(confirm).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
     } finally {
       confirm.mockRestore();
     }
@@ -64,23 +118,33 @@ describe('PomodoroPage', () => {
   it('starts the cycle over from the first focus when the reset is confirmed', () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
     try {
-      render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+      renderPausedLaterSession();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+      fireEvent.click(resetButton());
 
       expect(confirm).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('button', { name: 'Start focus' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Reset' })).toHaveProperty('disabled', true);
+      expect(resetButton()).toHaveProperty('disabled', true);
     } finally {
       confirm.mockRestore();
     }
   });
 
-  it('cannot reset before the cycle has begun', () => {
+  it('cannot reset a boundary in the first session', () => {
+    storeMode({ phase: 'short', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
-    expect(screen.getByRole('button', { name: 'Reset' })).toHaveProperty('disabled', true);
+    expect(screen.getByText(/^Next: /u)).toBeTruthy();
+    expect(resetButton()).toHaveProperty('disabled', true);
+  });
+
+  it('can reset a boundary once the cycle has moved past its first session', () => {
+    storeMode({ phase: 'short', session: 2, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(resetButton()).toHaveProperty('disabled', false);
   });
 
   it('keeps the next-phase line mounted, hidden, once a phase starts', () => {
