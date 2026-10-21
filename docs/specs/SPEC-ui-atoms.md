@@ -68,7 +68,9 @@ for these without any visible change.
                                          //   bore the class (see SPEC-ui-blocks). `fill`
                                          //   makes the card the screen: it becomes a grid
                                          //   taking the height its parent gives it, content
-                                         //   centred via `place-content: safe center`
+                                         //   centred via `place-content: safe center`, and
+                                         //   it scrolls (`overflow: auto`) where the base
+                                         //   card would clip
 <StatusText role="status" aria-live="polite"
             size="default" | "display">children</StatusText> // owns .editor-status
    // size="display" adds `.ui-status-text--display` (font-size: var(--space-3))

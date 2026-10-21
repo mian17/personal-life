@@ -41,6 +41,9 @@ describe('Card', () => {
     // clipping it above the scroll origin, where it could not be reached.
     expect(cssBlock('.ui-card--fill')).toMatch(/place-content:\s*safe center/);
     expect(cssBlock('.ui-card--fill')).toMatch(/display:\s*grid/);
+    // The base card clips; the fill variant must scroll instead, or a body too
+    // tall for a short viewport is unreachable.
+    expect(cssBlock('.ui-card--fill')).toMatch(/overflow:\s*auto/);
   });
 
   it('renders arbitrary children', () => {

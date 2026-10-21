@@ -455,11 +455,13 @@ intentional border; `--filter` stays borderless. */
 
 /* Opt-in full-height panel (Card `fill`): the card is the screen, so it takes the
    height its parent hands it and centres its content in that box. `place-content`
-   with `safe` keeps an over-tall body scrollable from its first row instead of
-   clipping it above the scroll origin. */
+   with `safe` keeps an over-tall body starting at its first row rather than
+   centred above the scroll origin, and `overflow: auto` lets the card itself
+   scroll there — the base card's `overflow: hidden` would clip it instead. */
 .ui-card--fill {
   display: grid;
   place-content: safe center;
+  overflow: auto;
 }
 
 /* ------------------------------------------------------- StatusText */
