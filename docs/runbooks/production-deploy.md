@@ -1,4 +1,4 @@
-# Production runbook — full stack (deploy `master` @ `7305c97`)
+# Production runbook — full stack (deploy `master` @ `21f7256`)
 
 Authoritative deploy procedure for this host. Replaces the earlier
 `master..refactor/notes-todos-shared-ui` runbook, which predates `feedback-service`,
@@ -13,10 +13,11 @@ copy-pasteable from that directory:
 cd /home/night/WebstormProjects/personal-life
 ```
 
-Ref: `master` @ `7305c97` (`docs(runbooks): correct production-deploy for real feedback state`),
-**plus the `pi/wf/feedback-status` merge** — the feedback status workflow this revision
-adds steps for. Record the exact commit you deploy in §3: this runbook pins a hash, and the
-hash moves as master advances.
+Ref: `master` @ `21f7256` (`style(pomodoro): iOS red icon, matching sibling palette`).
+That pin already contains `pi/wf/feedback-status` (the status workflow), the meal photo
+body-limit fix, the ops agent contract and the whole pomodoro app (`/pomodoro`,
+`/pomodoro/settings`, its own PWA manifest). Record the exact commit you deploy in §3:
+the runbook pins a hash, and the hash moves as master advances.
 `compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`) plus 7
 Redis instances, `postgres-feedback` and `rabbitmq-feedback`.
@@ -104,8 +105,10 @@ Facts that decide the steps below:
   named volumes; the meals food catalog (`/meals/foods`, `/meals/foods/new`,
   `/meals/foods/[id]`), the manual-log door (`/meals/entry/new?door=food`) and the
   `Autosuggest` block in `packages/ui`; per-route PWA identity for `/meals` and
-  `/feedback`.
-- **New in the feedback status workflow** (this revision's delta over `7305c97`): the
+ `/feedback`, and the pomodoro app (`/pomodoro`, `/pomodoro/settings`) carrying its own
+ manifest. `apps/app/Dockerfile` copies `@life/pomodoro` into the `app` image, so no new
+ container, volume, published port or env name arrives with it.
+- **New in the feedback status workflow** (already in this pin — no step of its own): the
   `feedback.status` column, the `PATCH /api/feedback/:id` status route, the row status
   pill and dropdown in `/feedback`, the URL-param status filter
   (`/feedback?status=<open|in_progress|done|wont_do>`) and the gear entry to
@@ -186,7 +189,7 @@ cd /home/night/WebstormProjects/personal-life
       contain the feedback status workflow — check with
       `git log --oneline -1 -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
       "unknown revision"). On the revision this runbook was written against that is
-      `7305c97`; `git status --short` shows only untracked `docs/reference-repo/`,
+      `21f7256`; `git status --short` shows only untracked `docs/reference-repo/`,
       `pictures/`, `.pi/`.
 - [ ] Record the images you are about to replace (rollback reference):
       `docker compose images`.
@@ -431,6 +434,10 @@ curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:3002/pomodoro/setti
 - [ ] Ships inside the `app` image — `apps/app/Dockerfile` copies
   `apps/pomodoro` in its build stage. Without that COPY the app image fails with
   `Module not found: Can't resolve '@life/pomodoro'`.
+- [ ] `Pause` holds the remaining digits, `Resume` continues from them; `Reset` is
+      confirm-gated, disabled before any progress exists, and reaches a finished focus so
+      it can drop straight into the break.
+- [ ] The phase-boundary beep plays once per boundary, not again on reload.
 
 ### Per-route PWA identity
 
