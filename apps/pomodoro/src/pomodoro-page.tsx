@@ -25,7 +25,7 @@ export function PomodoroPage({ durations }: PomodoroPageProps) {
       <Stack align="center">
         <StatusText>{PHASE_LABELS[timer.phase]}</StatusText>
         <Countdown remainingMs={timer.remainingMs} />
-        <SessionPills phase={timer.phase} session={timer.session} />
+        <SessionPills phase={timer.phase} status={timer.status} session={timer.session} />
         {/* Both waiting-state rows stay mounted and merely lose their paint:
             unmounting either one shrinks the card, and the centred stack pulls
             the whole read-out down by half the row it lost. The action row needs

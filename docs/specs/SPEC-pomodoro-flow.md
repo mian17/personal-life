@@ -138,12 +138,13 @@ State and storage:
   positive and landing on `boundary` if zero or negative; `boundary` → the boundary
   screen as left; `idle` → idle with the phase's full duration. Durations stay in the
   existing `pref_pomodoro_*` cookies (unchanged from `SPEC-pomodoro`).
-- **Session pills** — four pills; `active` = a focus session completed this cycle
-  (during focus N, N−1 are active; during a break, N; the long break fills all four;
-  the next focus resets them). The row is visual only and carries
-  `aria-label="Session N of 4"` — N is the focus session in progress, or the one just
-  finished during a break (a break belongs to the session it follows, including its
-  end boundary). No visible "Session N of 4" text anywhere.
+- **Session pills** — four pills; `active` = a focus session completed this cycle,
+  and a focus counts as completed at its own `00:00`, not when its break starts.
+  During focus N, N−1 are active; during a break, N; the long break fills all four;
+  the next focus resets them. The row is visual only and carries
+  `aria-label="Session N of 4"` — N is the focus session in progress, or the one
+  just finished during a break (a break belongs to the session it follows,
+  including its end boundary). No visible "Session N of 4" text anywhere.
 
 ## 5. Code Style
 
