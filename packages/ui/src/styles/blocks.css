@@ -731,6 +731,17 @@
   gap: var(--space-2);
 }
 
+/* Alignment of the children across the row axis, for a block whose content is
+   narrower than the column (a centred timer card). The default `start` needs no
+   rule — it is the grid's own justify-items. */
+.ui-stack--center {
+  justify-items: center;
+}
+
+.ui-stack--end {
+  justify-items: end;
+}
+
 /* --------------------------------------------------------------- Row */
 
 /* Horizontal companion to Stack: a flex row (wraps) with the same token gap

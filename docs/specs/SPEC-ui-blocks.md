@@ -40,8 +40,11 @@ and the notes app's current pages map onto these one-to-one.
    children</AlertBanner>
 <SearchField label placeholder value?: string      // controlled current query
              onQueryChange: (q: string) => void /> // visual + 300ms debounce ONLY;
-<Stack gap?="sm|md|lg" as?="div" role? aria-* …>   // vertical rhythm: grid, gap: var(--space-*)
-   children</Stack>                                //   (default md); no outer margins
+<Stack gap?="sm|md|lg" align?="start|center|end"   // vertical rhythm: grid, gap: var(--space-*)
+       as?="div" role? aria-* …>                   //   (default md); align sets justify-items
+   children</Stack>                                //   across the row axis (default start = no
+                                                   //   class); no outer margins (align added by
+                                                   //   the /pomodoro flow, for the centred card)
 <Section label? headingLevel?="h2|h3" actions?     // <section> → heading row (label+actions)
          gap?>children</Section>                   //   → Stack body; section margin-block-start
                                                    //   --space-2; heading margin-block-end --space-0-5

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { readPrefNumber } from '@life/app-kit';
-import { PageTitle } from '@life/ui';
+import { NavBar, PageShell, PageTitle } from '@life/ui';
 import { DEFAULT_DURATIONS, PomodoroPage, type Durations } from '@life/pomodoro';
-import { setPomodoroDurations } from './actions';
+import { PomodoroNav } from './pomodoro-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +13,11 @@ export default async function PomodoroRoute() {
   const durations = await readDurations();
 
   return (
-    <>
+    <PageShell>
+      <NavBar trailing={<PomodoroNav />} />
       <PageTitle>Pomodoro</PageTitle>
-      <PomodoroPage durations={durations} onDurationsChange={setPomodoroDurations} />
-    </>
+      <PomodoroPage durations={durations} />
+    </PageShell>
   );
 }
 

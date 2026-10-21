@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
-import { Stack, type StackGap } from '../src/components/stack';
+import { Stack, type StackAlign, type StackGap } from '../src/components/stack';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
@@ -48,6 +48,25 @@ describe('Stack', () => {
     expect(stack.classList.contains('ui-stack--md')).toBe(true);
     expect(stack.classList.contains('ui-stack--sm')).toBe(false);
     expect(stack.classList.contains('ui-stack--lg')).toBe(false);
+  });
+
+  it('defaults to no alignment class, leaving the grid at its own start', () => {
+    render(<Stack>x</Stack>);
+    const stack = document.querySelector('.ui-stack')!;
+    expect(stack.classList.contains('ui-stack--center')).toBe(false);
+    expect(stack.classList.contains('ui-stack--end')).toBe(false);
+  });
+
+  it.each<[StackAlign, string]>([
+    ['center', 'center'],
+    ['end', 'end'],
+  ])('maps align="%s" to justify-items: %s', (align, justifyItems) => {
+    render(<Stack align={align}>x</Stack>);
+    const stack = document.querySelector('.ui-stack')!;
+    expect(stack.classList.contains(`ui-stack--${align}`)).toBe(true);
+    expect(cssBlock(`.ui-stack--${align}`)).toMatch(
+      new RegExp(`justify-items:\\s*${justifyItems}`),
+    );
   });
 
   it('uses display: grid and no outer margins on the base block', () => {

@@ -2,30 +2,40 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { logIn } from './journey';
 
 /**
- * The pomodoro timer driven as a user (`SPEC-pomodoro` Testing Strategy): one
- * whole cycle, pause / resume / reset, and a reload that keeps both the chosen
- * durations and the running mode.
+ * The pomodoro timer's phase boundary, driven the way its owner meets it
+ * (`SPEC-pomodoro-flow` Testing Strategy): a focus phase runs out, the card holds
+ * `00:00` and names the next phase, one beep sounds, the tab title flashes, and
+ * nothing advances until the focused button is pressed. A reload keeps the time
+ * that is left, and the durations saved on `/pomodoro/settings` size the phases.
  *
  * Time is Playwright's fake clock, installed before the first navigation and
- * paused once the page is interactive, so a phase lasts 60 000 fake milliseconds
- * instead of a real minute and the run does not depend on wall time.
+ * paused once the page is interactive, so a 25-minute phase costs no real wait.
  *
- * Selectors are pomodoro-owned only: the copy this module renders (heading,
- * phase and session lines, countdown digits, field labels) and the button names
- * of its own controls. The frozen e2e selector surface of other suites is not
- * read or changed here.
+ * Selectors are pomodoro-owned only: the copy this module renders on `/pomodoro`
+ * and `/pomodoro/settings`, plus the button names of its own controls. The frozen
+ * e2e selector surface of other suites is neither read nor changed here.
  */
 
-/** The three durations as their fields show them, in minutes. */
+/** Where the audio stub counts the tones the page played. */
+declare global {
+  interface Window {
+    startedOscillators: number;
+  }
+}
+
+/** The durations as `/pomodoro/settings` takes them, in minutes. */
 interface ChosenMinutes {
   focus: number;
   short: number;
   long: number;
 }
 
-const DEFAULT_MINUTES: ChosenMinutes = { focus: 25, short: 5, long: 15 };
-const ONE_MINUTE: ChosenMinutes = { focus: 1, short: 1, long: 1 };
+/** Three distinct lengths, so a field wired to a sibling's cookie cannot pass. */
 const CHOSEN_MINUTES: ChosenMinutes = { focus: 2, short: 3, long: 4 };
+
+/** The shipped lengths: the phase the boundary test runs out, and the break it unlocks. */
+const FOCUS_MINUTES = 25;
+const SHORT_BREAK_MINUTES = 5;
 
 const SECOND_MS = 1_000;
 const MINUTE_MS = 60 * SECOND_MS;
@@ -33,113 +43,161 @@ const MINUTE_MS = 60 * SECOND_MS;
 /** Where the timer keeps its mode; its presence means the client mounted. */
 const TIMER_MODE_KEY = 'pomodoro-mode';
 
+/** The tab's name whenever no phase is waiting to be started. */
+const PINNED_TITLE = 'Pomodoro';
+
 type TimerPhase = 'Focus' | 'Short break' | 'Long break';
 
-/** What the timer card must read: the phase, and the focus session it belongs to. */
-interface PhaseReadout {
-  phase: TimerPhase;
-  session: number;
-}
-
-/**
- * One cycle from the first focus session. A break belongs to the session it
- * follows, so the session number only moves when focus begins — which is why the
- * long break reads `Session 4 of 4` and the next cycle restarts at session 1.
- */
-const ONE_CYCLE: PhaseReadout[] = [
-  { phase: 'Short break', session: 1 },
-  { phase: 'Focus', session: 2 },
-  { phase: 'Short break', session: 2 },
-  { phase: 'Focus', session: 3 },
-  { phase: 'Short break', session: 3 },
-  { phase: 'Focus', session: 4 },
-  { phase: 'Long break', session: 4 },
-  { phase: 'Focus', session: 1 },
-];
-
 test.describe('pomodoro timer', () => {
-  test('the full cycle runs every phase in order, and a reload keeps durations and mode', async ({
-    page,
-  }) => {
+  test('phase boundary holds until Start pressed', async ({ page }) => {
+    await stubAudioContext(page);
     await openPomodoro(page);
 
-    // First use: the shipped 25 / 5 / 15 minutes, first focus session, not started.
-    await expectShownMinutes(page, DEFAULT_MINUTES);
-    await expectPhase(page, { phase: 'Focus', session: 1 });
-    await expectCountdownSeconds(page, 25 * 60);
+    // The controls the boundary card replaced are gone, not merely hidden.
+    await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reset' })).toHaveCount(0);
+    await expect(page.getByText(/^Session \d of 4$/)).toHaveCount(0);
 
-    // One minute per phase keeps the whole cycle inside fake time. Each edit is
-    // stored and reloaded before the next is typed, so a later write can never
-    // carry a sibling field's stale value back to the server.
-    for (const edit of durationEdits(ONE_MINUTE)) {
-      await chooseMinutes(page, edit);
-      await reloadPomodoro(page);
-    }
-    await expectShownMinutes(page, ONE_MINUTE);
-    await expectCountdownSeconds(page, 60);
+    await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES));
+    await expect(startButton(page, 'Focus')).toBeFocused();
+    await startButton(page, 'Focus').click();
 
-    // One cycle: focus 1, three short breaks between focus 2, 3, 4, then the long
-    // break, then back to focus 1.
-    await timerControl(page, 'Start').click();
-    for (const readout of ONE_CYCLE) {
-      await runOnePhase(page);
-      await expectPhase(page, readout);
-    }
-    await expectCountdownSeconds(page, 60);
+    // The whole focus phase, in fake time.
+    await page.clock.runFor(FOCUS_MINUTES * MINUTE_MS);
 
-    // Pause freezes the digits: half a minute of clock time moves nothing.
-    await timerControl(page, 'Pause').click();
-    const frozenSeconds = await readCountdownSeconds(page);
-    await page.clock.runFor(30 * SECOND_MS);
-    await expectCountdownSeconds(page, frozenSeconds);
+    await expectBoundary(page, 'Short break');
+    await expectStartedOscillators(page, 1);
+    await expectTitleFlashing(page, 'Next: Short break');
 
-    // Resume continues from the frozen second, not from the phase's full length.
-    await timerControl(page, 'Start').click();
-    await page.clock.runFor(10 * SECOND_MS);
-    await expectCountdownSeconds(page, frozenSeconds - 10);
+    // Nothing counts once the phase is over: five more fake minutes leave the card as it was.
+    await page.clock.runFor(SHORT_BREAK_MINUTES * MINUTE_MS);
+    await expectBoundary(page, 'Short break');
+    await expectStartedOscillators(page, 1);
 
-    // Reset returns to the first focus session at its full chosen length.
-    await timerControl(page, 'Reset').click();
-    await expectPhase(page, { phase: 'Focus', session: 1 });
-    await expectCountdownSeconds(page, 60);
+    // The press is the only way forward, and it begins the break at its whole length.
+    await startButton(page, 'Short break').click();
+    await expect(phaseLine(page)).toHaveText('Short break');
+    await expectCountdownSeconds(page, minutesToSeconds(SHORT_BREAK_MINUTES));
+    await expect(page).toHaveTitle(PINNED_TITLE);
+  });
 
-    // Three new durations, each persisted through the server action and read back
-    // from the cookie it writes.
-    for (const edit of durationEdits(CHOSEN_MINUTES)) {
-      await chooseMinutes(page, edit);
-      await reloadPomodoro(page);
-    }
-    await expectShownMinutes(page, CHOSEN_MINUTES);
-    await expectCountdownSeconds(page, 2 * 60);
+  test('reload resumes remaining time', async ({ page }) => {
+    await openPomodoro(page);
+    await startButton(page, 'Focus').click();
 
-    // A mode that is not the first one: the short break after the first focus.
-    await timerControl(page, 'Start').click();
+    // Two fake minutes into the shipped 25-minute focus.
     await page.clock.runFor(2 * MINUTE_MS);
-    await expectPhase(page, { phase: 'Short break', session: 1 });
-    await expectCountdownSeconds(page, 3 * 60);
+    await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES - 2));
 
-    // Reload: the stored durations and the stored mode come back together, and the
-    // restored phase restarts at its own full length.
+    // The reload spends a few real seconds of the phase while it hydrates, so the
+    // digits land near 23:00 rather than exactly on it.
     await reloadPomodoro(page);
-    await expectShownMinutes(page, CHOSEN_MINUTES);
-    await expectPhase(page, { phase: 'Short break', session: 1 });
-    await expectCountdownSeconds(page, 3 * 60);
+    const resumedSeconds = await readCountdownSeconds(page);
+    expect(resumedSeconds).toBeGreaterThanOrEqual(minutesToSeconds(FOCUS_MINUTES - 2) - 15);
+    expect(resumedSeconds).toBeLessThanOrEqual(minutesToSeconds(FOCUS_MINUTES - 2) + 1);
+
+    // And it keeps counting: ten more fake seconds are ten fewer on the card.
+    await page.clock.runFor(10 * SECOND_MS);
+    await expectCountdownSeconds(page, resumedSeconds - 10);
+
+    // The toolbar's gear is the way to the durations, and it lands on their page.
+    await page.clock.resume();
+    await page.getByLabel('Settings').click();
+    await page.waitForURL(/\/pomodoro\/settings$/);
+    for (const field of MINUTE_FIELDS) {
+      await minutesField(page, field).fill(String(CHOSEN_MINUTES[field.name]));
+    }
+    await page.getByRole('button', { name: 'Save durations' }).click();
+    for (const field of MINUTE_FIELDS) {
+      await expectStoredMinutes(page, field);
+    }
+
+    // The timer is not on screen, so nothing observes the focus deadline passing.
+    await page.clock.runFor(FOCUS_MINUTES * MINUTE_MS);
+    await visitPomodoro(page);
+    await expectBoundary(page, 'Short break');
+
+    // A deadline that passed while the page was gone lands on the boundary card,
+    // and the card stays there: another fake minute moves nothing.
+    await page.clock.runFor(MINUTE_MS);
+    await expectBoundary(page, 'Short break');
+
+    // The saved lengths size the phases the boundary button starts.
+    await startButton(page, 'Short break').click();
+    await expectCountdownSeconds(page, minutesToSeconds(CHOSEN_MINUTES.short));
+    await page.clock.runFor(CHOSEN_MINUTES.short * MINUTE_MS);
+    await expectBoundary(page, 'Focus');
+
+    await startButton(page, 'Focus').click();
+    await expectCountdownSeconds(page, minutesToSeconds(CHOSEN_MINUTES.focus));
   });
 });
+
+/**
+ * Replaces WebAudio before the page's own scripts run, so the beep is observable
+ * without a sound card and the count survives the reloads the specs drive.
+ */
+async function stubAudioContext(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.startedOscillators = 0;
+
+    class StubOscillator {
+      frequency = { value: 0 };
+      onended: (() => void) | null = null;
+      connect() {}
+      start() {
+        window.startedOscillators += 1;
+      }
+      stop() {}
+    }
+
+    class StubAudioContext {
+      currentTime = 0;
+      destination = {};
+      createOscillator() {
+        return new StubOscillator();
+      }
+      resume() {
+        return Promise.resolve();
+      }
+      close() {
+        return Promise.resolve();
+      }
+    }
+
+    window.AudioContext = StubAudioContext as unknown as typeof AudioContext;
+  });
+}
+
+/** The beep is one tone per phase end, however long the card waits at the boundary. */
+async function expectStartedOscillators(page: Page, count: number): Promise<void> {
+  await expect.poll(() => page.evaluate(() => window.startedOscillators)).toBe(count);
+}
 
 /** Logs in, lands on the pomodoro page, and pauses the fake clock on it. */
 async function openPomodoro(page: Page): Promise<void> {
   await page.clock.install();
   await logIn(page);
-  await page.goto('/pomodoro');
-  await waitForTimer(page);
-  await freezeClock(page);
+  await visitPomodoro(page);
 }
 
-/** Reloads with a running clock, so the page can hydrate, then freezes it again. */
+/** Opens the pomodoro page, and pauses the fake clock on it. */
+async function visitPomodoro(page: Page): Promise<void> {
+  await arriveAtTimer(page, () => page.goto('/pomodoro'));
+}
+
+/** Reloads the page on screen, and pauses the fake clock on it again. */
 async function reloadPomodoro(page: Page): Promise<void> {
+  await arriveAtTimer(page, () => page.reload());
+}
+
+/**
+ * The clock must run while a document loads and hydrates, or the readiness probe
+ * below waits on a frozen browser; it is frozen again once the timer is up.
+ */
+async function arriveAtTimer(page: Page, load: () => Promise<unknown>): Promise<void> {
   await page.clock.resume();
-  await page.reload();
+  await load();
   await waitForTimer(page);
   await freezeClock(page);
 }
@@ -165,80 +223,59 @@ async function freezeClock(page: Page): Promise<void> {
   await page.clock.pauseAt(now + SECOND_MS);
 }
 
-/** Types one duration and waits until the server stored it. */
-async function chooseMinutes(page: Page, edit: DurationEdit): Promise<void> {
-  await minutesField(page, edit).fill(String(edit.minutes));
-  await expectStoredMinutes(page, edit);
+/** The one control on the card: it names the phase it begins. */
+function startButton(page: Page, nextPhase: TimerPhase): Locator {
+  return page.getByRole('button', {
+    name: nextPhase === 'Focus' ? 'Start focus' : 'Start break',
+    exact: true,
+  });
 }
 
-async function expectStoredMinutes(page: Page, edit: DurationEdit): Promise<void> {
-  await expect
-    .poll(() => storedPreference(page, edit), { timeout: 15_000 })
-    .toBe(String(edit.minutes));
+/** A phase that ran out: `00:00` held, the next phase named, its start button focused. */
+async function expectBoundary(page: Page, nextPhase: TimerPhase): Promise<void> {
+  await expectCountdownSeconds(page, 0);
+  await expect(page.getByText(`Next: ${nextPhase}`, { exact: true })).toBeVisible();
+  await expect(startButton(page, nextPhase)).toBeFocused();
 }
 
-async function storedPreference(page: Page, edit: DurationEdit): Promise<string | undefined> {
-  const cookies = await page.context().cookies();
-  return cookies.find((cookie) => cookie.name === `pref_${edit.preference}`)?.value;
-}
-
-async function expectShownMinutes(page: Page, chosen: ChosenMinutes): Promise<void> {
-  for (const edit of durationEdits(chosen)) {
-    await expect(minutesField(page, edit)).toHaveValue(String(edit.minutes));
+/**
+ * The tab alternates between its pinned name and the next phase once per fake
+ * second, so a second later it shows the other of the two, and a second after
+ * that the one it started on.
+ */
+async function expectTitleFlashing(page: Page, nextTitle: string): Promise<void> {
+  const reads = [await page.title()];
+  for (const _ of [SECOND_MS, SECOND_MS]) {
+    await page.clock.runFor(SECOND_MS);
+    reads.push(await page.title());
   }
+
+  for (const title of reads) {
+    expect([PINNED_TITLE, nextTitle]).toContain(title);
+  }
+  expect(reads[1]).not.toBe(reads[0]);
+  expect(reads[2]).toBe(reads[0]);
 }
 
-function minutesField(page: Page, edit: DurationEdit): Locator {
-  return page.getByLabel(edit.label, { exact: true });
+/** The phase line: the only text on the page that is a phase name on its own. */
+function phaseLine(page: Page): Locator {
+  return page.getByText(/^(Focus|Short break|Long break)$/);
 }
 
-/** One minute of fake time, which is exactly one phase now that each lasts a minute. */
-async function runOnePhase(page: Page): Promise<void> {
-  await page.clock.runFor(MINUTE_MS);
-}
-
-async function expectPhase(page: Page, readout: PhaseReadout): Promise<void> {
-  await expect(phaseReadout(page)).toHaveText(readout.phase);
-  await expect(sessionReadout(page)).toHaveText(`Session ${readout.session} of 4`);
+/** The countdown digits: the only text on the page shaped like `mm:ss`. */
+function countdownDigits(page: Page): Locator {
+  return page.getByText(/^\d{2}:\d{2}$/);
 }
 
 async function expectCountdownSeconds(page: Page, totalSeconds: number): Promise<void> {
-  await expect(countdownReadout(page)).toHaveText(toDigits(totalSeconds));
+  await expect(countdownDigits(page)).toHaveText(toDigits(totalSeconds));
 }
 
 async function readCountdownSeconds(page: Page): Promise<number> {
-  return toSeconds(await countdownReadout(page).innerText());
+  return toSeconds(await countdownDigits(page).innerText());
 }
 
-/** The timer card, reached by the heading the pomodoro page renders above it. */
-function timerSection(page: Page): Locator {
-  return page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Timer', exact: true }) });
-}
-
-/** The phase line: the only text in the card that is a phase name. */
-function phaseReadout(page: Page): Locator {
-  return timerSection(page).getByText(/^(Focus|Short break|Long break)$/);
-}
-
-/** The countdown digits: the only text in the card shaped like `mm:ss`. */
-function countdownReadout(page: Page): Locator {
-  return timerSection(page).getByText(/^\d{2}:\d{2}$/);
-}
-
-/** The session line: `Session N of 4`. */
-function sessionReadout(page: Page): Locator {
-  return timerSection(page).getByText(/^Session \d of 4$/);
-}
-
-type TimerControl = 'Start' | 'Pause' | 'Reset';
-
-function timerControl(page: Page, name: TimerControl): Locator {
-  return page.getByRole('button', { name, exact: true });
-}
-
-/** One duration field: the preference the server stores it under, and its label. */
+/** One duration field on `/pomodoro/settings`: its name, its cookie, and its label. */
 interface MinuteField {
   name: keyof ChosenMinutes;
   /** The cookie is `pref_` plus this name (`@life/app-kit`'s preference naming). */
@@ -252,12 +289,22 @@ const MINUTE_FIELDS: MinuteField[] = [
   { name: 'long', preference: 'pomodoro_long', label: 'Long break' },
 ];
 
-interface DurationEdit extends MinuteField {
-  minutes: number;
+function minutesField(page: Page, field: MinuteField): Locator {
+  return page.getByLabel(field.label, { exact: true });
 }
 
-function durationEdits(chosen: ChosenMinutes): DurationEdit[] {
-  return MINUTE_FIELDS.map((field) => ({ ...field, minutes: chosen[field.name] }));
+async function expectStoredMinutes(page: Page, field: MinuteField): Promise<void> {
+  const minutes = String(CHOSEN_MINUTES[field.name]);
+  await expect.poll(() => storedMinutes(page, field), { timeout: 15_000 }).toBe(minutes);
+}
+
+async function storedMinutes(page: Page, field: MinuteField): Promise<string | undefined> {
+  const cookies = await page.context().cookies();
+  return cookies.find((cookie) => cookie.name === `pref_${field.preference}`)?.value;
+}
+
+function minutesToSeconds(minutes: number): number {
+  return minutes * 60;
 }
 
 function toSeconds(digits: string): number {

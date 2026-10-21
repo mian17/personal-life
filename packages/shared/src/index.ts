@@ -174,7 +174,7 @@ export const TODO_LIST_NAME_MAX = 100;
 export const FEEDBACK_TYPE_VALUES = ['feature_request', 'enhancement', 'bug_report'] as const;
 export type FeedbackType = (typeof FEEDBACK_TYPE_VALUES)[number];
 
-export const FEEDBACK_APPS = ['notes', 'todos', 'meals', 'feedback'] as const;
+export const FEEDBACK_APPS = ['notes', 'todos', 'meals', 'pomodoro', 'feedback'] as const;
 export type FeedbackApp = (typeof FEEDBACK_APPS)[number];
 
 /**

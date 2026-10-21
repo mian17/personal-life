@@ -4,8 +4,8 @@ export type { PomodoroPageProps } from './pomodoro-page';
 export { Countdown } from './countdown';
 export type { CountdownProps } from './countdown';
 
-export { DurationFields } from './duration-fields';
-export type { DurationFieldsProps } from './duration-fields';
+export { SessionPills } from './session-pills';
+export type { SessionPillsProps } from './session-pills';
 
 export { useTimer } from './use-timer';
 export type { Timer } from './use-timer';

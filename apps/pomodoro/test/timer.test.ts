@@ -10,19 +10,26 @@ import {
   clampMinutes,
   initialState,
   parseMode,
-  pause,
-  reset,
+  remainingMs,
   serializeMode,
   start,
+  startNext,
   tick,
   type Durations,
+  type Phase,
   type TimerState,
 } from '../src/timer';
 
 const durations: Durations = { focus: 25, short: 5, long: 15 };
 
-/** The phase reached after each transition, starting with the initial focus session. */
-const cycleTable = [
+/** Any wall clock the owner happens to start at. */
+const START = 1_700_000_000_000;
+
+const FOCUS_MS = durations.focus * MINUTE_MS;
+const SHORT_MS = durations.short * MINUTE_MS;
+
+/** The phase reached after each start, beginning with the initial focus session. */
+const cycleTable: { phase: Phase; session: number }[] = [
   { phase: 'focus', session: 1 },
   { phase: 'short', session: 1 },
   { phase: 'focus', session: 2 },
@@ -34,115 +41,131 @@ const cycleTable = [
   { phase: 'focus', session: 1 },
 ];
 
-function startedState(): TimerState {
-  return start(initialState(durations));
+function startedTimer(now: number = START): TimerState {
+  return start(initialState(durations), now);
 }
 
-/** Runs the current phase out to zero so the next phase has just begun. */
-function finishPhase(state: TimerState): TimerState {
-  return tick(state, state.remainingMs);
+/** Ends the current phase the way the owner does: the deadline passes, then the button is pressed. */
+function pressStartAfterDeadline(state: TimerState): TimerState {
+  const atBoundary = tick(state, state.endsAt);
+  return startNext(atBoundary, atBoundary.endsAt);
 }
 
-/** Replays phase changes from a fresh running timer. */
-function stateAfter(transitions: number): TimerState {
-  let state = startedState();
-  for (let step = 0; step < transitions; step += 1) state = finishPhase(state);
+function timerAfterStarts(starts: number): TimerState {
+  let state = startedTimer();
+  for (let press = 0; press < starts; press += 1) state = pressStartAfterDeadline(state);
   return state;
 }
 
-function modeOf(state: TimerState): { phase: string; session: number } {
+function phaseOf(state: TimerState): { phase: Phase; session: number } {
   return { phase: state.phase, session: state.session };
 }
 
-describe('phase table', () => {
-  it('advances focus 1 → short → focus 2 → short → focus 3 → short → focus 4 → long → focus 1', () => {
-    const reached = cycleTable.map((_, transitions) => modeOf(stateAfter(transitions)));
+describe('remaining time', () => {
+  it('reads a phase that has not begun as its whole length, whatever the clock says', () => {
+    expect(remainingMs(initialState(durations), START)).toBe(FOCUS_MS);
+    expect(remainingMs(initialState(durations), START + 5 * MINUTE_MS)).toBe(FOCUS_MS);
+  });
+
+  it('counts down to the deadline a start stamped one phase length ahead', () => {
+    const state = startedTimer();
+    expect(state.endsAt).toBe(START + FOCUS_MS);
+
+    expect(remainingMs(state, START)).toBe(FOCUS_MS);
+    expect(remainingMs(state, START + MINUTE_MS)).toBe(FOCUS_MS - MINUTE_MS);
+    expect(remainingMs(state, START + FOCUS_MS)).toBe(0);
+  });
+
+  it('clamps to 00:00 once the deadline is reached or passed', () => {
+    const state = startedTimer();
+    expect(remainingMs(state, START + FOCUS_MS)).toBe(0);
+    expect(remainingMs(state, START + FOCUS_MS + 90_000)).toBe(0);
+    expect(remainingMs(state, START + 10 * FOCUS_MS)).toBe(0);
+  });
+});
+
+describe('boundary table', () => {
+  it('row: a reached deadline holds the boundary at 00:00 and keeps the finished phase', () => {
+    const ended = tick(startedTimer(), START + FOCUS_MS);
+
+    expect(ended.status).toBe('boundary');
+    expect(remainingMs(ended, START + FOCUS_MS)).toBe(0);
+    expect(phaseOf(ended)).toEqual({ phase: 'focus', session: 1 });
+  });
+
+  it('row: a tick arriving long after the deadline still lands on the boundary, losing no extra time', () => {
+    const tenPhasesLate = START + 10 * FOCUS_MS;
+
+    const ended = tick(startedTimer(), tenPhasesLate);
+
+    expect(ended.status).toBe('boundary');
+    expect(remainingMs(ended, tenPhasesLate)).toBe(0);
+    expect(phaseOf(ended)).toEqual({ phase: 'focus', session: 1 });
+  });
+
+  it('row: nothing advances without its own start, however often the clock is read', () => {
+    let state = tick(startedTimer(), START + FOCUS_MS);
+    for (const now of [FOCUS_MS, 2 * FOCUS_MS, 3 * FOCUS_MS]) state = tick(state, START + now);
+
+    expect(state.status).toBe('boundary');
+    expect(phaseOf(state)).toEqual({ phase: 'focus', session: 1 });
+    expect(remainingMs(state, START + 3 * FOCUS_MS)).toBe(0);
+  });
+
+  it('row: a start after the boundary gives the next phase its own full duration from that moment', () => {
+    const ended = tick(startedTimer(), START + FOCUS_MS);
+    const pressed = startNext(ended, START + FOCUS_MS + 90_000);
+
+    expect(pressed.status).toBe('running');
+    expect(phaseOf(pressed)).toEqual({ phase: 'short', session: 1 });
+    expect(pressed.endsAt).toBe(START + FOCUS_MS + 90_000 + SHORT_MS);
+    expect(remainingMs(pressed, START + FOCUS_MS + 90_000)).toBe(SHORT_MS);
+  });
+
+  it('row: a boundary names the phase after the finished one, never skipping it', () => {
+    const reached = cycleTable.map((_, starts) => phaseOf(timerAfterStarts(starts)));
+
     expect(reached).toEqual(cycleTable);
   });
 
-  it('gives every advanced phase its own full duration and keeps the timer running', () => {
-    const atShortBreak = stateAfter(1);
-    expect(atShortBreak).toMatchObject({ remainingMs: durations.short * MINUTE_MS, running: true });
-
-    const atSecondFocus = stateAfter(2);
-    expect(atSecondFocus).toMatchObject({ remainingMs: durations.focus * MINUTE_MS, running: true });
-  });
-
-  it('puts a break in the session it follows, so session only moves when focus begins', () => {
-    expect(modeOf(stateAfter(6))).toEqual({ phase: 'focus', session: 4 });
-    expect(modeOf(stateAfter(7))).toEqual({ phase: 'long', session: SESSIONS_PER_CYCLE });
+  it('row: a break belongs to the session it follows, so session moves only when focus begins', () => {
+    expect(phaseOf(timerAfterStarts(6))).toEqual({ phase: 'focus', session: 4 });
+    expect(phaseOf(timerAfterStarts(7))).toEqual({ phase: 'long', session: SESSIONS_PER_CYCLE });
+    expect(phaseOf(timerAfterStarts(8))).toEqual({ phase: 'focus', session: 1 });
   });
 });
 
 describe('tick', () => {
-  it('decrements the remaining time by the elapsed time while running', () => {
-    const state = tick(startedState(), 1000);
-    expect(state).toMatchObject({ phase: 'focus', session: 1, remainingMs: durations.focus * MINUTE_MS - 1000 });
+  it('leaves a running timer on its phase while the deadline is still ahead', () => {
+    const state = startedTimer();
+    expect(tick(state, START + MINUTE_MS)).toEqual(state);
   });
 
-  it('advances exactly one phase when the elapsed time overshoots the remaining time', () => {
-    const state = tick(startedState(), durations.focus * MINUTE_MS + 30_000);
-    expect(state).toMatchObject({
-      phase: 'short',
-      session: 1,
-      remainingMs: durations.short * MINUTE_MS,
-      running: true,
-    });
-  });
-
-  it('leaves a paused timer untouched', () => {
-    const paused = pause(startedState());
-    expect(tick(paused, 30_000)).toEqual(paused);
-  });
-});
-
-describe('start and pause', () => {
-  it('freezes the remaining time on pause and resumes from it on start', () => {
-    const running = tick(startedState(), 60_000);
-    const frozen = pause(running);
-    const resumed = start(frozen);
-    const continued = tick(resumed, 60_000);
-
-    expect(frozen).toMatchObject({ running: false, remainingMs: 24 * MINUTE_MS });
-    expect(tick(frozen, 60_000)).toEqual(frozen);
-    expect(resumed).toMatchObject({ running: true, remainingMs: 24 * MINUTE_MS });
-    expect(continued.remainingMs).toBe(23 * MINUTE_MS);
-  });
-});
-
-describe('reset', () => {
-  it('returns session 1, focus and the full focus duration from any later phase', () => {
-    const midLongBreak = pause(stateAfter(7));
-
-    expect(reset(midLongBreak)).toEqual(initialState(durations));
-    expect(reset(midLongBreak)).toMatchObject({
-      phase: 'focus',
-      session: 1,
-      remainingMs: durations.focus * MINUTE_MS,
-    });
-  });
-
-  it('keeps the chosen durations when resetting', () => {
-    const chosen: Durations = { focus: 50, short: 10, long: 20 };
-    const resetState = reset(initialState(chosen));
-
-    expect(resetState.durations).toEqual(chosen);
-    expect(resetState.remainingMs).toBe(chosen.focus * MINUTE_MS);
+  it('leaves a boundary and an idle timer untouched', () => {
+    const ended = tick(startedTimer(), START + FOCUS_MS);
+    expect(tick(ended, START + 2 * FOCUS_MS)).toEqual(ended);
+    expect(tick(initialState(durations), START)).toEqual(initialState(durations));
   });
 });
 
 describe('applyDurations', () => {
-  it('restarts the current phase at the new length while paused', () => {
-    const paused = pause(tick(startedState(), 5 * MINUTE_MS));
+  it('sizes the phase that starts next and leaves a running deadline alone', () => {
     const chosen: Durations = { focus: 40, short: 8, long: 20 };
+    const running = startedTimer();
 
-    const updated = applyDurations(paused, chosen);
+    const updated = applyDurations(running, chosen);
+    const afterBoundary = startNext(tick(updated, updated.endsAt), updated.endsAt);
 
-    expect(updated).toMatchObject({
-      durations: chosen,
-      remainingMs: chosen.focus * MINUTE_MS,
-      running: false,
-    });
+    expect(updated.endsAt).toBe(running.endsAt);
+    expect(updated.durations).toEqual(chosen);
+    expect(remainingMs(afterBoundary, updated.endsAt)).toBe(chosen.short * MINUTE_MS);
+  });
+
+  it('sizes an idle phase from the new durations', () => {
+    const chosen: Durations = { focus: 40, short: 8, long: 20 };
+    const updated = applyDurations(initialState(durations), chosen);
+
+    expect(remainingMs(updated, START)).toBe(chosen.focus * MINUTE_MS);
   });
 });
 
@@ -162,33 +185,64 @@ describe('clampMinutes', () => {
 
   it('clamps a malformed duration inside the state machine too', () => {
     const state = initialState({ focus: 0, short: 2.5, long: -1 });
-    expect(state.remainingMs).toBe(DEFAULT_MINUTES * MINUTE_MS);
-
-    const advanced = finishPhase(start(state));
-    expect(advanced.remainingMs).toBe(DEFAULT_MINUTES * MINUTE_MS);
+    expect(remainingMs(state, START)).toBe(DEFAULT_MINUTES * MINUTE_MS);
   });
 });
 
 describe('mode codec', () => {
-  it('round-trips phase and session', () => {
-    const midCycle = stateAfter(3);
-    const restored = parseMode(serializeMode(midCycle), durations);
+  it('round-trips a running phase with its deadline and remaining time', () => {
+    const running = startedTimer();
+    const stored = serializeMode(running, START + 2 * MINUTE_MS);
 
-    expect(serializeMode(midCycle)).toBe('{"phase":"short","session":2}');
-    expect(restored).toMatchObject({ phase: 'short', session: 2, running: false });
+    expect(stored).toBe(
+      JSON.stringify({
+        phase: 'focus',
+        session: 1,
+        status: 'running',
+        remainingMs: FOCUS_MS - 2 * MINUTE_MS,
+        endsAt: START + FOCUS_MS,
+      }),
+    );
+    expect(parseMode(stored, { durations, now: START + 3 * MINUTE_MS })).toEqual(running);
   });
 
-  it('restarts the restored phase at its full duration', () => {
-    const restored = parseMode(serializeMode(stateAfter(1)), durations);
-    expect(restored.remainingMs).toBe(durations.short * MINUTE_MS);
+  it('round-trips a boundary left as it was', () => {
+    const ended = tick(startedTimer(), START + FOCUS_MS);
+
+    expect(
+      parseMode(serializeMode(ended, START + FOCUS_MS), { durations, now: START + 5 * FOCUS_MS }),
+    ).toEqual(ended);
   });
 
-  it.each([[undefined], [null], [''], ['not json'], ['{"phase":"nope"}'], ['{"phase":"focus","session":9}']])(
-    'falls back to the initial state for %p',
-    (raw) => {
-      expect(parseMode(raw as string | undefined, durations)).toEqual(initialState(durations));
-    },
-  );
+  it('round-trips an idle phase', () => {
+    const idle = initialState(durations);
+
+    expect(parseMode(serializeMode(idle, START), { durations, now: START + 5 * MINUTE_MS })).toEqual(idle);
+  });
+
+  it('restores a running mode whose deadline passed while the page was gone as its boundary', () => {
+    const stored = serializeMode(startedTimer(), START);
+    const restored = parseMode(stored, { durations, now: START + 3 * FOCUS_MS });
+
+    expect(restored.status).toBe('boundary');
+    expect(phaseOf(restored)).toEqual({ phase: 'focus', session: 1 });
+    expect(remainingMs(restored, START + 3 * FOCUS_MS)).toBe(0);
+  });
+
+  it('restores a running mode whose deadline has not passed as still running', () => {
+    const stored = serializeMode(startedTimer(), START);
+    expect(parseMode(stored, { durations, now: START + MINUTE_MS }).status).toBe('running');
+  });
+
+  it('restores the idle phase for a malformed or absent blob', () => {
+    const invalid = [undefined, null, '', 'not json', '{"phase":"nope"}', '{"phase":"focus","session":9}'];
+
+    for (const raw of invalid) {
+      expect(parseMode(raw as string | undefined, { durations, now: START })).toEqual(
+        initialState(durations),
+      );
+    }
+  });
 });
 
 describe('purity', () => {
