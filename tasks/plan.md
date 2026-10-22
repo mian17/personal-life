@@ -27,6 +27,7 @@ No new dependency: `node:fs`, `node:os`, `node:path`, `node:process` only.
 - [ ] Task 3: Queue reporting — measured ETA, busy/timeout markers, exit 75
 - [ ] Task 4: Production harness claims a slot before build, releases at teardown
 - [ ] Task 5: Dev harness claims its own slot
+- [ ] Task 6: Loopback login hop (in scope — the harness made the bug reachable)
 
 Checkpoint after Tasks 1-3: derivation and queue unit suites green, `npm run typecheck` green, no harness entry point wired yet — queue logic provable without booting a stack.
 
@@ -148,6 +149,25 @@ Checkpoint after Tasks 4-5: one policy-allowed e2e run proves the derived stack 
 - `apps/app/test/e2e/global-setup.dev.ts`
 - `apps/app/test/e2e/global-teardown.dev.ts`
 **Estimated scope:** Small: 1-2 files
+
+## Task 6: Loopback login hop (in scope — the harness made the bug reachable)
+
+**Description:** Addressing the dev stack at `127.0.0.1:<derived port>` instead of the
+hardcoded `localhost` exposed a pre-existing cookie split: Next's middleware adapter
+rewrites the loopback host in every redirect Location to `localhost`, so the attempt
+cookie set on `127.0.0.1` is absent at the callback, which answers 400 `missing or
+invalid auth attempt`. `/auth/login` hops a non-localhost loopback spelling to
+`localhost` before setting the cookie, carrying `returnTo` through the hop.
+Non-loopback hosts (production, Tailscale) are untouched.
+
+**Acceptance criteria:**
+- [ ] `loopbackCanonicalHop()` returns a `localhost` URL for `127.0.0.1` and `[::1]`, preserving path and query.
+- [ ] It returns null for `localhost` itself and for any non-loopback host.
+- [ ] `/auth/login` issues a 307 to the hopped URL before setting `LOGIN_ATTEMPT_COOKIE`.
+- [ ] `npm run test:unit -- test/origin.test.ts` green (12 tests).
+
+**Files:** `apps/app/lib/auth/origin.ts`, `apps/app/app/auth/login/route.ts`,
+`apps/app/middleware.ts` (comment), `apps/app/test/origin.test.ts`.
 
 ## Risks
 

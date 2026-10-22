@@ -82,7 +82,23 @@ apps/app/test/e2e/degraded-app.ts      MODIFIED — consumes the derived degrade
 apps/app/test/slot-ports.test.ts       NEW — jest unit tests (derivation)
 apps/app/test/slot-queue.test.ts       NEW — jest unit tests (queue/reclaim/markers)
 docs/specs/SPEC-e2e-stack-slots.md     THIS SPEC
+
+apps/app/app/auth/login/route.ts       MODIFIED — hop a loopback spelling to
+                                       localhost before setting the attempt cookie
+apps/app/lib/auth/origin.ts            MODIFIED — `loopbackCanonicalHop()` /
+                                       `hostnameOf()` support that hop
+apps/app/middleware.ts                 MODIFIED — comment only: Next rewrites the
+                                       loopback host in the redirect Location
+apps/app/test/origin.test.ts           MODIFIED — 5 tests for the hop
 ```
+
+The auth four are in scope because this change makes the bug reachable: the dev
+harness stops addressing the stack at the hardcoded `localhost` and starts using
+`127.0.0.1:<derived port>`. Next's middleware adapter rewrites the loopback host in
+every redirect Location to `localhost`, so the attempt cookie lands on
+`127.0.0.1` and the callback answers 400 `missing or invalid auth attempt`. The
+harness cannot be correct without the hop, and the alternative (spelling every dev
+URL `localhost`) leaves the app broken for the operator who types `127.0.0.1`.
 
 Queue state is machine-scoped (worktrees are the unit of contention):
 `${os.tmpdir()}/life-e2e-slots` (override `E2E_QUEUE_DIR`), holding per-slot claim
