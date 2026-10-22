@@ -11,6 +11,9 @@ jobs:
     # so http://127.0.0.1:9000 is reachable without exposing the instance.
     runs-on: [self-hosted, sonarqube]
     steps:
+      - name: Ensure SonarQube is up
+        run: /home/night/WebstormProjects/sonarqube/ensure-up.sh
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
