@@ -2,6 +2,7 @@ import {
   canonicalizeLoopbackHost,
   canonicalizeLoopbackUrl,
   isLoopbackHost,
+  loopbackCanonicalHop,
   requestOrigin,
 } from '@/lib/auth/origin';
 
@@ -77,5 +78,37 @@ describe('requestOrigin', () => {
 
   it('falls back to nextUrl.origin when there is no host header', () => {
     expect(requestOrigin(req({}))).toBe('http://internal:9999');
+  });
+});
+
+describe('loopbackCanonicalHop', () => {
+  // Next emits a *relative* Location when the redirect targets the same origin,
+  // so canonicalizing the host is not enough: the browser stays on `127.0.0.1`,
+  // the attempt cookie lands there, and the IdP's callback to `localhost` cannot
+  // read it. These pin the hop that actually moves the browser.
+  it('moves a 127.0.0.1 browser to localhost, preserving path and returnTo', () => {
+    const hop = loopbackCanonicalHop(
+      req({ host: '127.0.0.1:3200' }),
+      '/auth/login?returnTo=%2Fnotes',
+    );
+    expect(hop?.toString()).toBe('http://localhost:3200/auth/login?returnTo=%2Fnotes');
+  });
+
+  it('moves an IPv6 loopback browser to localhost', () => {
+    expect(loopbackCanonicalHop(req({ host: '[::1]:3200' }), '/auth/login')?.hostname).toBe(
+      'localhost',
+    );
+  });
+
+  it('does not hop a browser that is already on localhost', () => {
+    expect(loopbackCanonicalHop(req({ host: 'localhost:3200' }), '/auth/login')).toBeNull();
+  });
+
+  it('never hops a non-loopback (production / Tailscale) host', () => {
+    expect(loopbackCanonicalHop(req({ host: 'life.example.ts.net' }), '/auth/login')).toBeNull();
+  });
+
+  it('does not hop when there is no host header at all', () => {
+    expect(loopbackCanonicalHop(req({}), '/auth/login')).toBeNull();
   });
 });

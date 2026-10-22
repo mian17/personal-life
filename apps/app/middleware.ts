@@ -47,8 +47,10 @@ export async function middleware(req: NextRequest) {
     return new NextResponse('Forbidden', { status: 403 });
   }
   if (decision === 'redirect-login') {
-    // Built on the request's external origin; Next normalizes loopback hosts
-    // (127.0.0.1 → localhost) in redirects, so the test client uses localhost too.
+    // Built on the request's external origin, canonicalized to `localhost`. Next
+    // emits this as a *relative* Location once its loopback rewrite makes the hop
+    // same-origin, so it does NOT move the browser between spellings —
+    // `/auth/login` performs that hop itself, before writing the attempt cookie.
     const login = absoluteUrl(req, '/auth/login');
     // Resume where the user was headed, but only for a safe navigation: a GET to
     // a page (not a POST-only BFF route), and never for API calls.

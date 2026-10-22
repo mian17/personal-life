@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { buildAuthorizationRequest } from '@/lib/auth/oidc-client';
+import { loopbackCanonicalHop } from '@/lib/auth/origin';
 import {
   LOGIN_ATTEMPT_COOKIE,
   encodeLoginAttempt,
@@ -27,6 +28,11 @@ function identityUnavailable(): NextResponse {
   });
 }
 
+/** This route's own path, carrying `returnTo` through the loopback hop. */
+function loginPath(returnTo: string | undefined): string {
+  return `/auth/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`;
+}
+
 /**
  * `GET /auth/login` — starts the authorization code + PKCE dance: builds the
  * IdP authorization URL (with `state`, `nonce`, S256 challenge, and the
@@ -51,6 +57,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // `next build` bakes `NODE_ENV` into the chunk while this flag stays runtime.
   const secure = process.env.APP_DEV_SKIP_ACCESS_GATE !== '1';
   const returnTo = sanitizeReturnTo(req.nextUrl.searchParams.get('returnTo'));
+
+  // The attempt cookie must live on the host the IdP's callback returns to, the
+  // canonical `localhost`. A browser that reached us on `127.0.0.1` has to be
+  // moved there *before* the cookie is written, so this hop answers first.
+  const hop = loopbackCanonicalHop(req, loginPath(returnTo));
+  if (hop) return NextResponse.redirect(hop, { status: 307 });
+
   const res = NextResponse.redirect(attempt.url, { status: 303 });
   res.cookies.set(
     LOGIN_ATTEMPT_COOKIE,
