@@ -63,6 +63,12 @@ Full executable commands from the repo profile, not widened:
 - Max test runs: 2
 - E2e (the only policy-allowed e2e command):
   `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"`
+- E2e from the repo root (the human-facing entry this spec adds):
+  `npm run test:e2e` runs prod then dev harness in sequence. Harness knobs
+  (`E2E_CONCURRENCY`, `E2E_*_PORT`, `E2E_QUEUE_ACQUIRE_GRACE_MS`,
+  `E2E_SLOT_MAX_AGE_MS`, `TEST_REDIS_URL`) are read from the repo-root
+  `.env.development` when the shell leaves them unset — only harness-owned names
+  are adopted, so the file's master keys never enter a harness child process.
 - Build: **none** — the repo profile declares no build command, and this spec adds
   none. (The harness itself invokes workspace builds internally at run time; that is
   product behavior, not a spec build step.)
@@ -81,6 +87,17 @@ apps/app/test/e2e/stack.ts             MODIFIED — consumes derived ports
 apps/app/test/e2e/degraded-app.ts      MODIFIED — consumes the derived degraded port
 apps/app/test/slot-ports.test.ts       NEW — jest unit tests (derivation)
 apps/app/test/slot-queue.test.ts       NEW — jest unit tests (queue/reclaim/markers)
+apps/app/test/e2e/env-file.ts          NEW — adopt harness knobs (E2E_*, port
+                                       overrides) from the repo-root
+                                       `.env.development`; secrets stay in the file
+apps/app/test/harness-env.test.ts      NEW — jest unit tests (adoption, isolation)
+apps/app/playwright.config.ts          MODIFIED — load harness env before any slot
+                                       or port decision
+apps/app/playwright.dev.config.ts      MODIFIED — same for the dev harness
+package.json (root)                    MODIFIED — `test:e2e` runs the harness
+                                       from the repo root
+scripts/setup-dev-env.sh               MODIFIED — emits the e2e block
+.env.development.example               MODIFIED — documents the e2e knobs
 docs/specs/SPEC-e2e-stack-slots.md     THIS SPEC
 
 apps/app/app/auth/login/route.ts       MODIFIED — hop a loopback spelling to

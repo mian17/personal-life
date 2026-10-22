@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import { E2E_OWNER, testPorts } from './test/e2e/config';
+import { loadHarnessEnv } from './test/e2e/env-file';
 import { heldSlot } from './test/e2e/teardown';
+
+// Read harness knobs (`E2E_CONCURRENCY`, port overrides) from `.env.development`
+// before any slot or port decision is made.
+loadHarnessEnv();
 
 /**
  * Playwright config for the cross-service login flow.

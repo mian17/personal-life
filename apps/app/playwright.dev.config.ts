@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 import { devPorts } from './test/e2e/config';
+import { loadHarnessEnv } from './test/e2e/env-file';
 import { heldSlot } from './test/e2e/teardown';
+
+loadHarnessEnv();
 
 /**
  * Development-mode harness: `next dev` (the human's `npm run dev` runtime) on

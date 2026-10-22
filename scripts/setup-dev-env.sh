@@ -102,6 +102,22 @@ OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,ht
 # GEMINI_API_BASE=
 # USDA_API_KEY=          # USDA resolution off until set (DEMO_KEY = public, rate-limited)
 # USDA_API_BASE=
+
+# --- e2e harness (apps/app/test/e2e) ----------------------------------------
+# Read by both Playwright configs (test/e2e/env-file.ts), so `npm run test:e2e`
+# from the repo root picks these up without prefixing the command. Only
+# harness-owned names are adopted — master keys in this file never reach a
+# harness child process. Shell values win over the file.
+#
+# Slots this machine hands out to concurrent e2e runs, 1-9 (default 1: one run
+# builds and binds at a time, every other attempt queues). Raise only when the
+# box can build that many stacks at once — five parallel `next build`s OOM a
+# 16 GB machine.
+# E2E_CONCURRENCY=1
+# How long an attempt queues before it reports E2E_QUEUE_TIMEOUT (ms).
+# E2E_QUEUE_ACQUIRE_GRACE_MS=480000
+# How long a claim may go unreleased before a dead run's slot is reclaimed (ms).
+# E2E_SLOT_MAX_AGE_MS=1800000
 EOF
 
 chmod 600 "$DEST"

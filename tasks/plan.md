@@ -28,6 +28,7 @@ No new dependency: `node:fs`, `node:os`, `node:path`, `node:process` only.
 - [ ] Task 4: Production harness claims a slot before build, releases at teardown
 - [ ] Task 5: Dev harness claims its own slot
 - [ ] Task 6: Loopback login hop (in scope — the harness made the bug reachable)
+- [ ] Task 7: One root e2e entry, knobs from `.env.development`
 
 Checkpoint after Tasks 1-3: derivation and queue unit suites green, `npm run typecheck` green, no harness entry point wired yet — queue logic provable without booting a stack.
 
@@ -168,6 +169,30 @@ Non-loopback hosts (production, Tailscale) are untouched.
 
 **Files:** `apps/app/lib/auth/origin.ts`, `apps/app/app/auth/login/route.ts`,
 `apps/app/middleware.ts` (comment), `apps/app/test/origin.test.ts`.
+
+## Task 7: One root e2e entry, knobs from `.env.development`
+
+**Description:** Add `npm run test:e2e` at the repo root so the harness runs without
+`cd apps/app`, and let a machine set harness knobs once in the repo-root
+`.env.development` — the file `npm run dev:build` already reads — instead of prefixing
+every command. Both Playwright configs adopt only harness-owned names
+(`E2E_*`, `TEST_REDIS_URL`, `APP_DEV_URL`) from that file; the file also holds master
+keys and DB passwords, and harness children are spawned with the whole process env, so
+loading it wholesale would hand production-shaped secrets to processes that must not
+see them. Shell values keep winning over the file. `scripts/setup-dev-env.sh` and the
+tracked example emit the block so a fresh checkout documents the knobs.
+
+**Acceptance criteria:**
+- [ ] `npm run test:e2e` at the repo root runs `apps/app` prod + dev harness (same sequence `apps/app`'s `test:e2e` already has).
+- [ ] `E2E_CONCURRENCY` set in the repo-root `.env.development` reaches the slot queue; an invalid value fails fast before any claim.
+- [ ] Names outside the harness allowlist (`NOTE_MASTER_KEY` etc.) stay out of `process.env`.
+- [ ] A shell-set value is not overridden by the file.
+- [ ] `npm run test:unit -- test/harness-env.test.ts` green; `npm run typecheck -w apps/app` green.
+
+**Files:** `package.json` (root), `apps/app/test/e2e/env-file.ts`,
+`apps/app/playwright.config.ts`, `apps/app/playwright.dev.config.ts`,
+`apps/app/test/harness-env.test.ts`, `scripts/setup-dev-env.sh`,
+`.env.development.example`, `docs/specs/SPEC-e2e-stack-slots.md`.
 
 ## Risks
 
