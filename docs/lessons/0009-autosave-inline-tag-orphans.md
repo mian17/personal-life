@@ -1,5 +1,9 @@
 # 0009 — inline `#tag` creation on autosave leaks orphan tags
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Summary:** Never create registry rows by parsing a draft: gate inline-tag creation on a user-produced terminator (whitespace); classify trigger vs inherent orphans.
 
 **Date:** 2026-10-01 — orphaned-tag investigation.

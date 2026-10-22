@@ -1,5 +1,9 @@
 # Deploy runbook — feedback stack (deploy `master`)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Deploy ref: **`master` after merging `feat/app-feedback`** (39 commits).
 
 Runs entirely in the **primary checkout** — `/home/night/WebstormProjects/personal-life` —

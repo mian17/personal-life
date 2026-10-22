@@ -1,5 +1,9 @@
 # Production runbook — todo-completion-history + todo-custom-repeat
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 > **App tip superseded:** the branch tip has moved past `5157bf1`; the app-side Done
 > reshape (`5157bf1..df7f58b`) is documented in `docs/runbooks/deploy-done-reshape.md`. The
 > backend chapters below are unchanged — deploy at `df7f58b` rather than `5157bf1`.

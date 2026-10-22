@@ -1,5 +1,9 @@
 # Production runbook addendum — meal photo → real foods (meal-ingredients chapter)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Scope: the **meal-ingredients** chapter — photo identity resolution on top of the
 meal-nutrition stack: each estimate item becomes a catalog food at 100 g with a
 USDA-verified 27-nutrient vector, logged by grams. Backend, env, and backup; no

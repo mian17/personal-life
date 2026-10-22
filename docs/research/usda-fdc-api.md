@@ -1,5 +1,9 @@
 # USDA FoodData Central API — reference
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Source:** the FDC OpenAPI 3.0 spec, pasted by the user 2026-10-04 while scoping
 `docs/intent/meal-food-capture.md`. **Canonical copy:** `GET https://api.nal.usda.gov/fdc/v1/yaml-spec`
 (also `/v1/json-spec`). **Version:** 1.0.1. **License:** CC0 1.0 Universal —

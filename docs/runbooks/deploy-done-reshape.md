@@ -1,5 +1,9 @@
 # Production runbook addendum — Done reshape (on top of completion-history + custom-repeat)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Scope: **`5157bf1..df7f58b`** on branch `feat/done-checkmark-undo` (tip **`df7f58b`**).
 This delta is **`apps/app` + `packages/ui` only** — no backend, no schema, no env.
 

@@ -1,5 +1,9 @@
 # Handoff — `docker compose up -d --build` hangs: root cause + prevention
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Repo: `/home/night/WebstormProjects/personal-life`
 Written: 2026-10-16. Author session: found root cause; spec **not** written yet. Repo untouched.
 

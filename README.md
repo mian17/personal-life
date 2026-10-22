@@ -243,8 +243,9 @@ on the host.
 
 ## Docs
 
-- Intent: `docs/intent/personal-life-api.md`
-- Spec: `docs/specs/SPEC-notes.md`
-- Plan / tasks: `tasks/plan.md`, `tasks/todo.md`
-- Notes UI spec: `docs/specs/SPEC-notes-ui.md`
-- Notes UI plan / tasks: `tasks/plan-notes-ui.md`, `tasks/todo-notes-ui.md`
+Planning docs (intent, specs, task plans) were removed in `d1f54c9`; recover any one
+with `git show d1f54c9^:<path>`. Kept: `AGENTS.md`, `docs/runbooks/`, `docs/lessons/`,
+`docs/research/`, `docs/reports/`.
+
+- Notes design (intent, spec, plan, tasks): `d1f54c9^:docs/intent/personal-life-api.md`,
+  `d1f54c9^:docs/specs/SPEC-notes.md`, `d1f54c9^:tasks/plan.md`.

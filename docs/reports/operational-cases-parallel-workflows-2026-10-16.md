@@ -1,5 +1,9 @@
 # Operational Cases — Parallel `agents-hard-gates` Run (2026-10-16)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Retrospective of the operational problems hit while four `agents-hard-gates`
 workflows ran in parallel against one monorepo, one git worktree each. This is a
 process/incident report, not a code review. For the per-feature outcomes see the

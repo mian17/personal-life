@@ -1,5 +1,9 @@
 # Production runbook addendum — meal-service (meal-nutrition chapter)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Scope: the **meal-nutrition** chapter — a **new** backend service, `apps/meal-service`
 (NestJS REST API on **`:3106`**), its shared library `packages/nutrition`, its dedicated
 Redis (`redis-meal`), and the meals routes/BFF in `apps/app`. Backend + compose + env; the

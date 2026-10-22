@@ -1,4 +1,8 @@
 ---
+
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
 title: MCP protocol best practice — delta against @life/ops
 status: research (read-only lane output, not a decision)
 date: 2026-10-18

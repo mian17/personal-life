@@ -1,5 +1,9 @@
 # Local runbook — meal photo → real foods (meal-ingredients chapter)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Scope: run the **meal photo → real foods** feature on a laptop with `npm run dev:build`,
 then test its three identity-resolution paths by hand. This is the development
 companion to `docs/runbooks/deploy-meal-nutrition.md` (production). Read it with

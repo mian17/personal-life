@@ -328,7 +328,7 @@ services:
   # One instance per service (app, idp, note, tags, todo, meal, feedback): app is the
   # persisted session store; the six others are unpersisted read-through caches. Internal
   # network only — NO published host ports. See README "Auth model" and
-  # tasks/plan-redis.md decisions 2/6.
+  # Redis wiring decisions: tasks/plan-redis.md (removed in d1f54c9; see git history).
   redis-app:
     image: redis:8-alpine
     command: redis-server --appendonly yes
@@ -462,7 +462,7 @@ services:
   # Production uses the internal compose network (`postgres-feedback:5432`,
   # `rabbitmq-feedback:5672`).
   # `redis-feedback` stays internal-only, like the other Redis instances above.
-  # See docs/specs/SPEC-feedback-infra.md "compose.yaml additions".
+  # Contract: docs/specs/SPEC-feedback-infra.md "compose.yaml additions" (d1f54c9^).
   postgres-feedback:
     image: postgres:17-alpine
     environment:

@@ -1,5 +1,9 @@
 # Production runbook — full stack (deploy `master` @ `21f7256`)
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Authoritative deploy procedure for this host. Replaces the earlier
 `master..refactor/notes-todos-shared-ui` runbook, which predates `feedback-service`,
 `meal-service` and the `Autosuggest`/food-catalog work and would stop a stack that now
@@ -187,7 +191,7 @@ cd /home/night/WebstormProjects/personal-life
 
 - [ ] Ref pinned: `git log -1 --oneline` → record the commit you are deploying. It must
       contain the feedback status workflow — check with
-      `git log --oneline -1 -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
+      `git log --oneline -1 d1f54c9^ -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
       "unknown revision"). On the revision this runbook was written against that is
       `21f7256`; `git status --short` shows only untracked `docs/reference-repo/`,
       `pictures/`, `.pi/`.
@@ -544,7 +548,7 @@ disagree (they predate `master`'s current service set):
   containers where compose.yaml now defines 16, and its "zero migration" claim misses both
   human-run migrations of §0. Keep for history; do not follow.
 
-Contracts: `docs/specs/SPEC-compose-build.md` (the shared build layer this runbook's
+Contracts (all at `d1f54c9^`): `docs/specs/SPEC-compose-build.md` (the shared build layer this runbook's
 preflight pins), `docs/specs/SPEC-db-backup-restore.md` (SQLite backup/restore),
 `docs/specs/SPEC-feedback-infra.md` (`db:*:pg`, Postgres/RabbitMQ, the cron lines),
 `docs/specs/SPEC-service-kernel.md` (the shared `life-api` audience), and

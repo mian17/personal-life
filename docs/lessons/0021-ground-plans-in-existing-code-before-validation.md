@@ -1,5 +1,9 @@
 # 0021 — Ground a plan in the existing code before validation, or the gate becomes whack-a-mole
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Summary:** Before writing specs/plans that extend an existing surface, read the real code that already owns the rules (cache package, existing helpers, root workspace list, test harness); ungrounded drafting makes the §6 gate surface your drafting errors one round at a time instead of converging.
 - **Date:** 2026-10-02
 - **Source:** user pushback during the meal-nutrition plan-validation loop

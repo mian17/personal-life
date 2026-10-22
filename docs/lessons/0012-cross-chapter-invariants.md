@@ -1,5 +1,9 @@
 # 0012 — A later chapter can overwrite an earlier locked decision; per-chapter validation cannot catch it
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Summary:** Read the governing intent/map before extending a surface; validation is intra-chapter, locked decisions are cross-chapter; a spec rationalization is a smell.
 
 - **Date:** 2026-10-01

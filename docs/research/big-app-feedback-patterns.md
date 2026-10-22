@@ -1,5 +1,9 @@
 # In-app feedback patterns in well-known products
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Purpose: evidence base for the `feedback-service` spec (shared submit form in every app's
 toolbar, owner-only inbox grouped by app then type, durable `feedback.submitted` stream).
 

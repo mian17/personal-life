@@ -1,5 +1,9 @@
 # 0011 — "Per-service Redis" means a dedicated instance, not a shared one
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Summary:** "Per-service cache" means a dedicated instance, not a shared one with namespaced keys; verify ownership, not presence.
 
 - **Date:** 2026-10-01

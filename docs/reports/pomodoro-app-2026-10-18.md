@@ -1,5 +1,9 @@
 # Report: pomodoro `/pomodoro` focus timer
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 **Verdict: PASS** — every hard gate passed. Change is **uncommitted** in the worktree, awaiting human review.
 
 - Repo/worktree: `/home/night/WebstormProjects/personal-life/.pi/worktrees/pomodoro-app`

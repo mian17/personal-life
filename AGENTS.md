@@ -7,12 +7,17 @@
 | `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
 | `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
 | `max-test-runs` | 2 |
-| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts`, `SPEC-ui-tokens.md` value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
+| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts` is the value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
 | `lessons` | `docs/lessons/` |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
 thinking discipline) are in the global protocol at `~/.config/opencode/AGENTS.md`.
+
+Docs layout: `docs/specs/`, `docs/intent/` and `tasks/` were removed in `d1f54c9` and
+are not restored wholesale — a run that needs a spec writes `docs/specs/SPEC-<module>.md`
+(or `SPEC.md` at the root for a single capability) and an intent writes
+`docs/intent/<topic>.md`, so `agents-hard-gates` keeps working unchanged.
 
 ## Contract 1 — Shared UI Contract (`@life/ui`)
 
@@ -52,7 +57,9 @@ a visual element and Rule 3 applies.
 1. Extend `@life/ui` upstream. Prop/slot/variant first; a new atom/block only when the
    concept is genuinely reusable across apps. Spec-first, always: update
    `docs/specs/SPEC-ui-*.md` (and `MAP-ui-primitives.md` for a new component) in the
-   same change, implement in `packages/ui` with tests, then consume from the app.
+   same change, implement in `packages/ui` with tests, then consume from the app. Those
+   specs were removed from the tree in `d1f54c9` — restore the one you need from
+   `git show d1f54c9^:<path>` instead of starting a competing copy.
 2. Genuinely app-specific **behavior** (page glue, domain widgets like the editor's
    autosave engine) stays in `apps/*` — but it must be composed FROM primitives and
    may not introduce new visual language. A new visual concept is case 1, not case 2.
@@ -64,9 +71,8 @@ a visual element and Rule 3 applies.
 
 - The e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`):
   never change without the user's explicit approval.
-- Token values: a deliberate theme change updates `packages/ui/test/tokens.test.ts` and
-  `SPEC-ui-tokens.md`'s value table in the same commit. Those are tripwires, not
-  suggestions.
+- Token values: a deliberate theme change updates `packages/ui/test/tokens.test.ts` in the
+  same commit. Those are tripwires, not suggestions.
 - PWA constants (`public/manifest-*.json`, `viewport.themeColor`) are app-owned and move
   only when the user asks.
 
@@ -138,9 +144,9 @@ improvised at implementation time.
 - The second service must NOT fork `notes-cache.ts` — extract the generic
   read-through cache into a shared workspace package first (same no-fork rule as
   `@life/ui`).
-- Content-bearing services additionally follow `docs/specs/SPEC-notes-at-rest.md`
-  (envelope at rest, `@life/crypto` consumption): this cache contract is one half
-  of that at-rest contract.
+- Content-bearing services additionally follow the notes at-rest contract — envelope at
+  rest, `@life/crypto` consumption (`docs/specs/SPEC-notes-at-rest.md` at `d1f54c9^` when
+  you need the wording). This cache contract is one half of that at-rest contract.
 
 ### Mechanical checks (tech lead runs at every review touching a backend service)
 
@@ -149,8 +155,9 @@ improvised at implementation time.
 - Every cache-write site passes the ciphertext test: the service's cache suite
   asserts serialized values contain `enc.v1.` and no known plaintext (pattern:
   `apps/note-service/test/notes-cache.e2e-spec.ts`).
-- `grep -rn "## Cache Rules" docs/specs/SPEC-*.md` → every backend service spec
-  has one.
+- Every backend service spec carries a `## Cache Rules` section → the service has one.
+  The spec corpus was removed in `d1f54c9`, so a service you touch needs its spec
+  restored from `d1f54c9^` before the check can see it.
 - No content matching in SQL over encrypted columns — filters run in memory
   post-decrypt (`content-match.ts` pattern).
 

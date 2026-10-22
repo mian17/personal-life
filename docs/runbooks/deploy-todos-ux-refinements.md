@@ -1,5 +1,9 @@
 # Production runbook addendum — Done ordering, quadrant tint, debounced toggles
 
+> Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
+> recover any of them with `git show d1f54c9^:<path>`. New work still writes them
+> (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
+
 Scope: **`2469ad4..f86e32e`** on branch `feat/done-checkmark-undo` (tip **`f86e32e`**).
 This delta is **`apps/app` only** — no `packages/ui` source, no backend, no schema, no env,
 no compose.
