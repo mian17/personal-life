@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { devPorts } from './test/e2e/config';
+import { heldSlot } from './test/e2e/teardown';
 
 /**
  * Development-mode harness: `next dev` (the human's `npm run dev` runtime) on
@@ -25,7 +26,9 @@ export default defineConfig({
   globalSetup: './test/e2e/global-setup.dev.ts',
   globalTeardown: './test/e2e/global-teardown.dev.ts',
   use: {
-    baseURL: process.env.APP_DEV_URL ?? `http://127.0.0.1:${devPorts().appPort}`,
+    // The slot `global-setup.dev.ts` claimed decides the port, so the browser
+    // follows the claim instead of pointing at another worktree's band.
+    baseURL: process.env.APP_DEV_URL ?? `http://127.0.0.1:${devPorts(heldSlot()).appPort}`,
     // No tailscale header: the access gate is skipped in dev by contract, and
     // the identity login wall is what this harness exercises for real.
     trace: 'retain-on-failure',

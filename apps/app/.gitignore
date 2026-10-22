@@ -5,3 +5,4 @@ blob-report/
 .e2e-state/
 .e2e-state-dev/
 test/e2e/service-pids-*.json
+test/e2e/service-slot.json

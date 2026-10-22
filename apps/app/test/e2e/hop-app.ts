@@ -1,6 +1,7 @@
 import { createClient } from 'redis';
 import { spawnService, waitForHttp, type SpawnedService } from './services';
 import { E2E_APP_SECRET, E2E_OWNER, hopPorts, repoRoot, testPorts } from './config';
+import { heldSlot } from './teardown';
 
 /**
  * Two real app replicas for the Redis hop proof (Task 3 of the Redis chapter).
@@ -36,7 +37,7 @@ export interface HopApps {
 
 /** Per-instance env: same Redis + IdP + note-service, distinct port/origin. */
 function hopAppEnv(port: number, redisUrl: string): NodeJS.ProcessEnv {
-  const { idpPort, notePort } = testPorts();
+  const { idpPort, notePort } = testPorts(heldSlot());
   const origin = `http://localhost:${port}`;
   return {
     NODE_ENV: 'production',
@@ -63,7 +64,7 @@ function hopAppEnv(port: number, redisUrl: string): NodeJS.ProcessEnv {
  * redirect/forbidden with no session, exactly as `degraded-app.ts` waits).
  */
 export async function startHopApps(redisUrl: string): Promise<HopApps> {
-  const { appAPort, appBPort } = hopPorts();
+  const { appAPort, appBPort } = hopPorts(heldSlot());
 
   const serviceA = await spawnService({
     name: 'app-a',

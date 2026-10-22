@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { E2E_OWNER, testPorts } from './config';
+import { heldSlot } from './teardown';
 
 /**
  * Production-only: the Tailscale **access gate**. Dev skips it by contract (no
@@ -11,7 +12,7 @@ import { E2E_OWNER, testPorts } from './config';
  * config-level `extraHTTPHeaders` would otherwise leak in).
  */
 
-const APP = `http://localhost:${testPorts().appPort}`;
+const APP = `http://localhost:${testPorts(heldSlot()).appPort}`;
 
 async function get(headers: Record<string, string>): Promise<Response> {
   return fetch(`${APP}/`, { redirect: 'manual', headers });

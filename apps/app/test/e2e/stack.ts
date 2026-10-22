@@ -2,12 +2,13 @@ import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
+import { degradedRedirectUris } from './degraded-app';
 import {
   E2E_APP_SECRET,
   E2E_OWNER,
   E2E_PASSWORD,
   E2E_USER,
-  FEEDBACK_PG_CONTAINER,
+  feedbackPgContainer,
   hopPorts,
   repoRoot,
 } from './config';
@@ -18,8 +19,8 @@ import {
  * replica A. Additive only: extra loopback redirect URIs are inert for every
  * other spec, and the IdP still rejects any unregistered callback.
  */
-function hopRedirectUris(): string[] {
-  const { appAPort, appBPort } = hopPorts();
+function hopRedirectUris(slot: number): string[] {
+  const { appAPort, appBPort } = hopPorts(slot);
   return [
     `http://localhost:${appAPort}/auth/callback`,
     `http://127.0.0.1:${appAPort}/auth/callback`,
@@ -60,6 +61,11 @@ export interface StackConfig {
   /** Scratch directory for the IdP/note-service DBs and keys. */
   stateDir: string;
   mode: 'production' | 'development';
+  /**
+   * The slot this stack owns: names its throwaway Postgres container and the
+   * degraded app's callback. Defaults to slot 0.
+   */
+  slot?: number;
 }
 
 export function appOriginFor(host: string, appPort: number): string {
@@ -120,7 +126,8 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     OIDC_APP_REDIRECT_URIS: [
       `http://localhost:${cfg.appPort}/auth/callback`,
       `http://127.0.0.1:${cfg.appPort}/auth/callback`,
-      ...hopRedirectUris(),
+      ...hopRedirectUris(cfg.slot ?? 0),
+      ...degradedRedirectUris(cfg.slot ?? 0),
     ].join(','),
     SEED_USERNAME: E2E_USER,
     SEED_PASSWORD: E2E_PASSWORD,
@@ -242,11 +249,12 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
 
 /**
  * A throwaway Postgres for feedback-service (the `pg-integration.test.ts`
- * pattern): fixed-name `postgres:17-alpine` container, ephemeral loopback port,
+ * pattern): slot-named `postgres:17-alpine` container, ephemeral loopback port,
  * never the compose `postgres-feedback`. A host without Docker fails fast — this e2e is
  * the feedback chapter's final proof, so a silent skip would hide it.
  */
-async function startThrowawayPostgres(): Promise<string> {
+async function startThrowawayPostgres(slot: number): Promise<string> {
+  const container = feedbackPgContainer(slot);
   const docker = (args: string[], capture = false): string =>
     execFileSync('docker', args, {
       encoding: 'utf8',
@@ -261,13 +269,13 @@ async function startThrowawayPostgres(): Promise<string> {
     );
   }
 
-  docker(['rm', '-f', FEEDBACK_PG_CONTAINER]);
+  docker(['rm', '-f', container]);
   docker([
     'run',
     '--rm',
     '-d',
     '--name',
-    FEEDBACK_PG_CONTAINER,
+    container,
     '-e',
     'POSTGRES_PASSWORD=test-only',
     '-e',
@@ -280,32 +288,33 @@ async function startThrowawayPostgres(): Promise<string> {
   const deadline = Date.now() + 60_000;
   for (;;) {
     try {
-      docker(['exec', FEEDBACK_PG_CONTAINER, 'pg_isready', '-U', 'postgres'], true);
+      docker(['exec', container, 'pg_isready', '-U', 'postgres'], true);
       break;
     } catch {
       if (Date.now() > deadline) {
-        stopThrowawayPostgres();
+        stopThrowawayPostgres(slot);
         throw new Error('throwaway Postgres never became ready');
       }
       await new Promise((r) => setTimeout(r, 500));
     }
   }
 
-  const mapped = docker(['port', FEEDBACK_PG_CONTAINER, '5432/tcp'], true)
-    .trim()
-    .split('\n')[0] ?? '';
+  const mapped = docker(['port', container, '5432/tcp'], true).trim().split('\n')[0] ?? '';
   const port = /:(\d+)$/.exec(mapped)?.[1];
   if (!port) {
-    stopThrowawayPostgres();
+    stopThrowawayPostgres(slot);
     throw new Error('throwaway Postgres never published a port');
   }
   return `postgresql://postgres:test-only@127.0.0.1:${port}/feedback`;
 }
 
-/** Force-remove the throwaway Postgres container (best-effort). */
-export function stopThrowawayPostgres(): void {
+/**
+ * Force-removes the slot's throwaway Postgres container (best-effort). Takes the
+ * slot its creator started it on, so teardown never removes another slot's DB.
+ */
+export function stopThrowawayPostgres(slot: number): void {
   try {
-    execFileSync('docker', ['rm', '-f', FEEDBACK_PG_CONTAINER], { stdio: 'ignore' });
+    execFileSync('docker', ['rm', '-f', feedbackPgContainer(slot)], { stdio: 'ignore' });
   } catch {
     // Already gone, or Docker unavailable at teardown.
   }
@@ -401,7 +410,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     // Skipped when the stack has no feedback port (the dev harness).
     const feedbackPort = cfg.feedbackPort;
     if (feedbackPort !== undefined) {
-      const feedbackDbUrl = await startThrowawayPostgres();
+      const feedbackDbUrl = await startThrowawayPostgres(cfg.slot ?? 0);
       await build('apps/feedback-service');
       services.push(
         await spawnService({
