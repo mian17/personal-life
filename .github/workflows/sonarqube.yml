@@ -1,0 +1,22 @@
+name: SonarQube
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    # Self-hosted runner on the same host as the SonarQube container,
+    # so http://127.0.0.1:9000 is reachable without exposing the instance.
+    runs-on: [self-hosted, sonarqube]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: http://127.0.0.1:9000
