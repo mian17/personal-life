@@ -10,7 +10,8 @@ loadHarnessEnv();
  * scratch DBs, reached on `127.0.0.1`.
  *
  * Run separately from the production harness because `next dev` and `next build`
- * share `apps/app/.next`. `npm run test:e2e -w apps/app` runs both in sequence.
+ * share `apps/app/.next`. `npm run test:e2e:prod-build -w apps/app` then
+ * `npm run test:e2e:dev-server -w apps/app` runs both in sequence.
  *
  * The access gate is skipped on the dev stack by the `APP_DEV_SKIP_ACCESS_GATE=1`
  * flag (set by `stack.ts`), so no tailscale header is sent (dev has no Tailscale

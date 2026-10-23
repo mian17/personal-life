@@ -183,7 +183,7 @@ see them. Shell values keep winning over the file. `scripts/setup-dev-env.sh` an
 tracked example emit the block so a fresh checkout documents the knobs.
 
 **Acceptance criteria:**
-- [ ] `npm run test:e2e` at the repo root runs `apps/app` prod + dev harness (same sequence `apps/app`'s `test:e2e` already has).
+- [ ] `npm run test:e2e` at the repo root runs both harnesses in order — `test:e2e:prod-build` (the built artifact) then `test:e2e:dev-server` (`next dev`) — each named for the runtime it boots.
 - [ ] `E2E_CONCURRENCY` set in the repo-root `.env.development` reaches the slot queue; an invalid value fails fast before any claim.
 - [ ] Names outside the harness allowlist (`NOTE_MASTER_KEY` etc.) stay out of `process.env`.
 - [ ] A shell-set value is not overridden by the file.

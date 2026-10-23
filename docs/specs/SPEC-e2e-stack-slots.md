@@ -64,7 +64,10 @@ Full executable commands from the repo profile, not widened:
 - E2e (the only policy-allowed e2e command):
   `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"`
 - E2e from the repo root (the human-facing entry this spec adds):
-  `npm run test:e2e` runs prod then dev harness in sequence. Harness knobs
+  `npm run test:e2e` runs both harnesses in sequence, named for the runtime each
+  one boots: `test:e2e:prod-build` (`next build` + `standalone/server.js`, the
+  artifact the Docker image ships) then `test:e2e:dev-server` (`next dev`, the
+  runtime a human runs). Harness knobs
   (`E2E_CONCURRENCY`, `E2E_*_PORT`, `E2E_QUEUE_ACQUIRE_GRACE_MS`,
   `E2E_SLOT_MAX_AGE_MS`, `TEST_REDIS_URL`) are read from the repo-root
   `.env.development` when the shell leaves them unset — only harness-owned names
