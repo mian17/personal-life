@@ -94,9 +94,13 @@ export function testRedisUrl(): string | undefined {
 export const prodPidsFile = 'service-pids-prod.json';
 export const devPidsFile = 'service-pids-dev.json';
 
-/** Absolute path of a recorded-PID file, kept outside the repository. */
+/**
+ * Absolute path of this worktree's recorded-PID file, kept outside the
+ * repository. Worktree-scoped because two worktrees run the harness at the same
+ * time: a shared name lets one run's teardown stop the other run's services.
+ */
 export function pidsFilePath(file: string): string {
-  return join(artifactsRoot(), file);
+  return join(artifactsRoot(), `${basename(repoRoot())}-${file}`);
 }
 
 /**

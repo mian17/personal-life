@@ -128,7 +128,10 @@ worktree by design; cross-machine locking is out of scope.
 
 A worktree holds **at most one slot at a time**: two stacks in one worktree share its build
 output (each service's `dist/`, built with `deleteOutDir`, and `apps/app/.next`), so the
-second build deletes what the first is running. Distinct slots isolate ports and containers
+second build deletes what the first is running. Everything a run records — its
+service PIDs and the slot it holds — is namespaced by worktree for the same
+reason: a shared `/tmp` file name lets one worktree's teardown stop the other
+worktree's services. Distinct slots isolate ports and containers
 and cannot isolate a shared directory, so a second attempt in a worktree that already holds
 a slot is refused with `E2E_WORKTREE_BUSY` rather than handed slot 1. A setup that throws
 after booting the slot's containers removes them, because Playwright never runs

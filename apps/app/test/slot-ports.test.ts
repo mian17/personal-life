@@ -1,6 +1,7 @@
 import {
   degradedAppPort,
   devPorts,
+  pidsFilePath,
   feedbackMqContainer,
   feedbackPgContainer,
   hopEnabled,
@@ -170,6 +171,16 @@ describe('slot-derived harness ports', () => {
 
     process.env.E2E_HOP = '1';
     expect(hopEnabled()).toBe(true);
+  });
+
+  it('keeps the recorded-PID file inside this worktree, not shared between worktrees', () => {
+    process.env.E2E_REPO_ROOT = '/tmp/worktree-alpha';
+
+    const alpha = pidsFilePath('service-pids-prod.json');
+    process.env.E2E_REPO_ROOT = '/tmp/worktree-beta';
+
+    expect(alpha).toMatch(/worktree-alpha-service-pids-prod\.json$/);
+    expect(pidsFilePath('service-pids-prod.json')).not.toBe(alpha);
   });
 
   it('reports a pinned TEST_REDIS_URL trimmed, and undefined when unset or blank', () => {

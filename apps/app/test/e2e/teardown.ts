@@ -1,6 +1,7 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { artifactsRoot, pidsFilePath } from './config';
+import { basename } from 'node:path';
+import { artifactsRoot, pidsFilePath, repoRoot } from './config';
 import { releaseSlot, type SlotClaim } from './slot-queue';
 
 /**
@@ -68,7 +69,7 @@ export function releaseHeldSlot(): void {
 
 /** One harness runs at a time per worktree, so one record file serves them all. */
 function heldSlotFile(): string {
-  return join(artifactsRoot(), 'service-slot.json');
+  return join(artifactsRoot(), `${basename(repoRoot())}-service-slot.json`);
 }
 
 function heldClaim(): SlotClaim | undefined {
