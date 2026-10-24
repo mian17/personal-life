@@ -91,7 +91,10 @@ export function createReceiver(config) {
       componentKeys: config.projectKey,
       resolved: 'false',
       inNewCodePeriod: 'true',
-      severities: 'BLOCKER,CRITICAL,MAJOR',
+      // MINOR included: the gate counts every new violation, so a MINOR-only
+      // new-code set still fails `new_violations > 0`. Filtering MINOR out left
+      // the loop reporting `no-issues` against a red gate.
+      severities: 'BLOCKER,CRITICAL,MAJOR,MINOR',
       types: 'BUG,VULNERABILITY,CODE_SMELL',
       ps: String(config.maxIssues),
       s: 'SEVERITY',

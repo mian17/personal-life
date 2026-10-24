@@ -12,8 +12,11 @@ does the whole job: fix, commit, push, and open the draft PR against `dev`.
 SonarQube's webhook payload reports only the quality gate, never issues. The agent
 could query them through the SonarQube MCP server, but then its scope is whatever
 the project carries — on this repo that is the whole backlog. The receiver pins
-the list to `inNewCodePeriod=true`, `BLOCKER,CRITICAL,MAJOR`, and
+the list to `inNewCodePeriod=true`, `BLOCKER,CRITICAL,MAJOR,MINOR`, and
 `SONAR_AUTOFIX_MAX_ISSUES`, so a run is bounded and the agent cannot wander.
+`MINOR` is in because the gate counts every new violation: a new-code set of only
+MINOR issues still fails `new_violations > 0`, and dropping them made the loop
+log `no-issues` against a red gate.
 
 ## Install
 
