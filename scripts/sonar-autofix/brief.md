@@ -1,19 +1,40 @@
 # SonarQube auto-fix brief
 
 You are fixing static-analysis issues that SonarQube found in the `personal-life`
-repository. The issues are in the JSON file named in the message. Each entry has a
-rule key, severity, file path, line, and message.
+repository, and you deliver the result yourself: one branch, one commit, one draft
+pull request. Nobody commits or opens the PR behind you.
+
+The message names three things: the branch to work on, a JSON file listing the
+issues, and a markdown file holding the PR body. Each issue has a rule key,
+severity, file path, line, and message.
 
 ## What to do
 
-1. Read every issue in the file. Group them by file.
-2. Fix each issue at the smallest possible scope. Touch only the flagged lines and
+1. Read every issue. Group them by file.
+2. You are already on the branch named in the message, in a dedicated worktree. Do
+   not create another branch and do not check out `main`.
+3. Fix each issue at the smallest possible scope. Touch only the flagged lines and
    their immediate surroundings.
-3. After editing, run `npm run typecheck` in the workspace that owns the file you
-   changed (`apps/<name>` or `packages/<name>`). Typecheck must pass before you
-   stop. Do not run test suites, do not run e2e, do not start the dev stack.
-4. Leave the working tree with your edits in place. Do not commit, do not push,
-   do not create a branch. The receiver outside the sandbox does that.
+4. Run `npm run typecheck` in the workspace that owns each file you changed
+   (`apps/<name>` or `packages/<name>`). Typecheck must pass before you commit.
+   Do not run test suites, do not run e2e, do not start the dev stack.
+5. Commit with this exact subject, then a blank line, then one line per issue as
+   `- <rule> <file>:<line>`:
+
+   ```
+   fix(sonar): address <N> new-code issue(s)
+   ```
+
+6. Push the branch: `git push --set-upstream origin <branch>`.
+7. Open the pull request as a **draft** against `main`, using the body file verbatim:
+
+   ```
+   gh pr create --draft --base main --head <branch> \
+     --title "fix(sonar): <N> new-code issue(s)" \
+     --body-file <pr body path>
+   ```
+
+8. Print the PR URL as the last line of your output.
 
 ## Constraints
 
@@ -29,8 +50,10 @@ rule key, severity, file path, line, and message.
   `packages/ui/test/tokens.test.ts`, PWA manifest constants.
 - UI code composes `@life/ui` primitives. Never add bare `<button>`, `<input>`,
   `<textarea>`, `<select>`, `<a>`, `<img>`, `<label>`, or `<progress>` to `apps/*`.
+- Never force-push. Never push to `main`. Never merge the pull request.
+- If nothing needs changing, do not commit and do not open a PR. Say so instead.
 
 ## When you finish
 
 Print a short report: one line per issue, `ruleKey file:line`, then `fixed` or
-`skipped — <reason>`. Nothing else.
+`skipped — <reason>`. Then the PR URL on its own last line.

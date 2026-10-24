@@ -4,8 +4,8 @@ SonarQube webhook → host receiver → pi-sbx sandbox agent → draft pull requ
 
 The receiver is the only long-running piece. It validates the webhook signature,
 filters to gate failures on `main` of this project, fetches the new-code issues,
-starts the sandbox agent in a fresh worktree, then commits, pushes, and opens a
-draft PR. The agent fixes; the receiver owns git and GitHub.
+and starts the sandbox agent in a fresh worktree. The agent then does the whole
+job: fix, commit, push, and open the draft PR.
 
 ## Why the receiver owns the issue list
 
@@ -83,17 +83,23 @@ An unsigned request returns `401`, a non-`main` branch returns `202` with
 ## What a real run does
 
 1. `git fetch origin main`, then a worktree at `~/.cache/sonar-autofix/worktree` on
-   branch `fix/sonar-<taskId>`.
-2. `pi-sbx --no-session -p --append-system-prompt scripts/sonar-autofix/brief.md`
-   with the issues file path in the prompt.
-3. `git add`, `git commit`, `git push`, `gh pr create --draft`.
+   branch `fix/sonar-<taskId>`, already checked out.
+2. The receiver writes the issue list and the PR body to
+   `~/.local/state/sonar-autofix/`, then runs
+   `pi-sbx --no-session -p --append-system-prompt scripts/sonar-autofix/brief.md`
+   naming the branch, the issues file, and the PR body file.
+3. Inside the sandbox the agent fixes the issues, runs the owning workspace's
+   `typecheck`, commits `fix(sonar): …`, pushes the branch, and runs
+   `gh pr create --draft --base main`.
+4. The receiver checks what the agent delivered and logs
+   `{"event":"pull-request","by":"agent","url":"…"}`.
 
-The push uses your existing git authentication — the remote is SSH and the
-receiver runs as you, so no credential setup happens inside the receiver and no
-key or ssh config is read or written by it. `gh` only creates the pull request.
+The agent works in its own worktree, on its own branch, and never touches `main`.
+Nothing is merged.
 
-Nothing is merged. The PR is a draft against `main`; you review it like any
-other.
+If the agent commits but does not open the PR, the receiver pushes and creates it
+itself and logs `delivery-fallback` first — work is never left stranded on an
+unpushed branch. If the agent changes nothing, the run logs `no-changes` and ends.
 
 ## Why it cannot loop
 
@@ -106,8 +112,9 @@ draft PR triggers a new `main` analysis, which is the next legitimate run.
 - One run at a time. Overlapping webhooks return `409` and are logged, not
   queued.
 - `SONAR_AUTOFIX_TIMEOUT_MS` (default 30 minutes) kills the agent.
-- The agent cannot commit, push, or reach GitHub with repository credentials; it
-  has the model key only. The receiver does the GitHub work with your `gh` login.
+- The agent needs working git authentication inside the sandbox: the repository
+  mount plus whatever your sandbox already uses for pushes. If a push fails, the
+  run logs the failure and leaves the worktree in place for inspection.
 - If the agent leaves no changes, the run logs `no-changes` and opens no PR.
 - Fixes are new-code only. Whole-repo backlog is out of scope by design; widen
   `SONAR_AUTOFIX_MAX_ISSUES` and drop `inNewCodePeriod` only if you want that.

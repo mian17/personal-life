@@ -152,20 +152,26 @@ export function createReceiver(config) {
     return { worktree, branch };
   }
 
-  async function openPullRequest(worktree, branch, taskId, summary) {
-    await git(['add', '--all'], { cwd: worktree });
-    const staged = await git(['diff', '--cached', '--name-only'], { cwd: worktree });
-    if (staged.length === 0) return { changed: false };
+  /**
+   * The agent owns delivery: it commits, pushes, and opens the draft PR. The
+   * receiver only verifies what happened, because a run that silently produced
+   * commits but no PR is worse than one that failed loudly.
+   */
+  async function inspectDelivery(worktree, branch) {
+    const commits = await git(['rev-list', '--count', `origin/main..${branch}`], { cwd: worktree }).catch(() => '0');
+    const pushed = await run('git', ['-C', worktree, 'ls-remote', '--heads', 'origin', branch]);
+    const pr = await run('gh', ['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
+      cwd: worktree,
+    });
+    return {
+      commits: Number(commits) || 0,
+      pushed: pushed.code === 0 && pushed.output.includes(branch),
+      url: pr.code === 0 ? pr.output.trim() : '',
+    };
+  }
 
-    const message = [
-      `fix(sonar): address ${summary.issues.length} new-code issue(s)`,
-      '',
-      `Analysis ${taskId}. Failed gate conditions: ${summary.conditions.join(', ') || 'none reported'}.`,
-      '',
-      summary.issues.map((issue) => `- ${issue.rule} ${issue.file}:${issue.line}`).join('\n'),
-    ].join('\n');
-    await git(['commit', '-m', message], { cwd: worktree });
-
+  /** Only used when the agent left work behind without opening the PR itself. */
+  async function createPullRequest(worktree, branch, taskId, summary) {
     const push = await run('git', ['-C', worktree, 'push', '--set-upstream', 'origin', branch]);
     if (push.code !== 0) throw new Error(`push failed: ${push.output}`);
 
@@ -175,23 +181,27 @@ export function createReceiver(config) {
       '--base', 'main',
       '--head', branch,
       '--title', `fix(sonar): ${summary.issues.length} new-code issue(s)`,
-      '--body', [
-        `SonarQube reported a quality gate failure on \`main\` (analysis ${taskId}).`,
-        '',
-        'Failed conditions:',
-        ...(summary.conditions.length > 0
-          ? summary.conditions.map((condition) => `- ${condition}`)
-          : ['- none reported']),
-        '',
-        `Targets ${summary.issues.length} of ${summary.total} new-code issues:`,
-        '',
-        ...summary.issues.map((issue) => `- \`${issue.rule}\` ${issue.file}:${issue.line} — ${issue.message}`),
-        '',
-        'Opened by the local sonar-autofix receiver. Review before merging.',
-      ].join('\n'),
+      '--body', pullRequestBody(taskId, summary),
     ], { cwd: worktree });
     if (pr.code !== 0) throw new Error(`gh pr create failed: ${pr.output}`);
-    return { changed: true, url: pr.output.match(/https:\/\/\S+/)?.[0] ?? '' };
+    return pr.output.match(/https:\/\/\S+/)?.[0] ?? '';
+  }
+
+  function pullRequestBody(taskId, summary) {
+    return [
+      `SonarQube reported a quality gate failure on \`main\` (analysis ${taskId}).`,
+      '',
+      'Failed conditions:',
+      ...(summary.conditions.length > 0
+        ? summary.conditions.map((condition) => `- ${condition}`)
+        : ['- none reported']),
+      '',
+      `Targets ${summary.issues.length} of ${summary.total} new-code issues:`,
+      '',
+      ...summary.issues.map((issue) => `- \`${issue.rule}\` ${issue.file}:${issue.line} — ${issue.message}`),
+      '',
+      'Opened by the local sonar-autofix run. Review before merging.',
+    ].join('\n');
   }
 
   async function fixIssues(payload) {
@@ -212,19 +222,39 @@ export function createReceiver(config) {
     }
 
     const { worktree, branch } = await prepareWorktree(taskId);
-    await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
+    const prBodyPath = join(config.stateDir, `pr-body-${taskId}.md`);
+    await writeFile(prBodyPath, pullRequestBody(taskId, summary));
 
+    await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
     const agent = await run('pi-sbx', [
       '--no-session', '-p',
       '--append-system-prompt', brief,
-      `Fix the SonarQube issues listed in ${issuesPath}.`,
+      [
+        `Branch: ${branch}. SonarQube analysis: ${taskId}.`,
+        `Issues: ${issuesPath}`,
+        `PR body: ${prBodyPath}`,
+        'Fix the issues, then commit, push, and open the draft PR as the brief describes.',
+      ].join('\n'),
     ], { cwd: worktree });
     await log('agent-done', { taskId, code: agent.code, tail: agent.output.slice(-1500) });
-    if (agent.code !== 0) throw new Error(`pi-sbx exited ${agent.code}`);
 
-    const result = await openPullRequest(worktree, branch, taskId, summary);
-    await log(result.changed ? 'pull-request' : 'no-changes', { taskId, branch, url: result.url });
+    const delivery = await inspectDelivery(worktree, branch);
+    if (delivery.url) {
+      await log('pull-request', { taskId, branch, url: delivery.url, by: 'agent' });
+      return;
+    }
+
+    if (delivery.commits === 0) {
+      await log('no-changes', { taskId, branch });
+      return;
+    }
+
+    // The agent fixed and committed but did not open the PR; finish the delivery
+    // rather than dropping the work on the floor.
+    await log('delivery-fallback', { taskId, branch, commits: delivery.commits });
+    const url = await createPullRequest(worktree, branch, taskId, summary);
+    await log('pull-request', { taskId, branch, url, by: 'receiver' });
   }
 
   async function handleWebhook(request, response) {
