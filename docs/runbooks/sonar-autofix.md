@@ -114,25 +114,25 @@ A fix lands on `fix/sonar-*`, which the workflow never scans, so its push cannot
 trigger another run. Merging the draft PR into `dev` pushes `dev`, which scans
 once and may start the next legitimate run.
 
-## One caveat about scanning `dev`
+## One caveat about the stored analysis
 
-SonarQube Community Build keeps a single analysis per project and
-`.github/workflows/sonarqube.yml` runs on both `main` and `dev`. Every `dev` scan
-therefore **replaces** the project's stored analysis, and the scanner does not set
-`sonar.branch.name` (Community Build ignores it). Consequences:
+SonarQube Community Build keeps a single analysis per project, and
+`.github/workflows/sonarqube.yml` scans only `dev`. Every scan therefore
+**replaces** the project's stored analysis, because the scanner does not set
+`sonar.branch.name` (Community Build ignores it).
 
-- The gate that triggers a run always describes the most recent scan, which is
-  usually `dev` — coherent, since the fix branches from `dev`.
-- `main`'s own analysis is overwritten by the next `dev` push, so the dashboard
-  no longer tells you how `main` scores alone.
+Consequences:
+
+- The gate-triggered run always describes the most recent scan, which is `dev` —
+  coherent, since fix branches are cut from `dev`.
+- `main` is not scanned at all. It is the release line and receives what `dev`
+  already analysed, so scanning the promotion would only duplicate it.
 - The workflow serialises scans (`concurrency: group: sonarqube`) so two pushes
   cannot race to overwrite the same analysis.
 
-If you need `main` and `dev` measured separately, that is a Developer Edition
-feature; the alternative is to scan only one of them.
-
-Override the target branch with `SONAR_AUTOFIX_BASE_BRANCH` if the integration
-branch ever moves.
+If you ever need `main` and `dev` measured separately, that is a Developer
+Edition feature. Override the target branch with `SONAR_AUTOFIX_BASE_BRANCH` if
+the integration branch ever moves.
 
 ## Limits
 
