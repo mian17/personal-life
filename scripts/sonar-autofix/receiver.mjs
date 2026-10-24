@@ -12,7 +12,7 @@
  *
  * Runbook: docs/runbooks/sonar-autofix.md
  */
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile, appendFile } from 'node:fs/promises';
@@ -76,18 +76,23 @@ function childEnv(overrides = {}) {
 }
 
 /**
- * The slug every path and command argument is built from, derived from the
- * webhook's analysis id. The id itself identifies the analysis for humans, so it
- * is kept for the log line and nothing else: a fixed-length hex digest cannot
- * carry a shell metacharacter, a `..`, or a leading `-`, so no request value
- * reaches an argument or a filename at all (Sonar S6350).
+ * The id this run is filed under: minted here from a counter and the clock, so
+ * it cannot contain anything a webhook sent. Every path, branch name, and
+ * command argument is built from it, which is why no payload value needs to be
+ * filtered, escaped, or trusted on the way to a sink.
  */
-function slugOf(payload) {
-  const raw = payload?.taskId;
-  if (typeof raw !== 'string' || raw.length === 0) {
-    throw new Error('webhook carried no taskId');
-  }
-  return createHash('sha256').update(raw).digest('hex').slice(0, 12);
+let runCounter = 0;
+function nextRunId() {
+  runCounter += 1;
+  return `${Date.now().toString(36)}-${runCounter}`;
+}
+
+/**
+ * A webhook string, reduced to what is safe to show a human. Used for the PR
+ * body only: it is never logged and never becomes part of a command.
+ */
+function displayable(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').slice(0, 64) : 'unknown';
 }
 
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
@@ -244,8 +249,13 @@ export function createReceiver(config) {
     };
   }
 
-  /** Only used when the agent left work behind without opening the PR itself. */
-  async function createPullRequest(worktree, branch, analysisId, summary) {
+  /**
+   * Only used when the agent left work behind without opening the PR itself.
+   * The body goes through `--body-file`: it quotes issue text from the SonarQube
+   * API, so passing it as an argument would put server-supplied strings into
+   * `gh`'s argv (Sonar S6350).
+   */
+  async function createPullRequest(worktree, branch, prBodyPath, summary) {
     const push = await git(['push', '--set-upstream', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
     if (push.code !== 0) throw new Error(`push failed: ${push.output}`);
 
@@ -255,7 +265,7 @@ export function createReceiver(config) {
       '--base', config.baseBranch,
       '--head', branch,
       '--title', `fix(sonar): ${summary.issues.length} new-code issue(s)`,
-      '--body', pullRequestBody(analysisId, summary),
+      '--body-file', prBodyPath,
     ], { cwd: worktree });
     if (pr.code !== 0) throw new Error(`gh pr create failed: ${pr.output}`);
     return pr.output.match(/https:\/\/\S+/)?.[0] ?? '';
@@ -281,14 +291,12 @@ export function createReceiver(config) {
   }
 
   async function fixIssues(payload) {
-    const taskId = slugOf(payload);
-    // The raw id is for humans only (log lines, PR body) and is bounded so it
-    // cannot smuggle markdown or a newline into the body; `taskId` is the slug
-    // every path and argument is derived from.
-    const analysisId = String(payload?.taskId ?? 'unknown').slice(0, 64);
+    const taskId = nextRunId();
+    // Only for the PR body's prose; never logged, never an argument.
+    const analysisId = displayable(payload?.taskId);
     const { total, issues } = await fetchIssues();
     if (issues.length === 0) {
-      await log('no-issues', { taskId, analysisId });
+      await log('no-issues', { taskId });
       return;
     }
 
@@ -297,7 +305,7 @@ export function createReceiver(config) {
     const summary = { total, issues, conditions: describeIssues(payload) };
 
     if (config.dryRun) {
-      await log('dry-run', { taskId, analysisId, issues: issues.length, ofTotal: total, issuesPath });
+      await log('dry-run', { taskId, issues: issues.length, ofTotal: total, issuesPath });
       return;
     }
 
@@ -305,7 +313,7 @@ export function createReceiver(config) {
     const prBodyPath = join(config.stateDir, `pr-body-${taskId}.md`);
     await writeFile(prBodyPath, pullRequestBody(analysisId, summary));
 
-    await log('agent-start', { taskId, analysisId, branch, issues: issues.length, ofTotal: total });
+    await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
     const agentResult = await agent([
       '--no-session', '-p',
@@ -333,7 +341,7 @@ export function createReceiver(config) {
     // The agent fixed and committed but did not open the PR; finish the delivery
     // rather than dropping the work on the floor.
     await log('delivery-fallback', { taskId, branch, commits: delivery.commits });
-    const url = await createPullRequest(worktree, branch, analysisId, summary);
+    const url = await createPullRequest(worktree, branch, prBodyPath, summary);
     await log('pull-request', { taskId, branch, url, by: 'receiver' });
   }
 
@@ -357,17 +365,13 @@ export function createReceiver(config) {
     }
 
     if (!isActionable(payload, config.projectKey)) {
-      await log('ignored', {
-        project: payload.project?.key,
-        status: payload.status,
-        gate: payload.qualityGate?.status,
-      });
+      await log('ignored');
       response.writeHead(202).end('ignored');
       return;
     }
 
     if (busy) {
-      await log('busy', { taskId: payload.taskId });
+      await log('busy');
       response.writeHead(409).end('a fix run is already in progress');
       return;
     }
@@ -375,7 +379,7 @@ export function createReceiver(config) {
     busy = true;
     response.writeHead(202).end('accepted');
     fixIssues(payload)
-      .catch((error) => log('failed', { taskId: payload.taskId, error: String(error.message ?? error) }))
+      .catch((error) => log('failed', { error: String(error.message ?? error) }))
       .finally(() => {
         busy = false;
       });
