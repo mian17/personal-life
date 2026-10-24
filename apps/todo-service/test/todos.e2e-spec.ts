@@ -97,7 +97,8 @@ describe('Todos API (e2e)', () => {
     });
 
     it('rejects a garbage bearer token', async () => {
-      await auth(request(server()).get('/api/todos'), 'not-a-jwt').expect(401);
+      const res = await auth(request(server()).get('/api/todos'), 'not-a-jwt').expect(401);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -153,15 +154,20 @@ describe('Todos API (e2e)', () => {
     });
 
     it('rejects an empty title and a malformed dueDate (400)', async () => {
-      await create({ title: '' }).expect(400);
-      await create({ title: 'bad date', dueDate: '01-10-2026' }).expect(400);
-      await create({}).expect(400);
+      const emptyTitle = await create({ title: '' }).expect(400);
+      expect(emptyTitle.status).toBe(400);
+      const badDate = await create({ title: 'bad date', dueDate: '01-10-2026' }).expect(400);
+      expect(badDate.status).toBe(400);
+      const missingTitle = await create({}).expect(400);
+      expect(missingTitle.status).toBe(400);
     });
 
     it('rejects a foreign/unknown listId with a 404 (never a raw FK failure)', async () => {
       const l = await createList('B-only', tokenB).expect(201);
-      await create({ title: 'cross-list', listId: l.body.id }, tokenA).expect(404);
-      await create({ title: 'missing-list', listId: MISSING_ID }).expect(404);
+      const foreign = await create({ title: 'cross-list', listId: l.body.id }, tokenA).expect(404);
+      expect(foreign.status).toBe(404);
+      const missing = await create({ title: 'missing-list', listId: MISSING_ID }).expect(404);
+      expect(missing.status).toBe(404);
     });
   });
 

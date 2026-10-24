@@ -52,11 +52,27 @@ describe('GET /logout landing (e2e)', () => {
     const cookie = (authed.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
 
     // The landing page itself must not mutate anything: the session still works.
-    await request(app.getHttpServer()).get('/logout').set('Cookie', cookie).expect(200);
-    await request(app.getHttpServer()).get('/').set('Cookie', cookie).expect(200);
+    const landing = await request(app.getHttpServer())
+      .get('/logout')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(landing.text).toContain('<h1>Signing out');
+    const stillSignedIn = await request(app.getHttpServer())
+      .get('/')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(stillSignedIn.text).toContain('Signed in as landing-user');
 
     // Only the POST ends it.
-    await request(app.getHttpServer()).post('/logout').set('Cookie', cookie).expect(303);
-    await request(app.getHttpServer()).get('/').set('Cookie', cookie).expect(302);
+    const out = await request(app.getHttpServer())
+      .post('/logout')
+      .set('Cookie', cookie)
+      .expect(303);
+    expect(out.headers.location).toBe('/login');
+    const afterLogout = await request(app.getHttpServer())
+      .get('/')
+      .set('Cookie', cookie)
+      .expect(302);
+    expect(afterLogout.headers.location).toBe('/login');
   });
 });

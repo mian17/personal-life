@@ -150,10 +150,31 @@ describe('Diary entries (e2e)', () => {
   });
 
   it('rejects a missing or malformed day (the service never defaults the user\'s day)', async () => {
-    await post({ mealGroup: 'lunch', foodId: 'food-5', quantity: 1, nutrients: vector() }).expect(400);
-    await post({ date: '03-09-2026', mealGroup: 'lunch', foodId: 'food-5', quantity: 1, nutrients: vector() }).expect(400);
-    await auth(request(app.getHttpServer()).get('/api/entries'), tokenA).expect(400);
-    await auth(request(app.getHttpServer()).get('/api/entries?date=2026/09/03'), tokenA).expect(400);
+    const missingDay = await post({
+      mealGroup: 'lunch',
+      foodId: 'food-5',
+      quantity: 1,
+      nutrients: vector(),
+    }).expect(400);
+    expect(missingDay.status).toBe(400);
+    const badDay = await post({
+      date: '03-09-2026',
+      mealGroup: 'lunch',
+      foodId: 'food-5',
+      quantity: 1,
+      nutrients: vector(),
+    }).expect(400);
+    expect(badDay.status).toBe(400);
+    const missingQuery = await auth(
+      request(app.getHttpServer()).get('/api/entries'),
+      tokenA,
+    ).expect(400);
+    expect(missingQuery.status).toBe(400);
+    const badQuery = await auth(
+      request(app.getHttpServer()).get('/api/entries?date=2026/09/03'),
+      tokenA,
+    ).expect(400);
+    expect(badQuery.status).toBe(400);
   });
 
   it('stores the snapshot as ciphertext, never plaintext', async () => {

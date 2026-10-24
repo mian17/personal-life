@@ -192,9 +192,11 @@ describe('Photo estimates (e2e)', () => {
   });
 
   it('takes the owner from the token, never the body', async () => {
-    await post(app, { imageBase64: IMAGE_B64, mimeType: MIME }).expect(401);
-    await auth(post(app, { imageBase64: IMAGE_B64, mimeType: MIME, ownerSub: 'user-b' })).expect(
-      400,
-    );
+    const anonymous = await post(app, { imageBase64: IMAGE_B64, mimeType: MIME }).expect(401);
+    expect(anonymous.status).toBe(401);
+    const spoofedOwner = await auth(
+      post(app, { imageBase64: IMAGE_B64, mimeType: MIME, ownerSub: 'user-b' }),
+    ).expect(400);
+    expect(spoofedOwner.status).toBe(400);
   });
 });

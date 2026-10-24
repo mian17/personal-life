@@ -41,9 +41,10 @@ describe('Notes API (e2e)', () => {
   });
 
   it('rejects a bad payload', async () => {
-    await auth(
+    const res = await auth(
       request(app.getHttpServer()).post('/api/notes').send({ body: '' }),
     ).expect(400);
+    expect(res.status).toBe(400);
   });
 
   it('stores and returns timestamps as UTC', async () => {
@@ -204,10 +205,12 @@ describe('Notes API (e2e)', () => {
     const id = created.body.id;
 
     await auth(request(app.getHttpServer()).delete(`/api/notes/${id}`)).expect(200);
-    await auth(request(app.getHttpServer()).get(`/api/notes/${id}`)).expect(404);
-    await auth(
+    const read = await auth(request(app.getHttpServer()).get(`/api/notes/${id}`)).expect(404);
+    expect(read.status).toBe(404);
+    const patched = await auth(
       request(app.getHttpServer()).patch(`/api/notes/${id}`).send({ body: 'nope' }),
     ).expect(404);
+    expect(patched.status).toBe(404);
   });
 
   it('restores a trashed note with the same createdAt, tagIds, and version', async () => {
