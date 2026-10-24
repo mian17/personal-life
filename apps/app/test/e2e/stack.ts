@@ -1,6 +1,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { bin, childEnv } from '../../../../packages/shared/src/child-process';
 import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
 import { degradedRedirectUris } from './degraded-app';
 import {
@@ -75,46 +76,6 @@ export interface StackConfig {
 
 export function appOriginFor(host: string, appPort: number): string {
   return `http://${host}:${appPort}`;
-}
-
-/**
- * The `PATH` every spawned command gets. Never the caller's `PATH`: that is
- * resolved at spawn time from directories anyone can write to (Sonar S4036), so
- * the harness pins the executable's own directory plus the standard toolchain
- * locations instead.
- *
- * ponytail: a fixed allowlist covers every toolchain this harness drives (node,
- * npm, docker). Add a directory when a dev machine installs one elsewhere.
- */
-const CHILD_PATH = [
-  dirname(process.execPath),
-  '/usr/local/bin',
-  '/opt/homebrew/bin',
-  '/usr/bin',
-  '/bin',
-].join(':');
-
-/** The caller's environment with `PATH` replaced by {@link CHILD_PATH}. */
-function childEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  return { ...process.env, PATH: CHILD_PATH, ...extra };
-}
-
-/**
- * Absolute path to a command. `spawn`/`execFile` by bare name would search
- * `PATH`, so a writable directory anywhere in it could substitute the binary
- * (Sonar S4036). Resolving against {@link CHILD_PATH} first keeps the search
- * deterministic and the resolved path is what gets executed.
- */
-const BIN_CACHE = new Map<string, string>();
-function bin(name: string): string {
-  const cached = BIN_CACHE.get(name);
-  if (cached !== undefined) return cached;
-  const found = CHILD_PATH.split(':')
-    .map((dir) => join(dir, name))
-    .find((candidate) => existsSync(candidate));
-  if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
-  BIN_CACHE.set(name, found);
-  return found;
 }
 
 function build(workspace: string): Promise<void> {

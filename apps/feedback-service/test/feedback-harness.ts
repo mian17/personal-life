@@ -3,9 +3,8 @@ import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { createServer, type Server } from 'http';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { bin, childEnv } from '../../../packages/shared/src/child-process';
 import request from 'supertest';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
@@ -76,41 +75,9 @@ export async function waitForAsync(
   }
 }
 
-/**
- * The `PATH` every spawned command gets. Never the caller's `PATH`: that is
- * resolved at spawn time from directories anyone can write to (Sonar S4036), so
- * the harness pins the executable's own directory plus the standard toolchain
- * locations instead.
- */
-const CHILD_PATH = [
-  dirname(process.execPath),
-  '/usr/local/bin',
-  '/opt/homebrew/bin',
-  '/usr/bin',
-  '/bin',
-].join(':');
-
-/**
- * Absolute path to a command. `spawn`/`execFile` by bare name would search
- * `PATH`, so a writable directory anywhere in it could substitute the binary
- * (Sonar S4036). Resolving against {@link CHILD_PATH} first keeps the search
- * deterministic and the resolved path is what gets executed.
- */
-const BIN_CACHE = new Map<string, string>();
-function bin(name: string): string {
-  const cached = BIN_CACHE.get(name);
-  if (cached !== undefined) return cached;
-  const found = CHILD_PATH.split(':')
-    .map((dir) => join(dir, name))
-    .find((candidate) => existsSync(candidate));
-  if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
-  BIN_CACHE.set(name, found);
-  return found;
-}
-
 function run(args: string[], capture = false): string {
   return execFileSync(bin('docker'), args, {
-    env: { ...process.env, PATH: CHILD_PATH },
+    env: childEnv(),
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
   });
