@@ -1,8 +1,7 @@
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { stopThrowawayPostgres } from './stack';
 import { heldSlot, releaseHeldSlot, stopRecorded } from './teardown';
-import { prodPidsFile } from './config';
+import { artifactsDir, prodPidsFile } from './config';
 
 /**
  * Stops the production-build services, removes this slot's throwaway Postgres,
@@ -15,7 +14,7 @@ export default async function globalTeardown(): Promise<void> {
   try {
     await stopRecorded(prodPidsFile);
     stopThrowawayPostgres(slot);
-    rmSync(join(__dirname, '..', '..', '.e2e-state'), { recursive: true, force: true });
+    rmSync(artifactsDir('e2e-state', slot), { recursive: true, force: true });
   } finally {
     releaseHeldSlot();
   }

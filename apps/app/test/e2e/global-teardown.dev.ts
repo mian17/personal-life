@@ -1,7 +1,6 @@
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { devPidsFile } from './config';
-import { releaseHeldSlot, stopRecorded } from './teardown';
+import { artifactsDir, devPidsFile } from './config';
+import { heldSlot, releaseHeldSlot, stopRecorded } from './teardown';
 
 /**
  * Stops the dev-mode services, clears their scratch state, and hands the dev
@@ -10,9 +9,12 @@ import { releaseHeldSlot, stopRecorded } from './teardown';
  * run ceiling reclaims it.
  */
 export default async function globalTeardown(): Promise<void> {
+  // Read the slot before releasing: the release deletes the claim it is read from.
+  const slot = heldSlot();
+
   try {
     await stopRecorded(devPidsFile);
-    rmSync(join(__dirname, '..', '..', '.e2e-state-dev'), { recursive: true, force: true });
+    rmSync(artifactsDir('e2e-state-dev', slot), { recursive: true, force: true });
   } finally {
     releaseHeldSlot();
   }

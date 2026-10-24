@@ -1,4 +1,6 @@
-import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 
 /**
  * Every harness port sits at `basePort + SLOT_STRIDE * slot`, so two worktrees
@@ -83,6 +85,11 @@ export function testRedisUrl(): string | undefined {
 export const prodPidsFile = 'service-pids-prod.json';
 export const devPidsFile = 'service-pids-dev.json';
 
+/** Absolute path of a recorded-PID file, kept outside the repository. */
+export function pidsFilePath(file: string): string {
+  return join(artifactsRoot(), file);
+}
+
 /**
  * The throwaway Postgres feedback-service gets in the harness: a slot-named
  * `postgres:17-alpine` container on an ephemeral loopback port, never the
@@ -94,6 +101,40 @@ export function feedbackPgContainer(slot = 0): string {
 
 export function repoRoot(): string {
   return process.env.E2E_REPO_ROOT ?? join(__dirname, '..', '..', '..', '..');
+}
+
+/**
+ * Where a run keeps everything it writes: scratch databases, recorded PIDs, the
+ * held-slot file, Playwright's output.
+ *
+ * Deliberately *outside* the repository. `apps/app` is the dev lane's Turbopack
+ * project root and therefore the dev server's watch root; a harness that appends
+ * to a SQLite DB or a trace file in there is writing into the tree under test
+ * (one measured run: 436 trace-file writes, plus live DB churn). Whether a given
+ * watcher reacts depends on the platform — inotify only reports watched
+ * directories, recursive watchers report everything — so the only portable rule
+ * is to keep the writes out of the tree entirely. Machine-scoped like the slot
+ * queue, so concurrent worktrees never share it.
+ */
+export function artifactsRoot(): string {
+  const root = process.env.E2E_ARTIFACTS_DIR?.trim() || join(tmpdir(), 'life-e2e-artifacts');
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+/** One harness slot's private corner of {@link artifactsRoot}. */
+export function artifactsDir(name: string, slot = 0): string {
+  return join(artifactsRoot(), `${name}-${slot}`);
+}
+
+/**
+ * Playwright's output directory for this worktree, kept outside the repository
+ * for the same reason as {@link artifactsRoot}. Scoped by worktree rather than
+ * by slot because a Playwright config is loaded before `globalSetup` claims its
+ * slot — the slot is not known yet at this point.
+ */
+export function playwrightOutputDir(folder: string): string {
+  return join(artifactsRoot(), `${basename(repoRoot())}-${folder}`);
 }
 
 /** The Tailscale owner used by the Playwright context (access gate). */

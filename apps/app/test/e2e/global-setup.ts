@@ -1,7 +1,6 @@
 import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { startStack, type StackConfig } from './stack';
-import { prodPidsFile, repoRoot, testPorts } from './config';
+import { prodPidsFile, artifactsDir, pidsFilePath, repoRoot, testPorts } from './config';
 import { claimSlotForRun } from './slot-queue';
 import { recordHeldSlot, releaseHeldSlot } from './teardown';
 
@@ -39,13 +38,14 @@ function productionStackConfig(slot: number): StackConfig {
     feedbackPort,
     appPort,
     appOrigin: `http://localhost:${appPort}`,
-    // Never under any service's real `data/` directory.
-    stateDir: join(repoRoot(), 'apps/app/.e2e-state'),
+    // Never under any service's real `data/` directory — and never inside the
+    // repository, which the dev lane's Turbopack watches (see `artifactsRoot`).
+    stateDir: artifactsDir('e2e-state', slot),
     slot,
   };
 }
 
 /** Leaves the PIDs for `global-teardown.ts`, which stops what this run started. */
 function recordServicePids(pids: (number | undefined)[]): void {
-  writeFileSync(join(__dirname, prodPidsFile), JSON.stringify({ pids }));
+  writeFileSync(pidsFilePath(prodPidsFile), JSON.stringify({ pids }));
 }

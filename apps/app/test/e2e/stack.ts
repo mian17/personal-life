@@ -40,7 +40,8 @@ function hopRedirectUris(slot: number): string[] {
  *    dev server's middleware URL normalization.
  *
  * Both point at the dev-style IdP and a scratch note-service. All state lives
- * under `apps/app/.e2e-state`, never any service's real `data/` directory.
+ * outside the repository (see `artifactsRoot`), never under any service's real
+ * `data/` directory and never inside the dev lane's watched project root.
  */
 
 export interface StackConfig {

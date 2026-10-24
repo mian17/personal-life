@@ -1,7 +1,6 @@
 import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { startStack, type StackConfig } from './stack';
-import { devPidsFile, devPorts, repoRoot } from './config';
+import { devPidsFile, artifactsDir, devPorts, pidsFilePath, repoRoot } from './config';
 import { claimSlotForRun } from './slot-queue';
 import { recordHeldSlot, releaseHeldSlot } from './teardown';
 
@@ -41,12 +40,14 @@ function developmentStackConfig(slot: number): StackConfig {
     appPort,
     // Dev is reached on 127.0.0.1 (the human's URL and the app's default).
     appOrigin: `http://127.0.0.1:${appPort}`,
-    stateDir: join(repoRoot(), 'apps/app/.e2e-state-dev'),
+    // Outside the repository: this lane boots `next dev`, whose Turbopack
+    // watches `apps/app`, so scratch writes in there reload the page under test.
+    stateDir: artifactsDir('e2e-state-dev', slot),
     slot,
   };
 }
 
 /** Leaves the PIDs for `global-teardown.dev.ts`, which stops what this run started. */
 function recordServicePids(pids: (number | undefined)[]): void {
-  writeFileSync(join(__dirname, devPidsFile), JSON.stringify({ pids }));
+  writeFileSync(pidsFilePath(devPidsFile), JSON.stringify({ pids }));
 }

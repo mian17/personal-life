@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_OWNER, testPorts } from './test/e2e/config';
+import { E2E_OWNER, playwrightOutputDir, testPorts } from './test/e2e/config';
 import { loadHarnessEnv } from './test/e2e/env-file';
 import { heldSlot } from './test/e2e/teardown';
 
@@ -36,6 +36,9 @@ export default defineConfig({
   reporter: [['list']],
   globalSetup: './test/e2e/global-setup.ts',
   globalTeardown: './test/e2e/global-teardown.ts',
+  // Output lands outside the repository: `apps/app` is the dev lane's watch
+  // root, and a run must not write into the tree under test (see `artifactsRoot`).
+  outputDir: playwrightOutputDir('test-results'),
   use: {
     // The app-under-test is reached as `localhost`: Next normalizes loopback
     // 127.0.0.1 → localhost in middleware redirects, so the browser origin must

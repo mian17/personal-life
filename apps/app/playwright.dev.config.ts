@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { devPorts } from './test/e2e/config';
+import { playwrightOutputDir, devPorts } from './test/e2e/config';
 import { loadHarnessEnv } from './test/e2e/env-file';
 import { heldSlot } from './test/e2e/teardown';
 
@@ -29,6 +29,9 @@ export default defineConfig({
   reporter: [['list']],
   globalSetup: './test/e2e/global-setup.dev.ts',
   globalTeardown: './test/e2e/global-teardown.dev.ts',
+  // Outside the repository: this lane boots `next dev`, whose Turbopack watches
+  // `apps/app`, so a run must not write into the tree under test.
+  outputDir: playwrightOutputDir('test-results-dev'),
   use: {
     // The slot `global-setup.dev.ts` claimed decides the port, so the browser
     // follows the claim instead of pointing at another worktree's band.

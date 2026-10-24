@@ -1,5 +1,6 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { artifactsRoot, pidsFilePath } from './config';
 import { releaseSlot, type SlotClaim } from './slot-queue';
 
 /**
@@ -10,7 +11,7 @@ import { releaseSlot, type SlotClaim } from './slot-queue';
 export async function stopRecorded(file: string): Promise<void> {
   let pids: number[] = [];
   try {
-    pids = (JSON.parse(readFileSync(join(__dirname, file), 'utf8')) as { pids: number[] }).pids;
+    pids = (JSON.parse(readFileSync(pidsFilePath(file), 'utf8')) as { pids: number[] }).pids;
   } catch {
     // No recorded services; nothing to stop.
   }
@@ -35,7 +36,7 @@ export async function stopRecorded(file: string): Promise<void> {
   for (const pid of pids) {
     send(pid, 'SIGKILL');
   }
-  rmSync(join(__dirname, file), { force: true });
+  rmSync(pidsFilePath(file), { force: true });
 }
 
 /**
@@ -67,7 +68,7 @@ export function releaseHeldSlot(): void {
 
 /** One harness runs at a time per worktree, so one record file serves them all. */
 function heldSlotFile(): string {
-  return join(__dirname, 'service-slot.json');
+  return join(artifactsRoot(), 'service-slot.json');
 }
 
 function heldClaim(): SlotClaim | undefined {
