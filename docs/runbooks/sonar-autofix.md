@@ -4,8 +4,8 @@ SonarQube webhook → host receiver → pi-sbx sandbox agent → draft pull requ
 
 The receiver is the only long-running piece. It validates the webhook signature,
 filters to gate failures on `main` of this project, fetches the new-code issues,
-and starts the sandbox agent in a fresh worktree. The agent then does the whole
-job: fix, commit, push, and open the draft PR.
+and starts the sandbox agent in a fresh worktree cut from `dev`. The agent then
+does the whole job: fix, commit, push, and open the draft PR against `dev`.
 
 ## Why the receiver owns the issue list
 
@@ -103,20 +103,30 @@ unpushed branch. If the agent changes nothing, the run logs `no-changes` and end
 
 ## Why it cannot loop
 
-The receiver acts only on gate failures where `branch.isMain` is true. A fix
-lands on `fix/sonar-*`, so its analysis never satisfies that filter.
+The receiver acts only on `branch.isMain` (an absent `branch` counts as main).
+A fix lands on `fix/sonar-*`, which the workflow never scans, so its push cannot
+trigger another run. Merging the draft PR into `dev` pushes `dev`, which scans
+once and may start the next legitimate run.
 
-## One caveat about `dev`
+## One caveat about scanning `dev`
 
-SonarQube Community Build analyses a single branch per project, and
-`.github/workflows/sonarqube.yml` only runs on `main`. So the gate failure that
-triggers a run is always a `main` failure, while the fix and its PR target `dev`.
-That is deliberate: `dev` is where work accumulates before `main`, and analysing a
-second branch would need a commercial edition. Keep this in mind when `dev`
-diverges from `main` — a `dev`-only issue never triggers a run.
+SonarQube Community Build keeps a single analysis per project and
+`.github/workflows/sonarqube.yml` runs on both `main` and `dev`. Every `dev` scan
+therefore **replaces** the project's stored analysis, and the scanner does not set
+`sonar.branch.name` (Community Build ignores it). Consequences:
 
-Override the target with `SONAR_AUTOFIX_BASE_BRANCH` if the integration branch
-ever moves.
+- The gate that triggers a run always describes the most recent scan, which is
+  usually `dev` — coherent, since the fix branches from `dev`.
+- `main`'s own analysis is overwritten by the next `dev` push, so the dashboard
+  no longer tells you how `main` scores alone.
+- The workflow serialises scans (`concurrency: group: sonarqube`) so two pushes
+  cannot race to overwrite the same analysis.
+
+If you need `main` and `dev` measured separately, that is a Developer Edition
+feature; the alternative is to scan only one of them.
+
+Override the target branch with `SONAR_AUTOFIX_BASE_BRANCH` if the integration
+branch ever moves.
 
 ## Limits
 

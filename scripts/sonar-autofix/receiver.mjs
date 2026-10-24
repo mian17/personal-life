@@ -49,7 +49,8 @@ export function signatureMatches(secret, body, header) {
 /**
  * A run is worth starting only when the gate failed on the main branch of this
  * project. Anything else — feature-branch analyses, passing gates, other
- * projects — would loop or chase the whole backlog.
+ * projects — would loop or chase the whole backlog. An absent `branch` means the
+ * payload came from an instance-level webhook, which only reports main.
  */
 export function isActionable(payload, projectKey) {
   return (
@@ -191,7 +192,7 @@ export function createReceiver(config) {
 
   function pullRequestBody(taskId, summary) {
     return [
-      `SonarQube reported a quality gate failure on \`main\` (analysis ${taskId}).`,
+      `SonarQube reported a quality gate failure (analysis ${taskId}).`,
       '',
       `This branch starts from \`${config.baseBranch}\` and targets it, not \`main\`.`,
       '',
