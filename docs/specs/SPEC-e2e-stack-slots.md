@@ -82,8 +82,7 @@ Full executable commands from the repo profile, not widened:
 apps/app/test/e2e/config.ts            MODIFIED — slot-derived ports + Postgres name
 apps/app/test/e2e/slot-queue.ts        NEW — FIFO tickets, claim/release, stale
                                        reclaim, measured ETA, queue markers
-apps/app/test/e2e/global-setup.ts      MODIFIED — acquire slot before any build;
-                                       scratch state + PID file outside the repo
+apps/app/test/e2e/global-setup.ts      MODIFIED — acquire slot before any build
 apps/app/test/e2e/global-setup.dev.ts  MODIFIED — same for the dev harness
 apps/app/test/e2e/global-teardown*.ts  MODIFIED — release the claim (with a
 apps/app/test/e2e/teardown.ts          best-effort `finally` release on abort)
@@ -96,8 +95,7 @@ apps/app/test/e2e/env-file.ts          NEW — adopt harness knobs (E2E_*, port
                                        `.env.development`; secrets stay in the file
 apps/app/test/harness-env.test.ts      NEW — jest unit tests (adoption, isolation)
 apps/app/playwright.config.ts          MODIFIED — load harness env before any slot
-                                       or port decision; Playwright `outputDir`
-                                       outside the repo (dev lane watch root)
+                                       or port decision
 apps/app/playwright.dev.config.ts      MODIFIED — same for the dev harness
 package.json (root)                    MODIFIED — `test:e2e` runs the harness
                                        from the repo root
@@ -127,13 +125,6 @@ Queue state is machine-scoped (worktrees are the unit of contention):
 files (`<slot>.hold.json`: pid, worktree, ports, claimedAt) and FIFO ticket files
 (`<createdAt>-<pid>.json`: worktree, requestedAt). The state dir is outside every
 worktree by design; cross-machine locking is out of scope.
-
-Run artifacts are machine-scoped too: `${os.tmpdir()}/life-e2e-artifacts` (override
-`E2E_ARTIFACTS_DIR`), holding each slot's scratch DBs (`e2e-state-<s>`,
-`e2e-state-dev-<s>`), the recorded PID files, the held-slot file, and Playwright's
-`outputDir` per worktree. Nothing a run writes may live under `apps/app`: that is the dev lane's
-Turbopack project root, so a write there lands in the tree under test
-(see assumption 9).
 
 Slot derivation (stride 10, slot `s` = `base + offset + 10*s`):
 
@@ -206,9 +197,8 @@ export function testPorts(slot = 0) {
   best-effort on abort; derive every harness port and the Postgres container name
   from the slot index; reclaim stale claims (holder pid dead, or claim file older
   than the run ceiling) on sight; emit the machine-parseable marker line before the
-  human line; keep the queue state machine-scoped; keep every harness write outside
-  the repository (see assumption 9); run typecheck and the targeted unit tests
-  before calling the work done.
+  human line; keep the queue state machine-scoped; run typecheck and the targeted
+  unit tests before calling the work done.
 - **Ask first:** changing slot stride, base ports, or the `E2E_CONCURRENCY` default;
   changing `max-test-runs` or what counts as a test run in QA policy; touching the
   frozen e2e selector surface (roles, visible text, aria-labels,
@@ -263,16 +253,6 @@ export function testPorts(slot = 0) {
 7. ETA is a rolling median of the last 5 completed slot holds.
 8. Each Playwright invocation (prod and dev) acquires its own slot at global-setup
    and releases it at global-teardown; the claim does not span both invocations.
-9. Everything a run writes (scratch DBs, recorded PIDs, held-slot file, Playwright
-   output) lives outside the repository, under `${os.tmpdir()}/life-e2e-artifacts`
-   (override `E2E_ARTIFACTS_DIR`). `apps/app` is the dev lane's Turbopack project
-   root and so the dev server's watch root: one measured dev run wrote 436 trace
-   bytes plus live SQLite churn into it, i.e. into the tree under test. Whether a
-   host's watcher turns that into a page reload is platform-dependent (inotify
-   reports only watched directories; recursive watchers report everything), so the
-   rule is to keep the writes out of the tree rather than to predict the watcher.
-   State dirs are per slot, Playwright output per worktree (the config loads
-   before a slot is claimed).
 
 ## 10. Open Questions
 
