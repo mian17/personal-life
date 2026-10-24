@@ -87,9 +87,21 @@ export function Pill({
         <a
           {...linkProps}
           role="button"
+          // `role="button"` promises a focusable control: an anchor has no href
+          // here, so it is not in the tab order on its own.
+          tabIndex={0}
           className={classes}
           aria-disabled={disabled || undefined}
           onClick={(event) => {
+            event.preventDefault();
+            if (disabled) return;
+            (linkProps.onClick as ((e: unknown) => void) | undefined)?.(event);
+          }}
+          // Enter activates an anchor natively; Space is the other half of the
+          // button contract, so it is mapped to the same click.
+          onKeyDown={(event) => {
+            linkProps.onKeyDown?.(event);
+            if (event.key !== ' ') return;
             event.preventDefault();
             if (disabled) return;
             (linkProps.onClick as ((e: unknown) => void) | undefined)?.(event);

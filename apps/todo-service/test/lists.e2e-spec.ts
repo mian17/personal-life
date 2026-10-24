@@ -89,11 +89,11 @@ describe('Lists API (e2e)', () => {
       const res = await listLists().expect(200);
       expect(res.body.map((l: { name: string }) => l.name)).toEqual(['Alpha', 'zeta']);
       for (const l of res.body) {
-        expect(Object.keys(l).sort()).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
+        expect(Object.keys(l).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
         expect(typeof l.version).toBe('number');
         expect(l.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(res.body.map((l: { id: string }) => l.id).sort()).toEqual([a.body.id, z.body.id].sort());
+      expect(res.body.map((l: { id: string }) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       // B's lists never appear to A.
       expect((await listLists(tokenB).expect(200)).body.map((l: { name: string }) => l.name)).toEqual(['beta']);

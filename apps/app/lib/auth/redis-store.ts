@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomBytes } from 'crypto';
 import { createClient } from 'redis';
 import type { AppSession, SessionStoreApi } from './session-store';
 
@@ -72,7 +73,10 @@ export const REDIS_RECONNECT_MAX_DELAY_MS = 2_000;
  * command rejects fast instead of hanging.
  */
 export function unboundedReconnectStrategy(retries: number): number {
-  const jitter = Math.floor(Math.random() * 200);
+  // Jitter only needs to decorrelate replicas; crypto is used so the value never
+  // comes from the PRNG (a reconnect delay is not a security boundary, but it is
+  // no worse here and keeps one source of randomness in the auth path).
+  const jitter = randomBytes(1)[0] % 200;
   return Math.min(2 ** retries * 50, REDIS_RECONNECT_MAX_DELAY_MS) + jitter;
 }
 
@@ -171,14 +175,22 @@ function parseRecord(raw: string | null): AppSession | undefined {
 
 export class RedisSessionStore implements SessionStoreApi {
   private readonly now: () => number;
-  private readonly ready: Promise<unknown>;
+  private readyPromise: Promise<unknown> | undefined;
 
   constructor(
     private readonly client: SessionRedisClient,
     private readonly options: RedisSessionStoreOptions,
   ) {
     this.now = options.now ?? Date.now;
-    this.ready = options.ready ?? Promise.resolve();
+  }
+
+  /**
+   * The connect promise, created on first use rather than in the constructor:
+   * `create`/`get`/`update`/`destroy` each await it, and `??=` keeps it a
+   * single promise for the instance's life (so a hung connect is awaited once).
+   */
+  private get ready(): Promise<unknown> {
+    return (this.readyPromise ??= this.options.ready ?? Promise.resolve());
   }
 
   /** The store's current time (the injected clock), used for consistent expiry math. */

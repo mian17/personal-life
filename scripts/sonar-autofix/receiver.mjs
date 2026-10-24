@@ -38,6 +38,16 @@ const DEFAULT_CONFIG = {
   dryRun: process.env.SONAR_AUTOFIX_DRY_RUN === '1',
 };
 
+/**
+ * The `PATH` every child gets. Never the caller's `PATH`: that carries
+ * world-writable directories, so a `PATH` lookup could run an attacker's
+ * binary (Sonar S4036). Override where `pi-sbx` lives when it is not `~/.local/bin`.
+ * `/opt/homebrew/bin` is there for `git`/`gh` on Apple Silicon.
+ */
+const CHILD_PATH =
+  process.env.SONAR_AUTOFIX_PATH ??
+  `${join(homedir(), '.local/bin')}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`;
+
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
 export function signatureMatches(secret, body, header) {
   if (typeof header !== 'string' || header.length === 0) return false;
@@ -104,7 +114,11 @@ export function createReceiver(config) {
     };
   }
 
-  function git(args, { cwd = config.repo, env = process.env } = {}) {
+  function childEnv(overrides = {}) {
+    return { ...process.env, PATH: CHILD_PATH, ...overrides };
+  }
+
+  function git(args, { cwd = config.repo, env = childEnv() } = {}) {
     return new Promise((resolvePromise, reject) => {
       const child = spawn('git', ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
       let stdout = '';
@@ -122,7 +136,7 @@ export function createReceiver(config) {
 
   function run(command, args, options = {}) {
     return new Promise((resolvePromise) => {
-      const child = spawn(command, args, { env: process.env, ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(command, args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
       let output = '';
       const collect = (chunk) => {
         output = (output + chunk).slice(-8000);

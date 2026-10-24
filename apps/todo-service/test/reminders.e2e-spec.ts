@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -24,10 +27,11 @@ import { ReminderService } from '../src/reminders/reminder.service';
  * The direct-DB deviation (Testing #8) is asserted here: a `sweep()` performs
  * **zero** read-through (`getThrough`) reads. The `TODO_CACHE` provider is
  * overridden with a recording `TodosCache`, and the DB is a throwaway sqlite file
- * under `test/` — never `apps/todo-service/data/**` (the hard line).
+ * in a private `mkdtemp` directory — never `apps/todo-service/data/**` (the hard line).
  */
 
-const TEST_DB = '/tmp/opencode/test-reminders.db';
+const TEST_DIR = mkdtempSync(join(tmpdir(), 'todo-reminders-'));
+const TEST_DB = join(TEST_DIR, 'test-reminders.db');
 process.env.DB_PATH = TEST_DB;
 
 const SUB = 'user-a';
@@ -127,6 +131,7 @@ describe('Reminder sweep (e2e)', () => {
   afterAll(async () => {
     await app.close();
     process.env = originalEnv;
+    rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
   const subscribe = (endpoint: string, sub = SUB) =>
@@ -188,7 +193,7 @@ describe('Reminder sweep (e2e)', () => {
 
     await reminder.sweep();
 
-    expect(sender.calls.map((c) => c.endpoint).sort()).toEqual([alive, dead].sort());
+    expect(sender.calls.map((c) => c.endpoint).sort((a: string, b: string) => a.localeCompare(b))).toEqual([alive, dead].sort((a: string, b: string) => a.localeCompare(b)));
     expect((await push.listFor(SUB)).map((s) => s.endpoint)).toEqual([alive]);
   });
 

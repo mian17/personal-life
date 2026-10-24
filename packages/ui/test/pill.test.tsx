@@ -107,4 +107,26 @@ describe('Pill', () => {
     const tags: PillTag[] = ['span', 'a'];
     expect(tags).toHaveLength(2);
   });
+
+  it('makes the no-href toggle focusable, since it carries role="button"', () => {
+    render(
+      <Pill as="a" size="filter" onClick={() => {}}>
+        t
+      </Pill>,
+    );
+    const toggle = screen.getByRole('button', { name: 't' });
+    expect(toggle.getAttribute('tabindex')).toBe('0');
+    expect(toggle.getAttribute('tabindex')).not.toBe('-1');
+  });
+
+  it('activates the no-href toggle on Space as well as Enter', () => {
+    const onClick = jest.fn();
+    render(
+      <Pill as="a" size="filter" onClick={onClick}>
+        t
+      </Pill>,
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: 't' }), { key: ' ' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });

@@ -292,7 +292,7 @@ function decodeCursor(cursor: string): string {
 }
 
 function pageLimit(limit: string | undefined): number {
-  const parsed = limit === undefined ? NaN : Number(limit);
+  const parsed = limit === undefined ? Number.NaN : Number(limit);
   if (!Number.isInteger(parsed) || parsed <= 0) return defaultPageLimit;
   return parsed;
 }

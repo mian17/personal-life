@@ -197,7 +197,7 @@ describe('Logout revokes grants (e2e)', () => {
 
     // Alice's grant rows are gone; Bob's are untouched.
     expect(grantIdsFor(aliceUser!.id)).toHaveLength(0);
-    expect(grantIdsFor(bobUser!.id).sort()).toEqual([...bobGrantsBefore].sort());
+    expect(grantIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([...bobGrantsBefore].sort((a: string, b: string) => a.localeCompare(b)));
 
     // And the behavior follows: Bob can still refresh, Alice cannot.
     expect((await refresh(app, bob.tokens.refresh_token!)).status).toBe(200);

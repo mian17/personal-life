@@ -182,7 +182,9 @@ describe('RedisUsersCache helper (unit)', () => {
     ({
       id: 'u1',
       username: 'zoe',
-      passwordHash: '$argon2id$hash',
+      // A fixture hash, not a credential: this suite round-trips a cached row and
+      // never verifies it, so the value only has to survive the JSON trip.
+      passwordHash: 'argon2id-fixture-not-a-secret',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       ...overrides,
     }) as User;

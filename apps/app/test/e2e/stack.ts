@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
 import { degradedRedirectUris } from './degraded-app';
 import {
@@ -77,12 +77,34 @@ export function appOriginFor(host: string, appPort: number): string {
   return `http://${host}:${appPort}`;
 }
 
+/**
+ * The `PATH` every spawned command gets. Never the caller's `PATH`: that is
+ * resolved at spawn time from directories anyone can write to (Sonar S4036), so
+ * the harness pins the executable's own directory plus the standard toolchain
+ * locations instead.
+ *
+ * ponytail: a fixed allowlist covers every toolchain this harness drives (node,
+ * npm, docker). Add a directory when a dev machine installs one elsewhere.
+ */
+const CHILD_PATH = [
+  dirname(process.execPath),
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+  '/usr/bin',
+  '/bin',
+].join(':');
+
+/** The caller's environment with `PATH` replaced by {@link CHILD_PATH}. */
+function childEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return { ...process.env, PATH: CHILD_PATH, ...extra };
+}
+
 function build(workspace: string): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(
       'npm',
       ['run', 'build', '-w', workspace],
-      { cwd: repoRoot(), env: { ...process.env, NODE_ENV: 'production' } },
+      { cwd: repoRoot(), env: childEnv({ NODE_ENV: 'production' }) },
       (err) => (err ? reject(err) : resolve()),
     );
   });
@@ -445,11 +467,12 @@ function forceRemoveContainer(name: string): void {
 }
 
 function runDocker(args: string[]): void {
-  execFileSync('docker', args, { stdio: 'ignore' });
+  execFileSync('docker', args, { env: childEnv(), stdio: 'ignore' });
 }
 
 function readDockerOutput(args: string[]): string {
   return execFileSync('docker', args, {
+    env: childEnv(),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -482,7 +505,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   await build('apps/idp');
   execFileSync('npm', ['run', 'seed', '-w', 'apps/idp'], {
     cwd: repoRoot(),
-    env: { ...process.env, ...idpEnv(cfg) },
+    env: childEnv(idpEnv(cfg)),
   });
 
   const services: SpawnedService[] = [];

@@ -122,15 +122,23 @@ export class RedisRefreshLock implements RefreshLock {
   readonly ttlMs: number;
   readonly pollIntervalMs: number;
   readonly distributed = true;
-  private readonly ready: Promise<unknown>;
+  private readyPromise: Promise<unknown> | undefined;
 
   constructor(
     private readonly client: RefreshLockClient,
-    options: RefreshLockOptions = {},
+    private readonly options: RefreshLockOptions = {},
   ) {
     this.ttlMs = options.ttlMs ?? REFRESH_LOCK_TTL_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? REFRESH_LOCK_POLL_INTERVAL_MS;
-    this.ready = options.ready ?? Promise.resolve();
+  }
+
+  /**
+   * The connect promise, created on first use rather than in the constructor:
+   * a constructor is synchronous, so the async hand-off happens where the lock
+   * actually needs it. `??=` keeps it a single promise for the instance's life.
+   */
+  private get ready(): Promise<unknown> {
+    return (this.readyPromise ??= this.options.ready ?? Promise.resolve());
   }
 
   async acquire(sessionId: string): Promise<AcquireResult> {

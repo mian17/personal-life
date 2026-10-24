@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { expect, type PlaywrightTestArgs, type PlaywrightWorkerArgs } from '@playwright/test';
 import { E2E_PASSWORD, E2E_USER } from '../config';
 import {
   createNote,
@@ -21,28 +22,42 @@ export interface JourneyOptions {
   alternateOrigin: string;
 }
 
+/** One checklist entry's body, given the fixtures Playwright hands a test. */
+type JourneyBody = (args: PlaywrightTestArgs & PlaywrightWorkerArgs) => Promise<void>;
+
+/** One entry a mode's spec registers with its own literal `test(...)` call. */
+export interface JourneyTest {
+  title: string;
+  body: JourneyBody;
+}
+
 /** A per-run marker so notes from different tests/reruns never collide. */
 function marker(): string {
-  return `chk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  return `chk-${Date.now().toString(36)}-${randomUUID().slice(0, 5)}`;
 }
 
 /**
- * Registers the human's full manual checklist as automated browser tests. The
- * dev-mode and production-mode harnesses both call this with their own origin,
- * so the two runtimes can never diverge.
+ * The human's full manual checklist as browser tests. The dev-mode and
+ * production-mode harnesses both build it with their own origin, so the two
+ * runtimes can never diverge — each spec registers the returned entries with
+ * its own literal `test(...)` call.
  */
-export function registerJourney(options: JourneyOptions): void {
+export function journeyChecklist(options: JourneyOptions): JourneyTest[] {
   const { origin, alternateOrigin } = options;
+  const entries: JourneyTest[] = [];
 
-  test.describe('full journey checklist', () => {
-    test('cold GET / → login redirect → IdP login → notes UI', async ({ page }) => {
+  // Collected, not registered: the owning spec owns the `test(...)` calls.
+  const collect = (title: string, body: JourneyBody): void => {
+    entries.push({ title, body });
+  };
+    collect('cold GET / → login redirect → IdP login → notes UI', async ({ page }) => {
       await startLogin(page);
       await submitCredentials(page, E2E_USER, E2E_PASSWORD);
       await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByLabel('New note')).toBeVisible();
     });
 
-    test('wrong password and unknown user fail identically (no enumeration)', async ({ page }) => {
+    collect('wrong password and unknown user fail identically (no enumeration)', async ({ page }) => {
       await startLogin(page);
       await submitCredentials(page, E2E_USER, 'definitely-not-the-password');
       await expect(page.getByRole('alert')).toHaveText('Invalid username or password', {
@@ -55,7 +70,7 @@ export function registerJourney(options: JourneyOptions): void {
       });
     });
 
-    test('create → edit → tag → search → reload keeps session → trash → restore → permanent delete', async ({
+    collect('create → edit → tag → search → reload keeps session → trash → restore → permanent delete', async ({
       page,
     }) => {
       await logIn(page);
@@ -105,7 +120,7 @@ export function registerJourney(options: JourneyOptions): void {
       await expect(page.getByText('Trash is empty.')).toBeVisible();
     });
 
-    test('logout ends the session; logging back in requires the password again (SSO kill)', async ({
+    collect('logout ends the session; logging back in requires the password again (SSO kill)', async ({
       page,
     }) => {
       await logIn(page);
@@ -117,7 +132,7 @@ export function registerJourney(options: JourneyOptions): void {
       await expect(page.locator('input[name="password"]')).toBeVisible();
     });
 
-    test('a fresh browser context sees the login wall (private-window analog)', async ({
+    collect('a fresh browser context sees the login wall (private-window analog)', async ({
       browser,
     }) => {
       const context = await browser.newContext();
@@ -128,7 +143,7 @@ export function registerJourney(options: JourneyOptions): void {
       await context.close();
     });
 
-    test('callback with a tampered state fails closed (4xx, no session)', async ({ request }) => {
+    collect('callback with a tampered state fails closed (4xx, no session)', async ({ request }) => {
       const res = await request.get('/auth/callback?code=forged&state=forged', {
         maxRedirects: 0,
       });
@@ -136,7 +151,7 @@ export function registerJourney(options: JourneyOptions): void {
       expect(res.headers()['set-cookie'] ?? '').not.toContain('app_session=');
     });
 
-    test('unauthenticated API call degrades to a login redirect, never a 500', async ({ request }) => {
+    collect('unauthenticated API call degrades to a login redirect, never a 500', async ({ request }) => {
       const res = await request.post('/api/notes/flush', {
         maxRedirects: 0,
         data: { body: 'x', tags: [] },
@@ -145,7 +160,7 @@ export function registerJourney(options: JourneyOptions): void {
       expect(res.headers()['location']).toContain('/auth/login');
     });
 
-    test('the login journey also passes from the alternate loopback origin', async ({ page }) => {
+    collect('the login journey also passes from the alternate loopback origin', async ({ page }) => {
       // Next normalizes loopback hosts, so this proves both spellings reach the
       // same journey (the bug class that hid behind a single-origin harness).
       await page.goto(`${alternateOrigin}/notes`);
@@ -154,13 +169,13 @@ export function registerJourney(options: JourneyOptions): void {
       await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible({ timeout: 30_000 });
     });
 
-    test('per-route returnTo: a saved /todos entry logs in and lands on /todos', async ({ page }) => {
+    collect('per-route returnTo: a saved /todos entry logs in and lands on /todos', async ({ page }) => {
       await startLogin(page, '/todos');
       await submitCredentials(page, E2E_USER, E2E_PASSWORD);
       await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible({ timeout: 30_000 });
     });
 
-    test('per-route PWA: each route links its own manifest', async ({ page }) => {
+    collect('per-route PWA: each route links its own manifest', async ({ page }) => {
       await logIn(page);
       await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
         'href',
@@ -182,5 +197,5 @@ export function registerJourney(options: JourneyOptions): void {
         '/manifest-pomodoro.json',
       );
     });
-  });
+  return entries;
 }

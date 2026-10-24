@@ -242,6 +242,10 @@ export function Autosuggest({
                 id={`${popupId}-option-${index}`}
                 role="option"
                 aria-selected={index === highlight}
+                // An option is a control, so it must be focusable — but never a tab
+                // stop: the field keeps focus and reaches rows through
+                // `aria-activedescendant` (WAI-ARIA APG combobox pattern).
+                tabIndex={-1}
                 className={cx(
                   'ui-autosuggest__option',
                   index === highlight && 'ui-autosuggest__option--active',

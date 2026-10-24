@@ -53,6 +53,16 @@ const DEFAULT_BASE = 'https://api.nal.usda.gov/fdc';
 /** The batch endpoint's one hard limit: at most 20 `fdcIds` per request. */
 const MAX_FDC_IDS_PER_REQUEST = 20;
 
+/**
+ * `value` without its trailing slashes, so a configured base never doubles the
+ * join's slash. A linear scan rather than `/\/+$/`, which backtracks.
+ */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end -= 1;
+  return value.slice(0, end);
+}
+
 const NOT_FOUND: UsdaFailure = { ok: false, reason: 'not-found' };
 const RATE_LIMITED: UsdaFailure = { ok: false, reason: 'rate-limited' };
 const UNAVAILABLE: UsdaFailure = { ok: false, reason: 'unavailable' };
@@ -75,7 +85,7 @@ export class UsdaClient {
       throw new Error('USDA is not configured: USDA_API_KEY must be set');
     }
     this.key = key;
-    this.base = (env.USDA_API_BASE ?? DEFAULT_BASE).replace(/\/+$/, '');
+    this.base = withoutTrailingSlashes(env.USDA_API_BASE ?? DEFAULT_BASE);
   }
 
   /**

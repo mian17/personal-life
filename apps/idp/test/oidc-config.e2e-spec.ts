@@ -51,7 +51,7 @@ describe('static clients', () => {
     expect(dev?.token_endpoint_auth_method).toBe('none');
     for (const c of clients) {
       expect(c.response_types).toEqual(['code']);
-      expect([...(c.grant_types ?? [])].sort()).toEqual(['authorization_code', 'refresh_token']);
+      expect([...(c.grant_types ?? [])].sort((a: string, b: string) => a.localeCompare(b))).toEqual(['authorization_code', 'refresh_token']);
     }
   });
 

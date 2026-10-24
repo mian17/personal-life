@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { createServer, type Server } from 'http';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { dirname } from 'node:path';
 import request from 'supertest';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
@@ -74,8 +75,23 @@ export async function waitForAsync(
   }
 }
 
+/**
+ * The `PATH` every spawned command gets. Never the caller's `PATH`: that is
+ * resolved at spawn time from directories anyone can write to (Sonar S4036), so
+ * the harness pins the executable's own directory plus the standard toolchain
+ * locations instead.
+ */
+const CHILD_PATH = [
+  dirname(process.execPath),
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+  '/usr/bin',
+  '/bin',
+].join(':');
+
 function run(args: string[], capture = false): string {
   return execFileSync('docker', args, {
+    env: { ...process.env, PATH: CHILD_PATH },
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
   });
@@ -118,7 +134,7 @@ async function createDatabase(serverUrl: string, label: string): Promise<string>
 }
 
 async function startContainer(): Promise<{ url: string; stop(): Promise<void> }> {
-  const name = `feedback-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const name = `feedback-test-${process.pid}-${randomUUID().slice(0, 8)}`;
   let port: string | null = null;
   const stop = async (): Promise<void> => {
     try {
