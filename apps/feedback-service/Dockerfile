@@ -47,5 +47,6 @@ COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
 COPY --from=build /repo/apps/feedback-service/package.json ./package.json
 COPY --from=build /repo/apps/feedback-service/dist ./dist
 
+USER node
 EXPOSE 3008
 CMD ["node", "dist/main.js"]

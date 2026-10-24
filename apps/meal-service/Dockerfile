@@ -56,5 +56,6 @@ COPY --from=build /repo/packages/nutrition/dist ./packages/nutrition/dist
 COPY --from=build /repo/apps/meal-service/package.json ./package.json
 COPY --from=build /repo/apps/meal-service/dist ./dist
 
+USER node
 EXPOSE 3106
 CMD ["node", "dist/main.js"]

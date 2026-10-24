@@ -51,5 +51,6 @@ COPY --from=build /repo/packages/db/dist ./packages/db/dist
 COPY --from=build /repo/apps/note-service/package.json ./package.json
 COPY --from=build /repo/apps/note-service/dist ./dist
 
+USER node
 EXPOSE 3001
 CMD ["node", "dist/main.js"]

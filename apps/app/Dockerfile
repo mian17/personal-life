@@ -58,5 +58,10 @@ COPY --from=build /repo/packages/app-kit/src ./node_modules/@life/app-kit/src
 COPY --from=build /repo/apps/pomodoro/package.json ./node_modules/@life/pomodoro/package.json
 COPY --from=build /repo/apps/pomodoro/src ./node_modules/@life/pomodoro/src
 
+# Next writes image/fetch caches under .next/cache at runtime; only that
+# directory is node-owned — application code stays root-owned and immutable.
+RUN mkdir -p /app/apps/app/.next/cache \
+ && chown -R node:node /app/apps/app/.next/cache
+USER node
 EXPOSE 3002
 CMD ["node", "apps/app/server.js"]

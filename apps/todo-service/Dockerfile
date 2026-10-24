@@ -47,5 +47,6 @@ COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
 COPY --from=build /repo/apps/todo-service/package.json ./package.json
 COPY --from=build /repo/apps/todo-service/dist ./dist
 
+USER node
 EXPOSE 3005
 CMD ["node", "dist/main.js"]
