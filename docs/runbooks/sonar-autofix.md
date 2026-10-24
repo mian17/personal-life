@@ -82,15 +82,15 @@ An unsigned request returns `401`, a non-`main` branch returns `202` with
 
 ## What a real run does
 
-1. `git fetch origin dev`, then a worktree at `~/.cache/sonar-autofix/worktree` on
+1. `git fetch origin dev`, then a worktree at `.pi/worktrees/sonar-autofix-run` on
    branch `fix/sonar-<taskId>` cut from `dev`, already checked out.
 2. The receiver writes the issue list and the PR body to
-   `~/.local/state/sonar-autofix/`, then runs
+   `.pi/worktrees/sonar-autofix-handoff/`, then runs
    `pi-sbx --no-session -p --append-system-prompt scripts/sonar-autofix/brief.md`
    naming the branch, the issues file, and the PR body file.
 3. Inside the sandbox the agent fixes the issues, runs the owning workspace's
    `typecheck`, commits `fix(sonar): …`, pushes the branch, and runs
-   `gh pr create --draft --base dev`.
+   `gh pr create --draft --base dev --body-file <pr body file>`.
 4. The receiver checks what the agent delivered and logs
    `{"event":"pull-request","by":"agent","url":"…"}`.
 
@@ -133,6 +133,10 @@ branch ever moves.
 - One run at a time. Overlapping webhooks return `409` and are logged, not
   queued.
 - `SONAR_AUTOFIX_TIMEOUT_MS` (default 30 minutes) kills the agent.
+- Paths are knobs: `SONAR_AUTOFIX_WORKTREE` (default
+  `.pi/worktrees/sonar-autofix-run`) and `SONAR_AUTOFIX_HANDOFF` (default
+  `.pi/worktrees/sonar-autofix-handoff`). Both must stay inside the repository —
+  the sandbox mounts the repo and sees nothing outside it.
 - The agent needs working git authentication inside the sandbox: the repository
   mount plus whatever your sandbox already uses for pushes. If a push fails, the
   run logs the failure and leaves the worktree in place for inspection.
@@ -147,5 +151,5 @@ systemctl --user disable --now sonar-autofix
 rm ~/.config/systemd/user/sonar-autofix.service ~/.config/sonar-autofix.env
 ```
 
-Delete the webhook in SonarQube. Remove `~/.cache/sonar-autofix/worktree` and any
-`fix/sonar-*` branches you no longer want.
+Delete the webhook in SonarQube. Remove `.pi/worktrees/sonar-autofix-run`, `.pi/worktrees/sonar-autofix-handoff`, and
+any `fix/sonar-*` branches you no longer want.

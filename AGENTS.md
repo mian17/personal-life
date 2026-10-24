@@ -10,9 +10,32 @@
 | `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts` is the value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
 | `lessons` | `docs/lessons/` |
+| `base-branch` | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main` |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
 thinking discipline) are in the global protocol at `~/.config/opencode/AGENTS.md`.
+
+## Branching — always from `dev`
+
+`main` is the release line and is never a working base. Cut every branch from
+`origin/dev` and open every pull request against `dev`:
+
+```bash
+git fetch origin dev
+git worktree add .pi/worktrees/<slug> -b <branch> origin/dev
+gh pr create --draft --base dev --head <branch>
+```
+
+Never branch from `main`, never rebase onto `main`, never push to `main` or to `dev`
+directly, and never merge a pull request without the user asking. Promotion from
+`dev` to `main` is a human decision, not part of any task.
+
+This applies to agents too, including short mechanical ones such as the
+`scripts/sonar-autofix` run — that receiver reads `SONAR_AUTOFIX_BASE_BRANCH`
+(default `dev`) and never targets `main`.
+
+Worktrees live under `.pi/worktrees/` (gitignored), not `.worktrees/` at the repo
+root and not `~/.cache` — the sandbox mounts the repository and nothing else.
 
 Docs layout: `docs/specs/`, `docs/intent/` and `tasks/` were removed in `d1f54c9` and
 are not restored wholesale — a run that needs a spec writes `docs/specs/SPEC-<module>.md`
