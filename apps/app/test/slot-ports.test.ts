@@ -1,9 +1,13 @@
 import {
   degradedAppPort,
   devPorts,
+  feedbackMqContainer,
   feedbackPgContainer,
+  hopEnabled,
   hopPorts,
+  redisContainer,
   testPorts,
+  testRedisUrl,
 } from './e2e/config';
 
 const SLOTS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -25,13 +29,21 @@ function allPortsForSlot(slot: number): number[] {
   ];
 }
 
+function containersForSlot(slot: number): string[] {
+  return [feedbackPgContainer(slot), feedbackMqContainer(slot), redisContainer(slot)];
+}
+
 describe('slot-derived harness ports', () => {
   afterEach(() => {
     delete process.env.E2E_IDP_PORT;
     delete process.env.E2E_DEV_APP_PORT;
     delete process.env.E2E_HOP_A_PORT;
     delete process.env.E2E_DEGRADED_APP_PORT;
+    delete process.env.E2E_HOP;
+    delete process.env.TEST_REDIS_URL;
     delete process.env.E2E_FEEDBACK_PG_CONTAINER;
+    delete process.env.E2E_FEEDBACK_MQ_CONTAINER;
+    delete process.env.E2E_REDIS_CONTAINER;
   });
 
   it('returns the historical port set for slot 0', () => {
@@ -97,17 +109,76 @@ describe('slot-derived harness ports', () => {
     expect(feedbackPgContainer(1)).toBe('feedback-pg-e2e-1');
   });
 
+  it('names the throwaway RabbitMQ container after the slot', () => {
+    expect(feedbackMqContainer(0)).toBe('feedback-mq-e2e-0');
+    expect(feedbackMqContainer(1)).toBe('feedback-mq-e2e-1');
+  });
+
+  it('names the throwaway Redis container after the slot', () => {
+    expect(redisContainer(0)).toBe('redis-e2e-0');
+    expect(redisContainer(1)).toBe('redis-e2e-1');
+  });
+
+  it('keeps every slot container name derived from its slot', () => {
+    for (const slot of SLOTS) {
+      expect(containersForSlot(slot)).toEqual([
+        `feedback-pg-e2e-${slot}`,
+        `feedback-mq-e2e-${slot}`,
+        `redis-e2e-${slot}`,
+      ]);
+    }
+  });
+
+  it('gives any two distinct slots disjoint container names', () => {
+    for (const slot of SLOTS) {
+      for (const otherSlot of SLOTS) {
+        if (otherSlot === slot) continue;
+
+        const sharedNames = containersForSlot(slot).filter((name) =>
+          containersForSlot(otherSlot).includes(name),
+        );
+        expect(sharedNames).toEqual([]);
+      }
+    }
+  });
+
   it('lets an explicit env override win over the derived value in any slot', () => {
     process.env.E2E_IDP_PORT = '4103';
     process.env.E2E_DEV_APP_PORT = '4200';
     process.env.E2E_HOP_A_PORT = '4310';
     process.env.E2E_DEGRADED_APP_PORT = '4108';
     process.env.E2E_FEEDBACK_PG_CONTAINER = 'feedback-pg-e2e-pinned';
+    process.env.E2E_FEEDBACK_MQ_CONTAINER = 'feedback-mq-e2e-pinned';
+    process.env.E2E_REDIS_CONTAINER = 'redis-e2e-pinned';
 
     expect(testPorts(3).idpPort).toBe(4103);
     expect(devPorts(3).appPort).toBe(4200);
     expect(hopPorts(3).appAPort).toBe(4310);
     expect(degradedAppPort(3)).toBe(4108);
     expect(feedbackPgContainer(3)).toBe('feedback-pg-e2e-pinned');
+    expect(feedbackMqContainer(3)).toBe('feedback-mq-e2e-pinned');
+    expect(redisContainer(3)).toBe('redis-e2e-pinned');
+  });
+
+  it('runs the two-replica hop proof only for E2E_HOP=1', () => {
+    expect(hopEnabled()).toBe(false);
+
+    for (const value of ['0', 'true', 'yes', ' 1', '']) {
+      process.env.E2E_HOP = value;
+      expect(hopEnabled()).toBe(false);
+    }
+
+    process.env.E2E_HOP = '1';
+    expect(hopEnabled()).toBe(true);
+  });
+
+  it('reports a pinned TEST_REDIS_URL trimmed, and undefined when unset or blank', () => {
+    expect(testRedisUrl()).toBeUndefined();
+
+    process.env.TEST_REDIS_URL = '   ';
+    expect(testRedisUrl()).toBeUndefined();
+
+    process.env.TEST_REDIS_URL = '  redis://127.0.0.1:6399  ';
+    expect(testRedisUrl()).toBe('redis://127.0.0.1:6399');
   });
 });

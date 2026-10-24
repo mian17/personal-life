@@ -1,5 +1,14 @@
+import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
-import { E2E_OWNER, E2E_PASSWORD, E2E_USER, testRedisUrl } from './config';
+import {
+  E2E_OWNER,
+  E2E_PASSWORD,
+  E2E_USER,
+  hopEnabled,
+  redisContainer,
+  testRedisUrl,
+} from './config';
+import { heldSlot } from './teardown';
 import {
   closeTestRedis,
   forceNearExpiry,
@@ -23,22 +32,22 @@ import {
  *     Notes, and the shared record rotated exactly once" is the observable proof
  *     that the `app:lock:refresh:<id>` lock made exactly one refresh happen.
  *
- * Gated on `TEST_REDIS_URL`: with it unset the whole file skips, so the default
- * e2e run (the 21 existing specs) stays zero-Redis and unchanged.
+ * Gated on `E2E_HOP=1`: Redis now always exists in the harness, so its presence
+ * can no longer be the signal. Without the flag the whole file skips and no
+ * replica boots, so the default e2e run stays exactly what it was.
  */
 
-const REDIS_URL = testRedisUrl();
+const REDIS_URL = hopEnabled() ? hopRedisUrl() : undefined;
 
 /**
  * The Redis hop proof is deliberately opt-in. It boots two extra production app
- * instances and requires a live test Redis; without `TEST_REDIS_URL` it must not
- * run (dev/e2e are Redis-free by contract). This `test.skip` is the gate — the
- * visible, code-level proof that the default suite is untouched.
+ * instances; without `E2E_HOP=1` it must not run. This `test.skip` is the gate —
+ * the visible, code-level proof that the default suite is untouched.
  */
 test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
   test.skip(
     !REDIS_URL,
-    'TEST_REDIS_URL is not set — skipping the Redis-backed two-replica hop proof',
+    'E2E_HOP=1 is not set — skipping the Redis-backed two-replica hop proof',
   );
 
   let apps: HopApps;
@@ -183,6 +192,42 @@ test.describe('Redis hop proof (two replicas, one Redis, one IdP)', () => {
     expect(await redis.get(`app:lock:refresh:${sessionId}`)).toBeNull();
   });
 });
+
+/**
+ * The one Redis both replicas share: the operator's pinned `TEST_REDIS_URL`
+ * when set, else the slot's own booted `redis-e2e-<slot>`, whose Docker-assigned
+ * loopback port the harness reads back here.
+ *
+ * ponytail: the `docker port` read-back duplicates `stack.ts`, which does not
+ * export the slot's Redis URL. Add an export there when a second consumer needs
+ * the endpoint.
+ */
+function hopRedisUrl(): string {
+  return testRedisUrl() ?? slotRedisUrl();
+}
+
+function slotRedisUrl(): string {
+  const name = redisContainer(heldSlot());
+  const port = publishedRedisPort(name);
+  if (port === undefined) {
+    throw new Error(`${name} published no 6379/tcp — is the slot's Redis running?`);
+  }
+  return `redis://127.0.0.1:${port}`;
+}
+
+function publishedRedisPort(name: string): number | undefined {
+  let mapping = '';
+  try {
+    mapping = execFileSync('docker', ['port', name, '6379/tcp'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch {
+    return undefined;
+  }
+  const hostPort = /:(\d+)$/.exec(mapping.trim().split('\n')[0] ?? '')?.[1];
+  return hostPort === undefined ? undefined : Number(hostPort);
+}
 
 /** A cookie that mirrors what replica A set (host-only on `localhost`). */
 function sessionCookie(sessionId: string) {

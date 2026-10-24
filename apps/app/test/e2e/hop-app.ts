@@ -11,13 +11,15 @@ import { heldSlot } from './teardown';
  * shared process memory. This boots both from the same production standalone
  * artifact Docker runs (`degraded-app.ts` pattern), pointing at:
  *
- *   - ONE Redis (`REDIS_URL` = `TEST_REDIS_URL`, provisioned by the test owner),
+ *   - ONE Redis, handed in by the caller: `TEST_REDIS_URL` when the operator
+ *     pinned one, else the held slot's booted `redis-e2e-<slot>`,
  *   - ONE IdP (the harness's, whose callback registry is extended in `stack.ts`),
  *   - ONE note-service (the harness's), so the browser proof exercises the real
  *     authenticated Notes UI rather than a synthetic endpoint.
  *
- * Nothing here touches the human's deployed stack or dev processes; the spec is
- * gated on `TEST_REDIS_URL` so default e2e stays zero-Redis.
+ * Nothing here touches the human's deployed stack or dev processes, and the
+ * replicas' Redis endpoint arrives as an argument (`startHopApps`) rather than
+ * being read from the environment here: the spec owns the one source of truth.
  */
 
 export interface HopInstance {

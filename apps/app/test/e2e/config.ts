@@ -62,8 +62,8 @@ export function devPorts(slot = 0) {
  * The two replicas for the Redis hop proof (Task 3). Kept clear of the 31xx
  * shared-stack and 32xx dev-stack ports, so no two harnesses can collide on a
  * port. Both replicas share the single harness IdP (`testPorts().idpPort`,
- * itself overridable via `E2E_IDP_PORT`) and the one test Redis
- * (`TEST_REDIS_URL`).
+ * itself overridable via `E2E_IDP_PORT`) and the one Redis — the slot's own
+ * `redis-e2e-<slot>`, or `TEST_REDIS_URL` when the operator pins one.
  */
 export function hopPorts(slot = 0) {
   return {
@@ -73,9 +73,18 @@ export function hopPorts(slot = 0) {
 }
 
 /**
- * The shared Redis the hop proof runs against. This is the spec's gate: unset →
- * the hop spec skips entirely (default e2e stays zero-Redis); set to a test-owned
- * endpoint (e.g. `redis://127.0.0.1:6399`) → the two replicas are booted with it.
+ * Whether the two-replica Redis hop proof runs. It boots two extra production
+ * app instances, so it is opt-in: Redis being around is no longer the signal,
+ * and without this flag the default suite never pays for the replicas.
+ */
+export function hopEnabled(): boolean {
+  return process.env.E2E_HOP === '1';
+}
+
+/**
+ * An explicit test Redis endpoint (e.g. `redis://127.0.0.1:6399`). Setting it
+ * suppresses the slot's own `redis-e2e-<slot>` boot; leaving it unset means the
+ * harness boots the slot's Redis.
  */
 export function testRedisUrl(): string | undefined {
   return process.env.TEST_REDIS_URL?.trim() || undefined;
@@ -97,6 +106,23 @@ export function pidsFilePath(file: string): string {
  */
 export function feedbackPgContainer(slot = 0): string {
   return process.env.E2E_FEEDBACK_PG_CONTAINER?.trim() || `feedback-pg-e2e-${slot}`;
+}
+
+/**
+ * The throwaway RabbitMQ the harness owns per slot: a slot-named
+ * `rabbitmq:4.1-alpine` container on an ephemeral loopback port, never the
+ * compose `rabbitmq-feedback`.
+ */
+export function feedbackMqContainer(slot = 0): string {
+  return process.env.E2E_FEEDBACK_MQ_CONTAINER?.trim() || `feedback-mq-e2e-${slot}`;
+}
+
+/**
+ * The throwaway Redis the harness owns per slot: a slot-named `redis:8-alpine`
+ * container on an ephemeral loopback port, never a service's real Redis.
+ */
+export function redisContainer(slot = 0): string {
+  return process.env.E2E_REDIS_CONTAINER?.trim() || `redis-e2e-${slot}`;
 }
 
 export function repoRoot(): string {
