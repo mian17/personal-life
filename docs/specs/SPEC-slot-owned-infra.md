@@ -198,7 +198,10 @@ export function feedbackMqContainer(slot = 0): string {
    or `dispatcher.service.ts`, and `feedbackEnv` still passes `RABBITMQ_URL:
    undefined` — the broker is up and unused.
 7. After a run's teardown, `docker ps -a` shows none of the held slot's three
-   containers; a concurrent run's slot-1 containers survive slot 0's teardown.
+   containers; a concurrent run's slot-1 containers survive slot 0's teardown. A
+   stack that fails after booting them removes them on the way out: Playwright never
+   runs global-teardown when global-setup throws, so `startStack`'s failure path
+   stops the slot's containers itself.
 8. `npm run typecheck` passes and the unit run is green within the
    `max-test-runs: 2` budget; no new dependency appears in any `package.json`.
 

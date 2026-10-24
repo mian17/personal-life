@@ -574,8 +574,11 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   } catch (err) {
     // A setup that fails after some services are up must not leak them: the
     // next run would then boot against this run's stale server — the exact
-    // EADDRINUSE + stale-chunk class the port preflight above guards.
+    // EADDRINUSE + stale-chunk class the port preflight above guards. The
+    // slot's containers go too, because Playwright never runs globalTeardown
+    // when globalSetup throws.
     for (const service of services) await service.stop();
+    stopThrowawayContainers(cfg.slot ?? 0);
     throw err;
   }
 }

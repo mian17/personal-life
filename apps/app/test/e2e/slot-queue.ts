@@ -10,6 +10,13 @@ import { testPorts } from './config';
  * is machine-scoped because worktree-local state cannot arbitrate between
  * worktrees.
  *
+ * A worktree holds at most one slot at a time. Two stacks of the same worktree
+ * would share its build output — each service's dist/ (built with
+ * `deleteOutDir`) and `apps/app/.next` — so the second build deletes what the
+ * first is running. Distinct slots isolate ports and containers, and cannot
+ * isolate a shared directory, so the second attempt is refused instead of
+ * handed slot 1.
+ *
  * A waiting attempt parks a FIFO ticket (`<requestedAt>-<pid>.json`); a holder
  * parks a claim (`<slot>.hold.json`). Both are created exclusively, so the file
  * system picks the winner of any race. Claims and tickets of attempts that died
@@ -62,8 +69,11 @@ export type SlotClaim = {
 /** Either the slot this attempt won, or the reasons to come back later. */
 export type SlotOutcome = { claim: SlotClaim } | { refusal: SlotRefusal };
 
-/** Which marker line the attempt prints: a holder blocks it, or the grace ran out. */
-export type QueueMarker = 'E2E_QUEUE_BUSY' | 'E2E_QUEUE_TIMEOUT';
+/**
+ * Which marker line the attempt prints: another worktree's holder blocks it, the
+ * grace ran out, or this worktree already runs a stack.
+ */
+export type QueueMarker = 'E2E_QUEUE_BUSY' | 'E2E_QUEUE_TIMEOUT' | 'E2E_WORKTREE_BUSY';
 
 /** What a queued-out attempt reports: who blocked it, where it stood, when to retry. */
 export type SlotRefusal = {
@@ -146,7 +156,10 @@ export function attemptClaim(worktree: string): SlotOutcome {
  */
 export function acquireSlot(worktree: string): SlotClaim | undefined {
   const slotCount = concurrencyLimit();
-  return withTicket(worktree, (entry) => claimWhenTurnArrives(entry, slotCount));
+  return withTicket(worktree, (entry) => {
+    if (worktreeHolder(entry.directory, entry.worktree)) return undefined;
+    return claimWhenTurnArrives(entry, slotCount);
+  });
 }
 
 /**
@@ -181,6 +194,9 @@ export function exitForRefusal(refusal: SlotRefusal): never {
 function waitForTurn(attempt: WaitingAttempt): SlotOutcome {
   for (;;) {
     reclaimAbandonedQueueFiles(attempt.entry.directory);
+
+    const sameWorktree = worktreeHolder(attempt.entry.directory, attempt.entry.worktree);
+    if (sameWorktree) return worktreeBusyRefusal(attempt.entry, sameWorktree);
 
     const claim = claimWhenTurnArrives(attempt.entry, attempt.slotCount);
     if (claim) return { claim };
@@ -359,6 +375,15 @@ function liveHolds(directory: string): SlotHold[] {
 }
 
 /**
+ * The claim this worktree already holds. A worktree has one build output, so a
+ * second attempt in it cannot be given any slot — waiting for one would not help.
+ */
+function worktreeHolder(directory: string, worktree: string): SlotHold | undefined {
+  const wanted = resolve(worktree);
+  return liveHolds(directory).find((hold) => resolve(hold.worktree) === wanted);
+}
+
+/**
  * The holder that makes waiting pointless: with every slot taken, no freed slot
  * can reach this attempt before some holder finishes. A partly free pool is not
  * that case — the earlier waiters simply have not been served yet.
@@ -427,6 +452,10 @@ function timedOutRefusal(entry: QueueEntry): SlotOutcome {
   return { refusal: refusalFrom({ marker: 'E2E_QUEUE_TIMEOUT', entry }) };
 }
 
+function worktreeBusyRefusal(entry: QueueEntry, holder: SlotHold): SlotOutcome {
+  return { refusal: refusalFrom({ marker: 'E2E_WORKTREE_BUSY', entry, holder }) };
+}
+
 function refusalFrom(source: RefusalSource): SlotRefusal {
   const position = queuePosition(source.entry);
 
@@ -455,11 +484,18 @@ function markerLine(refusal: SlotRefusal): string {
 function humanLine(refusal: SlotRefusal): string {
   const retry = `retry in about ${refusal.retryAfterSeconds}s`;
 
-  if (!refusal.holderPorts) {
+  if (refusal.marker === 'E2E_WORKTREE_BUSY') {
+    const where = refusal.holderPorts ? ` on ${describePorts(refusal.holderPorts)}` : '';
+    return `e2e queue: this worktree already runs a stack (pid ${refusal.holderPid})${where} — one stack per worktree, so wait for it or use another worktree`;
+  }
+
+  const ports = refusal.holderPorts;
+
+  if (!ports) {
     return `e2e queue: no live holder, ${refusal.position} attempt(s) ahead in line — ${retry}`;
   }
 
-  return `e2e queue: pid ${refusal.holderPid} runs the stack in ${refusal.holderWorktree} on ${describePorts(refusal.holderPorts)} — ${retry}`;
+  return `e2e queue: pid ${refusal.holderPid} runs the stack in ${refusal.holderWorktree} on ${describePorts(ports)} — ${retry}`;
 }
 
 function describePorts(ports: SlotPorts): string {

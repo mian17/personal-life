@@ -126,6 +126,14 @@ files (`<slot>.hold.json`: pid, worktree, ports, claimedAt) and FIFO ticket file
 (`<createdAt>-<pid>.json`: worktree, requestedAt). The state dir is outside every
 worktree by design; cross-machine locking is out of scope.
 
+A worktree holds **at most one slot at a time**: two stacks in one worktree share its build
+output (each service's `dist/`, built with `deleteOutDir`, and `apps/app/.next`), so the
+second build deletes what the first is running. Distinct slots isolate ports and containers
+and cannot isolate a shared directory, so a second attempt in a worktree that already holds
+a slot is refused with `E2E_WORKTREE_BUSY` rather than handed slot 1. A setup that throws
+after booting the slot's containers removes them, because Playwright never runs
+global-teardown when global-setup throws.
+
 Slot derivation (stride 10, slot `s` = `base + offset + 10*s`):
 
 | Resource | Prod (31xx) | Dev (32xx) | Hop (33xx) |
@@ -185,6 +193,9 @@ export function testPorts(slot = 0) {
   (target: millisecond) exit for not-my-turn attempts.
 - Every marker field and every reclaim branch has a test; no behavior ships behind a
   manual check alone.
+- `slot-queue.test.ts` covers the one-stack-per-worktree rule both ways: another worktree's
+  live hold lets this attempt walk to slot 1, this worktree's own live hold refuses with
+  `E2E_WORKTREE_BUSY` (machine line, human line, exit 75).
 - Verify with `npm run test:unit -- <file>`; at most 2 test runs per command. The
   e2e-level proof (two concurrent invocations, disjoint ports) runs through the
   policy e2e command in the QA lane.
@@ -222,6 +233,9 @@ export function testPorts(slot = 0) {
    followed by one human line naming the holder and its ports.
 3. `retryAfter` is measured from recent slot hold durations, not guessed; with no
    history it falls back to a documented constant.
+3a. One worktree never runs two stacks: while a sibling holds the slot, the second attempt
+   prints `E2E_WORKTREE_BUSY` and exits 75; a setup that throws after booting the slot's
+   containers leaves no container behind.
 4. Kill a holder mid-run: the next attempt reclaims the slot (pid dead) and proceeds
    without manual cleanup. Backdate a claim file past 30 minutes
    (`E2E_SLOT_MAX_AGE_MS`, default 1_800_000): same reclamation.

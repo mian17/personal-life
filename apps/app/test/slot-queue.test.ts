@@ -12,6 +12,8 @@ import {
 } from './e2e/slot-queue';
 
 const WORKTREE = '/tmp/worktree-under-test';
+/** A second worktree on the same machine, so a hold is another attempt's. */
+const OTHER_WORKTREE = '/tmp/other-worktree';
 const RUN_CEILING_MS = 60_000;
 const SLOT_ZERO_CLAIM = '0.hold.json';
 const HOLD_DURATION_FILE = 'hold-durations.json';
@@ -73,8 +75,13 @@ function claimFileName(slot: number): string {
   return join(directory, `${slot}.hold.json`);
 }
 
-function writeHold(slot: number, pid: number, claimedAt = Date.now()): void {
-  const hold = { pid, worktree: WORKTREE, ports: testPorts(slot), claimedAt };
+function writeHold(
+  slot: number,
+  pid: number,
+  claimedAt = Date.now(),
+  worktree = WORKTREE,
+): void {
+  const hold = { pid, worktree, ports: testPorts(slot), claimedAt };
   writeFileSync(claimFileName(slot), JSON.stringify(hold));
 }
 
@@ -124,16 +131,43 @@ describe('claiming a slot', () => {
     expect(acquireSlot(WORKTREE)).toMatchObject({ slot: 0 });
   });
 
-  it('walks to the next slot while a live attempt holds slot 0', () => {
+  it('walks to the next slot while another worktree holds slot 0', () => {
     process.env.E2E_CONCURRENCY = '2';
-    writeHold(0, process.pid);
+    writeHold(0, process.pid, Date.now(), OTHER_WORKTREE);
 
     expect(acquireSlot(WORKTREE)).toMatchObject({ slot: 1, ports: testPorts(1) });
   });
 
+  it('refuses a second stack in a worktree that already holds a slot', () => {
+    process.env.E2E_CONCURRENCY = '2';
+    writeHold(0, process.pid);
+
+    expect(acquireSlot(WORKTREE)).toBeUndefined();
+  });
+
+  it('reports the same-worktree refusal instead of slot 1', () => {
+    process.env.E2E_CONCURRENCY = '2';
+    writeHold(0, process.pid);
+
+    expect(attemptClaim(WORKTREE)).toMatchObject({
+      refusal: { marker: 'E2E_WORKTREE_BUSY', holderWorktree: WORKTREE, holderPorts: testPorts(0) },
+    });
+  });
+
+  it('prints the worktree refusal with the one-stack-per-worktree reason', () => {
+    process.env.E2E_CONCURRENCY = '2';
+    writeHold(0, process.pid);
+
+    const { exitCode, lines } = reportOf(WORKTREE);
+
+    expect(exitCode).toBe(75);
+    expect(lines[0]).toMatch(/^E2E_WORKTREE_BUSY holder=\d+ worktree=\S+ position=\d+ retryAfter=\d+$/);
+    expect(lines[1]).toContain('one stack per worktree');
+  });
+
   it('stops at the configured slot count', () => {
     process.env.E2E_CONCURRENCY = '1';
-    writeHold(0, process.pid);
+    writeHold(0, process.pid, Date.now(), OTHER_WORKTREE);
 
     expect(acquireSlot(WORKTREE)).toBeUndefined();
   });
@@ -156,7 +190,7 @@ describe('claiming a slot', () => {
 
 describe('reporting the queue', () => {
   it('reports the live holder, its ports and a fallback retry instead of waiting', () => {
-    writeHold(0, process.pid);
+    writeHold(0, process.pid, Date.now(), OTHER_WORKTREE);
 
     const startedAt = Date.now();
     const outcome = attemptClaim(WORKTREE);
@@ -166,7 +200,7 @@ describe('reporting the queue', () => {
       refusal: {
         marker: 'E2E_QUEUE_BUSY',
         holderPid: process.pid,
-        holderWorktree: WORKTREE,
+        holderWorktree: OTHER_WORKTREE,
         holderPorts: testPorts(0),
         position: 2,
         retryAfterSeconds: 2 * FALLBACK_RETRY_SECONDS,
@@ -175,14 +209,14 @@ describe('reporting the queue', () => {
   });
 
   it('counts the holders and the earlier waiters into the queue position', () => {
-    writeHold(0, process.pid);
+    writeHold(0, process.pid, Date.now(), OTHER_WORKTREE);
     writeTicket(Date.now() - 5);
 
     expect(attemptClaim(WORKTREE)).toMatchObject({ refusal: { position: 3, retryAfterSeconds: 900 } });
   });
 
   it('prints one busy marker line and one human line naming the holder, then exits 75', () => {
-    writeHold(0, process.pid);
+    writeHold(0, process.pid, Date.now(), OTHER_WORKTREE);
 
     const { exitCode, lines } = reportOf(WORKTREE);
 
