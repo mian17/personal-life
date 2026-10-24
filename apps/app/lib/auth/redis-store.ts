@@ -3,6 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { createClient } from 'redis';
 import type { AppSession, SessionStoreApi } from './session-store';
 
+/** An already-connected client has nothing to await. Shared so the getter stays pure. */
+const READY: Promise<unknown> = Promise.resolve();
+
 /**
  * Redis-backed session store — the shared-state implementation of the
  * `SessionStoreApi` seam (`session-store.ts`). Selected by `createSessionStore()`
@@ -175,7 +178,6 @@ function parseRecord(raw: string | null): AppSession | undefined {
 
 export class RedisSessionStore implements SessionStoreApi {
   private readonly now: () => number;
-  private readyPromise: Promise<unknown> | undefined;
 
   constructor(
     private readonly client: SessionRedisClient,
@@ -185,15 +187,13 @@ export class RedisSessionStore implements SessionStoreApi {
   }
 
   /**
-   * The connect promise, created on first use rather than in the constructor:
-   * `create`/`get`/`update`/`destroy` each await it, and `??=` keeps it a
-   * single promise for the instance's life (so a hung connect is awaited once).
+   * The connect promise `create`/`get`/`update`/`destroy` each await. It comes
+   * from the caller (`connectBounded`), which raced it against a timeout and
+   * made it never reject — awaiting it once per call is correct because it is
+   * already one promise, so caching it here would only add a field to guard.
    */
   private get ready(): Promise<unknown> {
-    if (this.readyPromise === undefined) {
-      this.readyPromise = this.options.ready ?? Promise.resolve();
-    }
-    return this.readyPromise;
+    return this.options.ready ?? READY;
   }
 
   /** The store's current time (the injected clock), used for consistent expiry math. */

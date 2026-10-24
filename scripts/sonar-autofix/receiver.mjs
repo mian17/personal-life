@@ -53,8 +53,8 @@ const CHILD_PATH =
  * Absolute path to a command. `spawn` by bare name would search `PATH`, so a
  * writable directory anywhere in it could substitute the binary (Sonar S4036).
  */
-/** Commands this receiver may run. `run()` takes its command from call sites, so an
- * allowlist keeps a future caller from turning it into a generic exec (Sonar S6350). */
+/** Commands this receiver may run. The allowlist means `bin()` cannot be talked
+ * into resolving something else if a name ever comes from outside. */
 const ALLOWED_COMMANDS = new Set(['git', 'gh', 'pi-sbx']);
 
 const BIN_CACHE = new Map();
@@ -68,6 +68,11 @@ function bin(name) {
   if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
   BIN_CACHE.set(name, found);
   return found;
+}
+
+/** The environment every child gets: the app's own, minus its `PATH`. */
+function childEnv(overrides = {}) {
+  return { ...process.env, PATH: CHILD_PATH, ...overrides };
 }
 
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
@@ -136,10 +141,6 @@ export function createReceiver(config) {
     };
   }
 
-  function childEnv(overrides = {}) {
-    return { ...process.env, PATH: CHILD_PATH, ...overrides };
-  }
-
   function git(args, { cwd = config.repo, env = childEnv() } = {}) {
     return new Promise((resolvePromise, reject) => {
       const child = spawn(bin('git'), ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -156,24 +157,43 @@ export function createReceiver(config) {
     });
   }
 
-  function run(command, args, options = {}) {
+  /**
+   * Wait for a child, collecting its output. Takes the spawned process, not a
+   * command name: the binary is a literal at each call site, so no caller value
+   * can pick it (Sonar S6350). Only `args` carry data, and they are handed to
+   * `spawn` as an argv array, never a shell string, so they stay arguments.
+   */
+  function drain(child, resolvePromise) {
+    let output = '';
+    const collect = (chunk) => {
+      output = (output + chunk).slice(-8000);
+    };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    const timer = setTimeout(() => child.kill('SIGTERM'), config.timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      resolvePromise({ code: -1, output: String(error.message) });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolvePromise({ code: code ?? -1, output });
+    });
+  }
+
+  /** `gh`, at a path resolved once. The binary is a literal, never caller data. */
+  function gh(args, options = {}) {
     return new Promise((resolvePromise) => {
-      const child = spawn(bin(command), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
-      let output = '';
-      const collect = (chunk) => {
-        output = (output + chunk).slice(-8000);
-      };
-      child.stdout.on('data', collect);
-      child.stderr.on('data', collect);
-      const timer = setTimeout(() => child.kill('SIGTERM'), config.timeoutMs);
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        resolvePromise({ code: -1, output: String(error.message) });
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        resolvePromise({ code: code ?? -1, output });
-      });
+      const child = spawn(bin('gh'), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      drain(child, resolvePromise);
+    });
+  }
+
+  /** The sandbox agent entrypoint, at a path resolved once. */
+  function agent(args, options = {}) {
+    return new Promise((resolvePromise) => {
+      const child = spawn(bin('pi-sbx'), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      drain(child, resolvePromise);
     });
   }
 
@@ -198,8 +218,8 @@ export function createReceiver(config) {
    */
   async function inspectDelivery(worktree, branch) {
     const commits = await git(['rev-list', '--count', `origin/${config.baseBranch}..${branch}`], { cwd: worktree }).catch(() => '0');
-    const pushed = await run('git', ['-C', worktree, 'ls-remote', '--heads', 'origin', branch]);
-    const pr = await run('gh', ['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
+    const pushed = await git(['ls-remote', '--heads', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
+    const pr = await gh(['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
       cwd: worktree,
     });
     return {
@@ -211,10 +231,10 @@ export function createReceiver(config) {
 
   /** Only used when the agent left work behind without opening the PR itself. */
   async function createPullRequest(worktree, branch, taskId, summary) {
-    const push = await run('git', ['-C', worktree, 'push', '--set-upstream', 'origin', branch]);
+    const push = await git(['push', '--set-upstream', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
     if (push.code !== 0) throw new Error(`push failed: ${push.output}`);
 
-    const pr = await run('gh', [
+    const pr = await gh([
       'pr', 'create',
       '--draft',
       '--base', config.baseBranch,
@@ -268,7 +288,7 @@ export function createReceiver(config) {
 
     await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
-    const agent = await run('pi-sbx', [
+    const agentResult = await agent([
       '--no-session', '-p',
       '--append-system-prompt', brief,
       [
@@ -279,7 +299,7 @@ export function createReceiver(config) {
         'Fix the issues, then commit, push, and open the draft PR as the brief describes.',
       ].join('\n'),
     ], { cwd: worktree });
-    await log('agent-done', { taskId, code: agent.code, tail: agent.output.slice(-1500) });
+    await log('agent-done', { taskId, code: agentResult.code, tail: agentResult.output.slice(-1500) });
 
     const delivery = await inspectDelivery(worktree, branch);
     if (delivery.url) {
