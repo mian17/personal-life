@@ -82,16 +82,19 @@ An unsigned request returns `401`, a non-`main` branch returns `202` with
 
 ## What a real run does
 
-1. `git fetch origin dev`, then a worktree at `.pi/worktrees/sonar-autofix-run` on
-   branch `fix/sonar-<taskId>` cut from `dev`, already checked out.
-2. The receiver writes the issue list and the PR body to
+1. `git fetch origin --prune`, then `git pull --ff-only origin dev` when the base
+   checkout is on `dev` — a stale base must not seed a branch. A non-fast-forward
+   fails the run rather than branching from stale code.
+2. A worktree at `.pi/worktrees/sonar-autofix-run` on branch `fix/sonar-<taskId>`
+   cut from `dev`, already checked out.
+3. The receiver writes the issue list and the PR body to
    `.pi/worktrees/sonar-autofix-handoff/`, then runs
    `pi-sbx --no-session -p --append-system-prompt scripts/sonar-autofix/brief.md`
    naming the branch, the issues file, and the PR body file.
-3. Inside the sandbox the agent fixes the issues, runs the owning workspace's
+4. Inside the sandbox the agent fixes the issues, runs the owning workspace's
    `typecheck`, commits `fix(sonar): …`, pushes the branch, and runs
    `gh pr create --draft --base dev --body-file <pr body file>`.
-4. The receiver checks what the agent delivered and logs
+5. The receiver checks what the agent delivered and logs
    `{"event":"pull-request","by":"agent","url":"…"}`.
 
 The agent works in its own worktree, on its own branch, and never touches `main` or `dev`.

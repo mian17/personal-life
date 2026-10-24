@@ -151,6 +151,21 @@ export function createReceiver(config) {
     });
   }
 
+  /**
+   * Fast-forward the base checkout so the next branch starts from the real head.
+   * Only a checkout already on the base branch is moved: `git pull` elsewhere
+   * would merge the base into whatever happens to be checked out, which is a
+   * silent way to contaminate someone's working branch. A non-fast-forward is
+   * reported, not swallowed — branching from a diverged base is worse than not
+   * branching.
+   */
+  async function refreshBaseCheckout() {
+    const current = await git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '');
+    if (current !== config.baseBranch) return { skipped: current };
+    await git(['pull', '--ff-only', 'origin', config.baseBranch]);
+    return { pulled: config.baseBranch };
+  }
+
   async function prepareWorktree(taskId) {
     const worktree = config.worktree;
     const branch = `fix/sonar-${taskId.replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}`;
@@ -160,7 +175,10 @@ export function createReceiver(config) {
     await git(['worktree', 'remove', '--force', worktree]).catch(() => {});
     await git(['worktree', 'prune']).catch(() => {});
     await git(['branch', '-D', branch]).catch(() => {});
-    await git(['fetch', 'origin', config.baseBranch]);
+    // Refresh before branching: a stale base is how a fix branch silently starts
+    // behind and produces a diff full of files already deleted upstream.
+    await git(['fetch', 'origin', '--prune']);
+    await refreshBaseCheckout();
     await git(['worktree', 'add', worktree, '-b', branch, `origin/${config.baseBranch}`]);
     return { worktree, branch };
   }
