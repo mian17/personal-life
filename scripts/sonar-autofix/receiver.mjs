@@ -31,9 +31,19 @@ const DEFAULT_CONFIG = {
   // Fixes branch from and target the integration branch, never main.
   baseBranch: process.env.SONAR_AUTOFIX_BASE_BRANCH ?? 'dev',
   stateDir: process.env.SONAR_AUTOFIX_STATE ?? join(homedir(), '.local/state/sonar-autofix'),
-  // Deliberately not the worktree this feature is developed in: the run starts by
-  // force-removing its worktree, so sharing a path would delete the checkout.
-  worktree: process.env.SONAR_AUTOFIX_WORKTREE ?? join(homedir(), '.cache/sonar-autofix/worktree'),
+  // Must sit inside the repository: the sandbox mounts the repo and nothing else,
+  // so a worktree in ~/.cache or ~/.local/state is invisible to the agent.
+  // `.pi/worktrees/` is gitignored, and the path differs from the feature's own
+  // checkout because a run force-removes its worktree before creating it.
+  worktree:
+    process.env.SONAR_AUTOFIX_WORKTREE ??
+    join(process.env.SONAR_AUTOFIX_REPO ?? resolve(import.meta.dirname, '../..'), '.pi/worktrees/sonar-autofix-run'),
+  // The agent reads the issue list and the PR body from files rather than from
+  // prose in the prompt: retyping them drops backticks and words. This directory
+  // is ignored by git and visible inside the sandbox.
+  handoffDir:
+    process.env.SONAR_AUTOFIX_HANDOFF ??
+    join(process.env.SONAR_AUTOFIX_REPO ?? resolve(import.meta.dirname, '../..'), '.pi/worktrees/sonar-autofix-handoff'),
   timeoutMs: Number(process.env.SONAR_AUTOFIX_TIMEOUT_MS ?? 30 * 60 * 1000),
   maxIssues: Number(process.env.SONAR_AUTOFIX_MAX_ISSUES ?? 25),
   dryRun: process.env.SONAR_AUTOFIX_DRY_RUN === '1',
@@ -138,7 +148,10 @@ export function createReceiver(config) {
       componentKeys: config.projectKey,
       resolved: 'false',
       inNewCodePeriod: 'true',
-      severities: 'BLOCKER,CRITICAL,MAJOR',
+      // MINOR included: the gate counts every new violation, so a MINOR-only
+      // new-code set still fails `new_violations > 0`. Filtering MINOR out left
+      // the loop reporting `no-issues` against a red gate.
+      severities: 'BLOCKER,CRITICAL,MAJOR,MINOR',
       types: 'BUG,VULNERABILITY,CODE_SMELL',
       ps: String(config.maxIssues),
       s: 'SEVERITY',
@@ -217,6 +230,21 @@ export function createReceiver(config) {
     });
   }
 
+  /**
+   * Fast-forward the base checkout so the next branch starts from the real head.
+   * Only a checkout already on the base branch is moved: `git pull` elsewhere
+   * would merge the base into whatever happens to be checked out, which is a
+   * silent way to contaminate someone's working branch. A non-fast-forward is
+   * reported, not swallowed — branching from a diverged base is worse than not
+   * branching.
+   */
+  async function refreshBaseCheckout() {
+    const current = await git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '');
+    if (current !== config.baseBranch) return { skipped: current };
+    await git(['pull', '--ff-only', 'origin', config.baseBranch]);
+    return { pulled: config.baseBranch };
+  }
+
   async function prepareWorktree(taskId) {
     const worktree = config.worktree;
     const branch = `fix/sonar-${taskId}`;
@@ -226,7 +254,10 @@ export function createReceiver(config) {
     await git(['worktree', 'remove', '--force', worktree]).catch(() => {});
     await git(['worktree', 'prune']).catch(() => {});
     await git(['branch', '-D', branch]).catch(() => {});
-    await git(['fetch', 'origin', config.baseBranch]);
+    // Refresh before branching: a stale base is how a fix branch silently starts
+    // behind and produces a diff full of files already deleted upstream.
+    await git(['fetch', 'origin', '--prune']);
+    await refreshBaseCheckout();
     await git(['worktree', 'add', worktree, '-b', branch, `origin/${config.baseBranch}`]);
     return { worktree, branch };
   }
@@ -300,31 +331,42 @@ export function createReceiver(config) {
       return;
     }
 
-    const issuesPath = join(config.stateDir, `issues-${taskId}.json`);
-    await writeFile(issuesPath, JSON.stringify(issues, null, 2));
+    const statePath = join(config.stateDir, `issues-${taskId}.json`);
+    await writeFile(statePath, JSON.stringify(issues, null, 2));
     const summary = { total, issues, conditions: describeIssues(payload) };
 
     if (config.dryRun) {
-      await log('dry-run', { taskId, issues: issues.length, ofTotal: total, issuesPath });
+      await log('dry-run', { taskId, issues: issues.length, ofTotal: total, issuesPath: statePath });
       return;
     }
 
     const { worktree, branch } = await prepareWorktree(taskId);
-    const prBodyPath = join(config.stateDir, `pr-body-${taskId}.md`);
+    await mkdir(config.handoffDir, { recursive: true });
+    const issuesPath = join(config.handoffDir, `issues-${taskId}.json`);
+    const prBodyPath = join(config.handoffDir, `pr-body-${taskId}.md`);
+    await writeFile(issuesPath, JSON.stringify(issues, null, 2));
+    // Prose only: the analysis id is bounded and whitespace-collapsed, and it
+    // reaches a file, never a command line.
     await writeFile(prBodyPath, pullRequestBody(analysisId, summary));
 
     await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
+    // pi-sbx keys its sandbox to its working directory. Run it from the repo root
+    // and name the worktree in the prompt so the agent lands in the existing
+    // pi-personal-life sandbox, which is the one that mounts the repo and holds
+    // the push credential.
     const agentResult = await agent([
       '--no-session', '-p',
       '--append-system-prompt', brief,
       [
+        `Worktree: ${worktree}`,
         `Branch: ${branch} (from ${config.baseBranch}, target ${config.baseBranch}).`,
-        `Issues: ${issuesPath}`,
-        `PR body: ${prBodyPath}`,
+        `Issues file: ${issuesPath}`,
+        `PR body file: ${prBodyPath}`,
+        '',
         'Fix the issues, then commit, push, and open the draft PR as the brief describes.',
       ].join('\n'),
-    ], { cwd: worktree });
+    ], { cwd: config.repo });
     await log('agent-done', { taskId, code: agentResult.code, tail: agentResult.output.slice(-1500) });
 
     const delivery = await inspectDelivery(worktree, branch);
