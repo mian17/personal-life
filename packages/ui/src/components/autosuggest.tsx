@@ -254,6 +254,13 @@ export function Autosuggest({
                 onMouseDown={(event) => event.preventDefault()}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => select(option)}
+                // The field owns keyboard interaction (aria-activedescendant), but a row
+                // that responds to a click must also respond to Enter/Space.
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  select(option);
+                }}
               >
                 <span className="ui-autosuggest__label">{option.label}</span>
                 {option.meta != null && <span className="ui-autosuggest__meta">{option.meta}</span>}

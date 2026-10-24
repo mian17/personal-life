@@ -108,25 +108,27 @@ describe('Pill', () => {
     expect(tags).toHaveLength(2);
   });
 
-  it('makes the no-href toggle focusable, since it carries role="button"', () => {
+  it('renders a no-href toggle as a real button, not an anchor with a patched role', () => {
     render(
       <Pill as="a" size="filter" onClick={() => {}}>
         t
       </Pill>,
     );
     const toggle = screen.getByRole('button', { name: 't' });
-    expect(toggle.getAttribute('tabindex')).toBe('0');
-    expect(toggle.getAttribute('tabindex')).not.toBe('-1');
+    expect(toggle.tagName).toBe('BUTTON');
+    // Native focusability: no tabIndex or role attribute needed.
+    expect(toggle.getAttribute('tabindex')).toBeNull();
+    expect(toggle.getAttribute('role')).toBeNull();
   });
 
-  it('activates the no-href toggle on Space as well as Enter', () => {
+  it('keeps the no-href toggle inert when disabled', () => {
     const onClick = jest.fn();
     render(
-      <Pill as="a" size="filter" onClick={onClick}>
+      <Pill as="a" size="filter" disabled onClick={onClick}>
         t
       </Pill>,
     );
-    fireEvent.keyDown(screen.getByRole('button', { name: 't' }), { key: ' ' });
-    expect(onClick).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 't' }));
+    expect(onClick).not.toHaveBeenCalled();
   });
 });

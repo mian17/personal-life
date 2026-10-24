@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { createClient } from 'redis';
 import type { AppSession, SessionStoreApi } from './session-store';
 
@@ -190,7 +190,10 @@ export class RedisSessionStore implements SessionStoreApi {
    * single promise for the instance's life (so a hung connect is awaited once).
    */
   private get ready(): Promise<unknown> {
-    return (this.readyPromise ??= this.options.ready ?? Promise.resolve());
+    if (this.readyPromise === undefined) {
+      this.readyPromise = this.options.ready ?? Promise.resolve();
+    }
+    return this.readyPromise;
   }
 
   /** The store's current time (the injected clock), used for consistent expiry math. */

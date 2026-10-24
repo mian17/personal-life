@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { createBoundedRedisClient, type RedisSetOptions } from './redis-store';
 
 /**
@@ -138,7 +138,10 @@ export class RedisRefreshLock implements RefreshLock {
    * actually needs it. `??=` keeps it a single promise for the instance's life.
    */
   private get ready(): Promise<unknown> {
-    return (this.readyPromise ??= this.options.ready ?? Promise.resolve());
+    if (this.readyPromise === undefined) {
+      this.readyPromise = this.options.ready ?? Promise.resolve();
+    }
+    return this.readyPromise;
   }
 
   async acquire(sessionId: string): Promise<AcquireResult> {

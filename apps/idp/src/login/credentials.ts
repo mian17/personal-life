@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import type { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';

@@ -99,10 +99,28 @@ function childEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return { ...process.env, PATH: CHILD_PATH, ...extra };
 }
 
+/**
+ * Absolute path to a command. `spawn`/`execFile` by bare name would search
+ * `PATH`, so a writable directory anywhere in it could substitute the binary
+ * (Sonar S4036). Resolving against {@link CHILD_PATH} first keeps the search
+ * deterministic and the resolved path is what gets executed.
+ */
+const BIN_CACHE = new Map<string, string>();
+function bin(name: string): string {
+  const cached = BIN_CACHE.get(name);
+  if (cached !== undefined) return cached;
+  const found = CHILD_PATH.split(':')
+    .map((dir) => join(dir, name))
+    .find((candidate) => existsSync(candidate));
+  if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
+  BIN_CACHE.set(name, found);
+  return found;
+}
+
 function build(workspace: string): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(
-      'npm',
+      bin('npm'),
       ['run', 'build', '-w', workspace],
       { cwd: repoRoot(), env: childEnv({ NODE_ENV: 'production' }) },
       (err) => (err ? reject(err) : resolve()),
@@ -467,11 +485,11 @@ function forceRemoveContainer(name: string): void {
 }
 
 function runDocker(args: string[]): void {
-  execFileSync('docker', args, { env: childEnv(), stdio: 'ignore' });
+  execFileSync(bin('docker'), args, { env: childEnv(), stdio: 'ignore' });
 }
 
 function readDockerOutput(args: string[]): string {
-  return execFileSync('docker', args, {
+  return execFileSync(bin('docker'), args, {
     env: childEnv(),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -503,7 +521,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   mkdirSync(cfg.stateDir, { recursive: true });
 
   await build('apps/idp');
-  execFileSync('npm', ['run', 'seed', '-w', 'apps/idp'], {
+  execFileSync(bin('npm'), ['run', 'seed', '-w', 'apps/idp'], {
     cwd: repoRoot(),
     env: childEnv(idpEnv(cfg)),
   });

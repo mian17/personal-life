@@ -14,6 +14,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile, appendFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
@@ -47,6 +48,27 @@ const DEFAULT_CONFIG = {
 const CHILD_PATH =
   process.env.SONAR_AUTOFIX_PATH ??
   `${join(homedir(), '.local/bin')}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`;
+
+/**
+ * Absolute path to a command. `spawn` by bare name would search `PATH`, so a
+ * writable directory anywhere in it could substitute the binary (Sonar S4036).
+ */
+/** Commands this receiver may run. `run()` takes its command from call sites, so an
+ * allowlist keeps a future caller from turning it into a generic exec (Sonar S6350). */
+const ALLOWED_COMMANDS = new Set(['git', 'gh', 'pi-sbx']);
+
+const BIN_CACHE = new Map();
+function bin(name) {
+  if (!ALLOWED_COMMANDS.has(name)) throw new Error(`command not allowed: ${name}`);
+  const cached = BIN_CACHE.get(name);
+  if (cached !== undefined) return cached;
+  const found = CHILD_PATH.split(':')
+    .map((dir) => join(dir, name))
+    .find((candidate) => existsSync(candidate));
+  if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
+  BIN_CACHE.set(name, found);
+  return found;
+}
 
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
 export function signatureMatches(secret, body, header) {
@@ -120,7 +142,7 @@ export function createReceiver(config) {
 
   function git(args, { cwd = config.repo, env = childEnv() } = {}) {
     return new Promise((resolvePromise, reject) => {
-      const child = spawn('git', ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(bin('git'), ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
       let stdout = '';
       let stderr = '';
       child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -136,7 +158,7 @@ export function createReceiver(config) {
 
   function run(command, args, options = {}) {
     return new Promise((resolvePromise) => {
-      const child = spawn(command, args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(bin(command), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
       let output = '';
       const collect = (chunk) => {
         output = (output + chunk).slice(-8000);

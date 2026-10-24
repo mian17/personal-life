@@ -38,12 +38,17 @@ function matchesNothingState(status: FeedbackStatus): { heading: string; body: s
 }
 
 /** Canonical ids first, unknown ids last (alphabetical). */
+function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
   const known = canonical.filter((key) => keys.includes(key));
   // Code-unit order (not `localeCompare`) to keep the previous default-sort semantics.
   const unknown = keys
     .filter((key) => !canonical.includes(key))
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort(compareCodeUnits);
   return [...known, ...unknown];
 }
 
