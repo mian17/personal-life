@@ -11,8 +11,9 @@ severity, file path, line, and message.
 ## What to do
 
 1. Read every issue. Group them by file.
-2. You are already on the branch named in the message, in a dedicated worktree. Do
-   not create another branch and do not check out `main`.
+2. You are already on the branch named in the message, in a dedicated worktree, cut
+   from the integration branch. Do not create another branch, do not check out
+   `main`, and do not rebase onto `main`.
 3. Fix each issue at the smallest possible scope. Touch only the flagged lines and
    their immediate surroundings.
 4. Run `npm run typecheck` in the workspace that owns each file you changed
@@ -26,10 +27,11 @@ severity, file path, line, and message.
    ```
 
 6. Push the branch: `git push --set-upstream origin <branch>`.
-7. Open the pull request as a **draft** against `main`, using the body file verbatim:
+7. Open the pull request as a **draft** against the target branch named in the
+   message (`dev`, not `main`), using the body file verbatim:
 
    ```
-   gh pr create --draft --base main --head <branch> \
+   gh pr create --draft --base <target branch> --head <branch> \
      --title "fix(sonar): <N> new-code issue(s)" \
      --body-file <pr body path>
    ```
@@ -50,7 +52,8 @@ severity, file path, line, and message.
   `packages/ui/test/tokens.test.ts`, PWA manifest constants.
 - UI code composes `@life/ui` primitives. Never add bare `<button>`, `<input>`,
   `<textarea>`, `<select>`, `<a>`, `<img>`, `<label>`, or `<progress>` to `apps/*`.
-- Never force-push. Never push to `main`. Never merge the pull request.
+- Never force-push. Never push to `main` or to the integration branch. Never merge
+  the pull request.
 - If nothing needs changing, do not commit and do not open a PR. Say so instead.
 
 ## When you finish

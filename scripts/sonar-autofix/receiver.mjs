@@ -27,6 +27,8 @@ const DEFAULT_CONFIG = {
   sonarToken: process.env.SONAR_TOKEN ?? '',
   webhookSecret: process.env.SONAR_WEBHOOK_SECRET ?? '',
   repo: process.env.SONAR_AUTOFIX_REPO ?? resolve(import.meta.dirname, '../..'),
+  // Fixes branch from and target the integration branch, never main.
+  baseBranch: process.env.SONAR_AUTOFIX_BASE_BRANCH ?? 'dev',
   stateDir: process.env.SONAR_AUTOFIX_STATE ?? join(homedir(), '.local/state/sonar-autofix'),
   // Deliberately not the worktree this feature is developed in: the run starts by
   // force-removing its worktree, so sharing a path would delete the checkout.
@@ -147,8 +149,8 @@ export function createReceiver(config) {
     await git(['worktree', 'remove', '--force', worktree]).catch(() => {});
     await git(['worktree', 'prune']).catch(() => {});
     await git(['branch', '-D', branch]).catch(() => {});
-    await git(['fetch', 'origin', 'main']);
-    await git(['worktree', 'add', worktree, '-b', branch, 'origin/main']);
+    await git(['fetch', 'origin', config.baseBranch]);
+    await git(['worktree', 'add', worktree, '-b', branch, `origin/${config.baseBranch}`]);
     return { worktree, branch };
   }
 
@@ -158,7 +160,7 @@ export function createReceiver(config) {
    * commits but no PR is worse than one that failed loudly.
    */
   async function inspectDelivery(worktree, branch) {
-    const commits = await git(['rev-list', '--count', `origin/main..${branch}`], { cwd: worktree }).catch(() => '0');
+    const commits = await git(['rev-list', '--count', `origin/${config.baseBranch}..${branch}`], { cwd: worktree }).catch(() => '0');
     const pushed = await run('git', ['-C', worktree, 'ls-remote', '--heads', 'origin', branch]);
     const pr = await run('gh', ['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
       cwd: worktree,
@@ -178,7 +180,7 @@ export function createReceiver(config) {
     const pr = await run('gh', [
       'pr', 'create',
       '--draft',
-      '--base', 'main',
+      '--base', config.baseBranch,
       '--head', branch,
       '--title', `fix(sonar): ${summary.issues.length} new-code issue(s)`,
       '--body', pullRequestBody(taskId, summary),
@@ -190,6 +192,8 @@ export function createReceiver(config) {
   function pullRequestBody(taskId, summary) {
     return [
       `SonarQube reported a quality gate failure on \`main\` (analysis ${taskId}).`,
+      '',
+      `This branch starts from \`${config.baseBranch}\` and targets it, not \`main\`.`,
       '',
       'Failed conditions:',
       ...(summary.conditions.length > 0
@@ -231,7 +235,8 @@ export function createReceiver(config) {
       '--no-session', '-p',
       '--append-system-prompt', brief,
       [
-        `Branch: ${branch}. SonarQube analysis: ${taskId}.`,
+        `Branch: ${branch} (from ${config.baseBranch}, target ${config.baseBranch}).`,
+        `SonarQube analysis: ${taskId}.`,
         `Issues: ${issuesPath}`,
         `PR body: ${prBodyPath}`,
         'Fix the issues, then commit, push, and open the draft PR as the brief describes.',

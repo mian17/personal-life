@@ -82,19 +82,19 @@ An unsigned request returns `401`, a non-`main` branch returns `202` with
 
 ## What a real run does
 
-1. `git fetch origin main`, then a worktree at `~/.cache/sonar-autofix/worktree` on
-   branch `fix/sonar-<taskId>`, already checked out.
+1. `git fetch origin dev`, then a worktree at `~/.cache/sonar-autofix/worktree` on
+   branch `fix/sonar-<taskId>` cut from `dev`, already checked out.
 2. The receiver writes the issue list and the PR body to
    `~/.local/state/sonar-autofix/`, then runs
    `pi-sbx --no-session -p --append-system-prompt scripts/sonar-autofix/brief.md`
    naming the branch, the issues file, and the PR body file.
 3. Inside the sandbox the agent fixes the issues, runs the owning workspace's
    `typecheck`, commits `fix(sonar): …`, pushes the branch, and runs
-   `gh pr create --draft --base main`.
+   `gh pr create --draft --base dev`.
 4. The receiver checks what the agent delivered and logs
    `{"event":"pull-request","by":"agent","url":"…"}`.
 
-The agent works in its own worktree, on its own branch, and never touches `main`.
+The agent works in its own worktree, on its own branch, and never touches `main` or `dev`.
 Nothing is merged.
 
 If the agent commits but does not open the PR, the receiver pushes and creates it
@@ -104,8 +104,19 @@ unpushed branch. If the agent changes nothing, the run logs `no-changes` and end
 ## Why it cannot loop
 
 The receiver acts only on gate failures where `branch.isMain` is true. A fix
-lands on `fix/sonar-*`, so its analysis never satisfies that filter. Merging the
-draft PR triggers a new `main` analysis, which is the next legitimate run.
+lands on `fix/sonar-*`, so its analysis never satisfies that filter.
+
+## One caveat about `dev`
+
+SonarQube Community Build analyses a single branch per project, and
+`.github/workflows/sonarqube.yml` only runs on `main`. So the gate failure that
+triggers a run is always a `main` failure, while the fix and its PR target `dev`.
+That is deliberate: `dev` is where work accumulates before `main`, and analysing a
+second branch would need a commercial edition. Keep this in mind when `dev`
+diverges from `main` — a `dev`-only issue never triggers a run.
+
+Override the target with `SONAR_AUTOFIX_BASE_BRANCH` if the integration branch
+ever moves.
 
 ## Limits
 
