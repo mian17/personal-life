@@ -152,6 +152,10 @@ describe('Foods search `q` (e2e)', () => {
 
   it('rejects a negative nutrient value at the write boundary', async () => {
     const negative = vectorOf(-5);
-    await post({ name: 'Negative', servingGrams: 100, nutrients: negative }, tokenA).expect(400);
+    const refused = await post(
+      { name: 'Negative', servingGrams: 100, nutrients: negative },
+      tokenA,
+    ).expect(400);
+    expect(refused.body.message).toBe('nutrients must carry the complete nutrient vector');
   });
 });

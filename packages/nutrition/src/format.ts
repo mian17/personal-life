@@ -97,8 +97,16 @@ function decimalsFor(amount: number, unit: NutrientUnit): number {
   return amount >= 10 ? 1 : 2;
 }
 
+/** Trailing zeros, then a bare trailing point — a linear scan, no backtracking. */
+function trimZeros(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '0') end -= 1;
+  const trimmed = text.slice(0, end);
+  return trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
+}
+
 function render(amount: number, unit: NutrientUnit): string {
   const decimals = decimalsFor(amount, unit);
   const text = amount.toFixed(decimals);
-  return decimals === 0 ? text : text.replace(/0+$/, '').replace(/\.$/, '');
+  return decimals === 0 ? text : trimZeros(text);
 }

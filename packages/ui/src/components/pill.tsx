@@ -38,16 +38,21 @@ export function Pill({
   children,
   ...rest
 }: PillProps) {
+  // A pill that acts without navigating is a button, whatever tag was asked for:
+  // an anchor with no href is not focusable or keyboard-activatable on its own,
+  // and patching that with `role`/`tabIndex`/a hand-written Space handler only
+  // reimplements what <button> already does.
+  const toggles = as === 'button' || (as === 'a' && href == null);
   const classes = cx(
     'ui-pill',
     `ui-pill--${size}`,
     tone != null && `ui-pill--${tone}`,
-    as === 'button' && 'ui-pill--button',
+    toggles && 'ui-pill--button',
     active && 'ui-pill--active',
     className,
   );
 
-  if (as === 'button') {
+  if (toggles) {
     // A chip that toggles state is a control, not a label: render a real button.
     // `onRemove` is a non-interactive-chip affordance and is deliberately not
     // rendered here (a button inside a button is invalid HTML).
@@ -75,30 +80,9 @@ export function Pill({
     </>
   );
 
-  if (as === 'a') {
-    // A pill anchor with NO href is a toggle, not a navigation: next/link with an
-    // empty href would reload the page, and an empty-href <a> is invalid. Render
-    // a real anchor for the visual contract (inline, `text-decoration: none`, no
-    // button chrome) but suppress the default navigation so the caller's onClick
-    // toggles state in place. With an href it is a normal next/link.
+  if (as === 'a' && href != null) {
+    // The no-href case was handled above as a button, so this branch always navigates.
     const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
-    if (href == null) {
-      return (
-        <a
-          {...linkProps}
-          role="button"
-          className={classes}
-          aria-disabled={disabled || undefined}
-          onClick={(event) => {
-            event.preventDefault();
-            if (disabled) return;
-            (linkProps.onClick as ((e: unknown) => void) | undefined)?.(event);
-          }}
-        >
-          {content}
-        </a>
-      );
-    }
     return (
       <Link href={href} className={classes} {...linkProps}>
         {content}

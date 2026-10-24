@@ -175,8 +175,7 @@ function tagNames(path: string): string[] {
 function ownerOf(path: string, table: 'note' | 'tag', id: string | number): string | null {
   const db = open(path, true);
   try {
-    const column = table === 'note' ? 'id' : 'id';
-    const row = db.prepare(`SELECT ownerSub FROM "${table}" WHERE "${column}" = ?`).get(id) as
+    const row = db.prepare(`SELECT ownerSub FROM "${table}" WHERE "id" = ?`).get(id) as
       | { ownerSub: string | null }
       | undefined;
     return row?.ownerSub ?? null;

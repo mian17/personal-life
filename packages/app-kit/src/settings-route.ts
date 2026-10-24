@@ -7,5 +7,7 @@ import type { RoutePath } from './types';
  * Pure string join — no `path`, no markup.
  */
 export function settingsHref(route: RoutePath): string {
-  return `${route.replace(/\/+$/, '')}/settings`;
+  let prefix = route;
+  while (prefix.endsWith('/')) prefix = prefix.slice(0, -1);
+  return `${prefix}/settings`;
 }

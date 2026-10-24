@@ -105,7 +105,7 @@ describe('Todos API (e2e)', () => {
     it('creates a todo with version 0 and the exact DTO key set', async () => {
       const created = await create({ title: 'buy milk', note: 'semi-skimmed' }).expect(201);
 
-      expect(Object.keys(created.body).sort()).toEqual([
+      expect(Object.keys(created.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
         'createdAt',
         'deletedAt',
         'done',
@@ -199,7 +199,7 @@ describe('Todos API (e2e)', () => {
       await patch(b.body.id, { done: true }).expect(200);
 
       const byDone = await list(`?listId=${l.body.id}&done=false`).expect(200);
-      expect(byDone.body.todos.map((t: { id: string }) => t.id).sort()).toEqual([a.body.id, c.body.id].sort());
+      expect(byDone.body.todos.map((t: { id: string }) => t.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       const byDueBefore = await list(`?listId=${l.body.id}&dueBefore=2026-03-03`).expect(200);
       expect(byDueBefore.body.todos.map((t: { id: string }) => t.id)).toEqual([a.body.id]);
@@ -208,7 +208,7 @@ describe('Todos API (e2e)', () => {
       expect(byDueAfter.body.todos.map((t: { id: string }) => t.id)).toEqual([b.body.id]);
 
       const byTag = await list(`?listId=${l.body.id}&tagId=2`).expect(200);
-      expect(byTag.body.todos.map((t: { id: string }) => t.id).sort()).toEqual([b.body.id, c.body.id].sort());
+      expect(byTag.body.todos.map((t: { id: string }) => t.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([b.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       const byQ = await list(`?listId=${l.body.id}&q=ALPHA`).expect(200);
       expect(byQ.body.todos.map((t: { id: string }) => t.id)).toEqual([a.body.id]);
@@ -233,7 +233,7 @@ describe('Todos API (e2e)', () => {
       do {
         const query = `?listId=${l.body.id}&limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
         const res = await list(query).expect(200);
-        expect(Object.keys(res.body).sort()).toEqual(['nextCursor', 'todos']);
+        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['nextCursor', 'todos']);
         seen.push(...res.body.todos.map((t: { id: string }) => t.id));
         cursor = res.body.nextCursor ?? undefined;
         pages += 1;
@@ -241,7 +241,7 @@ describe('Todos API (e2e)', () => {
 
       expect(seen).toHaveLength(5);
       expect(new Set(seen).size).toBe(5);
-      expect(seen).toEqual([...ids].sort().reverse());
+      expect(seen).toEqual([...ids].sort((a: string, b: string) => a.localeCompare(b)).reverse());
     });
 
     it('pages across the dated/undated boundary without repeating the boundary row', async () => {
@@ -291,7 +291,7 @@ describe('Todos API (e2e)', () => {
       expect(eleven.count).toBe(2);
       expect(twentyTwo.count).toBe(1);
       // Ids + counts only — no names, no content.
-      expect(Object.keys(eleven).sort()).toEqual(['count', 'tagId']);
+      expect(Object.keys(eleven).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['count', 'tagId']);
     });
 
     it('drops a tag from the usage surface once its last todo is deleted', async () => {

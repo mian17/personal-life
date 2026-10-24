@@ -107,4 +107,28 @@ describe('Pill', () => {
     const tags: PillTag[] = ['span', 'a'];
     expect(tags).toHaveLength(2);
   });
+
+  it('renders a no-href toggle as a real button, not an anchor with a patched role', () => {
+    render(
+      <Pill as="a" size="filter" onClick={() => {}}>
+        t
+      </Pill>,
+    );
+    const toggle = screen.getByRole('button', { name: 't' });
+    expect(toggle.tagName).toBe('BUTTON');
+    // Native focusability: no tabIndex or role attribute needed.
+    expect(toggle.getAttribute('tabindex')).toBeNull();
+    expect(toggle.getAttribute('role')).toBeNull();
+  });
+
+  it('keeps the no-href toggle inert when disabled', () => {
+    const onClick = jest.fn();
+    render(
+      <Pill as="a" size="filter" disabled onClick={onClick}>
+        t
+      </Pill>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 't' }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

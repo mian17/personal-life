@@ -1,6 +1,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
+import { bin, childEnv } from '../../../../packages/shared/src/child-process';
 import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
 import { degradedRedirectUris } from './degraded-app';
 import {
@@ -80,9 +81,9 @@ export function appOriginFor(host: string, appPort: number): string {
 function build(workspace: string): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(
-      'npm',
+      bin('npm'),
       ['run', 'build', '-w', workspace],
-      { cwd: repoRoot(), env: { ...process.env, NODE_ENV: 'production' } },
+      { cwd: repoRoot(), env: childEnv({ NODE_ENV: 'production' }) },
       (err) => (err ? reject(err) : resolve()),
     );
   });
@@ -445,11 +446,12 @@ function forceRemoveContainer(name: string): void {
 }
 
 function runDocker(args: string[]): void {
-  execFileSync('docker', args, { stdio: 'ignore' });
+  execFileSync(bin('docker'), args, { env: childEnv(), stdio: 'ignore' });
 }
 
 function readDockerOutput(args: string[]): string {
-  return execFileSync('docker', args, {
+  return execFileSync(bin('docker'), args, {
+    env: childEnv(),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -480,9 +482,9 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   mkdirSync(cfg.stateDir, { recursive: true });
 
   await build('apps/idp');
-  execFileSync('npm', ['run', 'seed', '-w', 'apps/idp'], {
+  execFileSync(bin('npm'), ['run', 'seed', '-w', 'apps/idp'], {
     cwd: repoRoot(),
-    env: { ...process.env, ...idpEnv(cfg) },
+    env: childEnv(idpEnv(cfg)),
   });
 
   const services: SpawnedService[] = [];

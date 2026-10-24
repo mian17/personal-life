@@ -88,6 +88,16 @@ interface ConversationTurn {
 /** The API method; the request path is `<base>/models/<model>:<method>`. */
 const METHOD = 'generateContent';
 
+/**
+ * `value` without its trailing slashes, so a configured base never doubles the
+ * join's slash. A linear scan rather than `/\/+$/`, which backtracks.
+ */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end -= 1;
+  return value.slice(0, end);
+}
+
 const SEARCH_TOOL_NAME = 'search_food';
 
 /**
@@ -251,7 +261,7 @@ export class GeminiClient {
       );
     }
     this.key = key;
-    this.url = `${base.replace(/\/+$/, '')}/models/${model}:${METHOD}`;
+    this.url = `${withoutTrailingSlashes(base)}/models/${model}:${METHOD}`;
   }
 
   /**

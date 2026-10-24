@@ -402,7 +402,7 @@ describe('Notes API (e2e)', () => {
       expect([...new Set(walked)]).toHaveLength(walked.length);
 
       const listed = await listedNoteIds();
-      expect([...walked].sort()).toEqual([...listed].sort());
+      expect([...walked].sort((a: string, b: string) => a.localeCompare(b))).toEqual([...listed].sort((a: string, b: string) => a.localeCompare(b)));
 
       const walkedOrder = walked.filter((id) => [oldest.id, middle.id, newest.id].includes(id));
       expect(walkedOrder).toEqual([newest.id, middle.id, oldest.id]);

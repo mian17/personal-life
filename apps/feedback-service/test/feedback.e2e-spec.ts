@@ -352,7 +352,7 @@ describeDb('Feedback API (e2e)', () => {
       expect(bodyJson).not.toContain(PLAINTEXT);
       expect(bodyJson).not.toContain(titleCiphertext);
       expect(bodyJson).not.toContain(ciphertext);
-      expect(Object.keys(body).sort()).toEqual([
+      expect(Object.keys(body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
         'app',
         'event_id',
         'feedback_id',

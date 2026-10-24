@@ -120,5 +120,5 @@ async function runBin(): Promise<void> {
 }
 
 if (require.main === module) {
-  runBin();
+  void runBin();
 }

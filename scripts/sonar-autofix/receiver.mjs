@@ -14,6 +14,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile, appendFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
@@ -47,6 +48,62 @@ const DEFAULT_CONFIG = {
   maxIssues: Number(process.env.SONAR_AUTOFIX_MAX_ISSUES ?? 25),
   dryRun: process.env.SONAR_AUTOFIX_DRY_RUN === '1',
 };
+
+/**
+ * The `PATH` every child gets. Never the caller's `PATH`: that carries
+ * world-writable directories, so a `PATH` lookup could run an attacker's
+ * binary (Sonar S4036). Override where `pi-sbx` lives when it is not `~/.local/bin`.
+ * `/opt/homebrew/bin` is there for `git`/`gh` on Apple Silicon.
+ */
+const CHILD_PATH =
+  process.env.SONAR_AUTOFIX_PATH ??
+  `${join(homedir(), '.local/bin')}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`;
+
+/**
+ * Absolute path to a command. `spawn` by bare name would search `PATH`, so a
+ * writable directory anywhere in it could substitute the binary (Sonar S4036).
+ */
+/** Commands this receiver may run. The allowlist means `bin()` cannot be talked
+ * into resolving something else if a name ever comes from outside. */
+const ALLOWED_COMMANDS = new Set(['git', 'gh', 'pi-sbx']);
+
+const BIN_CACHE = new Map();
+function bin(name) {
+  if (!ALLOWED_COMMANDS.has(name)) throw new Error(`command not allowed: ${name}`);
+  const cached = BIN_CACHE.get(name);
+  if (cached !== undefined) return cached;
+  const found = CHILD_PATH.split(':')
+    .map((dir) => join(dir, name))
+    .find((candidate) => existsSync(candidate));
+  if (found === undefined) throw new Error(`cannot find ${name} in ${CHILD_PATH}`);
+  BIN_CACHE.set(name, found);
+  return found;
+}
+
+/** The environment every child gets: the app's own, minus its `PATH`. */
+function childEnv(overrides = {}) {
+  return { ...process.env, PATH: CHILD_PATH, ...overrides };
+}
+
+/**
+ * The id this run is filed under: minted here from a counter and the clock, so
+ * it cannot contain anything a webhook sent. Every path, branch name, and
+ * command argument is built from it, which is why no payload value needs to be
+ * filtered, escaped, or trusted on the way to a sink.
+ */
+let runCounter = 0;
+function nextRunId() {
+  runCounter += 1;
+  return `${Date.now().toString(36)}-${runCounter}`;
+}
+
+/**
+ * A webhook string, reduced to what is safe to show a human. Used for the PR
+ * body only: it is never logged and never becomes part of a command.
+ */
+function displayable(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').slice(0, 64) : 'unknown';
+}
 
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
 export function signatureMatches(secret, body, header) {
@@ -117,9 +174,9 @@ export function createReceiver(config) {
     };
   }
 
-  function git(args, { cwd = config.repo, env = process.env } = {}) {
+  function git(args, { cwd = config.repo, env = childEnv() } = {}) {
     return new Promise((resolvePromise, reject) => {
-      const child = spawn('git', ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(bin('git'), ['-C', cwd, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
       let stdout = '';
       let stderr = '';
       child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -133,24 +190,43 @@ export function createReceiver(config) {
     });
   }
 
-  function run(command, args, options = {}) {
+  /**
+   * Wait for a child, collecting its output. Takes the spawned process, not a
+   * command name: the binary is a literal at each call site, so no caller value
+   * can pick it (Sonar S6350). Only `args` carry data, and they are handed to
+   * `spawn` as an argv array, never a shell string, so they stay arguments.
+   */
+  function drain(child, resolvePromise) {
+    let output = '';
+    const collect = (chunk) => {
+      output = (output + chunk).slice(-8000);
+    };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    const timer = setTimeout(() => child.kill('SIGTERM'), config.timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      resolvePromise({ code: -1, output: String(error.message) });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolvePromise({ code: code ?? -1, output });
+    });
+  }
+
+  /** `gh`, at a path resolved once. The binary is a literal, never caller data. */
+  function gh(args, options = {}) {
     return new Promise((resolvePromise) => {
-      const child = spawn(command, args, { env: process.env, ...options, stdio: ['ignore', 'pipe', 'pipe'] });
-      let output = '';
-      const collect = (chunk) => {
-        output = (output + chunk).slice(-8000);
-      };
-      child.stdout.on('data', collect);
-      child.stderr.on('data', collect);
-      const timer = setTimeout(() => child.kill('SIGTERM'), config.timeoutMs);
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        resolvePromise({ code: -1, output: String(error.message) });
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        resolvePromise({ code: code ?? -1, output });
-      });
+      const child = spawn(bin('gh'), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      drain(child, resolvePromise);
+    });
+  }
+
+  /** The sandbox agent entrypoint, at a path resolved once. */
+  function agent(args, options = {}) {
+    return new Promise((resolvePromise) => {
+      const child = spawn(bin('pi-sbx'), args, { env: childEnv(), ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      drain(child, resolvePromise);
     });
   }
 
@@ -171,7 +247,7 @@ export function createReceiver(config) {
 
   async function prepareWorktree(taskId) {
     const worktree = config.worktree;
-    const branch = `fix/sonar-${taskId.replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}`;
+    const branch = `fix/sonar-${taskId}`;
     await mkdir(dirname(worktree), { recursive: true });
     // Prune rather than remove: a leftover worktree from a killed run must go, but
     // `remove --force` on a path that is not a worktree would fail the run.
@@ -193,8 +269,8 @@ export function createReceiver(config) {
    */
   async function inspectDelivery(worktree, branch) {
     const commits = await git(['rev-list', '--count', `origin/${config.baseBranch}..${branch}`], { cwd: worktree }).catch(() => '0');
-    const pushed = await run('git', ['-C', worktree, 'ls-remote', '--heads', 'origin', branch]);
-    const pr = await run('gh', ['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
+    const pushed = await git(['ls-remote', '--heads', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
+    const pr = await gh(['pr', 'list', '--head', branch, '--json', 'url,isDraft', '--jq', '.[0].url // ""'], {
       cwd: worktree,
     });
     return {
@@ -204,26 +280,31 @@ export function createReceiver(config) {
     };
   }
 
-  /** Only used when the agent left work behind without opening the PR itself. */
-  async function createPullRequest(worktree, branch, taskId, summary) {
-    const push = await run('git', ['-C', worktree, 'push', '--set-upstream', 'origin', branch]);
+  /**
+   * Only used when the agent left work behind without opening the PR itself.
+   * The body goes through `--body-file`: it quotes issue text from the SonarQube
+   * API, so passing it as an argument would put server-supplied strings into
+   * `gh`'s argv (Sonar S6350).
+   */
+  async function createPullRequest(worktree, branch, prBodyPath, summary) {
+    const push = await git(['push', '--set-upstream', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
     if (push.code !== 0) throw new Error(`push failed: ${push.output}`);
 
-    const pr = await run('gh', [
+    const pr = await gh([
       'pr', 'create',
       '--draft',
       '--base', config.baseBranch,
       '--head', branch,
       '--title', `fix(sonar): ${summary.issues.length} new-code issue(s)`,
-      '--body', pullRequestBody(taskId, summary),
+      '--body-file', prBodyPath,
     ], { cwd: worktree });
     if (pr.code !== 0) throw new Error(`gh pr create failed: ${pr.output}`);
     return pr.output.match(/https:\/\/\S+/)?.[0] ?? '';
   }
 
-  function pullRequestBody(taskId, summary) {
+  function pullRequestBody(analysisId, summary) {
     return [
-      `SonarQube reported a quality gate failure (analysis ${taskId}).`,
+      `SonarQube reported a quality gate failure (analysis ${analysisId}).`,
       '',
       `This branch starts from \`${config.baseBranch}\` and targets it, not \`main\`.`,
       '',
@@ -241,7 +322,9 @@ export function createReceiver(config) {
   }
 
   async function fixIssues(payload) {
-    const taskId = payload.taskId ?? 'unknown';
+    const taskId = nextRunId();
+    // Only for the PR body's prose; never logged, never an argument.
+    const analysisId = displayable(payload?.taskId);
     const { total, issues } = await fetchIssues();
     if (issues.length === 0) {
       await log('no-issues', { taskId });
@@ -262,7 +345,9 @@ export function createReceiver(config) {
     const issuesPath = join(config.handoffDir, `issues-${taskId}.json`);
     const prBodyPath = join(config.handoffDir, `pr-body-${taskId}.md`);
     await writeFile(issuesPath, JSON.stringify(issues, null, 2));
-    await writeFile(prBodyPath, pullRequestBody(taskId, summary));
+    // Prose only: the analysis id is bounded and whitespace-collapsed, and it
+    // reaches a file, never a command line.
+    await writeFile(prBodyPath, pullRequestBody(analysisId, summary));
 
     await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
@@ -270,20 +355,19 @@ export function createReceiver(config) {
     // and name the worktree in the prompt so the agent lands in the existing
     // pi-personal-life sandbox, which is the one that mounts the repo and holds
     // the push credential.
-    const agent = await run('pi-sbx', [
+    const agentResult = await agent([
       '--no-session', '-p',
       '--append-system-prompt', brief,
       [
         `Worktree: ${worktree}`,
         `Branch: ${branch} (from ${config.baseBranch}, target ${config.baseBranch}).`,
-        `SonarQube analysis: ${taskId}.`,
         `Issues file: ${issuesPath}`,
         `PR body file: ${prBodyPath}`,
         '',
         'Fix the issues, then commit, push, and open the draft PR as the brief describes.',
       ].join('\n'),
     ], { cwd: config.repo });
-    await log('agent-done', { taskId, code: agent.code, tail: agent.output.slice(-1500) });
+    await log('agent-done', { taskId, code: agentResult.code, tail: agentResult.output.slice(-1500) });
 
     const delivery = await inspectDelivery(worktree, branch);
     if (delivery.url) {
@@ -299,7 +383,7 @@ export function createReceiver(config) {
     // The agent fixed and committed but did not open the PR; finish the delivery
     // rather than dropping the work on the floor.
     await log('delivery-fallback', { taskId, branch, commits: delivery.commits });
-    const url = await createPullRequest(worktree, branch, taskId, summary);
+    const url = await createPullRequest(worktree, branch, prBodyPath, summary);
     await log('pull-request', { taskId, branch, url, by: 'receiver' });
   }
 
@@ -323,17 +407,13 @@ export function createReceiver(config) {
     }
 
     if (!isActionable(payload, config.projectKey)) {
-      await log('ignored', {
-        project: payload.project?.key,
-        status: payload.status,
-        gate: payload.qualityGate?.status,
-      });
+      await log('ignored');
       response.writeHead(202).end('ignored');
       return;
     }
 
     if (busy) {
-      await log('busy', { taskId: payload.taskId });
+      await log('busy');
       response.writeHead(409).end('a fix run is already in progress');
       return;
     }
@@ -341,7 +421,7 @@ export function createReceiver(config) {
     busy = true;
     response.writeHead(202).end('accepted');
     fixIssues(payload)
-      .catch((error) => log('failed', { taskId: payload.taskId, error: String(error.message ?? error) }))
+      .catch((error) => log('failed', { error: String(error.message ?? error) }))
       .finally(() => {
         busy = false;
       });

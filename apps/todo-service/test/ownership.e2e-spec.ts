@@ -228,7 +228,7 @@ describe('Todos ownership (e2e)', () => {
       'title',
       'updatedAt',
       'version',
-    ].sort();
+    ].sort((a: string, b: string) => a.localeCompare(b));
 
     const created = await post({ title: 'shape-check', tagIds: [5] }, tokenA).expect(201);
     const fetched = await auth(
@@ -238,7 +238,7 @@ describe('Todos ownership (e2e)', () => {
 
     expect(fetched.body).not.toHaveProperty('owner');
     expect(fetched.body).not.toHaveProperty('ownerSub');
-    expect(Object.keys(fetched.body).sort()).toEqual(todoKeys);
+    expect(Object.keys(fetched.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(todoKeys);
     expect(fetched.body.tagIds).toEqual([5]);
 
     const listed = await list(tokenA).expect(200);
@@ -246,7 +246,7 @@ describe('Todos ownership (e2e)', () => {
     expect(item).toBeDefined();
     expect(item).not.toHaveProperty('owner');
     expect(item).not.toHaveProperty('ownerSub');
-    expect(Object.keys(item).sort()).toEqual(todoKeys);
+    expect(Object.keys(item).sort((a: string, b: string) => a.localeCompare(b))).toEqual(todoKeys);
   });
 
   it('preserves the full owner lifecycle (create/list/update/trash/restore)', async () => {

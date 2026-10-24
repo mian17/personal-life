@@ -1,6 +1,9 @@
 import 'server-only';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { createBoundedRedisClient, type RedisSetOptions } from './redis-store';
+
+/** An already-connected client has nothing to await. Shared so the getter stays pure. */
+const READY: Promise<unknown> = Promise.resolve();
 
 /**
  * The cross-replica refresh lock — the distributed half of the "one refresh per
@@ -122,15 +125,22 @@ export class RedisRefreshLock implements RefreshLock {
   readonly ttlMs: number;
   readonly pollIntervalMs: number;
   readonly distributed = true;
-  private readonly ready: Promise<unknown>;
 
   constructor(
     private readonly client: RefreshLockClient,
-    options: RefreshLockOptions = {},
+    private readonly options: RefreshLockOptions = {},
   ) {
     this.ttlMs = options.ttlMs ?? REFRESH_LOCK_TTL_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? REFRESH_LOCK_POLL_INTERVAL_MS;
-    this.ready = options.ready ?? Promise.resolve();
+  }
+
+  /**
+   * The connect promise `acquire` awaits. The caller supplies it, so a
+   * constructor assigning it would be storing a promise — not an async
+   * operation — but keeping the field out of the class is simpler still.
+   */
+  private get ready(): Promise<unknown> {
+    return this.options.ready ?? READY;
   }
 
   async acquire(sessionId: string): Promise<AcquireResult> {

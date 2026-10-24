@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { createServer, type Server } from 'http';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { bin, childEnv } from '../../../packages/shared/src/child-process';
 import request from 'supertest';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
@@ -75,7 +76,8 @@ export async function waitForAsync(
 }
 
 function run(args: string[], capture = false): string {
-  return execFileSync('docker', args, {
+  return execFileSync(bin('docker'), args, {
+    env: childEnv(),
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
   });
@@ -118,7 +120,7 @@ async function createDatabase(serverUrl: string, label: string): Promise<string>
 }
 
 async function startContainer(): Promise<{ url: string; stop(): Promise<void> }> {
-  const name = `feedback-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const name = `feedback-test-${process.pid}-${randomUUID().slice(0, 8)}`;
   let port: string | null = null;
   const stop = async (): Promise<void> => {
     try {

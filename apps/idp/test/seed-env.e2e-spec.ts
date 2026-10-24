@@ -169,7 +169,8 @@ describe('DB path resolver', () => {
   it('recognizes the production DB across path spellings', () => {
     expect(isProductionDbPath(join(process.cwd(), 'data', 'idp.db'))).toBe(true);
     expect(isProductionDbPath(join(process.cwd(), 'data', '..', 'data', 'idp.db'))).toBe(true);
-    expect(isProductionDbPath('/tmp/elsewhere/idp.db')).toBe(false);
+    // A DB outside the `data/` directory is not the production DB, wherever it lives.
+    expect(isProductionDbPath(join(process.cwd(), 'elsewhere', 'idp.db'))).toBe(false);
     expect(isProductionDbPath(join(process.cwd(), 'data', 'scratch.db'))).toBe(false);
   });
 });

@@ -170,7 +170,7 @@ describe('Logout ends the SSO session (e2e)', () => {
 
     // Alice's Session rows are gone; Bob's are untouched.
     expect(sessionIdsFor(aliceUser!.id)).toHaveLength(0);
-    expect(sessionIdsFor(bobUser!.id).sort()).toEqual([...bobSessionsBefore].sort());
+    expect(sessionIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([...bobSessionsBefore].sort((a: string, b: string) => a.localeCompare(b)));
 
     // And Bob's provider session still skips login.
     const bobAuthorize = await bob.get(authorizePath());

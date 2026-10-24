@@ -102,13 +102,13 @@ describe('Tags API (e2e)', () => {
       const res = await list().expect(200);
       expect(res.body.map((t: { name: string }) => t.name)).toEqual(['Alpha', 'zeta']);
       for (const tag of res.body) {
-        expect(Object.keys(tag).sort()).toEqual(['createdAt', 'id', 'name', 'version']);
+        expect(Object.keys(tag).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'name', 'version']);
         expect(typeof tag.version).toBe('number');
         expect(typeof tag.createdAt).toBe('string');
         expect(tag.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(res.body.map((t: { id: number }) => t.id).sort()).toEqual(
-        [a1.body.id, a2.body.id].sort(),
+      expect(res.body.map((t: { id: number }) => t.id).sort((a: number, b: number) => a - b)).toEqual(
+        [a1.body.id, a2.body.id].sort((a: number, b: number) => a - b),
       );
 
       // B's vocabulary never appears to A.
@@ -274,7 +274,7 @@ describe('Tags API (e2e)', () => {
 
       const resolved = await resolve([a.body.id, b.body.id, MISSING_ID]).expect(201);
       expect(resolved.body).toEqual([{ id: a.body.id, name: 'R-a' }]);
-      expect(Object.keys(resolved.body[0]).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(resolved.body[0]).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['id', 'name']);
 
       // B sees only B's tag.
       const fromB = await resolve([a.body.id, b.body.id], tokenB).expect(201);

@@ -2,7 +2,9 @@ name: SonarQube
 
 on:
   push:
-    branches: [main, dev]
+    # `main` is the release line and is not scanned: work lands on `dev` and is
+    # already analysed there, so scanning the promotion again only duplicates it.
+    branches: [dev]
   workflow_dispatch:
 
 # Community Build stores one analysis per project, so two overlapping scans would
