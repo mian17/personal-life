@@ -28,6 +28,7 @@
     "dev:infra:down": "bash scripts/dev-infra.sh down",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e:prod-build -w apps/app && npm run test:e2e:dev-server -w apps/app",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:backup": "npm run db:backup -w @life/db --",

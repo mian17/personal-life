@@ -8,9 +8,9 @@
     "start": "next start -p ${WEB_PORT:-3002} -H 127.0.0.1",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "jest --passWithNoTests",
-    "test:e2e": "npm run test:e2e:prod && npm run test:e2e:dev",
-    "test:e2e:prod": "playwright test --config playwright.config.ts",
-    "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+    "test:e2e": "npm run test:e2e:prod-build && npm run test:e2e:dev-server",
+    "test:e2e:prod-build": "playwright test --config playwright.config.ts",
+    "test:e2e:dev-server": "playwright test --config playwright.dev.config.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },

@@ -1,5 +1,8 @@
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { basename } from 'node:path';
+import { artifactsRoot, pidsFilePath, repoRoot } from './config';
+import { releaseSlot, type SlotClaim } from './slot-queue';
 
 /**
  * Reads a recorded PID file and stops each service's whole process group.
@@ -9,7 +12,7 @@ import { join } from 'node:path';
 export async function stopRecorded(file: string): Promise<void> {
   let pids: number[] = [];
   try {
-    pids = (JSON.parse(readFileSync(join(__dirname, file), 'utf8')) as { pids: number[] }).pids;
+    pids = (JSON.parse(readFileSync(pidsFilePath(file), 'utf8')) as { pids: number[] }).pids;
   } catch {
     // No recorded services; nothing to stop.
   }
@@ -34,5 +37,45 @@ export async function stopRecorded(file: string): Promise<void> {
   for (const pid of pids) {
     send(pid, 'SIGKILL');
   }
-  rmSync(join(__dirname, file), { force: true });
+  rmSync(pidsFilePath(file), { force: true });
+}
+
+/**
+ * Writes the claim down. Setup, teardown and the specs run as separate modules
+ * in separate processes, and a setup that aborts skips its own teardown, so the
+ * claim has to live somewhere all three can read rather than in memory.
+ */
+export function recordHeldSlot(claim: SlotClaim): void {
+  writeFileSync(heldSlotFile(), JSON.stringify(claim));
+}
+
+/** The slot this run holds; 0 when a spec runs without the harness setup. */
+export function heldSlot(): number {
+  return heldClaim()?.slot ?? 0;
+}
+
+/**
+ * Hands the slot back, best-effort: a run that never claimed, and a claim the
+ * queue already reclaimed because its holder died, are both nothing to report.
+ * Both entry points call it from a `finally`, so an aborted setup releases too.
+ */
+export function releaseHeldSlot(): void {
+  const claim = heldClaim();
+  if (!claim) return;
+
+  releaseSlot(claim);
+  rmSync(heldSlotFile(), { force: true });
+}
+
+/** One harness runs at a time per worktree, so one record file serves them all. */
+function heldSlotFile(): string {
+  return join(artifactsRoot(), `${basename(repoRoot())}-service-slot.json`);
+}
+
+function heldClaim(): SlotClaim | undefined {
+  try {
+    return JSON.parse(readFileSync(heldSlotFile(), 'utf8')) as SlotClaim;
+  } catch {
+    return undefined;
+  }
 }

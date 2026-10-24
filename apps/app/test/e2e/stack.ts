@@ -2,14 +2,18 @@ import { execFile, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { ensurePortFree, spawnService, waitForHttp, type SpawnedService } from './services';
+import { degradedRedirectUris } from './degraded-app';
 import {
   E2E_APP_SECRET,
   E2E_OWNER,
   E2E_PASSWORD,
   E2E_USER,
-  FEEDBACK_PG_CONTAINER,
+  feedbackMqContainer,
+  feedbackPgContainer,
   hopPorts,
+  redisContainer,
   repoRoot,
+  testRedisUrl,
 } from './config';
 
 /**
@@ -18,8 +22,8 @@ import {
  * replica A. Additive only: extra loopback redirect URIs are inert for every
  * other spec, and the IdP still rejects any unregistered callback.
  */
-function hopRedirectUris(): string[] {
-  const { appAPort, appBPort } = hopPorts();
+function hopRedirectUris(slot: number): string[] {
+  const { appAPort, appBPort } = hopPorts(slot);
   return [
     `http://localhost:${appAPort}/auth/callback`,
     `http://127.0.0.1:${appAPort}/auth/callback`,
@@ -39,7 +43,8 @@ function hopRedirectUris(): string[] {
  *    dev server's middleware URL normalization.
  *
  * Both point at the dev-style IdP and a scratch note-service. All state lives
- * under `apps/app/.e2e-state`, never any service's real `data/` directory.
+ * outside the repository (see `artifactsRoot`), never under any service's real
+ * `data/` directory and never inside the dev lane's watched project root.
  */
 
 export interface StackConfig {
@@ -50,8 +55,9 @@ export interface StackConfig {
   todoPort: number;
   /**
    * feedback-service: 31xx in the test harness (3107), never the dev stack's
-   * 3207. Optional — omitting it leaves feedback-service (and its throwaway
-   * Postgres) out of the stack, which is how the dev harness starts unchanged.
+   * 3207. Optional — omitting it leaves feedback-service out of the stack, which
+   * is how the dev harness starts. The slot's three throwaway containers boot
+   * either way: the slot owns them, so its teardown removes them.
    */
   feedbackPort?: number;
   mealPort: number;
@@ -60,6 +66,11 @@ export interface StackConfig {
   /** Scratch directory for the IdP/note-service DBs and keys. */
   stateDir: string;
   mode: 'production' | 'development';
+  /**
+   * The slot this stack owns: names its throwaway containers and the degraded
+   * app's callback. Defaults to slot 0.
+   */
+  slot?: number;
 }
 
 export function appOriginFor(host: string, appPort: number): string {
@@ -120,7 +131,8 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     OIDC_APP_REDIRECT_URIS: [
       `http://localhost:${cfg.appPort}/auth/callback`,
       `http://127.0.0.1:${cfg.appPort}/auth/callback`,
-      ...hopRedirectUris(),
+      ...hopRedirectUris(cfg.slot ?? 0),
+      ...degradedRedirectUris(cfg.slot ?? 0),
     ].join(','),
     SEED_USERNAME: E2E_USER,
     SEED_PASSWORD: E2E_PASSWORD,
@@ -240,75 +252,207 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
+/** The shared budget for a throwaway container to answer its readiness probe. */
+const READINESS_DEADLINE_MS = 60_000;
+
+/** Obviously-fake harness broker account (public by design, like a test cert). */
+const HARNESS_RABBITMQ_USER = 'harness';
+const HARNESS_RABBITMQ_PASSWORD = 'test-only';
+
+/**
+ * Boots the three throwaway containers the slot owns and returns the Postgres
+ * URL feedback-service is wired to. Every harness boots all three, whatever it
+ * consumes: the slot owns them, so its teardown is the only thing that removes
+ * them. Postgres comes first because feedback-service fails closed without a DB.
+ */
+async function bootSlotContainers(slot: number): Promise<string> {
+  const feedbackDbUrl = await startThrowawayPostgres(slot);
+  await startThrowawayRabbitMq(slot);
+  await bootSlotRedis(slot);
+  return feedbackDbUrl;
+}
+
+/**
+ * Boots the slot's cache unless an explicit `TEST_REDIS_URL` endpoint stands in
+ * for it, in which case the endpoint wins and no container is started.
+ */
+async function bootSlotRedis(slot: number): Promise<void> {
+  if (testRedisUrl() !== undefined) return;
+
+  await startThrowawayRedis(slot);
+}
+
 /**
  * A throwaway Postgres for feedback-service (the `pg-integration.test.ts`
- * pattern): fixed-name `postgres:17-alpine` container, ephemeral loopback port,
+ * pattern): slot-named `postgres:17-alpine` container, ephemeral loopback port,
  * never the compose `postgres-feedback`. A host without Docker fails fast — this e2e is
  * the feedback chapter's final proof, so a silent skip would hide it.
  */
-async function startThrowawayPostgres(): Promise<string> {
-  const docker = (args: string[], capture = false): string =>
-    execFileSync('docker', args, {
-      encoding: 'utf8',
-      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
-    });
+async function startThrowawayPostgres(slot: number): Promise<string> {
+  const port = await startThrowawayContainer({
+    name: feedbackPgContainer(slot),
+    image: 'postgres:17-alpine',
+    environment: ['POSTGRES_PASSWORD=test-only', 'POSTGRES_DB=feedback'],
+    containerPort: 5432,
+    readinessCommand: ['pg_isready', '-U', 'postgres'],
+  });
+  return `postgresql://postgres:test-only@127.0.0.1:${port}/feedback`;
+}
 
+/**
+ * The slot's throwaway `rabbitmq:4.1-alpine` broker on an ephemeral loopback
+ * port. It runs a non-guest account: the stock `guest` one only answers on the
+ * container's own loopback, so a published port would leave it unreachable.
+ */
+async function startThrowawayRabbitMq(slot: number): Promise<string> {
+  const port = await startThrowawayContainer({
+    name: feedbackMqContainer(slot),
+    image: 'rabbitmq:4.1-alpine',
+    environment: [
+      `RABBITMQ_DEFAULT_USER=${HARNESS_RABBITMQ_USER}`,
+      `RABBITMQ_DEFAULT_PASS=${HARNESS_RABBITMQ_PASSWORD}`,
+    ],
+    containerPort: 5672,
+    readinessCommand: ['rabbitmq-diagnostics', '-q', 'ping'],
+    readinessUser: 'rabbitmq',
+  });
+  return `amqp://${HARNESS_RABBITMQ_USER}:${HARNESS_RABBITMQ_PASSWORD}@127.0.0.1:${port}`;
+}
+
+/** The slot's throwaway `redis:8-alpine` cache on an ephemeral loopback port. */
+async function startThrowawayRedis(slot: number): Promise<string> {
+  const port = await startThrowawayContainer({
+    name: redisContainer(slot),
+    image: 'redis:8-alpine',
+    environment: [],
+    containerPort: 6379,
+    readinessCommand: ['redis-cli', 'ping'],
+  });
+  return `redis://127.0.0.1:${port}`;
+}
+
+/**
+ * Force-removes the three containers the slot owns (best-effort). Takes the slot
+ * that booted them, so teardown never removes another slot's containers.
+ */
+export function stopThrowawayContainers(slot: number): void {
+  forceRemoveContainer(feedbackPgContainer(slot));
+  forceRemoveContainer(feedbackMqContainer(slot));
+  forceRemoveContainer(redisContainer(slot));
+}
+
+/** Everything one throwaway container boot needs, and nothing about its caller. */
+interface ContainerRecipe {
+  name: string;
+  image: string;
+  /** `-e` values, `NAME=value` each. */
+  environment: string[];
+  /** The one port published on a Docker-chosen loopback port. */
+  containerPort: number;
+  /** Probe run inside the container until it answers. */
+  readinessCommand: string[];
+  /**
+   * Account the probe runs as, when the image's readiness tool must not run as
+   * root. RabbitMQ is the case: a root probe creates its Erlang cookie
+   * root-owned and the broker then refuses to start (`eacces`).
+   */
+  readinessUser?: string;
+}
+
+/**
+ * Boots one throwaway container for the slot and returns the loopback port
+ * Docker assigned it. A stale container left by a crashed run is reclaimed
+ * first, and any boot that dies before serving is removed before it throws, so
+ * no run has to clean up by hand.
+ */
+async function startThrowawayContainer(recipe: ContainerRecipe): Promise<number> {
+  requireDocker(recipe.image);
+  forceRemoveContainer(recipe.name);
+  runContainer(recipe);
+  await waitForReadiness(recipe);
+  return publishedPort(recipe);
+}
+
+function requireDocker(image: string): void {
   try {
-    docker(['version']);
+    runDocker(['version']);
   } catch {
-    throw new Error(
-      'e2e needs Docker to run feedback-service against a throwaway Postgres (postgres:17-alpine)',
-    );
+    throw new Error(`e2e needs Docker to run a throwaway container (${image})`);
   }
+}
 
-  docker(['rm', '-f', FEEDBACK_PG_CONTAINER]);
-  docker([
+function runContainer(recipe: ContainerRecipe): void {
+  runDocker([
     'run',
     '--rm',
     '-d',
     '--name',
-    FEEDBACK_PG_CONTAINER,
-    '-e',
-    'POSTGRES_PASSWORD=test-only',
-    '-e',
-    'POSTGRES_DB=feedback',
+    recipe.name,
+    ...recipe.environment.flatMap((variable) => ['-e', variable]),
     '-p',
-    '127.0.0.1::5432',
-    'postgres:17-alpine',
+    `127.0.0.1::${recipe.containerPort}`,
+    recipe.image,
   ]);
-
-  const deadline = Date.now() + 60_000;
-  for (;;) {
-    try {
-      docker(['exec', FEEDBACK_PG_CONTAINER, 'pg_isready', '-U', 'postgres'], true);
-      break;
-    } catch {
-      if (Date.now() > deadline) {
-        stopThrowawayPostgres();
-        throw new Error('throwaway Postgres never became ready');
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-  }
-
-  const mapped = docker(['port', FEEDBACK_PG_CONTAINER, '5432/tcp'], true)
-    .trim()
-    .split('\n')[0] ?? '';
-  const port = /:(\d+)$/.exec(mapped)?.[1];
-  if (!port) {
-    stopThrowawayPostgres();
-    throw new Error('throwaway Postgres never published a port');
-  }
-  return `postgresql://postgres:test-only@127.0.0.1:${port}/feedback`;
 }
 
-/** Force-remove the throwaway Postgres container (best-effort). */
-export function stopThrowawayPostgres(): void {
+async function waitForReadiness(recipe: ContainerRecipe): Promise<void> {
+  const deadline = Date.now() + READINESS_DEADLINE_MS;
+  while (!answersReadinessProbe(recipe)) {
+    if (Date.now() > deadline) {
+      forceRemoveContainer(recipe.name);
+      throw new Error(
+        `${recipe.name} never answered \`${recipe.readinessCommand.join(' ')}\` (${recipe.image})`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+function answersReadinessProbe(recipe: ContainerRecipe): boolean {
   try {
-    execFileSync('docker', ['rm', '-f', FEEDBACK_PG_CONTAINER], { stdio: 'ignore' });
+    runDocker(['exec', ...probeUserArguments(recipe), recipe.name, ...recipe.readinessCommand]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function probeUserArguments({ readinessUser }: ContainerRecipe): string[] {
+  return readinessUser === undefined ? [] : ['--user', readinessUser];
+}
+
+function publishedPort(recipe: ContainerRecipe): number {
+  let mapping = '';
+  try {
+    mapping = readDockerOutput(['port', recipe.name, `${recipe.containerPort}/tcp`]);
+  } catch {
+    // Reported as the one legible error below.
+  }
+  const hostPort = /:(\d+)$/.exec(mapping.trim().split('\n')[0] ?? '')?.[1];
+  if (hostPort === undefined) {
+    forceRemoveContainer(recipe.name);
+    throw new Error(`${recipe.name} never published ${recipe.containerPort}/tcp on loopback`);
+  }
+  return Number(hostPort);
+}
+
+function forceRemoveContainer(name: string): void {
+  try {
+    runDocker(['rm', '-f', name]);
   } catch {
     // Already gone, or Docker unavailable at teardown.
   }
+}
+
+function runDocker(args: string[]): void {
+  execFileSync('docker', args, { stdio: 'ignore' });
+}
+
+function readDockerOutput(args: string[]): string {
+  return execFileSync('docker', args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 /**
@@ -397,11 +541,10 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
       }),
     );
 
-    // The throwaway Postgres first: feedback-service fails closed without a DB.
-    // Skipped when the stack has no feedback port (the dev harness).
+    const feedbackDbUrl = await bootSlotContainers(cfg.slot ?? 0);
+
     const feedbackPort = cfg.feedbackPort;
     if (feedbackPort !== undefined) {
-      const feedbackDbUrl = await startThrowawayPostgres();
       await build('apps/feedback-service');
       services.push(
         await spawnService({
@@ -431,8 +574,11 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   } catch (err) {
     // A setup that fails after some services are up must not leak them: the
     // next run would then boot against this run's stale server — the exact
-    // EADDRINUSE + stale-chunk class the port preflight above guards.
+    // EADDRINUSE + stale-chunk class the port preflight above guards. The
+    // slot's containers go too, because Playwright never runs globalTeardown
+    // when globalSetup throws.
     for (const service of services) await service.stop();
+    stopThrowawayContainers(cfg.slot ?? 0);
     throw err;
   }
 }

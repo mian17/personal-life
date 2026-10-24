@@ -66,6 +66,37 @@ export function absoluteUrl(req: HeaderCarrier, path: string): URL {
   return new URL(path, requestOrigin(req));
 }
 
+/**
+ * Where to send the browser when it reached us on a non-canonical loopback
+ * spelling, or `null` when it is already on `localhost`.
+ *
+ * Next emits a *relative* Location when a middleware redirect targets the same
+ * origin as the request, so canonicalizing the host in the URL is not enough:
+ * the browser never leaves `127.0.0.1`. A cookie written there is invisible to
+ * the IdP's callback, which returns to `localhost` (the canonicalized redirect
+ * URI) — `missing or invalid auth attempt`. Navigating the browser between
+ * loopback spellings is the only reliable move, and that is what this URL is
+ * for. Non-loopback hosts (Tailscale, a real domain) are never rewritten, so
+ * they return `null` and are never split.
+ */
+export function loopbackCanonicalHop(req: HeaderCarrier, path: string): URL | null {
+  const hostHeader = firstHeader(req.headers.get('host'));
+  if (!hostHeader) return null;
+
+  const host = hostnameOf(hostHeader);
+  if (!isLoopbackHost(host) || host === 'localhost') return null;
+
+  // `requestOrigin` canonicalizes loopback, so this URL already points at `localhost`.
+  return new URL(path, requestOrigin(req));
+}
+
+/** Hostname only, without a trailing `:port`. IPv6 literals keep their brackets. */
+function hostnameOf(hostHeader: string): string {
+  if (hostHeader.startsWith('[')) return hostHeader.slice(0, hostHeader.indexOf(']') + 1);
+  const colon = hostHeader.indexOf(':');
+  return colon === -1 ? hostHeader : hostHeader.slice(0, colon);
+}
+
 function firstHeader(value: string | null): string | undefined {
   if (!value) return undefined;
   const first = value.split(',')[0]?.trim();

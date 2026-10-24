@@ -5,3 +5,7 @@ blob-report/
 .e2e-state/
 .e2e-state-dev/
 test/e2e/service-pids-*.json
+test/e2e/service-slot.json
+
+# Rewritten by `next dev` on every boot (managed agent-rules block), never authored.
+AGENTS.md

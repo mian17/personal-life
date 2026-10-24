@@ -1,6 +1,7 @@
 import { createClient } from 'redis';
 import { spawnService, waitForHttp, type SpawnedService } from './services';
 import { E2E_APP_SECRET, E2E_OWNER, hopPorts, repoRoot, testPorts } from './config';
+import { heldSlot } from './teardown';
 
 /**
  * Two real app replicas for the Redis hop proof (Task 3 of the Redis chapter).
@@ -10,13 +11,15 @@ import { E2E_APP_SECRET, E2E_OWNER, hopPorts, repoRoot, testPorts } from './conf
  * shared process memory. This boots both from the same production standalone
  * artifact Docker runs (`degraded-app.ts` pattern), pointing at:
  *
- *   - ONE Redis (`REDIS_URL` = `TEST_REDIS_URL`, provisioned by the test owner),
+ *   - ONE Redis, handed in by the caller: `TEST_REDIS_URL` when the operator
+ *     pinned one, else the held slot's booted `redis-e2e-<slot>`,
  *   - ONE IdP (the harness's, whose callback registry is extended in `stack.ts`),
  *   - ONE note-service (the harness's), so the browser proof exercises the real
  *     authenticated Notes UI rather than a synthetic endpoint.
  *
- * Nothing here touches the human's deployed stack or dev processes; the spec is
- * gated on `TEST_REDIS_URL` so default e2e stays zero-Redis.
+ * Nothing here touches the human's deployed stack or dev processes, and the
+ * replicas' Redis endpoint arrives as an argument (`startHopApps`) rather than
+ * being read from the environment here: the spec owns the one source of truth.
  */
 
 export interface HopInstance {
@@ -36,7 +39,7 @@ export interface HopApps {
 
 /** Per-instance env: same Redis + IdP + note-service, distinct port/origin. */
 function hopAppEnv(port: number, redisUrl: string): NodeJS.ProcessEnv {
-  const { idpPort, notePort } = testPorts();
+  const { idpPort, notePort } = testPorts(heldSlot());
   const origin = `http://localhost:${port}`;
   return {
     NODE_ENV: 'production',
@@ -63,7 +66,7 @@ function hopAppEnv(port: number, redisUrl: string): NodeJS.ProcessEnv {
  * redirect/forbidden with no session, exactly as `degraded-app.ts` waits).
  */
 export async function startHopApps(redisUrl: string): Promise<HopApps> {
-  const { appAPort, appBPort } = hopPorts();
+  const { appAPort, appBPort } = hopPorts(heldSlot());
 
   const serviceA = await spawnService({
     name: 'app-a',

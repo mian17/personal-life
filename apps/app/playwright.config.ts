@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_OWNER } from './test/e2e/config';
+import { E2E_OWNER, playwrightOutputDir, testPorts } from './test/e2e/config';
+import { loadHarnessEnv } from './test/e2e/env-file';
+import { heldSlot } from './test/e2e/teardown';
+
+// Read harness knobs (`E2E_CONCURRENCY`, port overrides) from `.env.development`
+// before any slot or port decision is made.
+loadHarnessEnv();
 
 /**
  * Playwright config for the cross-service login flow.
@@ -30,13 +36,18 @@ export default defineConfig({
   reporter: [['list']],
   globalSetup: './test/e2e/global-setup.ts',
   globalTeardown: './test/e2e/global-teardown.ts',
+  // Output lands outside the repository: `apps/app` is the dev lane's watch
+  // root, and a run must not write into the tree under test (see `artifactsRoot`).
+  outputDir: playwrightOutputDir('test-results'),
   use: {
     // The app-under-test is reached as `localhost`: Next normalizes loopback
     // 127.0.0.1 → localhost in middleware redirects, so the browser origin must
     // be `localhost` to keep login cookies + the callback on one origin. The
     // `origins.spec.ts` file additionally drives the 127.0.0.1 origin (both are
     // registered on the IdP).
-    baseURL: process.env.APP_URL ?? 'http://localhost:3100',
+    // Follow the slot `global-setup.ts` claimed, so the browser reaches this
+    // run's stack instead of another worktree's 3100.
+    baseURL: process.env.APP_URL ?? `http://localhost:${testPorts(heldSlot()).appPort}`,
     extraHTTPHeaders: { 'tailscale-user-login': E2E_OWNER },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
