@@ -12,7 +12,7 @@
  *
  * Runbook: docs/runbooks/sonar-autofix.md
  */
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile, appendFile } from 'node:fs/promises';
@@ -73,6 +73,21 @@ function bin(name) {
 /** The environment every child gets: the app's own, minus its `PATH`. */
 function childEnv(overrides = {}) {
   return { ...process.env, PATH: CHILD_PATH, ...overrides };
+}
+
+/**
+ * The slug every path and command argument is built from, derived from the
+ * webhook's analysis id. The id itself identifies the analysis for humans, so it
+ * is kept for the log line and nothing else: a fixed-length hex digest cannot
+ * carry a shell metacharacter, a `..`, or a leading `-`, so no request value
+ * reaches an argument or a filename at all (Sonar S6350).
+ */
+function slugOf(payload) {
+  const raw = payload?.taskId;
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new Error('webhook carried no taskId');
+  }
+  return createHash('sha256').update(raw).digest('hex').slice(0, 12);
 }
 
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
@@ -199,7 +214,7 @@ export function createReceiver(config) {
 
   async function prepareWorktree(taskId) {
     const worktree = config.worktree;
-    const branch = `fix/sonar-${taskId.replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}`;
+    const branch = `fix/sonar-${taskId}`;
     await mkdir(dirname(worktree), { recursive: true });
     // Prune rather than remove: a leftover worktree from a killed run must go, but
     // `remove --force` on a path that is not a worktree would fail the run.
@@ -230,7 +245,7 @@ export function createReceiver(config) {
   }
 
   /** Only used when the agent left work behind without opening the PR itself. */
-  async function createPullRequest(worktree, branch, taskId, summary) {
+  async function createPullRequest(worktree, branch, analysisId, summary) {
     const push = await git(['push', '--set-upstream', 'origin', branch], { cwd: worktree }).then((output) => ({ code: 0, output }), (error) => ({ code: 1, output: String(error.message) }));
     if (push.code !== 0) throw new Error(`push failed: ${push.output}`);
 
@@ -240,15 +255,15 @@ export function createReceiver(config) {
       '--base', config.baseBranch,
       '--head', branch,
       '--title', `fix(sonar): ${summary.issues.length} new-code issue(s)`,
-      '--body', pullRequestBody(taskId, summary),
+      '--body', pullRequestBody(analysisId, summary),
     ], { cwd: worktree });
     if (pr.code !== 0) throw new Error(`gh pr create failed: ${pr.output}`);
     return pr.output.match(/https:\/\/\S+/)?.[0] ?? '';
   }
 
-  function pullRequestBody(taskId, summary) {
+  function pullRequestBody(analysisId, summary) {
     return [
-      `SonarQube reported a quality gate failure (analysis ${taskId}).`,
+      `SonarQube reported a quality gate failure (analysis ${analysisId}).`,
       '',
       `This branch starts from \`${config.baseBranch}\` and targets it, not \`main\`.`,
       '',
@@ -266,10 +281,14 @@ export function createReceiver(config) {
   }
 
   async function fixIssues(payload) {
-    const taskId = payload.taskId ?? 'unknown';
+    const taskId = slugOf(payload);
+    // The raw id is for humans only (log lines, PR body) and is bounded so it
+    // cannot smuggle markdown or a newline into the body; `taskId` is the slug
+    // every path and argument is derived from.
+    const analysisId = String(payload?.taskId ?? 'unknown').slice(0, 64);
     const { total, issues } = await fetchIssues();
     if (issues.length === 0) {
-      await log('no-issues', { taskId });
+      await log('no-issues', { taskId, analysisId });
       return;
     }
 
@@ -278,22 +297,21 @@ export function createReceiver(config) {
     const summary = { total, issues, conditions: describeIssues(payload) };
 
     if (config.dryRun) {
-      await log('dry-run', { taskId, issues: issues.length, ofTotal: total, issuesPath });
+      await log('dry-run', { taskId, analysisId, issues: issues.length, ofTotal: total, issuesPath });
       return;
     }
 
     const { worktree, branch } = await prepareWorktree(taskId);
     const prBodyPath = join(config.stateDir, `pr-body-${taskId}.md`);
-    await writeFile(prBodyPath, pullRequestBody(taskId, summary));
+    await writeFile(prBodyPath, pullRequestBody(analysisId, summary));
 
-    await log('agent-start', { taskId, branch, issues: issues.length, ofTotal: total });
+    await log('agent-start', { taskId, analysisId, branch, issues: issues.length, ofTotal: total });
     const brief = join(worktree, 'scripts/sonar-autofix/brief.md');
     const agentResult = await agent([
       '--no-session', '-p',
       '--append-system-prompt', brief,
       [
         `Branch: ${branch} (from ${config.baseBranch}, target ${config.baseBranch}).`,
-        `SonarQube analysis: ${taskId}.`,
         `Issues: ${issuesPath}`,
         `PR body: ${prBodyPath}`,
         'Fix the issues, then commit, push, and open the draft PR as the brief describes.',
@@ -315,7 +333,7 @@ export function createReceiver(config) {
     // The agent fixed and committed but did not open the PR; finish the delivery
     // rather than dropping the work on the floor.
     await log('delivery-fallback', { taskId, branch, commits: delivery.commits });
-    const url = await createPullRequest(worktree, branch, taskId, summary);
+    const url = await createPullRequest(worktree, branch, analysisId, summary);
     await log('pull-request', { taskId, branch, url, by: 'receiver' });
   }
 
