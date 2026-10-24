@@ -285,7 +285,9 @@ function takeTicket(directory: string, worktree: string): QueueEntry {
 
 /** Ticket names sort by arrival, so the lowest ticket name belongs to the head waiter. */
 function isFirstInLine(entry: QueueEntry): boolean {
-  const [head] = waitingTicketNames(entry.directory).sort();
+  const [head] = waitingTicketNames(entry.directory).sort((earlier, later) =>
+    earlier.localeCompare(later),
+  );
   return head === basename(entry.ticketFile);
 }
 
