@@ -46,6 +46,19 @@ describe('TagPicker', () => {
     expect(screen.queryByLabelText('New tag')).toBeNull();
   });
 
+  it('wraps the create affordance in exactly one create element', () => {
+    // The spacing between the tag list and the create field comes from a single
+    // `.ui-tag-picker__create` box (gap + margin-top). Nesting it twice silently
+    // doubles that spacing, so pin the nesting depth and the field's place in it.
+    const { container } = render(
+      <TagPicker tags={TAGS} selectedIds={[]} onToggle={() => {}} onCreate={() => {}} />,
+    );
+    const create = container.querySelectorAll('.ui-tag-picker__create');
+    expect(create).toHaveLength(1);
+    expect(create[0].contains(screen.getByLabelText('New tag'))).toBe(true);
+    expect(create[0].contains(screen.getByRole('button', { name: 'Add tag' }))).toBe(true);
+  });
+
   it('creates a trimmed tag name and clears the draft', () => {
     const onCreate = jest.fn();
     render(

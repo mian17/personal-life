@@ -57,8 +57,6 @@ export function TagPicker({
         })}
       </div>
       {onCreate != null && (
-        <div className="ui-tag-picker__create">
-      {onCreate != null && (
         <CreateField
           className="ui-tag-picker__create"
           placeholder={placeholder}
@@ -66,8 +64,6 @@ export function TagPicker({
           disabled={disabled}
           onCreate={create}
         />
-      )}
-        </div>
       )}
     </fieldset>
   );
