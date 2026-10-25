@@ -6,7 +6,7 @@ import type { CreateFeedbackInput, FeedbackDto, FeedbackStatus } from '@life/sha
 import { Feedback } from './feedback.entity';
 import { FeedbackEvent } from './feedback-event.entity';
 import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 
 /**
  * AAD for a feedback title (`SPEC-feedback-service` Data model). Byte-exact:

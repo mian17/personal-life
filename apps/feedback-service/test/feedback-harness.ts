@@ -8,7 +8,8 @@ import { bin, childEnv } from '../../../packages/shared/src/child-process';
 import request from 'supertest';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
-import { AuthGuard } from '../src/auth/auth.guard';
+import { AuthGuard } from '@life/service-kit';
+import { VERIFIER_ENV } from '../src/service-config';
 import { FEEDBACK_CACHE, FeedbackCache } from '../src/feedback/feedback-cache';
 import {
   EVENT_SINK,
@@ -385,7 +386,7 @@ export async function startFeedbackApp(options: StartAppOptions): Promise<Feedba
   if (cache) builder = builder.overrideProvider(FEEDBACK_CACHE).useValue(cache);
 
   const app = (await builder.compile()).createNestApplication();
-  app.useGlobalGuards(new AuthGuard());
+  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );

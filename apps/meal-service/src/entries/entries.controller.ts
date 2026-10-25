@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { CreateEntryDto } from './dto/create-entry.dto';
 import { ListEntriesQuery } from './dto/list-entries.query';
 import { UpdateEntryDto } from './dto/update-entry.dto';

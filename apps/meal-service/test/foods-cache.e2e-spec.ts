@@ -4,7 +4,7 @@ import type { CacheClient } from '@life/cache';
 import { MealCache } from '../src/cache/meal-cache';
 import { FoodsCache } from '../src/foods/foods-cache';
 import { FoodsService } from '../src/foods/foods.service';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import type { CreateFoodDto } from '../src/foods/dto/create-food.dto';
 import { FakeRedisClient } from './fake-redis';
 

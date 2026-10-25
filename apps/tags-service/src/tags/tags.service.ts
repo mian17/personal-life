@@ -2,8 +2,8 @@ import { ConflictException, Inject, Injectable, Logger, NotFoundException } from
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
+import { KeysService } from '@life/service-kit';
 import { Tag } from './tag.entity';
-import { KeysService } from '../keys/keys.service';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
 
 /** The registry DTO (`SPEC-tags-service` API): the `version` is the OCC counter. */

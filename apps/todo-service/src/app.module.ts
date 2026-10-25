@@ -7,9 +7,8 @@ import { TodosModule } from './todos/todos.module';
 import { Todo } from './todos/todo.entity';
 import { TodoTag } from './todos/todo-tag.entity';
 import { TodoCompletion } from './todos/todo-completion.entity';
-import { UserKeys } from './keys/user-keys.entity';
-import { KeysModule } from './keys/keys.module';
-import { HealthModule } from '@life/service-kit';
+import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from './service-config';
 import { PushSubscription } from './push/push-subscription.entity';
 import { PushModule } from './push/push.module';
 import { RemindersModule } from './reminders/reminders.module';
@@ -26,8 +25,8 @@ import { RemindersModule } from './reminders/reminders.module';
     }),
     TodosModule,
     ListsModule,
-    KeysModule,
-    HealthModule.forRoot({ masterKeyEnv: 'TODO_MASTER_KEY' }),
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     PushModule,
     RemindersModule,
   ],

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { Note } from './note.entity';
 import { NoteTag } from './note-tag.entity';
 import { NotesController } from './notes.controller';
@@ -9,7 +10,10 @@ import { NotesService } from './notes.service';
 import { TagsController } from './tags.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Note, NoteTag]), KeysModule],
+  imports: [
+    TypeOrmModule.forFeature([Note, NoteTag]),
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+  ],
   controllers: [NotesController, TagsController],
   providers: [
     // Selection happens once at module init: REDIS_URL unset keeps today's

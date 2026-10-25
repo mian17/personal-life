@@ -3,8 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { json } from 'express';
+import { AuthGuard } from '@life/service-kit';
 import { AppModule } from './app.module';
-import { AuthGuard } from './auth/auth.guard';
+import { VERIFIER_ENV } from './service-config';
 
 /**
  * JSON body ceiling. This is the only service that receives an image, and a
@@ -21,7 +22,7 @@ export async function createApp(): Promise<INestApplication> {
   });
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.use(json({ limit: JSON_BODY_LIMIT }));
-  app.useGlobalGuards(new AuthGuard());
+  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );

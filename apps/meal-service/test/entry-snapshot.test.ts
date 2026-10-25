@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { decryptField } from '@life/crypto';
 import { MealCache, generationKey } from '../src/cache/meal-cache';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { NUTRIENTS, scale, sum, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
 import type { Entry } from '../src/entries/entry.entity';
 import { EntriesCache } from '../src/entries/entries-cache';

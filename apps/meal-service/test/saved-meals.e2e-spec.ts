@@ -3,7 +3,7 @@ import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { NUTRIENTS, type Nutrient } from '@life/nutrition';
 import { SavedMealsService } from '../src/saved-meals/saved-meals.service';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 
 /**
  * The frozen-snapshot contract for saved meals (`docs/intent/meal-nutrition.md`:

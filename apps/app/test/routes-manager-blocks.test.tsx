@@ -112,7 +112,11 @@ describe('ListManagerPanel importance-default Switch', () => {
 
   const rowExtraFor = (lists: List[], id: string, name = 'Groceries') => {
     const el = ListManagerPanel({ lists });
-    return el.props.rowExtra({ id, name });
+    const row = el.props.rowExtra({ id, name });
+    // The extra row is its own module-scope component (`ListRowExtra`, hoisted so
+    // the JSX-returning arrow is not defined inside a component). Assertions
+    // below still target the `SettingsRow` it renders; evaluate one level.
+    return row.type(row.props);
   };
 
   it.each([

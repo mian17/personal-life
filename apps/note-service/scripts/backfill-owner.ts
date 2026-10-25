@@ -153,6 +153,10 @@ const NOTE_TAG_TEMP_DDL = NOTE_TAG_DDL.replace(
  *
  *  a. `note`: `ALTER TABLE ADD COLUMN ownerSub TEXT` when missing (a native
  *     single-column add, no rebuild) and `IDX_note_owner_sub` when missing.
+ *     `contentUpdatedAt` gets the same treatment: it is a later nullable
+ *     addition to the entity, so a DB migrated only up to `ownerSub` would boot
+ *     into a `synchronize` table rebuild. Adding it here (both are nullable,
+ *     both are single-column native adds) keeps the first boot a no-op.
  *  b. `tag`: when it still lacks `ownerSub` or still carries the legacy
  *     single-column UNIQUE(name), rebuild it under `PRAGMA foreign_keys = OFF`,
  *     copy rows with ids preserved, drop the old table (taking the old unique
@@ -183,12 +187,16 @@ function mergeSteps(steps: SchemaResult[]): SchemaResult {
   };
 }
 
-/** Step 2a: `note.ownerSub` and its index — a native single-column add, no rebuild. */
+/** Step 2a: the nullable `note` columns and the owner index — native adds, no rebuild. */
 function ensureNoteOwnerColumn(db: Database.Database): SchemaResult {
   const actions: string[] = [];
   if (!hasColumn(db, 'note', 'ownerSub')) {
     db.exec('ALTER TABLE "note" ADD COLUMN "ownerSub" TEXT');
     actions.push('added note.ownerSub');
+  }
+  if (!hasColumn(db, 'note', 'contentUpdatedAt')) {
+    db.exec('ALTER TABLE "note" ADD COLUMN "contentUpdatedAt" datetime');
+    actions.push('added note.contentUpdatedAt');
   }
   if (!hasIndexNamed(db, 'note', 'IDX_note_owner_sub')) {
     db.exec('CREATE INDEX "IDX_note_owner_sub" ON "note"("ownerSub")');

@@ -11,7 +11,7 @@ import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import {
   completeVector,
   foodNameAad,

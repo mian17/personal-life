@@ -28,6 +28,13 @@ export class UserKeys {
   @Column({ type: 'integer', default: 1 })
   kekVersion: number;
 
-  @Column({ type: 'datetime' })
+  /**
+   * When the row was created. Typed as `Date` (not a driver literal) so the one
+   * entity works on both drivers in this repo: sqlite normalises `Date` to
+   * `datetime`, Postgres to `timestamp without time zone`. A literal like
+   * `datetime` is sqlite-only and `timestamptz` is Postgres-only, so either one
+   * would break the other services that share this entity.
+   */
+  @Column({ type: Date })
   createdAt: Date;
 }

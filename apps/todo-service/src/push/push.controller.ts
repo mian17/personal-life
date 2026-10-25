@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { PushSubscribeDto, PushUnsubscribeDto } from './push-subscribe.dto';
 import { PushService } from './push.service';
 

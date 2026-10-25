@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { completeVector, readStoredVector } from '../foods/content';
 import { Entry } from './entry.entity';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto';

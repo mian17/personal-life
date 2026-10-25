@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import type { TagUsage } from '@life/shared';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { CreateTodoDto } from './dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
 import { ListTodosQuery } from './dto/list-todos.query';

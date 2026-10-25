@@ -3,8 +3,8 @@ import { Test } from '@nestjs/testing';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { AuthGuard } from '../src/auth/auth.guard';
-import { Principal } from '../src/auth/principal';
+import { AuthGuard, Principal } from '@life/service-kit';
+import { VERIFIER_ENV } from '../src/service-config';
 import {
   configureVerifierEnv,
   JwtTestHarness,
@@ -132,7 +132,7 @@ describe('JWT auth principal seam (e2e)', () => {
       controllers: [PrincipalProbeController],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalGuards(new AuthGuard());
+    app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
     await app.init();
   });
 

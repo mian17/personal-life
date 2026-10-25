@@ -10,7 +10,7 @@ import { IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { decryptField } from '@life/crypto';
 import { Todo } from '../todos/todo.entity';
 import { TodosService } from '../todos/todos.service';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { PushService } from '../push/push.service';
 import {
   PushSender,
