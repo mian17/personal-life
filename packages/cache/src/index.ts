@@ -99,6 +99,12 @@ export class ReadThroughCache {
     const client = this.client;
     if (!client) return loader();
 
+    // Call sites carry the service prefix (`note:all`); the key builder composes
+    // it itself, so strip it here to keep every key byte-identical to the
+    // pre-extraction shape. Adapters therefore need no wrapper of their own.
+    const prefix = `${this.service}:`;
+    rest = rest.startsWith(prefix) ? rest.slice(prefix.length) : rest;
+
     let genBefore: number | null = null;
     try {
       genBefore = await this.readGeneration(client, sub);

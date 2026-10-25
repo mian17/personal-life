@@ -85,6 +85,13 @@ interface ConversationTurn {
   parts: unknown[];
 }
 
+/** What the search loop carries from one turn to the next: its wall-clock deadline and its two bounds. */
+interface SearchLoopState {
+  deadline: number;
+  searchesRun: number;
+  exhaustedReplySent: boolean;
+}
+
 /** The API method; the request path is `<base>/models/<model>:<method>`. */
 const METHOD = 'generateContent';
 
@@ -326,35 +333,64 @@ export class GeminiClient {
     searchTool: SearchFood,
   ): Promise<PhotoReadResult> {
     const turns: ConversationTurn[] = [{ role: 'user', parts: this.firstParts(image, hint) }];
-    const deadline = Date.now() + TOOL_LOOP_WALL_CLOCK_MS;
-    let searchesRun = 0;
-    let exhaustedReplySent = false;
+    const state: SearchLoopState = {
+      deadline: Date.now() + TOOL_LOOP_WALL_CLOCK_MS,
+      searchesRun: 0,
+      exhaustedReplySent: false,
+    };
     for (;;) {
-      if (Date.now() >= deadline) return readFailure(COULD_NOT_READ);
-      const response = await this.send(JSON.stringify(this.loopBody(turns)));
-      if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
-      const parts = candidateParts(parseJson(await response.text()));
-      if (!parts) return readFailure(COULD_NOT_READ);
-      const rawCalls = findToolCalls(parts);
-      if (rawCalls.length === 0) return finishReading(parts);
+      if (Date.now() >= state.deadline) return readFailure(COULD_NOT_READ);
+      const reply = await this.nextReply(turns);
+      if (!Array.isArray(reply)) return reply;
+      const rawCalls = findToolCalls(reply);
+      if (rawCalls.length === 0) return finishReading(reply);
       const calls = readToolCalls(rawCalls);
       if (!calls) return readFailure(COULD_NOT_READ);
-      if (searchesRun >= MAX_TOOL_ROUNDS) {
-        if (exhaustedReplySent) return finishReading(parts);
-        exhaustedReplySent = true;
-        // The cap is spent: no tool runs, so this turn costs no USDA call — and
-        // the empty answers offer no id, so the stranded foods take path 3.
-        turns.push({ role: 'model', parts }, { role: 'user', parts: emptyAnswers(calls) });
-        continue;
-      }
-      // Each result is remembered against its own query by the caller's closure
-      // (`PhotoService.searchFoodAndRemember`), so every call keeps its own id
-      // binding — no id crosses from one food's search onto another's.
-      const answers = await runSearchTools(searchTool, calls, deadline);
-      if (!answers) return readFailure(COULD_NOT_READ);
-      searchesRun += calls.length;
-      turns.push({ role: 'model', parts }, { role: 'user', parts: answers });
+      const answer = await this.answerCalls(turns, reply, calls, searchTool, state);
+      if (answer) return answer;
     }
+  }
+
+  /**
+   * One loop request: the candidate's `parts`, or the failure that ends the read
+   * — a non-2xx from the API (the service's) or a body that is not the
+   * documented envelope (the photo's).
+   */
+  private async nextReply(turns: ConversationTurn[]): Promise<unknown[] | PhotoReadResult> {
+    const response = await this.send(JSON.stringify(this.loopBody(turns)));
+    if (!response.ok) return readFailure(SERVICE_UNAVAILABLE, response.status);
+    return candidateParts(parseJson(await response.text())) ?? readFailure(COULD_NOT_READ);
+  }
+
+  /**
+   * One turn that carries `functionCall` parts. Past the search cap no tool runs:
+   * every pending call is answered empty for one further turn, so the model can
+   * answer with the foods it already found instead of losing the whole estimate
+   * — the empty answers offer no id, so the stranded foods take path 3.
+   * Otherwise every call runs and is answered with its own result. Returns the
+   * read's result when the loop is over, or null once the turn pair is appended.
+   */
+  private async answerCalls(
+    turns: ConversationTurn[],
+    parts: unknown[],
+    calls: { id?: string; query: string }[],
+    searchTool: SearchFood,
+    state: SearchLoopState,
+  ): Promise<PhotoReadResult | null> {
+    if (state.searchesRun >= MAX_TOOL_ROUNDS) {
+      if (state.exhaustedReplySent) return finishReading(parts);
+      state.exhaustedReplySent = true;
+      turns.push({ role: 'model', parts }, { role: 'user', parts: emptyAnswers(calls) });
+      return null;
+    }
+    // Each result is remembered against its own query by the caller's closure
+    // (`PhotoService.searchFoodAndRemember`), so every call keeps its own id
+    // binding — no id crosses from one food's search onto another's.
+    const answers = await runSearchTools(searchTool, calls, state.deadline);
+    if (!answers) return readFailure(COULD_NOT_READ);
+    state.searchesRun += calls.length;
+    turns.push({ role: 'model', parts }, { role: 'user', parts: answers });
+    return null;
   }
 
   private requestBody(image: PhotoImage, hint?: string): unknown {

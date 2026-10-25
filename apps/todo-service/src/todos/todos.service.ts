@@ -40,6 +40,55 @@ import {
   TodosCache,
 } from '../cache/todo-cache';
 
+/** The `PATCH /api/todos/:id` field set, applied after the ownership/version checks. */
+type TodoPatch = {
+  title?: string;
+  note?: string | null;
+  done?: boolean;
+  important?: boolean | null;
+  dueDate?: string | null;
+  repeat?: TodoRepeat | null;
+  repeatDays?: number[] | null;
+  listId?: string | null;
+  tagIds?: number[];
+  expectedVersion?: number;
+};
+
+/** The `dueBefore`/`dueAfter` window, evaluated in memory after the cache hit. */
+function matchesDueWindow(
+  dueDate: string | null,
+  opts: { dueBefore?: string; dueAfter?: string },
+): boolean {
+  if (opts.dueBefore !== undefined && !(dueDate !== null && dueDate < opts.dueBefore)) return false;
+  if (opts.dueAfter !== undefined && !(dueDate !== null && dueDate > opts.dueAfter)) return false;
+  return true;
+}
+
+/** The `findAll` read filters, applied in memory after the cache hit. */
+function matchesTodoFilters(
+  todo: TodoDto,
+  opts: {
+    q?: string;
+    listId?: string;
+    tagId?: number;
+    done?: boolean;
+    important?: boolean;
+    dueBefore?: string;
+    dueAfter?: string;
+  },
+): boolean {
+  if (opts.listId !== undefined && todo.listId !== opts.listId) return false;
+  if (opts.tagId !== undefined && !todo.tagIds.includes(opts.tagId)) return false;
+  if (opts.done !== undefined && todo.done !== opts.done) return false;
+  // In memory against the computed value — never a SQL predicate, never in the key.
+  if (opts.important !== undefined && todo.effectiveImportant !== opts.important) return false;
+  if (!matchesDueWindow(todo.dueDate, opts)) return false;
+  if (opts.q && !likeMatch(todo.title, `%${opts.q}%`) && !likeMatch(todo.note ?? '', `%${opts.q}%`)) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Deduplicate the `tagIds` a write carries, preserving first-seen order then
  * sorting. The result is the association set stored for the todo (TagRef
@@ -398,8 +447,8 @@ export class TodosService {
   }
 
   /** Resolve the owner DEK for a set of ciphertext rows (at most once per read). */
-  private async readDek(sub: string, rows: CachedTodoRow[]): Promise<Buffer | null> {
-    if (rows.length === 0) return null;
+  private readDek(sub: string, rows: CachedTodoRow[]): Promise<Buffer | null> {
+    if (rows.length === 0) return Promise.resolve(null);
     return this.keys.getDekForRead(sub);
   }
 
@@ -491,6 +540,71 @@ export class TodosService {
    * only that violation is swallowed so a real write failure still aborts the
    * transaction.
    */
+  /**
+   * Advance-on-tick for a recurring todo: log the pre-advance due `D`, then move
+   * the todo strictly past it and forward to on/after now, remaining open.
+   */
+  private async advanceOnTick(
+    manager: EntityManager,
+    sub: string,
+    todo: Todo,
+    id: string,
+  ): Promise<void> {
+    // Log the pre-advance due before overwriting it (occurrence = D).
+    const occurrence = todo.dueDate!;
+    const days = parseRepeatDays(todo.repeatDays);
+    const local = dueSortKey(todo.dueDate!, this.tz);
+    // Step strictly past the ticked occurrence first, then roll forward to
+    // on/after now — a future-due repeat must not jam on its own due.
+    const stepped = nextOccurrence(local, todo.repeat!, days);
+    const next = advanceToOnOrAfter(stepped, todo.repeat!, this.nowLocal(), days);
+    await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+    todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
+    todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+    todo.done = false;
+  }
+
+  /** A non-recurring tick: log `occurrence = D ?? '~'` and close the todo. */
+  private async closeOnTick(
+    manager: EntityManager,
+    sub: string,
+    todo: Todo,
+    id: string,
+  ): Promise<void> {
+    const occurrence = todo.dueDate ?? '~';
+    await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+    todo.done = true;
+  }
+
+  /**
+   * Undo (one rule for every todo shape): delete the newest log row. A dated
+   * `occurrence` is stored in the persisted dual shape, so assigning it back
+   * verbatim is the exact completed due; the `'~'` sentinel leaves the due
+   * untouched. No row means `done` is the only change.
+   */
+  private async undoCompletion(
+    manager: EntityManager,
+    sub: string,
+    todo: Todo,
+    id: string,
+  ): Promise<void> {
+    const repo = manager.getRepository(TodoCompletion);
+    const last = await repo.findOne({
+      where: { ownerSub: sub, todoId: id },
+      order: { completedAt: 'DESC' },
+    });
+    if (!last) {
+      todo.done = false;
+      return;
+    }
+    await repo.delete({ id: last.id, ownerSub: sub });
+    if (last.occurrence !== '~') {
+      todo.dueDate = last.occurrence;
+      todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
+    }
+    todo.done = false;
+  }
+
   private async writeCompletion(
     manager: EntityManager,
     sub: string,
@@ -515,7 +629,7 @@ export class TodosService {
   }
 
   /** The owner's full ciphertext row-set — the one cached `todo:all` entry. */
-  private async rawRows(sub: string): Promise<CachedTodoRow[]> {
+  private rawRows(sub: string): Promise<CachedTodoRow[]> {
     return this.cache.getThrough(
       sub,
       TODO_ALL,
@@ -621,27 +735,7 @@ export class TodosService {
       this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)),
     );
 
-    const filtered = decoded.filter((todo) => {
-      if (opts.listId !== undefined && todo.listId !== opts.listId) return false;
-      if (opts.tagId !== undefined && !todo.tagIds.includes(opts.tagId)) return false;
-      if (opts.done !== undefined && todo.done !== opts.done) return false;
-      // In memory against the computed value — never a SQL predicate, never in the key.
-      if (opts.important !== undefined && todo.effectiveImportant !== opts.important) return false;
-      if (opts.dueBefore !== undefined && !(todo.dueDate !== null && todo.dueDate < opts.dueBefore)) {
-        return false;
-      }
-      if (opts.dueAfter !== undefined && !(todo.dueDate !== null && todo.dueDate > opts.dueAfter)) {
-        return false;
-      }
-      if (
-        opts.q &&
-        !likeMatch(todo.title, `%${opts.q}%`) &&
-        !likeMatch(todo.note ?? '', `%${opts.q}%`)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const filtered = decoded.filter((todo) => matchesTodoFilters(todo, opts));
 
     const ordered: OrderedTodo[] = filtered.map((dto) => ({
       dto,
@@ -826,63 +920,14 @@ export class TodosService {
    * restores it as the due (verbatim — the persisted dual shape) and re-arms the
    * reminder; the `'~'` sentinel leaves the due untouched (N2/N3).
    */
-  async update(
-    sub: string,
-    id: string,
-    patch: {
-      title?: string;
-      note?: string | null;
-      done?: boolean;
-      important?: boolean | null;
-      dueDate?: string | null;
-      repeat?: TodoRepeat | null;
-      repeatDays?: number[] | null;
-      listId?: string | null;
-      tagIds?: number[];
-      expectedVersion?: number;
-    },
-  ): Promise<TodoDto> {
-    if (patch.listId !== undefined && patch.listId !== null) {
-      await this.lists.assertOwnedList(sub, patch.listId);
-    }
-
-    // Load WITHOUT the relation: associations are managed explicitly below.
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!todo) throw new NotFoundException('Todo not found');
-    if (patch.expectedVersion !== undefined && todo.version !== patch.expectedVersion) {
-      throw new ConflictException('Todo was modified');
-    }
-
+  async update(sub: string, id: string, patch: TodoPatch): Promise<TodoDto> {
+    const todo = await this.loadForUpdate(sub, id, patch);
     // Write path: always envelopes. Re-encrypting with a fresh nonce is correct
     // even when the plaintext is unchanged.
     const dek = await this.keys.getOrCreateDek(sub);
-    if (patch.title !== undefined) {
-      todo.title = encryptField(dek, patch.title, todoTitleAad(sub, id));
-    }
-    if (patch.note !== undefined) {
-      todo.note = patch.note === null ? null : encryptField(dek, patch.note, todoNoteAad(sub, id));
-    }
-    // Explicit `null` clears the override back to inherit.
-    if (patch.important !== undefined) todo.important = patch.important;
-    if (patch.listId !== undefined) todo.listId = patch.listId;
+    this.applyContentPatch(todo, patch, dek, sub, id);
 
-    // Resolve the resulting due/repeat before the invariant, normalizing a timed
-    // due. Clearing the due clears the repeat, the custom day set and the reminder.
-    const dueChanged = patch.dueDate !== undefined;
-    const repeatChanged = patch.repeat !== undefined || patch.repeatDays !== undefined;
-    if (patch.dueDate !== undefined) {
-      todo.dueDate = patch.dueDate === null ? null : this.normalizeDue(patch.dueDate, this.tz);
-      if (patch.dueDate === null) {
-        todo.repeat = null;
-        todo.repeatDays = null;
-      }
-    }
-    if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
-    // A repeat-day write applies to the resulting repeat: a repeat change without
-    // days clears days, a days change without repeat keeps the committed repeat.
-    if (repeatChanged) {
-      todo.repeatDays = formatRepeatDays(this.normalizeRepeat(todo.repeat, patch.repeatDays ?? null));
-    }
+    const { dueChanged, repeatChanged } = this.applyDuePatch(todo, patch);
 
     // Advance-on-tick: a recurring tick moves the todo to its next occurrence
     // and keeps it open; a non-recurring `done:true` closes it. The mutation
@@ -899,72 +944,107 @@ export class TodosService {
       todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
     }
 
-    let currentIds: number[];
-    if (patch.tagIds !== undefined) {
-      const ids = normalizeTagIds(patch.tagIds);
-      await this.todoTags.delete({ todoId: id });
-      if (ids.length > 0) {
-        await this.todoTags.insert(ids.map((tagId) => ({ todoId: id, tagId })));
-      }
-      currentIds = ids;
-    } else {
-      currentIds = (await this.todoTags.find({ where: { todoId: id } }))
-        .map((tt) => tt.tagId)
-        .sort((a, b) => a - b);
-    }
+    const currentIds = await this.resolveTagIds(id, patch.tagIds);
 
     todo.version += 1;
     todo.updatedAt = new Date();
-    // A done patch mutates the flag, the completion log and the advance in one
-    // transaction; every other patch keeps the linear path.
-    const saved =
-      patch.done === undefined
-        ? await this.todos.save(todo)
-        : await this.dataSource.transaction(async (manager) => {
-            if (advance) {
-              // Log the pre-advance due before overwriting it (occurrence = D).
-              const occurrence = todo.dueDate!;
-              const days = parseRepeatDays(todo.repeatDays);
-              const local = dueSortKey(todo.dueDate!, this.tz);
-              // Step strictly past the ticked occurrence first, then roll forward
-              // to on/after now — a future-due repeat must not jam on its own due.
-              const stepped = nextOccurrence(local, todo.repeat!, days);
-              const next = advanceToOnOrAfter(stepped, todo.repeat!, this.nowLocal(), days);
-              await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
-              todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
-              todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
-              todo.done = false;
-            } else if (patch.done === true) {
-              // One-off tick: occurrence is the due, or '~' when undated.
-              const occurrence = todo.dueDate ?? '~';
-              await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
-              todo.done = true;
-            } else {
-              // Undo (one rule for every todo shape): delete the newest log row.
-              // A dated `occurrence` is stored in the persisted dual shape, so
-              // assigning it back verbatim is the exact completed due; the `'~'`
-              // sentinel leaves the due untouched. No row means `done` is the only change.
-              const repo = manager.getRepository(TodoCompletion);
-              const last = await repo.findOne({
-                where: { ownerSub: sub, todoId: id },
-                order: { completedAt: 'DESC' },
-              });
-              if (last) {
-                await repo.delete({ id: last.id, ownerSub: sub });
-                if (last.occurrence !== '~') {
-                  todo.dueDate = last.occurrence;
-                  todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
-                }
-              }
-              todo.done = false;
-            }
-            return manager.save(todo);
-          });
+    const saved = await this.savePatch(todo, patch, sub, id, advance);
     // Bump AFTER the save/commit — a 409 above never bumps, a thrown
     // transaction never reaches here.
     await this.cache.bumpGeneration(sub);
     const row = { ...toCachedTodoRow(saved), tagIds: currentIds };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
+  }
+
+  /** Load + authorise a PATCH target (a foreign id and a missing one are one 404). */
+  private async loadForUpdate(sub: string, id: string, patch: TodoPatch): Promise<Todo> {
+    if (patch.listId !== undefined && patch.listId !== null) {
+      await this.lists.assertOwnedList(sub, patch.listId);
+    }
+    // Load WITHOUT the relation: associations are managed explicitly by the caller.
+    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!todo) throw new NotFoundException('Todo not found');
+    if (patch.expectedVersion !== undefined && todo.version !== patch.expectedVersion) {
+      throw new ConflictException('Todo was modified');
+    }
+    return todo;
+  }
+
+  /** Seal the scalar content/metadata fields a PATCH carries. */
+  private applyContentPatch(
+    todo: Todo,
+    patch: TodoPatch,
+    dek: Buffer,
+    sub: string,
+    id: string,
+  ): void {
+    if (patch.title !== undefined) {
+      todo.title = encryptField(dek, patch.title, todoTitleAad(sub, id));
+    }
+    if (patch.note !== undefined) {
+      todo.note = patch.note === null ? null : encryptField(dek, patch.note, todoNoteAad(sub, id));
+    }
+    // Explicit `null` clears the override back to inherit.
+    if (patch.important !== undefined) todo.important = patch.important;
+    if (patch.listId !== undefined) todo.listId = patch.listId;
+  }
+
+  /**
+   * Resolve the resulting due/repeat, normalizing a timed due. Clearing the due
+   * clears the repeat, the custom day set and the reminder. A repeat-day write
+   * applies to the resulting repeat: a repeat change without days clears days, a
+   * days change without repeat keeps the committed repeat.
+   */
+  private applyDuePatch(
+    todo: Todo,
+    patch: TodoPatch,
+  ): { dueChanged: boolean; repeatChanged: boolean } {
+    const dueChanged = patch.dueDate !== undefined;
+    const repeatChanged = patch.repeat !== undefined || patch.repeatDays !== undefined;
+    if (patch.dueDate !== undefined) {
+      todo.dueDate = patch.dueDate === null ? null : this.normalizeDue(patch.dueDate, this.tz);
+      if (patch.dueDate === null) {
+        todo.repeat = null;
+        todo.repeatDays = null;
+      }
+    }
+    if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
+    if (repeatChanged) {
+      todo.repeatDays = formatRepeatDays(this.normalizeRepeat(todo.repeat, patch.repeatDays ?? null));
+    }
+    return { dueChanged, repeatChanged };
+  }
+
+  /** Replace the association set on a `tagIds` write, else read the committed one. */
+  private async resolveTagIds(todoId: string, tagIds: number[] | undefined): Promise<number[]> {
+    if (tagIds === undefined) {
+      return (await this.todoTags.find({ where: { todoId } }))
+        .map((tt) => tt.tagId)
+        .sort((a, b) => a - b);
+    }
+    const ids = normalizeTagIds(tagIds);
+    await this.todoTags.delete({ todoId });
+    if (ids.length > 0) {
+      await this.todoTags.insert(ids.map((tagId) => ({ todoId, tagId })));
+    }
+    return ids;
+  }
+
+  /** Persist the row; a `done` patch mutates flag + completion log + advance atomically. */
+  private savePatch(
+    todo: Todo,
+    patch: TodoPatch,
+    sub: string,
+    id: string,
+    advance: boolean,
+  ): Promise<Todo> {
+    if (patch.done === undefined) return this.todos.save(todo);
+    return this.dataSource.transaction(async (manager) => {
+      if (advance) await this.advanceOnTick(manager, sub, todo, id);
+      else if (patch.done === true) await this.closeOnTick(manager, sub, todo, id);
+      else await this.undoCompletion(manager, sub, todo, id);
+      return manager.save(todo);
+    });
   }
 
   /**
@@ -1038,7 +1118,7 @@ export class TodosService {
    * live in `tags-service` (resolved by the BFF), so nothing here is content and
    * the `todo:tags` cache is metadata-only by design.
    */
-  async listTagUsage(sub: string): Promise<TagUsage[]> {
+  listTagUsage(sub: string): Promise<TagUsage[]> {
     return this.cache.getThrough(
       sub,
       TODO_TAGS,

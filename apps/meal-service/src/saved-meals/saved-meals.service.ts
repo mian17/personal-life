@@ -106,14 +106,14 @@ export class SavedMealsService {
   }
 
   /** Resolve the owner DEK at most once per read; null when nothing is sealed. */
-  private async readDek(sub: string, rows: CachedSavedMealRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedSavedMealRow[]): Promise<Buffer | null> {
     const needs = rows.some(
       (row) =>
         typeof row.name === 'string' &&
         (row.name.startsWith(ENC_PREFIX) ||
           row.items.some((item) => item.nutrients?.startsWith(ENC_PREFIX))),
     );
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.keys.getDekForRead(sub);
   }
 
@@ -183,7 +183,7 @@ export class SavedMealsService {
   }
 
   /** Frozen items for one saved meal, owner-scoped, stable order. */
-  private async loadItems(sub: string, savedMealId: string): Promise<SavedMealItem[]> {
+  private loadItems(sub: string, savedMealId: string): Promise<SavedMealItem[]> {
     return this.items.find({
       where: { ownerSub: sub, savedMealId },
       order: { createdAt: 'ASC', id: 'ASC' },

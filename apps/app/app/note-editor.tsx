@@ -37,6 +37,155 @@ function sameIds(a: readonly number[], b: readonly number[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
+/** A ref cell, narrowed to what the drain needs (no React version coupling). */
+interface Cell<T> {
+  current: T;
+}
+
+/** Everything one drain iteration reads and writes, so it can live at module scope. */
+interface DrainContext {
+  idRef: Cell<string | null>;
+  bodyRef: Cell<string>;
+  selectedRef: Cell<number[]>;
+  versionRef: Cell<number>;
+  dirtyRef: Cell<boolean>;
+  modeRef: Cell<ParseMode>;
+  sentRef: Cell<{ body: string; tagIds: number[] } | null>;
+  inFlightRef: Cell<boolean>;
+  setSelectedIds: (ids: number[]) => void;
+  setStatus: (status: Status) => void;
+  enterConflict: (server: Note) => void;
+}
+
+/**
+ * An empty body is not a failure on a new note (nothing was created) but is one
+ * on an existing note, so leaving cannot look like a saved clear.
+ */
+function settleEmptyBody(ctx: DrainContext, id: string | null): boolean {
+  ctx.sentRef.current = null;
+  if (id === null) {
+    ctx.dirtyRef.current = false;
+    return true;
+  }
+  ctx.dirtyRef.current = true;
+  ctx.setStatus('error');
+  return false;
+}
+
+/** A failed flush stays dirty for a later retry, but must not spin the drain. */
+function settleFailure(ctx: DrainContext): void {
+  ctx.sentRef.current = null;
+  ctx.dirtyRef.current = true;
+  ctx.setStatus('error');
+}
+
+/** 409: stop the drain and keep the local edit for the user's choice. */
+async function settleConflict(ctx: DrainContext, res: Response): Promise<void> {
+  // The response carries the current server note so the user can choose without
+  // another request.
+  let server: Note | null = null;
+  try {
+    const data = (await res.json()) as FlushResponse;
+    server = data.note ?? null;
+  } catch {
+    server = null;
+  }
+  if (server) ctx.enterConflict(server);
+  else settleFailure(ctx);
+}
+
+/** Fold a successful flush response into the refs and the status. */
+function settleSaved(ctx: DrainContext, data: FlushResponse, id: string | null): void {
+  if (id === null && typeof data.id === 'string') {
+    ctx.idRef.current = data.id;
+    // replaceState, not router.replace: a router transition is exactly what used
+    // to remount the editor and reset the caret.
+    window.history.replaceState(null, '', `/notes/${data.id}`);
+  }
+  if (typeof data.version === 'number') ctx.versionRef.current = data.version;
+  if (Array.isArray(data.tagIds)) {
+    // The server returns the ids that actually persisted; a tag deleted
+    // elsewhere was omitted and is detached here too.
+    ctx.selectedRef.current = data.tagIds;
+    ctx.setSelectedIds(data.tagIds);
+  }
+  const sent = ctx.sentRef.current;
+  ctx.sentRef.current = null;
+  const changed =
+    ctx.bodyRef.current !== sent?.body ||
+    !sameIds(ctx.selectedRef.current, sent?.tagIds ?? []);
+  if (ctx.dirtyRef.current || changed) {
+    // Latest-wins: a newer edit arrived during the request.
+    ctx.dirtyRef.current = true;
+    return;
+  }
+  ctx.setStatus('saved');
+}
+
+/** Fold one flush response into the editor state; `true` means the save failed. */
+async function settleResponse(ctx: DrainContext, res: Response, id: string | null): Promise<boolean> {
+  if (res.status === 409) {
+    await settleConflict(ctx, res);
+    return true;
+  }
+  if (!res.ok) {
+    settleFailure(ctx);
+    return true;
+  }
+  settleSaved(ctx, (await res.json()) as FlushResponse, id);
+  return false;
+}
+
+/** One flush request for `nextBody`/`nextTagIds`; `true` means it failed. */
+async function flushPendingBody(
+  ctx: DrainContext,
+  id: string | null,
+  nextBody: string,
+  nextTagIds: number[],
+): Promise<boolean> {
+  try {
+    // A route-handler fetch, unlike a Server Action, does not refresh the RSC tree
+    // of the current route, so the editor is never remounted mid-edit.
+    const res = await fetch(id === null ? '/api/notes/flush' : `/api/notes/${id}/flush`, {
+      method: id === null ? 'POST' : 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        body: nextBody,
+        inlineTagNames: parseInlineTags(nextBody, {
+          eofTerminates: ctx.modeRef.current === 'final',
+        }),
+        tagIds: nextTagIds,
+        ...(id === null ? {} : { expectedVersion: ctx.versionRef.current }),
+      }),
+    });
+    return await settleResponse(ctx, res, id);
+  } catch {
+    settleFailure(ctx);
+    return true;
+  }
+}
+
+/**
+ * One drain iteration: a clean editor is done, an empty body settles without a
+ * request, otherwise one flush runs. `true` means the editor may be left clean.
+ */
+async function drainOnce(ctx: DrainContext): Promise<boolean> {
+  if (!ctx.dirtyRef.current) return true;
+  const id = ctx.idRef.current;
+  const nextBody = ctx.bodyRef.current;
+  const nextTagIds = ctx.selectedRef.current;
+  if (!nextBody.trim()) return settleEmptyBody(ctx, id);
+  ctx.dirtyRef.current = false;
+  ctx.sentRef.current = { body: nextBody, tagIds: nextTagIds };
+  ctx.setStatus('saving');
+  ctx.inFlightRef.current = true;
+  try {
+    return !(await flushPendingBody(ctx, id, nextBody, nextTagIds));
+  } finally {
+    ctx.inFlightRef.current = false;
+  }
+}
+
 /**
  * The editor's tag state is the attached `tagIds`. Inline `#tag` names are
  * parsed from the body (strict grammar: a token is a tag only when a terminator
@@ -106,106 +255,26 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
       modeRef.current = 'strict';
       return Promise.resolve(false);
     }
-    const drain = (async (): Promise<boolean> => {
-      for (;;) {
-        if (!dirtyRef.current) return true;
-        const id = idRef.current;
-        const nextBody = bodyRef.current;
-        const nextTagIds = selectedRef.current;
-        if (!nextBody.trim()) {
-          // An empty new note is not created (success); an existing one is rejected
-          // and stays unsaved (failure) so leaving cannot look like a saved clear.
-          sentRef.current = null;
-          if (id === null) {
-            dirtyRef.current = false;
-            return true;
-          }
-          dirtyRef.current = true;
-          setStatus('error');
-          return false;
-        }
-        inFlightRef.current = true;
-        dirtyRef.current = false;
-        sentRef.current = { body: nextBody, tagIds: nextTagIds };
-        setStatus('saving');
-        let failed = false;
-        try {
-          // A route-handler fetch, unlike a Server Action, does not refresh the RSC
-          // tree of the current route, so the editor is never remounted mid-edit.
-          const res = await fetch(id === null ? '/api/notes/flush' : `/api/notes/${id}/flush`, {
-            method: id === null ? 'POST' : 'PATCH',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              body: nextBody,
-              inlineTagNames: parseInlineTags(nextBody, {
-                eofTerminates: modeRef.current === 'final',
-              }),
-              tagIds: nextTagIds,
-              ...(id === null ? {} : { expectedVersion: versionRef.current }),
-            }),
-          });
-          if (res.status === 409) {
-            // Stop the drain and keep the local edit. The response carries the
-            // current server note so the user can choose without another request.
-            let server: Note | null = null;
-            try {
-              const data = (await res.json()) as FlushResponse;
-              server = data.note ?? null;
-            } catch {
-              server = null;
-            }
-            if (server) {
-              enterConflict(server);
-            } else {
-              dirtyRef.current = true;
-              sentRef.current = null;
-              setStatus('error');
-            }
-            failed = true;
-          } else if (!res.ok) {
-            sentRef.current = null;
-            dirtyRef.current = true;
-            failed = true;
-            setStatus('error');
-          } else {
-            const data = (await res.json()) as FlushResponse;
-            if (id === null && typeof data.id === 'string') {
-              idRef.current = data.id;
-              // replaceState, not router.replace: a router transition is exactly what
-              // used to remount the editor and reset the caret.
-              window.history.replaceState(null, '', `/notes/${data.id}`);
-            }
-            if (typeof data.version === 'number') versionRef.current = data.version;
-            if (Array.isArray(data.tagIds)) {
-              // The server returns the ids that actually persisted; a tag deleted
-              // elsewhere was omitted and is detached here too.
-              selectedRef.current = data.tagIds;
-              setSelectedIds(data.tagIds);
-            }
-            const sent = sentRef.current;
-            sentRef.current = null;
-            const changed =
-              sent === null ||
-              bodyRef.current !== sent.body ||
-              !sameIds(selectedRef.current, sent.tagIds);
-            if (dirtyRef.current || changed) {
-              // Latest-wins: a newer edit arrived during the request.
-              dirtyRef.current = true;
-            } else {
-              setStatus('saved');
-            }
-          }
-        } catch {
-          sentRef.current = null;
-          dirtyRef.current = true;
-          failed = true;
-          setStatus('error');
-        } finally {
-          inFlightRef.current = false;
-        }
-        // A failure stays dirty for a later retry, but must not spin here.
-        if (failed) return false;
-      }
+    const ctx: DrainContext = {
+      idRef,
+      bodyRef,
+      selectedRef,
+      versionRef,
+      dirtyRef,
+      modeRef,
+      sentRef,
+      inFlightRef,
+      setSelectedIds,
+      setStatus,
+      enterConflict,
+    };
+    // A failure stays dirty for a later retry, but must not spin here.
+    // Recursive rather than a `while` around an `await`: each turn must observe
+    // the refs after the previous flush settled, so the turns are sequential by
+    // necessity. The named function expression keeps `drain` the promise.
+    const drain = (async function drainLoop(): Promise<boolean> {
+      const clean = await drainOnce(ctx);
+      return clean && dirtyRef.current ? drainLoop() : clean;
     })();
     drainRef.current = drain;
     void drain.finally(() => {
@@ -216,7 +285,7 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
   }, [enterConflict]);
 
   const flush = useCallback(
-    async (mode: ParseMode = 'strict'): Promise<boolean> => {
+    (mode: ParseMode = 'strict'): Promise<boolean> => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;

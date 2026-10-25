@@ -116,8 +116,8 @@ class NullRefreshLock implements RefreshLock {
   readonly pollIntervalMs = REFRESH_LOCK_POLL_INTERVAL_MS;
   readonly distributed = false;
 
-  async acquire(): Promise<AcquireResult> {
-    return { status: 'disabled' };
+  acquire(_sessionId: string): Promise<AcquireResult> {
+    return Promise.resolve({ status: 'disabled' });
   }
 }
 

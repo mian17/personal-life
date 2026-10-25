@@ -14,10 +14,11 @@
     "eval:pass5": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass5 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand"
   },
   "dependencies": {
-    "@life/nutrition": "*",
     "@life/cache": "*",
-    "@life/db": "*",
     "@life/crypto": "*",
+    "@life/db": "*",
+    "@life/nutrition": "*",
+    "@life/service-kit": "*",
     "@life/shared": "*",
     "@nestjs/common": "^11.0.11",
     "@nestjs/core": "^11.0.11",
@@ -66,7 +67,8 @@
       "^@life/cache$": "<rootDir>/../../packages/cache/src/index.ts",
       "^@life/db$": "<rootDir>/../../packages/db/src/index.ts",
       "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
-      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts"
+      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts"
     },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

@@ -106,12 +106,15 @@ export class ListsService {
    * compute `effectiveImportant` from the same cached source, never a second
    * loader (Contract 2 no-fork).
    */
-  async rawRows(sub: string): Promise<CachedListRow[]> {
+  rawRows(sub: string): Promise<CachedListRow[]> {
     return this.cache.getThrough(
       sub,
       TODO_LISTS,
       async () => {
-        const found = await this.lists.find({ where: { ownerSub: sub }, order: { createdAt: 'ASC' } });
+        const found = await this.lists.find({
+          where: { ownerSub: sub },
+          order: { createdAt: 'ASC' },
+        });
         return found.map(toCachedListRow);
       },
       { decode: decodeCiphertextListRowList, cacheable: isCiphertextListRowList },
@@ -123,7 +126,7 @@ export class ListsService {
    * collision check must not be decided by a possibly-stale entry, and a write
    * must not populate a generation it is about to invalidate.
    */
-  private async ownerRows(sub: string): Promise<List[]> {
+  private ownerRows(sub: string): Promise<List[]> {
     return this.lists.find({ where: { ownerSub: sub }, order: { createdAt: 'ASC' } });
   }
 

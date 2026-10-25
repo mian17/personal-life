@@ -25,6 +25,7 @@ COPY packages/crypto ./packages/crypto
 COPY packages/cache ./packages/cache
 COPY packages/db ./packages/db
 COPY packages/nutrition ./packages/nutrition
+COPY packages/service-kit ./packages/service-kit
 COPY apps/meal-service ./apps/meal-service
 
 RUN npm run build -w @life/shared \
@@ -32,6 +33,7 @@ RUN npm run build -w @life/shared \
   && npm run build -w @life/crypto \
   && npm run build -w @life/cache \
   && npm run build -w @life/nutrition \
+ && npm run build -w @life/service-kit \
   && npm run build -w @life/meal-service \
   && npm prune --omit=dev
 
@@ -53,6 +55,8 @@ COPY --from=build /repo/packages/db/package.json ./packages/db/package.json
 COPY --from=build /repo/packages/db/dist ./packages/db/dist
 COPY --from=build /repo/packages/nutrition/package.json ./packages/nutrition/package.json
 COPY --from=build /repo/packages/nutrition/dist ./packages/nutrition/dist
+COPY --from=build /repo/packages/service-kit/package.json ./packages/service-kit/package.json
+COPY --from=build /repo/packages/service-kit/dist ./packages/service-kit/dist
 COPY --from=build /repo/apps/meal-service/package.json ./package.json
 COPY --from=build /repo/apps/meal-service/dist ./dist
 

@@ -1,12 +1,5 @@
 import { createClient } from 'redis';
-import {
-  CACHE_TTL_SECONDS,
-  createCache,
-  ReadThroughCache,
-  type CacheClient,
-  type CacheHitOptions,
-  type CacheSetOptions,
-} from '@life/cache';
+import { ReadThroughCache, type CacheClient } from '@life/cache';
 
 /**
  * todo-service's adapter over the generic read-through cache (`@life/cache`,
@@ -29,8 +22,8 @@ import {
  * invalidates both shapes together — coarser than strictly needed, and correct.
  */
 
-export { CACHE_TTL_SECONDS };
-export type { CacheClient, CacheHitOptions, CacheSetOptions };
+export { CACHE_TTL_SECONDS } from '@life/cache';
+export type { CacheClient, CacheHitOptions, CacheSetOptions } from '@life/cache';
 
 /** The namespace prefix every todo key (and counter) carries on shared Redis. */
 const SERVICE = 'todo';
@@ -50,27 +43,9 @@ export function generationKey(sub: string): string {
 /** Nest DI token for the module-init cache selection. */
 export const TODO_CACHE = Symbol('TODO_CACHE');
 
-export class TodosCache {
-  private readonly inner: ReadThroughCache;
-
-  /** `null` client = Redis not configured; every call runs the loader directly. */
+export class TodosCache extends ReadThroughCache {
   constructor(client: CacheClient | null) {
-    this.inner = createCache({ service: SERVICE, client });
-  }
-
-  /** Read-through one of the owner's four entries; `loader` returns stored rows. */
-  async getThrough<T>(
-    sub: string,
-    rest: string,
-    loader: () => Promise<T>,
-    options: CacheHitOptions<T> = {},
-  ): Promise<T> {
-    return this.inner.getThrough(sub, rest, loader, options);
-  }
-
-  /** Invalidate every one of this owner's reads after a successful write. */
-  async bumpGeneration(sub: string): Promise<void> {
-    await this.inner.bumpGeneration(sub);
+    super({ service: SERVICE, client });
   }
 }
 

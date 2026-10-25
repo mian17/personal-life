@@ -87,11 +87,12 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
     this.trigger();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): Promise<void> {
     this.stopped = true;
     if (this.ticker) clearInterval(this.ticker);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.dropListener();
+    return Promise.resolve();
   }
 
   /** Any trigger: notification, tick, or reconnect — they all drain the log. */

@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { Note } from './notes/note.entity';
 import { NoteTag } from './notes/note-tag.entity';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from '@life/service-kit';
 import { KeysModule } from './keys/keys.module';
 import { UserKeys } from './keys/user-keys.entity';
 import { NotesModule } from './notes/notes.module';
@@ -18,7 +18,7 @@ import { NotesModule } from './notes/notes.module';
     }),
     NotesModule,
     KeysModule,
-    HealthModule,
+    HealthModule.forRoot({ masterKeyEnv: 'NOTE_MASTER_KEY' }),
   ],
 })
 export class AppModule {}

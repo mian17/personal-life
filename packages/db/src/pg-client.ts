@@ -62,7 +62,7 @@ function runOrThrow(cmd: string, args: string[]): void {
 }
 
 function quoteIdent(name: string): string {
-  return `"${name.replace(/"/g, '""')}"`;
+  return `"${name.replaceAll('"', '""')}"`;
 }
 
 /**

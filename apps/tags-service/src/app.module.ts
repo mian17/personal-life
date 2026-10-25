@@ -5,7 +5,7 @@ import { Tag } from './tags/tag.entity';
 import { UserKeys } from './keys/user-keys.entity';
 import { KeysModule } from './keys/keys.module';
 import { TagsModule } from './tags/tags.module';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from '@life/service-kit';
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { HealthModule } from './health/health.module';
     }),
     TagsModule,
     KeysModule,
-    HealthModule,
+    HealthModule.forRoot({ masterKeyEnv: 'TAGS_MASTER_KEY' }),
   ],
 })
 export class AppModule {}

@@ -6,7 +6,7 @@ import { EntriesModule } from './entries/entries.module';
 import { Food } from './foods/food.entity';
 import { FoodsModule } from './foods/foods.module';
 import { Serving } from './foods/serving.entity';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from '@life/service-kit';
 import { KeysModule } from './keys/keys.module';
 import { UserKeys } from './keys/user-keys.entity';
 import { PhotoModule } from './photo/photo.module';
@@ -25,7 +25,7 @@ import { TargetModule } from './targets/target.module';
       synchronize: true,
     }),
     KeysModule,
-    HealthModule,
+    HealthModule.forRoot({ masterKeyEnv: 'MEAL_MASTER_KEY' }),
     TargetModule,
     FoodsModule,
     EntriesModule,
