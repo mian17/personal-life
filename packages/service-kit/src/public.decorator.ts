@@ -1,5 +1,4 @@
-import { SetMetadata } from '@nestjs/common';
-import type { CustomDecorator } from '@nestjs/common';
+import { SetMetadata, type CustomDecorator } from '@nestjs/common';
 
 /**
  * Marks a route as unauthenticated so the global `AuthGuard` skips its JWT check.
