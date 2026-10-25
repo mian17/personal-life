@@ -1,7 +1,6 @@
 import { createClient } from 'redis';
 import {
   CACHE_TTL_SECONDS,
-  createCache,
   ReadThroughCache,
   type CacheClient,
   type CacheHitOptions,
@@ -50,27 +49,9 @@ export function generationKey(sub: string): string {
 /** Nest DI token for the module-init cache selection. */
 export const TODO_CACHE = Symbol('TODO_CACHE');
 
-export class TodosCache {
-  private readonly inner: ReadThroughCache;
-
-  /** `null` client = Redis not configured; every call runs the loader directly. */
+export class TodosCache extends ReadThroughCache {
   constructor(client: CacheClient | null) {
-    this.inner = createCache({ service: SERVICE, client });
-  }
-
-  /** Read-through one of the owner's four entries; `loader` returns stored rows. */
-  getThrough<T>(
-    sub: string,
-    rest: string,
-    loader: () => Promise<T>,
-    options: CacheHitOptions<T> = {},
-  ): Promise<T> {
-    return this.inner.getThrough(sub, rest, loader, options);
-  }
-
-  /** Invalidate every one of this owner's reads after a successful write. */
-  async bumpGeneration(sub: string): Promise<void> {
-    await this.inner.bumpGeneration(sub);
+    super({ service: SERVICE, client });
   }
 }
 

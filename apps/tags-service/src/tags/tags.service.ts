@@ -99,7 +99,7 @@ export class TagsService {
    * only DB access; decrypt/sort/filter all happen after every hit.
    */
   private rawRows(sub: string): Promise<CachedTagRow[]> {
-    return this.cache.getThrough(
+    return this.cache.getAllThrough(
       sub,
       async () => {
         const found = await this.tags.find({ where: { ownerSub: sub }, order: { id: 'ASC' } });

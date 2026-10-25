@@ -1,7 +1,6 @@
 import { createClient } from 'redis';
 import {
   CACHE_TTL_SECONDS,
-  createCache,
   ReadThroughCache,
   type CacheClient,
   type CacheHitOptions,
@@ -24,10 +23,10 @@ import {
 export { CACHE_TTL_SECONDS };
 export type { CacheClient, CacheHitOptions, CacheSetOptions };
 
-/** The namespace prefix every meal key (and counter) carries. */
+/** The namespace prefix every meal key (and counter) carries on shared Redis. */
 const SERVICE = 'meal';
 
-/** The per-user counter every one of that user's read keys embeds; bumped once per write. */
+/** The per-user counter every one of that user's read keys embeds; bumped per write. */
 export function generationKey(sub: string): string {
   return `${SERVICE}:gen:${sub}`;
 }
@@ -35,38 +34,18 @@ export function generationKey(sub: string): string {
 /** Nest DI token for the module-init cache selection. */
 export const MEAL_CACHE = Symbol('MEAL_CACHE');
 
-export class MealCache {
-  private readonly inner: ReadThroughCache;
-
-  /** `null` client = Redis not configured; every call runs the loader directly. */
+export class MealCache extends ReadThroughCache {
   constructor(client: CacheClient | null) {
-    this.inner = createCache({ service: SERVICE, client });
-  }
-
-  getThrough<T>(
-    sub: string,
-    baseKey: string,
-    loader: () => Promise<T>,
-    options: CacheHitOptions<T> = {},
-  ): Promise<T> {
-    // Call sites pass `meal:`-prefixed keys; the generic layer composes the
-    // prefix itself, so strip it to keep the final key byte-identical.
-    const prefix = `${SERVICE}:`;
-    const rest = baseKey.startsWith(prefix) ? baseKey.slice(prefix.length) : baseKey;
-    return this.inner.getThrough(sub, rest, loader, options);
-  }
-
-  async bumpGeneration(sub: string): Promise<void> {
-    await this.inner.bumpGeneration(sub);
+    super({ service: SERVICE, client });
   }
 }
 
 /**
- * Module-init selection: no `REDIS_URL` means today's direct-DB path (dev/e2e
- * unchanged — `REDIS_URL` is unset there by design). With a URL, connect in the
- * background — boot must not block or crash if Redis is briefly unreachable —
- * and `disableOfflineQueue` makes commands reject immediately while
- * disconnected so reads fail open to the DB instead of hanging.
+ * Module-init selection: no `REDIS_URL` means the direct DB path (dev/e2e
+ * unchanged). With a URL, connect in the background — boot must not block or
+ * crash if Redis is briefly unreachable — and `disableOfflineQueue` makes
+ * commands reject immediately while disconnected so reads fail open to the DB
+ * instead of hanging on a queued command.
  */
 export function createMealCache(redisUrl: string | undefined): MealCache {
   if (!redisUrl) return new MealCache(null);

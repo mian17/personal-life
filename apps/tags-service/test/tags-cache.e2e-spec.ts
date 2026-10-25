@@ -216,8 +216,8 @@ describe('TagsCache (read-through + generation invalidation)', () => {
   it('selection: no REDIS_URL means the direct DB path (loader every call)', async () => {
     const cache = createTagsCache(undefined);
     const loader = jest.fn(async () => [{ id: 1, name: ENC_PREFIX + 'x.y' }]);
-    await cache.getThrough(SUB, loader);
-    await cache.getThrough(SUB, loader);
+    await cache.getAllThrough(SUB, loader);
+    await cache.getAllThrough(SUB, loader);
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
