@@ -157,8 +157,9 @@ export function createReceiver(config) {
       s: 'SEVERITY',
       asc: 'false',
     });
+    const credentials = Buffer.from(`${config.sonarToken}:`).toString('base64');
     const response = await fetch(`${config.sonarUrl}/api/issues/search?${query}`, {
-      headers: { Authorization: `Basic ${Buffer.from(`${config.sonarToken}:`).toString('base64')}` },
+      headers: { Authorization: `Basic ${credentials}` },
     });
     if (!response.ok) throw new Error(`issues search failed: ${response.status} ${await response.text()}`);
     const { issues = [], total = 0 } = await response.json();
@@ -453,8 +454,10 @@ export async function start(config = DEFAULT_CONFIG) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  start().catch((error) => {
+  try {
+    await start();
+  } catch (error) {
     console.error(`sonar-autofix: ${error.message}`);
     process.exit(1);
-  });
+  }
 }
