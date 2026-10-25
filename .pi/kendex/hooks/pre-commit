@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Install with: scripts/install-sonar-hooks.sh
+# Judges the staged bytes of this commit with the same gate as the Write/Edit
+# hook, so a write that never went through those tools (`bash` heredoc, `sed -i`,
+# a script) is still judged. `--no-verify` and `-n` skip it; CI is the backstop.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -f "$root/sonar-project.properties" ] || exit 0
+exec node "$root/.pi/kendex/hooks/sonar-check.mjs" --staged

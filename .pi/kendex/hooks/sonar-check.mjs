@@ -211,32 +211,19 @@ function isThisProject(root) {
 	}
 }
 
-async function main() {
-	const payload = JSON.parse(readFileSync(0, "utf-8"));
-	const input = payload.tool_input ?? {};
-	if (typeof input.file_path !== "string" || input.file_path === "") return 0;
-	const root = payload.cwd ?? process.cwd();
-	if (!isThisProject(root)) return 0;
-	const absolute = isAbsolute(input.file_path) ? input.file_path : resolve(root, input.file_path);
-	// A path that escapes the checkout is not under the mount the analyzer reads
-	// from, so no verdict about it is possible here.
-	const inside = relative(root, absolute);
-	if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) return 0;
-	if (!isMeasured(inside)) return 0;
+/** The findings SonarQube reports for `content`, judged as the file it is
+ * written to. Undefined when no verdict is possible: the path is outside this
+ * project, outside `sonar.sources`, of an unanalysable language, or the
+ * analyzer could not be reached. Every no-verdict path is a pass. */
+async function analyse(absolute, root, content, relativeToRoot) {
+	if (!isThisProject(root)) return undefined;
+	if (relativeToRoot === "" || relativeToRoot.startsWith("..") || isAbsolute(relativeToRoot)) return undefined;
+	if (!isMeasured(relativeToRoot)) return undefined;
 	const language = languageOf(absolute);
-	if (language === undefined) return 0;
-
-	let content;
-	try {
-		content = prospectiveContent(payload);
-	} catch {
-		// The edit tool itself refuses this call; this gate has no opinion.
-		return 0;
-	}
-	if (content === undefined) return 0;
+	if (language === undefined) return undefined;
 
 	const session = await openSession();
-	if (session === undefined) return 0;
+	if (session === undefined) return undefined;
 
 	// The analyzer reads from disk, so the prospective content is written beside
 	// the file as the gateway can see it. Cleaned up whatever the outcome.
@@ -246,7 +233,7 @@ async function main() {
 		mkdirSync(resolve(scratch, ".."), { recursive: true });
 		writeFileSync(scratch, content);
 	} catch {
-		return 0;
+		return undefined;
 	}
 
 	const analysis = await callTool(session, "analyze_code_snippet", {
@@ -260,16 +247,88 @@ async function main() {
 	} catch {
 		// A scratch file or directory left behind is stale, not a verdict.
 	}
-	if (analysis === undefined) return 0;
+	if (analysis === undefined) return undefined;
 
 	const issues = findingsIn(analysis);
-	if (issues === undefined || issues.length === 0) return 0;
+	return issues === undefined || issues.length === 0 ? undefined : issues;
+}
+
+/** Write/Edit: the bytes the tool would put on disk, before it does. */
+async function main() {
+	const payload = JSON.parse(readFileSync(0, "utf-8"));
+	const input = payload.tool_input ?? {};
+	if (typeof input.file_path !== "string" || input.file_path === "") return 0;
+	const root = payload.cwd ?? process.cwd();
+	const absolute = isAbsolute(input.file_path) ? input.file_path : resolve(root, input.file_path);
+
+	let content;
+	try {
+		content = prospectiveContent(payload);
+	} catch {
+		// The edit tool itself refuses this call; this gate has no opinion.
+		return 0;
+	}
+	if (content === undefined) return 0;
+
+	const issues = await analyse(absolute, root, content, relative(root, absolute));
+	if (issues === undefined) return 0;
 
 	process.stderr.write(`${input.file_path} has ${issues.length} SonarQube finding(s):\n${describe(issues)}\n`);
 	return 2;
 }
 
-main().then(
+/**
+ * pre-commit: judged on the *staged* bytes, so a write that never went through
+ * the Write/Edit tools (`bash` heredoc, `sed -i`, a script) is judged too.
+ *
+ * `git commit` runs this from the top of the worktree it commits in, so the
+ * paths git reports are relative to `process.cwd()`. Nothing here is committed;
+ * a refusal leaves the index and the working tree untouched.
+ */
+async function commitGate() {
+	const root = process.cwd();
+	const staged = stagedFiles(root);
+	if (staged === undefined || staged.length === 0) return 0;
+
+	const refused = [];
+	for (const file of staged) {
+		const absolute = resolve(root, file);
+		const content = stagedContent(file);
+		if (content === undefined) continue;
+		const issues = await analyse(absolute, root, content, file);
+		if (issues === undefined) continue;
+		refused.push(`${file} has ${issues.length} SonarQube finding(s):\n${describe(issues)}`);
+	}
+	if (refused.length === 0) return 0;
+
+	process.stderr.write(`${refused.join("\n\n")}\n\nNothing was committed. Fix the findings, then commit again.\n`);
+	return 2;
+}
+
+/** Added, copied and modified files in the index, as git spells them. */
+function stagedFiles(root) {
+	try {
+		const out = execFileSync("git", ["-c", "core.quotepath=off", "diff", "--cached", "--name-only", "--diff-filter=ACM", "-z"],
+			{ cwd: root, encoding: "utf-8", timeout: 10_000 });
+		return out.split("\0").filter((path) => path !== "");
+	} catch {
+		return undefined;
+	}
+}
+
+/** The staged blob, which is what the commit would contain, or undefined when
+ * the file was deleted in the index (nothing to judge). */
+function stagedContent(file) {
+	try {
+		return execFileSync("git", ["show", `:${file}`], { encoding: "utf-8", maxBuffer: 32 * 1024 * 1024, timeout: 10_000 });
+	} catch {
+		return undefined;
+	}
+}
+
+const entry = (process.env.KENDEX_HOOK_ENTRY ?? (process.argv[2] === "--staged" ? "commit" : "tool"));
+
+(entry === "commit" ? commitGate() : main()).then(
 	(code) => process.exit(code),
 	() => process.exit(0),
 );
