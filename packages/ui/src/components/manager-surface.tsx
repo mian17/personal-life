@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
-import { Check, CircleX, Pencil, Plus, X } from 'lucide-react';
+import { Check, CircleX, Pencil, X } from 'lucide-react';
 import { cx } from '../lib/cx';
+import { CreateField } from './create-field';
 import { Input } from './input';
 import { IconButton } from './icon-button';
 import { Menu } from './menu';
@@ -57,18 +58,11 @@ export function ManagerSurface<T extends ManagerItem>({
   className,
   ...rest
 }: Readonly<ManagerSurfaceProps<T>>) {
-  const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<T['id'] | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [openId, setOpenId] = useState<T['id'] | null>(null);
-  const canCreate = draft.trim() !== '';
 
-  const create = () => {
-    const name = draft.trim();
-    if (name === '') return;
-    onCreate(name);
-    setDraft('');
-  };
+  const create = (name: string) => onCreate(name);
 
   const startEdit = (item: T) => {
     setEditingId(item.id);
@@ -87,25 +81,13 @@ export function ManagerSurface<T extends ManagerItem>({
 
   return (
     <div className={cx(classPrefix, className)} aria-label={label} {...rest}>
-      <div className={`${classPrefix}__create`}>
-        <Input
-          type="text"
-          aria-label={placeholder}
-          placeholder={placeholder}
-          value={draft}
-          disabled={disabled}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              create();
-            }
-          }}
-        />
-        <IconButton label={createLabel} disabled={disabled || !canCreate} onClick={create}>
-          <Plus size={16} aria-hidden />
-        </IconButton>
-      </div>
+      <CreateField
+        className={`${classPrefix}__create`}
+        placeholder={placeholder}
+        createLabel={createLabel}
+        disabled={disabled}
+        onCreate={create}
+      />
       <ul className={`${classPrefix}__list`}>
         {items.map((item) => (
           <li key={item.id} className={`${classPrefix}__row`}>
