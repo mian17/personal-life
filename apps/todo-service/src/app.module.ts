@@ -9,7 +9,7 @@ import { TodoTag } from './todos/todo-tag.entity';
 import { TodoCompletion } from './todos/todo-completion.entity';
 import { UserKeys } from './keys/user-keys.entity';
 import { KeysModule } from './keys/keys.module';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from '@life/service-kit';
 import { PushSubscription } from './push/push-subscription.entity';
 import { PushModule } from './push/push.module';
 import { RemindersModule } from './reminders/reminders.module';
@@ -27,7 +27,7 @@ import { RemindersModule } from './reminders/reminders.module';
     TodosModule,
     ListsModule,
     KeysModule,
-    HealthModule,
+    HealthModule.forRoot({ masterKeyEnv: 'TODO_MASTER_KEY' }),
     PushModule,
     RemindersModule,
   ],

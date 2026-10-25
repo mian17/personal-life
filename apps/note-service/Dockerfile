@@ -23,12 +23,14 @@ COPY packages/shared ./packages/shared
 COPY packages/crypto ./packages/crypto
 COPY packages/cache ./packages/cache
 COPY packages/db ./packages/db
+COPY packages/service-kit ./packages/service-kit
 COPY apps/note-service ./apps/note-service
 
 RUN npm run build -w @life/shared \
   && npm run build -w @life/db \
   && npm run build -w @life/crypto \
   && npm run build -w @life/cache \
+ && npm run build -w @life/service-kit \
   && npm run build -w @life/note-service \
   && npm prune --omit=dev
 
@@ -48,6 +50,8 @@ COPY --from=build /repo/packages/cache/package.json ./packages/cache/package.jso
 COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
 COPY --from=build /repo/packages/db/package.json ./packages/db/package.json
 COPY --from=build /repo/packages/db/dist ./packages/db/dist
+COPY --from=build /repo/packages/service-kit/package.json ./packages/service-kit/package.json
+COPY --from=build /repo/packages/service-kit/dist ./packages/service-kit/dist
 COPY --from=build /repo/apps/note-service/package.json ./package.json
 COPY --from=build /repo/apps/note-service/dist ./dist
 
