@@ -18,7 +18,8 @@ hooks="$main/.pi/kendex/hooks"
 # missing hook silently, so half a directory would look installed and gate
 # nothing. Prefer whichever copy is complete.
 complete() {
-	[ -f "$1/sonar-check.mjs" ] && [ -x "$1/pre-commit" ]
+	local dir="$1"
+	[[ -f "$dir/sonar-check.mjs" && -x "$dir/pre-commit" ]]
 }
 if ! complete "$hooks"; then
 	hooks="$toplevel/.pi/kendex/hooks"

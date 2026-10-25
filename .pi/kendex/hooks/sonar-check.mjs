@@ -42,6 +42,12 @@ const ANALYZE_TIMEOUT_MS = 110_000;
 
 // SonarQube's own language keys, read off the tool's schema. The extension
 // picks one; `docker` has none, and a `.mjs` is `js` to the analyzer.
+//
+// Shell has no key at all: this tool rejects `sh`, `bash` and `shell`, so a
+// `.sh` cannot be analysed here even though the full scan does analyse it.
+// Shell is therefore gated only by CI, which is how
+// `scripts/install-sonar-hooks.sh` reached a pull request with two findings
+// this gate would otherwise have refused.
 const BY_EXTENSION = new Map([
 	[".ts", "ts"], [".mts", "ts"], [".cts", "ts"],
 	[".tsx", "tsx"],

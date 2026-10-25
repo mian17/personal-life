@@ -9,9 +9,9 @@
 # fallback for a checkout that has its own complete `.pi/kendex/hooks`.
 # `--no-verify` and `-n` skip this; the SonarQube CI job on `dev` is the backstop.
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-[ -f "$root/sonar-project.properties" ] || exit 0
+[[ -f "$root/sonar-project.properties" ]] || exit 0
 here="$(dirname "${BASH_SOURCE[0]}")"
 gate="$here/sonar-check.mjs"
-[ -f "$gate" ] || gate="$root/.pi/kendex/hooks/sonar-check.mjs"
-[ -f "$gate" ] || exit 0
+[[ -f "$gate" ]] || gate="$root/.pi/kendex/hooks/sonar-check.mjs"
+[[ -f "$gate" ]] || exit 0
 exec node "$gate" --staged
