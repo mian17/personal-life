@@ -287,9 +287,9 @@ export class NotesService {
    * A set with no `enc.v1.` body is all-legacy (or empty), so no key is needed
    * and the rows pass through `openField` untouched (dual-read).
    */
-  private async readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
     const needs = rows.some((r) => r.body.startsWith(ENC_PREFIX));
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.requireKeys().getDekForRead(sub);
   }
 
