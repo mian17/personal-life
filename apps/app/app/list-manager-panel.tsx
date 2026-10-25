@@ -16,12 +16,12 @@ export function ImportantDefaultSwitch({
   name,
   importantDefault,
   version,
-}: {
+}: Readonly<{
   id: string;
   name: string;
   importantDefault: boolean | null;
   version?: number;
-}) {
+}>) {
   const [on, setOn] = useState(importantDefault ?? false);
   const persisted = useRef(importantDefault ?? false);
   const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);
@@ -43,10 +43,35 @@ export function ImportantDefaultSwitch({
 }
 
 /**
+ * The extra settings row a managed list carries: its "Important by default"
+ * switch. Hoisted out of `ListManagerPanel` so the row is a stable component
+ * identity (and the switch keeps its state across re-renders of the panel).
+ */
+function ListRowExtra({
+  id,
+  name,
+  list,
+}: Readonly<{ id: string; name: string; list: List | undefined }>) {
+  return (
+    <SettingsRow
+      label="Important by default"
+      control={
+        <ImportantDefaultSwitch
+          id={id}
+          name={name}
+          importantDefault={list?.importantDefault ?? null}
+          version={list?.version}
+        />
+      }
+    />
+  );
+}
+
+/**
  * The todo-local list management surface (`ListManager` upstream primitive),
  * wired to todo-service through the shared server actions.
  */
-export function ListManagerPanel({ lists }: { lists: List[] }) {
+export function ListManagerPanel({ lists }: Readonly<{ lists: List[] }>) {
   return (
     <ListManager
       lists={lists.map((list) => ({ id: list.id, name: list.name }))}
@@ -56,22 +81,13 @@ export function ListManagerPanel({ lists }: { lists: List[] }) {
         void renameListAction(id, name, list?.importantDefault ?? false, list?.version);
       }}
       onDelete={(id) => void deleteListAction(id)}
-      rowExtra={(option) => {
-        const list = lists.find((candidate) => candidate.id === option.id);
-        return (
-          <SettingsRow
-            label="Important by default"
-            control={
-              <ImportantDefaultSwitch
-                id={option.id}
-                name={option.name}
-                importantDefault={list?.importantDefault ?? null}
-                version={list?.version}
-              />
-            }
-          />
-        );
-      }}
+      rowExtra={(option) => (
+        <ListRowExtra
+          id={option.id}
+          name={option.name}
+          list={lists.find((candidate) => candidate.id === option.id)}
+        />
+      )}
     />
   );
 }

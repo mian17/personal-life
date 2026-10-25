@@ -50,7 +50,7 @@ export function Autosuggest({
   minChars = 3,
   debounceMs = 0,
   maxVisible = 8,
-}: AutosuggestProps) {
+}: Readonly<AutosuggestProps>) {
   const [text, setText] = useState('');
   const [highlight, setHighlight] = useState(-1);
   const [dismissed, setDismissed] = useState(false);
@@ -259,9 +259,7 @@ export function Autosuggest({
           style={{ positionAnchor: anchorName, '--ui-autosuggest-rows': maxVisible } as CSSProperties}
         >
           {options.length === 0 ? (
-            <p className="ui-autosuggest__empty" role="status">
-              {emptyLabel}
-            </p>
+            <output className="ui-autosuggest__empty">{emptyLabel}</output>
           ) : (
             options.map((option, index) => (
               <div

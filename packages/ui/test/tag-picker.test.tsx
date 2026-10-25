@@ -12,7 +12,10 @@ describe('TagPicker', () => {
   it('renders a labelled group with one toggle button per tag', () => {
     render(<TagPicker tags={TAGS} selectedIds={[]} onToggle={() => {}} />);
     const group = screen.getByRole('group', { name: 'Tags' });
-    expect(group.tagName).toBe('DIV');
+    // `fieldset` carries the grouping natively, so the role is real rather than
+    // patched onto a div (S6819); the visible label arrives as its `legend`.
+    expect(group.tagName).toBe('FIELDSET');
+    expect(group.querySelector('legend')?.textContent).toBe('Tags');
     // Toggle pills render as real buttons: they change state in place, they do
     // not navigate, so a button is the element that carries the right semantics
     // (focusable, Enter/Space activation) without a role patched onto an anchor.

@@ -766,14 +766,27 @@
 
 /* -------------------------------------------------------- TagPicker */
 
-/* A picker is a labelled region: the label sits BESIDE the chips (one row,
-   the `PillGroup` pattern) so it reads as a labelled control, not an orphan
-   row. `align-items: baseline` keeps the label on the chips' text line. */
-.ui-tag-picker__row {
+/* A picker is a labelled region: `fieldset` is the element that carries the
+   grouping natively, so its UA border/padding/margin are reset and the label
+   becomes a `legend` laid BESIDE the chips (the `PillGroup` pattern) — one row,
+   reading as a labelled control rather than an orphan caption row.
+   `align-items: baseline` keeps the label on the chips' text line. */
+.ui-tag-picker {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-0-5);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* `legend` is floated/`display: block` in UA styles; `contents` keeps the
+   label's text in the flex row without the legend box breaking the line. */
+.ui-tag-picker__label {
+  display: inline;
+  padding: 0;
 }
 
 .ui-tag-picker__tags {
