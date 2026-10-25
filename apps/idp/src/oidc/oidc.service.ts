@@ -118,7 +118,7 @@ export class OidcService {
         // Resolve the account id (our User.id) to claims for the id_token/userinfo.
         findAccount: (_ctx, id) => ({
           accountId: id,
-          claims: async () => ({ sub: id }),
+          claims: () => Promise.resolve({ sub: id }),
         }),
         loadExistingGrant,
         features: {

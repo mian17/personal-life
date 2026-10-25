@@ -30,7 +30,7 @@ export class FeedbackCache {
   }
 
   /** Read-through one of this owner's entries; `loader` returns stored rows. */
-  async getThrough<T>(
+  getThrough<T>(
     sub: string,
     rest: string,
     loader: () => Promise<T>,

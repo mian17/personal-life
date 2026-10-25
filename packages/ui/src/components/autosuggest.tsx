@@ -148,53 +148,80 @@ export function Autosuggest({
     else setHighlight(-1);
   }
 
+  /** Alt+ArrowDown opens the popup without taking a highlight. */
+  function openWithoutHighlight(event: KeyboardEvent<HTMLInputElement>) {
+    if (!longEnough) return;
+    setDismissed(false);
+    event.preventDefault();
+  }
+
+  /** ArrowDown opens the popup on its first row, or walks an open one down. */
+  function moveDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) {
+      if (!canOpen) return;
+      setDismissed(false);
+      setHighlight(options.length > 0 ? 0 : -1);
+    } else {
+      setHighlight((index) => (index < options.length - 1 ? index + 1 : index));
+    }
+    event.preventDefault();
+  }
+
+  function moveUp(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) return;
+    setHighlight((index) => (index > 0 ? index - 1 : 0));
+    event.preventDefault();
+  }
+
+  function moveToEdge(key: string, event: KeyboardEvent<HTMLInputElement>) {
+    if (!open || options.length === 0) return;
+    setHighlight(key === 'Home' ? 0 : options.length - 1);
+    event.preventDefault();
+  }
+
+  function pickHighlighted(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open || highlight < 0 || highlight >= options.length) return;
+    select(options[highlight]);
+    event.preventDefault();
+  }
+
+  function escapeOrClear(event: KeyboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    // First Escape closes the popup, the next one (already closed) clears the field.
+    if (open) setDismissed(true);
+    else clear();
+  }
+
+  function leaveField() {
+    if (open && highlight >= 0 && highlight < options.length) select(options[highlight]);
+    setDismissed(true);
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     const { key } = event;
-
     if (key === 'ArrowDown' && event.altKey) {
-      // Opens the popup without taking a highlight.
-      if (!longEnough) return;
-      setDismissed(false);
-      event.preventDefault();
+      openWithoutHighlight(event);
       return;
     }
-
     switch (key) {
       case 'ArrowDown':
-        if (!open) {
-          if (!canOpen) return;
-          setDismissed(false);
-          setHighlight(options.length > 0 ? 0 : -1);
-        } else {
-          setHighlight((index) => (index < options.length - 1 ? index + 1 : index));
-        }
-        event.preventDefault();
+        moveDown(event);
         return;
       case 'ArrowUp':
-        if (!open) return;
-        setHighlight((index) => (index > 0 ? index - 1 : 0));
-        event.preventDefault();
+        moveUp(event);
         return;
       case 'Home':
       case 'End':
-        if (!open || options.length === 0) return;
-        setHighlight(key === 'Home' ? 0 : options.length - 1);
-        event.preventDefault();
+        moveToEdge(key, event);
         return;
       case 'Enter':
-        if (!open || highlight < 0 || highlight >= options.length) return;
-        select(options[highlight]);
-        event.preventDefault();
+        pickHighlighted(event);
         return;
       case 'Escape':
-        event.preventDefault();
-        // First Escape closes the popup, the next one (already closed) clears the field.
-        if (open) setDismissed(true);
-        else clear();
+        escapeOrClear(event);
         return;
       case 'Tab':
-        if (open && highlight >= 0 && highlight < options.length) select(options[highlight]);
-        setDismissed(true);
+        leaveField();
         return;
       default:
         return;

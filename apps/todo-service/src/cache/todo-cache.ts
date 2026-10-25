@@ -59,7 +59,7 @@ export class TodosCache {
   }
 
   /** Read-through one of the owner's four entries; `loader` returns stored rows. */
-  async getThrough<T>(
+  getThrough<T>(
     sub: string,
     rest: string,
     loader: () => Promise<T>,

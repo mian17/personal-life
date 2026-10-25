@@ -36,7 +36,7 @@ export class HealthService {
 
   async readiness(): Promise<HealthBody> {
     await this.assertDatabaseReachable();
-    await this.assertKeyCustodyConfigured();
+    this.assertKeyCustodyConfigured();
     return { status: 'ok' };
   }
 

@@ -43,7 +43,7 @@ export class MealCache {
     this.inner = createCache({ service: SERVICE, client });
   }
 
-  async getThrough<T>(
+  getThrough<T>(
     sub: string,
     baseKey: string,
     loader: () => Promise<T>,

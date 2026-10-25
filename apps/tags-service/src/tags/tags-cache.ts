@@ -48,7 +48,7 @@ export class TagsCache {
   }
 
   /** Read-through the owner's single row-set entry; `loader` returns ciphertext rows. */
-  async getThrough<T>(
+  getThrough<T>(
     sub: string,
     loader: () => Promise<T>,
     options: CacheHitOptions<T> = {},
