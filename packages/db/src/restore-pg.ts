@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { connect } from 'node:net';
 import { isAbsolute, join, relative, resolve, dirname } from 'node:path';
 import { readManifest } from './backup';
 import type { PgManifestEntry } from './backup-pg';
@@ -12,6 +11,7 @@ import {
   tableCounts,
 } from './pg-client';
 import type { PgIdentity, PgRunner } from './pg-client';
+import { defaultProbe } from './restore';
 import type { StackProbe, StackState } from './restore';
 
 /**
@@ -24,7 +24,6 @@ import type { StackProbe, StackState } from './restore';
  */
 
 const STACK_PORTS: readonly number[] = [3002, 3003];
-const STACK_PROBE_TIMEOUT_MS = 1000;
 
 /** Exit 1: a usage or precondition / post-check failure. */
 class RestorePgError extends Error {}
@@ -65,32 +64,6 @@ function parseOnly(argv: string[]): string | undefined {
   return raw;
 }
 
-/**
- * Default stack probe (spec "Restore safety check"): the same read-only TCP probe as
- * `src/restore.ts`'s — `127.0.0.1` ports, one-second timeout, `connect` → `up`,
- * `ECONNREFUSED` → `down`, anything else / timeout → `unknown`. Never kills or spawns.
- * (`ponytail:` the SQLite variant owns the identical probe but keeps it private, so this
- * is a local copy; export `defaultProbe` from `src/restore.ts` once editing that file is
- * allowed.)
- */
-function defaultProbe(port: number): Promise<StackState> {
-  return new Promise((settle) => {
-    const socket = connect({ host: '127.0.0.1', port });
-    let done = false;
-    const finish = (state: StackState) => {
-      if (done) return;
-      done = true;
-      socket.destroy();
-      settle(state);
-    };
-    socket.setTimeout(STACK_PROBE_TIMEOUT_MS);
-    socket.once('connect', () => finish('up'));
-    socket.once('timeout', () => finish('unknown'));
-    socket.once('error', (err: NodeJS.ErrnoException) =>
-      finish(err.code === 'ECONNREFUSED' ? 'down' : 'unknown'),
-    );
-  });
-}
 
 /**
  * The authoritative "database in use" signal, run inside the container: other backends
@@ -166,7 +139,9 @@ function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string, database: stri
  * Probed concurrently: the ports are independent checks, and a sequential loop
  * would only add latency before the same refusal. */
 async function assertStackStopped(probe: StackProbe): Promise<void> {
-  const states = await Promise.all(STACK_PORTS.map(async (port) => probe(port)));
+  const states = await Promise.all(
+    STACK_PORTS.map((port) => Promise.resolve(probe(port))),
+  );
   for (const [index, state] of states.entries()) {
     const port = STACK_PORTS[index];
     if (state === 'up') throw new StackRunningError(`stack appears up on 127.0.0.1:${port}`);
@@ -263,7 +238,7 @@ function assertRowCountsMatch(
   preRestorePath: string,
 ): void {
   const snapshotManifest = readManifest(fromDir) as { databases?: PgManifestEntry[] } | null;
-  const expected = snapshotManifest?.databases?.[0]?.tables;
+  const expected: Record<string, number> | undefined = snapshotManifest?.databases?.[0]?.tables;
   if (!expected || Object.keys(expected).length === 0) return;
   const restored = tableCounts(runner, db);
   for (const [table, count] of Object.entries(expected)) {
@@ -286,6 +261,8 @@ export async function runRestorePg(options: {
   now?: () => Date;
 }): Promise<RestorePgResult> {
   const env = options.env ?? process.env;
+  // The SQLite variant owns the identical read-only TCP probe, so this reuses it
+  // instead of keeping a local copy.
   const probe = options.probe ?? defaultProbe;
   const db = resolveFeedbackDb(env);
   assertOnlyMatchesDatabase(options.only, db.database);
