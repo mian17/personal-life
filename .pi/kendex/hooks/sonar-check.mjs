@@ -8,9 +8,19 @@
 // quote and dash folding, BOM handling and line-ending restoration all behave
 // exactly as they do on the real call.
 //
-// Exit 0 allows; exit 2 refuses with the reason on stderr. Every unexpected
-// path exits 0 as well. A gate that fails shut on a SonarQube restart stops all
-// work, and one finding arriving late is the smaller failure.
+// Exit 0 allows; exit 2 refuses with the reason on stderr.
+//
+// A path this gate does not measure (outside the project, outside
+// `sonar.sources`, a language SonarQube cannot parse) is allowed: it is not a
+// verdict about code quality, it is this gate not having business there.
+//
+// A path it DOES measure and cannot analyse — the MCP gateway is down, the
+// session could not be opened, the tool did not answer — is the opposite case:
+// silence would be mistaken for a clean file. Those refuse. Set
+// KENDEX_SONAR_FAIL_OPEN=1 to restore the earlier fail-open behaviour (allow);
+// it exists because a gate that stops all work when a container restarts is its
+// own outage, and that was the stated preference before delegated children made
+// a silent pass more dangerous than a blocked write.
 
 import { createRequire } from "node:module";
 import { readFileSync, mkdirSync, writeFileSync, rmSync, rmdirSync } from "node:fs";
@@ -23,6 +33,10 @@ const MCP_URL = "http://mcp-gateway.docker.internal/mcp";
 // path outside it. Host-absolute paths ("/home/night/...") are rejected, so
 // every path this hook sends is relative to the mount root.
 const MOUNT_ROOT = "/app/mcp-workspace";
+/** A path this gate measures but cannot get a verdict for. Distinct from
+ * `undefined`, which means the gate has no business with the path at all. */
+const UNAVAILABLE = Symbol("sonar-gate-unavailable");
+const FAIL_OPEN = process.env.KENDEX_SONAR_FAIL_OPEN === "1";
 const PROBE_TIMEOUT_MS = 4000;
 const ANALYZE_TIMEOUT_MS = 110_000;
 
@@ -223,7 +237,7 @@ async function analyse(absolute, root, content, relativeToRoot) {
 	if (language === undefined) return undefined;
 
 	const session = await openSession();
-	if (session === undefined) return undefined;
+	if (session === undefined) return UNAVAILABLE;
 
 	// The analyzer reads from disk, so the prospective content is written beside
 	// the file as the gateway can see it. Cleaned up whatever the outcome.
@@ -247,10 +261,19 @@ async function analyse(absolute, root, content, relativeToRoot) {
 	} catch {
 		// A scratch file or directory left behind is stale, not a verdict.
 	}
-	if (analysis === undefined) return undefined;
+	if (analysis === undefined) return UNAVAILABLE;
 
 	const issues = findingsIn(analysis);
 	return issues === undefined || issues.length === 0 ? undefined : issues;
+}
+
+function unavailableText(file) {
+	return `${file} could not be analysed: the SonarQube gateway is unreachable or the tool did not answer.`;
+}
+
+/** Whether an unavailable verdict should refuse this run. */
+function refusesWhenUnavailable() {
+	return !FAIL_OPEN;
 }
 
 /** Write/Edit: the bytes the tool would put on disk, before it does. */
@@ -272,6 +295,11 @@ async function main() {
 
 	const issues = await analyse(absolute, root, content, relative(root, absolute));
 	if (issues === undefined) return 0;
+	if (issues === UNAVAILABLE) {
+		if (!refusesWhenUnavailable()) return 0;
+		process.stderr.write(`${unavailableText(input.file_path)}\nSet KENDEX_SONAR_FAIL_OPEN=1 to allow this write.\n`);
+		return 2;
+	}
 
 	process.stderr.write(`${input.file_path} has ${issues.length} SonarQube finding(s):\n${describe(issues)}\n`);
 	return 2;
@@ -297,11 +325,18 @@ async function commitGate() {
 		if (content === undefined) continue;
 		const issues = await analyse(absolute, root, content, file);
 		if (issues === undefined) continue;
+		if (issues === UNAVAILABLE) {
+			if (refusesWhenUnavailable()) refused.push(unavailableText(file));
+			continue;
+		}
 		refused.push(`${file} has ${issues.length} SonarQube finding(s):\n${describe(issues)}`);
 	}
 	if (refused.length === 0) return 0;
 
-	process.stderr.write(`${refused.join("\n\n")}\n\nNothing was committed. Fix the findings, then commit again.\n`);
+	const remedy = FAIL_OPEN
+		? "Nothing was committed."
+		: "Nothing was committed. Fix any findings above; if something could not be analysed, retry once the gateway is back, or set KENDEX_SONAR_FAIL_OPEN=1 to commit anyway.";
+	process.stderr.write(`${refused.join("\n\n")}\n\n${remedy}\n`);
 	return 2;
 }
 
