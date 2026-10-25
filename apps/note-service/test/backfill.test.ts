@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { decryptField, encryptField, unwrapDek, wrapDek } from '@life/crypto';
 import { Note } from '../src/notes/note.entity';
 import { NoteTag } from '../src/notes/note-tag.entity';
-import { UserKeys } from '../src/keys/user-keys.entity';
+import { UserKeys } from '@life/service-kit';
 import {
   BackfillRowError,
   applyBackfill,

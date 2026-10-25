@@ -10,7 +10,6 @@ import {
   HealthController,
   HealthModule,
 } from '../src/index';
-import * as appPublicDecorator from '../../../apps/note-service/src/auth/public.decorator';
 
 const MASTER_KEY_ENV = 'SERVICE_KIT_TEST_MASTER_KEY';
 
@@ -51,9 +50,9 @@ describe('@life/service-kit health', () => {
 
   it('pins the public metadata key the service guards read', () => {
     // The kit ships its own `Public` so the package imports nothing from an app.
-    // That is only safe while both sides agree on the literal, which this asserts.
+    // The literal is the cross-package contract: every service's `@Public()` and
+    // this package's guard must agree on it for the exemption to work.
     expect(IS_PUBLIC_KEY).toBe('auth:isPublic');
-    expect(IS_PUBLIC_KEY).toBe(appPublicDecorator.IS_PUBLIC_KEY);
   });
 
   it('marks the health routes public so probes never need credentials', () => {

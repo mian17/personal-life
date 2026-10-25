@@ -3,14 +3,15 @@ import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AppModule } from './app.module';
-import { AuthGuard } from './auth/auth.guard';
+import { AuthGuard } from '@life/service-kit';
+import { VERIFIER_ENV } from './service-config';
 
 export async function createApp(): Promise<INestApplication> {
   mkdirSync(dirname(process.env.DB_PATH ?? join(process.cwd(), 'data', 'todo.db')), {
     recursive: true,
   });
   const app = await NestFactory.create(AppModule);
-  app.useGlobalGuards(new AuthGuard());
+  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );

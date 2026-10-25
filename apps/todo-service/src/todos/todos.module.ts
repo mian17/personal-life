@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { TodoCacheModule } from '../cache/todo-cache.module';
 import { ListsModule } from '../lists/lists.module';
 import { Todo } from './todo.entity';
@@ -17,7 +18,7 @@ import { TodosService } from './todos.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Todo, TodoTag, TodoCompletion]),
-    KeysModule,
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     TodoCacheModule,
     ListsModule,
   ],

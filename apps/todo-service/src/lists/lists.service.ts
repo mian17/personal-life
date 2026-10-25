@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 
 /** The list DTO (`SPEC-todo-service` API): `version` is the OCC counter. */

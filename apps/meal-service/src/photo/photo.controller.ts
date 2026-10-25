@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { EstimatePhotoDto } from './dto/estimate-photo.dto';
 import { PhotoService } from './photo.service';
 

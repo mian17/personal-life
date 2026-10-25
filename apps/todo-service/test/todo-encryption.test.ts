@@ -3,9 +3,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { CryptoError, ENC_PREFIX, wrapDek } from '@life/crypto';
-import { createMasterKey } from '../src/keys/keys.module';
-import { MASTER_KEY_ENV } from '../src/keys/keys.service';
-import { UserKeys } from '../src/keys/user-keys.entity';
+import { createMasterKey, UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../src/service-config';
 import { Todo } from '../src/todos/todo.entity';
 import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
 
@@ -202,8 +201,8 @@ describe('master-key bootstrap', () => {
   it('fails closed when the master key env var is missing', () => {
     delete process.env[MASTER_KEY_ENV];
 
-    expect(() => createMasterKey()).toThrow(CryptoError);
-    expect(() => createMasterKey()).toThrow(new RegExp(MASTER_KEY_ENV));
+    expect(() => createMasterKey(MASTER_KEY_ENV)).toThrow(CryptoError);
+    expect(() => createMasterKey(MASTER_KEY_ENV)).toThrow(new RegExp(MASTER_KEY_ENV));
   });
 
   it('fails closed on a wrong-length key without leaking key material', () => {
@@ -212,7 +211,7 @@ describe('master-key bootstrap', () => {
 
     let message = '';
     try {
-      createMasterKey();
+      createMasterKey(MASTER_KEY_ENV);
     } catch (err) {
       message = (err as Error).message;
     }

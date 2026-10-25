@@ -5,7 +5,7 @@ import { IsNull, Not, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { Note } from './note.entity';
 import { NoteTag } from './note-tag.entity';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
 import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';

@@ -4,8 +4,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { KeysService } from '../src/keys/keys.service';
-import { UserKeys } from '../src/keys/user-keys.entity';
+import { KeysService, UserKeys } from '@life/service-kit';
 import { Note } from '../src/notes/note.entity';
 import { NoteTag } from '../src/notes/note-tag.entity';
 import { NotesCache } from '../src/notes/notes-cache';
@@ -75,7 +74,14 @@ async function sqliteLike(ds: DataSource, text: string, pattern: string): Promis
   return Number(rows[0].m) === 1;
 }
 
-/** Create a note through the service, then pin its `createdAt` for ordering tests. */
+/**
+ * Create a note through the service, then pin its list timestamp for ordering
+ * tests. The list ranks by `contentUpdatedAt ?? createdAt` (`listTimestampOf`),
+ * and `create` always stamps `contentUpdatedAt`, so pinning `createdAt` alone
+ * would leave the ranking key at "now" and the ordering assertions would be
+ * checking uuid order instead. Pin both, so "this note is older" means what the
+ * test says it means.
+ */
 async function seedNote(
   h: Harness,
   body: string,
@@ -84,7 +90,9 @@ async function seedNote(
 ): Promise<{ id: string }> {
   const dto = await h.service.create(SUB, body, tagIds);
   if (createdAt) {
-    await h.dataSource.getRepository(Note).update(dto.id, { createdAt });
+    await h.dataSource
+      .getRepository(Note)
+      .update(dto.id, { createdAt, contentUpdatedAt: createdAt });
   }
   return dto;
 }

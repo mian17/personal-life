@@ -5,14 +5,17 @@ import { CryptoError, generateDek, unwrapDek, wrapDek } from '@life/crypto';
 import { UserKeys } from './user-keys.entity';
 
 /** DI token for the process-wide master key (a 32-byte `Buffer`). */
-export const MASTER_KEY = Symbol('MEAL_MASTER_KEY');
+export const MASTER_KEY = Symbol('SERVICE_KIT_MASTER_KEY');
 
-/** Env var holding the base64 32-byte master key (fail-closed bootstrap). */
-export const MASTER_KEY_ENV = 'MEAL_MASTER_KEY';
+/** What a service must tell the kit: the env var holding its master key. */
+export interface KeysOptions {
+  /** e.g. `MEAL_MASTER_KEY`; loaded fail-closed at bootstrap. */
+  masterKeyEnv: string;
+}
 
 /**
- * DEK custody for meal-service at-rest content (`SPEC-meal-service` "Boundaries"
- * / Contract 2, mirroring note-service's pattern byte-for-byte so the at-rest
+ * DEK custody for at-rest content, shared by every service (Contract 2,
+ * mirroring note-service's original pattern byte-for-byte so the at-rest
  * discipline is uniform):
  *
  * - Provisioning is lazy: the first content write for a `sub` generates a fresh

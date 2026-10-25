@@ -1,15 +1,27 @@
 import { createRemoteJWKSet, jwtVerify, errors, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 
 /**
- * Bearer-JWT verification for this resource server. Tokens are verified
- * offline against the IdP's JWKS — signature, `iss`, `aud`, and `exp` — with a
- * 30s clock skew (recorded decision). Any doubt fails closed.
+ * Bearer-JWT verification for every resource server in the ecosystem. Tokens are
+ * verified offline against the IdP's JWKS — signature, `iss`, `aud`, and `exp` —
+ * with a 30s clock skew (recorded decision). Any doubt fails closed.
  *
  * Key rotation is handled by `jose`: the cached key set is refreshed when a
  * token's `kid` is unknown, bounded by a cooldown so an attacker cannot force
  * unbounded refetches (see createRemoteJWKSet docs — `cacheMaxAge` default
  * 10min, `cooldownDuration` default 30s).
+ *
+ * Each service states its own two env names, so one implementation serves all of
+ * them without a per-service copy: pass `{ jwksUrlEnv: 'MEAL_IDP_JWKS_URL',
+ * audienceEnv: 'MEAL_SERVICE_AUDIENCE' }` and the shared code reads the right vars.
  */
+
+/** The two service-specific env var names the shared verifier reads. */
+export interface VerifierEnvNames {
+  /** e.g. `MEAL_IDP_JWKS_URL`; overrides the `<IDP_ISSUER>/jwks` derivation. */
+  jwksUrlEnv: string;
+  /** e.g. `MEAL_SERVICE_AUDIENCE`; the ecosystem shares one `life-api` audience. */
+  audienceEnv: string;
+}
 
 export interface VerifierConfig {
   issuer: string;
@@ -23,17 +35,18 @@ export interface VerifierConfig {
   jwksCooldownMs: number;
 }
 
-export function resolveVerifierConfig(env: NodeJS.ProcessEnv = process.env): VerifierConfig {
+export function resolveVerifierConfig(
+  envNames: VerifierEnvNames,
+  env: NodeJS.ProcessEnv = process.env,
+): VerifierConfig {
   const issuer = env.IDP_ISSUER?.trim();
   if (!issuer) {
     throw new Error('IDP_ISSUER is not set');
   }
-  // IDP_JWKS_URL overrides the default `<IDP_ISSUER>/jwks` derivation.
-  const jwksUrl = env.IDP_JWKS_URL?.trim() || new URL('/jwks', issuer).href;
   return {
     issuer,
-    jwksUrl,
-    audience: env.NOTE_SERVICE_AUDIENCE?.trim() || 'life-api',
+    jwksUrl: env[envNames.jwksUrlEnv]?.trim() || new URL('/jwks', issuer).href,
+    audience: env[envNames.audienceEnv]?.trim() || 'life-api',
     clockToleranceS: 30,
     jwksCacheMaxAgeMs: Number(env.IDP_JWKS_CACHE_MAX_AGE_MS ?? 10 * 60 * 1000),
     jwksCooldownMs: Number(env.IDP_JWKS_COOLDOWN_MS ?? 30 * 1000),

@@ -5,7 +5,8 @@ import type { Request } from 'express';
  * The authenticated identity of a request: the IdP `sub` of the verified access
  * token (or the `dev-user` constant produced by the `NODE_ENV=development`
  * bypass). Set by `AuthGuard`; handlers read it via `@Principal()`. It is opaque
- * here — never parsed, never logged (owner boundary, `SPEC-feedback-service`).
+ * here — never parsed, never logged. `ownerSub` always comes from `@Principal()`,
+ * never from a request body.
  */
 export interface Principal {
   sub: string;

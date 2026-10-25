@@ -5,7 +5,7 @@ import {
   NotesCache,
 } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { ENC_PREFIX, encryptField, generateDek, wrapDek } from '@life/crypto';
 import { FakeRedisClient, FailingRedisClient } from './fake-redis';
 

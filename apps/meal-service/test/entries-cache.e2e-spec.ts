@@ -4,7 +4,7 @@ import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { MealCache, generationKey } from '../src/cache/meal-cache';
 import { EntriesCache } from '../src/entries/entries-cache';
 import { EntriesService } from '../src/entries/entries.service';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto';
 import type { Entry } from '../src/entries/entry.entity';
 import type { CacheClient } from '@life/cache';

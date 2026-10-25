@@ -6,8 +6,7 @@ import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { Note } from '../src/notes/note.entity';
 import { NoteTag } from '../src/notes/note-tag.entity';
-import { UserKeys } from '../src/keys/user-keys.entity';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService, UserKeys } from '@life/service-kit';
 import { NotesCache } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
 import { applySurgery } from '../../tags-service/src/tags/import';
@@ -174,7 +173,7 @@ describe('tags-extraction T5: NoteTag entity + synchronize stability', () => {
 
   /** The post-`owner-backfill`, pre-surgery note DB shape (the migration's input). */
   const PRE_MIGRATION_SCHEMA = `
-CREATE TABLE "note" ("id" varchar PRIMARY KEY NOT NULL, "body" text NOT NULL, "ownerSub" text, "version" integer NOT NULL DEFAULT (0), "deletedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE "note" ("id" varchar PRIMARY KEY NOT NULL, "body" text NOT NULL, "ownerSub" text, "version" integer NOT NULL DEFAULT (0), "deletedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "contentUpdatedAt" datetime);
 CREATE INDEX "IDX_note_owner_sub" ON "note" ("ownerSub");
 CREATE TABLE "tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text);
 CREATE TABLE "note_tag" ("noteId" varchar NOT NULL, "tagId" integer NOT NULL, CONSTRAINT "FK_ddfc0b18dcc060cb8899a249910" FOREIGN KEY ("noteId") REFERENCES "note" ("id") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "FK_0d23f466571ec62e5c103785f06" FOREIGN KEY ("tagId") REFERENCES "tag" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, PRIMARY KEY ("noteId", "tagId"));

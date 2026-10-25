@@ -29,7 +29,7 @@ import {
   nextOccurrence,
   parseRepeatDays,
 } from './recurrence';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { ListsService } from '../lists/lists.service';
 import {
   TODO_ALL,

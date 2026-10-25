@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
 import { SavedMealsService } from './saved-meals.service';
 

@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { Entry } from './entry.entity';
 import { EntriesController } from './entries.controller';
 import { EntriesCache } from './entries-cache';
 import { EntriesService } from './entries.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Entry]), KeysModule],
+  imports: [TypeOrmModule.forFeature([Entry]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
   controllers: [EntriesController],
   providers: [
     // Composition, not a second client: the service's ONE adapter is provided

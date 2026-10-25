@@ -1,13 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { Feedback } from './feedback.entity';
 import { FeedbackController } from './feedback.controller';
 import { FEEDBACK_CACHE, createFeedbackCache } from './feedback-cache';
 import { FeedbackService } from './feedback.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Feedback]), KeysModule],
+  imports: [
+    TypeOrmModule.forFeature([Feedback]),
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+  ],
   controllers: [FeedbackController],
   providers: [
     // Selection happens once at module init: REDIS_URL unset keeps the

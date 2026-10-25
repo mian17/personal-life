@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { Food } from './food.entity';
 import { Serving } from './serving.entity';
 import { FoodsController } from './foods.controller';
@@ -9,7 +10,7 @@ import { FoodsCache } from './foods-cache';
 import { FoodsService } from './foods.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Food, Serving]), KeysModule],
+  imports: [TypeOrmModule.forFeature([Food, Serving]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
   controllers: [FoodsController],
   exports: [FoodsService],
   providers: [

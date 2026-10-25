@@ -12,40 +12,48 @@ import {
   verifyAccessToken,
   type JwksResolver,
   type VerifierConfig,
+  type VerifierEnvNames,
 } from './jwt-verifier';
 import type { AuthenticatedRequest, Principal } from './principal';
-import { IS_PUBLIC_KEY } from './public.decorator';
+import { IS_PUBLIC_KEY } from '../public.decorator';
 
 /**
- * JWT-only auth guard for meal-service. Every request must carry a valid
+ * JWT-only auth guard shared by every service. Each request must carry a valid
  * IdP-issued access token, verified offline via JWKS — signature, `iss`, `aud`,
  * `exp` — with a 30s clock skew. Any doubt fails closed; the token is never
  * logged.
  *
- * A route marked `@Public()` (health probes) skips the check entirely —
- * probes cannot log in. `Reflector` is resolved with a default so the bare
- * `new AuthGuard()` construction keeps working in tests and modules that do
- * not provide it.
+ * A route marked `@Public()` (health probes) skips the check entirely — probes
+ * cannot log in. `Reflector` is resolved with a default so the guard can be
+ * constructed directly (`new AuthGuard(envNames)`) in `app.factory` and in tests
+ * without Nest's injector.
  *
  * On success the verified `sub` is propagated as `request.principal`, and a
  * verified token without a usable `sub` is rejected with 401: claims without
- * identity are unauthenticated, and `sub` becomes an owner filter downstream
- * (`SPEC-meal-service` Code Style).
+ * identity are unauthenticated, and `sub` becomes an owner filter downstream.
+ *
+ * The two service-specific env var names arrive as `envNames`, so this one class
+ * serves every service without a per-service copy of the verification logic.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
   private resolver?: JwksResolver;
   private config?: VerifierConfig;
 
-  constructor(private readonly reflector: Reflector = new Reflector()) {}
+  constructor(
+    private readonly envNames: VerifierEnvNames,
+    private readonly reflector: Reflector = new Reflector(),
+  ) {}
 
   canActivate(context: ExecutionContext): Promise<boolean> | boolean {
     // Explicit `@Public()` exemption before any credential parsing: a public
     // route answers regardless of `NODE_ENV` and never inspects a token.
-    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])) {
+    if (
+      this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
       return true;
     }
 
@@ -69,7 +77,7 @@ export class AuthGuard implements CanActivate {
   private async verifyJwt(req: AuthenticatedRequest, token: string): Promise<boolean> {
     if (!this.config) {
       try {
-        this.config = resolveVerifierConfig();
+        this.config = resolveVerifierConfig(this.envNames);
       } catch {
         // Verification is not configured in this environment; fail closed.
         throw new UnauthorizedException();
