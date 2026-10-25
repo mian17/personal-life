@@ -32,6 +32,13 @@ const DEV_SEED_PASSWORD = 'dev-password-not-a-secret';
  * production-refusal test before this gate). `process.loadEnvFile` assigns only
  * unset keys, so explicit env always wins even when the file is loaded.
  */
+/** A username or path reaching these logs comes from the environment, so it is
+ * reduced to one printable line first: a value carrying a newline would forge
+ * extra log lines. Allowlist, not a control-byte denylist. */
+function oneLine(value: string): string {
+  return value.replace(/[^\u0020-\u007e]+/g, ' ').trim();
+}
+
 function loadDevEnvFile(): void {
   if (process.env.SEED_LOAD_DEV_ENV !== '1') return;
   try {
@@ -63,7 +70,7 @@ async function main(): Promise<void> {
   // `data/idp.db`, `./data/idp.db`, and absolute equivalents all count.
   if (!isProduction && isProductionDbPath(dbPath)) {
     console.error(
-      `refusing to seed the production identity DB (${dbPath}) without NODE_ENV=production; ` +
+      `refusing to seed the production identity DB (${oneLine(dbPath)}) without NODE_ENV=production; ` +
         'production seeding requires NODE_ENV=production',
     );
     process.exitCode = 1;
@@ -73,7 +80,7 @@ async function main(): Promise<void> {
   // Announce the mode and target loudly before writing. The password is never printed.
   const banner = isProduction ? '[seed:production]' : '[seed:test]';
   const target = isProduction ? 'PRODUCTION identity DB' : 'test DB';
-  console.log(`${banner} seeding ${target}: ${dbPath}`);
+  console.log(`${banner} seeding ${target}: ${oneLine(dbPath)}`);
 
   mkdirSync(dirname(dbPath), { recursive: true });
 
@@ -84,18 +91,18 @@ async function main(): Promise<void> {
     if (await users.findByUsername(username)) {
       // Idempotent: an already-seeded user is success, not an error — so a
       // dev-start hook can call this on every boot without failing.
-      console.log(`user "${username}" already exists — nothing to do`);
+      console.log(`user "${oneLine(username)}" already exists — nothing to do`);
       return;
     }
 
     await users.createUser(username, password);
-    console.log(`seeded user "${username}"`);
+    console.log(`seeded user "${oneLine(username)}"`);
   } finally {
     await app.close();
   }
 }
 
 main().catch((err: unknown) => {
-  console.error('seed failed:', err instanceof Error ? err.message : 'unknown error');
+  console.error('seed failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
   process.exitCode = 1;
 });
