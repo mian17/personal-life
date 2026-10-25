@@ -8,6 +8,7 @@ import { NoteTag } from './note-tag.entity';
 import { KeysService } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
+import { decodeTagUsage } from '@life/shared';
 import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
 
 /**
@@ -102,28 +103,6 @@ function decodeCiphertextNoteList(raw: unknown): CachedNoteRow[] {
  */
 function withContentUpdatedAtResolved(row: CachedNoteRow): CachedNoteRow {
   return { ...row, contentUpdatedAt: row.contentUpdatedAt ?? null };
-}
-
-/**
- * The `note:tags` cache holds **metadata only** (`SPEC-tags-extraction` Cache
- * Rules): the used-`tagId`+count rows, which carry no plaintext. A hit is valid
- * when every row has numeric `tagId`/`count` fields.
- */
-function isTagUsageRow(row: TagUsage): boolean {
-  return (
-    typeof row?.tagId === 'number' &&
-    Number.isInteger(row.tagId) &&
-    typeof row?.count === 'number' &&
-    Number.isInteger(row.count) &&
-    row.count >= 0
-  );
-}
-
-function decodeTagUsage(raw: unknown): TagUsage[] {
-  if (!Array.isArray(raw) || !raw.every(isTagUsageRow)) {
-    throw new Error('cache entry is not tag usage');
-  }
-  return raw.map((row) => ({ tagId: row.tagId, count: row.count }));
 }
 
 /**

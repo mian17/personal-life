@@ -10,7 +10,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { likeMatch } from '@life/shared';
+import { decodeTagUsage, likeMatch } from '@life/shared';
 import type {
   TagUsage,
   Todo as TodoDto,
@@ -225,27 +225,6 @@ function toCachedCompletionRow(completion: TodoCompletion): CachedCompletionRow 
     occurrence: completion.occurrence,
     completedAt: completion.completedAt,
   };
-}
-
-/**
- * The `todo:tags` cache holds **metadata only** (ids + counts, no names). A hit
- * is valid when every row has numeric `tagId`/`count` fields.
- */
-function isTagUsageRow(row: TagUsage): boolean {
-  return (
-    typeof row?.tagId === 'number' &&
-    Number.isInteger(row.tagId) &&
-    typeof row?.count === 'number' &&
-    Number.isInteger(row.count) &&
-    row.count >= 0
-  );
-}
-
-function decodeTagUsage(raw: unknown): TagUsage[] {
-  if (!Array.isArray(raw) || !raw.every(isTagUsageRow)) {
-    throw new Error('cache entry is not tag usage');
-  }
-  return raw.map((row) => ({ tagId: row.tagId, count: row.count }));
 }
 
 /** A hydrated, decrypted todo plus its stable ordering key. */
