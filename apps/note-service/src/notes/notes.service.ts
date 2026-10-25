@@ -8,25 +8,8 @@ import { NoteTag } from './note-tag.entity';
 import { KeysService } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
-import { decodeTagUsage } from '@life/shared';
+import { decodeTagUsage, normalizeTagIds } from '@life/shared';
 import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
-
-/**
- * Deduplicate the `tagIds` a write carries, preserving first-seen order. The
- * result is the association set stored for the note (TagRef semantics,
- * `SPEC-service-kernel`): note-service stores exactly the ids it is given —
- * no registry validation, no name resolution (names live in `tags-service`).
- */
-function normalizeTagIds(tagIds: number[] | undefined): number[] {
-  const seen = new Set<number>();
-  const out: number[] = [];
-  for (const id of tagIds ?? []) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out.sort((a, b) => a - b);
-}
 
 /**
  * AAD for a note body (`SPEC-notes-at-rest` Encryption Rules). Byte-exact and

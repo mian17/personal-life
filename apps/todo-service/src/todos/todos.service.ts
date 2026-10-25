@@ -10,7 +10,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { decodeTagUsage, likeMatch } from '@life/shared';
+import { decodeTagUsage, likeMatch, normalizeTagIds } from '@life/shared';
 import type {
   TagUsage,
   Todo as TodoDto,
@@ -87,24 +87,6 @@ function matchesTodoFilters(
     return false;
   }
   return true;
-}
-
-/**
- * Deduplicate the `tagIds` a write carries, preserving first-seen order then
- * sorting. The result is the association set stored for the todo (TagRef
- * semantics, `SPEC-service-kernel`): todo-service stores exactly the ids it is
- * given — no registry validation, no name resolution (names live in
- * `tags-service`).
- */
-function normalizeTagIds(tagIds: number[] | undefined): number[] {
-  const seen = new Set<number>();
-  const out: number[] = [];
-  for (const id of tagIds ?? []) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out.sort((a, b) => a - b);
 }
 
 /**

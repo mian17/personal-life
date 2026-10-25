@@ -20,7 +20,7 @@ export interface TagUsage {
   count: number;
 }
 
-export { decodeTagUsage, isTagUsageRow } from './tag-usage';
+export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
 
 export interface Note {
   id: string;
