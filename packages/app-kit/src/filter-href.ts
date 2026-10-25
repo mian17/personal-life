@@ -1,8 +1,8 @@
-import type { QueryParams, RoutePath } from './types';
+import type { QueryParams } from './types';
 
 export interface FilterHrefInput {
   /** Route prefix, used verbatim (leading `/` for absolute hrefs). */
-  path: RoutePath;
+  path: string;
   /** The full current param bag — every key that must survive the change. */
   current?: QueryParams;
   /** Per-key overrides; `undefined` or `''` removes that key. */

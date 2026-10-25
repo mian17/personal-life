@@ -1,7 +1,8 @@
 'use server';
 
-import { setPrefNumber } from '@life/app-kit';
+import { setPrefNumbers } from '@life/app-kit/preference-action';
 import { clampMinutes } from '@life/pomodoro';
+
 
 /** The three form fields and the cookie each one persists. */
 const DURATION_FIELDS = [
@@ -15,7 +16,12 @@ const DURATION_FIELDS = [
  * minutes the owner edited (SPEC-pomodoro §4, State storage).
  */
 export async function setPomodoroDurations(formData: FormData): Promise<void> {
-  for (const { field, pref } of DURATION_FIELDS) {
-    await setPrefNumber(pref, clampMinutes(Number(formData.get(field))));
-  }
+  // One batch write, not one round trip per field: the three cookies are
+  // independent, so awaiting inside the loop only cost two extra cookie-store
+  // reads and two extra revalidations.
+  await setPrefNumbers(
+    DURATION_FIELDS.map(
+      ({ field, pref }) => [pref, clampMinutes(Number(formData.get(field)))] as const,
+    ),
+  );
 }

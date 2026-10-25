@@ -8,7 +8,6 @@ import {
   GeminiClient,
   type PhotoFailureReason,
   type PhotoFoodSuggestion,
-  type SearchFood,
   type SearchFoodResult,
 } from './gemini.client';
 
@@ -266,7 +265,9 @@ export class PhotoService {
    */
   private usda(): UsdaClient | null {
     try {
-      return (this.usdaClient ??= this.makeUsdaClient());
+      // Build once, then reuse: one place decides whether USDA is available.
+      this.usdaClient ??= this.makeUsdaClient();
+      return this.usdaClient;
     } catch {
       warnUsdaUnconfiguredOnce();
       return null;

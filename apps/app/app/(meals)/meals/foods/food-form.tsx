@@ -46,8 +46,13 @@ export interface FoodFormBounds {
   amountMax: number;
 }
 
-/** One measure as typed: both halves are strings, so a half-filled row can render as typed. */
+/**
+ * One measure as typed: both halves are strings, so a half-filled row can render
+ * as typed. `key` is a stable per-row identity — rows are added and removed in
+ * place, so an array index would let React reuse the wrong row's DOM.
+ */
 interface MeasureDraft {
+  key: string;
   label: string;
   amount: string;
 }
@@ -86,8 +91,17 @@ function initialFacts(food: MealFood | null, nutrition: FoodNutrition): Record<N
 }
 
 /** The stored measures as editable rows. */
+let measureKeySeed = 0;
+
+/** A fresh row identity; only uniqueness within the form matters. */
+function nextMeasureKey(): string {
+  measureKeySeed += 1;
+  return `measure-${measureKeySeed}`;
+}
+
 function initialMeasures(food: MealFood | null): MeasureDraft[] {
-  return (food?.servings ?? []).map((serving) => ({
+  return (food?.servings ?? []).map((serving, index) => ({
+    key: `stored-${index}`,
     label: serving.label,
     amount: String(round2(serving.amount)),
   }));
@@ -111,12 +125,12 @@ export function FoodForm({
   food,
   nutrition,
   bounds,
-}: {
+}: Readonly<{
   /** The food being edited; `null` renders the create form. */
   food: MealFood | null;
   nutrition: FoodNutrition;
   bounds: FoodFormBounds;
-}) {
+}>) {
   const router = useRouter();
   const [name, setName] = useState(food?.name ?? '');
   const [unit, setUnit] = useState<FoodUnit>(food?.unit ?? 'g');
@@ -141,7 +155,9 @@ export function FoodForm({
 
   function addMeasure() {
     setMeasures((previous) =>
-      previous.length >= bounds.portionsMax ? previous : [...previous, { label: '', amount: '' }],
+      previous.length >= bounds.portionsMax
+        ? previous
+        : [...previous, { key: nextMeasureKey(), label: '', amount: '' }],
     );
   }
 
@@ -277,7 +293,7 @@ export function FoodForm({
         >
           <StatusText>A named amount in {unit}, e.g. "1 carton" = 1000.</StatusText>
           {measures.map((measure, index) => (
-            <Row key={index}>
+            <Row key={measure.key}>
               <Input
                 aria-label={`Measure ${index + 1} label`}
                 placeholder="1 carton"

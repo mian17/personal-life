@@ -5,4 +5,3 @@
  */
 export type AppPrefKey = 'matrix';
 export { readPref, setPref } from '@life/app-kit';
-export type { PrefKey } from '@life/app-kit';
