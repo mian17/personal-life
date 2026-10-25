@@ -126,7 +126,7 @@ describe('FeedbackForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe('Title is required.');
     expect(titleInput().getAttribute('aria-invalid')).toBe('true');
-    expect(textarea().getAttribute('aria-invalid')).toBe(null);
+    expect(textarea().getAttribute('aria-invalid')).toBeNull();
     expect(document.activeElement).toBe(titleInput());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe('FeedbackForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe('Description is required.');
     expect(textarea().getAttribute('aria-invalid')).toBe('true');
-    expect(titleInput().getAttribute('aria-invalid')).toBe(null);
+    expect(titleInput().getAttribute('aria-invalid')).toBeNull();
     expect(document.activeElement).toBe(textarea());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
@@ -158,8 +158,8 @@ describe('FeedbackForm', () => {
     await submitForm();
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    expect(titleInput().getAttribute('aria-invalid')).toBe(null);
-    expect(textarea().getAttribute('aria-invalid')).toBe(null);
+    expect(titleInput().getAttribute('aria-invalid')).toBeNull();
+    expect(textarea().getAttribute('aria-invalid')).toBeNull();
   });
 
   it('submits the trimmed title and description with the exact app, type and idempotency key, then closes', async () => {

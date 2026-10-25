@@ -1,4 +1,4 @@
-import type { Todo, TodoCompletion, TodoCompletionPage } from '@life/shared';
+import type { Todo, TodoCompletion } from '@life/shared';
 import { dueDateState, type DueDateState } from '@life/ui';
 
 /**

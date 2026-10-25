@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
+import { join } from 'node:path';
 import { Tag } from './tags/tag.entity';
 import { UserKeys } from './keys/user-keys.entity';
 import { KeysModule } from './keys/keys.module';

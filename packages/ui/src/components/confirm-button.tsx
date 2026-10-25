@@ -12,7 +12,7 @@ export interface ConfirmButtonProps extends Omit<ButtonProps, 'type'> {
   children: ReactNode;
 }
 
-export function ConfirmButton({ message, onClick, children, ...rest }: ConfirmButtonProps) {
+export function ConfirmButton({ message, onClick, children, ...rest }: Readonly<ConfirmButtonProps>) {
   return (
     <Button
       type="submit"

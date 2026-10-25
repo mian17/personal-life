@@ -51,7 +51,7 @@ export function EditorChrome({
   tagPicker,
   gap = 'lg',
   children,
-}: EditorChromeProps): JSX.Element {
+}: Readonly<EditorChromeProps>): JSX.Element {
   return (
     <EditorScreen>
       <EditorToolbar back={back} title={title} status={status} actions={actions} />

@@ -24,7 +24,7 @@ export function Switch({
   disabled,
   name,
   className,
-}: SwitchProps) {
+}: Readonly<SwitchProps>) {
   return (
     <button
       type="button"

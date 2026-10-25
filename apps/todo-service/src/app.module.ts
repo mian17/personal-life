@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
+import { join } from 'node:path';
 import { List } from './lists/list.entity';
 import { ListsModule } from './lists/lists.module';
 import { TodosModule } from './todos/todos.module';

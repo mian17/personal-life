@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import { DATE_ONLY, type UpdateProfileDto } from './dto/update-profile.dto';

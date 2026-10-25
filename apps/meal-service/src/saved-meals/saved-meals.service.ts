@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
@@ -175,11 +175,11 @@ export class SavedMealsService {
       where: { ownerSub: sub, deletedAt: IsNull() },
       order: { updatedAt: 'DESC', id: 'ASC' },
     });
-    const rows: CachedSavedMealRow[] = [];
-    for (const meal of meals) {
-      rows.push(toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id)));
-    }
-    return rows;
+    return Promise.all(
+      meals.map(async (meal) =>
+        toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id)),
+      ),
+    );
   }
 
   /** Frozen items for one saved meal, owner-scoped, stable order. */

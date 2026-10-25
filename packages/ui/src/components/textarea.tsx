@@ -7,7 +7,7 @@ export interface TextareaProps extends ComponentPropsWithRef<'textarea'> {
   variant?: TextareaVariant;
 }
 
-export function Textarea({ variant = 'default', className, ...rest }: TextareaProps) {
+export function Textarea({ variant = 'default', className, ...rest }: Readonly<TextareaProps>) {
   return (
     <textarea
       className={cx('ui-textarea', variant !== 'default' && `ui-textarea--${variant}`, className)}

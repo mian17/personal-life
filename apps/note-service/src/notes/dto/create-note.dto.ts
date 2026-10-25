@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsOptional, IsString, MaxLength, MinLength, IsNotEmpty } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, MaxLength, IsNotEmpty } from 'class-validator';
 import { NOTE_BODY_MAX } from '@life/shared';
 
 export class CreateNoteDto {

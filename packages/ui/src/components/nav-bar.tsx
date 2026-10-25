@@ -7,7 +7,7 @@ export interface NavBarProps {
   className?: string;
 }
 
-export function NavBar({ leading, trailing, className }: NavBarProps) {
+export function NavBar({ leading, trailing, className }: Readonly<NavBarProps>) {
   return (
     <nav className={cx('ui-nav-bar', className)}>
       {leading}

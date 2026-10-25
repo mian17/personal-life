@@ -25,7 +25,7 @@ export function Dialog({
   footer,
   size = 'default',
   className,
-}: DialogProps) {
+}: Readonly<DialogProps>) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 

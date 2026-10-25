@@ -8,7 +8,7 @@ export interface CountdownProps {
 }
 
 /** The digits are read, never announced: the status line beside them carries the live text. */
-export function Countdown({ remainingMs }: CountdownProps) {
+export function Countdown({ remainingMs }: Readonly<CountdownProps>) {
   return (
     <StatusText size="display" aria-live="off">
       {formatCountdown(remainingMs)}

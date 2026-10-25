@@ -4,7 +4,7 @@ import { Button, EmptyState, List, ListItem, LocalTime } from '@life/ui';
 import { deleteNoteAction } from './actions';
 import { splitBody } from './note-title';
 
-export function NoteList({ notes }: { notes: Note[] }) {
+export function NoteList({ notes }: Readonly<{ notes: Note[] }>) {
   if (notes.length === 0) {
     return <EmptyState heading="No notes yet." body="Tap + to write your first note." />;
   }

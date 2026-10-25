@@ -6,7 +6,7 @@ export interface PillGroupProps extends ComponentPropsWithRef<'div'> {
   actions?: ReactNode;
 }
 
-export function PillGroup({ label, actions, className, children, ...rest }: PillGroupProps) {
+export function PillGroup({ label, actions, className, children, ...rest }: Readonly<PillGroupProps>) {
   return (
     <div className={cx('ui-pill-group', className)} {...rest}>
       {label != null && <span className="ui-pill-group__label">{label}</span>}

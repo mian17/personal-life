@@ -8,7 +8,7 @@ export interface LocalTimeProps extends Omit<ComponentPropsWithRef<'time'>, 'dat
   dateTime: string;
 }
 
-export function LocalTime({ dateTime, className, ...rest }: LocalTimeProps) {
+export function LocalTime({ dateTime, className, ...rest }: Readonly<LocalTimeProps>) {
   const [text, setText] = useState('');
 
   useEffect(() => {

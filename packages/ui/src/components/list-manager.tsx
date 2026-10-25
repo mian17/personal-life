@@ -37,7 +37,7 @@ export function ListManager({
   rowExtra,
   className,
   ...rest
-}: ListManagerProps) {
+}: Readonly<ListManagerProps>) {
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');

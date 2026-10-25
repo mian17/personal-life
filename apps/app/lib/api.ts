@@ -24,7 +24,8 @@ export function listNotes(tagId?: number, q?: string): Promise<NotePage> {
   if (tagId !== undefined) params.set('tagId', String(tagId));
   if (q) params.set('q', q);
   const qs = params.toString();
-  return call<NotePage>(`/api/notes${qs ? `?${qs}` : ''}`);
+  const query = qs ? `?${qs}` : '';
+  return call<NotePage>(`/api/notes${query}`);
 }
 
 export function getNote(id: string): Promise<Note> {

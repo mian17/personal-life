@@ -19,7 +19,7 @@ export interface FeedbackNavItemProps {
  * The toolbar item: it renders the `IconButton`, owns the dialog's `open` state
  * (the app never manages dialog state) and composes `FeedbackForm` inside.
  */
-export function FeedbackNavItem({ app, onSubmit, label = 'Send feedback' }: FeedbackNavItemProps) {
+export function FeedbackNavItem({ app, onSubmit, label = 'Send feedback' }: Readonly<FeedbackNavItemProps>) {
   const [open, setOpen] = useState(false);
 
   return (

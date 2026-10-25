@@ -21,7 +21,7 @@ export function useSnackbar(): SnackbarApi {
   return useContext(SnackbarContext);
 }
 
-export function SnackbarProvider({ children }: { children: ReactNode }) {
+export function SnackbarProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [current, setCurrent] = useState<(SnackbarOptions & { key: number }) | null>(null);
 
   const showSnackbar = useCallback((options: SnackbarOptions) => {

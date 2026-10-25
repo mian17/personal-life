@@ -196,7 +196,7 @@ async function drainOnce(ctx: DrainContext): Promise<boolean> {
  * commits it. Unresolvable ids (a tag deleted in the other app) come back in
  * the response's `tagIds` as the detached set, and rendering omits them.
  */
-export function NoteEditor({ note, availableTags }: { note?: Note; availableTags: TagOption[] }) {
+export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; availableTags: TagOption[] }>) {
   const router = useRouter();
   const [body, setBody] = useState(note?.body ?? '');
   const [selectedIds, setSelectedIds] = useState<number[]>(note?.tagIds ?? []);

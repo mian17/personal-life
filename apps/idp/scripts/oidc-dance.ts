@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 /**
  * Throwaway OIDC client: runs the full authorization code + PKCE dance against a
@@ -17,10 +17,15 @@ function arg(name: string, fallback?: string): string | undefined {
 }
 
 /** This script prints values the server chose. One carrying a newline or a
- * control byte would forge extra log lines, so server text is folded onto a
- * single printable line before it is interpolated. */
+ * control byte would forge extra log lines, so server text is reduced to a
+ * single printable line before it is interpolated: everything outside
+ * printable ASCII is dropped, then any run of whitespace collapses to one
+ * space. An allowlist rather than a control-byte denylist, because the point
+ * is that only characters known to be inert reach the log. */
 function oneLine(value: string | number | null | undefined): string {
-  return String(value ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ');
+  return String(value ?? '')
+    .replace(/[^\u0020-\u007e]+/g, ' ')
+    .trim();
 }
 
 const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(/\/$/, '');
@@ -115,7 +120,7 @@ async function followToCode(next: string | null): Promise<{
       break;
     }
     const res = await get(url.toString());
-    console.log(`   resume[${i}] -> ${res.status} ${res.headers.get('location') ?? ''}`);
+    console.log(`   resume[${i}] -> ${oneLine(res.status)} ${oneLine(res.headers.get('location'))}`);
     next = res.headers.get('location');
   }
   return { code, returnedState };
@@ -165,7 +170,7 @@ async function main(): Promise<void> {
 
   const authorize = await get(buildAuthorizeUrl(pkce, dance));
   const interaction = authorize.headers.get('location');
-  console.log(`1. authorize -> ${authorize.status} ${interaction ?? authorize.statusText}`);
+  console.log(`1. authorize -> ${oneLine(authorize.status)} ${oneLine(interaction ?? authorize.statusText)}`);
   if (!interaction) throw new Error('expected an interaction redirect');
 
   const interactionUrl = new URL(interaction, ISSUER).toString();
@@ -173,7 +178,7 @@ async function main(): Promise<void> {
   console.log(`2. interaction -> ${form.status} (login form)`);
 
   const login = await postForm(interactionUrl, { username: USERNAME, password: PASSWORD });
-  console.log(`3. login -> ${login.status} ${login.headers.get('location') ?? ''}`);
+  console.log(`3. login -> ${oneLine(login.status)} ${oneLine(login.headers.get('location'))}`);
 
   const { code, returnedState } = await followToCode(login.headers.get('location'));
   console.log(`4. code -> ${code ? 'received' : 'MISSING'} (state ${returnedState === dance.state ? 'matches' : 'MISMATCH'})`);
@@ -195,7 +200,8 @@ async function main(): Promise<void> {
     error?: string;
     error_description?: string;
   };
-  console.log(`5. token -> ${tokenRes.status} ${tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`}`);
+  const outcome = tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`;
+  console.log(`5. token -> ${oneLine(tokenRes.status)} ${oneLine(outcome)}`);
   if (!tokens.access_token) throw new Error(`token exchange failed: ${tokens.error} ${tokens.error_description}`);
 
   const atClaims = jwtClaims(tokens.access_token) as { aud?: string; exp?: number; iat?: number };
@@ -214,7 +220,7 @@ async function main(): Promise<void> {
     });
   await checkRefreshRotation(refreshUse, refreshToken);
 
-  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${atClaims.aud}`);
+  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${oneLine(atClaims.aud)}`);
 }
 
 interface RefreshBody {
@@ -235,6 +241,6 @@ async function postJson(
 }
 
 main().catch((err: unknown) => {
-  console.error('dance failed:', err instanceof Error ? err.message : 'unknown error');
+  console.error('dance failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
   process.exitCode = 1;
 });

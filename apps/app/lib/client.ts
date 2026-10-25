@@ -26,7 +26,7 @@ export async function callService<T>(
     headers: {
       Authorization: `Bearer ${session.accessToken}`,
       'content-type': 'application/json',
-      ...(init?.headers ?? {}),
+      ...init?.headers,
     },
     cache: 'no-store',
   });

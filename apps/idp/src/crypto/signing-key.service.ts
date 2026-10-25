@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { dirname, join } from 'path';
+import { dirname, join } from 'node:path';
 import { resolveDbPath } from '../config/db-path';
 import { JsonWebKeySet, loadOrCreateKeySet } from './signing-keys';
 

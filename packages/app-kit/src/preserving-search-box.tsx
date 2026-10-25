@@ -29,7 +29,7 @@ export function PreservingSearchBox({
   params,
   label,
   placeholder,
-}: PreservingSearchBoxProps) {
+}: Readonly<PreservingSearchBoxProps>) {
   const router = useRouter();
 
   const handleQueryChange = (value: string) => {

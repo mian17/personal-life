@@ -22,7 +22,7 @@ export function ManagerBlock({
   backHref,
   backLabel = 'Back',
   children,
-}: ManagerBlockProps): JSX.Element {
+}: Readonly<ManagerBlockProps>): JSX.Element {
   return (
     <PageShell>
       <NavBar

@@ -34,7 +34,7 @@ export function DueDatePill({
   emptyLabel = 'No date',
   className,
   ...rest
-}: DueDatePillProps) {
+}: Readonly<DueDatePillProps>) {
   const state = dueDateState(dueDate, today ?? todayIso());
   const dated = state !== 'none';
 

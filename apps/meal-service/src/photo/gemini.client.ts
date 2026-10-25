@@ -129,7 +129,7 @@ const NO_SEARCH_RESULT: SearchFoodResult = { catalog: [], usda: [] };
  * travelling to the API for a guaranteed rejection. Byte-size limits are the
  * controller DTO's job — they are a request-size contract, not a Gemini one.
  */
-const IMAGE_MIME_TYPES = [
+const IMAGE_MIME_TYPES = new Set([
   'image/png',
   'image/jpeg',
   'image/jpg',
@@ -138,7 +138,7 @@ const IMAGE_MIME_TYPES = [
   'image/heif',
   'image/gif',
   'image/avif',
-];
+]);
 
 const PROMPT = [
   'You read a photo of a meal and name the real foods on the plate.',
@@ -292,7 +292,7 @@ export class GeminiClient {
     hint?: string,
     searchTool?: SearchFood,
   ): Promise<PhotoReadResult> {
-    if (!IMAGE_MIME_TYPES.includes(image.mimeType)) return readFailure(COULD_NOT_READ);
+    if (!IMAGE_MIME_TYPES.has(image.mimeType)) return readFailure(COULD_NOT_READ);
     try {
       if (searchTool === undefined) return await this.readOnce(image, hint);
       return await this.readWithSearch(image, hint, searchTool);

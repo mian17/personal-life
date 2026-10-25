@@ -17,7 +17,7 @@ export interface SessionPillsProps {
  * The row is a picture, not a read-out: the dots carry no text, so assistive tech
  * reads the count once, from the label.
  */
-export function SessionPills({ phase, status, session }: SessionPillsProps) {
+export function SessionPills({ phase, status, session }: Readonly<SessionPillsProps>) {
   const completedSessions = completedFocuses(phase, status, session);
 
   return (

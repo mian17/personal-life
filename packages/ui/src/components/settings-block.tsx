@@ -12,7 +12,7 @@ export interface SettingsBlockProps {
   className?: string;
 }
 
-export function SettingsBlock({ title, children, className }: SettingsBlockProps) {
+export function SettingsBlock({ title, children, className }: Readonly<SettingsBlockProps>) {
   return (
     <Section label={title} gap="sm" className={className}>
       <Card>

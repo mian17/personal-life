@@ -17,9 +17,9 @@ function parseFeedbackStatus(raw: string | undefined): FeedbackStatus | undefine
 
 export default async function FeedbackPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ status?: string }>;
-}) {
+}>) {
   const { status } = await searchParams;
   const entries = await listFeedback();
 

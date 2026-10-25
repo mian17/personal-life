@@ -14,7 +14,7 @@ export function IconButton({
   className,
   children,
   ...rest
-}: IconButtonProps) {
+}: Readonly<IconButtonProps>) {
   return (
     <button
       type="button"

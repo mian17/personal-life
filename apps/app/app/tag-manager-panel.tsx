@@ -9,7 +9,7 @@ import { createTagAction, deleteTagAction, renameTagAction } from './actions';
  * mutation goes through the shared server actions, so a rename or delete here is
  * the single vocabulary and shows up in the other app immediately.
  */
-export function TagManagerPanel({ tags }: { tags: TagOption[] }) {
+export function TagManagerPanel({ tags }: Readonly<{ tags: TagOption[] }>) {
   return (
     <TagManager
       tags={tags}

@@ -19,7 +19,7 @@ export function Section({
   className,
   children,
   ...rest
-}: SectionProps) {
+}: Readonly<SectionProps>) {
   const Heading = headingLevel;
   return (
     <section className={cx('ui-section', className)} {...rest}>

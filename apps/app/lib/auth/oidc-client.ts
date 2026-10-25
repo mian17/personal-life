@@ -1,6 +1,6 @@
 import 'server-only';
 import * as client from 'openid-client';
-import { getAuthEnv, getIdpIssuer, issuerAllowsInsecure, type AuthEnv } from './env';
+import { getAuthEnv, issuerAllowsInsecure, type AuthEnv } from './env';
 
 /**
  * The single OIDC-client seam. Everything that talks to the IdP goes through
@@ -148,4 +148,4 @@ export async function refreshTokens(
   return toTokens(tokens);
 }
 
-export { getIdpIssuer };
+export { getIdpIssuer } from './env';

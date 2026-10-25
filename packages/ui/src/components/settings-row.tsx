@@ -12,7 +12,7 @@ export interface SettingsRowProps {
   className?: string;
 }
 
-export function SettingsRow({ label, description, control, className }: SettingsRowProps) {
+export function SettingsRow({ label, description, control, className }: Readonly<SettingsRowProps>) {
   return (
     <div className={cx('ui-settings-row', className)}>
       <div className="ui-settings-row__text">

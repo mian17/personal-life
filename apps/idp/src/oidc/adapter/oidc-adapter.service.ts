@@ -154,10 +154,12 @@ export class OidcAdapterService {
       .filter((row) => this.accountIdOf(row) === accountId)
       .map((row) => row.id);
 
-    for (const grantId of grantIds) {
-      await this.repo.delete({ grantId });
-      await this.repo.delete({ key: keyFor(GRANT_MODEL, grantId) });
-    }
+    await Promise.all(
+      grantIds.flatMap((grantId) => [
+        this.repo.delete({ grantId }),
+        this.repo.delete({ key: keyFor(GRANT_MODEL, grantId) }),
+      ]),
+    );
     return grantIds.length;
   }
 
@@ -174,9 +176,9 @@ export class OidcAdapterService {
       .filter((row) => this.accountIdOf(row) === accountId)
       .map((row) => row.id);
 
-    for (const sessionId of sessionIds) {
-      await this.repo.delete({ key: keyFor(SESSION_MODEL, sessionId) });
-    }
+    await Promise.all(
+      sessionIds.map((sessionId) => this.repo.delete({ key: keyFor(SESSION_MODEL, sessionId) })),
+    );
     return sessionIds.length;
   }
 }

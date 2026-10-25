@@ -60,7 +60,7 @@ export async function clearTokens(): Promise<void> {
 
 function configHome(env: NodeJS.ProcessEnv): string {
   const xdg = env.XDG_CONFIG_HOME?.trim();
-  return xdg ? xdg : join(homedir(), '.config');
+  return xdg || join(homedir(), '.config');
 }
 
 async function readCredentialFile(): Promise<string | undefined> {

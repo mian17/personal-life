@@ -37,7 +37,7 @@ export function Pill({
   className,
   children,
   ...rest
-}: PillProps) {
+}: Readonly<PillProps>) {
   // A pill that acts without navigating is a button, whatever tag was asked for:
   // an anchor with no href is not focusable or keyboard-activatable on its own,
   // and patching that with `role`/`tabIndex`/a hand-written Space handler only

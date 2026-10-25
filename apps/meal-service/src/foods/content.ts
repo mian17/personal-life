@@ -67,7 +67,7 @@ export function completeVector(value: unknown): NutrientVector {
   for (const { key } of NUTRIENTS) {
     const number = source[key];
     if (typeof number !== 'number' || !Number.isFinite(number)) {
-      throw new Error(`nutrient vector field ${key} must be a finite number`);
+      throw new TypeError(`nutrient vector field ${key} must be a finite number`);
     }
     if (number < 0) {
       throw new Error(`nutrient vector field ${key} must not be negative`);
