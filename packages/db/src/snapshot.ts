@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 /**
  * The repository's single SQLite snapshot/verify primitive (`SPEC-db-backup-restore`

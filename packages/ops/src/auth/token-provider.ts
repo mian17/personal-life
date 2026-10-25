@@ -38,9 +38,7 @@ function expiresSoon(stored: StoredTokens, skewMs: number): boolean {
 
 /** One rotation however many readers ask: the first starts it, the rest join it. */
 function rotateAccessToken(): Promise<string | undefined> {
-  if (inFlightRotation === undefined) {
-    inFlightRotation = rotateAndForgetFailure().finally(clearRotation);
-  }
+  inFlightRotation ??= rotateAndForgetFailure().finally(clearRotation);
   return inFlightRotation;
 }
 

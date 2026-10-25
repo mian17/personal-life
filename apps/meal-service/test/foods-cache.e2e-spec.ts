@@ -230,7 +230,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       expect(defaultList).toEqual([]);
       expect(withDeleted.map((food) => food.name)).toEqual(['Milk, Brand X']);
       expect(loaderCallsAfterFirst).toBe(loaderCallsBefore + 1);
-      expect(h.foods.find.mock.calls.length).toBe(loaderCallsAfterFirst);
+      expect(h.foods.find.mock.calls).toHaveLength(loaderCallsAfterFirst);
 
       const written = client.values.find(
         (v) => v.key === `meal:${SUB}:v2:food:list`,
@@ -267,7 +267,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       // `scale(base, amount / servingGrams)`: 1000 ml of a 100 ml base = ×10.
       expect(second[0].servings[0].nutrients.calories).toBe(600);
       // The second read did not run the loader again.
-      expect(h.foods.find.mock.calls.length).toBe(loaderCallsOnHit);
+      expect(h.foods.find.mock.calls).toHaveLength(loaderCallsOnHit);
     });
 
     it('findOne twice consults the loader once and returns decrypted content on the hit', async () => {
@@ -281,7 +281,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
 
       expect(first.nutrients.calories).toBe(321);
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
-      expect(h.foods.findOne.mock.calls.length).toBe(loaderCallsOnHit);
+      expect(h.foods.findOne.mock.calls).toHaveLength(loaderCallsOnHit);
       const written = client.values.find((v) => v.key === `meal:${SUB}:v1:food:one:${created.id}`)!;
       // The cached value is the stored row, never the decrypted DTO.
       expect(written.value).toContain(ENC_PREFIX);

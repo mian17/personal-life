@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
@@ -749,7 +749,7 @@ export class TodosService {
 
     const hasMore = after.length > limit;
     const page = hasMore ? after.slice(0, limit) : after;
-    const last = page[page.length - 1];
+    const last = page.at(-1);
     const nextCursor = hasMore && last ? encodeCursor(last) : null;
     return { todos: page.map((item) => item.dto), nextCursor };
   }
@@ -792,7 +792,10 @@ export class TodosService {
         this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)),
       )
       .filter((todo): todo is TodoDto & { deletedAt: string } => todo.deletedAt !== null);
-    const desc = (a: string, b: string) => (a === b ? 0 : a < b ? 1 : -1);
+    const desc = (a: string, b: string) => {
+      if (a === b) return 0;
+      return a < b ? 1 : -1;
+    };
     const ordered = [...decoded].sort(
       (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
     );
@@ -805,7 +808,7 @@ export class TodosService {
 
     const hasMore = after.length > limit;
     const page = hasMore ? after.slice(0, limit) : after;
-    const last = page[page.length - 1];
+    const last = page.at(-1);
     const nextCursor =
       hasMore && last ? encodeTrashCursor({ deletedAt: last.deletedAt, id: last.id }) : null;
     return { todos: page, nextCursor };
@@ -846,7 +849,10 @@ export class TodosService {
     const byId = new Map(todoRows.map((row) => [row.id, row]));
     const joined = rows.filter((row) => byId.has(row.todoId));
 
-    const desc = (a: string, b: string) => (a === b ? 0 : a < b ? 1 : -1);
+    const desc = (a: string, b: string) => {
+      if (a === b) return 0;
+      return a < b ? 1 : -1;
+    };
     const ordered = [...joined].sort(
       (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
     );
@@ -858,7 +864,7 @@ export class TodosService {
 
     const hasMore = after.length > limit;
     const page = hasMore ? after.slice(0, limit) : after;
-    const last = page[page.length - 1];
+    const last = page.at(-1);
     const nextCursor = hasMore && last ? encodeCompletionCursor(last) : null;
 
     // Resolve list names only when a page row is actually listed.

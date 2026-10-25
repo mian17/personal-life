@@ -27,7 +27,7 @@ const DEFAULT_UNIT_AMOUNT = 100;
  * filtering and the row → food meaning. Nothing is listed while the query is
  * empty: a catalog can hold 100+ foods, and dumping it would bury the field.
  */
-export function FoodSearch({ foods, onPick }: { foods: PickerFood[]; onPick: OnPick }) {
+export function FoodSearch({ foods, onPick }: Readonly<{ foods: PickerFood[]; onPick: OnPick }>) {
   const [query, setQuery] = useState('');
 
   if (foods.length === 0) {

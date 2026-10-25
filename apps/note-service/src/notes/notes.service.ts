@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { IsNull, Not, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { Note } from './note.entity';
@@ -224,7 +224,7 @@ function paginate<T extends { id: string }>(
   }
   const hasMore = items.length > limit;
   const page = hasMore ? items.slice(0, limit) : items;
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     hasMore && last ? Buffer.from(`${timestampOf(last)}|${last.id}`).toString('base64') : null;
   return { page, nextCursor };

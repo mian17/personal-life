@@ -30,7 +30,7 @@ export function Menu({
   onOpenChange,
   disabled,
   className,
-}: MenuProps) {
+}: Readonly<MenuProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

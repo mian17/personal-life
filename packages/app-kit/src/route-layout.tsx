@@ -15,6 +15,6 @@ export function routeLayoutMetadata(manifest: string, title: string, icon: strin
 }
 
 /** The passthrough layout body (`<>{children}</>`) every segment layout uses. */
-export function RouteLayout({ children }: { children: React.ReactNode }): React.ReactElement {
+export function RouteLayout({ children }: Readonly<{ children: React.ReactNode }>): React.ReactElement {
   return <>{children}</>;
 }

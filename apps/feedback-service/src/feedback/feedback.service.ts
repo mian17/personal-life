@@ -76,7 +76,8 @@ function decodeCiphertextList(raw: unknown): CachedFeedbackRow[] {
 /** Newest-first (`createdAt DESC, id DESC`), applied after every cache hit. */
 function newestFirst(a: FeedbackDto, b: FeedbackDto): number {
   if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
-  return a.id === b.id ? 0 : a.id < b.id ? 1 : -1;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
 }
 
 /**

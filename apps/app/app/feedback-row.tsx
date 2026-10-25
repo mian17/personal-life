@@ -29,10 +29,10 @@ const STATUS_OPTIONS = FEEDBACK_STATUSES.map(({ value, label }) => ({ value, lab
 export function FeedbackRow({
   entry,
   setStatusAction,
-}: {
+}: Readonly<{
   entry: FeedbackDto;
   setStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
-}) {
+}>) {
   const { label } = feedbackStatusOption(entry.status);
   /**
    * `picked` is the value in flight: while the write is pending the dropdown

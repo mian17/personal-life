@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';

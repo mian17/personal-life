@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Todo } from './todo.entity';
 
 /**

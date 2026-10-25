@@ -20,7 +20,7 @@ export function SearchField({
   value,
   onQueryChange,
   className,
-}: SearchFieldProps) {
+}: Readonly<SearchFieldProps>) {
   const [inner, setInner] = useState(value ?? '');
   const lastValue = useRef(value ?? '');
   const lastEmitted = useRef(value ?? '');

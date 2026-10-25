@@ -18,7 +18,7 @@ export function Stack({
   className,
   children,
   ...rest
-}: StackProps) {
+}: Readonly<StackProps>) {
   const Tag = as;
   return (
     <Tag className={cx('ui-stack', `ui-stack--${gap}`, alignClass(align), className)} {...rest}>

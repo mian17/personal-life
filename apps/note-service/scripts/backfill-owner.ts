@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 /**
  * `owner-backfill` — the one-time, human-run migration that assigns every legacy

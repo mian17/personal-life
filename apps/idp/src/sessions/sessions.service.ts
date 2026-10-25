@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Session } from './session.entity';
@@ -36,7 +36,7 @@ export class SessionsService {
       where: { tokenHash: hashToken(token) },
       relations: { user: true },
     });
-    if (!session || !session.user) return null;
+    if (!session?.user) return null;
     if (session.expiresAt.getTime() <= Date.now()) return null;
     return session.user;
   }

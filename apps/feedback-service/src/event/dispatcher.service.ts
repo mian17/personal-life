@@ -144,7 +144,8 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
     });
     const onLost = (err?: Error): void => {
       if (this.listener !== client) return;
-      this.logger.error(`LISTEN connection lost${err ? `: ${err.message}` : ''}`);
+      const detail = err ? `: ${err.message}` : '';
+      this.logger.error(`LISTEN connection lost${detail}`);
       this.dropListener();
       this.scheduleRetry();
     };

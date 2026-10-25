@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'fs';
-import { connect } from 'net';
-import { isAbsolute, join, relative, resolve, dirname } from 'path';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
+import { isAbsolute, join, relative, resolve, dirname } from 'node:path';
 import { readManifest } from './backup';
 import type { PgManifestEntry } from './backup-pg';
 import {
@@ -162,10 +162,13 @@ function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string, database: stri
   return { root, backupRoot, fromDir, file, snapshotPath };
 }
 
-/** Every stack port must probe `down`; `up` or `unknown` fails closed. */
+/** Every stack port must probe `down`; `up` or `unknown` fails closed.
+ * Probed concurrently: the ports are independent checks, and a sequential loop
+ * would only add latency before the same refusal. */
 async function assertStackStopped(probe: StackProbe): Promise<void> {
-  for (const port of STACK_PORTS) {
-    const state = await probe(port);
+  const states = await Promise.all(STACK_PORTS.map(async (port) => probe(port)));
+  for (const [index, state] of states.entries()) {
+    const port = STACK_PORTS[index];
     if (state === 'up') throw new StackRunningError(`stack appears up on 127.0.0.1:${port}`);
     if (state !== 'down') {
       throw new StackRunningError(`cannot determine stack state on 127.0.0.1:${port}: ${state}`);

@@ -134,7 +134,7 @@ describe('/todos list page wiring', () => {
     const kids = asArray(TodosNav() as unknown as { props: { children: unknown } });
 
     const feedback = kids.filter((k) => k.type === FeedbackNavItem);
-    expect(feedback.length).toBe(1);
+    expect(feedback).toHaveLength(1);
     expect(feedback[0].props.app).toBe('todos');
 
     // Settings stays the trailing nav item, feedback immediately before it.

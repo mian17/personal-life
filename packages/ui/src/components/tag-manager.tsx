@@ -31,7 +31,7 @@ export function TagManager({
   createLabel = 'Add tag',
   className,
   ...rest
-}: TagManagerProps) {
+}: Readonly<TagManagerProps>) {
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState('');

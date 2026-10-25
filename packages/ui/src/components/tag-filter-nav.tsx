@@ -17,7 +17,7 @@ export interface TagFilterNavProps {
   'aria-label'?: string;
 }
 
-export function TagFilterNav({ items, label, className, ...rest }: TagFilterNavProps) {
+export function TagFilterNav({ items, label, className, ...rest }: Readonly<TagFilterNavProps>) {
   return (
     <nav
       className={cx('ui-tag-filter-nav', className)}

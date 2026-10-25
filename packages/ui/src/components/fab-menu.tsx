@@ -18,7 +18,7 @@ export interface FabMenuProps {
   className?: string;
 }
 
-export function FabMenu({ label, icon, children, open, onOpenChange, className }: FabMenuProps) {
+export function FabMenu({ label, icon, children, open, onOpenChange, className }: Readonly<FabMenuProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
   useFabMenuDismiss({ rootRef, open, onOpenChange });
 

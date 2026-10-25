@@ -1,6 +1,6 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs';
-import { connect } from 'net';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'path';
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { DatabaseName } from './paths';
 import { resolvePaths, selectPaths } from './paths';
 import { snapshotAndVerify, verifyDatabase } from './snapshot';

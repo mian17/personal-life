@@ -53,7 +53,7 @@ export function ListItem({
   className,
   children,
   ...rest
-}: ListItemProps) {
+}: Readonly<ListItemProps>) {
   const titleLineCarriesAction =
     (variant === 'nested' || variant === 'feedback') && titleAction != null;
 

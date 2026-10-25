@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
+import { join } from 'node:path';
 import { Note } from './notes/note.entity';
 import { NoteTag } from './notes/note-tag.entity';
 import { HealthModule } from '@life/service-kit';

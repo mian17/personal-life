@@ -288,6 +288,6 @@ describe('EntriesService — read path discipline', () => {
     const dbCallsBefore = h.repo.find.mock.calls.length;
     const again = await h.service.findAll(SUB, DAY);
     expect(again[0].nutrients).toEqual(created.nutrients);
-    expect(h.repo.find.mock.calls.length).toBe(dbCallsBefore);
+    expect(h.repo.find.mock.calls).toHaveLength(dbCallsBefore);
   });
 });

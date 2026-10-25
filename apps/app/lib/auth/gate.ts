@@ -66,7 +66,7 @@ export function decideGate(input: GateInput): GateDecision {
   if ((input.accessGate ?? true) && input.hasForwardedHost) {
     const owner = input.ownerLogin;
     const login = input.tailscaleLogin;
-    if (!owner || !login || login.toLowerCase() !== owner.toLowerCase()) {
+    if (!owner || login?.toLowerCase() !== owner.toLowerCase()) {
       return 'forbidden';
     }
   }

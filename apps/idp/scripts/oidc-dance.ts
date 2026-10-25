@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 /**
  * Throwaway OIDC client: runs the full authorization code + PKCE dance against a
@@ -195,7 +195,8 @@ async function main(): Promise<void> {
     error?: string;
     error_description?: string;
   };
-  console.log(`5. token -> ${tokenRes.status} ${tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`}`);
+  const outcome = tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`;
+  console.log(`5. token -> ${tokenRes.status} ${outcome}`);
   if (!tokens.access_token) throw new Error(`token exchange failed: ${tokens.error} ${tokens.error_description}`);
 
   const atClaims = jwtClaims(tokens.access_token) as { aud?: string; exp?: number; iat?: number };

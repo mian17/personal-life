@@ -89,10 +89,10 @@ function pickerFoods(foods: MealFood[]): PickerFood[] {
 export default async function MealEntryPage({
   params,
   searchParams,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
   searchParams: Promise<{ door?: string }>;
-}) {
+}>) {
   const { id } = await params;
 
   if (id === 'new') {

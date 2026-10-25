@@ -8,7 +8,7 @@ export interface IconLinkProps extends Omit<ComponentPropsWithRef<'a'>, 'href' |
   children: ReactNode;
 }
 
-export function IconLink({ href, label, className, children, ...rest }: IconLinkProps) {
+export function IconLink({ href, label, className, children, ...rest }: Readonly<IconLinkProps>) {
   return (
     <Link href={href} aria-label={label} className={cx('ui-icon-link', className)} {...rest}>
       {children}

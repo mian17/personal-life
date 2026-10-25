@@ -1,4 +1,4 @@
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 /**
  * Shared, service-agnostic DB path resolution (`SPEC-service-kernel` "Shared

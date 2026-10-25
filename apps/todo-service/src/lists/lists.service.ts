@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
@@ -148,7 +148,8 @@ export class ListsService {
     const an = a.name.toLowerCase();
     const bn = b.name.toLowerCase();
     if (an !== bn) return an < bn ? -1 : 1;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? -1 : 1;
   }
 
   /** `GET /api/lists` — decrypted, name-sorted (case-insensitive). */

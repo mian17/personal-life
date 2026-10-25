@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
-import { basename, join, resolve } from 'path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import type { DatabaseName } from './paths';
 import { resolvePaths, selectPaths } from './paths';
 import { snapshotAndVerify } from './snapshot';

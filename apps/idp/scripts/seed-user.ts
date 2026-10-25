@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { SeedModule } from '../src/config/seed.module';
 import { UsersService } from '../src/users/users.service';
 import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';

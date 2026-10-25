@@ -179,15 +179,13 @@ export class OidcService {
 
   /** Provider endpoint paths for enabled features (used to verify the static gate). */
   handledPaths(): string[] {
-    if (!this.resolved) {
-      this.resolved = OIDC_ROUTE_NAMES.flatMap((name) => {
-        try {
-          return [this.provider().pathFor(name)];
-        } catch {
-          return [];
-        }
-      });
-    }
+    this.resolved ??= OIDC_ROUTE_NAMES.flatMap((name) => {
+      try {
+        return [this.provider().pathFor(name)];
+      } catch {
+        return [];
+      }
+    });
     return this.resolved;
   }
 

@@ -25,7 +25,7 @@ describe('pomodoro toolbar nav', () => {
     const kids = asArray(PomodoroNav() as unknown as { props: { children: unknown } });
 
     const feedback = kids.filter((k) => k.type === FeedbackNavItem);
-    expect(feedback.length).toBe(1);
+    expect(feedback).toHaveLength(1);
     expect(feedback[0].props.app).toBe('pomodoro');
 
     // Same trailing order as `/todos`: the gear is the last nav item.

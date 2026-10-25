@@ -54,10 +54,10 @@ const GOAL_OPTIONS = [
 export function TargetProfileForm({
   initial,
   summary,
-}: {
+}: Readonly<{
   initial: MealTarget | null;
   summary?: string | null;
-}) {
+}>) {
   const router = useRouter();
   const [age, setAge] = useState(initial == null ? '' : String(initial.age));
   const [sex, setSex] = useState(initial?.sex ?? 'male');

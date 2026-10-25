@@ -16,12 +16,12 @@ export function TodoList({
   today,
   lists,
   availableTags,
-}: {
+}: Readonly<{
   groups: TodoGroup[];
   today: string;
   lists: TodoList[];
   availableTags: TagOption[];
-}) {
+}>) {
   const total = groups.reduce((count, group) => count + group.todos.length, 0);
 
   if (total === 0) {

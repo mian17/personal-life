@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { json } from 'express';
 import { AppModule } from './app.module';
 import { AuthGuard } from './auth/auth.guard';

@@ -267,7 +267,8 @@ export interface MealFood {
  * names arrive decrypted, so the log path can compare them in memory.
  */
 export function listMealFoods(q?: string): Promise<MealFood[]> {
-  return call<MealFood[]>(`/api/foods${q ? `?${new URLSearchParams({ q })}` : ''}`);
+  const query = q ? `?${new URLSearchParams({ q })}` : '';
+  return call<MealFood[]>(`/api/foods${query}`);
 }
 
 /**

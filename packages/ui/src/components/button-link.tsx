@@ -17,7 +17,7 @@ export function ButtonLink({
   className,
   children,
   ...rest
-}: ButtonLinkProps) {
+}: Readonly<ButtonLinkProps>) {
   return (
     <Link
       href={href}

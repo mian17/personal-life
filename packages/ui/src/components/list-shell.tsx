@@ -43,7 +43,7 @@ export function ListShell({
   fabLabel,
   fabIcon,
   fill,
-}: ListShellProps): JSX.Element {
+}: Readonly<ListShellProps>): JSX.Element {
   return (
     <PageShell className={fill ? 'ui-list-shell--fill' : undefined}>
       <NavBar trailing={navTrailing} />

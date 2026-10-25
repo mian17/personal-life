@@ -18,7 +18,7 @@ export interface SelectProps extends Omit<ComponentPropsWithRef<'select'>, 'chil
   options: SelectOption[];
 }
 
-export function Select({ options, className, ...rest }: SelectProps) {
+export function Select({ options, className, ...rest }: Readonly<SelectProps>) {
   return (
     <select className={cx('ui-select', className)} {...rest}>
       {options.map((option) => (

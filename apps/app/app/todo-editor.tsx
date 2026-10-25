@@ -53,12 +53,12 @@ export function TodoEditor({
   todo,
   lists,
   availableTags,
-}: {
+}: Readonly<{
   /** Absent = create mode. */
   todo?: Todo;
   lists: List[];
   availableTags: TagOption[];
-}) {
+}>) {
   const router = useRouter();
   const editing = todo != null;
   const [title, setTitle] = useState(todo?.title ?? '');
