@@ -19,8 +19,8 @@ function arg(name: string, fallback?: string): string | undefined {
 /** This script prints values the server chose. One carrying a newline or a
  * control byte would forge extra log lines, so server text is folded onto a
  * single printable line before it is interpolated. */
-function oneLine(value: unknown): string {
-  return String(value ?? '').replace(/[\r\n\u0000-\u001f\u007f]+/g, ' ');
+function oneLine(value: string | number | null | undefined): string {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ');
 }
 
 const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(/\/$/, '');
