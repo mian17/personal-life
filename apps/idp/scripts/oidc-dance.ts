@@ -16,6 +16,13 @@ function arg(name: string, fallback?: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : fallback;
 }
 
+/** This script prints values the server chose. One carrying a newline or a
+ * control byte would forge extra log lines, so server text is folded onto a
+ * single printable line before it is interpolated. */
+function oneLine(value: unknown): string {
+  return String(value ?? '').replace(/[\r\n\u0000-\u001f\u007f]+/g, ' ');
+}
+
 const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(/\/$/, '');
 const CLIENT_ID = arg('--client-id') ?? 'dev';
 const REDIRECT_URI = arg('--redirect-uri') ?? 'http://127.0.0.1:8080/cb';
@@ -129,16 +136,16 @@ async function checkRefreshRotation(
 ): Promise<void> {
   const rotated = await refreshUse(refreshToken);
   console.log(
-    `7. refresh -> ${rotated.status} newRT=${rotated.body.refresh_token !== refreshToken ? 'yes' : 'no'} at_ttl=${rotated.body.expires_in}s`,
+    `7. refresh -> ${oneLine(rotated.status)} newRT=${rotated.body.refresh_token !== refreshToken ? 'yes' : 'no'} at_ttl=${oneLine(rotated.body.expires_in)}s`,
   );
   const newToken = rotated.body.refresh_token;
   if (!newToken) throw new Error('refresh did not return a new refresh token');
 
   const reuse = await refreshUse(refreshToken);
-  console.log(`8. replay retired RT -> ${reuse.status} ${reuse.body.error ?? ''} (expect 400 invalid_grant)`);
+  console.log(`8. replay retired RT -> ${oneLine(reuse.status)} ${oneLine(reuse.body.error)} (expect 400 invalid_grant)`);
 
   const afterRevoke = await refreshUse(newToken);
-  console.log(`9. newest RT after replay -> ${afterRevoke.status} ${afterRevoke.body.error ?? ''} (expect 400: family revoked)`);
+  console.log(`9. newest RT after replay -> ${oneLine(afterRevoke.status)} ${oneLine(afterRevoke.body.error)} (expect 400: family revoked)`);
 }
 
 async function main(): Promise<void> {

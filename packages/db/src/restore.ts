@@ -164,10 +164,13 @@ function assertSnapshotsUsable(chosen: readonly ChosenTarget[], fromDir: string)
   }
 }
 
-/** The stack must probe `down` on every port; `up`/`unknown` fail closed. */
+/** The stack must probe `down` on every port; `up`/`unknown` fail closed.
+ * Probed concurrently: the ports are independent checks, and a sequential loop
+ * would only add latency before the same refusal. */
 async function assertStackStopped(probe: StackProbe): Promise<void> {
-  for (const port of STACK_PORTS) {
-    const state = await probe(port);
+  const states = await Promise.all(STACK_PORTS.map(async (port) => probe(port)));
+  for (const [index, state] of states.entries()) {
+    const port = STACK_PORTS[index];
     if (state === 'up') throw new StackRunningError(`stack appears up on 127.0.0.1:${port}`);
     if (state !== 'down') {
       throw new StackRunningError(`cannot determine stack state on 127.0.0.1:${port}: ${state}`);

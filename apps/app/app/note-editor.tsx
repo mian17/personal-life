@@ -112,9 +112,8 @@ function settleSaved(ctx: DrainContext, data: FlushResponse, id: string | null):
   const sent = ctx.sentRef.current;
   ctx.sentRef.current = null;
   const changed =
-    sent === null ||
-    ctx.bodyRef.current !== sent.body ||
-    !sameIds(ctx.selectedRef.current, sent.tagIds);
+    ctx.bodyRef.current !== sent?.body ||
+    !sameIds(ctx.selectedRef.current, sent?.tagIds ?? []);
   if (ctx.dirtyRef.current || changed) {
     // Latest-wins: a newer edit arrived during the request.
     ctx.dirtyRef.current = true;
@@ -270,10 +269,12 @@ export function NoteEditor({ note, availableTags }: { note?: Note; availableTags
       enterConflict,
     };
     // A failure stays dirty for a later retry, but must not spin here.
-    const drain = (async (): Promise<boolean> => {
-      let clean = await drainOnce(ctx);
-      while (clean && dirtyRef.current) clean = await drainOnce(ctx);
-      return clean;
+    // Recursive rather than a `while` around an `await`: each turn must observe
+    // the refs after the previous flush settled, so the turns are sequential by
+    // necessity. The named function expression keeps `drain` the promise.
+    const drain = (async function drainLoop(): Promise<boolean> {
+      const clean = await drainOnce(ctx);
+      return clean && dirtyRef.current ? drainLoop() : clean;
     })();
     drainRef.current = drain;
     void drain.finally(() => {
