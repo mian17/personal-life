@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "tool_call": [
+      {
+        "matcher": "^(Write|Edit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "exec bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"$PWD\")/.pi/kendex/hooks/sonar-check.sh\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
