@@ -1,11 +1,5 @@
 import { createClient } from 'redis';
-import {
-  CACHE_TTL_SECONDS,
-  ReadThroughCache,
-  type CacheClient,
-  type CacheHitOptions,
-  type CacheSetOptions,
-} from '@life/cache';
+import { ReadThroughCache, type CacheClient } from '@life/cache';
 
 /**
  * feedback-service's adapter over the generic read-through cache (`@life/cache`,
@@ -23,8 +17,8 @@ import {
  *   60s TTL is the backstop; any client error fails open to the direct loader.
  */
 
-export { CACHE_TTL_SECONDS };
-export type { CacheClient, CacheHitOptions, CacheSetOptions };
+export { CACHE_TTL_SECONDS } from '@life/cache';
+export type { CacheClient, CacheHitOptions, CacheSetOptions } from '@life/cache';
 
 /** The namespace prefix every feedback key (and counter) carries on shared Redis. */
 const SERVICE = 'feedback';

@@ -1,11 +1,5 @@
 import { createClient } from 'redis';
-import {
-  CACHE_TTL_SECONDS,
-  ReadThroughCache,
-  type CacheClient,
-  type CacheHitOptions,
-  type CacheSetOptions,
-} from '@life/cache';
+import { ReadThroughCache, type CacheClient } from '@life/cache';
 
 /**
  * meal-service's single namespace adapter over the generic read-through cache
@@ -20,8 +14,8 @@ import {
  * all of that owner's reads at once.
  */
 
-export { CACHE_TTL_SECONDS };
-export type { CacheClient, CacheHitOptions, CacheSetOptions };
+export { CACHE_TTL_SECONDS } from '@life/cache';
+export type { CacheClient, CacheHitOptions, CacheSetOptions } from '@life/cache';
 
 /** The namespace prefix every meal key (and counter) carries on shared Redis. */
 const SERVICE = 'meal';
