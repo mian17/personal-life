@@ -104,9 +104,12 @@ describe('Health dialect (e2e)', () => {
   });
 
   it('ignores even a garbage bearer on the health trio', async () => {
-    await get('/health/live', 'not-a-jwt').expect(200);
-    await get('/health/ready', 'not-a-jwt').expect(200);
-    await get('/health', 'not-a-jwt').expect(200);
+    const live = await get('/health/live', 'not-a-jwt').expect(200);
+    const ready = await get('/health/ready', 'not-a-jwt').expect(200);
+    const alias = await get('/health', 'not-a-jwt').expect(200);
+    expect(live.body).toEqual({ status: 'ok' });
+    expect(ready.body).toEqual({ status: 'ok' });
+    expect(alias.body).toEqual({ status: 'ok' });
   });
 
   it('leaks nothing: bodies are exactly the status JSON', async () => {

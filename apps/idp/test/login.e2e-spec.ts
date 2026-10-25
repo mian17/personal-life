@@ -130,11 +130,12 @@ describe('Login and sessions (e2e)', () => {
       .getRepository(Session)
       .update({ tokenHash }, { expiresAt: new Date(Date.now() - 1000) });
 
-    await request(app.getHttpServer())
+    const expired = await request(app.getHttpServer())
       .get('/')
       .set('Cookie', cookie)
       .expect(302)
       .expect('Location', '/login');
+    expect(expired.headers.location).toBe('/login');
   });
 
   it('redirects GET / to /login without a session', async () => {
@@ -147,15 +148,17 @@ describe('Login and sessions (e2e)', () => {
   it('treats a malformed session cookie as absent (login redirect, not a 500)', async () => {
     // A stray `%` is invalid percent-encoding; decoding it throws URIError. The
     // parser must fail closed to "no cookie" so GET / redirects to /login.
-    await request(app.getHttpServer())
+    const malformedGet = await request(app.getHttpServer())
       .get('/')
       .set('Cookie', `${COOKIE}=%`)
       .expect(302)
       .expect('Location', '/login');
-    await request(app.getHttpServer())
+    expect(malformedGet.headers.location).toBe('/login');
+    const malformedLogout = await request(app.getHttpServer())
       .post('/logout')
       .set('Cookie', `${COOKIE}=%`)
       .expect(303);
+    expect(malformedLogout.headers.location).toBe('/login');
   });
 });
 

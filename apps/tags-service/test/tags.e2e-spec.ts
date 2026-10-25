@@ -88,7 +88,10 @@ describe('Tags API (e2e)', () => {
     });
 
     it('rejects a garbage bearer token', async () => {
-      await auth(request(app.getHttpServer()).get('/api/tags'), 'not-a-jwt').expect(401);
+      const res = await auth(request(app.getHttpServer()).get('/api/tags'), 'not-a-jwt').expect(
+        401,
+      );
+      expect(res.status).toBe(401);
     });
   });
 
@@ -164,13 +167,18 @@ describe('Tags API (e2e)', () => {
     });
 
     it('rejects an empty name and a non-string name', async () => {
-      await auth(request(app.getHttpServer()).post('/api/tags'), tokenA)
+      const empty = await auth(request(app.getHttpServer()).post('/api/tags'), tokenA)
         .send({ name: '' })
         .expect(400);
-      await auth(request(app.getHttpServer()).post('/api/tags'), tokenA)
+      expect(empty.status).toBe(400);
+      const nonString = await auth(request(app.getHttpServer()).post('/api/tags'), tokenA)
         .send({ name: 42 })
         .expect(400);
-      await auth(request(app.getHttpServer()).post('/api/tags'), tokenA).send({}).expect(400);
+      expect(nonString.status).toBe(400);
+      const missing = await auth(request(app.getHttpServer()).post('/api/tags'), tokenA)
+        .send({})
+        .expect(400);
+      expect(missing.status).toBe(400);
     });
   });
 
@@ -282,9 +290,10 @@ describe('Tags API (e2e)', () => {
     });
 
     it('rejects a non-array ids payload', async () => {
-      await auth(request(app.getHttpServer()).post('/api/tags/resolve'), tokenA)
+      const res = await auth(request(app.getHttpServer()).post('/api/tags/resolve'), tokenA)
         .send({ ids: 'nope' })
         .expect(400);
+      expect(res.status).toBe(400);
     });
   });
 

@@ -108,10 +108,12 @@ describe('Todos due/repeat (e2e)', () => {
     });
 
     it('rejects repeat with no due (400) on create and on update', async () => {
-      await create({ title: 'no due repeat', repeat: 'daily' }).expect(400);
+      const created = await create({ title: 'no due repeat', repeat: 'daily' }).expect(400);
+      expect(created.body.message).toBe('repeat requires a dueDate');
 
       const undated = await create({ title: 'undated' }).expect(201);
-      await patch(undated.body.id, { repeat: 'daily' }).expect(400);
+      const updated = await patch(undated.body.id, { repeat: 'daily' }).expect(400);
+      expect(updated.body.message).toBe('repeat requires a dueDate');
     });
   });
 

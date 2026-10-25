@@ -113,8 +113,10 @@ describe('Lists API (e2e)', () => {
 
     it('rejects a case-insensitive collision within one owner with 409', async () => {
       await createList('Groceries').expect(201);
-      await createList('groceries').expect(409);
-      await createList('GROCERIES').expect(409);
+      const lower = await createList('groceries').expect(409);
+      expect(lower.status).toBe(409);
+      const upper = await createList('GROCERIES').expect(409);
+      expect(upper.status).toBe(409);
     });
 
     it('allows the same name under a different owner', async () => {
@@ -124,8 +126,10 @@ describe('Lists API (e2e)', () => {
     });
 
     it('rejects an empty name (400)', async () => {
-      await createList('').expect(400);
-      await auth(request(server()).post('/api/lists'), tokenA).send({}).expect(400);
+      const empty = await createList('').expect(400);
+      expect(empty.status).toBe(400);
+      const missing = await auth(request(server()).post('/api/lists'), tokenA).send({}).expect(400);
+      expect(missing.status).toBe(400);
     });
   });
 

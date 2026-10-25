@@ -116,25 +116,49 @@ describeDb('Feedback API (e2e)', () => {
     });
 
     it('rejects a whitespace-only description with 400 (never 422)', async () => {
-      await post(app, token, validBody(feedbackId(), '   ')).expect(400);
+      const res = await post(app, token, validBody(feedbackId(), '   ')).expect(400);
+      expect(res.status).toBe(400);
     });
 
     it('rejects a missing, blank or over-long title with 400', async () => {
-      await post(app, token, {
+      const missingTitle = await post(app, token, {
         id: feedbackId(),
         app: 'notes',
         type: 'bug_report',
         description: 'has no title',
       }).expect(400);
-      await post(app, token, validBody(feedbackId(), 'blank title', '   ')).expect(400);
-      await post(app, token, validBody(feedbackId(), 'long title', 'x'.repeat(201))).expect(400);
+      expect(missingTitle.status).toBe(400);
+      const blankTitle = await post(
+        app,
+        token,
+        validBody(feedbackId(), 'blank title', '   '),
+      ).expect(400);
+      expect(blankTitle.status).toBe(400);
+      const longTitle = await post(
+        app,
+        token,
+        validBody(feedbackId(), 'long title', 'x'.repeat(201)),
+      ).expect(400);
+      expect(longTitle.status).toBe(400);
     });
 
     it('rejects validation failures with 400: unknown field, bad uuid, bad type, over-length', async () => {
-      await post(app, token, { ...validBody(feedbackId(), 'x'), ownerSub: 'spoofed' }).expect(400);
-      await post(app, token, validBody('not-a-uuid', 'x')).expect(400);
-      await post(app, token, { ...validBody(feedbackId(), 'x'), type: 'praise' }).expect(400);
-      await post(app, token, validBody(feedbackId(), 'x'.repeat(2001))).expect(400);
+      const unknownField = await post(app, token, {
+        ...validBody(feedbackId(), 'x'),
+        ownerSub: 'spoofed',
+      }).expect(400);
+      expect(unknownField.status).toBe(400);
+      const badUuid = await post(app, token, validBody('not-a-uuid', 'x')).expect(400);
+      expect(badUuid.status).toBe(400);
+      const badType = await post(app, token, {
+        ...validBody(feedbackId(), 'x'),
+        type: 'praise',
+      }).expect(400);
+      expect(badType.status).toBe(400);
+      const overLength = await post(app, token, validBody(feedbackId(), 'x'.repeat(2001))).expect(
+        400,
+      );
+      expect(overLength.status).toBe(400);
     });
 
     it('GET returns a bare owner-scoped array (no envelope), newest-first', async () => {
@@ -257,7 +281,10 @@ describeDb('Feedback API (e2e)', () => {
     });
 
     it('rejects a malformed id with 400, never a driver 500', async () => {
-      await patchFeedbackStatus(app, token, 'not-a-uuid', { status: 'done' }).expect(400);
+      const res = await patchFeedbackStatus(app, token, 'not-a-uuid', { status: 'done' }).expect(
+        400,
+      );
+      expect(res.status).toBe(400);
     });
 
     it('answers 404 for a missing id and a foreign id, byte-identically', async () => {
