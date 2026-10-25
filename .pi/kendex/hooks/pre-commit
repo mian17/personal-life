@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Installed by scripts/install-sonar-hooks.sh. Judges the staged bytes of this
+# commit with the same gate as the Write/Edit hook, so a write that never went
+# through those tools (a `bash` heredoc, `sed -i`, a script) is judged too.
+#
+# `core.hooksPath` may point at another checkout's copy of this directory (an
+# absolute path into the main checkout, so worktrees on old commits still run
+# it). The gate lives beside this file, so that copy wins; `$root` is only the
+# fallback for a checkout that has its own complete `.pi/kendex/hooks`.
+# `--no-verify` and `-n` skip this; the SonarQube CI job on `dev` is the backstop.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[[ -f "$root/sonar-project.properties" ]] || exit 0
+here="$(dirname "${BASH_SOURCE[0]}")"
+gate="$here/sonar-check.mjs"
+[[ -f "$gate" ]] || gate="$root/.pi/kendex/hooks/sonar-check.mjs"
+[[ -f "$gate" ]] || exit 0
+exec node "$gate" --staged
