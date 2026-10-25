@@ -1,7 +1,7 @@
 'use client';
 
 import type { List } from '@life/shared';
-import { ListManager, SettingsRow, Switch } from '@life/ui';
+import { ListManager, SettingsRow, Switch, type TodoListOption } from '@life/ui';
 import { useRef, useState } from 'react';
 import { createListAction, deleteListAction, renameListAction } from './todo-actions';
 import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
@@ -68,6 +68,22 @@ function ListRowExtra({
 }
 
 /**
+ * Builds the `rowExtra` renderer once per panel render. It lives at module
+ * scope, not inline in `ListManagerPanel`, so the JSX-returning arrow is not a
+ * component definition nested inside a component (Sonar `S6478`) and the row
+ * keeps a stable identity.
+ */
+function rowExtraFor(lists: List[]) {
+  return (option: TodoListOption) => (
+    <ListRowExtra
+      id={option.id}
+      name={option.name}
+      list={lists.find((candidate) => candidate.id === option.id)}
+    />
+  );
+}
+
+/**
  * The todo-local list management surface (`ListManager` upstream primitive),
  * wired to todo-service through the shared server actions.
  */
@@ -81,13 +97,7 @@ export function ListManagerPanel({ lists }: Readonly<{ lists: List[] }>) {
         void renameListAction(id, name, list?.importantDefault ?? false, list?.version);
       }}
       onDelete={(id) => void deleteListAction(id)}
-      rowExtra={(option) => (
-        <ListRowExtra
-          id={option.id}
-          name={option.name}
-          list={lists.find((candidate) => candidate.id === option.id)}
-        />
-      )}
+      rowExtra={rowExtraFor(lists)}
     />
   );
 }
