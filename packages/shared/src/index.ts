@@ -1,5 +1,7 @@
 export { likeMatch } from './like-match';
 export { resolveDbPath } from './db-path';
+export { runReadinessChecks } from './service-health';
+export type { HealthBody, ReadinessChecks } from './service-health';
 
 /**
  * `TagRef` — the ecosystem tag vocabulary reference (`SPEC-service-kernel`).
