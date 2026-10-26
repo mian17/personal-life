@@ -66,7 +66,7 @@ def code_lines(path: Path):
 
 
 def duplicate_blocks(root: Path):
-    """{sha1 of window text: [(relative path, first line, last line), ...]}."""
+    """{sha256 of window text: [(relative path, first line, last line), ...]}."""
     windows: defaultdict[str, list[tuple[Path, int, int]]] = defaultdict(list)
     scanned = 0
     for path in product_files(root):
@@ -75,7 +75,7 @@ def duplicate_blocks(root: Path):
         for start in range(len(lines) - WINDOW + 1):
             chunk = lines[start:start + WINDOW]
             text = '\n'.join(norm for _, norm in chunk)
-            windows[hashlib.sha1(text.encode()).hexdigest()].append(
+            windows[hashlib.sha256(text.encode()).hexdigest()].append(
                 (path.relative_to(root), chunk[0][0], chunk[-1][0])
             )
     cross_file = {

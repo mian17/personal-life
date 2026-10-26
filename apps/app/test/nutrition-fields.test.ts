@@ -2,37 +2,30 @@ import { NUTRIENT_LABELS, NUTRIENTS } from '@life/nutrition';
 import { field, groupedFields, GROUPS, unitOf } from '@/app/(meals)/meals/nutrition-fields';
 
 /**
- * The pre-extraction value table, copied verbatim from the two files this module
- * replaced (`foods/fields.ts` and `entry/[id]/page.tsx` had these identical groups).
- * It is the contract: the extraction must not reorder or re-label anything.
+ * The pre-extraction value table, copied from the two files this module replaced
+ * (`foods/fields.ts` and `entry/[id]/page.tsx` had these identical groups). It is the
+ * contract: the extraction must not reorder or re-label anything.
+ *
+ * Written as `<title>: <comma-separated keys>` so the assertion stays a literal
+ * independent of `GROUPS` — a test that derived its expectation from the module it
+ * checks would pass no matter what the module did.
  */
-const EXPECTED_GROUPS: { title: string; keys: string[] }[] = [
-  { title: 'Macros', keys: ['calories', 'fat', 'carbohydrates', 'protein'] },
-  {
-    title: 'Fat breakdown',
-    keys: ['monounsaturatedFat', 'polyunsaturatedFat', 'saturatedFat', 'transFat'],
+const EXPECTED_TABLE = `
+Macros: calories,fat,carbohydrates,protein
+Fat breakdown: monounsaturatedFat,polyunsaturatedFat,saturatedFat,transFat
+Cholesterol & sodium: cholesterol,sodium
+Carb breakdown: fiber,sugar
+Vitamins: vitaminA,vitaminC,thiaminB1,riboflavinB2,niacinB3,folateB9,vitaminB6,vitaminB12
+Minerals: calcium,iron,magnesium,phosphorus,potassium,zinc
+Other: caffeine
+`.trim();
+
+const EXPECTED_GROUPS: { title: string; keys: string[] }[] = EXPECTED_TABLE.split('\n').map(
+  (row) => {
+    const at = row.indexOf(':');
+    return { title: row.slice(0, at), keys: row.slice(at + 1).trim().split(',') };
   },
-  { title: 'Cholesterol & sodium', keys: ['cholesterol', 'sodium'] },
-  { title: 'Carb breakdown', keys: ['fiber', 'sugar'] },
-  {
-    title: 'Vitamins',
-    keys: [
-      'vitaminA',
-      'vitaminC',
-      'thiaminB1',
-      'riboflavinB2',
-      'niacinB3',
-      'folateB9',
-      'vitaminB6',
-      'vitaminB12',
-    ],
-  },
-  {
-    title: 'Minerals',
-    keys: ['calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc'],
-  },
-  { title: 'Other', keys: ['caffeine'] },
-];
+);
 
 describe('nutrition-fields', () => {
   it('keeps the exact group titles and key order', () => {
