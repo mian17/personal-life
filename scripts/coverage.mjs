@@ -52,10 +52,18 @@ function runWorkspace(dir) {
   rmSync(coverageDir, { recursive: true, force: true });
   console.log(`\n=== coverage: ${dir}`);
   try {
-    execFileSync(JEST, ['--coverage', '--coverageReporters=lcov', `--coverageDirectory=${coverageDir}`, '--silent'], {
-      cwd: join(ROOT, dir),
-      stdio: ['ignore', 'inherit', 'inherit'],
-    });
+    // `--testTimeout` overrides jest's 5s default for hooks too. Instrumentation
+    // roughly doubles ts-jest compile cost, and on a cold cache (every CI run)
+    // an e2e `beforeAll` that boots Nest + sqlite crosses 5s and fails the suite
+    // spuriously — measured 2/13 note-service suites red cold vs green warm.
+    execFileSync(
+      JEST,
+      ['--coverage', '--coverageReporters=lcov', `--coverageDirectory=${coverageDir}`, '--silent', '--testTimeout=30000'],
+      {
+        cwd: join(ROOT, dir),
+        stdio: ['ignore', 'inherit', 'inherit'],
+      },
+    );
   } catch {
     // A suite that fails still emits its report; the failure is reported by
     // `npm test`, and CI must not scan a stale report over a red suite.

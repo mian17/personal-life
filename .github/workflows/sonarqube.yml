@@ -34,6 +34,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Workspace `@life/*` types only exist after a build: a fresh clone has no
+      # `dist/`, so every suite importing another workspace fails with TS2307
+      # (measured: 13/13 note-service suites red). `dist/` is in
+      # `sonar.exclusions` and dropped by the coverage merge, so building first
+      # adds no scan noise.
+      - name: Build workspaces
+        run: npm run build
+
       # Suites that boot a sqlite service need a writable data directory, and
       # those directories are gitignored, so a fresh checkout has none.
       - name: Prepare test data directories
