@@ -39,12 +39,10 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC): Promise<Grant 
   const grantId =
     oidc.result?.consent?.grantId || oidc.session.grantIdFor(oidc.client.clientId);
   let grant = grantId ? await oidc.provider.Grant.find(grantId) : undefined;
-  if (!grant) {
-    grant = new oidc.provider.Grant({
-      accountId: oidc.account.accountId,
-      clientId: oidc.client.clientId,
-    });
-  }
+  grant ??= new oidc.provider.Grant({
+    accountId: oidc.account.accountId,
+    clientId: oidc.client.clientId,
+  });
 
   const oidcScopes = [...oidc.requestParamOIDCScopes];
   if (oidcScopes.length) grant.addOIDCScope(oidcScopes.join(' '));

@@ -285,7 +285,15 @@ async function openBrowser(url: string): Promise<void> {
   const { execFile } = await import('node:child_process');
   const opener = process.platform === 'darwin' ? 'open' : nonMacOpener();
   await new Promise<void>((resolve, reject) => {
-    execFile(opener, [url], (error) => (error ? reject(error) : resolve()));
+    execFile(opener, [url], (error) => {
+      // Rebuilt as an Error: the rejection value must be one, and the opener's
+      // message is all the caller needs.
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve();
+    });
   });
 }
 

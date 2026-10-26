@@ -32,7 +32,7 @@ export type ThemeToggleProps = Omit<
   'type' | 'onClick' | 'aria-label' | 'aria-pressed' | 'children'
 >;
 
-export function ThemeToggle({ className, ...rest }: ThemeToggleProps) {
+export function ThemeToggle({ className, ...rest }: Readonly<ThemeToggleProps>) {
   const [theme, setTheme] = useState<Theme>('system');
 
   useEffect(() => {
