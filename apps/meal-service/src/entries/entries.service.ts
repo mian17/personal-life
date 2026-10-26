@@ -99,11 +99,11 @@ export class EntriesService {
   }
 
   /** Resolve the owner DEK at most once per read; null when nothing is sealed. */
-  private async readDek(sub: string, rows: CachedEntryRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedEntryRow[]): Promise<Buffer | null> {
     const needs = rows.some(
       (row) => typeof row.nutrients === 'string' && row.nutrients.startsWith(ENC_PREFIX),
     );
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.keys.getDekForRead(sub);
   }
 

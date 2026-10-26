@@ -2,7 +2,6 @@ import 'server-only';
 import { loadOrNotFound } from '@life/app-kit';
 import {
   format,
-  NUTRIENT_LABELS,
   NUTRIENTS,
   UNKNOWN,
   type Nutrient,
@@ -16,6 +15,7 @@ import {
   type MealFood,
 } from '@/lib/meal-api';
 import { getDefaultMealGroup, getToday } from '@/lib/today';
+import { field, groupedFields, unitOf } from '../../nutrition-fields';
 import { MealEditor, type NutritionFields } from './editor';
 import type { PickerFood } from './food-picker';
 
@@ -23,32 +23,6 @@ export const dynamic = 'force-dynamic';
 
 /** The fields the review step shows inline, in display order (one display choice, not a unit table). */
 const HEADLINE = ['calories', 'fat', 'carbohydrates', 'protein'] as const satisfies readonly Nutrient[];
-
-/**
- * The seven display groups for the expanded `All nutrients (27)` region. Grouping is
- * an app-owned display choice — `@life/nutrition`'s set is flat — but the keys,
- * labels, and units all come from the package. `Other` holds exactly `Caffeine`, the
- * one nutrient with no home group. Every key appears once across the groups.
- */
-const GROUPS: { title: string; keys: readonly Nutrient[] }[] = [
-  { title: 'Macros', keys: ['calories', 'fat', 'carbohydrates', 'protein'] },
-  { title: 'Fat breakdown', keys: ['monounsaturatedFat', 'polyunsaturatedFat', 'saturatedFat', 'transFat'] },
-  { title: 'Cholesterol & sodium', keys: ['cholesterol', 'sodium'] },
-  { title: 'Carb breakdown', keys: ['fiber', 'sugar'] },
-  { title: 'Vitamins', keys: ['vitaminA', 'vitaminC', 'thiaminB1', 'riboflavinB2', 'niacinB3', 'folateB9', 'vitaminB6', 'vitaminB12'] },
-  { title: 'Minerals', keys: ['calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc'] },
-  { title: 'Other', keys: ['caffeine'] },
-];
-
-/** The unit `@life/nutrition` declares for a key — the one owner of units. */
-function unitOf(key: Nutrient): string {
-  return NUTRIENTS.find((nutrient) => nutrient.key === key)!.unit;
-}
-
-/** A field as the client renders it: the key, its package label, and its package unit. */
-function field(key: Nutrient) {
-  return { key, label: NUTRIENT_LABELS[key], unit: unitOf(key) };
-}
 
 /**
  * Everything the client editor needs from `@life/nutrition`, derived here as
@@ -60,7 +34,7 @@ function field(key: Nutrient) {
 const NUTRITION: NutritionFields = {
   fields: HEADLINE.map(field),
   extraCount: NUTRIENTS.length - HEADLINE.length,
-  groups: GROUPS.map(({ title, keys }) => ({ title, fields: keys.map(field) })),
+  groups: groupedFields(),
   unknown: UNKNOWN,
   empty: Object.fromEntries(NUTRIENTS.map(({ key }) => [key, 0])) as NutrientVector,
   totalUnit: unitOf('calories'),

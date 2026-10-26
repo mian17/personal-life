@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import type { ReactNode, RefObject } from 'react';
+import { useRef } from 'react';
+import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
+import { usePanelDismiss } from '../lib/panel-dismiss';
 
 export interface FabMenuProps {
   /** Trigger accessible name. */
@@ -20,7 +21,7 @@ export interface FabMenuProps {
 
 export function FabMenu({ label, icon, children, open, onOpenChange, className }: Readonly<FabMenuProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
-  useFabMenuDismiss({ rootRef, open, onOpenChange });
+  usePanelDismiss({ rootRef, open, onOpenChange });
 
   return (
     <div ref={rootRef} className={cx('ui-fab-menu', className)}>
@@ -43,29 +44,3 @@ export function FabMenu({ label, icon, children, open, onOpenChange, className }
   );
 }
 
-interface FabMenuDismiss {
-  rootRef: RefObject<HTMLDivElement | null>;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-/** Closes the panel on Escape or a pointerdown outside the menu. */
-function useFabMenuDismiss({ rootRef, open, onOpenChange }: FabMenuDismiss) {
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current != null && !rootRef.current.contains(event.target as Node)) {
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [rootRef, open, onOpenChange]);
-}

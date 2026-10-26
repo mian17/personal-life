@@ -3,9 +3,8 @@ import { CryptoError } from './errors';
 import {
   KEY_BYTES,
   NONCE_BYTES,
-  TAG_BYTES,
-  decodeBase64Url,
   encodeBase64Url,
+  splitSealed,
 } from './envelope';
 
 /** Wrapped-DEK format marker: `kw.v1.<nonce-b64url>.<ct-b64url>`. */
@@ -54,36 +53,10 @@ export function wrapDek(dek: Buffer, masterKey: Buffer): string {
   return `${KW_PREFIX}${encodeBase64Url(nonce)}.${encodeBase64Url(body)}`;
 }
 
-function parseWrappedKey(wrapped: string): { nonce: Buffer; body: Buffer; tag: Buffer } {
-  if (typeof wrapped !== 'string') {
-    throw new CryptoError('invalid wrapped key: expected a string');
-  }
-  if (!wrapped.startsWith(KW_PREFIX)) {
-    throw new CryptoError('invalid wrapped key: unknown or missing version prefix');
-  }
-  const parts = wrapped.slice(KW_PREFIX.length).split('.');
-  if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
-    throw new CryptoError('invalid wrapped key: expected exactly two base64url parts');
-  }
-  const nonce = decodeBase64Url(parts[0], 'wrapped key nonce');
-  if (nonce.length !== NONCE_BYTES) {
-    throw new CryptoError(`invalid wrapped key: nonce must be ${NONCE_BYTES} bytes`);
-  }
-  const combined = decodeBase64Url(parts[1], 'wrapped key ciphertext');
-  if (combined.length < TAG_BYTES) {
-    throw new CryptoError('invalid wrapped key: ciphertext shorter than the auth tag');
-  }
-  return {
-    nonce,
-    body: combined.subarray(0, combined.length - TAG_BYTES),
-    tag: combined.subarray(combined.length - TAG_BYTES),
-  };
-}
-
 /** Unwrap a DEK produced by {@link wrapDek}. Fails closed on any tamper/wrong-key. */
 export function unwrapDek(wrapped: string, masterKey: Buffer): Buffer {
   const kek = deriveKek(masterKey);
-  const { nonce, body, tag } = parseWrappedKey(wrapped);
+  const { nonce, body, tag } = splitSealed(wrapped, KW_PREFIX, 'wrapped key');
   try {
     const decipher = createDecipheriv('aes-256-gcm', kek, nonce);
     decipher.setAuthTag(tag);

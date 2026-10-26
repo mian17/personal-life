@@ -87,7 +87,7 @@ function parseFrom(argv: string[]): string {
  * `down`; any other error or a timeout → `unknown`. It never kills, stops, or spawns
  * anything.
  */
-function defaultProbe(port: number): Promise<StackState> {
+export function defaultProbe(port: number): Promise<StackState> {
   return new Promise((settle) => {
     const socket = connect({ host: '127.0.0.1', port });
     let done = false;

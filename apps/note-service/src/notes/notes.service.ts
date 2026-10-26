@@ -8,24 +8,8 @@ import { NoteTag } from './note-tag.entity';
 import { KeysService } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
+import { decodeTagUsage, normalizeTagIds } from '@life/shared';
 import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
-
-/**
- * Deduplicate the `tagIds` a write carries, preserving first-seen order. The
- * result is the association set stored for the note (TagRef semantics,
- * `SPEC-service-kernel`): note-service stores exactly the ids it is given —
- * no registry validation, no name resolution (names live in `tags-service`).
- */
-function normalizeTagIds(tagIds: number[] | undefined): number[] {
-  const seen = new Set<number>();
-  const out: number[] = [];
-  for (const id of tagIds ?? []) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out.sort((a, b) => a - b);
-}
 
 /**
  * AAD for a note body (`SPEC-notes-at-rest` Encryption Rules). Byte-exact and
@@ -102,28 +86,6 @@ function decodeCiphertextNoteList(raw: unknown): CachedNoteRow[] {
  */
 function withContentUpdatedAtResolved(row: CachedNoteRow): CachedNoteRow {
   return { ...row, contentUpdatedAt: row.contentUpdatedAt ?? null };
-}
-
-/**
- * The `note:tags` cache holds **metadata only** (`SPEC-tags-extraction` Cache
- * Rules): the used-`tagId`+count rows, which carry no plaintext. A hit is valid
- * when every row has numeric `tagId`/`count` fields.
- */
-function isTagUsageRow(row: TagUsage): boolean {
-  return (
-    typeof row?.tagId === 'number' &&
-    Number.isInteger(row.tagId) &&
-    typeof row?.count === 'number' &&
-    Number.isInteger(row.count) &&
-    row.count >= 0
-  );
-}
-
-function decodeTagUsage(raw: unknown): TagUsage[] {
-  if (!Array.isArray(raw) || !raw.every(isTagUsageRow)) {
-    throw new Error('cache entry is not tag usage');
-  }
-  return raw.map((row) => ({ tagId: row.tagId, count: row.count }));
 }
 
 /**
@@ -287,9 +249,9 @@ export class NotesService {
    * A set with no `enc.v1.` body is all-legacy (or empty), so no key is needed
    * and the rows pass through `openField` untouched (dual-read).
    */
-  private async readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedNoteRow[]): Promise<Buffer | null> {
     const needs = rows.some((r) => r.body.startsWith(ENC_PREFIX));
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.requireKeys().getDekForRead(sub);
   }
 

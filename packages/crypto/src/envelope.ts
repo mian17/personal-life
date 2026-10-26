@@ -63,27 +63,28 @@ export function seal(key: Buffer, nonce: Buffer, plaintext: Buffer, aad: Buffer)
  * version, wrong part count, bad base64url, bad nonce length or short ct all
  * fail with {@link CryptoError}.
  */
-function splitEnvelope(
-  envelope: string,
+export function splitSealed(
+  sealed: string,
   prefix: string,
+  label: string,
 ): { nonce: Buffer; body: Buffer; tag: Buffer } {
-  if (typeof envelope !== 'string') {
-    throw new CryptoError('invalid envelope: expected a string');
+  if (typeof sealed !== 'string') {
+    throw new CryptoError(`invalid ${label}: expected a string`);
   }
-  if (!envelope.startsWith(prefix)) {
-    throw new CryptoError('invalid envelope: unknown or missing version prefix');
+  if (!sealed.startsWith(prefix)) {
+    throw new CryptoError(`invalid ${label}: unknown or missing version prefix`);
   }
-  const parts = envelope.slice(prefix.length).split('.');
+  const parts = sealed.slice(prefix.length).split('.');
   if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
-    throw new CryptoError('invalid envelope: expected exactly two base64url parts');
+    throw new CryptoError(`invalid ${label}: expected exactly two base64url parts`);
   }
-  const nonce = decodeBase64Url(parts[0], 'envelope nonce');
+  const nonce = decodeBase64Url(parts[0], `${label} nonce`);
   if (nonce.length !== NONCE_BYTES) {
-    throw new CryptoError(`invalid envelope: nonce must be ${NONCE_BYTES} bytes`);
+    throw new CryptoError(`invalid ${label}: nonce must be ${NONCE_BYTES} bytes`);
   }
-  const combined = decodeBase64Url(parts[1], 'envelope ciphertext');
+  const combined = decodeBase64Url(parts[1], `${label} ciphertext`);
   if (combined.length < TAG_BYTES) {
-    throw new CryptoError('invalid envelope: ciphertext shorter than the auth tag');
+    throw new CryptoError(`invalid ${label}: ciphertext shorter than the auth tag`);
   }
   return {
     nonce,
@@ -99,7 +100,7 @@ function splitEnvelope(
  */
 export function open(key: Buffer, envelope: string, aad: Buffer): Buffer {
   assertKey(key);
-  const { nonce, body, tag } = splitEnvelope(envelope, ENC_PREFIX);
+  const { nonce, body, tag } = splitSealed(envelope, ENC_PREFIX, 'envelope');
   try {
     const decipher = createDecipheriv('aes-256-gcm', key, nonce);
     decipher.setAAD(aad);

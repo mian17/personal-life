@@ -1,11 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import type { ComponentPropsWithRef } from 'react';
-import { Plus } from 'lucide-react';
 import { cx } from '../lib/cx';
-import { Input } from './input';
-import { IconButton } from './icon-button';
+import { CreateField } from './create-field';
 import { Pill } from './pill';
 
 export interface TagOption {
@@ -36,15 +33,7 @@ export function TagPicker({
   className,
   ...rest
 }: Readonly<TagPickerProps>) {
-  const [draft, setDraft] = useState('');
-  const canCreate = draft.trim() !== '';
-
-  const create = () => {
-    const name = draft.trim();
-    if (name === '') return;
-    onCreate?.(name);
-    setDraft('');
-  };
+  const create = (name: string) => onCreate?.(name);
 
   return (
     <fieldset aria-label={label} className={cx('ui-tag-picker', className)} {...rest}>
@@ -68,29 +57,13 @@ export function TagPicker({
         })}
       </div>
       {onCreate != null && (
-        <div className="ui-tag-picker__create">
-          <Input
-            type="text"
-            aria-label={placeholder}
-            placeholder={placeholder}
-            value={draft}
-            disabled={disabled}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                create();
-              }
-            }}
-          />
-          <IconButton
-            label={createLabel}
-            disabled={disabled || !canCreate}
-            onClick={create}
-          >
-            <Plus size={16} aria-hidden />
-          </IconButton>
-        </div>
+        <CreateField
+          className="ui-tag-picker__create"
+          placeholder={placeholder}
+          createLabel={createLabel}
+          disabled={disabled}
+          onCreate={create}
+        />
       )}
     </fieldset>
   );

@@ -16,3 +16,4 @@ backup/
 .pi/worktrees/
 # security scan artifacts (generated)
 vbsec-reports/
+__pycache__/
