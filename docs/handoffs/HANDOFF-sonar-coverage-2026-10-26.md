@@ -262,3 +262,50 @@ sonar-scanner -Dsonar.branch.name=pi/wf/coverage
 
 If the scanner number is already > 80%, tasks 4's test-writing branch is dead code —
 skip it and go straight to the PR.
+
+---
+
+## 10. Task 2 result — verified on host (2026-10-26)
+
+Ran the real scanner on the host against the local SonarQube. This closes task 2 and
+settles task 4's numbers.
+
+```bash
+# scanner 6.2.1 CLI downloaded to /tmp/sonar-scanner-6.2.1.4610-linux-x64
+cd .pi/worktrees/coverage
+SONAR_HOST_URL=http://127.0.0.1:9000 SONAR_TOKEN=<admin token> \
+  sonar-scanner            # EXECUTION SUCCESS, 1:06
+```
+
+- Log line proving ingestion: `Analysing [.../.coverage/lcov.info]` then
+  `Sensor JavaScript/TypeScript Coverage [javascript] (done)`.
+- **Zero** warnings mentioning a missing/unreadable coverage report. The single `WARN`
+  in the log is the unrelated `sonar.python.version` notice.
+- `sonar.branch.name` is **not usable**: Community Build rejects it
+  (`Developer Edition or above is required`). The project therefore keeps one record
+  (branch `main`), and this scan now holds revision `405e794` from `pi/wf/coverage`.
+  The post-merge `dev` scan is what makes the record authoritative again.
+
+Server-side numbers after the scan (project `personal-life`):
+
+| metric | before | after |
+|---|---|---|
+| `coverage` | 0.0% | **81.2%** |
+| `line_coverage` | 0.0% | **82.3%** |
+| `lines_to_cover` | 6462 | 9309 |
+| `uncovered_lines` | 6462 | 1649 |
+| `ncloc` | 24056 | 24146 |
+
+Local lcov measurement for comparison: 7376/8087 = **91.21%** over the 370 files that
+produced records. Sonar's denominator is larger (9309 lines) because it counts every
+indexed product file, including the ones in the 5 workspaces whose suites failed in the
+sandbox — those count as fully uncovered here. A CI run on the host (postgres + rabbit
+available) covers them and should only move the number up.
+
+**Consequence for task 4:** 81.2% > 80% on the server, so the test-writing branch of the
+goal is dead — no tests are to be written. Margin is 1.2 points, which is why the CI
+step (task 3) still matters: it is what keeps the number current and complete.
+
+Top remaining 0.0%-coverage files on the server, for the record: `note-editor.tsx` (197
+lines), `scripts`-' `receiver.mjs` (159), `oidc-dance.ts` (95),
+`dispatcher.service.ts` (70), `duplication-report.py` (63), `coverage.mjs` (56).

@@ -20,3 +20,4 @@ __pycache__/
 
 # Coverage reports (local lcov for SonarQube; never committed)
 .coverage/
+.scannerwork/
