@@ -26,6 +26,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Suites that boot a sqlite service need a writable data directory, and
+      # those directories are gitignored, so a fresh checkout has none.
+      - name: Prepare test data directories
+        run: mkdir -p apps/{idp,meal-service,note-service,tags-service,todo-service}/data
+
+      # Produces `.coverage/lcov.info`, the report the scan step below ingests -
+      # without it every line counts as uncovered, which is why the project read
+      # 0.0% for so long. A failing suite fails the job on purpose: scanning a
+      # stale or partial report silently understates coverage.
+      - name: Test with coverage
+        run: npm run test:coverage
+
       - name: SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:

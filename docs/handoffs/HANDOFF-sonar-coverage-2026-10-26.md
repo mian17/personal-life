@@ -309,3 +309,44 @@ step (task 3) still matters: it is what keeps the number current and complete.
 Top remaining 0.0%-coverage files on the server, for the record: `note-editor.tsx` (197
 lines), `scripts`-' `receiver.mjs` (159), `oidc-dance.ts` (95),
 `dispatcher.service.ts` (70), `duplication-report.py` (63), `coverage.mjs` (56).
+
+---
+
+## 11. Task 3 done, and the number moved (2026-10-26)
+
+### The CI step
+
+`.github/workflows/sonarqube.yml` now runs `setup-node` -> `npm ci` -> create the
+gitignored `apps/*/data` directories -> `npm run test:coverage` **before** the scan.
+A red suite fails the job on purpose, so the scanner never ingests a stale or partial
+report. No `continue-on-error`.
+
+### One real flake fixed on the way (rule: "pre-existing" is not a category)
+
+The first full `npm run test:coverage` on the host failed 5 of 17 workspaces. Four were
+sandbox artefacts that do not reproduce here (missing MCP SDK in `node_modules`, data
+dirs, no postgres). One was a genuine bug in the test itself:
+
+`packages/db/test/pg-integration.test.ts` gated readiness on `pg_isready`, which answers
+against the image entrypoint's **temporary bootstrap server**. The real postmaster
+restarts a moment later, so the first `psql` could land in the gap:
+`connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed`.
+Reproduced 2/4 runs. The gate now runs `psql -c 'select 1'` against the actual
+database; 3/3 clean afterwards, and the whole workspace passes 71/71.
+
+### Numbers, all three stages
+
+| stage | coverage | line_coverage | lines_to_cover | uncovered | ncloc |
+|---|---|---|---|---|---|
+| before (no report) | 0.0% | 0.0% | 6462 | 6462 | 24056 |
+| report wired, 5 workspaces failed (sandbox) | 81.2% | 82.3% | 9309 | 1649 | 24146 |
+| report wired, all 17 workspaces green (host) | **83.2%** | **84.3%** | 9432 | 1482 | 24146 |
+
+Local lcov for the green run: 7660/8347 = **91.77%** over 382 files (vs Sonar's 9432
+indexed lines — the difference is files jest never instruments, chiefly `scripts/` and
+`apps/pomodoro`).
+
+**Task 4 is closed without writing tests:** 83.2% > 80% was reached by plumbing alone,
+which is exactly the branch the goal allowed. Margin is 3.2 points on the server.
+
+`npm run typecheck` across all 36 workspace script invocations: 0 errors.
