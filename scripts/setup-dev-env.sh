@@ -125,23 +125,30 @@ EOF
 
 # A key counts as present only when the file defines it at line start.
 has_key() {
-  grep -qE "^$2=" "$1"
+  local file="$1"
+  local name="$2"
+  grep -qE "^${name}=" "$file"
 }
 
-if [ -e "$DEST" ]; then
+if [[ -e "$DEST" ]]; then
   # Collect what the existing file lacks. Existing values are never touched.
   missing=""
-  added=()
+  added=""
+  count=0
   while IFS= read -r line; do
     key="${line%%=*}"
-    case "$key" in '' | \#*) continue ;; esac
+    # Only `KEY=value` lines participate; blank lines and comments are skipped.
+    if [[ -z "$key" || "$key" == '#'* ]]; then
+      continue
+    fi
     if ! has_key "$DEST" "$key"; then
-      missing="${missing}${line}"$'\n'
-      added+=("$key")
+      missing+="${line}"$'\n'
+      added+=" $key"
+      count=$((count + 1))
     fi
   done < "$TEMPLATE"
 
-  if [ "${#added[@]}" -eq 0 ]; then
+  if [[ "$count" -eq 0 ]]; then
     echo "complete, nothing to add: $DEST" >&2
     exit 0
   fi
@@ -152,7 +159,7 @@ if [ -e "$DEST" ]; then
     printf '%s' "$missing"
   } >> "$DEST"
 
-  echo "appended ${#added[@]} missing key(s) to $DEST: ${added[*]}" >&2
+  echo "appended ${count} missing key(s) to $DEST:${added}" >&2
   echo "review the new values, then: bash scripts/dev-infra.sh up" >&2
   exit 0
 fi
