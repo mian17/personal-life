@@ -264,7 +264,10 @@ describeDb('Feedback event stream (e2e)', () => {
       expect(second!.sink.eventIds.indexOf(pending[0])).toBeLessThan(
         second!.sink.eventIds.indexOf(pending[1]),
       );
-      expect(await cursor()).not.toBe(resumeFrom);
+      // The sink records an event before `advance()` persists the cursor, so a
+      // rewind issued the moment both ids appear can still be overwritten by
+      // the in-flight advance and replay nothing. Wait for the cursor itself.
+      await waitForAsync(async () => (await cursor()) === (await head()), 'cursor at head');
 
       // At-least-once delivery, exactly-once effect: rewind past the replayed
       // events (the crash window) and let the tick redeliver them.
