@@ -216,7 +216,7 @@ export class OidcService {
     const callback = this.provider().callback();
     return (req, res, next) => {
       if (isProviderPath(req.path || '')) {
-        callback(req, res);
+        callback(req, res).catch(next);
         return;
       }
       next();

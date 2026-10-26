@@ -83,9 +83,7 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException();
       }
     }
-    if (!this.resolver) {
-      this.resolver = createJwksResolver(this.config);
-    }
+    this.resolver ??= createJwksResolver(this.config);
     let payload: JWTPayload;
     try {
       payload = await verifyAccessToken(token, this.resolver, this.config);

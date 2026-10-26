@@ -30,6 +30,11 @@ test('paths Sonar cannot index are dropped', () => {
   assert.equal(normalizePath('src/notes/notes.test.ts', WORKSPACE), null, 'test file in src');
 });
 
+test('a `node --test` suite is not counted as product source', () => {
+  assert.equal(normalizePath('scripts/coverage.test.mjs', '.'), null, 'node:test file');
+  assert.equal(normalizePath('scripts/sonar-autofix/receiver.mjs', '.'), 'scripts/sonar-autofix/receiver.mjs', 'its subject is');
+});
+
 test('a file instrumented twice keeps the most-covered record', () => {
   const report = [
     'SF:src/a.ts',

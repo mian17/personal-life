@@ -619,7 +619,7 @@ export function MealEditor({
             }
           />
         ) : (
-          <List>{items.map(itemForm)}</List>
+          <List>{items.map((item, index) => itemForm(item, index))}</List>
         )}
       </Section>
 

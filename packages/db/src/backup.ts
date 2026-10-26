@@ -101,7 +101,9 @@ export function pruneRoutineSnapshots(
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .filter((name) => isRoutineSnapshot(backupRoot, name))
-    .sort();
+    // Snapshot names are ISO timestamps, so lexicographic order is age order.
+    // `localeCompare` (not the bare comparator default) keeps that explicit.
+    .sort((a, b) => a.localeCompare(b));
 
   for (const name of routine.slice(0, Math.max(0, routine.length - keep))) {
     const dir = join(backupRoot, name);

@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
- * Produce one lcov report for SonarQube from every workspace's jest suite.
+ * Produce one lcov report for SonarQube from every suite that can report one:
+ * each workspace's jest suite, plus the `node --test` suites under `scripts/`.
  *
  * Why this exists: SonarQube reported 0.0% coverage because no lcov report was
  * ever generated, so the scanner had nothing to ingest. Every workspace already
- * had a jest suite; only the reporting step was missing.
+ * had a jest suite; only the reporting step was missing. The `scripts/` suites
+ * were missed by the first version for the same reason one level down — they
+ * run under `node --test`, not jest, so Sonar saw their product files (the
+ * autofix receiver, this reporter) as entirely uncovered.
  *
  * Two things make the merge correct rather than merely present:
  *  - `SF:` paths are rewritten to repository-relative. SonarQube resolves a
@@ -33,7 +37,7 @@ function workspaceDirs() {
     if (!pattern.includes('*')) return [pattern];
     const [parent] = pattern.split('/');
     return readdirSync(join(ROOT, parent))
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .map((name) => `${parent}/${name}`)
       .filter((dir) => existsSync(join(ROOT, dir, 'package.json')));
   });
@@ -73,13 +77,42 @@ function runWorkspace(dir) {
   return join(coverageDir, 'lcov.info');
 }
 
+/**
+ * `node --test` suites that live outside any workspace (the dev tooling under
+ * `scripts/`). Jest never sees them, so their coverage has to be collected by
+ * the runner itself.
+ */
+function nodeTestSuites() {
+  return readdirSync(join(ROOT, 'scripts'), { recursive: true })
+    .map((entry) => `scripts/${entry.split(sep).join('/')}`)
+    .filter((entry) => entry.endsWith('.test.mjs'))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/** Run one `node --test` suite and return the lcov it prints on stdout. */
+function runNodeSuite(file) {
+  console.log(`\n=== coverage: ${file}`);
+  try {
+    return execFileSync(
+      process.execPath,
+      ['--test', '--experimental-test-coverage', '--test-reporter=lcov', file],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+  } catch (error) {
+    // Same rule as jest: keep the report the suite managed to print, but fail.
+    console.error(`=== coverage: ${file} FAILED`);
+    process.exitCode = 1;
+    return typeof error.stdout === 'string' ? error.stdout : '';
+  }
+}
+
 /** `SF:` -> repository-relative, dropping anything SonarQube cannot index. */
 export function normalizePath(sf, workspace) {
   const absolute = sf.startsWith('/') ? sf : resolve(ROOT, workspace, sf);
   const rel = relative(ROOT, absolute);
   if (rel.startsWith('..') || rel.includes('node_modules')) return null;
   if (/(^|\/)(dist|coverage|\.next)\//.test(rel)) return null;
-  if (/\.test\.tsx?$|\.spec\.tsx?$|e2e-spec\.tsx?$|(^|\/)test\//.test(rel)) return null;
+  if (/\.(test|spec|e2e-spec)\.(?:ts|tsx|mjs|cjs|js)$|(^|\/)test\//.test(rel)) return null;
   return rel.split(sep).join('/');
 }
 
@@ -103,14 +136,24 @@ export function parseLcov(text, workspace) {
   return records;
 }
 
+/** Keep the most-covered record per source path (see the header for why). */
+function mergeRecord(merged, record) {
+  const existing = merged.get(record.path);
+  if (!existing || record.hits > existing.hits) merged.set(record.path, record);
+}
+
 function main() {
   const merged = new Map();
   for (const dir of testableWorkspaces()) {
     const report = runWorkspace(dir);
     if (!existsSync(report)) continue;
-    for (const [path, record] of parseLcov(readFileSync(report, 'utf8'), dir)) {
-      const existing = merged.get(path);
-      if (!existing || record.hits > existing.hits) merged.set(path, record);
+    for (const record of parseLcov(readFileSync(report, 'utf8'), dir).values()) {
+      mergeRecord(merged, record);
+    }
+  }
+  for (const file of nodeTestSuites()) {
+    for (const record of parseLcov(runNodeSuite(file), '.').values()) {
+      mergeRecord(merged, record);
     }
   }
 

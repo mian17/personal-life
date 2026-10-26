@@ -75,7 +75,7 @@ export function TodoItem({
   const [intent, setIntent] = useState<{ version: number; done: boolean } | null>(null);
   const baseline = useRef({ version: todo.version, done: todo.done });
   const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);
-  const done = intent && intent.version === todo.version ? intent.done : todo.done;
+  const done = intent?.version === todo.version ? intent.done : todo.done;
 
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);

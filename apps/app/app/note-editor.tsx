@@ -43,7 +43,7 @@ interface Cell<T> {
 }
 
 /** Everything one drain iteration reads and writes, so it can live at module scope. */
-interface DrainContext {
+export interface DrainContext {
   idRef: Cell<string | null>;
   bodyRef: Cell<string>;
   selectedRef: Cell<number[]>;
@@ -168,8 +168,11 @@ async function flushPendingBody(
 /**
  * One drain iteration: a clean editor is done, an empty body settles without a
  * request, otherwise one flush runs. `true` means the editor may be left clean.
+ *
+ * Exported so the state machine can be pinned without a DOM (`test/note-drain`);
+ * it reads and writes through `ctx` refs, never through React.
  */
-async function drainOnce(ctx: DrainContext): Promise<boolean> {
+export async function drainOnce(ctx: DrainContext): Promise<boolean> {
   if (!ctx.dirtyRef.current) return true;
   const id = ctx.idRef.current;
   const nextBody = ctx.bodyRef.current;
