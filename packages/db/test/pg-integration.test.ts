@@ -59,10 +59,14 @@ describeDocker('pg backup/restore against a throwaway container', () => {
     ]);
     if (started.status !== 0) throw new Error(`container start failed: ${started.stderr}`);
 
+    // `pg_isready` answers during the image entrypoint's temporary bootstrap
+    // server too, so it can report ready seconds before the real postmaster
+    // accepts connections — query the actual database instead.
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      if (docker(['exec', CONTAINER, 'pg_isready', '-U', 'postgres']).status === 0) break;
+      const probe = docker(['exec', CONTAINER, 'psql', '-U', 'postgres', '-d', 'feedback', '-c', 'select 1']);
+      if (probe.status === 0) break;
       await new Promise((settle) => setTimeout(settle, 1000));
-      if (attempt === 59) throw new Error('postgres never became ready');
+      if (attempt === 59) throw new Error(`postgres never became ready: ${probe.stderr.trim()}`);
     }
 
     runner = createDockerPgRunner(CONTAINER);

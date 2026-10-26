@@ -155,9 +155,14 @@ async function startContainer(): Promise<{ url: string; stop(): Promise<void> }>
     }
     if (!port) throw new Error('postgres container never published a port');
 
+    // `pg_isready` also answers during the image entrypoint's temporary
+    // bootstrap server, which is shut down and replaced a moment later; a
+    // connection opened against it dies with "Connection terminated
+    // unexpectedly". Query the real database instead, so the pool only ever
+    // talks to the postmaster that survives.
     for (let attempt = 0; ; attempt += 1) {
       try {
-        run(['exec', name, 'pg_isready', '-U', 'postgres'], true);
+        run(['exec', name, 'psql', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1'], true);
         break;
       } catch {
         if (attempt >= 60) throw new Error('postgres never became ready');
