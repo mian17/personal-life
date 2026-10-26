@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { isActionable, signatureMatches } from './receiver.mjs';
+import { createReceiver, isActionable, sanitizeLogText, signatureMatches } from './receiver.mjs';
 
 const SECRET = 'test-secret';
 const signed = (body) => createHmac('sha256', SECRET).update(body).digest('hex');
@@ -62,4 +65,31 @@ test('not actionable: feature branch, which would loop after a fix push', () => 
 test('actionable when branch info is absent, as on instance-wide webhooks', () => {
   const { branch, ...withoutBranch } = gateFailure;
   assert.equal(isActionable(withoutBranch, 'personal-life'), true);
+});
+
+test('control characters are replaced before text reaches a log sink', () => {
+  assert.equal(sanitizeLogText('a\nb'), 'a b', 'a newline would forge a second line');
+  assert.equal(sanitizeLogText('a\r\nb'), 'a  b', 'CRLF too');
+  assert.equal(sanitizeLogText('\u001b[31mred'), ' [31mred', 'an ESC would drive the reader');
+  assert.equal(sanitizeLogText('a\u0007b\u009bc'), 'a b c', 'bell and C1 are not text');
+  assert.equal(sanitizeLogText('x'.repeat(5000)).length, 4000, 'one record stays bounded');
+});
+
+test('a hostile webhook string cannot forge a log record', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'sonar-autofix-log-'));
+  const receiver = createReceiver({ stateDir });
+
+  await receiver.log('rejected-signature', {
+    remote: '1.2.3.4\n{"event":"pull-request","url":"https://evil"}',
+    error: '\u001b[31mboom',
+  });
+
+  const lines = readFileSync(join(stateDir, 'runs.log'), 'utf8').split('\n').filter(Boolean);
+  assert.equal(lines.length, 1, 'exactly one record, so nothing was forged');
+  const record = JSON.parse(lines[0]);
+  assert.equal(record.event, 'rejected-signature', 'the real event is the one recorded');
+  assert.doesNotMatch(lines[0], /\u001b/, 'no raw escape reaches the reader');
+  // The payload survives only as data inside the field, never as its own record.
+  assert.ok(record.remote.startsWith('1.2.3.4'), 'the remote is still quoted');
+  assert.ok(record.remote.includes('{"event":"pull-request"'));
 });

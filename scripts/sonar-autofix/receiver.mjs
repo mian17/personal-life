@@ -105,6 +105,19 @@ function displayable(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').slice(0, 64) : 'unknown';
 }
 
+/**
+ * Log-injection guard. Webhook strings and child-process output end up in this
+ * log, and a control character there is not text: a newline forges a second log
+ * line, and an ESC drives whatever terminal reads the line. Every control
+ * character is replaced before the text leaves for stdout or the run file, and
+ * the result is bounded so one record cannot flood the log.
+ */
+export function sanitizeLogText(text) {
+  return String(text)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .slice(0, 4000);
+}
+
 /** HMAC-SHA256 over the raw body, as SonarQube signs it. */
 export function signatureMatches(secret, body, header) {
   if (typeof header !== 'string' || header.length === 0) return false;
@@ -138,7 +151,7 @@ export function createReceiver(config) {
   let busy = false;
 
   async function log(event, detail = {}) {
-    const line = JSON.stringify({ at: new Date().toISOString(), event, ...detail });
+    const line = sanitizeLogText(JSON.stringify({ at: new Date().toISOString(), event, ...detail }));
     console.log(line);
     await appendFile(join(config.stateDir, 'runs.log'), `${line}\n`).catch(() => {});
   }
@@ -457,7 +470,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     await start();
   } catch (error) {
-    console.error(`sonar-autofix: ${error.message}`);
+    console.error(sanitizeLogText(`sonar-autofix: ${error.message}`));
     process.exit(1);
   }
 }
