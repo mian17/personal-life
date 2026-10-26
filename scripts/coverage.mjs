@@ -74,7 +74,7 @@ function runWorkspace(dir) {
 }
 
 /** `SF:` -> repository-relative, dropping anything SonarQube cannot index. */
-function normalizePath(sf, workspace) {
+export function normalizePath(sf, workspace) {
   const absolute = sf.startsWith('/') ? sf : resolve(ROOT, workspace, sf);
   const rel = relative(ROOT, absolute);
   if (rel.startsWith('..') || rel.includes('node_modules')) return null;
@@ -84,7 +84,7 @@ function normalizePath(sf, workspace) {
 }
 
 /** Parse an lcov report into records keyed by repository-relative source path. */
-function parseLcov(text, workspace) {
+export function parseLcov(text, workspace) {
   const records = new Map();
   for (const block of text.split('end_of_record')) {
     const lines = block.split('\n').map((line) => line.trim());
@@ -131,4 +131,5 @@ function main() {
   console.log(`\ncoverage: ${merged.size} files -> ${relative(ROOT, out)}`);
 }
 
-main();
+// Importable for `scripts/coverage.test.mjs`; only the CLI invocation runs a scan.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
