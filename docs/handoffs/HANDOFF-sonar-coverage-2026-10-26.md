@@ -404,3 +404,19 @@ gone, `systemctl docker` inactive, no passwordless sudo). SonarQube runs in a
 container, so the post-merge `dev` scan cannot be re-read until it is back. The
 committed server number stays task-2's verified **83.2%** — that scan is real
 evidence; a re-scan would only confirm it on the same tree.
+
+## 13. Post-Docker-return re-scan (2026-10-26)
+
+Docker came back; SonarQube 26.10.0.133078 up. Re-ran the scanner against the current
+tree, `HEAD = 3550fc2`:
+
+- `EXECUTION SUCCESS`, `Analysing [.../.coverage/lcov.info]`, `Sensor
+  JavaScript/TypeScript Coverage (done)`, no missing-report warning.
+- `api/measures/component?component=personal-life`: coverage **83.2**, line_coverage
+  **84.3**, lines_to_cover **9432**, uncovered_lines **1482** — identical to task 2, so
+  the refactor that made `coverage.mjs` importable changed no behaviour.
+- SonarCloud check on `3550fc2`: `completed/success`.
+
+`scripts/coverage.test.mjs` added (5 assertions, `npm run test:coverage-report`): the two
+rules that fail *silently* if they regress — `SF:` path normalization plus the
+unindexable-path drop list, and most-covered-wins dedupe across workspaces.
