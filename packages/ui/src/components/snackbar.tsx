@@ -23,7 +23,7 @@ export function Snackbar({
   onDismiss,
   duration = 5000,
   className,
-}: SnackbarProps) {
+}: Readonly<SnackbarProps>) {
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
@@ -40,8 +40,7 @@ export function Snackbar({
   }, [leaving, onDismiss]);
 
   return (
-    <div
-      role="status"
+    <output
       className={cx('ui-snackbar', leaving && 'ui-snackbar--leaving', className)}
     >
       <span className="ui-snackbar__text">{message}</span>
@@ -58,6 +57,6 @@ export function Snackbar({
           {actionLabel}
         </Button>
       )}
-    </div>
+    </output>
   );
 }

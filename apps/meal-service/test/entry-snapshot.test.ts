@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { decryptField } from '@life/crypto';
 import { MealCache, generationKey } from '../src/cache/meal-cache';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { NUTRIENTS, scale, sum, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
 import type { Entry } from '../src/entries/entry.entity';
 import { EntriesCache } from '../src/entries/entries-cache';
@@ -288,6 +288,6 @@ describe('EntriesService — read path discipline', () => {
     const dbCallsBefore = h.repo.find.mock.calls.length;
     const again = await h.service.findAll(SUB, DAY);
     expect(again[0].nutrients).toEqual(created.nutrients);
-    expect(h.repo.find.mock.calls.length).toBe(dbCallsBefore);
+    expect(h.repo.find.mock.calls).toHaveLength(dbCallsBefore);
   });
 });

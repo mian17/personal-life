@@ -12,7 +12,7 @@ export interface EditorStackProps extends ComponentPropsWithRef<'div'> {
  * remaining height under the toolbar (`flex: 1`) and owns no outer margins — the
  * `EditorScreen` provides the padding.
  */
-export function EditorStack({ gap = 'lg', className, children, ...rest }: EditorStackProps) {
+export function EditorStack({ gap = 'lg', className, children, ...rest }: Readonly<EditorStackProps>) {
   return (
     <div className={cx('ui-editor-stack', `ui-editor-stack--${gap}`, className)} {...rest}>
       {children}

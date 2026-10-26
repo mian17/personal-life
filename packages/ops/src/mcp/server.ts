@@ -89,7 +89,7 @@ function answerRequestsUntilStdinCloses(loop: ServerLoop): Promise<number> {
         if (lineEnd === -1) return;
         const line = buffered.slice(0, lineEnd);
         buffered = buffered.slice(lineEnd + 1);
-        respondToLine(loop, line);
+        void respondToLine(loop, line);
       }
     });
     process.stdin.on('end', () => finish(0));

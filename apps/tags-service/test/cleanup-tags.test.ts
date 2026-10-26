@@ -1,8 +1,8 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import {
   DEFAULT_NOTE_DB_PATH,
   DEFAULT_TAGS_DB_PATH,
@@ -374,7 +374,7 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
     const code = main([], { env: envFor(fx.dir, fx.note, fx.todo, fx.tags), print, printError });
 
     expect(code).toBe(1);
-    expect(print.mock.calls.length).toBe(0);
+    expect(print.mock.calls).toHaveLength(0);
     expect(printError.mock.calls.join(' ')).toContain('todo.db');
     expect(sha256(fx.tags)).toBe(before);
     expect(backupFiles(fx.dir)).toEqual([]);
@@ -532,6 +532,6 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
     expect(lines.slice(1)).toEqual(['orphan id=2 owner=u1', 'orphan id=9 owner=u1']);
 
     const details = lines.filter((l: string) => l.startsWith('orphan id='));
-    expect(details.length).toBe(plan.orphans);
+    expect(details).toHaveLength(plan.orphans);
   });
 });

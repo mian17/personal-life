@@ -99,13 +99,19 @@ describe('Push subscriptions (e2e)', () => {
 
   describe('POST /api/push/subscribe', () => {
     it('rejects a malformed or extra-key body with 400', async () => {
-      await subscribe({ endpoint: 'https://push.test/1' }).expect(400);
-      await subscribe({ keys: { p256dh: 'p', auth: 'a' } }).expect(400);
-      await subscribe({ ...body('https://push.test/2'), extra: true }).expect(400);
-      await subscribe({
+      const noKeys = await subscribe({ endpoint: 'https://push.test/1' }).expect(400);
+      expect(noKeys.status).toBe(400);
+      const noEndpoint = await subscribe({ keys: { p256dh: 'p', auth: 'a' } }).expect(400);
+      expect(noEndpoint.status).toBe(400);
+      const extraTopLevel = await subscribe({ ...body('https://push.test/2'), extra: true }).expect(
+        400,
+      );
+      expect(extraTopLevel.status).toBe(400);
+      const extraKey = await subscribe({
         endpoint: 'https://push.test/3',
         keys: { p256dh: 'p', auth: 'a', extra: 'x' },
       }).expect(400);
+      expect(extraKey.status).toBe(400);
     });
 
     it('upserts scoped by (sub, endpoint): a repeat subscribe refreshes, never duplicates', async () => {
@@ -133,8 +139,10 @@ describe('Push subscriptions (e2e)', () => {
 
   describe('DELETE /api/push/subscribe', () => {
     it('is idempotent: an unknown endpoint still returns 200', async () => {
-      await unsubscribe('https://push.test/never-subscribed').expect(200);
-      await unsubscribe('https://push.test/never-subscribed').expect(200);
+      const first = await unsubscribe('https://push.test/never-subscribed').expect(200);
+      expect(first.status).toBe(200);
+      const second = await unsubscribe('https://push.test/never-subscribed').expect(200);
+      expect(second.status).toBe(200);
     });
 
     it("deletes only the caller's row and leaves a shared endpoint's other owner intact", async () => {

@@ -1,10 +1,10 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 
 /** The list DTO (`SPEC-todo-service` API): `version` is the OCC counter. */
@@ -106,12 +106,15 @@ export class ListsService {
    * compute `effectiveImportant` from the same cached source, never a second
    * loader (Contract 2 no-fork).
    */
-  async rawRows(sub: string): Promise<CachedListRow[]> {
+  rawRows(sub: string): Promise<CachedListRow[]> {
     return this.cache.getThrough(
       sub,
       TODO_LISTS,
       async () => {
-        const found = await this.lists.find({ where: { ownerSub: sub }, order: { createdAt: 'ASC' } });
+        const found = await this.lists.find({
+          where: { ownerSub: sub },
+          order: { createdAt: 'ASC' },
+        });
         return found.map(toCachedListRow);
       },
       { decode: decodeCiphertextListRowList, cacheable: isCiphertextListRowList },
@@ -123,7 +126,7 @@ export class ListsService {
    * collision check must not be decided by a possibly-stale entry, and a write
    * must not populate a generation it is about to invalidate.
    */
-  private async ownerRows(sub: string): Promise<List[]> {
+  private ownerRows(sub: string): Promise<List[]> {
     return this.lists.find({ where: { ownerSub: sub }, order: { createdAt: 'ASC' } });
   }
 
@@ -145,7 +148,8 @@ export class ListsService {
     const an = a.name.toLowerCase();
     const bn = b.name.toLowerCase();
     if (an !== bn) return an < bn ? -1 : 1;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? -1 : 1;
   }
 
   /** `GET /api/lists` — decrypted, name-sorted (case-insensitive). */

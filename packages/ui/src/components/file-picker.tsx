@@ -20,7 +20,7 @@ export function FilePicker({
   onChange,
   accept = 'image/*',
   ...rest
-}: FilePickerProps) {
+}: Readonly<FilePickerProps>) {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     // jsdom dispatches programmatically even to a disabled control; enforce the contract.
     if (event.target.disabled) return;

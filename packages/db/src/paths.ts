@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { resolveDbPath } from '@life/shared';
 
 export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal';

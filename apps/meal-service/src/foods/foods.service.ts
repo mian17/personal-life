@@ -6,12 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import {
   completeVector,
   foodNameAad,
@@ -132,7 +132,7 @@ export class FoodsService {
   }
 
   /** Resolve the owner DEK at most once per read; null when nothing is sealed. */
-  private async readDek(sub: string, rows: CachedFoodRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedFoodRow[]): Promise<Buffer | null> {
     const sealed = (stored: string | null) =>
       typeof stored === 'string' && stored.startsWith(ENC_PREFIX);
     const needs = rows.some(
@@ -141,7 +141,7 @@ export class FoodsService {
         sealed(row.nutrients) ||
         row.servings.some((s) => sealed(s.label) || sealed(s.nutrients)),
     );
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.keys.getDekForRead(sub);
   }
 
@@ -266,7 +266,7 @@ export class FoodsService {
     // generation and die here; a thrown save never bumps.
     await this.cache.bump(sub);
     return this.toDto(
-      { ...toCachedFoodRow(saved), servings: servings.map(toCachedServing) },
+      { ...toCachedFoodRow(saved), servings: servings.map((s) => toCachedServing(s)) },
       sub,
       dek,
     );
@@ -307,7 +307,7 @@ export class FoodsService {
       }
       servings = await this.replaceServings(sub, saved, base, normalizePortions(dto.portions), dek);
     } else if (baseChanged || dto.servingGrams !== undefined) {
-      const effectiveBase = base ?? (await this.storedBaseVector(sub, saved, dek));
+      const effectiveBase = base ?? this.storedBaseVector(sub, saved, dek);
       servings = await this.deriveServings(sub, saved, effectiveBase, dek);
     } else {
       servings = await this.servings.find({ where: { foodId: saved.id, ownerSub: sub } });
@@ -316,7 +316,7 @@ export class FoodsService {
 
     await this.cache.bump(sub);
     return this.toDto(
-      { ...toCachedFoodRow(saved), servings: servings.map(toCachedServing) },
+      { ...toCachedFoodRow(saved), servings: servings.map((s) => toCachedServing(s)) },
       sub,
       dek,
     );
@@ -397,7 +397,7 @@ export class FoodsService {
    * An all-zero base (a food created before any vector was set) yields all-zero
    * servings, which is the model's documented "absent data is 0" case.
    */
-  private async storedBaseVector(sub: string, food: Food, dek: Buffer): Promise<NutrientVector> {
+  private storedBaseVector(sub: string, food: Food, dek: Buffer): NutrientVector {
     if (!food.nutrients) return zeroVector();
     return readStoredVector(this.openField(food.nutrients, dek, foodNutrientsAad(sub, food.id), food.id));
   }

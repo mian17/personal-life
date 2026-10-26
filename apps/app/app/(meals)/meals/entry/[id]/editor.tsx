@@ -147,7 +147,7 @@ function totalDisplay(value: number, unit: string, unknown: string): string {
 function scaleVector(vector: NutrientVector, factor: number): NutrientVector {
   const out = {} as NutrientVector;
   for (const key of Object.keys(vector) as Nutrient[]) {
-    out[key] = !(factor > 0) ? 0 : Math.max(0, vector[key] * factor);
+    out[key] = factor <= 0 ? 0 : Math.max(0, vector[key] * factor);
   }
   return out;
 }
@@ -182,6 +182,56 @@ function toEditorItem(estimate: PhotoEstimateItem, nutrition: NutritionFields): 
 }
 
 /**
+ * The items the editor opens with. A restored entry reviews its stored row; the
+ * manual door starts empty (every confirmed pick appends); any other door seeds
+ * one blank review row.
+ */
+function initialItems(
+  entry: MealEntry | null,
+  manual: boolean,
+  foodName: string | undefined,
+  nutrition: NutritionFields,
+): EditorItem[] {
+  if (entry) {
+    return [
+      {
+        // The dish name comes from the page (resolved against the catalog); a
+        // pre-feature entry — whose `foodId` *is* the dish name — falls back to
+        // `entry.foodId`. Never the raw id as a label. The entry stores no base,
+        // so the grams view reads 100.
+        dish: foodName ?? entry.foodId,
+        foodId: null,
+        servingGrams: 100,
+        quantity: entry.quantity,
+        nutrients: entry.nutrients,
+        // An existing entry's stored vector cannot say which fields the user
+        // confirmed, so only the headline is treated as known — the same rule
+        // the editor had before the expanded region existed.
+        known: nutrition.fields.map(({ key }) => key),
+      },
+    ];
+  }
+  if (manual) return [];
+  return [
+    { dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] },
+  ];
+}
+
+/**
+ * The banner the photo section shows for a failure reason: the photo's own
+ * failures (`no-image`, `could-not-read`) keep the frozen copy, a service
+ * failure (`service-unavailable`) gets the outage sibling, and no failure shows
+ * nothing.
+ */
+function photoBannerFor(reason: PhotoFailureReason | null): string | null {
+  if (reason === null) return null;
+  if (reason === 'service-unavailable') {
+    return 'Photo service is unavailable. Enter the meal by hand — nothing was guessed.';
+  }
+  return "Couldn't read that photo. Enter the meal by hand — nothing was guessed.";
+}
+
+/**
  * The review editor. `entry` absent = a new meal (the `/meals/entry/new` photo
  * and manual doors); `date` is the client's resolved `YYYY-MM-DD` (lesson 0019);
  * `nutrition` is the plain-JSON display data derived from `@life/nutrition` on
@@ -195,7 +245,7 @@ export function MealEditor({
   door = null,
   foods = [],
   defaultMealGroup,
-}: {
+}: Readonly<{
   entry: MealEntry | null;
   date: string;
   nutrition: NutritionFields;
@@ -207,34 +257,14 @@ export function MealEditor({
   defaultMealGroup?: MealGroup;
   /** The catalog the `'food'` door picks from, with per-100 facts the page formatted. */
   foods?: PickerFood[];
-}) {
+}>) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   // The manual door logs by search: the editor starts empty and every confirmed
   // pick appends, while every other door keeps its single pre-seeded review row.
   const manual = door === 'food' && entry === null;
-  const [items, setItems] = useState<EditorItem[]>(
-    entry
-      ? [
-          {
-            // The dish name comes from the page (resolved against the catalog);
-            // a pre-feature entry — whose `foodId` *is* the dish name — falls
-            // back to `entry.foodId`. Never the raw id as a label. The entry
-            // stores no base, so the grams view reads 100.
-            dish: foodName ?? entry.foodId,
-            foodId: null,
-            servingGrams: 100,
-            quantity: entry.quantity,
-            nutrients: entry.nutrients,
-            // An existing entry's stored vector cannot say which fields the user
-            // confirmed, so only the headline is treated as known — the same rule
-            // the editor had before the expanded region existed.
-            known: nutrition.fields.map(({ key }) => key),
-          },
-        ]
-      : manual
-        ? []
-        : [{ dish: '', foodId: null, servingGrams: 100, quantity: 1, nutrients: nutrition.empty, known: [] }],
+  const [items, setItems] = useState<EditorItem[]>(() =>
+    initialItems(entry, manual, foodName, nutrition),
   );
   const [mealGroup, setMealGroup] = useState<MealGroup>(
     entry?.mealGroup ?? defaultMealGroup ?? 'lunch',
@@ -251,12 +281,7 @@ export function MealEditor({
 
   // The photo's own failures (`no-image`, `could-not-read`) keep the frozen
   // banner; a service failure (`service-unavailable`) gets the outage sibling.
-  const photoBanner =
-    photoFailure === 'service-unavailable'
-      ? 'Photo service is unavailable. Enter the meal by hand — nothing was guessed.'
-      : photoFailure === null
-        ? null
-        : "Couldn't read that photo. Enter the meal by hand — nothing was guessed.";
+  const photoBanner = photoBannerFor(photoFailure);
   // Which item's full-screen nutrients modal is open, by index — one open at a
   // time, and no item is the "no item" sentinel `null`.
   const [openNutrients, setOpenNutrients] = useState<number | null>(null);
@@ -473,8 +498,10 @@ export function MealEditor({
     const subject = item.dish !== '' ? item.dish : `item ${index + 1}`;
     const estimated = isEstimated(item, nutrition);
     // The count comes from the groups, so the trigger can never claim a number
-    // the modal does not hold.
-    const triggerLabel = `All nutrients (${estimatedKeys(nutrition).length})${estimated ? ` · ${nutrition.extraCount} estimated` : ''}`;
+    // the modal does not hold. The estimated tail is built first: a nested
+    // template literal inside the outer one reads as a formatting bug.
+    const estimatedTail = estimated ? ` · ${nutrition.extraCount} estimated` : '';
+    const triggerLabel = `All nutrients (${estimatedKeys(nutrition).length})${estimatedTail}`;
     return (
       <ListItem
         key={index}
@@ -592,7 +619,7 @@ export function MealEditor({
             }
           />
         ) : (
-          <List>{items.map(itemForm)}</List>
+          <List>{items.map((item, index) => itemForm(item, index))}</List>
         )}
       </Section>
 

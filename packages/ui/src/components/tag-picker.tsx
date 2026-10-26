@@ -1,11 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import type { ComponentPropsWithRef } from 'react';
-import { Check, Plus } from 'lucide-react';
 import { cx } from '../lib/cx';
-import { Input } from './input';
-import { IconButton } from './icon-button';
+import { CreateField } from './create-field';
 import { Pill } from './pill';
 
 export interface TagOption {
@@ -13,7 +10,7 @@ export interface TagOption {
   name: string;
 }
 
-export interface TagPickerProps extends Omit<ComponentPropsWithRef<'div'>, 'onToggle'> {
+export interface TagPickerProps extends Omit<ComponentPropsWithRef<'fieldset'>, 'onToggle'> {
   tags: TagOption[];
   selectedIds: number[];
   onToggle: (id: number) => void;
@@ -35,65 +32,39 @@ export function TagPicker({
   createLabel = 'Add tag',
   className,
   ...rest
-}: TagPickerProps) {
-  const [draft, setDraft] = useState('');
-  const canCreate = draft.trim() !== '';
-
-  const create = () => {
-    const name = draft.trim();
-    if (name === '') return;
-    onCreate?.(name);
-    setDraft('');
-  };
+}: Readonly<TagPickerProps>) {
+  const create = (name: string) => onCreate?.(name);
 
   return (
-    <div role="group" aria-label={label} className={cx('ui-tag-picker', className)} {...rest}>
-      <div className="ui-tag-picker__row">
-        <span className="ui-field-label">{label}</span>
-        <div className="ui-tag-picker__tags">
-          {tags.map((tag) => {
-            const selected = selectedIds.includes(tag.id);
-            return (
-              <Pill
-                key={tag.id}
-                as="a"
-                size="filter"
-                active={selected}
-                aria-pressed={selected}
-                disabled={disabled}
-                onClick={() => onToggle(tag.id)}
-              >
-                {tag.name}
-              </Pill>
-            );
-          })}
-        </div>
+    <fieldset aria-label={label} className={cx('ui-tag-picker', className)} {...rest}>
+      <legend className="ui-tag-picker__label ui-field-label">{label}</legend>
+      <div className="ui-tag-picker__tags">
+        {tags.map((tag) => {
+          const selected = selectedIds.includes(tag.id);
+          return (
+            <Pill
+              key={tag.id}
+              as="a"
+              size="filter"
+              active={selected}
+              aria-pressed={selected}
+              disabled={disabled}
+              onClick={() => onToggle(tag.id)}
+            >
+              {tag.name}
+            </Pill>
+          );
+        })}
       </div>
       {onCreate != null && (
-        <div className="ui-tag-picker__create">
-          <Input
-            type="text"
-            aria-label={placeholder}
-            placeholder={placeholder}
-            value={draft}
-            disabled={disabled}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                create();
-              }
-            }}
-          />
-          <IconButton
-            label={createLabel}
-            disabled={disabled || !canCreate}
-            onClick={create}
-          >
-            <Plus size={16} aria-hidden />
-          </IconButton>
-        </div>
+        <CreateField
+          className="ui-tag-picker__create"
+          placeholder={placeholder}
+          createLabel={createLabel}
+          disabled={disabled}
+          onCreate={create}
+        />
       )}
-    </div>
+    </fieldset>
   );
 }

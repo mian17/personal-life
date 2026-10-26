@@ -16,7 +16,7 @@ export function StatusText({
   className,
   children,
   ...rest
-}: StatusTextProps) {
+}: Readonly<StatusTextProps>) {
   return (
     <span
       role="status"

@@ -1,0 +1,19 @@
+[Unit]
+Description=SonarQube auto-fix receiver (webhook -> sandbox agent -> draft PR)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/sonar-autofix.env
+WorkingDirectory=%h/WebstormProjects/personal-life
+ExecStart=/usr/bin/node %h/WebstormProjects/personal-life/scripts/sonar-autofix/receiver.mjs
+Restart=on-failure
+RestartSec=10
+# The agent is a child process; keep the unit's cgroup so the timeout and the
+# stop command reach it too.
+KillMode=control-group
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target

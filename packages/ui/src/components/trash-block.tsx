@@ -66,7 +66,7 @@ export function TrashBlock({
   emptyTrashMessage,
   restoreLabel = 'Restore',
   emptyTrashLabel = 'Empty Trash',
-}: TrashBlockProps): JSX.Element {
+}: Readonly<TrashBlockProps>): JSX.Element {
   return (
     <PageShell>
       <NavBar

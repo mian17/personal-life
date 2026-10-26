@@ -95,7 +95,8 @@ export function groupTodos(
     const cb = latestByTodo.get(b.id);
     if (ca && cb) {
       if (ca.completedAt !== cb.completedAt) return ca.completedAt < cb.completedAt ? 1 : -1;
-      return ca.id < cb.id ? 1 : ca.id > cb.id ? -1 : 0;
+      if (ca.id === cb.id) return 0;
+      return ca.id < cb.id ? 1 : -1;
     }
     if (ca) return -1;
     if (cb) return 1;

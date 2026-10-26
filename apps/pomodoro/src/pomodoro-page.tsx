@@ -16,7 +16,7 @@ export interface PomodoroPageProps {
   durations: Durations;
 }
 
-export function PomodoroPage({ durations }: PomodoroPageProps) {
+export function PomodoroPage({ durations }: Readonly<PomodoroPageProps>) {
   const timer = useTimer(durations);
   const canReset = resetAllowed(timer.status);
 

@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * server-action form — no client JS, no photo path — so one tap posts the
  * frozen numbers as a diary entry. Composition is `@life/ui` only (Contract 1).
  */
-export default async function SavedMealPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SavedMealPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const meal = await loadOrNotFound(() => getSavedMeal(id));
   // Name resolution reads the whole catalog (soft-deleted rows included): the

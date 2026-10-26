@@ -14,9 +14,9 @@ export const dynamic = 'force-dynamic';
  */
 export default async function FoodsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ q?: string }>;
-}) {
+}>) {
   const { q } = await searchParams;
   const foods = await listMealFoods(q);
 
@@ -32,7 +32,7 @@ export default async function FoodsPage({
 }
 
 /** One row: the per-100 facts a staple is logged from, never a log-time amount. */
-function FoodList({ foods, query }: { foods: MealFood[]; query?: string }) {
+function FoodList({ foods, query }: Readonly<{ foods: MealFood[]; query?: string }>) {
   if (foods.length === 0) return <FoodListEmpty query={query} />;
 
   return (
@@ -50,7 +50,7 @@ function FoodList({ foods, query }: { foods: MealFood[]; query?: string }) {
 }
 
 /** An empty search says so; an empty catalog invites the first food. */
-function FoodListEmpty({ query }: { query?: string }) {
+function FoodListEmpty({ query }: Readonly<{ query?: string }>) {
   if (query) return <EmptyState heading="No matches." body="No food name contains that text." />;
 
   return <EmptyState heading="No foods yet." body="Foods you add are saved here to log in one tap." />;

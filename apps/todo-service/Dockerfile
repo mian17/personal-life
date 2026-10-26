@@ -22,11 +22,13 @@ COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/crypto ./packages/crypto
 COPY packages/cache ./packages/cache
+COPY packages/service-kit ./packages/service-kit
 COPY apps/todo-service ./apps/todo-service
 
 RUN npm run build -w @life/shared \
   && npm run build -w @life/crypto \
   && npm run build -w @life/cache \
+ && npm run build -w @life/service-kit \
   && npm run build -w @life/todo-service \
   && npm prune --omit=dev
 
@@ -44,8 +46,11 @@ COPY --from=build /repo/packages/crypto/package.json ./packages/crypto/package.j
 COPY --from=build /repo/packages/crypto/dist ./packages/crypto/dist
 COPY --from=build /repo/packages/cache/package.json ./packages/cache/package.json
 COPY --from=build /repo/packages/cache/dist ./packages/cache/dist
+COPY --from=build /repo/packages/service-kit/package.json ./packages/service-kit/package.json
+COPY --from=build /repo/packages/service-kit/dist ./packages/service-kit/dist
 COPY --from=build /repo/apps/todo-service/package.json ./package.json
 COPY --from=build /repo/apps/todo-service/dist ./dist
 
+USER node
 EXPOSE 3005
 CMD ["node", "dist/main.js"]

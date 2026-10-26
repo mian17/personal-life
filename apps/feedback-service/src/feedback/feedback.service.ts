@@ -6,7 +6,7 @@ import type { CreateFeedbackInput, FeedbackDto, FeedbackStatus } from '@life/sha
 import { Feedback } from './feedback.entity';
 import { FeedbackEvent } from './feedback-event.entity';
 import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 
 /**
  * AAD for a feedback title (`SPEC-feedback-service` Data model). Byte-exact:
@@ -76,7 +76,8 @@ function decodeCiphertextList(raw: unknown): CachedFeedbackRow[] {
 /** Newest-first (`createdAt DESC, id DESC`), applied after every cache hit. */
 function newestFirst(a: FeedbackDto, b: FeedbackDto): number {
   if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
-  return a.id === b.id ? 0 : a.id < b.id ? 1 : -1;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
 }
 
 /**

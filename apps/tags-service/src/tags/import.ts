@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   ENC_PREFIX,
   decryptField,

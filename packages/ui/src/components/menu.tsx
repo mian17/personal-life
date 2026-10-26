@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { cx } from '../lib/cx';
+import { usePanelDismiss } from '../lib/panel-dismiss';
 import { IconButton } from './icon-button';
 
 export interface MenuProps {
@@ -30,26 +31,10 @@ export function Menu({
   onOpenChange,
   disabled,
   className,
-}: MenuProps) {
+}: Readonly<MenuProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current != null && !rootRef.current.contains(event.target as Node)) {
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [open, onOpenChange]);
+  usePanelDismiss({ rootRef, open, onOpenChange });
 
   return (
     <div ref={rootRef} className={cx('ui-menu', className)}>

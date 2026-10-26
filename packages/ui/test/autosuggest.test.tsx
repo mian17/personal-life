@@ -121,6 +121,9 @@ describe('Autosuggest', () => {
       `${popup.id}-option-2`,
     ]);
     expect(rows.map((row) => row.getAttribute('aria-selected'))).toEqual(['false', 'false', 'false']);
+    // Focus stays on the field (`aria-activedescendant`); rows are reachable but
+    // are not tab stops.
+    expect(rows.map((row) => row.getAttribute('tabindex'))).toEqual(['-1', '-1', '-1']);
   });
 
   it('reports every keystroke immediately at the default debounce', () => {

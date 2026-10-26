@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
+import { join } from 'node:path';
 import { Tag } from './tags/tag.entity';
-import { UserKeys } from './keys/user-keys.entity';
-import { KeysModule } from './keys/keys.module';
 import { TagsModule } from './tags/tags.module';
-import { HealthModule } from './health/health.module';
+import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from './service-config';
 
 @Module({
   imports: [
@@ -16,8 +15,8 @@ import { HealthModule } from './health/health.module';
       synchronize: true,
     }),
     TagsModule,
-    KeysModule,
-    HealthModule,
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
   ],
 })
 export class AppModule {}

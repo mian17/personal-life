@@ -2,6 +2,9 @@ import { Check, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } 
 import { FEEDBACK_TYPE_VALUES, type FeedbackType } from '@life/shared';
 import { Feedback } from './feedback.entity';
 
+/** The `type` vocabulary as a SQL literal list, so the CHECK cannot drift from `@life/shared`. */
+const TYPE_VALUES_SQL = FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',');
+
 /**
  * The transactional event log (`SPEC-feedback-service` Event stream). One row
  * per `feedback` insert, written in the same transaction. **Metadata only** —
@@ -19,7 +22,7 @@ import { Feedback } from './feedback.entity';
  * The dispatcher side (trigger DDL, LISTEN, publisher) is T9.
  */
 @Entity('feedback_event')
-@Check('CHK_feedback_event_type', `type IN (${FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',')})`)
+@Check('CHK_feedback_event_type', `type IN (${TYPE_VALUES_SQL})`)
 export class FeedbackEvent {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   seq: string;

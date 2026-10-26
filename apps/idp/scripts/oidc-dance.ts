@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 /**
  * Throwaway OIDC client: runs the full authorization code + PKCE dance against a
@@ -14,6 +14,18 @@ import { createHash, randomBytes } from 'crypto';
 function arg(name: string, fallback?: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : fallback;
+}
+
+/** This script prints values the server chose. One carrying a newline or a
+ * control byte would forge extra log lines, so server text is reduced to a
+ * single printable line before it is interpolated: everything outside
+ * printable ASCII is dropped, then any run of whitespace collapses to one
+ * space. An allowlist rather than a control-byte denylist, because the point
+ * is that only characters known to be inert reach the log. */
+function oneLine(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .replace(/[^\u0020-\u007e]+/g, ' ')
+    .trim();
 }
 
 const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(/\/$/, '');
@@ -65,40 +77,39 @@ async function postForm(url: string, fields: Record<string, string>): Promise<Re
   return res;
 }
 
-async function main(): Promise<void> {
-  if (!USERNAME || !PASSWORD) {
-    throw new Error('provide --username/--password (or SEED_USERNAME/SEED_PASSWORD)');
-  }
+interface Pkce {
+  verifier: string;
+  challenge: string;
+}
 
-  const verifier = randomBytes(32).toString('base64url');
-  const challenge = createHash('sha256').update(verifier).digest('base64url');
-  const state = randomBytes(8).toString('hex');
-  const nonce = randomBytes(8).toString('hex');
+interface DanceState {
+  state: string;
+  nonce: string;
+}
 
+/** The authorize request with the PKCE challenge and the state/nonce. */
+function buildAuthorizeUrl(pkce: Pkce, dance: DanceState): string {
   const authUrl = new URL(`${ISSUER}/auth`);
   authUrl.searchParams.set('client_id', CLIENT_ID);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'openid');
   authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-  authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('nonce', nonce);
-  authUrl.searchParams.set('code_challenge', challenge);
+  authUrl.searchParams.set('state', dance.state);
+  authUrl.searchParams.set('nonce', dance.nonce);
+  authUrl.searchParams.set('code_challenge', pkce.challenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   if (RESOURCE) authUrl.searchParams.set('resource', RESOURCE);
+  return authUrl.toString();
+}
 
-  const authorize = await get(authUrl.toString());
-  const interaction = authorize.headers.get('location');
-  console.log(`1. authorize -> ${authorize.status} ${interaction ?? authorize.statusText}`);
-  if (!interaction) throw new Error('expected an interaction redirect');
-
-  const interactionUrl = new URL(interaction, ISSUER).toString();
-  const form = await get(interactionUrl);
-  console.log(`2. interaction -> ${form.status} (login form)`);
-
-  const login = await postForm(interactionUrl, { username: USERNAME, password: PASSWORD });
-  console.log(`3. login -> ${login.status} ${login.headers.get('location') ?? ''}`);
-
-  let next = login.headers.get('location');
+/**
+ * Follow the post-login redirect chain until it leaves our origin with the code,
+ * capturing the returned state. Bounded to five hops.
+ */
+async function followToCode(next: string | null): Promise<{
+  code: string | undefined;
+  returnedState: string | undefined;
+}> {
   let code: string | undefined;
   let returnedState: string | undefined;
   for (let i = 0; i < 5 && next; i++) {
@@ -109,10 +120,68 @@ async function main(): Promise<void> {
       break;
     }
     const res = await get(url.toString());
-    console.log(`   resume[${i}] -> ${res.status} ${res.headers.get('location') ?? ''}`);
+    console.log(`   resume[${i}] -> ${oneLine(res.status)} ${oneLine(res.headers.get('location'))}`);
     next = res.headers.get('location');
   }
-  console.log(`4. code -> ${code ? 'received' : 'MISSING'} (state ${returnedState === state ? 'matches' : 'MISMATCH'})`);
+  return { code, returnedState };
+}
+
+/** Decode a JWT payload (no signature check; `verify-jwks.ts` does that). */
+function jwtClaims(token: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()) as Record<
+    string,
+    unknown
+  >;
+}
+
+/** Rotate the refresh token, replay the retired one, then prove family revocation. */
+async function checkRefreshRotation(
+  refreshUse: (rt: string) => Promise<{ status: number; body: RefreshBody }>,
+  refreshToken: string,
+): Promise<void> {
+  const rotated = await refreshUse(refreshToken);
+  console.log(
+    `7. refresh -> ${oneLine(rotated.status)} newRT=${rotated.body.refresh_token !== refreshToken ? 'yes' : 'no'} at_ttl=${oneLine(rotated.body.expires_in)}s`,
+  );
+  const newToken = rotated.body.refresh_token;
+  if (!newToken) throw new Error('refresh did not return a new refresh token');
+
+  const reuse = await refreshUse(refreshToken);
+  console.log(`8. replay retired RT -> ${oneLine(reuse.status)} ${oneLine(reuse.body.error)} (expect 400 invalid_grant)`);
+
+  const afterRevoke = await refreshUse(newToken);
+  console.log(`9. newest RT after replay -> ${oneLine(afterRevoke.status)} ${oneLine(afterRevoke.body.error)} (expect 400: family revoked)`);
+}
+
+async function main(): Promise<void> {
+  if (!USERNAME || !PASSWORD) {
+    throw new Error('provide --username/--password (or SEED_USERNAME/SEED_PASSWORD)');
+  }
+
+  const verifier = randomBytes(32).toString('base64url');
+  const pkce: Pkce = {
+    verifier,
+    challenge: createHash('sha256').update(verifier).digest('base64url'),
+  };
+  const dance: DanceState = {
+    state: randomBytes(8).toString('hex'),
+    nonce: randomBytes(8).toString('hex'),
+  };
+
+  const authorize = await get(buildAuthorizeUrl(pkce, dance));
+  const interaction = authorize.headers.get('location');
+  console.log(`1. authorize -> ${oneLine(authorize.status)} ${oneLine(interaction ?? authorize.statusText)}`);
+  if (!interaction) throw new Error('expected an interaction redirect');
+
+  const interactionUrl = new URL(interaction, ISSUER).toString();
+  const form = await get(interactionUrl);
+  console.log(`2. interaction -> ${form.status} (login form)`);
+
+  const login = await postForm(interactionUrl, { username: USERNAME, password: PASSWORD });
+  console.log(`3. login -> ${oneLine(login.status)} ${oneLine(login.headers.get('location'))}`);
+
+  const { code, returnedState } = await followToCode(login.headers.get('location'));
+  console.log(`4. code -> ${code ? 'received' : 'MISSING'} (state ${returnedState === dance.state ? 'matches' : 'MISMATCH'})`);
   if (!code) throw new Error('no authorization code returned');
 
   const tokenRes = await postForm(`${ISSUER}/token`, {
@@ -120,7 +189,7 @@ async function main(): Promise<void> {
     code,
     redirect_uri: REDIRECT_URI,
     client_id: CLIENT_ID,
-    code_verifier: verifier,
+    code_verifier: pkce.verifier,
   });
   const tokens = (await tokenRes.json()) as {
     access_token?: string;
@@ -131,39 +200,27 @@ async function main(): Promise<void> {
     error?: string;
     error_description?: string;
   };
-  console.log(`5. token -> ${tokenRes.status} ${tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`}`);
+  const outcome = tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`;
+  console.log(`5. token -> ${oneLine(tokenRes.status)} ${oneLine(outcome)}`);
   if (!tokens.access_token) throw new Error(`token exchange failed: ${tokens.error} ${tokens.error_description}`);
 
-  const atClaims = JSON.parse(
-    Buffer.from(tokens.access_token.split('.')[1], 'base64url').toString(),
-  ) as { aud?: string; exp?: number; iat?: number };
-  const idClaims = tokens.id_token
-    ? (JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString()) as {
-        nonce?: string;
-      })
-    : undefined;
+  const atClaims = jwtClaims(tokens.access_token) as { aud?: string; exp?: number; iat?: number };
+  const idClaims = tokens.id_token ? (jwtClaims(tokens.id_token) as { nonce?: string }) : undefined;
   console.log(`6. access token -> aud=${JSON.stringify(atClaims.aud)} ttl=${(atClaims.exp ?? 0) - (atClaims.iat ?? 0)}s`);
-  console.log(`   id_token nonce ${idClaims?.nonce === nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent'}`);
+  console.log(`   id_token nonce ${idClaims?.nonce === dance.nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent'}`);
 
   // 7. Refresh: rotate, then replay the retired token to trigger family revocation.
-  if (!tokens.refresh_token) throw new Error('expected a refresh token from the token endpoint');
+  const refreshToken = tokens.refresh_token;
+  if (!refreshToken) throw new Error('expected a refresh token from the token endpoint');
   const refreshUse = (rt: string) =>
     postJson(`${ISSUER}/token`, {
       grant_type: 'refresh_token',
       refresh_token: rt,
       client_id: CLIENT_ID,
     });
-  const rotated = await refreshUse(tokens.refresh_token);
-  console.log(`7. refresh -> ${rotated.status} newRT=${rotated.body.refresh_token !== tokens.refresh_token ? 'yes' : 'no'} at_ttl=${rotated.body.expires_in}s`);
-  if (!rotated.body.refresh_token) throw new Error('refresh did not return a new refresh token');
+  await checkRefreshRotation(refreshUse, refreshToken);
 
-  const reuse = await refreshUse(tokens.refresh_token);
-  console.log(`8. replay retired RT -> ${reuse.status} ${reuse.body.error ?? ''} (expect 400 invalid_grant)`);
-
-  const afterRevoke = await refreshUse(rotated.body.refresh_token);
-  console.log(`9. newest RT after replay -> ${afterRevoke.status} ${afterRevoke.body.error ?? ''} (expect 400: family revoked)`);
-
-  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${atClaims.aud}`);
+  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${oneLine(atClaims.aud)}`);
 }
 
 interface RefreshBody {
@@ -184,6 +241,6 @@ async function postJson(
 }
 
 main().catch((err: unknown) => {
-  console.error('dance failed:', err instanceof Error ? err.message : 'unknown error');
+  console.error('dance failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
   process.exitCode = 1;
 });

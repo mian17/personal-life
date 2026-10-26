@@ -4,7 +4,7 @@ import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { MealCache, generationKey } from '../src/cache/meal-cache';
 import { EntriesCache } from '../src/entries/entries-cache';
 import { EntriesService } from '../src/entries/entries.service';
-import { KeysService } from '../src/keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto';
 import type { Entry } from '../src/entries/entry.entity';
 import type { CacheClient } from '@life/cache';
@@ -153,7 +153,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
       expect(first[0].nutrients.calories).toBe(200);
       // The second read did not run the loader again.
-      expect(h.repo.find.mock.calls.length).toBe(dbCallsOnHit);
+      expect(h.repo.find.mock.calls).toHaveLength(dbCallsOnHit);
       // One entry was written for the day, under the current generation.
       expect(client.setCalls).toContain(`meal:${SUB}:v1:entries:${DAY}`);
       const written = client.values.find((v) => v.key === `meal:${SUB}:v1:entries:${DAY}`)!;
@@ -172,7 +172,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
 
       expect(first.nutrients.calories).toBe(321);
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
-      expect(h.repo.findOne.mock.calls.length).toBe(dbCallsOnHit);
+      expect(h.repo.findOne.mock.calls).toHaveLength(dbCallsOnHit);
       const written = client.values.find((v) => v.key === `meal:${SUB}:v1:entry:${created.id}`)!;
       // The cached value is the stored row, never the decrypted DTO.
       expect(written.value).toContain(ENC_PREFIX);
@@ -322,7 +322,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
       // B's entry survived A's write: B's next read is still a hit.
       const dbCallsBefore = h.repo.find.mock.calls.length;
       await h.service.findAll(B, DAY);
-      expect(h.repo.find.mock.calls.length).toBe(dbCallsBefore);
+      expect(h.repo.find.mock.calls).toHaveLength(dbCallsBefore);
     });
   });
 

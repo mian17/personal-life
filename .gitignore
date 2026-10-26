@@ -12,5 +12,12 @@ data/
 backup/
 *.db
 .worktrees/
+# pi's own worktrees and handoff files
+.pi/worktrees/
 # security scan artifacts (generated)
 vbsec-reports/
+__pycache__/
+
+# Coverage reports (local lcov for SonarQube; never committed)
+.coverage/
+.scannerwork/

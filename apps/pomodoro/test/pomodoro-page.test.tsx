@@ -62,7 +62,7 @@ describe('PomodoroPage', () => {
     const stack = row.parentElement;
     const rows = stack?.children.length ?? 0;
     expect(row.classList.contains('ui-invisible')).toBe(false);
-    expect(row.children.length).toBe(2);
+    expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 
@@ -71,7 +71,7 @@ describe('PomodoroPage', () => {
     expect(start.isConnected).toBe(true);
     expect(start.textContent).toBe('Pause');
     expect(stack?.children.length).toBe(rows);
-    expect(row.children.length).toBe(2);
+    expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 

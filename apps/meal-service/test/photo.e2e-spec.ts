@@ -4,7 +4,7 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { AuthGuard } from '../src/auth/auth.guard';
+import { AuthGuard } from '@life/service-kit';
 import { MealCache } from '../src/cache/meal-cache';
 import { Entry } from '../src/entries/entry.entity';
 import { COULD_NOT_READ, GeminiClient } from '../src/photo/gemini.client';
@@ -12,6 +12,7 @@ import { zeroVector } from '../src/foods/content';
 import { GEMINI_CLIENT_FACTORY } from '../src/photo/photo.service';
 import { FakeGemini, geminiResponse, readablePayload } from './fake-gemini';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { VERIFIER_ENV } from '../src/service-config';
 
 /**
  * Photo estimates over HTTP (`SPEC-meal-service` Photo → Gemini pipeline,
@@ -81,7 +82,7 @@ describe('Photo estimates (e2e)', () => {
       .useValue(() => new GeminiClient(geminiEnv(), fake.handler))
       .compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalGuards(new AuthGuard());
+    app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
     );
@@ -192,9 +193,11 @@ describe('Photo estimates (e2e)', () => {
   });
 
   it('takes the owner from the token, never the body', async () => {
-    await post(app, { imageBase64: IMAGE_B64, mimeType: MIME }).expect(401);
-    await auth(post(app, { imageBase64: IMAGE_B64, mimeType: MIME, ownerSub: 'user-b' })).expect(
-      400,
-    );
+    const anonymous = await post(app, { imageBase64: IMAGE_B64, mimeType: MIME }).expect(401);
+    expect(anonymous.status).toBe(401);
+    const spoofedOwner = await auth(
+      post(app, { imageBase64: IMAGE_B64, mimeType: MIME, ownerSub: 'user-b' }),
+    ).expect(400);
+    expect(spoofedOwner.status).toBe(400);
   });
 });

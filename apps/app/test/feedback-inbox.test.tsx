@@ -408,7 +408,7 @@ describe('FeedbackInbox filtering', () => {
     expect(bar).toContain('href="/feedback"');
     expect(bar).toContain('href="/feedback?status=done"');
     const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active"/g) ?? [];
-    expect(active.length).toBe(1);
+    expect(active).toHaveLength(1);
   });
 
   it('shows only the Done rows under the Done filter, same grouping and order', () => {

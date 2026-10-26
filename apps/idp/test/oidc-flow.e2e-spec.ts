@@ -300,7 +300,7 @@ describe('Authorization code + PKCE flow (e2e)', () => {
     expect(client!.tokenEndpointAuthMethod).toBe('client_secret_basic');
     expect(client!.grantTypes).toContain('authorization_code');
     // Task 6 adds refresh_token; both clients get it and nothing else.
-    expect([...(client!.grantTypes ?? [])].sort()).toEqual(['authorization_code', 'refresh_token']);
+    expect([...(client!.grantTypes ?? [])].sort((a: string, b: string) => a.localeCompare(b))).toEqual(['authorization_code', 'refresh_token']);
     expect(client!.responseTypes).toEqual(['code']);
     expect(client!.idTokenSignedResponseAlg).toBe('EdDSA');
     expect(client!.redirectUris?.length ?? 0).toBeGreaterThan(0);

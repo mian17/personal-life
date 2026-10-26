@@ -57,6 +57,4 @@ async function writeIcon({ file, color, icon }) {
   console.log(`${file} ${color} ${icon} ${statSync(path).size} bytes`);
 }
 
-for (const route of ICONS) {
-  await writeIcon(route);
-}
+await Promise.all(ICONS.map((route) => writeIcon(route)));

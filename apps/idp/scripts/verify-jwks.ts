@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import type { JSONWebKeySet } from 'jose';
 
@@ -11,6 +11,13 @@ import type { JSONWebKeySet } from 'jose';
  *
  * Exits 0 and prints the verified claims, or exits non-zero on any failure.
  */
+/** Error text can embed server-chosen values, so it is reduced to one
+ * printable line before logging: a value carrying a newline would forge extra
+ * log lines. Allowlist, not a control-byte denylist. */
+function oneLine(value: string): string {
+  return value.replace(/[^\u0020-\u007e]+/g, ' ').trim();
+}
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -55,6 +62,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error('verification failed:', err instanceof Error ? err.message : 'unknown error');
+  console.error('verification failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
   process.exitCode = 1;
 });

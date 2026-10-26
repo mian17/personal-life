@@ -89,7 +89,7 @@ export async function discoverEndpoints(options: Pick<LoginOptions, 'issuer' | '
   const authorizationEndpoint = metadata['authorization_endpoint'];
   const tokenEndpoint = metadata['token_endpoint'];
   if (typeof authorizationEndpoint !== 'string' || typeof tokenEndpoint !== 'string') {
-    throw new Error(`login failed: issuer ${options.issuer} has no OIDC token endpoints`);
+    throw new TypeError(`login failed: issuer ${options.issuer} has no OIDC token endpoints`);
   }
   return { authorizationEndpoint, tokenEndpoint };
 }
@@ -283,10 +283,23 @@ function respond(response: { end: (body: string) => void; writeHead: (status: nu
 
 async function openBrowser(url: string): Promise<void> {
   const { execFile } = await import('node:child_process');
-  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  const opener = process.platform === 'darwin' ? 'open' : nonMacOpener();
   await new Promise<void>((resolve, reject) => {
-    execFile(opener, [url], (error) => (error ? reject(error) : resolve()));
+    execFile(opener, [url], (error) => {
+      // Rebuilt as an Error: the rejection value must be one, and the opener's
+      // message is all the caller needs.
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve();
+    });
   });
+}
+
+/** Windows opens a URL with `start`; every other non-macOS platform uses `xdg-open`. */
+function nonMacOpener(): string {
+  return process.platform === 'win32' ? 'start' : 'xdg-open';
 }
 
 function defaultAnnounce(url: string): void {

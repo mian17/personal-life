@@ -89,11 +89,11 @@ describe('Lists API (e2e)', () => {
       const res = await listLists().expect(200);
       expect(res.body.map((l: { name: string }) => l.name)).toEqual(['Alpha', 'zeta']);
       for (const l of res.body) {
-        expect(Object.keys(l).sort()).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
+        expect(Object.keys(l).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
         expect(typeof l.version).toBe('number');
         expect(l.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(res.body.map((l: { id: string }) => l.id).sort()).toEqual([a.body.id, z.body.id].sort());
+      expect(res.body.map((l: { id: string }) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       // B's lists never appear to A.
       expect((await listLists(tokenB).expect(200)).body.map((l: { name: string }) => l.name)).toEqual(['beta']);
@@ -113,8 +113,10 @@ describe('Lists API (e2e)', () => {
 
     it('rejects a case-insensitive collision within one owner with 409', async () => {
       await createList('Groceries').expect(201);
-      await createList('groceries').expect(409);
-      await createList('GROCERIES').expect(409);
+      const lower = await createList('groceries').expect(409);
+      expect(lower.status).toBe(409);
+      const upper = await createList('GROCERIES').expect(409);
+      expect(upper.status).toBe(409);
     });
 
     it('allows the same name under a different owner', async () => {
@@ -124,8 +126,10 @@ describe('Lists API (e2e)', () => {
     });
 
     it('rejects an empty name (400)', async () => {
-      await createList('').expect(400);
-      await auth(request(server()).post('/api/lists'), tokenA).send({}).expect(400);
+      const empty = await createList('').expect(400);
+      expect(empty.status).toBe(400);
+      const missing = await auth(request(server()).post('/api/lists'), tokenA).send({}).expect(400);
+      expect(missing.status).toBe(400);
     });
   });
 

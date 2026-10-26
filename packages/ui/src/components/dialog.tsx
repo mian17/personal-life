@@ -25,19 +25,9 @@ export function Dialog({
   footer,
   size = 'default',
   className,
-}: DialogProps) {
+}: Readonly<DialogProps>) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-
-  function handleBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
-    const el = ref.current;
-    if (!el) return;
-    if (e.target !== el) return; // clicks on child content (incl. keyboard-activated controls)
-    const rect = el.getBoundingClientRect();
-    const outside =
-      e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom;
-    if (outside) onOpenChange(false);
-  }
 
   useEffect(() => {
     const el = ref.current;
@@ -55,8 +45,26 @@ export function Dialog({
       // platform-initiated close (Escape/backdrop) may bubble up.
       if (open) onOpenChange(false);
     };
+    // A native listener rather than an `onClick` JSX prop: `<dialog>` is a
+    // non-interactive element, so a click handler belongs on the element itself.
+    const handleBackdropClick = (e: MouseEvent) => {
+      // Only a click on the dialog's own backdrop, outside its box, closes it;
+      // clicks on child content (incl. keyboard-activated controls) do not.
+      if (e.target !== el) return;
+      const rect = el.getBoundingClientRect();
+      const outside =
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom;
+      if (outside) onOpenChange(false);
+    };
     el.addEventListener('close', handleClose);
-    return () => el.removeEventListener('close', handleClose);
+    el.addEventListener('click', handleBackdropClick);
+    return () => {
+      el.removeEventListener('close', handleClose);
+      el.removeEventListener('click', handleBackdropClick);
+    };
   }, [open, onOpenChange]);
 
   return (
@@ -64,7 +72,6 @@ export function Dialog({
       ref={ref}
       className={cx('ui-dialog', size === 'full' && 'ui-dialog--full', className)}
       aria-labelledby={titleId}
-      onClick={handleBackdropClick}
     >
       <div className="ui-dialog__head">
         <h2 className="ui-dialog__title" id={titleId}>

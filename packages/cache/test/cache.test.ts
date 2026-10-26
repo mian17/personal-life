@@ -103,6 +103,23 @@ describe('ReadThroughCache (read-through + generation invalidation)', () => {
       ]);
     });
 
+    it('strips a caller-supplied <service>: prefix so adapter keys stay byte-identical', async () => {
+      const client = new FakeRedisClient();
+      const cache = makeCache(client);
+      // Adapters whose call sites carry the service prefix (`note:all`) rely on
+      // the cache stripping it; a prefix of a *different* service, or a bare
+      // rest, must pass through untouched.
+      await cache.getThrough(SUB, `${SERVICE}:list`, async () => 1);
+      await cache.getThrough(SUB, 'other:list', async () => 2);
+      await cache.getThrough(SUB, 'all', async () => 3);
+
+      expect(client.setCalls).toEqual([
+        `${SERVICE}:${SUB}:v0:list`,
+        `${SERVICE}:${SUB}:v0:other:list`,
+        `${SERVICE}:${SUB}:v0:all`,
+      ]);
+    });
+
     it('honors a custom ttlSeconds option', async () => {
       const client = new FakeRedisClient();
       const cache = createCache({ service: SERVICE, client, ttlSeconds: 5 });

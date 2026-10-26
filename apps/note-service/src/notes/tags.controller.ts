@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { NotesService } from './notes.service';
 
 /**

@@ -28,7 +28,7 @@ export interface MatrixBlockProps {
   className?: string;
 }
 
-export function MatrixBlock({ quadrants, className }: MatrixBlockProps): JSX.Element {
+export function MatrixBlock({ quadrants, className }: Readonly<MatrixBlockProps>): JSX.Element {
   return (
     <div className={cx('ui-matrix', className)}>
       {quadrants.map((quadrant) => (

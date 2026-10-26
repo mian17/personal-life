@@ -4,15 +4,15 @@ import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
 import { FeedbackNavItem, IconLink, ListShell, TagFilterNav } from '@life/ui';
-import { ListTodo, Plus, Settings, Tags, Trash2 } from 'lucide-react';
+import { Plus, Settings, Tags, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NotesPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ tag?: string; q?: string }>;
-}) {
+}>) {
   const { tag, q } = await searchParams;
   const tagId = parseTagId(tag);
   const [{ notes }, usage] = await Promise.all([listNotes(tagId, q), listNoteTagUsage()]);

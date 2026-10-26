@@ -1,5 +1,5 @@
 import { createClient } from 'redis';
-import { createCache, ReadThroughCache, type CacheClient, type CacheHitOptions } from '@life/cache';
+import { ReadThroughCache, type CacheClient } from '@life/cache';
 
 /**
  * feedback-service's adapter over the generic read-through cache (`@life/cache`,
@@ -16,41 +16,33 @@ import { createCache, ReadThroughCache, type CacheClient, type CacheHitOptions }
  * - `feedback:gen:<sub>` — the per-owner counter, `INCR`ed after each write.
  *   60s TTL is the backstop; any client error fails open to the direct loader.
  */
+
+export { CACHE_TTL_SECONDS } from '@life/cache';
+export type { CacheClient, CacheHitOptions, CacheSetOptions } from '@life/cache';
+
+/** The namespace prefix every feedback key (and counter) carries on shared Redis. */
 const SERVICE = 'feedback';
+
+/** The per-user counter every one of that user's read keys embeds; bumped per write. */
+export function generationKey(sub: string): string {
+  return `${SERVICE}:gen:${sub}`;
+}
 
 /** Nest DI token for the module-init cache selection. */
 export const FEEDBACK_CACHE = Symbol('FEEDBACK_CACHE');
 
-export class FeedbackCache {
-  private readonly inner: ReadThroughCache;
-
-  /** `null` client = Redis not configured; every call runs the loader directly. */
+export class FeedbackCache extends ReadThroughCache {
   constructor(client: CacheClient | null) {
-    this.inner = createCache({ service: SERVICE, client });
-  }
-
-  /** Read-through one of this owner's entries; `loader` returns stored rows. */
-  async getThrough<T>(
-    sub: string,
-    rest: string,
-    loader: () => Promise<T>,
-    options: CacheHitOptions<T> = {},
-  ): Promise<T> {
-    return this.inner.getThrough(sub, rest, loader, options);
-  }
-
-  /** Invalidate every one of this owner's reads after a successful write. */
-  async bumpGeneration(sub: string): Promise<void> {
-    await this.inner.bumpGeneration(sub);
+    super({ service: SERVICE, client });
   }
 }
 
 /**
- * Module-init selection: no `REDIS_URL` means the direct DB path (dev/e2e).
- * With a URL, connect in the background — boot must not block or crash if Redis
- * is briefly unreachable — and `disableOfflineQueue` makes commands reject
- * immediately while disconnected so reads fail open to the DB instead of
- * hanging on a queued command.
+ * Module-init selection: no `REDIS_URL` means the direct DB path (dev/e2e
+ * unchanged). With a URL, connect in the background — boot must not block or
+ * crash if Redis is briefly unreachable — and `disableOfflineQueue` makes
+ * commands reject immediately while disconnected so reads fail open to the DB
+ * instead of hanging on a queued command.
  */
 export function createFeedbackCache(redisUrl: string | undefined): FeedbackCache {
   if (!redisUrl) return new FeedbackCache(null);

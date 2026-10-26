@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
-import { KeysModule } from '../keys/keys.module';
+import { KeysModule } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../service-config';
 import { SavedMeal } from './saved-meal.entity';
 import { SavedMealItem } from './saved-meal-item.entity';
 import { SavedMealsController } from './saved-meals.controller';
@@ -9,7 +10,7 @@ import { SavedMealsCache } from './saved-meals-cache';
 import { SavedMealsService } from './saved-meals.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SavedMeal, SavedMealItem]), KeysModule],
+  imports: [TypeOrmModule.forFeature([SavedMeal, SavedMealItem]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
   controllers: [SavedMealsController],
   providers: [
     // Composition, not a second client: the service's ONE adapter is provided

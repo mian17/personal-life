@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * The bounds mirror the service `CreateFoodDto`; `lib/meal-api.ts` owns the
  * values (lesson 0016) and this page only passes them down.
  */
-export default async function NewFoodPage() {
+export default function NewFoodPage() {
   const bounds: FoodFormBounds = {
     nameMax: FOOD_NAME_MAX,
     labelMax: SERVING_LABEL_MAX,

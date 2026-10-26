@@ -50,7 +50,7 @@ export function Autosuggest({
   minChars = 3,
   debounceMs = 0,
   maxVisible = 8,
-}: AutosuggestProps) {
+}: Readonly<AutosuggestProps>) {
   const [text, setText] = useState('');
   const [highlight, setHighlight] = useState(-1);
   const [dismissed, setDismissed] = useState(false);
@@ -148,53 +148,80 @@ export function Autosuggest({
     else setHighlight(-1);
   }
 
+  /** Alt+ArrowDown opens the popup without taking a highlight. */
+  function openWithoutHighlight(event: KeyboardEvent<HTMLInputElement>) {
+    if (!longEnough) return;
+    setDismissed(false);
+    event.preventDefault();
+  }
+
+  /** ArrowDown opens the popup on its first row, or walks an open one down. */
+  function moveDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) {
+      if (!canOpen) return;
+      setDismissed(false);
+      setHighlight(options.length > 0 ? 0 : -1);
+    } else {
+      setHighlight((index) => (index < options.length - 1 ? index + 1 : index));
+    }
+    event.preventDefault();
+  }
+
+  function moveUp(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) return;
+    setHighlight((index) => (index > 0 ? index - 1 : 0));
+    event.preventDefault();
+  }
+
+  function moveToEdge(key: string, event: KeyboardEvent<HTMLInputElement>) {
+    if (!open || options.length === 0) return;
+    setHighlight(key === 'Home' ? 0 : options.length - 1);
+    event.preventDefault();
+  }
+
+  function pickHighlighted(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open || highlight < 0 || highlight >= options.length) return;
+    select(options[highlight]);
+    event.preventDefault();
+  }
+
+  function escapeOrClear(event: KeyboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    // First Escape closes the popup, the next one (already closed) clears the field.
+    if (open) setDismissed(true);
+    else clear();
+  }
+
+  function leaveField() {
+    if (open && highlight >= 0 && highlight < options.length) select(options[highlight]);
+    setDismissed(true);
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     const { key } = event;
-
     if (key === 'ArrowDown' && event.altKey) {
-      // Opens the popup without taking a highlight.
-      if (!longEnough) return;
-      setDismissed(false);
-      event.preventDefault();
+      openWithoutHighlight(event);
       return;
     }
-
     switch (key) {
       case 'ArrowDown':
-        if (!open) {
-          if (!canOpen) return;
-          setDismissed(false);
-          setHighlight(options.length > 0 ? 0 : -1);
-        } else {
-          setHighlight((index) => (index < options.length - 1 ? index + 1 : index));
-        }
-        event.preventDefault();
+        moveDown(event);
         return;
       case 'ArrowUp':
-        if (!open) return;
-        setHighlight((index) => (index > 0 ? index - 1 : 0));
-        event.preventDefault();
+        moveUp(event);
         return;
       case 'Home':
       case 'End':
-        if (!open || options.length === 0) return;
-        setHighlight(key === 'Home' ? 0 : options.length - 1);
-        event.preventDefault();
+        moveToEdge(key, event);
         return;
       case 'Enter':
-        if (!open || highlight < 0 || highlight >= options.length) return;
-        select(options[highlight]);
-        event.preventDefault();
+        pickHighlighted(event);
         return;
       case 'Escape':
-        event.preventDefault();
-        // First Escape closes the popup, the next one (already closed) clears the field.
-        if (open) setDismissed(true);
-        else clear();
+        escapeOrClear(event);
         return;
       case 'Tab':
-        if (open && highlight >= 0 && highlight < options.length) select(options[highlight]);
-        setDismissed(true);
+        leaveField();
         return;
       default:
         return;
@@ -232,9 +259,7 @@ export function Autosuggest({
           style={{ positionAnchor: anchorName, '--ui-autosuggest-rows': maxVisible } as CSSProperties}
         >
           {options.length === 0 ? (
-            <p className="ui-autosuggest__empty" role="status">
-              {emptyLabel}
-            </p>
+            <output className="ui-autosuggest__empty">{emptyLabel}</output>
           ) : (
             options.map((option, index) => (
               <div
@@ -242,6 +267,10 @@ export function Autosuggest({
                 id={`${popupId}-option-${index}`}
                 role="option"
                 aria-selected={index === highlight}
+                // An option is a control, so it must be focusable — but never a tab
+                // stop: the field keeps focus and reaches rows through
+                // `aria-activedescendant` (WAI-ARIA APG combobox pattern).
+                tabIndex={-1}
                 className={cx(
                   'ui-autosuggest__option',
                   index === highlight && 'ui-autosuggest__option--active',
@@ -250,6 +279,13 @@ export function Autosuggest({
                 onMouseDown={(event) => event.preventDefault()}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => select(option)}
+                // The field owns keyboard interaction (aria-activedescendant), but a row
+                // that responds to a click must also respond to Enter/Space.
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  select(option);
+                }}
               >
                 <span className="ui-autosuggest__label">{option.label}</span>
                 {option.meta != null && <span className="ui-autosuggest__meta">{option.meta}</span>}

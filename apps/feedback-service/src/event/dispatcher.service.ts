@@ -87,11 +87,12 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
     this.trigger();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): Promise<void> {
     this.stopped = true;
     if (this.ticker) clearInterval(this.ticker);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.dropListener();
+    return Promise.resolve();
   }
 
   /** Any trigger: notification, tick, or reconnect — they all drain the log. */
@@ -143,7 +144,8 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
     });
     const onLost = (err?: Error): void => {
       if (this.listener !== client) return;
-      this.logger.error(`LISTEN connection lost${err ? `: ${err.message}` : ''}`);
+      const detail = err ? `: ${err.message}` : '';
+      this.logger.error(`LISTEN connection lost${detail}`);
       this.dropListener();
       this.scheduleRetry();
     };

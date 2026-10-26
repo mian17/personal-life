@@ -30,7 +30,8 @@ function identityUnavailable(): NextResponse {
 
 /** This route's own path, carrying `returnTo` through the loopback hop. */
 function loginPath(returnTo: string | undefined): string {
-  return `/auth/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`;
+  if (!returnTo) return '/auth/login';
+  return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
 /**

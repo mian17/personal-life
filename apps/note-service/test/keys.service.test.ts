@@ -5,9 +5,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import { CryptoError, wrapDek } from '@life/crypto';
-import { createMasterKey } from '../src/keys/keys.module';
-import { KeysService, MASTER_KEY_ENV } from '../src/keys/keys.service';
-import { UserKeys } from '../src/keys/user-keys.entity';
+import { KeysService, UserKeys, createMasterKey } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../src/service-config';
 
 /**
  * `notes-at-rest` T2 — DEK provisioning/memo (`SPEC-notes-at-rest` Data Model +
@@ -165,8 +164,8 @@ describe('master-key bootstrap', () => {
   it('fails closed when the master key env var is missing', () => {
     delete process.env[MASTER_KEY_ENV];
 
-    expect(() => createMasterKey()).toThrow(CryptoError);
-    expect(() => createMasterKey()).toThrow(new RegExp(MASTER_KEY_ENV));
+    expect(() => createMasterKey(MASTER_KEY_ENV)).toThrow(CryptoError);
+    expect(() => createMasterKey(MASTER_KEY_ENV)).toThrow(new RegExp(MASTER_KEY_ENV));
   });
 
   it('fails closed on a wrong-length key without leaking key material', () => {
@@ -175,7 +174,7 @@ describe('master-key bootstrap', () => {
 
     let message = '';
     try {
-      createMasterKey();
+      createMasterKey(MASTER_KEY_ENV);
     } catch (err) {
       message = (err as Error).message;
     }

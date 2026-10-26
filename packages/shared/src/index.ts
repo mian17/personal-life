@@ -20,6 +20,8 @@ export interface TagUsage {
   count: number;
 }
 
+export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
+
 export interface Note {
   id: string;
   body: string;
@@ -156,7 +158,7 @@ export interface TodoCompletionPage {
 /**
  * A todo-local list (`SPEC-todo-service`); `version` is the OCC counter.
  * `importantDefault` is the list's importance default (`null` = false), used as
- * the fallback in `Todo.effectiveImportant` (`SPEC-todo-importance`).
+ * the fallback for a row whose own `important` is unset (`SPEC-todo-importance`).
  */
 export interface List {
   id: string;

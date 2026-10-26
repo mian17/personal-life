@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TODO_REPEATS, type List, type Todo, type TodoRepeat } from '@life/shared';
+import {
+  TODO_REPEATS,
+  type CreateTodoInput,
+  type List,
+  type Todo,
+  type TodoRepeat,
+  type UpdateTodoInput,
+} from '@life/shared';
 import {
   EditorChrome,
   IconButton,
@@ -20,6 +27,22 @@ import { createTodoAction, updateTodoAction } from './todo-actions';
 import { RecurrenceDialog } from './recurrence-dialog';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 
+/** Join the calendar day and optional time; no date ⇒ date-only stays null. */
+function joinDue(dueDate: string, dueTime: string): string | null {
+  if (dueDate === '') return null;
+  return dueTime === '' ? dueDate : `${dueDate}T${dueTime}`;
+}
+
+/** The note is cleared (`null`) rather than sent empty. */
+function noteOrNull(note: string): string | null {
+  return note.trim() === '' ? null : note;
+}
+
+/** Only a custom repeat carries weekdays. */
+function customDays(repeat: TodoRepeat | null, repeatDays: number[]): number[] | undefined {
+  return repeat === 'custom' ? repeatDays : undefined;
+}
+
 /**
  * The todo editor screen, shared by create (`/todos/new`) and edit
  * (`/todos/[id]/edit`). One component, two modes — the same fields and layout;
@@ -30,12 +53,12 @@ export function TodoEditor({
   todo,
   lists,
   availableTags,
-}: {
+}: Readonly<{
   /** Absent = create mode. */
   todo?: Todo;
   lists: List[];
   availableTags: TagOption[];
-}) {
+}>) {
   const router = useRouter();
   const editing = todo != null;
   const [title, setTitle] = useState(todo?.title ?? '');
@@ -80,44 +103,46 @@ export function TodoEditor({
   async function save() {
     if (!canSave || saving) return;
     setSaving(true);
-    // Join the calendar day and optional time; no date ⇒ date-only stays null.
-    const due = dueDate === '' ? null : dueTime === '' ? dueDate : `${dueDate}T${dueTime}`;
+    // Await the action's revalidatePath before navigating: the RSC cache must
+    // reflect the write before `router.back()` renders the List/Matrix, or they
+    // show stale rows. A failed write stays on the editor so the user can retry;
+    // the `saving` guard prevents a double write from a second tap.
     try {
-      // Await the action's revalidatePath before navigating: the RSC cache must
-      // reflect the write before `router.back()` renders the List/Matrix, or they
-      // show stale rows. A failed write stays on the editor so the user can retry;
-      // the `saving` guard prevents a double write from a second tap.
-      if (editing) {
-        await updateTodoAction(
-          todo.id,
-          {
-            title,
-            note: note.trim() === '' ? null : note,
-            dueDate: due,
-            repeat,
-            repeatDays: repeat === 'custom' ? repeatDays : undefined,
-            listId,
-            tagIds,
-            ...(importantOverride !== undefined ? { important: importantOverride } : {}),
-          },
-          todo.version,
-        );
-      } else {
-        await createTodoAction({
-          title,
-          note: note.trim() === '' ? undefined : note,
-          dueDate: due ?? undefined,
-          repeat,
-          repeatDays: repeat === 'custom' ? repeatDays : undefined,
-          listId: listId ?? undefined,
-          tagIds,
-          ...(importantOverride !== undefined ? { important: importantOverride } : {}),
-        });
-      }
+      if (editing) await updateTodoAction(todo.id, updateInput(), todo.version);
+      else await createTodoAction(createInput());
       router.back();
     } catch {
       setSaving(false);
     }
+  }
+
+  /** The edit PATCH: only a touched override is sent, so an untouched one inherits. */
+  function updateInput(): UpdateTodoInput {
+    return {
+      title,
+      note: noteOrNull(note),
+      dueDate: joinDue(dueDate, dueTime),
+      repeat,
+      repeatDays: customDays(repeat, repeatDays),
+      listId,
+      tagIds,
+      ...(importantOverride !== undefined ? { important: importantOverride } : {}),
+    };
+  }
+
+  /** The create POST: absent fields are omitted so the service defaults apply. */
+  function createInput(): CreateTodoInput {
+    const due = joinDue(dueDate, dueTime);
+    return {
+      title,
+      note: noteOrNull(note) ?? undefined,
+      dueDate: due ?? undefined,
+      repeat,
+      repeatDays: customDays(repeat, repeatDays),
+      listId: listId ?? undefined,
+      tagIds,
+      ...(importantOverride !== undefined ? { important: importantOverride } : {}),
+    };
   }
 
   return (

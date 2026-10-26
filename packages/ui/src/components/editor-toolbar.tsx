@@ -18,7 +18,7 @@ export interface EditorToolbarProps {
   className?: string;
 }
 
-export function EditorToolbar({ back, title, status, actions, className }: EditorToolbarProps) {
+export function EditorToolbar({ back, title, status, actions, className }: Readonly<EditorToolbarProps>) {
   return (
     <div className={cx('ui-editor-toolbar', className)}>
       <IconButton label={back.label} onClick={back.onBack}>

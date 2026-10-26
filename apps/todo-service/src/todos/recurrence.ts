@@ -48,6 +48,52 @@ function iso(y: number, m: number, d: number): number {
   return wd === 0 ? 7 : wd;
 }
 
+/** A weekend in UTC weekday terms (0=Sun, 6=Sat). */
+function isWeekend(y: number, m: number, d: number): boolean {
+  const wd = weekday(y, m, d);
+  return wd === 0 || wd === 6;
+}
+
+/** `weekdays`: step one day, then skip Sat/Sun. */
+function stepWeekdays(p: Local): string {
+  p.d += 1;
+  normalize(p);
+  while (isWeekend(p.y, p.m, p.d)) {
+    p.d += 1;
+    normalize(p);
+  }
+  return format(p);
+}
+
+/** `custom`: the next day (≤ 7) whose ISO weekday is in `days`; no set = no step. */
+function stepCustom(p: Local, local: string, days: number[] | null): string {
+  if (!days || days.length === 0) return local;
+  for (let i = 0; i < 7; i += 1) {
+    p.d += 1;
+    normalize(p);
+    if (days.includes(iso(p.y, p.m, p.d))) return format(p);
+  }
+  return format(p);
+}
+
+/** `monthly`: one month on, clamping to the target month's last day. */
+function stepMonthly(p: Local): string {
+  p.m += 1;
+  if (p.m > 12) {
+    p.m = 1;
+    p.y += 1;
+  }
+  p.d = Math.min(p.d, lastDay(p.y, p.m));
+  return format(p);
+}
+
+/** `yearly`: one year on, clamping Feb 29 to Feb 28. */
+function stepYearly(p: Local): string {
+  p.y += 1;
+  p.d = Math.min(p.d, lastDay(p.y, p.m));
+  return format(p);
+}
+
 /**
  * One step of `repeat` on the local value. `monthly` clamps to the target
  * month's last day; `yearly` clamps Feb 29 to Feb 28; `weekdays` skips
@@ -56,48 +102,24 @@ function iso(y: number, m: number, d: number): number {
  */
 export function nextOccurrence(local: string, repeat: TodoRepeat, days: number[] | null = null): string {
   const p = parse(local);
-
-  if (repeat === 'daily') {
-    p.d += 1;
-    return normalize(p);
-  }
-  if (repeat === 'weekly') {
-    p.d += 7;
-    return normalize(p);
-  }
-  if (repeat === 'weekdays') {
-    p.d += 1;
-    normalize(p);
-    while (weekday(p.y, p.m, p.d) === 0 || weekday(p.y, p.m, p.d) === 6) {
+  switch (repeat) {
+    case 'daily':
       p.d += 1;
-      normalize(p);
-    }
-    return format(p);
+      return normalize(p);
+    case 'weekly':
+      p.d += 7;
+      return normalize(p);
+    case 'weekdays':
+      return stepWeekdays(p);
+    case 'custom':
+      return stepCustom(p, local, days);
+    case 'monthly':
+      return stepMonthly(p);
+    case 'yearly':
+      return stepYearly(p);
+    default:
+      return local;
   }
-  if (repeat === 'custom') {
-    if (!days || days.length === 0) return local;
-    for (let i = 0; i < 7; i += 1) {
-      p.d += 1;
-      normalize(p);
-      if (days.includes(iso(p.y, p.m, p.d))) return format(p);
-    }
-    return format(p);
-  }
-  if (repeat === 'monthly') {
-    p.m += 1;
-    if (p.m > 12) {
-      p.m = 1;
-      p.y += 1;
-    }
-    p.d = Math.min(p.d, lastDay(p.y, p.m));
-    return format(p);
-  }
-  if (repeat === 'yearly') {
-    p.y += 1;
-    p.d = Math.min(p.d, lastDay(p.y, p.m));
-    return format(p);
-  }
-  return local;
 }
 
 /** Roll overflowing day fields into the calendar (and clamp to month end). */

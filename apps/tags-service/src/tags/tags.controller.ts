@@ -11,7 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { TagsService, type TagDto } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';

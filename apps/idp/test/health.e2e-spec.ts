@@ -62,9 +62,12 @@ describe('Health (e2e)', () => {
   });
 
   it('serves the whole trio unauthenticated', async () => {
-    await get('/health/live').expect(200);
-    await get('/health/ready').expect(200);
-    await get('/health').expect(200);
+    const live = await get('/health/live').expect(200);
+    const ready = await get('/health/ready').expect(200);
+    const alias = await get('/health').expect(200);
+    expect(live.body).toEqual({ status: 'ok' });
+    expect(ready.body).toEqual({ status: 'ok' });
+    expect(alias.body).toEqual({ status: 'ok' });
   });
 
   it('answers live 200 but ready/alias 503 {status:degraded} when the DB is down', async () => {

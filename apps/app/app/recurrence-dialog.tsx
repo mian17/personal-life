@@ -24,13 +24,14 @@ export function RecurrenceDialog({
   dueDate,
   value,
   onConfirm,
-}: RecurrenceDialogProps) {
+}: Readonly<RecurrenceDialogProps>) {
   const [draft, setDraft] = useState<number[]>(value);
 
   useEffect(() => {
     if (!open) return;
     const due = isoWeekday(dueDate);
-    setDraft(value.length > 0 ? value : due !== 0 ? [due] : []);
+    const seed = due !== 0 ? [due] : [];
+    setDraft(value.length > 0 ? value : seed);
   }, [open, value, dueDate]);
 
   function toggle(day: number) {

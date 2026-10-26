@@ -2,8 +2,8 @@ import { ConflictException, Inject, Injectable, Logger, NotFoundException } from
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
+import { KeysService } from '@life/service-kit';
 import { Tag } from './tag.entity';
-import { KeysService } from '../keys/keys.service';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
 
 /** The registry DTO (`SPEC-tags-service` API): the `version` is the OCC counter. */
@@ -98,8 +98,8 @@ export class TagsService {
    * (`tags:<sub>:v<gen>:all`) serving both list and resolve. The loader is the
    * only DB access; decrypt/sort/filter all happen after every hit.
    */
-  private async rawRows(sub: string): Promise<CachedTagRow[]> {
-    return this.cache.getThrough(
+  private rawRows(sub: string): Promise<CachedTagRow[]> {
+    return this.cache.getAllThrough(
       sub,
       async () => {
         const found = await this.tags.find({ where: { ownerSub: sub }, order: { id: 'ASC' } });
@@ -116,7 +116,7 @@ export class TagsService {
    * to invalidate. The cache is read-only plumbing for `list`/`resolve` — the
    * same split as note-service's `resolveTags` vs `listTags`.
    */
-  private async ownerRows(sub: string): Promise<Tag[]> {
+  private ownerRows(sub: string): Promise<Tag[]> {
     return this.tags.find({ where: { ownerSub: sub }, order: { id: 'ASC' } });
   }
 

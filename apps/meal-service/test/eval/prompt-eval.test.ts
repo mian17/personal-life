@@ -62,7 +62,10 @@ const live = process.env.PROMPT_EVAL === '1';
 
   it('samples each fixture and reports pass@1 / pass@5', async () => {
     for (const fixtureId of fixtureDirs) {
-      await sampleFixture(fixtureId, samplesPerFixture, coordinates);
+      const outcomes = await sampleFixture(fixtureId, samplesPerFixture, coordinates);
+      // A fixture with no sample is a harness bug, not a model failure: the run
+      // must cover every fixture the configured sample count asks for.
+      expect(outcomes).toHaveLength(samplesPerFixture);
     }
   }, 30 * 60_000);
 });
@@ -112,7 +115,11 @@ interface SampleOutcome {
   itemCount: number;
 }
 
-async function sampleFixture(fixtureId: string, samples: number, coordinates: NodeJS.ProcessEnv): Promise<void> {
+async function sampleFixture(
+  fixtureId: string,
+  samples: number,
+  coordinates: NodeJS.ProcessEnv,
+): Promise<SampleOutcome[]> {
   const expected = readFixture(fixtureId);
   const image = fs.readFileSync(path.join(__dirname, 'fixtures', fixtureId, expected.photo));
   const outcomes: SampleOutcome[] = [];
@@ -122,6 +129,7 @@ async function sampleFixture(fixtureId: string, samples: number, coordinates: No
   }
 
   printFixtureReport(expected, outcomes);
+  return outcomes;
 }
 
 function readFixture(fixtureId: string): ExpectedMeal {

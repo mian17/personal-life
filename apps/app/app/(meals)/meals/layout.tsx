@@ -3,7 +3,7 @@ import { SnackbarProvider } from '@life/ui';
 
 export const metadata = routeLayoutMetadata('/manifest-meals.json', 'Meals', '/icon-meals.png');
 
-export default function MealsLayout({ children }: { children: React.ReactNode }) {
+export default function MealsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <RouteLayout>
       <SnackbarProvider>{children}</SnackbarProvider>

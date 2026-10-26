@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'fs';
-import { dirname, join, resolve } from 'path';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { pruneRoutineSnapshots } from './backup';
 import {
   createComposePgRunner,

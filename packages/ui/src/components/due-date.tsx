@@ -18,7 +18,7 @@ export interface DueDateProps {
  * Tomorrow label (lesson 0003: one owner for frontend date reads) and exposes
  * the grouping state as a class so CSS can colour it.
  */
-export function DueDate({ dueDate, today, tone = 'plain', className }: DueDateProps) {
+export function DueDate({ dueDate, today, tone = 'plain', className }: Readonly<DueDateProps>) {
   const state = dueDateState(dueDate, today ?? todayIso());
 
   return (

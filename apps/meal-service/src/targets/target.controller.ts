@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
-import { Principal } from '../auth/principal';
+import { Principal } from '@life/service-kit';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TargetService } from './target.service';
 

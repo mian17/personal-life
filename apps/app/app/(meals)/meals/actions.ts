@@ -31,17 +31,19 @@ import { getToday } from '@/lib/today';
 export async function relogMealAction(id: string): Promise<void> {
   const date = await getToday();
   const saved = await getSavedMeal(id);
-  for (const item of saved.items) {
-    await createMealEntry({
-      date,
-      mealGroup: saved.mealGroup,
-      // An item saved without a catalog food keeps the meal's name as its id —
-      // bounded like every other write, so a long name can't 400 the re-log.
-      foodId: (item.foodId ?? saved.name).slice(0, FOOD_ID_MAX),
-      quantity: item.quantity,
-      nutrients: item.nutrients,
-    });
-  }
+  await Promise.all(
+    saved.items.map((item) =>
+      createMealEntry({
+        date,
+        mealGroup: saved.mealGroup,
+        // An item saved without a catalog food keeps the meal's name as its id —
+        // bounded like every other write, so a long name can't 400 the re-log.
+        foodId: (item.foodId ?? saved.name).slice(0, FOOD_ID_MAX),
+        quantity: item.quantity,
+        nutrients: item.nutrients,
+      }),
+    ),
+  );
   revalidatePath('/meals');
   redirect(`/meals/${date}`);
 }

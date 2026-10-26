@@ -13,7 +13,7 @@ import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-ca
  * re-exports the server-only `readPref`/`next/headers`, which must not enter this
  * client graph (`SPEC-app-kit-settings`, Subpath export).
  */
-export function MatrixSwitch({ checked }: { checked: boolean }) {
+export function MatrixSwitch({ checked }: Readonly<{ checked: boolean }>) {
   const [on, setOn] = useState(checked);
   const persisted = useRef(checked);
   const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);

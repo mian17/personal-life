@@ -1,19 +1,11 @@
 import { createClient } from 'redis';
-import {
-  CACHE_TTL_SECONDS,
-  createCache,
-  ReadThroughCache,
-  type CacheClient,
-  type CacheHitOptions,
-  type CacheSetOptions,
-} from '@life/cache';
+import { ReadThroughCache, type CacheClient, type CacheHitOptions } from '@life/cache';
 
 /**
  * tags-service's adapter over the generic read-through cache (`@life/cache`,
  * `SPEC-service-kernel` "Shared primitives"). All generation-counter mechanics,
  * fail-open, stale-guard, TTL, and ciphertext-value discipline live in the shared
- * package; this module only pins the `tags` namespace and the single `<rest>`
- * this service ever uses.
+ * package; this module only pins the `tags` namespace.
  *
  * Key shape (`SPEC-tags-service` Cache Rules): `tags:<sub>:v<gen>:all` — the
  * owner's serialized **ciphertext** tag rows. One entry serves BOTH the list and
@@ -22,10 +14,10 @@ import {
  * `note:`/`todo:`).
  */
 
-export { CACHE_TTL_SECONDS };
-export type { CacheClient, CacheHitOptions, CacheSetOptions };
+export { CACHE_TTL_SECONDS } from '@life/cache';
+export type { CacheClient, CacheHitOptions, CacheSetOptions } from '@life/cache';
 
-/** The namespace prefix every tag key (and counter) carries on shared Redis. */
+/** The namespace prefix every tags key (and counter) carries on shared Redis. */
 const SERVICE = 'tags';
 
 /** The only `<rest>` this service caches: the owner's whole tag row-set. */
@@ -39,26 +31,22 @@ export function generationKey(sub: string): string {
 /** Nest DI token for the module-init cache selection. */
 export const TAGS_CACHE = Symbol('TAGS_CACHE');
 
-export class TagsCache {
-  private readonly inner: ReadThroughCache;
-
-  /** `null` client = Redis not configured; every call runs the loader directly. */
+/**
+ * Read-through the owner's single row-set entry; `loader` returns ciphertext rows.
+ * Named apart from the inherited generic `getThrough` because this service only
+ * ever caches one `<rest>` value, so the key is not a caller concern.
+ */
+export class TagsCache extends ReadThroughCache {
   constructor(client: CacheClient | null) {
-    this.inner = createCache({ service: SERVICE, client });
+    super({ service: SERVICE, client });
   }
 
-  /** Read-through the owner's single row-set entry; `loader` returns ciphertext rows. */
-  async getThrough<T>(
+  getAllThrough<T>(
     sub: string,
     loader: () => Promise<T>,
     options: CacheHitOptions<T> = {},
   ): Promise<T> {
-    return this.inner.getThrough(sub, ALL, loader, options);
-  }
-
-  /** Invalidate every one of this owner's reads after a successful write. */
-  async bumpGeneration(sub: string): Promise<void> {
-    await this.inner.bumpGeneration(sub);
+    return super.getThrough(sub, ALL, loader, options);
   }
 }
 

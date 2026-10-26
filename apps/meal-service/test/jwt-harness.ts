@@ -9,7 +9,8 @@ import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
  *
  * Env names are meal-service's own (`MEAL_IDP_JWKS_URL` /
  * `MEAL_SERVICE_AUDIENCE`), not note-service's `IDP_JWKS_URL` /
- * `NOTE_SERVICE_AUDIENCE` — see `src/auth/jwt-verifier.ts`.
+ * `NOTE_SERVICE_AUDIENCE` — see `src/service-config.ts` and the shared verifier
+ * in `@life/service-kit`.
  */
 
 export const TEST_ISSUER = 'https://idp.test';

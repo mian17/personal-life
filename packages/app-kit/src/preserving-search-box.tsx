@@ -3,11 +3,11 @@
 import { SearchField } from '@life/ui';
 import { useRouter } from 'next/navigation';
 import { filterHref } from './filter-href';
-import type { QueryParams, RoutePath } from './types';
+import type { QueryParams } from './types';
 
 export interface PreservingSearchBoxProps {
   /** Route to replace, e.g. `/notes` or `/todos`. */
-  path: RoutePath;
+  path: string;
   /** Controlled current query value. */
   q?: string;
   /** Other params to preserve verbatim; `q` is owned by this component. */
@@ -29,7 +29,7 @@ export function PreservingSearchBox({
   params,
   label,
   placeholder,
-}: PreservingSearchBoxProps) {
+}: Readonly<PreservingSearchBoxProps>) {
   const router = useRouter();
 
   const handleQueryChange = (value: string) => {

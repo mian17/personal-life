@@ -6,7 +6,6 @@ import {
   setPref,
   settingsHref as settingsHrefFromBarrel,
 } from '../src/index';
-import type { PrefKey } from '../src/index';
 
 describe('settingsHref', () => {
   it('appends the settings segment to the app-scoped route', () => {
@@ -26,7 +25,7 @@ describe('settingsHref', () => {
     expect(typeof parsePrefValue).toBe('function');
     expect(typeof readPref).toBe('function');
     expect(typeof setPref).toBe('function');
-    const key: PrefKey = 'pref';
+    const key = 'pref';
     expect(typeof key).toBe('string');
   });
 });

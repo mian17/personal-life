@@ -1,8 +1,7 @@
 import 'server-only';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import {
   REFRESH_SKEW_MS,
-  SESSION_TTL_MS,
   sessionStore,
   type AppSession,
   type SessionStoreApi,

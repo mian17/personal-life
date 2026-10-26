@@ -7,8 +7,6 @@ import {
   DueDate,
   IconButton,
   ListItem,
-  Pill,
-  PillGroup,
   type ListItemTone,
   type TagOption,
   useSnackbar,
@@ -24,7 +22,11 @@ import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-ca
  * (frozen label, always ghost) with the `Checkbox` glyph. Ticking a row is a
  * plain toggle — the row never hides or collapses.
  */
-export function DoneToggle({ done, label, onToggle }: { done: boolean; label: string; onToggle: () => void }) {
+export function DoneToggle({
+  done,
+  label,
+  onToggle,
+}: Readonly<{ done: boolean; label: string; onToggle: () => void }>) {
   return (
     <IconButton label={label} variant="ghost" onClick={onToggle}>
       <Checkbox checked={done} />
@@ -53,14 +55,14 @@ export function TodoItem({
   availableTags,
   size = 'default',
   tone,
-}: {
+}: Readonly<{
   todo: Todo;
   today: string;
   lists: List[];
   availableTags: TagOption[];
   size?: 'default' | 'dense';
   tone?: ListItemTone;
-}) {
+}>) {
   const { showSnackbar } = useSnackbar();
   // Optimistic, version-anchored completion: the row strikes/mutes in place on the
   // SAME press, but the server write is debounced — a burst of toggles coalesces
@@ -73,9 +75,8 @@ export function TodoItem({
   const [intent, setIntent] = useState<{ version: number; done: boolean } | null>(null);
   const baseline = useRef({ version: todo.version, done: todo.done });
   const debouncedFlush = useDebouncedCallback(TOGGLE_DEBOUNCE_MS);
-  const done = intent && intent.version === todo.version ? intent.done : todo.done;
+  const done = intent?.version === todo.version ? intent.done : todo.done;
 
-  const attached = availableTags.filter((tag) => todo.tagIds.includes(tag.id));
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
 

@@ -3,8 +3,8 @@ import { DataSource } from 'typeorm';
 import { loadMasterKeyFromEnv } from '@life/crypto';
 import { Note } from '../src/notes/note.entity';
 import { NoteTag } from '../src/notes/note-tag.entity';
-import { UserKeys } from '../src/keys/user-keys.entity';
-import { MASTER_KEY_ENV } from '../src/keys/keys.service';
+import { UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from '../src/service-config';
 import { resolveDbPath } from '../src/keys/db';
 import { formatRotationReport, rotateMasterKeys } from '../src/keys/rotation';
 

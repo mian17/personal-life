@@ -5,9 +5,8 @@ import { FeedbackEvent } from './feedback/feedback-event.entity';
 import { FeedbackCursor } from './feedback/feedback-cursor.entity';
 import { EventModule } from './event/event.module';
 import { FeedbackModule } from './feedback/feedback.module';
-import { HealthModule } from './health/health.module';
-import { KeysModule } from './keys/keys.module';
-import { UserKeys } from './keys/user-keys.entity';
+import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from './service-config';
 
 /** Fail closed: no Postgres URL, no boot (`SPEC-feedback-service` Security). */
 const dbUrl = process.env.FEEDBACK_DB_URL?.trim();
@@ -23,8 +22,8 @@ if (!dbUrl) {
       entities: [UserKeys, Feedback, FeedbackEvent, FeedbackCursor],
       synchronize: true,
     }),
-    KeysModule,
-    HealthModule,
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     FeedbackModule,
     EventModule,
   ],

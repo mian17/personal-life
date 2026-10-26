@@ -6,6 +6,10 @@ import {
   type FeedbackType,
 } from '@life/shared';
 
+/** The vocabularies as SQL literal lists, so each CHECK cannot drift from `@life/shared`. */
+const TYPE_VALUES_SQL = FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',');
+const STATUS_VALUES_SQL = FEEDBACK_STATUS_VALUES.map((v) => `'${v}'`).join(',');
+
 /**
  * The feedback row (`SPEC-feedback-service` Data model). `title` and
  * `description` are `enc.v1.` envelopes with AADs
@@ -24,8 +28,8 @@ import {
  * (lesson 0016: one owner per rule).
  */
 @Entity('feedback')
-@Check('CHK_feedback_type', `type IN (${FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',')})`)
-@Check('CHK_feedback_status', `status IN (${FEEDBACK_STATUS_VALUES.map((v) => `'${v}'`).join(',')})`)
+@Check('CHK_feedback_type', `type IN (${TYPE_VALUES_SQL})`)
+@Check('CHK_feedback_status', `status IN (${STATUS_VALUES_SQL})`)
 @Index('IDX_feedback_owner_created', ['ownerSub', 'createdAt', 'id'])
 export class Feedback {
   @PrimaryColumn({ type: 'uuid' })

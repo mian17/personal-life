@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
+import { join } from 'node:path';
 import { Entry } from './entries/entry.entity';
 import { EntriesModule } from './entries/entries.module';
 import { Food } from './foods/food.entity';
 import { FoodsModule } from './foods/foods.module';
 import { Serving } from './foods/serving.entity';
-import { HealthModule } from './health/health.module';
-import { KeysModule } from './keys/keys.module';
-import { UserKeys } from './keys/user-keys.entity';
+import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import { MASTER_KEY_ENV } from './service-config';
 import { PhotoModule } from './photo/photo.module';
 import { SavedMeal } from './saved-meals/saved-meal.entity';
 import { SavedMealItem } from './saved-meals/saved-meal-item.entity';
@@ -24,8 +23,8 @@ import { TargetModule } from './targets/target.module';
       entities: [UserKeys, Target, Food, Serving, Entry, SavedMeal, SavedMealItem],
       synchronize: true,
     }),
-    KeysModule,
-    HealthModule,
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     TargetModule,
     FoodsModule,
     EntriesModule,

@@ -5,11 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService } from '../keys/keys.service';
+import { KeysService } from '@life/service-kit';
 import { completeVector, readStoredVector } from '../foods/content';
 import type { MealGroup } from '../entries/dto/create-entry.dto';
 import { SavedMeal } from './saved-meal.entity';
@@ -106,14 +106,14 @@ export class SavedMealsService {
   }
 
   /** Resolve the owner DEK at most once per read; null when nothing is sealed. */
-  private async readDek(sub: string, rows: CachedSavedMealRow[]): Promise<Buffer | null> {
+  private readDek(sub: string, rows: CachedSavedMealRow[]): Promise<Buffer | null> {
     const needs = rows.some(
       (row) =>
         typeof row.name === 'string' &&
         (row.name.startsWith(ENC_PREFIX) ||
           row.items.some((item) => item.nutrients?.startsWith(ENC_PREFIX))),
     );
-    if (!needs) return null;
+    if (!needs) return Promise.resolve(null);
     return this.keys.getDekForRead(sub);
   }
 
@@ -175,15 +175,15 @@ export class SavedMealsService {
       where: { ownerSub: sub, deletedAt: IsNull() },
       order: { updatedAt: 'DESC', id: 'ASC' },
     });
-    const rows: CachedSavedMealRow[] = [];
-    for (const meal of meals) {
-      rows.push(toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id)));
-    }
-    return rows;
+    return Promise.all(
+      meals.map(async (meal) =>
+        toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id)),
+      ),
+    );
   }
 
   /** Frozen items for one saved meal, owner-scoped, stable order. */
-  private async loadItems(sub: string, savedMealId: string): Promise<SavedMealItem[]> {
+  private loadItems(sub: string, savedMealId: string): Promise<SavedMealItem[]> {
     return this.items.find({
       where: { ownerSub: sub, savedMealId },
       order: { createdAt: 'ASC', id: 'ASC' },

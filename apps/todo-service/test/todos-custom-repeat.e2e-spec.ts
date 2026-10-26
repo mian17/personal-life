@@ -124,7 +124,12 @@ describe('Todos custom repeat (e2e)', () => {
     });
 
     it('still requires a due date for custom (400)', async () => {
-      await create({ title: 'custom no due', repeat: 'custom', repeatDays: [4] }).expect(400);
+      const res = await create({
+        title: 'custom no due',
+        repeat: 'custom',
+        repeatDays: [4],
+      }).expect(400);
+      expect(res.body.message).toBe('repeat requires a dueDate');
     });
   });
 

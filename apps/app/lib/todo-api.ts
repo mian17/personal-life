@@ -40,7 +40,8 @@ export function listTodos(filters: TodoFilters = {}): Promise<TodoPage> {
   if (filters.limit !== undefined) params.set('limit', String(filters.limit));
   if (filters.cursor !== undefined) params.set('cursor', filters.cursor);
   const qs = params.toString();
-  return call<TodoPage>(`/api/todos${qs ? `?${qs}` : ''}`);
+  const query = qs ? `?${qs}` : '';
+  return call<TodoPage>(`/api/todos${query}`);
 }
 
 export function getTodo(id: string): Promise<Todo> {
@@ -63,7 +64,8 @@ export function listTodoCompletions(
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
   const qs = params.toString();
-  return call<TodoCompletionPage>(`/api/todos/completions${qs ? `?${qs}` : ''}`);
+  const query = qs ? `?${qs}` : '';
+  return call<TodoCompletionPage>(`/api/todos/completions${query}`);
 }
 
 export function createTodo(input: CreateTodoInput): Promise<Todo> {

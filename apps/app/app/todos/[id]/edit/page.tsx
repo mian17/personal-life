@@ -5,7 +5,7 @@ import { TodoEditor } from '../../../todo-editor';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditTodoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditTodoPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
 
   const todo = await loadOrNotFound(() => getTodo(id));

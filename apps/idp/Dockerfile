@@ -38,5 +38,6 @@ COPY --from=build /repo/packages/shared/dist ./packages/shared/dist
 COPY --from=build /repo/apps/idp/package.json ./package.json
 COPY --from=build /repo/apps/idp/dist ./dist
 
+USER node
 EXPOSE 3003
 CMD ["node", "dist/main.js"]

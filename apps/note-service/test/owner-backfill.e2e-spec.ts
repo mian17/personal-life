@@ -175,8 +175,7 @@ function tagNames(path: string): string[] {
 function ownerOf(path: string, table: 'note' | 'tag', id: string | number): string | null {
   const db = open(path, true);
   try {
-    const column = table === 'note' ? 'id' : 'id';
-    const row = db.prepare(`SELECT ownerSub FROM "${table}" WHERE "${column}" = ?`).get(id) as
+    const row = db.prepare(`SELECT ownerSub FROM "${table}" WHERE "id" = ?`).get(id) as
       | { ownerSub: string | null }
       | undefined;
     return row?.ownerSub ?? null;
@@ -187,6 +186,11 @@ function ownerOf(path: string, table: 'note' | 'tag', id: string | number): stri
 
 describe('owner-backfill (e2e)', () => {
   const originalEnv = { ...process.env };
+
+  // This suite boots the real Nest app (TypeORM connect + schema sync) on top of
+  // a migrated DB. Jest's 5s default is not enough for that under parallel
+  // workers, and a timeout there reads as a schema mismatch when it is not one.
+  jest.setTimeout(30_000);
 
   afterAll(() => {
     process.env = originalEnv;

@@ -46,7 +46,7 @@ export function FeedbackForm({
   onSubmit,
   title: dialogTitle = 'Send feedback',
   submitLabel = 'Send',
-}: FeedbackFormProps) {
+}: Readonly<FeedbackFormProps>) {
   const [type, setType] = useState<FeedbackType>(FEEDBACK_TYPES[0].value);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

@@ -2,8 +2,16 @@ name: SonarQube
 
 on:
   push:
-    branches: [main]
+    # `main` is the release line and is not scanned: work lands on `dev` and is
+    # already analysed there, so scanning the promotion again only duplicates it.
+    branches: [dev]
   workflow_dispatch:
+
+# Community Build stores one analysis per project, so two overlapping scans would
+# race to overwrite it. Serialise them; the last push wins.
+concurrency:
+  group: sonarqube
+  cancel-in-progress: false
 
 jobs:
   scan:
@@ -17,6 +25,43 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `--ignore-scripts` on purpose: Sonar rule S6505 flags installing with
+      # package-manager scripts enabled (githubactions:S6505, MAJOR), which is
+      # exactly what `npm ci` alone does — it failed the PR's quality gate at
+      # rating C. Only three dependencies carry install scripts, and only the two
+      # native ones matter here: `better-sqlite3` (sqlite suites) and `argon2`
+      # (idp). Rebuild those explicitly; `fsevents` is macOS-only and optional.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build native dependencies
+        run: npm rebuild better-sqlite3 argon2
+
+      # Workspace `@life/*` types only exist after a build: a fresh clone has no
+      # `dist/`, so every suite importing another workspace fails with TS2307
+      # (measured: 13/13 note-service suites red). `dist/` is in
+      # `sonar.exclusions` and dropped by the coverage merge, so building first
+      # adds no scan noise.
+      - name: Build workspaces
+        run: npm run build
+
+      # Suites that boot a sqlite service need a writable data directory, and
+      # those directories are gitignored, so a fresh checkout has none.
+      - name: Prepare test data directories
+        run: mkdir -p apps/{idp,meal-service,note-service,tags-service,todo-service}/data
+
+      # Produces `.coverage/lcov.info`, the report the scan step below ingests -
+      # without it every line counts as uncovered, which is why the project read
+      # 0.0% for so long. A failing suite fails the job on purpose: scanning a
+      # stale or partial report silently understates coverage.
+      - name: Test with coverage
+        run: npm run test:coverage
 
       - name: SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v8.3.0

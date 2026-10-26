@@ -1,5 +1,5 @@
-import { JsonWebKey, createHash, createPrivateKey, generateKeyPairSync, sign } from 'crypto';
-import { readFileSync, writeFileSync } from 'fs';
+import { JsonWebKey, createHash, createPrivateKey, generateKeyPairSync, sign } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /** One persisted OKP/Ed25519 key pair in JWK form (private, never leaves `data/`). */
 export interface SigningKeyJwk {

@@ -118,7 +118,7 @@ export class OidcService {
         // Resolve the account id (our User.id) to claims for the id_token/userinfo.
         findAccount: (_ctx, id) => ({
           accountId: id,
-          claims: async () => ({ sub: id }),
+          claims: () => Promise.resolve({ sub: id }),
         }),
         loadExistingGrant,
         features: {
@@ -179,15 +179,13 @@ export class OidcService {
 
   /** Provider endpoint paths for enabled features (used to verify the static gate). */
   handledPaths(): string[] {
-    if (!this.resolved) {
-      this.resolved = OIDC_ROUTE_NAMES.flatMap((name) => {
-        try {
-          return [this.provider().pathFor(name)];
-        } catch {
-          return [];
-        }
-      });
-    }
+    this.resolved ??= OIDC_ROUTE_NAMES.flatMap((name) => {
+      try {
+        return [this.provider().pathFor(name)];
+      } catch {
+        return [];
+      }
+    });
     return this.resolved;
   }
 
@@ -218,7 +216,7 @@ export class OidcService {
     const callback = this.provider().callback();
     return (req, res, next) => {
       if (isProviderPath(req.path || '')) {
-        callback(req, res);
+        callback(req, res).catch(next);
         return;
       }
       next();

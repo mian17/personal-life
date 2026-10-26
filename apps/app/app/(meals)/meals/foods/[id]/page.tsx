@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * stored values, and deleting is the soft delete behind the form's
  * `ConfirmButton` — past entries never rewrite.
  */
-export default async function EditFoodPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditFoodPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const food = await loadOrNotFound(() => getMealFood(id));
 

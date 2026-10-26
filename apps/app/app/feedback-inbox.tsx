@@ -38,9 +38,17 @@ function matchesNothingState(status: FeedbackStatus): { heading: string; body: s
 }
 
 /** Canonical ids first, unknown ids last (alphabetical). */
+function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
   const known = canonical.filter((key) => keys.includes(key));
-  const unknown = keys.filter((key) => !canonical.includes(key)).sort();
+  // Code-unit order (not `localeCompare`) to keep the previous default-sort semantics.
+  const unknown = keys
+    .filter((key) => !canonical.includes(key))
+    .sort(compareCodeUnits);
   return [...known, ...unknown];
 }
 
@@ -51,7 +59,7 @@ function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
  * (`?status=done`; All drops the param), so the view is shareable and the server
  * renders the one the owner asked for.
  */
-function StatusFilter({ status }: { status: FeedbackStatus | undefined }) {
+function StatusFilter({ status }: Readonly<{ status: FeedbackStatus | undefined }>) {
   return (
     <PillGroup label="Status">
       <Pill
@@ -91,13 +99,13 @@ export function FeedbackInbox({
   status,
   submitFeedbackAction,
   setFeedbackStatusAction,
-}: {
+}: Readonly<{
   entries: FeedbackDto[];
   /** The validated `?status=` param; `undefined` (absent or unknown) is All. */
   status?: FeedbackStatus;
   submitFeedbackAction: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
   setFeedbackStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
-}) {
+}>) {
   const visible =
     status === undefined ? entries : entries.filter((entry) => entry.status === status);
 

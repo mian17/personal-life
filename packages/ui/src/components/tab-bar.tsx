@@ -23,7 +23,7 @@ export interface TabBarProps {
   className?: string;
 }
 
-export function Tab({ href, active = false, children, className }: TabProps): JSX.Element {
+export function Tab({ href, active = false, children, className }: Readonly<TabProps>): JSX.Element {
   return (
     <Link
       href={href}
@@ -39,7 +39,7 @@ export function TabBar({
   ['aria-label']: ariaLabel,
   children,
   className,
-}: TabBarProps): JSX.Element {
+}: Readonly<TabBarProps>): JSX.Element {
   return (
     <nav aria-label={ariaLabel} className={cx('ui-tab-bar', className)}>
       {children}

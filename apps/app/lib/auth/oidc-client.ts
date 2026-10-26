@@ -1,6 +1,6 @@
 import 'server-only';
 import * as client from 'openid-client';
-import { getAuthEnv, getIdpIssuer, issuerAllowsInsecure, type AuthEnv } from './env';
+import { getAuthEnv, issuerAllowsInsecure, type AuthEnv } from './env';
 
 /**
  * The single OIDC-client seam. Everything that talks to the IdP goes through
@@ -36,8 +36,11 @@ export async function getConfiguration(env: AuthEnv = getAuthEnv()): Promise<cli
 
   const options: client.DiscoveryRequestOptions = {};
   if (issuerAllowsInsecure(env.issuer)) {
-    // Local dev IdP is plain http; the library is HTTPS-only by default.
-    options.execute = [client.allowInsecureRequests];
+    // Local dev IdP is plain http; the library is HTTPS-only by default. The
+    // escape hatch is deprecated to discourage production use only — every
+    // other way to reach a plain-http issuer (`oauth4webapi`'s protocol check,
+    // `Configuration.tlsOnly`) is internal, so this is the sole supported path.
+    options.execute = [client.allowInsecureRequests]; // NOSONAR: typescript:S1874, documented dev-only escape hatch
   }
 
   const config = await client.discovery(
@@ -148,4 +151,4 @@ export async function refreshTokens(
   return toTokens(tokens);
 }
 
-export { getIdpIssuer };
+export { getIdpIssuer } from './env';

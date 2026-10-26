@@ -1,6 +1,10 @@
 import 'server-only';
+import { randomBytes } from 'node:crypto';
 import { createClient } from 'redis';
 import type { AppSession, SessionStoreApi } from './session-store';
+
+/** An already-connected client has nothing to await. Shared so the getter stays pure. */
+const READY: Promise<unknown> = Promise.resolve();
 
 /**
  * Redis-backed session store — the shared-state implementation of the
@@ -72,7 +76,10 @@ export const REDIS_RECONNECT_MAX_DELAY_MS = 2_000;
  * command rejects fast instead of hanging.
  */
 export function unboundedReconnectStrategy(retries: number): number {
-  const jitter = Math.floor(Math.random() * 200);
+  // Jitter only needs to decorrelate replicas; crypto is used so the value never
+  // comes from the PRNG (a reconnect delay is not a security boundary, but it is
+  // no worse here and keeps one source of randomness in the auth path).
+  const jitter = randomBytes(1)[0] % 200;
   return Math.min(2 ** retries * 50, REDIS_RECONNECT_MAX_DELAY_MS) + jitter;
 }
 
@@ -171,14 +178,22 @@ function parseRecord(raw: string | null): AppSession | undefined {
 
 export class RedisSessionStore implements SessionStoreApi {
   private readonly now: () => number;
-  private readonly ready: Promise<unknown>;
 
   constructor(
     private readonly client: SessionRedisClient,
     private readonly options: RedisSessionStoreOptions,
   ) {
     this.now = options.now ?? Date.now;
-    this.ready = options.ready ?? Promise.resolve();
+  }
+
+  /**
+   * The connect promise `create`/`get`/`update`/`destroy` each await. It comes
+   * from the caller (`connectBounded`), which raced it against a timeout and
+   * made it never reject — awaiting it once per call is correct because it is
+   * already one promise, so caching it here would only add a field to guard.
+   */
+  private get ready(): Promise<unknown> {
+    return this.options.ready ?? READY;
   }
 
   /** The store's current time (the injected clock), used for consistent expiry math. */

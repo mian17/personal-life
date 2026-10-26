@@ -11,7 +11,7 @@ export interface CardProps extends ComponentPropsWithRef<'div'> {
   fill?: boolean;
 }
 
-export function Card({ fill, className, children, ...rest }: CardProps) {
+export function Card({ fill, className, children, ...rest }: Readonly<CardProps>) {
   return (
     <div className={cx('ui-card', fill && 'ui-card--fill', className)} {...rest}>
       {children}

@@ -13,7 +13,7 @@ export interface CheckboxProps extends Omit<ComponentPropsWithRef<'span'>, 'chil
  * muted done state) rides on the button's colour. The check is cut out in
  * `--panel` so it reads against the filled square.
  */
-export function Checkbox({ checked = false, className, ...rest }: CheckboxProps) {
+export function Checkbox({ checked = false, className, ...rest }: Readonly<CheckboxProps>) {
   return (
     <span
       aria-hidden

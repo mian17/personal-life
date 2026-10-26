@@ -95,7 +95,9 @@ Facts that decide the steps below:
 
 - **Five SQLite bind mounts**: `./apps/{note,tags,todo,meal}-service/data:/data` and
   `./apps/idp/data:/data`. `meal-service` writes `meal.db` (compose sets `DB_PATH:
-  /data/meal.db` — the app module's `life.db` default is dev-only).
+  /data/meal.db` — the app module's `life.db` default is dev-only). Containers
+  run as `node` (uid 1000), so each `data/` directory must be writable by uid
+  1000 or the service cannot create its database.
 - **Only four ports leave the host**: `3002` (app), `3003` (idp), `5432`
   (postgres-feedback), `5672` (rabbitmq-feedback) — all `127.0.0.1`-only. `tailscale serve`
   proxies 443 → `127.0.0.1:3002` and 8443 → `127.0.0.1:3003`; the other four app services
@@ -218,8 +220,11 @@ cd /home/night/WebstormProjects/personal-life
       `docker compose config >/dev/null` → exits 0 (it fails fast on a missing secret).
 - [ ] The five SQLite `data/` directories exist (`apps/note-service/data`,
       `apps/tags-service/data`, `apps/todo-service/data`, `apps/meal-service/data`,
-      `apps/idp/data`). Create any missing one yourself so Docker does not create it
-      root-owned: `mkdir -p apps/meal-service/data` is the one that matters here.
+      `apps/idp/data`) **and are owned by uid 1000** — containers run as `node`,
+      so a root-owned directory fails the service on its first database write.
+      Create any missing one yourself rather than letting Docker create it
+      root-owned: `mkdir -p apps/meal-service/data`; repair an existing one with
+      `chown -R 1000:1000 apps/*/data`.
 - [ ] Published ports free on loopback: 3002, 3003, 5432, 5672 —
       `docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E '3002|3003|5432|5672'` shows
       only containers you know about.

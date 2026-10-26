@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 /**
  * `owner-backfill` — the one-time, human-run migration that assigns every legacy
@@ -153,6 +153,10 @@ const NOTE_TAG_TEMP_DDL = NOTE_TAG_DDL.replace(
  *
  *  a. `note`: `ALTER TABLE ADD COLUMN ownerSub TEXT` when missing (a native
  *     single-column add, no rebuild) and `IDX_note_owner_sub` when missing.
+ *     `contentUpdatedAt` gets the same treatment: it is a later nullable
+ *     addition to the entity, so a DB migrated only up to `ownerSub` would boot
+ *     into a `synchronize` table rebuild. Adding it here (both are nullable,
+ *     both are single-column native adds) keeps the first boot a no-op.
  *  b. `tag`: when it still lacks `ownerSub` or still carries the legacy
  *     single-column UNIQUE(name), rebuild it under `PRAGMA foreign_keys = OFF`,
  *     copy rows with ids preserved, drop the old table (taking the old unique
@@ -163,123 +167,145 @@ const NOTE_TAG_TEMP_DDL = NOTE_TAG_DDL.replace(
  */
 export function applySchema(noteDbPath: string): SchemaResult {
   const db = new Database(noteDbPath);
-  const actions: string[] = [];
-  let mutated = false;
   try {
-    // (a) note.
-    if (!hasColumn(db, 'note', 'ownerSub')) {
-      db.exec('ALTER TABLE "note" ADD COLUMN "ownerSub" TEXT');
-      actions.push('added note.ownerSub');
-      mutated = true;
-    }
-    if (!hasIndexNamed(db, 'note', 'IDX_note_owner_sub')) {
-      db.exec('CREATE INDEX "IDX_note_owner_sub" ON "note"("ownerSub")');
-      actions.push('created IDX_note_owner_sub');
-      mutated = true;
-    }
-
-    // (b) tag.
-    if (!tableExists(db, 'tag')) {
-      db.exec(TAG_TABLE_DDL);
-      actions.push('created tag table');
-      mutated = true;
-    } else if (!hasColumn(db, 'tag', 'ownerSub') || hasSingleColumnUniqueOnName(db, 'tag')) {
-      const hadOwnerSub = hasColumn(db, 'tag', 'ownerSub');
-      const ownerSelect = hadOwnerSub ? '"ownerSub"' : 'NULL';
-      // PRAGMA foreign_keys is a no-op inside a transaction, so it is toggled
-      // around the transaction, not within it.
-      db.exec('PRAGMA foreign_keys = OFF');
-      try {
-        db.exec('BEGIN');
-        try {
-          db.exec(
-            'CREATE TABLE "temporary_tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)',
-          );
-          db.exec(
-            `INSERT INTO "temporary_tag" ("id","name","ownerSub") ` +
-              `SELECT "id","name",${ownerSelect} FROM "tag"`,
-          );
-          db.exec('DROP TABLE "tag"');
-          db.exec('ALTER TABLE "temporary_tag" RENAME TO "tag"');
-          db.exec('COMMIT');
-        } catch (err) {
-          db.exec('ROLLBACK');
-          throw err;
-        }
-        const violations = db.prepare('PRAGMA foreign_key_check').all() as unknown[];
-        if (violations.length > 0) {
-          throw new Error(
-            `tag rebuild left ${violations.length} foreign-key violation(s); aborting`,
-          );
-        }
-      } finally {
-        // Enforcement is restored on every path, success or failure.
-        db.exec('PRAGMA foreign_keys = ON');
-      }
-      actions.push('rebuilt tag (removed legacy UNIQUE(name))');
-      mutated = true;
-    } else {
-      actions.push('skipped tag rebuild (already migrated)');
-    }
-
-    // (c) user_keys: DEK custody (data-privacy chapter). DDL byte-equivalent to
-    // the entity so the boot-mutates-nothing contract holds.
-    if (!tableExists(db, 'user_keys')) {
-      db.exec(
-        'CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT NULL, "kekVersion" integer NOT NULL DEFAULT (1), "createdAt" datetime NOT NULL)',
-      );
-      actions.push('created user_keys');
-      mutated = true;
-    }
-
-    // (d) note_tag: reconciled to the association-only `NoteTag` entity (the tag
-    // vocabulary is external after the tags-extraction migration). Rebuilt when it
-    // still references `tag` or carries the legacy join-table indexes; created
-    // fresh when absent. Same FK-off rebuild pattern as the tag table above.
-    const noteTagSql = db
-      .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='note_tag'`)
-      .get() as { sql: string } | undefined;
-    const legacyNoteTag =
-      !!noteTagSql &&
-      (noteTagSql.sql.includes('REFERENCES "tag"') ||
-        hasIndexNamed(db, 'note_tag', 'IDX_ddfc0b18dcc060cb8899a24991'));
-    if (!noteTagSql) {
-      db.exec(NOTE_TAG_DDL);
-      actions.push('created note_tag');
-      mutated = true;
-    } else if (legacyNoteTag) {
-      db.exec('PRAGMA foreign_keys = OFF');
-      try {
-        db.exec('BEGIN');
-        try {
-          db.exec(NOTE_TAG_TEMP_DDL);
-          db.exec(
-            'INSERT INTO "temporary_note_tag" ("noteId","tagId") ' +
-              'SELECT "noteId","tagId" FROM "note_tag"',
-          );
-          db.exec('DROP TABLE "note_tag"');
-          db.exec('ALTER TABLE "temporary_note_tag" RENAME TO "note_tag"');
-          db.exec('COMMIT');
-        } catch (err) {
-          db.exec('ROLLBACK');
-          throw err;
-        }
-        const violations = db.prepare('PRAGMA foreign_key_check').all() as unknown[];
-        if (violations.length > 0) {
-          throw new Error(
-            `note_tag rebuild left ${violations.length} foreign-key violation(s); aborting`,
-          );
-        }
-      } finally {
-        db.exec('PRAGMA foreign_keys = ON');
-      }
-      actions.push('rebuilt note_tag (association-only, dropped FK to tag)');
-      mutated = true;
-    }
-
-    return { mutated, actions };
+    return mergeSteps([
+      ensureNoteOwnerColumn(db),
+      ensureTagTable(db),
+      ensureUserKeysTable(db),
+      ensureNoteTagTable(db),
+    ]);
   } finally {
     db.close();
+  }
+}
+
+/** Every step's evidence, in step order; a mutation in any step makes the run a mutation. */
+function mergeSteps(steps: SchemaResult[]): SchemaResult {
+  return {
+    mutated: steps.some((step) => step.mutated),
+    actions: steps.flatMap((step) => step.actions),
+  };
+}
+
+/** Step 2a: the nullable `note` columns and the owner index — native adds, no rebuild. */
+function ensureNoteOwnerColumn(db: Database.Database): SchemaResult {
+  const actions: string[] = [];
+  if (!hasColumn(db, 'note', 'ownerSub')) {
+    db.exec('ALTER TABLE "note" ADD COLUMN "ownerSub" TEXT');
+    actions.push('added note.ownerSub');
+  }
+  if (!hasColumn(db, 'note', 'contentUpdatedAt')) {
+    db.exec('ALTER TABLE "note" ADD COLUMN "contentUpdatedAt" datetime');
+    actions.push('added note.contentUpdatedAt');
+  }
+  if (!hasIndexNamed(db, 'note', 'IDX_note_owner_sub')) {
+    db.exec('CREATE INDEX "IDX_note_owner_sub" ON "note"("ownerSub")');
+    actions.push('created IDX_note_owner_sub');
+  }
+  return { mutated: actions.length > 0, actions };
+}
+
+/**
+ * Step 2b: the `tag` table — created when absent, rebuilt when it still lacks
+ * `ownerSub` or still carries the legacy single-column UNIQUE(name), skipped
+ * when already migrated.
+ */
+function ensureTagTable(db: Database.Database): SchemaResult {
+  if (!tableExists(db, 'tag')) {
+    db.exec(TAG_TABLE_DDL);
+    return { mutated: true, actions: ['created tag table'] };
+  }
+  if (hasColumn(db, 'tag', 'ownerSub') && !hasSingleColumnUniqueOnName(db, 'tag')) {
+    return { mutated: false, actions: ['skipped tag rebuild (already migrated)'] };
+  }
+  const ownerSelect = hasColumn(db, 'tag', 'ownerSub') ? '"ownerSub"' : 'NULL';
+  rebuildWithForeignKeysOff(
+    db,
+    'tag rebuild',
+    () => {
+      db.exec(
+        'CREATE TABLE "temporary_tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)',
+      );
+      db.exec(
+        `INSERT INTO "temporary_tag" ("id","name","ownerSub") ` +
+          `SELECT "id","name",${ownerSelect} FROM "tag"`,
+      );
+      db.exec('DROP TABLE "tag"');
+      db.exec('ALTER TABLE "temporary_tag" RENAME TO "tag"');
+    },
+  );
+  return { mutated: true, actions: ['rebuilt tag (removed legacy UNIQUE(name))'] };
+}
+
+/** Step 2c: `user_keys` — DEK custody (data-privacy chapter). DDL byte-equivalent to the entity. */
+function ensureUserKeysTable(db: Database.Database): SchemaResult {
+  if (tableExists(db, 'user_keys')) return { mutated: false, actions: [] };
+  db.exec(
+    'CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT NULL, "kekVersion" integer NOT NULL DEFAULT (1), "createdAt" datetime NOT NULL)',
+  );
+  return { mutated: true, actions: ['created user_keys'] };
+}
+
+/**
+ * Step 2d: `note_tag` reconciled to the association-only `NoteTag` entity (the
+ * tag vocabulary is external after the tags-extraction migration) — rebuilt when
+ * it still references `tag` or carries the legacy join-table indexes, created
+ * fresh when absent.
+ */
+function ensureNoteTagTable(db: Database.Database): SchemaResult {
+  const noteTagSql = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='note_tag'`)
+    .get() as { sql: string } | undefined;
+  if (!noteTagSql) {
+    db.exec(NOTE_TAG_DDL);
+    return { mutated: true, actions: ['created note_tag'] };
+  }
+  const legacyNoteTag =
+    noteTagSql.sql.includes('REFERENCES "tag"') ||
+    hasIndexNamed(db, 'note_tag', 'IDX_ddfc0b18dcc060cb8899a24991');
+  if (!legacyNoteTag) return { mutated: false, actions: [] };
+  rebuildWithForeignKeysOff(
+    db,
+    'note_tag rebuild',
+    () => {
+      db.exec(NOTE_TAG_TEMP_DDL);
+      db.exec(
+        'INSERT INTO "temporary_note_tag" ("noteId","tagId") ' +
+          'SELECT "noteId","tagId" FROM "note_tag"',
+      );
+      db.exec('DROP TABLE "note_tag"');
+      db.exec('ALTER TABLE "temporary_note_tag" RENAME TO "note_tag"');
+    },
+  );
+  return { mutated: true, actions: ['rebuilt note_tag (association-only, dropped FK to tag)'] };
+}
+
+/**
+ * A table rebuild: enforcement off around the transaction (`PRAGMA foreign_keys`
+ * is a no-op inside one), the rebuild committed, a clean `PRAGMA foreign_key_check`
+ * required, and enforcement restored on every path, success or failure.
+ */
+function rebuildWithForeignKeysOff(
+  db: Database.Database,
+  label: string,
+  rebuild: () => void,
+): void {
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('BEGIN');
+    try {
+      rebuild();
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    const violations = db.prepare('PRAGMA foreign_key_check').all() as unknown[];
+    if (violations.length > 0) {
+      throw new Error(`${label} left ${violations.length} foreign-key violation(s); aborting`);
+    }
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
   }
 }
 

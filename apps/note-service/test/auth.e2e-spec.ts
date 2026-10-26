@@ -3,8 +3,8 @@ import { Test } from '@nestjs/testing';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { AuthGuard } from '../src/auth/auth.guard';
-import { Principal } from '../src/auth/principal';
+import { AuthGuard, Principal } from '@life/service-kit';
+import { VERIFIER_ENV } from '../src/service-config';
 import {
   configureVerifierEnv,
   JwtTestHarness,
@@ -55,37 +55,46 @@ describe('JWT auth (e2e)', () => {
   });
 
   it('rejects a wrong-audience JWT', async () => {
-    await get(await harness.sign({ audience: 'todo-service' })).expect(401);
+    const res = await get(await harness.sign({ audience: 'todo-service' })).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('rejects an issuer mismatch', async () => {
-    await get(await harness.sign({ issuer: 'https://evil.test' })).expect(401);
+    const res = await get(await harness.sign({ issuer: 'https://evil.test' })).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('rejects an expired JWT', async () => {
-    await get(await harness.sign({ expiresIn: -60 })).expect(401);
+    const res = await get(await harness.sign({ expiresIn: -60 })).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('rejects a tampered signature', async () => {
     const token = await harness.sign();
     const [h, p, s] = token.split('.');
-    await get(`${h}.${p}.AAAA${s.slice(4)}`).expect(401);
+    const res = await get(`${h}.${p}.AAAA${s.slice(4)}`).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('rejects a garbage or missing header', async () => {
-    await get().expect(401);
-    await get('not-a-jwt').expect(401);
-    await get('aaa.bbb.ccc').expect(401);
+    const missing = await get().expect(401);
+    const garbage = await get('not-a-jwt').expect(401);
+    const threeParts = await get('aaa.bbb.ccc').expect(401);
+    expect(missing.status).toBe(401);
+    expect(garbage.status).toBe(401);
+    expect(threeParts.status).toBe(401);
   });
 
   it('verifies a JWT signed by a rotated kid (rotation tolerance)', async () => {
     const rotated = await harness.rotate();
-    await get(await harness.sign({ kid: rotated.kid })).expect(200);
+    const res = await get(await harness.sign({ kid: rotated.kid })).expect(200);
+    expect(res.body).toHaveProperty('notes');
   });
 
   it('rejects a non-JWT bearer (the static token is gone)', async () => {
     // A non-JWT bearer is no longer a credential of any kind.
-    await get('static-token-not-a-secret').expect(401);
+    const res = await get('static-token-not-a-secret').expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('uses the configured issuer constant in tests', () => {
@@ -123,7 +132,7 @@ describe('JWT auth principal seam (e2e)', () => {
       controllers: [PrincipalProbeController],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalGuards(new AuthGuard());
+    app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
     await app.init();
   });
 
@@ -149,11 +158,13 @@ describe('JWT auth principal seam (e2e)', () => {
   });
 
   it('rejects a verified token with no sub claim', async () => {
-    await probe(await harness.sign({ omitSubject: true })).expect(401);
+    const res = await probe(await harness.sign({ omitSubject: true })).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('rejects a verified token with an empty-string sub', async () => {
-    await probe(await harness.sign({ subject: '' })).expect(401);
+    const res = await probe(await harness.sign({ subject: '' })).expect(401);
+    expect(res.status).toBe(401);
   });
 
   it('sets the dev-user principal under NODE_ENV=development', async () => {
@@ -163,8 +174,11 @@ describe('JWT auth principal seam (e2e)', () => {
   });
 
   it('still rejects a missing or garbage token', async () => {
-    await probe().expect(401);
-    await probe('not-a-jwt').expect(401);
-    await probe('aaa.bbb.ccc').expect(401);
+    const missing = await probe().expect(401);
+    const garbage = await probe('not-a-jwt').expect(401);
+    const threeParts = await probe('aaa.bbb.ccc').expect(401);
+    expect(missing.status).toBe(401);
+    expect(garbage.status).toBe(401);
+    expect(threeParts.status).toBe(401);
   });
 });

@@ -14,7 +14,7 @@ export function AlertBanner({
   className,
   children,
   ...rest
-}: AlertBannerProps) {
+}: Readonly<AlertBannerProps>) {
   return (
     <div className={cx('ui-alert-banner', `ui-alert-banner--${tone}`, className)} {...rest}>
       <p className="ui-alert-banner__text">{children}</p>
