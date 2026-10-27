@@ -27,9 +27,10 @@ is converted.
 3. **Deletion is paced per component**, in the same change as its conversion; the close-out task
    deletes the then-empty files.
 4. **No-counterpart components** (`confirm-button`, `create-field`, `due-date`, `due-date-pill`,
-   `empty-state`, `file-picker`, `icon-link` anchors, `list`, `list-shell`, `local-time`,
-   `nav-bar`, `page-actions`, `page-title`, `row`, `settings-row`, `stack`, `status-text`,
+   `empty-state`, `file-picker`, `list`, `list-item`, `list-shell`, `local-time`,
+   `nav-bar`, `page-actions`, `page-title`, `row`, `section`, `settings-row`, `stack`, `status-text`,
    `theme-toggle`) keep their markup and behaviour and are styled with Tailwind utilities only.
+   `icon-link` is **not** here: Task 6 replaces it with the registry `button` source in `asChild` form.
    Composites that own no visual language (`feedback-form`, `feedback-nav-item`, `search-field`,
    `editor-*`, managers, matrix) compose the replaced primitives.
    `autosuggest` is a Combobox (`Popover` + `Command`, `cmdk`) — the user's rule is "if there is
@@ -94,7 +95,8 @@ Every task touching primitive markup ends its Verification with **FV**:
 `tab-bar` swapped. No code is edited here.
 **Acceptance criteria:**
 - [ ] The ledger above carries every answer with its source; no row is open
-- [ ] Decision 1's no-counterpart list matches spec §1; no stop condition remains for a stale
+- [ ] Decision 4's no-counterpart list matches spec §1: every component with no registry copy
+      appears exactly once and no component with a copy appears; no stop condition remains for a stale
       selector, snapshot or stylesheet assertion
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
