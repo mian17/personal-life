@@ -459,7 +459,7 @@ from Task 2), keeping `label`/`summary`/`open`/`onOpenChange`, the always-visibl
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/menu.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
-- [ ] Manual check: `grep -n "ui-menu__\|ui-menu {" packages/ui/src/styles/blocks.css` returns nothing (the `.ui-list-manager__row > .ui-menu` layout rules belong to Tasks 33-34); FV
+- [ ] Manual check: `grep -n "^\.ui-menu" packages/ui/src/styles/blocks.css` returns nothing (the `.ui-list-manager__row > .ui-menu` layout rules belong to Tasks 33-34); FV
 **Dependencies:** 18
 **Files likely touched:** `packages/ui/src/components/menu.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
@@ -546,7 +546,10 @@ stay.
 
 **Description:** Rebuild the 183-line `feedback-form.tsx` and `feedback-nav-item.tsx` as compositions
 of `Input`, `Textarea`, `Select`, `Button`, `Pill`, `Card` with utilities only, keeping the form
-action, validation messaging, status options and the item markup the app's regexes read.
+action, validation messaging, status options and the item markup the app's regexes read. The form
+emits `ui-field`, `ui-field-label`, `ui-field-label--strong` and `ui-field-label__required` hooks in
+its own markup; Task 10 already removed those `blocks.css` rules, so Task 24's `ui-field` grep is a
+sanity check, not a removal.
 **Acceptance criteria:**
 - [ ] `FeedbackForm`/`FeedbackFormProps`/`FeedbackNavItem`/`FeedbackNavItemProps` and submission behaviour unchanged; every control inside is a converted primitive
 - [ ] The status-pill class strings render where the converted markup carries them (update the pinned
@@ -557,7 +560,7 @@ action, validation messaging, status options and the item markup the app's regex
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-nav-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-feedback\|ui-nav-item\|ui-field" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 4, 7, 10, 13, 14, 16, 17, 18
+**Dependencies:** 4, 7, 13, 14, 17, 18
 **Files likely touched:** `packages/ui/src/components/feedback-form.tsx`, `packages/ui/src/components/feedback-nav-item.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -670,7 +673,7 @@ target and the `button.trash-delete` affordance.
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
-- [ ] Manual check: `grep -n "ui-list-item--\|ui-list-item__" packages/ui/src/styles/blocks.css` returns nothing; FV
+- [ ] Manual check: `grep -n "ui-list-item" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 29
 **Files likely touched:** `packages/ui/src/components/list-item.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
@@ -709,9 +712,9 @@ survives after Tasks 33-34 (the surface renders `classPrefix`, so its rules live
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-block.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
-- [ ] Manual check: `grep -n "ui-manager" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 16, 25
-**Files likely touched:** `packages/ui/src/components/manager-surface.tsx`, `packages/ui/src/components/manager-block.tsx`, `packages/ui/src/styles/blocks.css`
+- [ ] Manual check: `grep -n "ui-manager" packages/ui/src/styles/blocks.css` returns nothing (the manager rules are `.ui-tag-manager*`/`.ui-list-manager*`, deleted by Tasks 33-34 in their own sections); FV
+**Dependencies:** 4, 6, 7, 10, 19, 27, 28 (PageShell is not restyled until Task 37 — ManagerBlock composes it as-is, so it is not a prerequisite)
+**Files likely touched:** `packages/ui/src/components/manager-surface.tsx`, `packages/ui/src/components/manager-block.tsx`
 **Estimated scope:** Medium: 3-5 files
 
 ## Task 33: Convert TagManager
@@ -798,7 +801,7 @@ composes — PageShell's page grid, EditorChrome's chrome frame and tag-picker s
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-shell.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/editor-chrome.test.tsx
 - [ ] Manual check: `grep -n "ui-page \|ui-editor-chrome" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 25, 35
+**Dependencies:** 25, 35, 36 (TagPicker is not restyled until Task 38 — EditorChrome composes it as-is, so it is not a prerequisite)
 **Files likely touched:** `packages/ui/src/components/page-shell.tsx`, `packages/ui/src/components/editor-chrome.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -811,8 +814,9 @@ composes — PageShell's page grid, EditorChrome's chrome frame and tag-picker s
 ## Task 38: Restyle FabMenu and TagPicker
 
 **Description:** Second out-of-scope pass: `FabMenu` and `TagPicker` keep composition and behaviour;
-only their own `blocks.css` rules move to utilities, with `FabMenu` reusing the converted
-`Menu`/`FabLink`.
+only their own `blocks.css` rules move to utilities. `FabMenu` keeps its own disclosure markup —
+`fab-menu.tsx` composes no primitives (only `useRef`, `cx`, `usePanelDismiss`), so Tasks 19 and 28
+are not its dependencies.
 **Acceptance criteria:**
 - [ ] `FabMenu`/`FabMenuProps`/`TagPicker`/`TagPickerProps`/`TagOption` unchanged; `ui-fab-menu*`/`ui-tag-picker*` hooks still render with unchanged nesting
 - [ ] Both `blocks.css` sections removed
@@ -821,7 +825,7 @@ only their own `blocks.css` rules move to utilities, with `FabMenu` reusing the 
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/fab-menu.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-picker.test.tsx
 - [ ] Manual check: `grep -n "ui-fab-menu\|ui-tag-picker" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 10, 13, 19, 28
+**Dependencies:** 10, 13
 **Files likely touched:** `packages/ui/src/components/fab-menu.tsx`, `packages/ui/src/components/tag-picker.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
