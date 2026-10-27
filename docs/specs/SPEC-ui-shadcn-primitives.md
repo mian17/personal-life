@@ -161,8 +161,9 @@ owns the resets, and loading a second reset under it would re-order every app's 
   **not** a frozen surface; a registry replacement decides its own markup.
 - `packages/ui/test/tokens.test.ts` is frozen (value table byte-identical) and stays green.
 - New suite `packages/ui/test/theme-parity.test.ts`: renders representative primitives in
-  light and dark and asserts `getComputedStyle(...)` resolves each frozen colour token to
-  the exact value in the table.
+  light and dark and resolves each frozen colour token's `var(--…)` chain through the
+  injected stylesheet's CSSOM (jsdom does not resolve `var()`), asserting it equals the
+  exact value in the table.
 - Coverage expectations: every replaced primitive has a green suite; every frozen colour
   token is asserted in both themes.
 - Levels: unit (component behaviour) + parity (computed styles) inside `packages/ui`; e2e only

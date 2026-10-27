@@ -460,7 +460,7 @@ from Task 2), keeping `label`/`summary`/`open`/`onOpenChange`, the always-visibl
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/menu.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "^\.ui-menu" packages/ui/src/styles/blocks.css` returns nothing (the `.ui-list-manager__row > .ui-menu` layout rules belong to Tasks 33-34); FV
-**Dependencies:** 18
+**Dependencies:** 4, 18
 **Files likely touched:** `packages/ui/src/components/menu.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
 
@@ -567,7 +567,7 @@ sanity check, not a removal.
 ## Checkpoint: After Tasks 22-24
 
 - [ ] Composite widgets and feedback compositions are utility-styled with their hooks intact
-- [ ] No `sonner`, `cmdk` or other unapproved dependency in `package-lock.json`
+- [ ] No `sonner` or other unapproved dependency in `package-lock.json` (`cmdk`, `class-variance-authority`, `tailwindcss`, `@tailwindcss/postcss` are approved by Task 2)
 - [ ] `npm run typecheck` green; each touched suite green within its 2-run budget
 
 ## Task 25: Convert Stack, Row and EditorStack
@@ -601,7 +601,7 @@ slot, the `ui-section`/`__heading`/`__actions` and `ui-page-actions` hooks and t
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-actions.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-section\|ui-page-actions" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 2
+**Dependencies:** 2, 25
 **Files likely touched:** `packages/ui/src/components/section.tsx`, `packages/ui/src/components/page-actions.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -640,7 +640,7 @@ through the utility scale.
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/nav-bar.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/fab-link.test.tsx
 - [ ] Manual check: `grep -n "ui-nav-bar\|ui-fab-link" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 2, 6
+**Dependencies:** 2, 4, 6
 **Files likely touched:** `packages/ui/src/components/nav-bar.tsx`, `packages/ui/src/components/fab-link.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -656,7 +656,7 @@ through the utility scale.
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-shell.test.tsx
 - [ ] Manual check: `grep -n "ui-list \|ui-list-shell" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 2
+**Dependencies:** 2, 27, 28 (PageShell is not restyled until Task 37 — ListShell composes it as-is, so it is not prerequisite)
 **Files likely touched:** `packages/ui/src/components/list.tsx`, `packages/ui/src/components/list-shell.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -769,7 +769,7 @@ quadrant/tone vocabulary, toolbar slot order and the `ui-matrix`/`ui-editor-tool
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/matrix-block.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/editor-toolbar.test.tsx
 - [ ] Manual check: `grep -n "ui-matrix\|ui-editor-toolbar" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 25, 26
+**Dependencies:** 4, 25, 26
 **Files likely touched:** `packages/ui/src/components/matrix-block.tsx`, `packages/ui/src/components/editor-toolbar.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -840,8 +840,8 @@ can be deleted.
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/trash-block.test.tsx
-- [ ] Manual check: `grep -n "ui-trash" packages/ui/src/styles/blocks.css` returns nothing and `grep -rn "trash-delete" packages/ui/src/components/trash-block.tsx` still finds it; FV
-**Dependencies:** 30
+- [ ] Manual check: `grep -n "ui-trash\|trash-delete\|trash-empty\|trash-restore" packages/ui/src/styles/*.css` returns nothing and `grep -rn "trash-delete" packages/ui/src/components/trash-block.tsx` still finds it; FV
+**Dependencies:** 4, 6, 17, 22, 26, 27, 28, 29, 30 (PageShell is not restyled until Task 37 — TrashBlock composes it as-is, so it is not prerequisite)
 **Files likely touched:** `packages/ui/src/components/trash-block.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
 
