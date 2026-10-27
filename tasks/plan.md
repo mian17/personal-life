@@ -117,7 +117,8 @@ the registry copies import, so no later task touches the lockfile. Wire `@tailwi
 `apps/app/postcss.config.mjs`.
 **Acceptance criteria:**
 - [ ] `theme.css` maps all 11 frozen colours to `var(--…)` with no hex/rgb literal; imports only the
-      theme and utilities layers; no preflight. `styles.css` imports tokens, theme, base only
+      theme and utilities layers; no preflight. `styles.css` imports theme between tokens and base —
+      `atoms.css`/`blocks.css` keep their imports until Task 40 deletes them
 - [ ] `base.css` unchanged; `package.json`/`package-lock.json` carry every dependency the later
       tasks need, so Tasks 8, 18, 19, 20, 21, 23 add none
 **Verification:**
