@@ -260,9 +260,7 @@ owns the resets, and loading a second reset under it would re-order every app's 
    carrying only `@tailwindcss/postcss`, no compiled stylesheet and no generation script (§2).
 2. ~~DOM-structure approvals~~ — resolved: a registry replacement owns its markup, and suites
    pinning the old markup are updated or have that assertion deleted.
-3. ~~Snapshot policy~~ — resolved, see Decision 1: regenerate or delete per replaced
-   primitive in the same change, diff explained. Detail: regenerate or delete per replaced
-   primitive in the same change. A snapshot of markup that no longer exists is deleted, not
-   rewritten.
+3. ~~Snapshot policy~~ — resolved: regenerate or delete per replaced primitive in the same
+   change, diff explained. A snapshot of markup that no longer exists is deleted, not rewritten.
 4. Open: whether vendored registry files need a licence/attribution note beyond the per-file
    provenance comment. Not a blocker — the provenance comment is the accepted minimum (§8).
