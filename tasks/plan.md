@@ -730,7 +730,7 @@ survives after Tasks 33-34 (the surface renders `classPrefix`, so its rules live
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-manager.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
 - [ ] Manual check: `grep -n "ui-tag-manager" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 4, 7, 19, 31, 32
+**Dependencies:** 4, 7, 19, 31, 32 (TagPicker is not restyled until Task 38 — TagManager type-imports it only, so it is not a prerequisite)
 **Files likely touched:** `packages/ui/src/components/tag-manager.tsx`, `packages/ui/test/__snapshots__/manager-markup.test.tsx.snap`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
