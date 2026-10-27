@@ -49,7 +49,8 @@ dashes:
 - Geometry, spacing, radii and type take shadcn defaults through the utility scale.
 - cva variants, `data-slot` attributes and Radix behaviour stay exactly as vendored. The only
   edits a copy receives are class strings, the provenance pointer, and the inert `ui-*` compat
-  hooks that hold the frozen selector surface (plan Decision 1).
+  hooks that keep existing `apps/*` locators working where the converted markup can carry them
+  (plan Decision 1); where it cannot, the pinned assertion is updated in the same task.
 
 ## Vendored items
 

@@ -31,8 +31,12 @@ is converted.
    `nav-bar`, `page-actions`, `page-title`, `row`, `section`, `settings-row`, `stack`, `status-text`,
    `theme-toggle`) keep their markup and behaviour and are styled with Tailwind utilities only.
    `icon-link` is **not** here: Task 6 replaces it with the registry `button` source in `asChild` form.
+   The app-specific blocks `page-shell`, `fab-menu`, `tag-picker`, `trash-block`, `fab-link` are also not
+   here: spec §1 puts them out of scope as composition-only, restyled on the replaced primitives by
+   Tasks 37-39.
    Composites that own no visual language (`feedback-form`, `feedback-nav-item`, `search-field`,
-   `editor-*`, managers, matrix) compose the replaced primitives.
+   `pill-group`, `settings-block`, `tag-filter-nav`, `editor-*`, `manager-surface`, `manager-block`,
+   managers, matrix) compose the replaced primitives.
    `autosuggest` is a Combobox (`Popover` + `Command`, `cmdk`) — the user's rule is "if there is
    a counterpart in shadcn, replace it".
 5. **`select` uses the native-select recipe**, no Radix: native `<select>`, same registry
@@ -74,7 +78,8 @@ that trips over it, not escalated.
 
 Every task touching primitive markup ends its Verification with **FV**:
 
-- **Contract 1 greps clean:** `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps --include='*.tsx'` → zero hits in app source; `grep -rn "next/link" apps --include='*.tsx'` → zero hits; `grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(" apps packages/ui/src --include='*.css'` → only `tokens.css`.
+- **Contract 1 greps clean:** `grep -rnE "<(button|input|textarea|select|a|img|label|progress)\b" apps --include='*.tsx'` → zero hits in `apps/*` UI source (the regex-string matches in
+`apps/app/test/todo-item.test.tsx` are assertions on rendered HTML, not JSX); `grep -rn "next/link" apps --include='*.tsx'` → zero hits; `grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(" apps packages/ui/src --include='*.css'` → only `tokens.css`.
 - **Identifier greps:** `grep -riE "tag-chip" packages/ui/src` → zero hits; `grep -riE "note" packages/ui/src --include='*.ts' --include='*.tsx'` → comment lines only, no `note` identifier in code. (`trash` is now an ordinary identifier: `TrashBlock` is a real component and is exempt from no grep.)
 - **No orphaned assertion:** no suite under `packages/ui/test/` reads a `.css` file that the task deleted, and no snapshot pins markup the task replaced.
 - **Behaviour preserved:** the component's suite is green for everything that is not a deleted stylesheet assertion.
@@ -100,7 +105,7 @@ Every task touching primitive markup ends its Verification with **FV**:
       selector, snapshot or stylesheet assertion
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tokens.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
 - [ ] Manual check: no `open` row remains in the ledger
 **Dependencies:** None
 **Files likely touched:** `tasks/plan.md`, `tasks/todo.md`
@@ -125,7 +130,7 @@ the registry copies import, so no later task touches the lockfile. Wire `@tailwi
       tasks need, so Tasks 8, 18, 19, 20, 21, 23 add none
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tokens.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
 - [ ] Manual check: `npm run dev -w apps/app`, load `/todos`, confirm the rendered CSS resolves
       `bg-bg`/`text-text` and has no unresolved `@import 'tailwindcss'`; FV
 **Dependencies:** 1
@@ -142,7 +147,7 @@ row, so each converted file carries a one-line pointer.
 - [ ] No component or stylesheet changes in this task
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/manager-markup.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
 - [ ] Manual check: the record names a concrete revision and Task 4 links to it from its provenance comment
 **Dependencies:** 1
 **Files likely touched:** `packages/ui/vendor/shadcn/SNAPSHOT.md`
@@ -164,8 +169,8 @@ geometry via the utility scale and the disabled treatment; remove both `atoms.cs
 - [ ] `Button`/`IconButton` render from the registry `button` source with `data-slot`; both `atoms.css` blocks gone; both suites green for everything that is not a deleted stylesheet assertion
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/button.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/icon-button.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/button.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/icon-button.test.tsx
 - [ ] Manual check: `grep -n "ui-btn" packages/ui/src/styles/atoms.css` returns nothing while the hooks remain in `components`; FV
 **Dependencies:** 2, 3
 **Files likely touched:** `packages/ui/src/components/button.tsx`, `packages/ui/src/components/icon-button.tsx`, `packages/ui/src/styles/atoms.css`
@@ -181,8 +186,8 @@ injected sheet's CSSOM (jsdom does not resolve `var()`), asserting the 11 frozen
 - [ ] `test/tokens.test.ts` untouched and green; a drifted value in `theme.css`/`tokens.css` fails
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/theme-parity.test.ts
-- [ ] Focused unit tests pass: npm run test:unit -- test/tokens.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-parity.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
 - [ ] Manual check: change one `theme.css` mapping, confirm the suite goes red, revert; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/test/theme-parity.test.ts`
@@ -198,8 +203,8 @@ styling out of `atoms.css`.
 - [ ] Anchors keep `ui-btn`-family and `ui-icon-link` hooks; no `atoms.css` rule remains; no `next/link` in `apps/*`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/button-link.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/icon-link.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/button-link.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/icon-link.test.tsx
 - [ ] Manual check: `grep -rn "next/link" apps --include='*.tsx'` returns zero hits; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/button-link.tsx`, `packages/ui/src/components/icon-link.tsx`, `packages/ui/src/styles/atoms.css`
@@ -221,8 +226,8 @@ styling out of `atoms.css`.
 - [ ] Neither component has an `atoms.css` rule; both suites green for everything that is not a deleted stylesheet assertion
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/input.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/textarea.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/input.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/textarea.test.tsx
 - [ ] Manual check: `grep -n "ui-input\|ui-textarea" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/input.tsx`, `packages/ui/src/components/textarea.tsx`, `packages/ui/src/styles/atoms.css`
@@ -238,8 +243,8 @@ installed in Task 2), keeping the controlled/uncontrolled prop surface and the
 - [ ] No `atoms.css` block for either; keyboard and label association still covered by the unmodified suites
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/checkbox.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/switch.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/checkbox.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/switch.test.tsx
 - [ ] Manual check: `grep -n "ui-checkbox\|ui-switch" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 2, 4
 **Files likely touched:** `packages/ui/src/components/checkbox.tsx`, `packages/ui/src/components/switch.tsx`, `packages/ui/src/styles/atoms.css`
@@ -255,9 +260,9 @@ only, no Radix, so the platform picker and `<option>` mapping stay; keep `ui-sel
 - [ ] `atoms.css` block gone; no `@radix-ui/react-select` added; suite assertions untouched
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/select.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/select.test.tsx
 - [ ] Manual check: `grep -n "ui-select" packages/ui/src/styles/atoms.css` returns nothing and `git diff` adds no Radix select; FV
-**Dependencies:** 7
+**Dependencies:** 4, 7
 **Files likely touched:** `packages/ui/src/components/select.tsx`, `packages/ui/src/styles/atoms.css`
 **Estimated scope:** Small: 1-2 files
 
@@ -278,10 +283,10 @@ disabled).
 - [ ] `test/create-field.test.tsx` asserts label association, submit payload and disabled state
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/search-field.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/create-field.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/search-field.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/create-field.test.tsx
 - [ ] Manual check: `grep -n "ui-search-box\|ui-field-label\|ui-field " packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 7
+**Dependencies:** 4, 7
 **Files likely touched:** `packages/ui/src/components/search-field.tsx`, `packages/ui/src/components/create-field.tsx`, `packages/ui/test/create-field.test.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Large: 5+ files
 
@@ -295,7 +300,7 @@ focus/disabled affordances as utilities rather than sibling-combinator rules.
 - [ ] No `atoms.css` block remains; behaviour assertions untouched
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/file-picker.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/file-picker.test.tsx
 - [ ] Manual check: `grep -n "ui-file-picker" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/file-picker.tsx`, `packages/ui/src/styles/atoms.css`
@@ -311,8 +316,8 @@ component is converted, and the assertion goes with the CSS rule it read).
 - [ ] `ui-invisible` comes from the `invisible` utility; no `atoms.css` rule for either component
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/status-text.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/local-time.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/status-text.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/local-time.test.tsx
 - [ ] Manual check: `grep -n "ui-status-text\|ui-invisible" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/status-text.tsx`, `packages/ui/src/components/local-time.tsx`, `packages/ui/src/styles/atoms.css`
@@ -330,12 +335,14 @@ component is converted, and the assertion goes with the CSS rule it read).
 and the three render modes (`span`/`a`/`button`), keeping the `Pill` export set, the `tone`
 vocabulary mapped onto frozen tokens, and every `ui-pill*` hook.
 **Acceptance criteria:**
-- [ ] `Pill`/`PillProps`/`PillSize`/`PillTag`/`PillButtonType` and tag-selection logic unchanged; the exact class strings `apps/app` asserts still render
-- [ ] Tone→colour via token utilities only; `atoms.css` pill block gone; `row.locator('.ui-pill')` still matches
+- [ ] `Pill`/`PillProps`/`PillSize`/`PillTag`/`PillButtonType` and tag-selection logic unchanged; the class strings `apps/app` asserts render where the registry markup carries them, and the pinned
+  test is updated in this task otherwise
+- [ ] Tone→colour via token utilities only; `atoms.css` pill block gone; `row.locator('.ui-pill')` still matches (retire the pin and update the test in this task if the
+  registry `badge` markup cannot carry the hook)
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/pill.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/pill-group.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/pill.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/pill-group.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-pill" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
@@ -352,8 +359,8 @@ because `apps/app` tests slice rendered HTML on it.
 - [ ] Both compose `Pill`, no hand-rolled visuals; both `blocks.css` blocks gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/pill-group.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/tag-filter-nav.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/pill-group.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-filter-nav.test.tsx
 - [ ] Manual check: `grep -n "ui-pill-group\|ui-tag-filter-nav" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 13
 **Files likely touched:** `packages/ui/src/components/pill-group.tsx`, `packages/ui/src/components/tag-filter-nav.tsx`, `packages/ui/src/styles/blocks.css`
@@ -369,8 +376,8 @@ colours resolved from `--danger`/`--accent`/`--muted` utilities.
 - [ ] Both `atoms.css` blocks gone; signal colours come from token utilities only
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/due-date-pill.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/due-date.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/due-date-pill.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/due-date.test.tsx
 - [ ] Manual check: `grep -n "ui-due" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 13
 **Files likely touched:** `packages/ui/src/components/due-date-pill.tsx`, `packages/ui/src/components/due-date.tsx`, `packages/ui/src/styles/atoms.css`
@@ -391,7 +398,7 @@ colours resolved from `--danger`/`--accent`/`--muted` utilities.
 - [ ] The `atoms.css` card block is gone; surface colours come from token utilities
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/card.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/card.test.tsx
 - [ ] Manual check: `grep -n "ui-card" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/card.tsx`, `packages/ui/src/styles/atoms.css`
@@ -403,12 +410,13 @@ colours resolved from `--danger`/`--accent`/`--muted` utilities.
 frozen palette, and `empty-state.tsx` as a `Card`-composed utility layout; `ui-alert-banner` stays on
 the element the `meals.spec.ts` locator finds.
 **Acceptance criteria:**
-- [ ] `AlertBanner`/`AlertBannerProps`/`AlertBannerTone` and `EmptyState`/`EmptyStateProps` unchanged; `ui-alert-banner` still renders on the located element
+- [ ] `AlertBanner`/`AlertBannerProps`/`AlertBannerTone` and `EmptyState`/`EmptyStateProps` unchanged; `ui-alert-banner` renders on the located element where the registry `alert` markup carries it; the
+  `meals.spec.ts` locator is updated in this task otherwise
 - [ ] `blocks.css` no longer holds `.ui-alert-banner` or `.ui-empty`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/alert-banner.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/empty-state.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/alert-banner.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/empty-state.test.tsx
 - [ ] Manual check: `grep -n "ui-alert-banner\|ui-empty" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 16
 **Files likely touched:** `packages/ui/src/components/alert-banner.tsx`, `packages/ui/src/components/empty-state.tsx`, `packages/ui/src/styles/blocks.css`
@@ -424,10 +432,10 @@ sheet layout, the labelled title, focus trap/restore, and the `ui-dialog`/`ui-di
 - [ ] Hooks still render on the asserted element; `blocks.css` no longer holds the dialog rules
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/dialog.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/dialog.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-dialog" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 2, 6
+**Dependencies:** 2, 4, 6
 **Files likely touched:** `packages/ui/src/components/dialog.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
 
@@ -448,7 +456,7 @@ from Task 2), keeping `label`/`summary`/`open`/`onOpenChange`, the always-visibl
 - [ ] `ui-menu*` hooks still render on the same elements; `blocks.css` menu block gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/menu.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/menu.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-menu" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 18
@@ -467,7 +475,7 @@ the hand-written `aria-current` list; the `test/tab-bar.test.tsx` assertions tha
 - [ ] Rendered from the registry `tabs` source with `data-slot` intact; tab rules leave `blocks.css`; no stale `aria-current` assertion remains
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tab-bar.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tab-bar.test.tsx
 - [ ] Manual check: `grep -n "ui-tab" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/tab-bar.tsx`, `packages/ui/test/tab-bar.test.tsx`, `packages/ui/src/styles/blocks.css`
@@ -483,8 +491,8 @@ preserving `useSnackbar`, `SnackbarApi`/`SnackbarOptions`, leaving-animation tim
 - [ ] Hooks still render; only approved deps used; snackbar rules leave `blocks.css`; `test/snackbar-provider.test.tsx` asserts enqueue, auto-dismiss, removal
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/snackbar.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/snackbar-provider.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/snackbar.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/snackbar-provider.test.tsx
 - [ ] Manual check: `grep -n "ui-snackbar" packages/ui/src/styles/blocks.css` returns nothing and no `sonner` dependency; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/snackbar.tsx`, `packages/ui/src/components/snackbar-provider.tsx`, `packages/ui/test/snackbar-provider.test.tsx`, `packages/ui/src/styles/blocks.css`
@@ -506,8 +514,8 @@ read/write logic stays put and the leftover bespoke CSS goes.
 - [ ] Both compose converted primitives with no bespoke visual CSS remaining
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/theme-toggle.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/confirm-button.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-toggle.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/confirm-button.test.tsx
 - [ ] Manual check: `grep -n "ui-theme\|ui-confirm" packages/ui/src/styles/*.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/theme-toggle.tsx`, `packages/ui/src/components/confirm-button.tsx`
@@ -526,10 +534,10 @@ stay.
 - [ ] Rendered from the registry `combobox`/`command` source; `blocks.css` no longer holds the autosuggest rules; no hand-written listbox markup remains
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/autosuggest.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/autosuggest.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-autosuggest" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 7
+**Dependencies:** 4, 7
 **Files likely touched:** `packages/ui/src/components/autosuggest.tsx`, `packages/ui/src/components/command.tsx`, `packages/ui/src/components/popover.tsx`, `packages/ui/test/autosuggest.test.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -540,14 +548,15 @@ of `Input`, `Textarea`, `Select`, `Button`, `Pill`, `Card` with utilities only, 
 action, validation messaging, status options and the item markup the app's regexes read.
 **Acceptance criteria:**
 - [ ] `FeedbackForm`/`FeedbackFormProps`/`FeedbackNavItem`/`FeedbackNavItemProps` and submission behaviour unchanged; every control inside is a converted primitive
-- [ ] The status-pill class strings still render; both `blocks.css` blocks gone
+- [ ] The status-pill class strings render where the converted markup carries them (update the pinned
+  assertion in this task otherwise); both `blocks.css` blocks gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/feedback-form.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/feedback-nav-item.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-form.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-nav-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-feedback\|ui-nav-item" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 9, 13
+**Dependencies:** 4, 7, 9, 13, 16
 **Files likely touched:** `packages/ui/src/components/feedback-form.tsx`, `packages/ui/src/components/feedback-nav-item.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -567,8 +576,8 @@ action, validation messaging, status options and the item markup the app's regex
 - [ ] Gap/alignment hooks (`ui-stack--sm|md|lg`, `ui-stack--center|end`, `ui-row--*`) still render; no stack rule remains
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/stack.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/row.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/stack.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/row.test.tsx
 - [ ] Manual check: `grep -n "ui-stack\|ui-row\|ui-editor-stack" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2
 **Files likely touched:** `packages/ui/src/components/stack.tsx`, `packages/ui/src/components/row.tsx`, `packages/ui/src/components/editor-stack.tsx`, `packages/ui/src/styles/blocks.css`
@@ -584,8 +593,8 @@ slot, the `ui-section`/`__heading`/`__actions` and `ui-page-actions` hooks and t
 - [ ] `section.ui-section > div > h2.ui-section__heading` preserved in rendered markup; the section and page-actions rule blocks gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/section.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/page-actions.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/section.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-actions.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-section\|ui-page-actions" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2
@@ -602,7 +611,7 @@ documented and the page-title rule block leaves `blocks.css`.
 - [ ] The `blocks.css` page-title rules are gone; typography comes from token utilities only
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/page-title.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-title.test.tsx
 - [ ] Manual check: `grep -n "ui-page-title" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2
 **Files likely touched:** `packages/ui/src/components/page-title.tsx`, `packages/ui/src/styles/blocks.css`
@@ -624,8 +633,8 @@ through the utility scale.
 - [ ] `ui-nav-bar`/`ui-fab-link` hooks still render; both `blocks.css` blocks gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/nav-bar.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/fab-link.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/nav-bar.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/fab-link.test.tsx
 - [ ] Manual check: `grep -n "ui-nav-bar\|ui-fab-link" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2, 6
 **Files likely touched:** `packages/ui/src/components/nav-bar.tsx`, `packages/ui/src/components/fab-link.tsx`, `packages/ui/src/styles/blocks.css`
@@ -640,8 +649,8 @@ through the utility scale.
 - [ ] `blocks.css` no longer holds the list or shell rules
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/list.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/list-shell.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-shell.test.tsx
 - [ ] Manual check: `grep -n "ui-list \|ui-list-shell" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2
 **Files likely touched:** `packages/ui/src/components/list.tsx`, `packages/ui/src/components/list-shell.tsx`, `packages/ui/src/styles/blocks.css`
@@ -658,7 +667,7 @@ target and the `button.trash-delete` affordance.
 - [ ] Every hook renders on the element the app regexes match with unchanged nesting; `button.trash-delete` still matches; `.ui-list-item*` block gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/list-item.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-list-item" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 29
@@ -680,8 +689,8 @@ control slots, delete-affordance placement and the `ui-settings-row`/`ui-setting
 - [ ] `blocks.css` no longer holds `.ui-settings-row` or the settings-block rules
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/settings-row.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/settings-block.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/settings-row.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/settings-block.test.tsx
 - [ ] Manual check: `grep -n "ui-settings" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 16, 25
 **Files likely touched:** `packages/ui/src/components/settings-row.tsx`, `packages/ui/src/components/settings-block.tsx`, `packages/ui/src/styles/blocks.css`
@@ -696,8 +705,8 @@ element order the `manager-markup` snapshots record and the `ui-manager-*` hooks
 - [ ] Manager snapshot regenerated or deleted in this change, diff explained; manager rules leave `blocks.css`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/manager-block.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/manager-markup.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-block.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
 - [ ] Manual check: `grep -n "ui-manager" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 16, 25
 **Files likely touched:** `packages/ui/src/components/manager-surface.tsx`, `packages/ui/src/components/manager-block.tsx`, `packages/ui/src/styles/blocks.css`
@@ -713,10 +722,10 @@ element order the `manager-markup` snapshots record and the `ui-manager-*` hooks
 - [ ] Manager snapshot regenerated or deleted in this change, diff explained; manager rules leave `blocks.css`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tag-manager.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/manager-markup.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-manager.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
 - [ ] Manual check: `grep -n "ui-tag-manager" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 31, 32
+**Dependencies:** 4, 7, 19, 31, 32
 **Files likely touched:** `packages/ui/src/components/tag-manager.tsx`, `packages/ui/test/__snapshots__/manager-markup.test.tsx.snap`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -730,17 +739,17 @@ inline rename editor, the `ui-list-manager__*` hooks and the snapshot-recorded m
 - [ ] Manager snapshot regenerated or deleted in this change, diff explained; manager rules leave `blocks.css`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/list-manager.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/manager-markup.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-manager.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-markup.test.tsx
 - [ ] Manual check: `grep -n "ui-list-manager" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 31, 32, 33
+**Dependencies:** 4, 7, 19, 31, 32, 33
 **Files likely touched:** `packages/ui/src/components/list-manager.tsx`, `packages/ui/test/__snapshots__/manager-markup.test.tsx.snap`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
 ## Checkpoint: After Tasks 31-34
 
 - [ ] Settings rows, the manager surface and both managers converted
-- [ ] The manager markup contract still holds; snapshots unchanged or approved
+- [ ] The manager markup contract still holds; snapshots regenerated or deleted in-task with the diff explained
 - [ ] `npm run typecheck` green; each touched suite green within its 2-run budget
 
 ## Task 35: Convert MatrixBlock and EditorToolbar
@@ -752,8 +761,8 @@ quadrant/tone vocabulary, toolbar slot order and the `ui-matrix`/`ui-editor-tool
 - [ ] Hooks still render; the 2×2 grid survives every breakpoint via utilities; both rule blocks gone
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/matrix-block.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/editor-toolbar.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/matrix-block.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/editor-toolbar.test.tsx
 - [ ] Manual check: `grep -n "ui-matrix\|ui-editor-toolbar" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 25, 26
 **Files likely touched:** `packages/ui/src/components/matrix-block.tsx`, `packages/ui/src/components/editor-toolbar.tsx`, `packages/ui/src/styles/blocks.css`
@@ -768,7 +777,7 @@ containment), keeping `ui-editor-screen` and the slot structure the editor pages
 - [ ] `blocks.css` no longer holds `.ui-editor-screen`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/editor-screen.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/editor-screen.test.tsx
 - [ ] Manual check: `grep -n "ui-editor-screen" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 25
 **Files likely touched:** `packages/ui/src/components/editor-screen.tsx`, `packages/ui/src/styles/blocks.css`
@@ -776,16 +785,16 @@ containment), keeping `ui-editor-screen` and the slot structure the editor pages
 
 ## Task 37: Restyle PageShell and EditorChrome
 
-**Description:** Out-of-scope blocks keep their design and composition (spec §1); only the parts that
-consume a replaced primitive — PageShell's page grid, EditorChrome's chrome frame and tag-picker slot
-— move to utilities, and their `blocks.css` sections are removed because Task 40 requires it.
+**Description:** Out-of-scope blocks keep their design and composition (spec §1); all their `blocks.css`
+rules move to utilities so Task 40 can delete the file, each rebuilt on the converted primitives it
+composes — PageShell's page grid, EditorChrome's chrome frame and tag-picker slot.
 **Acceptance criteria:**
 - [ ] `PageShell`/`PageShellProps`/`EditorChrome`/`EditorChromeProps`/`EditorChromeTagPicker` and slot composition unchanged; rendered structure identical apart from `class` contents
 - [ ] Both `blocks.css` sections removed; no visual rule recreated outside utilities
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/page-shell.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/editor-chrome.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-shell.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/editor-chrome.test.tsx
 - [ ] Manual check: `grep -n "ui-page \|ui-editor-chrome" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 25, 35
 **Files likely touched:** `packages/ui/src/components/page-shell.tsx`, `packages/ui/src/components/editor-chrome.tsx`, `packages/ui/src/styles/blocks.css`
@@ -807,10 +816,10 @@ only their own `blocks.css` rules move to utilities, with `FabMenu` reusing the 
 - [ ] Both `blocks.css` sections removed
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/fab-menu.test.tsx
-- [ ] Focused unit tests pass: npm run test:unit -- test/tag-picker.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/fab-menu.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-picker.test.tsx
 - [ ] Manual check: `grep -n "ui-fab-menu\|ui-tag-picker" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 13, 28
+**Dependencies:** 13, 19, 28
 **Files likely touched:** `packages/ui/src/components/fab-menu.tsx`, `packages/ui/src/components/tag-picker.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -824,7 +833,7 @@ can be deleted.
 - [ ] `button.trash-delete` still renders and matches; the trash section leaves `blocks.css`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/trash-block.test.tsx
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/trash-block.test.tsx
 - [ ] Manual check: `grep -n "ui-trash" packages/ui/src/styles/blocks.css` returns nothing and `grep -rn "trash-delete" packages/ui/src/components/trash-block.tsx` still finds it; FV
 **Dependencies:** 30
 **Files likely touched:** `packages/ui/src/components/trash-block.tsx`, `packages/ui/src/styles/blocks.css`
@@ -841,8 +850,8 @@ computed-style assertions stay.
 - [ ] No suite under `packages/ui/test/` reads either path; no colour literal outside `tokens.css`
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tokens.test.ts
-- [ ] Focused unit tests pass: npm run test:unit -- test/theme-parity.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-parity.test.ts
 - [ ] Manual check: `grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(" apps packages/ui/src --include='*.css'` hits only `packages/ui/src/styles/tokens.css`, and `grep -rln "atoms.css\|blocks.css" packages/ui` returns nothing; FV
 **Dependencies:** 6, 12, 17, 24, 36, 39
 **Files likely touched:** `packages/ui/src/styles/atoms.css`, `packages/ui/src/styles/blocks.css`, `packages/ui/src/styles.css`, `packages/ui/test/*.test.tsx`
@@ -856,20 +865,21 @@ computed-style assertions stay.
 
 ## Task 41: Run the close-out gate
 
-**Description:** Run the spec §8 checks as one gate and paste the output into the phase report:
+**Description:** Run the spec §8 checks as one gate and paste the output into `docs/reports/shadcn-primitive-migration-<date>.md`:
 typecheck across workspaces, every `packages/ui/test/` suite, the Contract 1 greps, the
 `apps/*` diff, and `tokens.test.ts` byte-identical to `origin/dev`.
 **Acceptance criteria:**
 - [ ] `npm run typecheck` green; every `packages/ui/test/` suite green within its 2-run budget
-- [ ] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists at most `apps/app/postcss.config.mjs`
+- [ ] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists only `apps/app/postcss.config.mjs` in
+      source and, at most, test files whose assertions pinned markup a replacement removed
 - [ ] `tokens.test.ts` byte-identical to `origin/dev`; every replaced component file names its registry item or records that it has no counterpart
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -- test/tokens.test.ts
-- [ ] Focused unit tests pass: npm run test:unit -- test/theme-parity.test.ts
-- [ ] Manual check: the Contract 1 greps and the `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` output are pasted into the phase report; FV
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
+- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-parity.test.ts
+- [ ] Manual check: the Contract 1 greps, the `no app re-implementation of a packages/ui component's markup` check, and the `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` output are pasted into `docs/reports/shadcn-primitive-migration-<date>.md`; FV
 **Dependencies:** 40
-**Files likely touched:** `tasks/plan.md`
+**Files likely touched:** `tasks/plan.md`, `docs/reports/shadcn-primitive-migration-<date>.md`
 **Estimated scope:** Small: 1-2 files
 
 ## Checkpoint: Complete

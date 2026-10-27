@@ -83,7 +83,7 @@ npm run typecheck
 # unit tests — one file, from the owning workspace; max 2 runs per command
 npm run test:unit -w @life/ui -- test/button.test.tsx
 
-# e2e — only to verify the frozen selector surface after a DOM-structure change
+# e2e — only after a DOM-structure change, and only for the behaviour it actually covers
 npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"
 ```
 
@@ -91,11 +91,12 @@ npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"
 
 ```
 packages/ui/src/components/   vendored shadcn registry copies, one file per primitive
+packages/ui/vendor/shadcn/     pinned registry snapshot record (SNAPSHOT.md + copied source)
 packages/ui/src/lib/          existing helpers (cx.ts etc.) the vendored source reuses
 packages/ui/src/styles/tokens.css   frozen colour values — the ONLY file with colour literals
 packages/ui/src/styles/theme.css    Tailwind v4 @theme mapping (var() references to tokens.css)
-packages/ui/src/styles/base.css     base/reset layer (Tailwind preflight mapped to tokens)
-packages/ui/src/styles.css          package entry: theme + base imports only
+packages/ui/src/styles/base.css     base/reset layer (preflight deliberately not imported; these are our own rules)
+packages/ui/src/styles.css          package entry: tokens + theme + base imports only
 packages/ui/test/                   jest suites: behaviour, theme parity, frozen tokens
 docs/specs/                         this spec (SPEC-ui-shadcn-primitives.md)
 docs/intent/                        confirmed intent (already present)
@@ -179,7 +180,8 @@ owns the resets, and loading a second reset under it would re-order every app's 
   assertions.
 - Run `npm run typecheck -w @life/ui` and the touched test suites; run the Contract 1
   mechanical greps (`raw HTML elements in apps`, `next/link in apps`, colour literals
-  outside `tokens.css`, `note|trash|tag-chip` in `packages/ui/src` code) at every review.
+  outside `tokens.css`, `note|tag-chip` in `packages/ui/src` code) at every review. `trash` is an
+  ordinary identifier (`TrashBlock`), exempt.
 - Delete any assertion, snapshot, selector pin or spec line that blocks a registry
   replacement. Migration outranks the old surface: no hand-written CSS survives to keep a
   stale assertion green.
@@ -252,14 +254,13 @@ owns the resets, and loading a second reset under it would re-order every app's 
 
 ## 10. Open Questions
 
-1. Tailwind compile pipeline final form: per-app `postcss.config.mjs` (assumption 3, zero
-   source change) versus a compiled stylesheet generated inside `packages/ui` (needs a
-   generation script — the repo profile has no build command). The user decides which
-   reading of "apps/* compiles untouched" applies.
+1. ~~Tailwind compile pipeline final form~~ — resolved 2026-10-27: `apps/app/postcss.config.mjs`
+   carrying only `@tailwindcss/postcss`, no compiled stylesheet and no generation script (§2).
 2. ~~DOM-structure approvals~~ — resolved: a registry replacement owns its markup, and suites
    pinning the old markup are updated or have that assertion deleted.
-3. Snapshot policy for `packages/ui/test/__snapshots__`: regenerate or delete per replaced
+3. ~~Snapshot policy~~ — resolved, see Decision 1: regenerate or delete per replaced
+   primitive in the same change, diff explained. Detail: regenerate or delete per replaced
    primitive in the same change. A snapshot of markup that no longer exists is deleted, not
    rewritten.
-4. Whether vendored registry files need a licence/attribution note beyond the per-file
-   provenance comment.
+4. Open: whether vendored registry files need a licence/attribution note beyond the per-file
+   provenance comment. Not a blocker — the provenance comment is the accepted minimum (§8).
