@@ -71,8 +71,8 @@ Acceptance criteria (one cluster — see §8 for the testable form):
 
 ## 3. Commands
 
-Repo profile commands only. The repo profile declares no build command, so this spec has no
-build step and none may be added.
+Repo profile commands only. The repo profile has no build knob (root `npm run build` exists but is
+outside this spec's command set), so this spec adds no build step.
 
 ```bash
 # typecheck — run in the touched workspace
@@ -90,7 +90,7 @@ npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"
 ## 4. Project Structure
 
 ```
-packages/ui/src/components/   vendored shadcn registry copies, one file per primitive
+packages/ui/src/components/   vendored registry copies + kept primitives and helpers
 packages/ui/vendor/shadcn/     pinned registry snapshot record (SNAPSHOT.md + copied source)
 packages/ui/src/lib/          existing helpers (cx.ts etc.) the vendored source reuses
 packages/ui/src/styles/tokens.css   frozen colour values — the ONLY file with colour literals
@@ -124,7 +124,7 @@ const buttonVariants = cva(
         primary: 'bg-accent text-on-accent hover:bg-accent/90',
         danger: 'bg-danger text-on-accent hover:bg-danger/90',
       },
-      size: { md: 'h-tap px-4', icon: 'h-icon-btn w-icon-btn' },
+      size: { md: 'h-12 px-4', icon: 'size-12' },
     },
     defaultVariants: { variant: 'primary', size: 'md' },
   },
@@ -216,11 +216,13 @@ owns the resets, and loading a second reset under it would re-order every app's 
    pinned markup a replacement removed.
 2. `npm run test:unit -w @life/ui -- <file>` is green for every suite in
    `packages/ui/test/`, each within 2 runs.
-3. `packages/ui/test/tokens.test.ts` is byte-identical to `origin/dev` and green.
+3. The colour value table in `packages/ui/test/tokens.test.ts` is byte-identical to
+   `origin/dev`, and the file stays green.
 4. `packages/ui/test/theme-parity.test.ts` asserts, for all 11 frozen colour tokens
    (`--bg`, `--panel`, `--text`, `--muted`, `--accent`, `--danger`, `--danger-soft`,
-   `--amber`, `--green`, `--border`, `--on-accent`), that a rendered primitive's computed
-   style equals the frozen value in both light and dark.
+   `--amber`, `--green`, `--border`, `--on-accent`; `--on-accent` is theme-invariant, declared
+   once on `:root`), that a rendered primitive's computed style equals the frozen value in both
+   light and dark.
 5. `packages/ui/src/styles/atoms.css` and `blocks.css` are deleted and no longer imported.
 6. `grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(" apps packages/ui/src --include='*.css'` hits only
    `packages/ui/src/styles/tokens.css`.
