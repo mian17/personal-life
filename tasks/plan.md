@@ -171,7 +171,7 @@ geometry via the utility scale and the disabled treatment; remove both `atoms.cs
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/button.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/icon-button.test.tsx
-- [ ] Manual check: `grep -n "ui-btn" packages/ui/src/styles/atoms.css` returns nothing while the hooks remain in `components`; FV
+- [ ] Manual check: `grep -n "ui-btn\|ui-icon-btn" packages/ui/src/styles/atoms.css` returns nothing while the hooks remain in `components`; FV
 **Dependencies:** 2, 3
 **Files likely touched:** `packages/ui/src/components/button.tsx`, `packages/ui/src/components/icon-button.tsx`, `packages/ui/src/styles/atoms.css`
 **Estimated scope:** Medium: 3-5 files
@@ -205,7 +205,7 @@ styling out of `atoms.css`.
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/button-link.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/icon-link.test.tsx
-- [ ] Manual check: `grep -rn "next/link" apps --include='*.tsx'` returns zero hits; FV
+- [ ] Manual check: `grep -n "ui-icon-link" packages/ui/src/styles/atoms.css` returns nothing while the hook remains in `components`; `grep -rn "next/link" apps --include='*.tsx'` returns zero hits; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/button-link.tsx`, `packages/ui/src/components/icon-link.tsx`, `packages/ui/src/styles/atoms.css`
 **Estimated scope:** Medium: 3-5 files
@@ -368,9 +368,10 @@ because `apps/app` tests slice rendered HTML on it.
 
 ## Task 15: Convert DueDatePill and DueDate
 
-**Description:** Restyle both as badge/text compositions over the converted `Pill`/`StatusText`,
-keeping overdue/today/later semantics, the `ui-due-pill--*`/`ui-due-date--*` hooks and signal
-colours resolved from `--danger`/`--accent`/`--muted` utilities.
+**Description:** Restyle both as badge/text components in place (neither file imports `Pill` or
+`StatusText` today; keep it that way unless a later primitive needs the composition), keeping
+overdue/today/later semantics, the `ui-due-pill--*`/`ui-due-date--*` hooks and signal colours
+resolved from `--danger`/`--accent`/`--muted` utilities.
 **Acceptance criteria:**
 - [ ] `DueDatePill`/`DueDatePillProps`/`DueDateState`/`DueDate`/`DueDateProps`/`DueDateTone` unchanged; the hooks still render
 - [ ] Both `atoms.css` blocks gone; signal colours come from token utilities only
@@ -379,7 +380,7 @@ colours resolved from `--danger`/`--accent`/`--muted` utilities.
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/due-date-pill.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/due-date.test.tsx
 - [ ] Manual check: `grep -n "ui-due" packages/ui/src/styles/atoms.css` returns nothing; FV
-**Dependencies:** 13
+**Dependencies:** 2
 **Files likely touched:** `packages/ui/src/components/due-date-pill.tsx`, `packages/ui/src/components/due-date.tsx`, `packages/ui/src/styles/atoms.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -458,7 +459,7 @@ from Task 2), keeping `label`/`summary`/`open`/`onOpenChange`, the always-visibl
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/menu.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
-- [ ] Manual check: `grep -n "ui-menu" packages/ui/src/styles/blocks.css` returns nothing; FV
+- [ ] Manual check: `grep -n "ui-menu__\|ui-menu {" packages/ui/src/styles/blocks.css` returns nothing (the `.ui-list-manager__row > .ui-menu` layout rules belong to Tasks 33-34); FV
 **Dependencies:** 18
 **Files likely touched:** `packages/ui/src/components/menu.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
@@ -555,8 +556,8 @@ action, validation messaging, status options and the item markup the app's regex
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-form.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-nav-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
-- [ ] Manual check: `grep -n "ui-feedback\|ui-nav-item" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 4, 7, 9, 13, 16
+- [ ] Manual check: `grep -n "ui-feedback\|ui-nav-item\|ui-field" packages/ui/src/styles/blocks.css` returns nothing; FV
+**Dependencies:** 4, 7, 10, 13, 14, 16, 17, 18
 **Files likely touched:** `packages/ui/src/components/feedback-form.tsx`, `packages/ui/src/components/feedback-nav-item.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -669,7 +670,7 @@ target and the `button.trash-delete` affordance.
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-item.test.tsx
 - [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
-- [ ] Manual check: `grep -n "ui-list-item" packages/ui/src/styles/blocks.css` returns nothing; FV
+- [ ] Manual check: `grep -n "ui-list-item--\|ui-list-item__" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 29
 **Files likely touched:** `packages/ui/src/components/list-item.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Small: 1-2 files
@@ -692,7 +693,7 @@ control slots, delete-affordance placement and the `ui-settings-row`/`ui-setting
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/settings-row.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/settings-block.test.tsx
 - [ ] Manual check: `grep -n "ui-settings" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 16, 25
+**Dependencies:** 16, 25, 26
 **Files likely touched:** `packages/ui/src/components/settings-row.tsx`, `packages/ui/src/components/settings-block.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
@@ -702,7 +703,8 @@ control slots, delete-affordance placement and the `ui-settings-row`/`ui-setting
 element order the `manager-markup` snapshots record and the `ui-manager-*` hooks.
 **Acceptance criteria:**
 - [ ] `ManagerBlock`/`ManagerBlockProps` unchanged; `ManagerSurface` keeps its internal shape
-- [ ] Manager snapshot regenerated or deleted in this change, diff explained; manager rules leave `blocks.css`
+- [ ] Manager snapshot regenerated or deleted in this change, diff explained; no manager layout rule
+survives after Tasks 33-34 (the surface renders `classPrefix`, so its rules live in their section)
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/manager-block.test.tsx
@@ -819,7 +821,7 @@ only their own `blocks.css` rules move to utilities, with `FabMenu` reusing the 
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/fab-menu.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tag-picker.test.tsx
 - [ ] Manual check: `grep -n "ui-fab-menu\|ui-tag-picker" packages/ui/src/styles/blocks.css` returns nothing; FV
-**Dependencies:** 13, 19, 28
+**Dependencies:** 10, 13, 19, 28
 **Files likely touched:** `packages/ui/src/components/fab-menu.tsx`, `packages/ui/src/components/tag-picker.tsx`, `packages/ui/src/styles/blocks.css`
 **Estimated scope:** Medium: 3-5 files
 
