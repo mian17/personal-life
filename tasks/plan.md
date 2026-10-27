@@ -41,8 +41,8 @@ is converted.
    a counterpart in shadcn, replace it".
 5. **`select` uses the native-select recipe**, no Radix: native `<select>`, same registry
    provenance, no DOM change, no selector risk.
-6. **`base.css` keeps its frozen blocks** that `tokens.test.ts` asserts verbatim; preflight arrives
-   through `theme.css`.
+6. **`base.css` keeps its frozen blocks** that `tokens.test.ts` asserts verbatim, and keeps owning
+   the resets: Tailwind's preflight is deliberately not imported by `theme.css` (spec §5).
 7. **No px/hex literals in our stylesheets**: geometry from Tailwind's scale, `theme.css` maps to
    `var(--…)` only, colour literals only in `tokens.css`.
 
