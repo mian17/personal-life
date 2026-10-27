@@ -18,11 +18,10 @@ explicit "yes" before this file was written.
   `blocks.css`; a new primitive is a shadcn registry copy plus theme mapping, with zero
   behaviour code written by us.
 - **Constraint:** colour theme is locked to today's values. Geometry, spacing, radii and
-  type scale are free to take shadcn defaults. Frozen surfaces stay frozen: the e2e selector
-  surface, `packages/ui/test/tokens.test.ts`, PWA `viewport.themeColor` and
-  `public/manifest-*.json`; any unavoidable selector change is proposed individually for
-  approval. Branch is cut from `origin/dev`, the PR targets `dev`, and it is not merged
-  without the user's say-so.
+  type scale are free to take shadcn defaults. Frozen: `packages/ui/test/tokens.test.ts` (value
+  table), PWA `viewport.themeColor` and `public/manifest-*.json`. The e2e selector surface is
+  **not** frozen — see the amendment below. Branch is cut from `origin/dev`, the PR targets
+  `dev`, and it is not merged without the user's say-so.
 - **Out of scope:** app-specific blocks that have no shadcn equivalent (`page-shell`,
   `editor-chrome`, `fab-menu`, `trash-block`, `manager-surface`, `tag-picker`) keep their
   composition and are restyled only where they consume a replaced primitive. No Storybook,
@@ -35,6 +34,23 @@ explicit "yes" before this file was written.
 - Colour parity is proven in jest via `tokens.test.ts` plus computed-style assertions. A
   screenshot-baseline program was considered and dropped: "styling must be the same" was
   clarified to mean the colour theme only.
+
+## Amendment — 2026-10-27: this is a migration, nothing blocks it
+
+User, verbatim: *"approve … i said if there is a counterpart in shadcn, replace it, remove the
+frozen spec. From now on, this is a migration, so anything that is blocking the migration must
+all be removed."*
+
+- **Approved:** `apps/app/postcss.config.mjs`, `cmdk` for the `autosuggest` → `combobox`
+  (Popover + Command) swap, `tab-bar` → Radix `tabs`.
+- **Revoked:** the frozen e2e selector surface. `ui-*` class strings, `aria-current="page"`,
+  nesting depth and `button.trash-delete` are ordinary implementation details; a test that
+  pinned the old markup is updated or the assertion deleted in the same change.
+- **Test policy:** old stylesheet-reading assertions are deleted with the CSS rule they read
+  (the user named the `opacity: 0.5` assertions specifically). Behaviour, rendered-DOM and
+  computed-style assertions stay.
+- **Still frozen:** the colour value table in `packages/ui/test/tokens.test.ts`, PWA constants,
+  `@life/ui`'s public exports.
 
 ## Confirmation
 
