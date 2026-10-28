@@ -55,6 +55,20 @@ describe('Button', () => {
     },
   );
 
+  it('gives danger + icon the IconButton default surface while the glyph stays danger', () => {
+    render(
+      <Button variant="danger" size="icon">
+        x
+      </Button>,
+    );
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('border');
+    expect(classes).toContain('border-border');
+    expect(classes).toContain('bg-panel');
+    expect(classes).toContain('size-12');
+    expect(classes).toContain('text-danger');
+  });
+
   it('carries the disabled treatment on the rendered element', () => {
     render(<Button disabled>x</Button>);
     const button = screen.getByRole('button') as HTMLButtonElement;

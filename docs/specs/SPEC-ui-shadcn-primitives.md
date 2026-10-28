@@ -46,7 +46,9 @@ Acceptance criteria (one cluster — see §8 for the testable form):
   exceptions: the added `apps/app/postcss.config.mjs` (the CSS pipeline entry point, not
   application code), and app composition a registry replacement's markup change forces at the
   consuming site — the one case: `DoneToggle` in `apps/app/app/todo-item.tsx`, recomposed to
-  render the now-interactive `Checkbox` directly (no `IconButton` wrapper). Tests inside `apps/*`
+  render the now-interactive `Checkbox` directly (no `IconButton` wrapper). The directly-rendered
+  checkbox takes its left inset from `--icon-btn-size` and `--checkbox-size` (centred in the
+  wrapper's former 40px square, still without a wrapper). Tests inside `apps/*`
   may be updated where they pinned markup a registry replacement removed.
 - AC2: no hand-written `atoms.css` or `blocks.css`; styling is Tailwind v4 utilities mapped
   to the existing tokens.
@@ -150,6 +152,11 @@ Conventions: no raw hex/rgb/px outside `tokens.css`; no hand-rolled markup recre
 primitive's visuals; each vendored file carries a one-line provenance comment (registry
 item name + snapshot date). Tailwind's preflight is deliberately not imported — `base.css`
 owns the resets, and loading a second reset under it would re-order every app's box model.
+`base.css` resets the UA button chrome inside `@layer base` (`border-style: var(--tw-border-style)`
++ `border-width: 0`) precisely because preflight is absent — which is why borderless button
+variants no longer show the UA bevel while utilities still win.
+The `danger` + `icon` compound variant carries `IconButton`'s default surface (border colour
+`border`, fill `panel`) at the 48px tap-target size (`size-12`), with the glyph in `danger`.
 
 ## 6. Testing Strategy
 

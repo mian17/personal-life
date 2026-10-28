@@ -32,7 +32,12 @@ export const buttonVariants = cva(
       },
     },
     compoundVariants: [
-      { variant: 'danger', size: 'icon', class: 'text-xl leading-none' },
+      // surface matches IconButton default (border-border bg-panel); glyph keeps variant colour (danger)
+      {
+        variant: 'danger',
+        size: 'icon',
+        class: 'border border-border bg-panel text-xl leading-none',
+      },
       { variant: 'danger', size: 'default', class: 'w-12' },
       { variant: 'danger', size: 'bare', class: 'border border-danger text-sm' },
     ],

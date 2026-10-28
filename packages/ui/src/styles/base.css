@@ -2,6 +2,16 @@
   box-sizing: border-box;
 }
 
+@layer base {
+  /* UA button chrome (2px outset ButtonBorder) must not paint under borderless variants.
+     Layered so utilities still win; `border-width: 0` + `border-style: var(--tw-border-style)`
+     instead of `border: 0` so the `border` utility only has to set width. */
+  button {
+    border-style: var(--tw-border-style);
+    border-width: 0;
+  }
+}
+
 html,
 body {
   margin: 0;

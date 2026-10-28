@@ -67,6 +67,14 @@ const rowSlotStyles = cx(
 );
 
 /**
+ * Leading checkbox inset: the removed 40px `IconButton` wrapper (`--icon-btn-size`) centred
+ * its control, so the checkbox takes that square's leftover width split around it. Direct
+ * child only — a row without a leading checkbox matches nothing.
+ */
+const checkboxInsetStyles =
+  '[&>.ui-checkbox]:mx-[calc((var(--icon-btn-size)-var(--checkbox-size,var(--space-0-75)))/2)]';
+
+/**
  * The whole row is the target: the body stretches to the row height and takes its width.
  * Each shape below spells out its own alignment, gap and padding, so nothing is applied
  * twice and no later class has to outrank an earlier one.
@@ -240,6 +248,7 @@ export function ListItem({
         tone && `ui-list-item--${tone}`,
         rowSurfaceStyles,
         isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
+        checkboxInsetStyles,
         isColumn || isDense ? 'items-start' : 'items-center',
         isDense ? 'min-h-0' : rowFloorStyles,
         variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',
