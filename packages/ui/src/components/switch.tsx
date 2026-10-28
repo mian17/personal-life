@@ -35,7 +35,7 @@ const switchTrack = cx(
   // `outline-hidden` zeroes `--tw-outline-style`, and `outline-<width>` draws with that
   // variable — so the ring needs `outline-solid` to exist. Without it Chromium computes
   // `outline-style: none` and the focus ring is invisible.
-  'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)]',
   'focus-visible:outline-accent',
   'disabled:cursor-default disabled:opacity-50',
 );

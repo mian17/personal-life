@@ -62,6 +62,7 @@ Every answer is quoted from the maintainer's 2026-10-27 ruling, which supersedes
 | (e) | Let the stylesheet-reading suites change | **approved** | maintainer: "delete all old tests spec … test that tests specifically opacity: 0.5 must be deleted"; spec §6 |
 | (f) | Frozen e2e selector surface (`ui-*`, aria labels, `button.trash-delete`, `aria-current`) | **revoked** | maintainer: "remove the frozen spec … anything that is blocking the migration must all be removed" |
 | (g) | `tab-bar` → shadcn `tabs` | **approved** | maintainer, 2026-10-27: "2. swap it" |
+| (h) | `apps/app/app/todo-item.tsx`: unwrap `DoneToggle`'s `IconButton` so the registry `Checkbox` is the only interactive control | **approved — derived** | maintainer, 2026-10-27: "if there is a counterpart in shadcn, replace it … anything that is blocking the migration must all be removed" — the `IconButton`-around-`Checkbox` nest is the blocker the registry copy cannot keep (§9.1 forbids the `checkbox` deviation); the same ruling's scope carries it, and no new question was open |
 
 ## Stop conditions
 
@@ -355,7 +356,7 @@ vocabulary mapped onto frozen tokens, and every `ui-pill*` hook.
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/pill.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/pill-group.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-pill" packages/ui/src/styles/atoms.css` returns nothing; FV
 **Dependencies:** 4
 **Files likely touched:** `packages/ui/src/components/pill.tsx`, `packages/ui/src/styles/atoms.css`
@@ -446,7 +447,7 @@ sheet layout, the labelled title, focus trap/restore, and the `ui-dialog`/`ui-di
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/dialog.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-dialog" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2, 4, 6
 **Files likely touched:** `packages/ui/src/components/dialog.tsx`, `packages/ui/src/styles/blocks.css`
@@ -470,7 +471,7 @@ from Task 2), keeping `label`/`summary`/`open`/`onOpenChange`, the always-visibl
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/menu.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "^\.ui-menu" packages/ui/src/styles/blocks.css` returns nothing (the `.ui-list-manager__row > .ui-menu` layout rules belong to Tasks 33-34); FV
 **Dependencies:** 4, 18
 **Files likely touched:** `packages/ui/src/components/menu.tsx`, `packages/ui/src/styles/blocks.css`
@@ -548,7 +549,7 @@ stay.
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/autosuggest.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-autosuggest" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 4, 7
 **Files likely touched:** `packages/ui/src/components/autosuggest.tsx`, `packages/ui/src/components/command.tsx`, `packages/ui/src/components/popover.tsx`, `packages/ui/test/autosuggest.test.tsx`, `packages/ui/src/styles/blocks.css`
@@ -582,7 +583,7 @@ sanity check, not a removal.
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-form.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/feedback-nav-item.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "submit feedback from the notes toolbar and read it back in the inbox"
 - [ ] Manual check: `grep -n "ui-feedback\|ui-nav-item\|ui-field" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 4, 7, 13, 14, 17, 18
 **Files likely touched:** `packages/ui/src/components/feedback-form.tsx`, `packages/ui/src/components/feedback-nav-item.tsx`, `packages/ui/src/styles/blocks.css`
@@ -623,7 +624,7 @@ slot, the `ui-section`/`__heading`/`__actions` and `ui-page-actions` hooks and t
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/section.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/page-actions.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-section\|ui-page-actions" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 2, 25
 **Files likely touched:** `packages/ui/src/components/section.tsx`, `packages/ui/src/components/page-actions.tsx`, `packages/ui/src/styles/blocks.css`
@@ -696,7 +697,7 @@ target and the `button.trash-delete` affordance.
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/list-item.test.tsx
-- [ ] E2E passes where task needs end-to-end check: npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
+- [x] E2E passes (run 2026-10-28, `playwright.config.ts`): npx playwright test --config apps/app/playwright.config.ts test/e2e/feedback.spec.ts -g "flipping an entry to Done removes it from Open and returns it under Done"
 - [ ] Manual check: `grep -n "ui-list-item" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 29
 **Files likely touched:** `packages/ui/src/components/list-item.tsx`, `packages/ui/src/styles/blocks.css`
@@ -900,8 +901,9 @@ typecheck across workspaces, every `packages/ui/test/` suite, the Contract 1 gre
 `apps/*` diff, and `tokens.test.ts` byte-identical to `origin/dev`.
 **Acceptance criteria:**
 - [x] `npm run typecheck` green; every `packages/ui/test/` suite green within its 2-run budget
-- [x] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists only `apps/app/postcss.config.mjs` in
-      source and, at most, test files whose assertions pinned markup a replacement removed
+- [x] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists only `apps/app/postcss.config.mjs` and
+      `apps/app/app/todo-item.tsx` in source (spec §8.1's two sanctioned files) and, at most, test files
+      whose assertions pinned markup a replacement removed
 - [x] `tokens.test.ts` byte-identical to `origin/dev`; every replaced component file names its registry item or records that it has no counterpart
 **Verification:**
 - [x] Typecheck passes: npm run typecheck
@@ -918,7 +920,15 @@ typecheck across workspaces, every `packages/ui/test/` suite, the Contract 1 gre
 - [x] `theme-parity.test.ts` proves all 11 frozen colours in light and dark; `tokens.test.ts` byte-identical to `origin/dev`
 - [x] `atoms.css`/`blocks.css` deleted; no colour literal outside `tokens.css`
 - [x] No suite reads a deleted stylesheet; no snapshot pins replaced markup
-- [x] `apps/*` source unchanged beyond the approved PostCSS config; the change stays uncommitted on `pi/wf/shadcn-primitive-migration`
+- [x] `apps/*` source unchanged beyond spec §8.1's two sanctioned files (`apps/app/postcss.config.mjs`, the `DoneToggle` recomposition in `apps/app/app/todo-item.tsx`); the migration is commit
+  `62461f5` on `pi/wf/shadcn-primitive-migration`, and the gate round's own repairs stay uncommitted
+  on top of it for review
+
+Per-task verification blocks below Task 41 record the plan as written, not a ticked
+execution log: the tasks were implemented and their suites run during the run, but the
+individual boxes were not maintained per task. The evidence of record is the §8 gate
+output pasted into `docs/reports/shadcn-primitive-migration-2026-10-28.md`, and a task
+box left unticked here does not mean its work is outstanding.
 
 ## Open Questions
 

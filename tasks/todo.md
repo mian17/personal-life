@@ -5,6 +5,10 @@
 verification, dependencies, files, scope). Checkpoints are the phase gates from `tasks/plan.md`
 Step 5; a task is checked only when its own verification block is green.*
 
+> Task boxes here mirror `tasks/plan.md` and are not a ticked execution log; the
+> evidence of record is the §8 gate output in
+> `docs/reports/shadcn-primitive-migration-2026-10-28.md`.
+
 ### Phase 0 — Gate
 - [x] Task 1: Record the maintainer's rulings (ledger settled 2026-10-27: PostCSS config,
       `cmdk`, selector surface revoked, stylesheet-reading assertions deletable, `tab-bar` swapped)

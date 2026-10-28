@@ -25,7 +25,7 @@ const selectStyles = cx(
   'block w-full min-w-0 h-12 rounded-md border border-border bg-panel px-3 py-2',
   'text-base text-text [font:inherit] outline-none transition-colors',
   'cursor-pointer [-webkit-tap-highlight-color:transparent]',
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
   'disabled:cursor-not-allowed disabled:text-muted',
 );
 

@@ -56,7 +56,7 @@ const pillVariants = cva('inline-flex items-center rounded-full', {
 
 /** Shed only the UA button chrome, so a button pill matches its span/anchor twin. */
 const toggleStyles =
-  'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+  'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent';
 
 const removeStyles =
   'min-h-0 cursor-pointer rounded-full border-0 bg-transparent px-[var(--space-0-35)] py-0 text-[length:var(--space-0-95)] font-semibold leading-none text-muted hover:text-danger [font-family:inherit]';

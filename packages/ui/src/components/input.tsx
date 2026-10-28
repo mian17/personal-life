@@ -17,7 +17,7 @@ const inputStyles = cx(
   'text-base text-text placeholder:text-muted',
   '[font:inherit] outline-none transition-colors',
   'file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-text',
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
   'disabled:cursor-not-allowed disabled:text-muted',
 );
 

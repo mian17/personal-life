@@ -32,14 +32,15 @@ const cornerStyles = cx(
 
 /**
  * FabLink's accent pill, as a button rather than a link. `outline-none` zeroes the
- * style variable that `outline-2` draws with, so the focus ring needs its style back.
+ * style variable an outline width draws with, so the focus ring needs its style back;
+ * width and offset both ride the `--focus-ring` token.
  */
 const triggerStyles = cx(
   'inline-flex items-center justify-center size-[var(--fab-size)] rounded-full cursor-pointer',
   'border-0 bg-accent text-on-accent shadow-[var(--shadow-fab)]',
   'outline-none transition-colors',
-  'focus-visible:outline-solid focus-visible:outline-2',
-  'focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
+  'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
 );
 
 /** The options panel: a raised surface holding the links the app supplies. */

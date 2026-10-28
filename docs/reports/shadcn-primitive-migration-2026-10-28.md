@@ -2,11 +2,12 @@
 
 One gate, run once, on `pi/wf/shadcn-primitive-migration` at `95c0fea`, based on
 `origin/dev` at `3d1eb4f`. Every check below is a spec §8 success criterion, pasted
-as it ran. The change is left uncommitted in the working tree for the user's review.
+as it ran. The migration itself is commit `62461f5`; this gate round's repairs are left
+uncommitted on top of it for the user's review.
 
 Run date: 2026-10-28.
 
-## §8.1 — typecheck green, `apps/*` source untouched
+## §8.1 — typecheck green, `apps/*` source unchanged beyond the two sanctioned files
 
 `npm run typecheck` across all workspaces:
 
@@ -25,12 +26,17 @@ rc=0
 `git diff --name-only origin/dev...HEAD -- 'apps/**/*'`:
 
 ```
+apps/app/app/todo-item.tsx
 apps/app/postcss.config.mjs
+apps/app/test/feedback-inbox.test.tsx
+apps/app/test/meal-day-view.test.tsx
+apps/app/test/meal-editor.test.tsx
+apps/app/test/todo-item.test.tsx
 ```
 
-Committed history touches one `apps/*` file: the approved PostCSS entry point. The
-working tree adds only `apps/app/app/todo-item.tsx` (source) and four test files whose
-assertions pinned markup the registry replacement removed:
+Exactly the two files spec §8.1 sanctions — the PostCSS entry point and the `DoneToggle`
+recomposition — plus four test files whose assertions pinned markup the registry
+replacement removed. Committed history and the working tree agree on that set:
 
 ```
 $ git diff --name-only origin/dev -- apps
@@ -59,9 +65,9 @@ Full package suite, one run:
 ```
 $ npm run test:unit -w @life/ui
 Test Suites: 61 passed, 61 total
-Tests:       528 passed, 528 total
+Tests:       536 passed, 536 total
 Snapshots:   11 passed, 11 total
-Time:        18.13 s
+Time:        16.095 s
 ```
 
 Second run, narrowed to the two suites §8.3 and §8.4 name:
@@ -197,7 +203,73 @@ $ git diff --name-only origin/dev -- apps/app/public apps/app/app/layout.tsx
 Manifest files and `viewport.themeColor` are byte-identical to `origin/dev`. The six
 app-specific blocks (`editor-chrome`, `fab-menu`, `manager-surface`, `page-shell`,
 `tag-picker`, `trash-block`) keep their composition and their behaviour; their
-suites are among the 528 passing tests.
+suites are among the 536 passing tests.
+
+## §8.10 — focus rings survive the utility-class port
+
+The registry recipes reach for `focus-visible:outline-2` without
+`focus-visible:outline-solid`. Tailwind v4 compiles `outline-2` to
+`outline-style: var(--tw-outline-style)` while 11 converted atoms also carry
+`outline-none`, which sets `--tw-outline-style: none`. Without an explicit
+`outline-solid` the ring is computed but never painted. `origin/dev` drew that ring on
+eight selectors across the deleted stylesheets — `.ui-icon-btn`, `.ui-icon-link`,
+`.ui-pill--button`, `.ui-switch`, `.ui-tab`, `.ui-fab-link`, `.ui-fab-menu__trigger`
+and the two-part `.ui-file-picker__input:focus-visible + .ui-file-picker__surface` —
+so those are regressions being repaired. `button`, `input`, `select` and `textarea`
+had no authored ring before; the registry recipe adds one, and without the reset it
+would have been silently dead CSS rather than a visible improvement. Five files
+already carried the reset (`checkbox`, `switch`, `tab-bar`, `fab-link`, `fab-menu`);
+the other eight (`button`, `icon-button`, `icon-link`, `input`, `select`, `textarea`,
+`pill`, and `file-picker` as `peer-focus-visible:outline-solid` on its peer input) now
+do too:
+
+```
+$ grep -rln "focus-visible:outline-solid" packages/ui/src/components/*.tsx | wc -l
+13
+$ grep -rln "outline-none" packages/ui/src/components/*.tsx | wc -l
+11
+```
+
+Covered by 8 new tests across `button`, `icon-button`, `icon-link`, `input`,
+`select`, `textarea`, `pill` and `file-picker` (the 528 → 536 delta in §8.2).
+
+### Ring geometry rides `--focus-ring`
+
+Width and offset come from the token, not a literal, so a token change moves the
+ring (plan Task 7: the treatment is `over --focus-ring`; `tokens.css:24` declares
+`--focus-ring: 2px`):
+
+```
+$ grep -rl "outline-\[length:var(--focus-ring)\]" packages/ui/src/components/*.tsx | wc -l
+13
+$ grep -rl "outline-offset-\[var(--focus-ring)\]" packages/ui/src/components/*.tsx | wc -l
+13
+$ grep -rn "outline-2\|outline-offset-2" packages/ui/src/components/*.tsx | wc -l
+0
+```
+
+Tailwind v4 compiles both arbitrary utilities as expected (`outline-width:
+var(--focus-ring)`, `outline-offset: var(--focus-ring)`), and the per-component
+companion suites assert the token-bearing class beside `focus-visible:outline-solid`.
+
+## §8.11 — e2e selector surface green after the maintainer's revocation
+
+The frozen surface was revoked (Task 1 ledger row (f)), but the plan-pinned specs
+still have to pass. Full suite, one run:
+
+```
+$ npx playwright test --config apps/app/playwright.config.ts
+  2 skipped
+  27 passed (3.0m)
+```
+
+The two skips are `test/e2e/hop.spec.ts`, env-gated on `E2E_HOP=1` — unrelated to
+this change. Both plan-pinned tests pass:
+
+- `test/e2e/feedback.spec.ts` › *submit feedback from the notes toolbar and read it back in the inbox*
+- `test/e2e/feedback.spec.ts` › *flipping an entry to Done removes it from Open and returns it under Done*
+
+`test/e2e/meals.spec.ts` passes 7/7.
 
 ## Provenance — every converted file names its registry item or records no counterpart
 
@@ -236,12 +308,8 @@ approved PostCSS entry point and the `DoneToggle` unwrap that the snapshot recor
 assigns to this gate ("belongs to the gate that owns `todo-item.tsx`"). Nothing else in
 `apps/*` source changed; the four test files change only their markup pins.
 
-State: uncommitted on `pi/wf/shadcn-primitive-migration`; 110 entries in
-`git status --porcelain -uall` against `origin/dev`. Composition: 49 modified component
-files; 43 modified test files; modified `packages/ui/src/styles.css`; modified
-`tasks/todo.md`; 2 stylesheet deletions (`atoms.css`, `blocks.css`) staged in index.
-Every remaining entry sits unstaged or untracked. Untracked additions: 2 new component
-files (`command.tsx`, `popover.tsx`), no dedicated test files — exercised indirectly via
-`autosuggest.test.tsx` listbox assertions; 3 new test files (`create-field.test.tsx`,
-`snackbar-provider.test.tsx`, `theme-parity.test.ts`); plus this report. Spec, plan,
-vendor records are tracked modifications. Nothing committed. Nothing pushed.
+State: the migration is commit `62461f5` on `pi/wf/shadcn-primitive-migration`,
+116 files against `origin/dev`. The gate round's own repairs sit on top of it, uncommitted:
+21 modified files — 8 component files gaining `focus-visible:outline-solid`, 8 test
+files with the matching regression assertions, the `manager-markup` snapshot, this
+report, `tasks/plan.md`, `tasks/todo.md` and `packages/ui/vendor/shadcn/SNAPSHOT.md`. Nothing pushed.

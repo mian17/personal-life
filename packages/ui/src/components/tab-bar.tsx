@@ -48,8 +48,8 @@ const tabStyles = cx(
   'px-[var(--space-0-75)] py-[var(--space-0-5)] rounded-[var(--radius-md)]',
   'text-muted no-underline cursor-pointer transition-colors',
   'data-[state=active]:bg-accent data-[state=active]:text-on-accent',
-  'outline-hidden focus-visible:outline-solid focus-visible:outline-2',
-  'focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'outline-hidden focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
+  'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
 );
 
 export function Tab({ href, active = false, children, className }: Readonly<TabProps>) {

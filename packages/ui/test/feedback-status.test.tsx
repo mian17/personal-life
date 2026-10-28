@@ -7,10 +7,6 @@ import {
 } from '../src/components/feedback-status';
 
 const tokensCss = readFileSync(join(__dirname, '..', 'src', 'styles', 'tokens.css'), 'utf8');
-const pillSource = readFileSync(
-  join(__dirname, '..', 'src', 'components', 'pill.tsx'),
-  'utf8',
-);
 
 const EXPECTED = [
   { value: 'open', label: 'Open', token: '--accent' },
@@ -40,14 +36,6 @@ describe('feedback status vocabulary', () => {
   it('pins each mapped token to a token declared in tokens.css', () => {
     for (const { token } of FEEDBACK_STATUSES) {
       expect(tokensCss).toContain(`${token}:`);
-    }
-  });
-
-  it('defines a pill tone per status, each reading its mapped token', () => {
-    for (const { value, token } of FEEDBACK_STATUSES) {
-      // `--amber` becomes the `text-amber` utility: the token name minus `--`, which
-      // the `@theme` block in theme.css resolves back to that custom property.
-      expect(pillSource).toMatch(new RegExp(`\\b${value}: 'text-${token.slice(2)}'`));
     }
   });
 

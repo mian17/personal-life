@@ -149,4 +149,16 @@ describe('Pill', () => {
     fireEvent.click(screen.getByRole('button', { name: 't' }));
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  /**
+   * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
+   * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.
+   * `focus-visible:outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring draws', () => {
+    render(<Pill as="button">t</Pill>);
+    const pill = screen.getByRole('button', { name: 't' });
+    expect(pill.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(pill.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
+  });
 });

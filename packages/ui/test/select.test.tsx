@@ -45,4 +45,16 @@ describe('Select', () => {
     render(<Select aria-label="Repeat" options={OPTIONS} ref={ref} />);
     expect(ref.current).toBe(screen.getByLabelText('Repeat'));
   });
+
+  /**
+   * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
+   * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.
+   * `focus-visible:outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring draws', () => {
+    render(<Select aria-label="Repeat" options={OPTIONS} />);
+    const select = screen.getByLabelText('Repeat');
+    expect(select.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(select.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
+  });
 });

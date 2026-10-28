@@ -18,7 +18,7 @@ export interface IconLinkProps extends Omit<ComponentPropsWithRef<'a'>, 'href' |
  * appears.
  */
 const iconLinkStyles =
-  'inline-flex size-10 items-center justify-center rounded-md border border-border bg-panel text-text no-underline outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [-webkit-tap-highlight-color:transparent]';
+  'inline-flex size-10 items-center justify-center rounded-md border border-border bg-panel text-text no-underline outline-none transition-colors focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent [-webkit-tap-highlight-color:transparent]';
 
 export function IconLink({ href, label, className, children, ...rest }: Readonly<IconLinkProps>) {
   return (

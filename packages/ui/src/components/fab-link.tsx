@@ -27,9 +27,10 @@ const fabLinkStyles = cx(
   'inline-flex items-center justify-center size-[var(--fab-size)] rounded-full',
   'bg-accent text-on-accent no-underline shadow-[var(--shadow-fab)]',
   'outline-none transition-colors',
-  // `outline-none` zeroes the style variable `outline-2` draws with, so the ring needs its style back.
-  'focus-visible:outline-solid focus-visible:outline-2',
-  'focus-visible:outline-offset-2 focus-visible:outline-accent',
+  // `outline-none` zeroes the style variable an outline width draws with, so the ring
+  // needs its style back; width and offset both ride the `--focus-ring` token.
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
+  'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
 );
 
 export function FabLink({ href, label, className, children, ...rest }: Readonly<FabLinkProps>) {

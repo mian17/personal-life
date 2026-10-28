@@ -26,7 +26,7 @@ export interface FilePickerProps extends Omit<ComponentPropsWithRef<'input'>, 't
 const surfaceStyles = cx(
   'flex flex-col gap-1 p-3 rounded-md border border-dashed border-border bg-panel text-text',
   'cursor-pointer transition-colors',
-  'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
+  'peer-focus-visible:outline-solid peer-focus-visible:outline-[length:var(--focus-ring)] peer-focus-visible:outline-offset-[var(--focus-ring)] peer-focus-visible:outline-accent',
   'peer-disabled:cursor-default peer-disabled:opacity-50',
 );
 

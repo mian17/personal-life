@@ -12,7 +12,7 @@ export interface IconButtonProps extends ComponentPropsWithRef<'button'> {
 
 /** The registry icon size at this control's 40px square: `size-10`. */
 const iconButtonVariants = cva(
-  'inline-flex size-10 items-center justify-center rounded-md border font-semibold cursor-pointer outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50',
+  'inline-flex size-10 items-center justify-center rounded-md border font-semibold cursor-pointer outline-none transition-colors focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       variant: {

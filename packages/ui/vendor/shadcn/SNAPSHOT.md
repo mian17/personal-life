@@ -76,6 +76,19 @@ row in place. The template:
 | `checkbox` | `src/components/checkbox.tsx` | `ui-registry-2026-10-26` | 8 |
 | `switch` | `src/components/switch.tsx` | `ui-registry-2026-10-26` | 8 |
 | `dropdown-menu` | `src/components/menu.tsx` | `ui-registry-2026-10-26` | 19 |
+| `alert` | `src/components/alert-banner.tsx` | `ui-registry-2026-10-26` | 17 |
+| `badge` | `src/components/pill.tsx` | `ui-registry-2026-10-26` | 13 |
+| `button` | `src/components/button-link.tsx`, `src/components/icon-link.tsx` | `ui-registry-2026-10-26` | 6 |
+| `card` | `src/components/card.tsx` | `ui-registry-2026-10-26` | 16 |
+| `command` | `src/components/command.tsx` | `ui-registry-2026-10-26` | 23 |
+| `dialog` | `src/components/dialog.tsx` | `ui-registry-2026-10-26` | 18 |
+| `input` | `src/components/input.tsx` | `ui-registry-2026-10-26` | 7 |
+| `input` | `src/components/file-picker.tsx` | `ui-registry-2026-10-26` | 11 |
+| `native-select` | `src/components/select.tsx` | `ui-registry-2026-10-26` | 9 |
+| `popover` | `src/components/popover.tsx` | `ui-registry-2026-10-26` | 23 |
+| `tabs` | `src/components/tab-bar.tsx` | `ui-registry-2026-10-26` | 20 |
+| `textarea` | `src/components/textarea.tsx` | `ui-registry-2026-10-26` | 7 |
+| `toast` | `src/components/snackbar.tsx`, `src/components/snackbar-provider.tsx` | `ui-registry-2026-10-26` | 21 |
 
 ## Recorded deviations
 
@@ -94,4 +107,8 @@ The spec has no exemption list (§1) and §9.1 limits deviations to components w
 counterpart, and `checkbox` has one, so D1 was not a valid deviation. The atom is now the real
 registry copy (`CheckboxPrimitive.Root` + `Indicator` + `Check`). Removing the nested `IconButton`
 from `DoneToggle` is a composition change in `apps/*`, which `tasks/plan.md` keeps out of a
-conversion task's blast radius; it belongs to the gate that owns `todo-item.tsx`, not to Task 8.
+conversion task's blast radius on its own, so it was read back to the maintainer's component-scope
+ruling in the Task 1 ledger (row (b): *"if there is a counterpart in shadcn, replace it … anything
+that is blocking the migration must all be removed"*) and recorded there as row (h). `tasks/plan.md` Task 8 now names
+`apps/app/app/todo-item.tsx` in its blast radius, and spec §8.1 names it as one of two
+sanctioned `apps/*` source files.

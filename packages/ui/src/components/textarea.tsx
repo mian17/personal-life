@@ -24,7 +24,7 @@ const textareaVariants = cva(
       variant: {
         default: cx(
           'min-h-16 resize-y rounded-md border border-border bg-panel px-3 py-2 text-base text-text',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+          'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
         ),
         editor:
           'flex-1 resize-none border-0 rounded-none bg-transparent p-0 text-[length:var(--fs-editor)] [-webkit-tap-highlight-color:transparent]',
