@@ -88,16 +88,55 @@ function apiBase(options: MainOptions): string {
 
 /** Loads the service module named by `LIFE_OPS_SERVICE`; exportable for test-only loading in-process. */
 export async function loadService(env: NodeJS.ProcessEnv): Promise<ServiceModule> {
-  const modulePath = env.LIFE_OPS_SERVICE?.trim();
-  if (!modulePath) throw new Error('LIFE_OPS_SERVICE is not set; point it at a registry module');
-  const exported = (await import(modulePath)) as {
+  const requested = env.LIFE_OPS_SERVICE?.trim();
+  if (!requested) throw new Error('LIFE_OPS_SERVICE is not set; point it at a registry module');
+  return await importServiceModule(moduleSpecifier(requested));
+}
+
+/**
+ * The in-package service modules a bare name may select (SPEC-ops-notes-service §9.2).
+ * A bare name outside this list fails by name instead of reaching a directory scan
+ * or an import of the literal string.
+ *
+ * ponytail: hand-listed, so a second service edits one line here. Add a
+ * `src/services` directory read when the list outgrows a screen.
+ */
+const IN_PACKAGE_SERVICE_NAMES = ['notes'] as const;
+
+/** A bare name is an in-package service; anything path-like stays a module specifier. */
+function moduleSpecifier(requested: string): string {
+  if (!isBareServiceName(requested)) return requested;
+  return inPackageServiceSpecifier(requested);
+}
+
+function isBareServiceName(requested: string): boolean {
+  return !/[/\\]/.test(requested);
+}
+
+function inPackageServiceSpecifier(serviceName: string): string {
+  if (!isInPackageService(serviceName)) throw new Error(unknownServiceMessage(serviceName));
+  return `../services/${serviceName}`;
+}
+
+function isInPackageService(serviceName: string): boolean {
+  return (IN_PACKAGE_SERVICE_NAMES as readonly string[]).includes(serviceName);
+}
+
+function unknownServiceMessage(serviceName: string): string {
+  const known = IN_PACKAGE_SERVICE_NAMES.join(', ');
+  return `LIFE_OPS_SERVICE names unknown service ${serviceName}; known services: ${known}`;
+}
+
+/** Reads whichever registry shape the module exports: a whole service, or a bare registry. */
+async function importServiceModule(specifier: string): Promise<ServiceModule> {
+  const exported = (await import(specifier)) as {
     service?: ServiceModule;
     registry?: ResourceRegistry;
     apiBase?: string;
   };
   if (exported.service !== undefined) return exported.service;
   if (exported.registry !== undefined) return { registry: exported.registry, apiBase: exported.apiBase };
-  throw new Error(`LIFE_OPS_SERVICE module ${modulePath} exports no service registry`);
+  throw new Error(`LIFE_OPS_SERVICE module ${specifier} exports no service registry`);
 }
 
 /** The `bin` runner: read the environment, load the service, dispatch, exit. */

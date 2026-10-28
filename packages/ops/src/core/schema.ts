@@ -15,7 +15,7 @@ export interface JsonSchema {
 
 export interface JsonSchemaProperty {
   type: string;
-  items?: { type: 'string' };
+  items?: { type: 'string' | 'number' };
   enum?: readonly string[];
   description: string;
 }
@@ -51,8 +51,9 @@ function schemaForField(field: FieldSpec): JsonSchemaProperty {
   return field.enum === undefined ? shape : { ...shape, enum: field.enum };
 }
 
-function baseType(field: FieldSpec): { type: string; items?: { type: 'string' } } {
+function baseType(field: FieldSpec): { type: string; items?: { type: 'string' | 'number' } } {
   if (field.type === 'string[]') return { type: 'array', items: { type: 'string' } };
+  if (field.type === 'number[]') return { type: 'array', items: { type: 'number' } };
   return { type: field.type };
 }
 

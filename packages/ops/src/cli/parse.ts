@@ -53,7 +53,7 @@ function optionSpecs(operation: OpSpec): ParseArgsOptionsConfig {
 
 function optionFor(field: FieldSpec): { type: 'string' | 'boolean'; multiple?: boolean } {
   if (field.type === 'boolean') return { type: 'boolean' };
-  if (field.type === 'string[]') return { type: 'string', multiple: true };
+  if (field.type === 'string[]' || field.type === 'number[]') return { type: 'string', multiple: true };
   return { type: 'string' };
 }
 
@@ -68,7 +68,17 @@ function convertValues(
   );
 }
 
-/** `parseArgs` yields numbers as text; the core validator rejects a non-numeric one. */
+/**
+ * `parseArgs` yields numbers as text and array fields as text lists; the core
+ * validator rejects a non-numeric entry either way.
+ */
 function toInputValue(field: FieldSpec | undefined, value: unknown): unknown {
-  return field?.type === 'number' ? Number(value) : value;
+  if (field?.type === 'number') return Number(value);
+  if (field?.type === 'number[]') return toNumberArray(value);
+  return value;
+}
+
+function toNumberArray(value: unknown): unknown[] {
+  const entries = Array.isArray(value) ? value : [value];
+  return entries.map((entry) => Number(entry));
 }

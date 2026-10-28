@@ -5,16 +5,19 @@
  * schema can never drift from the validator without failing here.
  *
  * The case table exercises every `FieldSpec` type the sample registry declares
- * (string, number, boolean, string[]) plus required fields, unknown fields, and
- * enums — the last through a local registry, since the sample declares no enum.
+ * (string, number, boolean, string[]) plus the `number[]` type through a local
+ * registry, required fields, unknown fields, and enums.
  */
 import { defineResource, kindIsDestructive } from '../src/core/registry';
-import { deriveInputSchema, type JsonSchema } from '../src/core/schema';
+import { deriveInputSchema, type JsonSchema, type JsonSchemaProperty } from '../src/core/schema';
 import { validateInput } from '../src/core/validate';
+import { describeIssues } from '../src/core/validate';
 import { fieldNames, findOp } from '../src/core/registry';
 import { sampleRegistry } from '../src/fixtures/sample';
 import type { OpSpec, ResourceRegistry } from '../src/core/types';
 import { listTools } from '../src/mcp/tools';
+import { parseCallCommand } from '../src/cli/parse';
+import { service as notesService } from '../src/services/notes';
 
 interface Case {
   name: string;
@@ -37,6 +40,24 @@ const enumRegistry = defineResource({
     },
   ],
 });
+
+/** The `number[]` field the notes resource carries, on a one-op registry. */
+const tagRegistry = defineResource({
+  name: 'notes',
+  basePath: '/notes',
+  ops: [
+    {
+      kind: 'create',
+      fields: {
+        body: { type: 'string', required: true, description: 'Note body' },
+        tagIds: { type: 'number[]', description: 'Tag ids to attach' },
+      },
+    },
+  ],
+});
+
+/** The real notes registry (SPEC-ops-notes-service §1.1) — the module both adapters render. */
+const notesRegistry = notesService.registry;
 
 const CASES: Case[] = [
   {
@@ -67,6 +88,36 @@ const CASES: Case[] = [
   { name: 'a string update version', registry: sampleRegistry, kind: 'update', supplied: { id: 'r1', expectedVersion: '2' }, accepted: false },
   { name: 'a declared enum value', registry: enumRegistry, kind: 'create', supplied: { title: 'a', status: 'draft' }, accepted: true },
   { name: 'an undeclared enum value', registry: enumRegistry, kind: 'create', supplied: { title: 'a', status: 'gone' }, accepted: false },
+  { name: 'an empty tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [] }, accepted: true },
+  { name: 'a two-element tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1, 2] }, accepted: true },
+  { name: 'a fractional tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1.5] }, accepted: true },
+  { name: 'a mixed tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1, '2'] }, accepted: false },
+  { name: 'a NaN tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [Number.NaN] }, accepted: false },
+  { name: 'an infinite tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [Number.POSITIVE_INFINITY] }, accepted: false },
+  { name: 'a bare tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: 1 }, accepted: false },
+  { name: 'a text tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: '1' }, accepted: false },
+  {
+    name: 'a two-element notes tag id array',
+    registry: notesRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [1, 2] },
+    accepted: true,
+  },
+  { name: 'a quoted notes tag id', registry: notesRegistry, kind: 'create', supplied: { body: 'a', tagIds: ['1'] }, accepted: false },
+  { name: 'a bare notes tag id', registry: notesRegistry, kind: 'create', supplied: { body: 'a', tagIds: 1 }, accepted: false },
+  { name: 'omitting the notes body', registry: notesRegistry, kind: 'create', supplied: { tagIds: [] }, accepted: false },
+  { name: 'a notes get id', registry: notesRegistry, kind: 'get', supplied: { id: 'n1' }, accepted: true },
+  { name: 'omitting the notes get id', registry: notesRegistry, kind: 'get', supplied: {}, accepted: false },
+  { name: 'an empty notes list input', registry: notesRegistry, kind: 'list', supplied: {}, accepted: true },
+  { name: 'a notes list filter page', registry: notesRegistry, kind: 'list', supplied: { tagId: 3, q: 'x', limit: 20, cursor: 'c1' }, accepted: true },
+  { name: 'a quoted notes list limit', registry: notesRegistry, kind: 'list', supplied: { limit: '5' }, accepted: false },
+  { name: 'a notes update id', registry: notesRegistry, kind: 'update', supplied: { id: 'n1', tagIds: [1] }, accepted: true },
+  { name: 'omitting the notes update id', registry: notesRegistry, kind: 'update', supplied: { tagIds: [1] }, accepted: false },
+  { name: 'a stale notes update version', registry: notesRegistry, kind: 'update', supplied: { id: 'n1', expectedVersion: 2 }, accepted: true },
+  { name: 'a notes delete id', registry: notesRegistry, kind: 'delete', supplied: { id: 'n1' }, accepted: true },
+  { name: 'omitting the notes delete id', registry: notesRegistry, kind: 'delete', supplied: {}, accepted: false },
+  { name: 'a notes restore id', registry: notesRegistry, kind: 'restore', supplied: { id: 'n1' }, accepted: true },
+  { name: 'omitting the notes restore id', registry: notesRegistry, kind: 'restore', supplied: {}, accepted: false },
 ];
 
 describe('the shared case table', () => {
@@ -111,6 +162,54 @@ describe('the derived schema', () => {
       enum: ['draft', 'live'],
       description: 'Lifecycle status',
     });
+  });
+
+  it('advertises number items for a number array field', () => {
+    expect(deriveInputSchema(tagRegistry, 'create').properties['tagIds']).toEqual({
+      type: 'array',
+      items: { type: 'number' },
+      description: 'Tag ids to attach',
+    });
+  });
+});
+
+describe('the canonical failure text', () => {
+  it('names the field and the expected array type', () => {
+    const operation = findOp(tagRegistry, 'create');
+    const issues = validateInput(operation, { body: 'a', tagIds: [1, '2'] });
+
+    expect(describeIssues('notes', 'create', issues)).toBe(
+      'invalid input for notes.create: tagIds: expected number[]',
+    );
+  });
+});
+
+describe('the call flag parser', () => {
+  it('turns a repeated numeric flag into a number array', () => {
+    const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', '1', '--tagIds', '2'], tagRegistry);
+
+    expect(call.input['tagIds']).toEqual([1, 2]);
+  });
+
+  it('turns a single numeric flag occurrence into a one-element array', () => {
+    const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', '7'], tagRegistry);
+
+    expect(call.input['tagIds']).toEqual([7]);
+  });
+
+  it('keeps repeated string flags a string array', () => {
+    const call = parseCallCommand(['sample', 'create', '--title', 'a', '--labels', 'x', '--labels', 'y'], sampleRegistry);
+
+    expect(call.input['labels']).toEqual(['x', 'y']);
+  });
+
+  it('converts a repeated non-numeric flag into a value the validator rejects', () => {
+    const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', 'one'], tagRegistry);
+    const issues = validateInput(call.operation, call.input);
+
+    expect(describeIssues('notes', 'create', issues)).toBe(
+      'invalid input for notes.create: tagIds: expected number[]',
+    );
   });
 });
 
@@ -216,6 +315,80 @@ describe('the MCP tool surface', () => {
   });
 });
 
+/** The closed `tools/list` surface the notes registry must project, in registry order. */
+const NOTES_TOOL_ROWS: Array<[string, string]> = [
+  ['notes_create', 'Create notes'],
+  ['notes_get', 'Get notes'],
+  ['notes_list', 'List notes'],
+  ['notes_update', 'Update notes'],
+  ['notes_delete', 'Delete notes'],
+  ['notes_restore', 'Restore notes'],
+];
+
+/** The read kinds, whose hints every other kind inverts (SPEC-ops-agent-contract §3.2). */
+const READ_ONLY_KINDS: OpSpec['kind'][] = ['get', 'list'];
+
+/** Each notes op with the required fields the registry declares for it. */
+const NOTES_REQUIRED_ROWS: Array<[OpSpec['kind'], string[]]> = [
+  ['create', ['body']],
+  ['get', ['id']],
+  ['list', []],
+  ['update', ['id']],
+  ['delete', ['id']],
+  ['restore', ['id']],
+];
+
+describe('the notes tool surface', () => {
+  it('names and titles the six notes tools in registry order', () => {
+    expect(listTools(notesRegistry).map((tool) => [tool.name, tool.title])).toEqual(NOTES_TOOL_ROWS);
+  });
+
+  it('marks the read kinds read-only and non-destructive', () => {
+    const tools = listTools(notesRegistry).filter((tool) => isReadTool(tool.name));
+
+    expect(tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint])).toEqual([
+      [true, false],
+      [true, false],
+    ]);
+  });
+
+  it('marks every writing kind non-read-only and destructive', () => {
+    const tools = listTools(notesRegistry).filter((tool) => !isReadTool(tool.name));
+
+    expect(tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint])).toEqual([
+      [false, true],
+      [false, true],
+      [false, true],
+      [false, true],
+    ]);
+  });
+
+  it('closes the world for every notes tool', () => {
+    expect(listTools(notesRegistry).every((tool) => tool.annotations.openWorldHint === false)).toBe(true);
+  });
+
+  it('advertises number tag ids wherever the registry declares them', () => {
+    for (const kind of ['create', 'update'] as const) {
+      expect(deriveInputSchema(notesRegistry, kind).properties['tagIds']).toMatchObject({
+        type: 'array',
+        items: { type: 'number' },
+      });
+    }
+  });
+
+  for (const [kind, required] of NOTES_REQUIRED_ROWS) {
+    it(`advertises the registry required fields for notes ${kind}`, () => {
+      expect(deriveInputSchema(notesRegistry, kind).required).toEqual(required);
+    });
+  }
+});
+
+/** True when the tool's kind is a read, read off the hint the projection stamped. */
+function isReadTool(toolName: string): boolean {
+  const kind = toolName.replace('notes_', '') as OpSpec['kind'];
+  return READ_ONLY_KINDS.includes(kind);
+}
+
 /** A one-op registry carrying an explicit `isDestructive`, for the override cases. */
 function overriddenRegistry(operation: {
   kind: OpSpec['kind'];
@@ -249,14 +422,24 @@ function declares(schema: JsonSchema, name: string): boolean {
   return schema.additionalProperties !== false;
 }
 
-function matches(property: { type: string; items?: { type: 'string' }; enum?: readonly string[] }, value: unknown): boolean {
+function matches(property: JsonSchemaProperty, value: unknown): boolean {
   if (value === undefined) return true;
-  if (!hasType(property.type, value)) return false;
+  if (!hasType(property, value)) return false;
   return property.enum === undefined || property.enum.includes(value as string);
 }
 
-function hasType(type: string, value: unknown): boolean {
-  if (type === 'array') return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
-  if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
-  return typeof value === type;
+function hasType(property: JsonSchemaProperty, value: unknown): boolean {
+  if (property.type === 'array') return hasItemType(property.items?.type, value);
+  if (property.type === 'number') return isFiniteNumber(value);
+  return typeof value === property.type;
+}
+
+function hasItemType(itemType: 'string' | 'number' | undefined, value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  if (itemType === 'number') return value.every(isFiniteNumber);
+  return value.every((entry) => typeof entry === 'string');
+}
+
+function isFiniteNumber(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value);
 }
