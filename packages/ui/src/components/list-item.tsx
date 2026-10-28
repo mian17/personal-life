@@ -62,7 +62,9 @@ const rowSlotStyles = cx(
   '[&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0',
   '[&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0',
   '[&>form>.ui-btn--danger]:p-[var(--space-0-5)]',
-  '[&>form>.ui-btn--danger]:mr-[var(--space-0-5)]',
+  // Glyph's right inset lands on the row's own text inset (`--space-0-9`), the same
+  // padding the row body carries, so a trailing control does not read tighter than the text.
+  '[&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))]',
   '[&>form>.ui-btn--danger]:rounded-[var(--radius-lg)]',
 );
 
@@ -119,7 +121,14 @@ const subStyles = cx(
 
 const separatorStyles = 'shrink-0 text-border';
 const snippetStyles = 'min-w-0 truncate';
-const nestedBodyStyles = 'grid gap-[var(--space-0-5)] pl-[var(--space-1)]';
+const nestedBodyStyles = 'grid gap-[var(--space-0-5)]';
+
+/**
+ * A nested body spans its column, but a title line carrying an action gives that action
+ * `--icon-btn-size` plus the action-line gap, so the body reserves the same column and a
+ * child field shares the title field's edges.
+ */
+const nestedBodyActionInsetStyles = 'pr-[calc(var(--icon-btn-size)+var(--space-0-5))]';
 
 /** The title line carrying its action: the action sits against the title, not the child body. */
 const actionLineStyles = cx(
@@ -228,7 +237,15 @@ export function ListItem({
         {subNode}
       </span>
       {variant === 'nested' ? (
-        <span className={cx('ui-list-item__nested-body', nestedBodyStyles)}>{children}</span>
+        <span
+          className={cx(
+            'ui-list-item__nested-body',
+            nestedBodyStyles,
+            titleLineCarriesAction && nestedBodyActionInsetStyles,
+          )}
+        >
+          {children}
+        </span>
       ) : (
         children
       )}

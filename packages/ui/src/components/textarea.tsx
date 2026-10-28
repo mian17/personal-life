@@ -23,7 +23,7 @@ const textareaVariants = cva(
     variants: {
       variant: {
         default: cx(
-          'min-h-16 resize-y rounded-md border border-border bg-panel px-3 py-2 text-base text-text',
+          'min-h-16 resize-none rounded-md border border-border bg-panel px-3 py-2 text-base text-text',
           'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
         ),
         editor:

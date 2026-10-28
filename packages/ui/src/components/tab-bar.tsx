@@ -62,7 +62,15 @@ export function Tab({ href, active = false, children, className }: Readonly<TabP
       <Link
         href={href}
         data-slot="tabs-trigger"
-        className={cx('ui-tab', active && 'ui-tab--active', tabStyles, className)}
+        className={cx(
+          'ui-tab',
+          active && 'ui-tab--active',
+          tabStyles,
+          // The surface follows the prop the app already passes, so it cannot depend on
+          // Radix forwarding `data-state` onto the `asChild` anchor.
+          active && 'bg-accent text-on-accent',
+          className,
+        )}
       >
         {children}
       </Link>

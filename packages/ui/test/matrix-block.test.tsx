@@ -121,6 +121,9 @@ describe('MatrixBlock', () => {
     expect(items.classList.contains('flex-1')).toBe(true);
     expect(items.classList.contains('min-h-0')).toBe(true);
     expect(items.classList.contains('overflow-y-auto')).toBe(true);
+    // Packed from the top: a lone item sits under the heading instead of centring, and a
+    // full quadrant's rows never stretch past the scroller.
+    expect(items.classList.contains('content-start')).toBe(true);
 
     // Guard: every class resolves through utilities or tokens, never a raw px/hex/rgb value.
     const classes = `${matrix.className} ${quadrant.className} ${label.className} ${items.className}`;

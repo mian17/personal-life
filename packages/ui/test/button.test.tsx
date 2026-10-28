@@ -55,16 +55,17 @@ describe('Button', () => {
     },
   );
 
-  it('gives danger + icon the IconButton default surface while the glyph stays danger', () => {
+  it('gives danger + icon no surface of its own, while the glyph stays danger', () => {
     render(
       <Button variant="danger" size="icon">
         x
       </Button>,
     );
     const classes = classesOf(screen.getByRole('button'));
-    expect(classes).toContain('border');
-    expect(classes).toContain('border-border');
-    expect(classes).toContain('bg-panel');
+    // Borderless: the panel behind the button is the surface.
+    expect(classes).not.toContain('border');
+    expect(classes).not.toContain('border-border');
+    expect(classes).not.toContain('bg-panel');
     expect(classes).toContain('size-12');
     expect(classes).toContain('text-danger');
   });

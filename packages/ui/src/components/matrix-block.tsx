@@ -54,7 +54,7 @@ const labelToneStyles: Record<MatrixTone, string> = {
 };
 
 /** Overflowing content scrolls inside the box; the heading stays put. */
-const itemsStyles = 'grid gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto';
+const itemsStyles = 'grid content-start gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto';
 
 /** Empty quadrant: muted and centred in the remaining box height. */
 const emptyStyles = 'flex-1 grid place-content-center m-0 text-muted text-center text-[length:var(--space-0-85)]';

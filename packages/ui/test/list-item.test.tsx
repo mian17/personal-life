@@ -133,6 +133,23 @@ describe('ListItem', () => {
     expect(children[2]).toBe(screen.getByTestId('delete-action'));
   });
 
+  it('insets the trailing delete glyph to the row text inset', () => {
+    render(
+      <ul>
+        <ListItem href="/meals/1" title="Oats" deleteAction={<button>x</button>} />
+      </ul>,
+    );
+    const row = document.querySelector('.ui-list-item')!;
+    const rowClasses = classesOf(row);
+    // The row's text inset and the glyph's right inset resolve to the same token, so the
+    // trailing control cannot sit tighter to the edge than the text opposite it.
+    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))]');
+    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:p-[var(--space-0-5)]');
+    expect(document.querySelector('.ui-list-item__link')!.className).toContain(
+      'p-[var(--space-0-9)]',
+    );
+  });
+
   it('lays the trailing slot out as a flex row, so its form fills the slot', () => {
     render(
       <ul>
@@ -274,9 +291,13 @@ describe('ListItem', () => {
     expect(link).toContain('flex-col');
     expect(link).toContain('items-stretch');
 
-    // The indent rides a token, and the row top-aligns so the delete slot sits with
-    // the parent line rather than centring against the tall body.
-    expect(classesOf(body)).toContain('pl-[var(--space-1)]');
+    // No extra indent: the nested body starts on the title's own column, so a child
+    // field and the title field share a left edge.
+    const bodyClasses = classesOf(body);
+    expect(bodyClasses).not.toContain('pl-[var(--space-1)]');
+    expect(bodyClasses.some((token) => token.startsWith('pl-'))).toBe(false);
+    // Without a title-line action there is no action column to reserve.
+    expect(bodyClasses.some((token) => token.startsWith('pr-'))).toBe(false);
     const row = classesOf(screen.getByRole('listitem'));
     expect(row).toContain('items-start');
     expect(classesWithPrefix(row, '[&>.ui-icon-btn]:mt-')).toHaveLength(1);
@@ -304,6 +325,11 @@ describe('ListItem', () => {
     // The action rides the title line, not the indented child body.
     expect(titleLine.contains(slot)).toBe(true);
     expect(document.querySelector('.ui-list-item__nested-body')!.contains(slot)).toBe(false);
+    // The nested body reserves the action's column (`--icon-btn-size` + the action-line
+    // gap), so its right edge matches the title field's rather than the row's.
+    expect(classesOf(document.querySelector('.ui-list-item__nested-body')!)).toContain(
+      'pr-[calc(var(--icon-btn-size)+var(--space-0-5))]',
+    );
     // ... and the title content stays the line's first child, so it grows.
     expect(titleLine.firstChild!.textContent).toBe('Omelette');
 

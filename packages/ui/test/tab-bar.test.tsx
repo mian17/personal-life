@@ -31,6 +31,26 @@ describe('Tab', () => {
     expect(tab.classList.contains('ui-tab--active')).toBe(true);
   });
 
+  it('paints the active tab from the prop, not from the forwarded Radix state', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos" active>List</Tab>
+        <Tab href="/todos/matrix">Matrix</Tab>
+      </TabBar>,
+    );
+    // The surface rides the prop-conditioned classes the anchor receives itself.
+    const active = classesOf(screen.getByRole('tab', { name: 'List' }));
+    expect(active).toContain('bg-accent');
+    expect(active).toContain('text-on-accent');
+
+    const inactive = classesOf(screen.getByRole('tab', { name: 'Matrix' }));
+    expect(inactive).not.toContain('bg-accent');
+    expect(inactive).not.toContain('text-on-accent');
+
+    // `asChild` does forward `data-state`, so the `data-[state=active]` fallback is live.
+    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('data-state')).toBe('active');
+  });
+
   it('leaves the other tabs unselected', () => {
     render(
       <TabBar aria-label="Todos views">
