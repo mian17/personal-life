@@ -18,7 +18,7 @@ Run date: 2026-10-28.
 
 | Lane | Verdict | Evidence |
 |---|---|---|
-| correctness | PASS | `npm run typecheck` 17 workspaces, `rc=0`, no diagnostics. `@life/ui` suite 61/61 suites, 536/536 tests, 11 snapshots, one run. Playwright 27 passed, 2 skipped (`hop.spec.ts`, `E2E_HOP=1`). Recorded verbatim in §8.1, §8.2, §8.11 of `docs/reports/shadcn-primitive-migration-2026-10-28.md`. |
+| correctness | PASS | `npm run typecheck` 17 workspaces, `rc=0`, no diagnostics. `@life/ui` suite 61/61 suites, 535/535 tests, 11 snapshots, measured once on the current tree. Playwright 27 passed, 2 skipped (`hop.spec.ts`, `E2E_HOP=1`). Recorded verbatim in §8.1, §8.2, §8.11 of `docs/reports/shadcn-primitive-migration-2026-10-28.md`. |
 | code-quality | PASS | Contract 1 greps clean: zero raw UI elements in `apps/*` source, zero `next/link`, colour literals only in `packages/ui/src/styles/tokens.css`, zero `atoms.css`/`blocks.css` imports in `packages/ui`. 13 components carry `focus-visible:outline-solid`, 11 carry `outline-none`, 0 raw `outline-2`/`outline-offset-2` — the §8.10 dead-ring repair. |
 | security | PASS | `vbsec-reports/scan-2026-10-28-020144.md`, raw verdict below. |
 | qa | PASS | Two test runs total, inside the `max-test-runs: 2` budget: full `@life/ui` suite, then a focused `theme-parity` + `tokens` run. One e2e run (27 passed, 2 env-gated skips). Zero failures, zero retries needed for green. |

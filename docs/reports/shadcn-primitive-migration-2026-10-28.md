@@ -65,7 +65,7 @@ Full package suite, one run:
 ```
 $ npm run test:unit -w @life/ui
 Test Suites: 61 passed, 61 total
-Tests:       536 passed, 536 total
+Tests:       535 passed, 535 total
 Snapshots:   11 passed, 11 total
 Time:        16.095 s
 ```
@@ -203,7 +203,7 @@ $ git diff --name-only origin/dev -- apps/app/public apps/app/app/layout.tsx
 Manifest files and `viewport.themeColor` are byte-identical to `origin/dev`. The six
 app-specific blocks (`editor-chrome`, `fab-menu`, `manager-surface`, `page-shell`,
 `tag-picker`, `trash-block`) keep their composition and their behaviour; their
-suites are among the 536 passing tests.
+suites are among the 535 passing tests.
 
 ## §8.10 — focus rings survive the utility-class port
 
@@ -230,8 +230,8 @@ $ grep -rln "outline-none" packages/ui/src/components/*.tsx | wc -l
 11
 ```
 
-Covered by 8 new tests across `button`, `icon-button`, `icon-link`, `input`,
-`select`, `textarea`, `pill` and `file-picker` (the 528 → 536 delta in §8.2).
+Covered by a focus-ring test in each of `button`, `icon-button`, `icon-link`,
+`input`, `select`, `textarea`, `pill` and `file-picker` (the 528 → 535 delta in §8.2, 7 net).
 
 ### Ring geometry rides `--focus-ring`
 
