@@ -13,6 +13,8 @@ maintainer never has to run git locally for it.
   content that `dev` does not. The merge is pure bookkeeping — it makes `main` an ancestor of `dev`
   again so the next promotion PR stops conflicting textually. `dev` stays the source of truth.
 - **Merge the PR with "Create a merge commit", never squash** — squashing it recreates the problem.
+- The back-merge commit is content-neutral, so `sonarqube.yml` detects it by tree comparison and
+  skips the scan — there is nothing to analyse.
 - **The one thing that breaks it:** a hotfix committed straight to `main`, bypassing `dev`.
   `-s ours` would drop it from `dev`'s tree, and if it only edits shared files the deletion guard
   cannot see it. Hotfixes must land on `dev` first, then be promoted like everything else.
