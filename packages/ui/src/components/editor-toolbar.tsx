@@ -18,14 +18,21 @@ export interface EditorToolbarProps {
   className?: string;
 }
 
+/** One row: back control, then the middle slot, then the actions, pushed to the far edge. */
+const toolbarStyles =
+  'flex items-center justify-between gap-[var(--space-0-5)] mb-[var(--space-0-5)]';
+
+/** Sized below the list `PageTitle` (an editor is a sub-screen), centred between the two controls. */
+const titleStyles = 'flex-1 min-w-0 m-0 text-center text-[length:var(--space-0-95)] font-semibold';
+
 export function EditorToolbar({ back, title, status, actions, className }: Readonly<EditorToolbarProps>) {
   return (
-    <div className={cx('ui-editor-toolbar', className)}>
+    <div className={cx('ui-editor-toolbar', toolbarStyles, className)}>
       <IconButton label={back.label} onClick={back.onBack}>
         <ChevronLeft size={20} aria-hidden />
       </IconButton>
       {title != null ? (
-        <h1 className="ui-editor-toolbar__title">{title}</h1>
+        <h1 className={cx('ui-editor-toolbar__title', titleStyles)}>{title}</h1>
       ) : (
         status
       )}

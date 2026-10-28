@@ -22,8 +22,15 @@ function setup(disabled = false) {
   return { onCreate, onRename, onDelete };
 }
 
+/**
+ * The registry trigger opens on a primary press, so a click alone would never reach it. jsdom ships
+ * no `PointerEvent`, hence the mouse event carrying that type.
+ */
 const openMenu = (name: string) =>
-  fireEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+  fireEvent(
+    screen.getByRole('button', { name: `Actions for ${name}` }),
+    new MouseEvent('pointerdown', { bubbles: true, button: 0 }),
+  );
 
 describe('ListManager', () => {
   it('lists every todo list with a rename and delete affordance', () => {
@@ -123,7 +130,7 @@ describe('ListManager', () => {
     expect(document.querySelector('.ui-list-manager')!.classList.contains('legacy-hook')).toBe(true);
   });
 
-  it('calls rowExtra once per list and renders each node in its own row', () => {
+  it('calls rowExtra once per list and renders each node in its own row menu', () => {
     const rowExtra = jest.fn((list: TodoListOption) => <span>extra-{list.id}</span>);
     render(
       <ListManager
@@ -141,10 +148,13 @@ describe('ListManager', () => {
     expect(rowExtra).toHaveBeenCalledTimes(2);
     expect(rowExtra).toHaveBeenCalledWith(LISTS[0]);
     expect(rowExtra).toHaveBeenCalledWith(LISTS[1]);
+    // The registry panel portals out of the row, so the extra node is reachable in the
+    // document rather than in `rows[0]` — and only for the row whose menu is open.
     openMenu('Groceries');
-    expect(rows[0].textContent).toContain('extra-l1');
+    expect(screen.getByText('extra-l1')).toBeTruthy();
+    expect(screen.queryByText('extra-l2')).toBeNull();
     openMenu('Work');
-    expect(rows[1].textContent).toContain('extra-l2');
+    expect(screen.getByText('extra-l2')).toBeTruthy();
   });
 
   it('renders the existing rows unchanged when rowExtra is omitted', () => {

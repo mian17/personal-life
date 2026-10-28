@@ -14,7 +14,7 @@ describe('PageActions', () => {
     );
     const container = document.querySelector('.ui-page-actions')!;
     expect(container.tagName).toBe('DIV');
-    expect(classesOf(container)).toEqual(['ui-page-actions']);
+    expect(classesOf(container)).toContain('ui-page-actions');
   });
 
   it('renders its children inside the container', () => {
@@ -33,10 +33,9 @@ describe('PageActions', () => {
         <span />
       </PageActions>,
     );
-    expect(classesOf(document.querySelector('.ui-page-actions')!)).toEqual([
-      'legacy-hook',
-      'ui-page-actions',
-    ]);
+    const classes = classesOf(document.querySelector('.ui-page-actions')!);
+    expect(classes).toContain('ui-page-actions');
+    expect(classes).toContain('legacy-hook');
   });
 
   it('forwards arbitrary attributes', () => {

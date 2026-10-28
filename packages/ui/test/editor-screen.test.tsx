@@ -11,7 +11,23 @@ describe('EditorScreen', () => {
     render(<EditorScreen>content</EditorScreen>);
     const screenEl = screen.getByText('content');
     expect(screenEl.tagName).toBe('DIV');
-    expect(classesOf(screenEl)).toEqual(['ui-editor-screen']);
+    expect(classesOf(screenEl)).toEqual(expect.arrayContaining(['ui-editor-screen']));
+  });
+
+  // jsdom never applies stylesheets, so the page-height layout is read off the classes it carries.
+  it('takes its height and safe-area padding from utilities rather than a stylesheet rule', () => {
+    render(<EditorScreen>content</EditorScreen>);
+    const screenEl = screen.getByText('content');
+    expect(screenEl.classList.contains('flex')).toBe(true);
+    expect(screenEl.classList.contains('flex-col')).toBe(true);
+    expect(screenEl.classList.contains('min-h-[100dvh]')).toBe(true);
+    expect(
+      screenEl.classList.contains('pt-[max(var(--space-0-75),env(safe-area-inset-top))]'),
+    ).toBe(true);
+    expect(
+      screenEl.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]'),
+    ).toBe(true);
+    expect(screenEl.classList.contains('px-[var(--space-1)]')).toBe(true);
   });
 
   it('renders its children inside the container', () => {
@@ -25,7 +41,9 @@ describe('EditorScreen', () => {
 
   it('merges className instead of replacing it', () => {
     render(<EditorScreen className="legacy-hook">content</EditorScreen>);
-    expect(classesOf(screen.getByText('content'))).toEqual(['legacy-hook', 'ui-editor-screen']);
+    expect(classesOf(screen.getByText('content'))).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-editor-screen']),
+    );
   });
 
   it('forwards arbitrary attributes and a ref', () => {

@@ -46,8 +46,11 @@ export function SearchField({
     return () => clearTimeout(timer);
   }, [inner]);
 
+  // `mb-4` is the block gap `.ui-search-box` used to carry. The hook stays so callers
+  // can still reach the wrapper; the leading glyph and the clear control are the
+  // browser's own for `type="search"`, so no markup here re-draws them.
   return (
-    <div className={cx('ui-search-box', className)}>
+    <div className={cx('ui-search-box mb-4', className)}>
       <Input
         type="search"
         placeholder={placeholder}

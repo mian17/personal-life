@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import { Stack, type StackAlign, type StackGap } from '../src/components/stack';
@@ -8,13 +6,16 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-function cssBlock(selector: string): string {
-  const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-  return (
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-      [])[1] ?? ''
-  );
-}
+const GAP_UTILITY: Record<StackGap, string> = {
+  sm: 'gap-[var(--space-0-5)]',
+  md: 'gap-[var(--space-1)]',
+  lg: 'gap-[var(--space-2)]',
+};
+
+const ALIGN_UTILITY: Record<Exclude<StackAlign, 'start'>, string> = {
+  center: 'justify-items-center',
+  end: 'justify-items-end',
+};
 
 describe('Stack', () => {
   it('renders its children in a ui-stack <div>', () => {
@@ -26,7 +27,7 @@ describe('Stack', () => {
     );
     const stack = document.querySelector('.ui-stack')!;
     expect(stack.tagName).toBe('DIV');
-    expect(classesOf(stack)[0]).toBe('ui-stack');
+    expect(stack.classList.contains('ui-stack')).toBe(true);
     expect(stack.contains(screen.getByTestId('a'))).toBe(true);
     expect(stack.contains(screen.getByTestId('b'))).toBe(true);
   });
@@ -35,11 +36,12 @@ describe('Stack', () => {
     ['sm', '--space-0-5'],
     ['md', '--space-1'],
     ['lg', '--space-2'],
-  ])('maps gap="%s" to the %s token', (gap, token) => {
+  ])('maps gap="%s" to the %s token utility', (gap, token) => {
     render(<Stack gap={gap}>x</Stack>);
     const stack = document.querySelector('.ui-stack')!;
     expect(stack.classList.contains(`ui-stack--${gap}`)).toBe(true);
-    expect(cssBlock(`.ui-stack--${gap}`)).toMatch(new RegExp(`gap:\\s*var\\(${token}\\)`));
+    expect(stack.classList.contains(GAP_UTILITY[gap])).toBe(true);
+    expect(GAP_UTILITY[gap]).toContain(`var(${token})`);
   });
 
   it('defaults the gap to md', () => {
@@ -48,6 +50,7 @@ describe('Stack', () => {
     expect(stack.classList.contains('ui-stack--md')).toBe(true);
     expect(stack.classList.contains('ui-stack--sm')).toBe(false);
     expect(stack.classList.contains('ui-stack--lg')).toBe(false);
+    expect(stack.classList.contains(GAP_UTILITY.md)).toBe(true);
   });
 
   it('defaults to no alignment class, leaving the grid at its own start', () => {
@@ -55,6 +58,8 @@ describe('Stack', () => {
     const stack = document.querySelector('.ui-stack')!;
     expect(stack.classList.contains('ui-stack--center')).toBe(false);
     expect(stack.classList.contains('ui-stack--end')).toBe(false);
+    expect(stack.classList.contains(ALIGN_UTILITY.center)).toBe(false);
+    expect(stack.classList.contains(ALIGN_UTILITY.end)).toBe(false);
   });
 
   it.each<[StackAlign, string]>([
@@ -64,17 +69,18 @@ describe('Stack', () => {
     render(<Stack align={align}>x</Stack>);
     const stack = document.querySelector('.ui-stack')!;
     expect(stack.classList.contains(`ui-stack--${align}`)).toBe(true);
-    expect(cssBlock(`.ui-stack--${align}`)).toMatch(
-      new RegExp(`justify-items:\\s*${justifyItems}`),
-    );
+    expect(stack.classList.contains(ALIGN_UTILITY[align as 'center' | 'end'])).toBe(true);
+    expect(ALIGN_UTILITY[align as 'center' | 'end']).toContain(justifyItems);
   });
 
-  it('uses display: grid and no outer margins on the base block', () => {
-    expect(cssBlock('.ui-stack')).toMatch(/display:\s*grid/);
-    expect(cssBlock('.ui-stack')).not.toMatch(/margin/);
+  it('lays out as a grid and adds no outer margin', () => {
+    render(<Stack>x</Stack>);
+    const classes = classesOf(document.querySelector('.ui-stack')!);
+    expect(classes).toContain('grid');
+    expect(classes.some((name) => name.startsWith('m-'))).toBe(false);
   });
 
- it('forwards role and aria-label verbatim (the New todo group contract)', () => {
+  it('forwards role and aria-label verbatim (the New todo group contract)', () => {
     render(
       <Stack role="group" aria-label="New todo">
         x
@@ -88,11 +94,9 @@ describe('Stack', () => {
 
   it('merges className instead of replacing it', () => {
     render(<Stack className="legacy-hook">x</Stack>);
-    expect(classesOf(document.querySelector('.ui-stack')!)).toEqual([
-      'legacy-hook',
-      'ui-stack',
-      'ui-stack--md',
-    ]);
+    expect(classesOf(document.querySelector('.ui-stack')!)).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-stack', 'ui-stack--md']),
+    );
   });
 
   it('forwards a ref to the rendered div', () => {

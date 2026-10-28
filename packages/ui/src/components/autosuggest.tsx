@@ -1,9 +1,25 @@
+// Composed registry `combobox` recipe (`popover` + `command`), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
-import { cx } from '../lib/cx';
+import { useCommandState } from 'cmdk';
+import { Command, CommandEmpty, CommandItem, CommandList } from './command';
 import { Input } from './input';
+import { Popover, PopoverAnchor, PopoverContent } from './popover';
+
+/**
+ * A value no row carries. `cmdk` selects the first row whenever its value is empty, so a list
+ * would open with row 1 already chosen and a bare Enter would pick something the user never
+ * walked to. The root's value starts here instead: truthy, matching nothing, selecting nothing.
+ */
+const NO_ROW = '\u0000';
+
+/** The one piece of row state the root owns: which option a pick reports, and how to move it. */
+interface Highlight {
+  highlightedValue: string;
+  moveHighlightTo: (value: string) => void;
+}
 
 /** One candidate the caller offers. `meta` renders as the quiet trailing text. */
 export interface AutosuggestOption {
@@ -34,12 +50,35 @@ export interface AutosuggestProps {
 }
 
 /**
- * A combobox: an `Input` that owns its own text and reports the query to a
- * caller which supplies the already-filtered options. The popup is a native
- * `popover`, so the platform lifts it into the top layer — no portal, no JS
- * positioning — and it escapes an ancestor's `overflow: hidden`.
+ * A combobox from the registry recipe: an `Input` inside a `Popover`, over a `Command` root whose
+ * list holds the candidates.
+ *
+ * `cmdk` owns the listbox, the highlight `aria-activedescendant` names, and the keyboard walk that
+ * moves it — the field sits inside the root so its keys reach that walk. This file owns the
+ * `minChars` gate, the debounced report, the pick and the dismissal. The caller filters
+ * (`shouldFilter` is off), so the options arrive already matched and best-first.
+ *
+ * Deviation from the recipe: it lets `cmdk` auto-highlight the first row, so a list opens with a
+ * row already chosen and a bare Enter picks something the user never walked to. Here the root's
+ * `value` rests at `NO_ROW` until an explicit walk, which is how the hand-rolled list behaved.
  */
-export function Autosuggest({
+export function Autosuggest(props: Readonly<AutosuggestProps>) {
+  // Held here because the root owns the selection, and the field below reads it back through
+  // `useCommandState`. `''` never reaches the root: it would mean "preselect row 1" to `cmdk`.
+  const [highlightedValue, setHighlightedValue] = useState<string>(NO_ROW);
+  const moveHighlightTo = useCallback(
+    (next: string) => setHighlightedValue(next === '' ? NO_ROW : next),
+    [],
+  );
+  return (
+    <Command shouldFilter={false} value={highlightedValue} onValueChange={moveHighlightTo}>
+      <ComboboxField {...props} highlightedValue={highlightedValue} moveHighlightTo={moveHighlightTo} />
+    </Command>
+  );
+}
+
+/** The field and its popup, reading the highlight out of the `Command` root that owns it. */
+function ComboboxField({
   options,
   onQueryChange,
   onSelect,
@@ -50,57 +89,54 @@ export function Autosuggest({
   minChars = 3,
   debounceMs = 0,
   maxVisible = 8,
-}: Readonly<AutosuggestProps>) {
+  highlightedValue,
+  moveHighlightTo,
+}: Readonly<AutosuggestProps & Highlight>) {
   const [text, setText] = useState('');
-  const [highlight, setHighlight] = useState(-1);
   const [dismissed, setDismissed] = useState(false);
-  const popupRef = useRef<HTMLDivElement>(null);
+  const [listboxId, setListboxId] = useState('');
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onQueryChangeRef = useRef(onQueryChange);
   onQueryChangeRef.current = onQueryChange;
+  const query = text.trim();
+  const longEnough = query.length >= minChars;
+  const hasPopupContent = options.length > 0 || emptyLabel != null;
+  const open = longEnough && hasPopupContent && !dismissed;
+  // `cmdk` mints the row element ids and marks the selected row, but it hands neither the ids nor
+  // the marked element out. Both are re-read here after each commit that can change them: the
+  // count moves when rows mount, the selection moves when the walk does.
+  const markedValue = useCommandState((state) => state.value);
+  const renderedRows = useCommandState((state) => state.filtered.count);
+  const [highlightedRowId, setHighlightedRowId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!open || highlightedValue === NO_ROW) {
+      setHighlightedRowId(undefined);
+      return;
+    }
+    setHighlightedRowId(listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.id);
+  }, [open, highlightedValue, markedValue, renderedRows, options]);
 
-  // The anchor name is per instance (`anchor-name` is a page-global ident) and
-  // must be a CSS ident: `useId` gives back punctuation that is not.
-  const anchorName = `--ui-autosuggest-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const popupId = `${anchorName}-popup`;
+  // `cmdk` mints the listbox id, so the field's `aria-controls` copies it as the list mounts.
+  const mountList = useCallback((list: HTMLDivElement | null) => {
+    listRef.current = list;
+    setListboxId(list?.id ?? '');
+  }, []);
 
-  const trimmed = text.trim();
-  const longEnough = trimmed.length >= minChars;
-  const canOpen = longEnough && (options.length > 0 || emptyLabel != null);
-  const open = canOpen && !dismissed;
-
+  // The field keeps focus, so the platform dismisses nothing: a press outside both the field and
+  // the list drops the list, and the text stays put.
   useEffect(() => {
     if (!open) return;
-    const popup = popupRef.current;
-    if (!popup) return;
-    popup.showPopover();
-    return () => popup.hidePopover();
-  }, [open]);
-
-  // `aria-activedescendant` announces the highlighted row but the browser never
-  // scrolls it into view. With more than `maxVisible` matches the highlight
-  // would walk off the visible slice. `block: 'nearest'` scrolls the popup only.
-  useEffect(() => {
-    if (!open || highlight < 0) return;
-    // jsdom has no layout and no `scrollIntoView`; the browser is the judge of placement.
-    popupRef.current?.children[highlight]?.scrollIntoView?.({ block: 'nearest' });
-  }, [open, highlight]);
-
-  // Light dismiss: `popover="manual"` gets none from the platform, and a list
-  // left floating over the controls below the field is the one thing a picker
-  // must not do. The field itself is spared so clicking it keeps the list up.
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: PointerEvent) {
+    function dismissOnOutsidePress(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (popupRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest(`[aria-controls="${popupId}"]`)) return;
+      if (fieldRef.current?.contains(target) || listRef.current?.contains(target)) return;
       setDismissed(true);
     }
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [open, popupId]);
+    document.addEventListener('pointerdown', dismissOnOutsidePress, true);
+    return () => document.removeEventListener('pointerdown', dismissOnOutsidePress, true);
+  }, [open]);
 
   useEffect(() => () => cancelReport(), []);
 
@@ -113,20 +149,22 @@ export function Autosuggest({
   }
 
   /** Hand a trimmed query to the caller: `''` below `minChars`, after `debounceMs` otherwise. */
-  function report(query: string) {
+  function report(nextQuery: string) {
     cancelReport();
-    setHighlight(-1);
-    if (query.length < minChars) {
+    // New text means new rows: the old highlight named one that may be gone, and the list opens
+    // unchosen rather than on whatever landed first.
+    moveHighlightTo(NO_ROW);
+    if (nextQuery.length < minChars) {
       onQueryChangeRef.current('');
       return;
     }
     if (debounceMs <= 0) {
-      onQueryChangeRef.current(query);
+      onQueryChangeRef.current(nextQuery);
       return;
     }
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      onQueryChangeRef.current(query);
+      onQueryChangeRef.current(nextQuery);
     }, debounceMs);
   }
 
@@ -142,158 +180,109 @@ export function Autosuggest({
     report('');
   }
 
-  function select(option: AutosuggestOption) {
+  /** `cmdk` reports a pick by value (the option id), so the row is looked up again here. */
+  function selectValue(value: string) {
+    const option = options.find((candidate) => candidate.id === value);
+    if (option == null) return;
     onSelect(option);
     if (clearOnSelect) clear();
-    else setHighlight(-1);
+    else moveHighlightTo(NO_ROW);
   }
 
-  /** Alt+ArrowDown opens the popup without taking a highlight. */
-  function openWithoutHighlight(event: KeyboardEvent<HTMLInputElement>) {
-    if (!longEnough) return;
-    setDismissed(false);
+  /** Escape closes the list and keeps the text; the next Escape, finding it closed, clears. */
+  function closeOrClear(event: KeyboardEvent<HTMLInputElement>) {
     event.preventDefault();
-  }
-
-  /** ArrowDown opens the popup on its first row, or walks an open one down. */
-  function moveDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (!open) {
-      if (!canOpen) return;
-      setDismissed(false);
-      setHighlight(options.length > 0 ? 0 : -1);
-    } else {
-      setHighlight((index) => (index < options.length - 1 ? index + 1 : index));
-    }
-    event.preventDefault();
-  }
-
-  function moveUp(event: KeyboardEvent<HTMLInputElement>) {
-    if (!open) return;
-    setHighlight((index) => (index > 0 ? index - 1 : 0));
-    event.preventDefault();
-  }
-
-  function moveToEdge(key: string, event: KeyboardEvent<HTMLInputElement>) {
-    if (!open || options.length === 0) return;
-    setHighlight(key === 'Home' ? 0 : options.length - 1);
-    event.preventDefault();
-  }
-
-  function pickHighlighted(event: KeyboardEvent<HTMLInputElement>) {
-    if (!open || highlight < 0 || highlight >= options.length) return;
-    select(options[highlight]);
-    event.preventDefault();
-  }
-
-  function escapeOrClear(event: KeyboardEvent<HTMLInputElement>) {
-    event.preventDefault();
-    // First Escape closes the popup, the next one (already closed) clears the field.
     if (open) setDismissed(true);
     else clear();
   }
 
-  function leaveField() {
-    if (open && highlight >= 0 && highlight < options.length) select(options[highlight]);
-    setDismissed(true);
+  /** ArrowDown reopens a list that a press or an Escape closed; an open list is `cmdk`'s to walk. */
+  function reopenOnArrowDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (open || !hasPopupContent) return;
+    event.preventDefault();
+    setDismissed(false);
+    // The reopen takes the walk's first step, exactly as ArrowDown on a closed list always did.
+    moveHighlightTo(options[0]?.id ?? NO_ROW);
+  }
+
+  /** Alt+ArrowDown opens the list the way a first ArrowDown does, minus the step onto a row. */
+  function reopenWithoutHighlight(event: KeyboardEvent<HTMLInputElement>) {
+    if (!longEnough) return;
+    event.preventDefault();
+    if (open) return;
+    setDismissed(false);
+    moveHighlightTo(NO_ROW);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    const { key } = event;
-    if (key === 'ArrowDown' && event.altKey) {
-      openWithoutHighlight(event);
-      return;
-    }
-    switch (key) {
-      case 'ArrowDown':
-        moveDown(event);
-        return;
-      case 'ArrowUp':
-        moveUp(event);
-        return;
-      case 'Home':
-      case 'End':
-        moveToEdge(key, event);
-        return;
-      case 'Enter':
-        pickHighlighted(event);
-        return;
+    switch (event.key) {
       case 'Escape':
-        escapeOrClear(event);
+        closeOrClear(event);
         return;
       case 'Tab':
-        leaveField();
+        // Tab accepts the row the user walked to, as the hand-rolled list did, and moves on.
+        if (open) selectValue(highlightedValue);
+        return;
+      case 'ArrowDown':
+        if (event.altKey) reopenWithoutHighlight(event);
+        else reopenOnArrowDown(event);
         return;
       default:
+        // ArrowUp, Home, End and Enter are `cmdk`'s: it owns the walk over the rendered rows.
         return;
     }
   }
 
   return (
-    <>
-      <Input
-        type="text"
-        style={{ anchorName }}
-        placeholder={placeholder}
-        aria-label={label}
-        role="combobox"
-        autoComplete="off"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={popupId}
-        aria-activedescendant={open && highlight >= 0 ? `${popupId}-option-${highlight}` : undefined}
-        value={text}
-        onChange={(event) => change(event.target.value)}
-        onKeyDown={handleKeyDown}
-        // A dismissed list comes back when the field is entered again: a press
-        // for a field that kept focus (Escape), a focus for one that did not.
-        onPointerDown={() => setDismissed(false)}
-        onFocus={() => setDismissed(false)}
-      />
+    <Popover open={open} onOpenChange={(next) => setDismissed(!next)}>
+      <PopoverAnchor asChild>
+        <Input
+          ref={fieldRef}
+          type="text"
+          placeholder={placeholder}
+          aria-label={label}
+          role="combobox"
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={open ? listboxId : undefined}
+          aria-activedescendant={open ? highlightedRowId : undefined}
+          value={text}
+          onChange={(event) => change(event.target.value)}
+          onKeyDown={handleKeyDown}
+          // A dismissed list comes back when the field is entered again: a press for a field that
+          // kept focus (Escape), a focus for one that did not.
+          onPointerDown={() => setDismissed(false)}
+          onFocus={() => setDismissed(false)}
+        />
+      </PopoverAnchor>
       {open && (
-        <div
-          ref={popupRef}
-          id={popupId}
-          popover="manual"
-          role={options.length > 0 ? 'listbox' : undefined}
-          className="ui-autosuggest__popup"
-          style={{ positionAnchor: anchorName, '--ui-autosuggest-rows': maxVisible } as CSSProperties}
+        <PopoverContent
+          align="start"
+          sideOffset={4}
+          className="w-[var(--radix-popover-trigger-width)] p-0"
+          // The field owns focus and the outside press; the panel takes neither.
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
         >
-          {options.length === 0 ? (
-            <output className="ui-autosuggest__empty">{emptyLabel}</output>
-          ) : (
-            options.map((option, index) => (
-              <div
+          <CommandList ref={mountList} style={{ '--autosuggest-rows': maxVisible } as CSSProperties}>
+            {options.map((option) => (
+              <CommandItem
                 key={option.id}
-                id={`${popupId}-option-${index}`}
-                role="option"
-                aria-selected={index === highlight}
-                // An option is a control, so it must be focusable — but never a tab
-                // stop: the field keeps focus and reaches rows through
-                // `aria-activedescendant` (WAI-ARIA APG combobox pattern).
-                tabIndex={-1}
-                className={cx(
-                  'ui-autosuggest__option',
-                  index === highlight && 'ui-autosuggest__option--active',
-                )}
-                // Without this the field blurs, the popup unmounts and the click is lost.
-                onMouseDown={(event) => event.preventDefault()}
+                value={option.id}
+                className="min-h-[var(--tap-height)]"
+                onSelect={selectValue}
+                // Without this the row press blurs the field and the click is lost.
                 onPointerDown={(event) => event.preventDefault()}
-                onClick={() => select(option)}
-                // The field owns keyboard interaction (aria-activedescendant), but a row
-                // that responds to a click must also respond to Enter/Space.
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return;
-                  event.preventDefault();
-                  select(option);
-                }}
               >
-                <span className="ui-autosuggest__label">{option.label}</span>
-                {option.meta != null && <span className="ui-autosuggest__meta">{option.meta}</span>}
-              </div>
-            ))
-          )}
-        </div>
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {option.meta != null && <span className="shrink-0 text-muted">{option.meta}</span>}
+              </CommandItem>
+            ))}
+            <CommandEmpty>{emptyLabel}</CommandEmpty>
+          </CommandList>
+        </PopoverContent>
       )}
-    </>
+    </Popover>
   );
 }

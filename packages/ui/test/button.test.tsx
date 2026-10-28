@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Button, type ButtonSize, type ButtonVariant } from '../src/components/button';
@@ -14,7 +12,9 @@ describe('Button', () => {
     const button = screen.getByRole('button');
     expect(button.tagName).toBe('BUTTON');
     expect(button.textContent).toBe('Save');
-    expect(classesOf(button)).toEqual(['ui-btn', 'ui-btn--default', 'ui-btn--primary'].sort());
+    expect(button.classList.contains('ui-btn')).toBe(true);
+    expect(button.classList.contains('ui-btn--default')).toBe(true);
+    expect(button.classList.contains('ui-btn--primary')).toBe(true);
   });
 
   it.each<ButtonVariant>(['primary', 'ghost', 'danger', 'quiet'])(
@@ -55,33 +55,27 @@ describe('Button', () => {
     },
   );
 
-  it('splits the danger type metrics: icon = 1.25rem/1, default = inherited body type', () => {
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-    const block = (selector: string) =>
-      (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-        [])[1] ?? '';
-
-    const icon = block('.ui-btn--danger.ui-btn--icon');
-    expect(icon).toMatch(/font-size:\s*var\(--space-1-25\)/);
-    expect(icon).toMatch(/line-height:\s*1\b/);
-
-    const fallback = block('.ui-btn--danger.ui-btn--default');
-    expect(fallback).not.toMatch(/font-size/);
-    expect(fallback).not.toMatch(/line-height/);
+  it('gives danger + icon no surface of its own, while the glyph stays danger', () => {
+    render(
+      <Button variant="danger" size="icon">
+        x
+      </Button>,
+    );
+    const classes = classesOf(screen.getByRole('button'));
+    // Borderless: the panel behind the button is the surface.
+    expect(classes).not.toContain('border');
+    expect(classes).not.toContain('border-border');
+    expect(classes).not.toContain('bg-panel');
+    expect(classes).toContain('size-12');
+    expect(classes).toContain('text-danger');
   });
 
-  it('renders the disabled treatment at the cascade level — not just the attribute', () => {
+  it('carries the disabled treatment on the rendered element', () => {
     render(<Button disabled>x</Button>);
     const button = screen.getByRole('button') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-
-    // Rendered contract: the rule is emitted and wins, so a disabled control
-    // cannot look live (lesson 0020). A prop assertion alone would pass while
-    // the button still looked clickable — the exact bug this fixes.
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-    const block = (css.match(/\.ui-btn\[disabled\]\s*\{([^}]*)\}/) ?? [])[1] ?? '';
-    expect(block).toMatch(/opacity:\s*0?\.5/);
-    expect(block).toMatch(/cursor:\s*not-allowed/);
+    expect(button.classList.contains('disabled:opacity-50')).toBe(true);
+    expect(button.classList.contains('disabled:cursor-not-allowed')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {
@@ -133,5 +127,17 @@ describe('Button', () => {
     const ref = createRef<HTMLButtonElement>();
     render(<Button ref={ref}>x</Button>);
     expect(ref.current).toBe(screen.getByRole('button'));
+  });
+
+  /**
+   * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
+   * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.
+   * `focus-visible:outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring draws', () => {
+    render(<Button>x</Button>);
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(button.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
   });
 });

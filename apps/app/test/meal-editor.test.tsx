@@ -932,9 +932,8 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       expect(dialogs[0].props.title).toBe('All nutrients');
       expect(dialogs[0].props.size).toBe('full');
       expect(dialogs[0].props.open).toBe(false);
-
-      const html = renderToStaticMarkup(tree);
-      expect(html).toContain('ui-dialog--full');
+      // A closed dialog portals nothing, so its sheet class is asserted by
+      // `packages/ui/test/dialog.test.tsx`, where the panel is actually mounted.
     } finally {
       harness.restore();
     }

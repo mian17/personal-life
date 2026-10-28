@@ -1,28 +1,18 @@
 import { render } from '@testing-library/react';
 import { createElement } from 'react';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { Row } from '../src/components/row';
 
 /**
- * `Row` — horizontal companion to `Stack`. Assertions mirror
- * `stack.test.tsx`: the class contract plus the resolved CSS rule from
- * `blocks.css` (jsdom does not apply the stylesheet, so the rule text is the
- * source of truth for the token mapping).
+ * `Row` — the horizontal companion to `Stack`. Assertions mirror
+ * `stack.test.tsx`: the class contract plus the token gap utility each gap
+ * resolves to.
  */
 
-const blocksCss = readFileSync(
-  join(__dirname, '..', 'src', 'styles', 'blocks.css'),
-  'utf8',
-);
-
-function ruleFor(selector: string): string {
-  const match = blocksCss.match(
-    new RegExp(`${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s*\\{([^}]*)\\}`),
-  );
-  if (!match) throw new Error(`no rule for ${selector}`);
-  return match[1];
-}
+const GAP_UTILITY = {
+  sm: 'gap-[var(--space-0-5)]',
+  md: 'gap-[var(--space-1)]',
+  lg: 'gap-[var(--space-2)]',
+} as const;
 
 describe('Row', () => {
   it('renders children in a div with the default md gap class', () => {
@@ -36,20 +26,21 @@ describe('Row', () => {
     expect(div.querySelectorAll('span')).toHaveLength(2);
   });
 
-  it('maps each gap to its modifier class', () => {
+  it('maps each gap to its modifier class and token utility', () => {
     for (const gap of ['sm', 'md', 'lg'] as const) {
       const { container } = render(createElement(Row, { gap }));
-      expect((container.firstElementChild as HTMLElement).className).toContain(`ui-row--${gap}`);
+      const div = container.firstElementChild as HTMLElement;
+      expect(div.className).toContain(`ui-row--${gap}`);
+      expect(div.className).toContain(GAP_UTILITY[gap]);
     }
   });
 
-  it('the CSS is a flex row that wraps, with the token gap and no outer margin', () => {
-    expect(ruleFor('.ui-row')).toContain('display: flex');
-    expect(ruleFor('.ui-row')).toContain('flex-wrap: wrap');
-    expect(ruleFor('.ui-row')).not.toContain('margin');
-    expect(ruleFor('.ui-row--sm')).toContain('gap: var(--space-0-5)');
-    expect(ruleFor('.ui-row--md')).toContain('gap: var(--space-1)');
-    expect(ruleFor('.ui-row--lg')).toContain('gap: var(--space-2)');
+  it('is a wrapping flex row with no outer margin', () => {
+    const { container } = render(createElement(Row, null));
+    const classes = (container.firstElementChild as HTMLElement).className.split(/\s+/);
+    expect(classes).toContain('flex');
+    expect(classes).toContain('flex-wrap');
+    expect(classes.some((name) => name.startsWith('m-'))).toBe(false);
   });
 
   it('merges className and forwards arbitrary attributes', () => {

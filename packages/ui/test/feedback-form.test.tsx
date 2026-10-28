@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { useState } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { CreateFeedbackInput, FeedbackSubmitResult } from '@life/shared';
@@ -12,28 +10,6 @@ import type { FeedbackFormProps } from '../src/components/feedback-form';
 let minted = 0;
 (globalThis as unknown as { crypto: { randomUUID: () => string } }).crypto.randomUUID = () =>
   `00000000-0000-4000-8000-${String(++minted).padStart(12, '0')}`;
-
-// jsdom 20 defines `<dialog>` but not its modal methods; the shim only flips the
-// `open` attribute (the accessibility-visible part) and records the calls. It
-// never dispatches `close`, so the component's platform-close path stays inert.
-type DialogShim = {
-  showModal(this: HTMLDialogElement): void;
-  close(this: HTMLDialogElement): void;
-};
-
-const showModal = jest.fn(function (this: HTMLDialogElement) {
-  this.setAttribute('open', '');
-});
-const close = jest.fn(function (this: HTMLDialogElement) {
-  this.removeAttribute('open');
-});
-
-beforeEach(() => {
-  showModal.mockClear();
-  close.mockClear();
-  (HTMLDialogElement.prototype as unknown as DialogShim).showModal = showModal;
-  (HTMLDialogElement.prototype as unknown as DialogShim).close = close;
-});
 
 function renderForm(props: Partial<FeedbackFormProps> = {}) {
   const onOpenChange = jest.fn();
@@ -75,7 +51,7 @@ describe('FeedbackForm', () => {
   it('opens with the frozen title and closes through onOpenChange', () => {
     const { onOpenChange } = renderForm();
 
-    expect(showModal).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Send feedback');
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -88,8 +64,7 @@ describe('FeedbackForm', () => {
 
   it('stays closed while open is false', () => {
     renderForm({ open: false });
-    expect(showModal).not.toHaveBeenCalled();
-    expect(close).toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('renders the three type pills with aria-pressed, first selected', () => {
@@ -293,23 +268,16 @@ describe('FeedbackForm', () => {
     expect(titleInput().placeholder).toBe('Short summary of your feedback');
     expect(textarea().placeholder).toBe('What happened, and what did you expect?');
 
-    expect(titleLabel.className.split(/\s+/)).toEqual([
+    // The hooks lead the class list; the utilities that now carry the retired
+    // `.ui-field-label--strong` colour and weight follow them.
+    expect([titleLabel.classList[0], titleLabel.classList[1]]).toEqual([
       'ui-field-label',
       'ui-field-label--strong',
     ]);
-    expect(descriptionLabel.className.split(/\s+/)).toEqual([
+    expect([descriptionLabel.classList[0], descriptionLabel.classList[1]]).toEqual([
       'ui-field-label',
       'ui-field-label--strong',
     ]);
-
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-    const baseAt = css.indexOf('.ui-field-label {');
-    const strongAt = css.indexOf('.ui-field-label--strong');
-    expect(baseAt).toBeGreaterThanOrEqual(0);
-    expect(strongAt).toBeGreaterThan(baseAt);
-    const strongBlock = css.slice(strongAt, css.indexOf('}', strongAt));
-    expect(strongBlock).toContain('color: var(--text)');
-    expect(strongBlock).toContain('font-weight: 600');
 
     const markers = document.querySelectorAll('.ui-field-label__required');
     expect(markers).toHaveLength(2);

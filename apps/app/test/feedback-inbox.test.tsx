@@ -61,12 +61,12 @@ function headings(html: string, level: 'h2' | 'h3'): string[] {
 
 function rowTitles(html: string): string[] {
   return [
-    ...html.matchAll(/class="ui-list-item__title(?: ui-list-item__title--with-action)?"[^>]*>([^<]*)</g),
+    ...html.matchAll(/class="ui-list-item__title(?: |")[^"]*"[^>]*>([^<]*)</g),
   ].map((m) => m[1]);
 }
 
 function rowSnippets(html: string): string[] {
-  return [...html.matchAll(/ui-list-item__snippet">([^<]*)</g)].map((m) => m[1]);
+  return [...html.matchAll(/ui-list-item__snippet[^"]*">([^<]*)</g)].map((m) => m[1]);
 }
 
 /**
@@ -92,7 +92,11 @@ function render(entries: FeedbackDto[], status?: FeedbackDto['status']): string 
 function statusPill(html: string, title: string): { class: string; label: string } | undefined {
   const row = html.slice(html.indexOf(title));
   const match = row.match(/class="([^"]*ui-pill--(?:open|in_progress|done|wont_do)[^"]*)"[^>]*>([^<]*)<\/span>/);
-  return match ? { class: match[1], label: match[2].replace(/&#x27;/g, "'") } : undefined;
+  if (!match) return undefined;
+  // The registry markup carries utility classes beside the frozen hooks; the row
+  // contract is the `ui-pill*` prefix, so the pin reads only those tokens.
+  const hooks = match[1].split(/\s+/).filter((token) => token.startsWith('ui-pill'));
+  return { class: hooks.join(' '), label: match[2].replace(/&#x27;/g, "'") };
 }
 
 /** The row dropdown's accessible name — the entry's title names the control. */
@@ -407,7 +411,7 @@ describe('FeedbackInbox filtering', () => {
     // The filter is a navigation: All drops the param, each status carries it.
     expect(bar).toContain('href="/feedback"');
     expect(bar).toContain('href="/feedback?status=done"');
-    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active"/g) ?? [];
+    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active\b/g) ?? [];
     expect(active).toHaveLength(1);
   });
 

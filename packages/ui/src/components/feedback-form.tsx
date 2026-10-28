@@ -8,6 +8,7 @@ import type {
   FeedbackType,
 } from '@life/shared';
 import { FEEDBACK_TITLE_MAX } from '@life/shared';
+import { cx } from '../lib/cx';
 import { AlertBanner } from './alert-banner';
 import { Button } from './button';
 import { Dialog } from './dialog';
@@ -29,6 +30,24 @@ export interface FeedbackFormProps {
   /** Submit button label. Default "Send". */
   submitLabel?: string;
 }
+
+/** Label above its control, the layout the retired `.ui-field` rule gave. */
+const fieldStyles = 'ui-field flex flex-col gap-[var(--space-0-4)]';
+
+/**
+ * A stacked field caption reads as text, not as the quiet chip-row caption: it takes
+ * the colour and weight the retired `.ui-field-label--strong` rule gave. Both class
+ * hooks stay on the label, so the caption is still reachable by name.
+ */
+const labelStyles = cx(
+  'ui-field-label ui-field-label--strong',
+  'shrink-0 text-text font-semibold text-[length:var(--space-0-85)]',
+);
+
+const requiredMarkerStyles = cx(
+  'ui-field-label__required',
+  'ml-[var(--space-0-3)] text-danger',
+);
 
 const TITLE_REQUIRED = 'Title is required.';
 const DESCRIPTION_REQUIRED = 'Description is required.';
@@ -143,12 +162,9 @@ export function FeedbackForm({
           </Pill>
         ))}
       </PillGroup>
-      <div className="ui-field">
-        <label className="ui-field-label ui-field-label--strong" htmlFor={titleId}>
-          Title{' '}
-          <span className="ui-field-label__required" aria-hidden="true">
-            *
-          </span>
+      <div className={fieldStyles}>
+        <label className={labelStyles} htmlFor={titleId}>
+          Title <span className={requiredMarkerStyles} aria-hidden="true">*</span>
         </label>
         <Input
           ref={titleRef}
@@ -161,12 +177,9 @@ export function FeedbackForm({
           onChange={(event) => setTitle(event.target.value)}
         />
       </div>
-      <div className="ui-field">
-        <label className="ui-field-label ui-field-label--strong" htmlFor={descriptionId}>
-          Description{' '}
-          <span className="ui-field-label__required" aria-hidden="true">
-            *
-          </span>
+      <div className={fieldStyles}>
+        <label className={labelStyles} htmlFor={descriptionId}>
+          Description <span className={requiredMarkerStyles} aria-hidden="true">*</span>
         </label>
         <Textarea
           ref={descriptionRef}

@@ -1,5 +1,6 @@
 // React 19 types dropped the global `JSX` namespace; it is exported by `react`.
 import type { JSX, ReactNode } from 'react';
+import { cx } from '../lib/cx';
 import { FabLink } from './fab-link';
 import { NavBar } from './nav-bar';
 import { PageShell } from './page-shell';
@@ -32,6 +33,20 @@ export interface ListShellProps {
   fill?: boolean;
 }
 
+/**
+ * Opt-in full-height page: the page column spans the viewport and the body slot grows to fill
+ * the rest, so a full-height child (e.g. the matrix) spans the screen. The page's bottom padding
+ * still reserves room for the fixed fab.
+ */
+const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
+
+/**
+ * The growing slot between the page title block and the fab. `minmax(0, 1fr)`, not a bare `1fr`:
+ * `1fr` is `minmax(auto, 1fr)`, so a tall child would grow this track instead of scrolling inside
+ * it. A definite `100dvh` page is what bounds it.
+ */
+const fillBodyStyles = 'flex-1 min-h-0 grid [grid-template-rows:minmax(0,1fr)]';
+
 export function ListShell({
   title,
   navTrailing,
@@ -45,13 +60,13 @@ export function ListShell({
   fill,
 }: Readonly<ListShellProps>): JSX.Element {
   return (
-    <PageShell className={fill ? 'ui-list-shell--fill' : undefined}>
+    <PageShell className={fill ? cx('ui-list-shell--fill', fillPageStyles) : undefined}>
       <NavBar trailing={navTrailing} />
       <PageTitle>{title}</PageTitle>
       {tabs}
       {search}
       {filters}
-      {fill ? <div className="ui-list-shell__body">{body}</div> : body}
+      {fill ? <div className={cx('ui-list-shell__body', fillBodyStyles)}>{body}</div> : body}
       {fabHref != null && (
         <FabLink href={fabHref} label={fabLabel ?? ''}>
           {fabIcon}

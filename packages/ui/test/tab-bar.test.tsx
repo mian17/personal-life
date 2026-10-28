@@ -6,50 +6,87 @@ function classesOf(el: Element): string[] {
 }
 
 describe('Tab', () => {
-  it('renders a next/link anchor with the href and children verbatim', () => {
-    render(<Tab href="/todos">List</Tab>);
-    const link = screen.getByRole('link', { name: 'List' });
-    expect(link.tagName).toBe('A');
-    expect(link.getAttribute('href')).toBe('/todos');
-    expect(link.getAttribute('data-next-link')).toBe('');
-    expect(classesOf(link)).toEqual(['ui-tab']);
+  it('renders a route anchor inside the Radix trigger', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos">List</Tab>
+      </TabBar>,
+    );
+    const tab = screen.getByRole('tab', { name: 'List' });
+    expect(tab.tagName).toBe('A');
+    expect(tab.getAttribute('href')).toBe('/todos');
+    expect(tab.getAttribute('data-next-link')).toBe('');
+    expect(tab.getAttribute('data-slot')).toBe('tabs-trigger');
+    expect(tab.classList.contains('ui-tab')).toBe(true);
   });
 
-  it('marks the active tab with aria-current="page"', () => {
-    render(<Tab href="/todos" active>List</Tab>);
-    const link = screen.getByRole('link', { name: 'List' });
-    expect(link.getAttribute('aria-current')).toBe('page');
-    expect(classesOf(link)).toEqual(['ui-tab', 'ui-tab--active']);
+  it('selects the active tab and carries the compat hook', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos" active>List</Tab>
+      </TabBar>,
+    );
+    const tab = screen.getByRole('tab', { name: 'List' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(tab.classList.contains('ui-tab--active')).toBe(true);
   });
 
-  it('omits aria-current when not active', () => {
-    render(<Tab href="/todos/matrix">Matrix</Tab>);
-    const link = screen.getByRole('link', { name: 'Matrix' });
-    expect(link.hasAttribute('aria-current')).toBe(false);
-    expect(link.classList.contains('ui-tab--active')).toBe(false);
-  });
-
-  it('merges className instead of replacing it', () => {
-    render(<Tab href="/todos" className="legacy-hook">List</Tab>);
-    expect(classesOf(screen.getByRole('link', { name: 'List' }))).toEqual([
-      'legacy-hook',
-      'ui-tab',
-    ]);
-  });
-});
-
-describe('TabBar', () => {
-  it('renders a <nav> landmark with the aria-label and the tabs in order', () => {
+  it('paints the active tab from the prop, not from the forwarded Radix state', () => {
     render(
       <TabBar aria-label="Todos views">
         <Tab href="/todos" active>List</Tab>
         <Tab href="/todos/matrix">Matrix</Tab>
       </TabBar>,
     );
-    const nav = screen.getByRole('navigation', { name: 'Todos views' });
-    expect(nav.tagName).toBe('NAV');
-    expect(classesOf(nav)).toEqual(['ui-tab-bar']);
-    expect(Array.from(nav.children).map((child) => child.textContent)).toEqual([
+    // The surface rides the prop-conditioned classes the anchor receives itself.
+    const active = classesOf(screen.getByRole('tab', { name: 'List' }));
+    expect(active).toContain('bg-accent');
+    expect(active).toContain('text-on-accent');
+
+    const inactive = classesOf(screen.getByRole('tab', { name: 'Matrix' }));
+    expect(inactive).not.toContain('bg-accent');
+    expect(inactive).not.toContain('text-on-accent');
+
+    // `asChild` does forward `data-state`, so the `data-[state=active]` fallback is live.
+    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('data-state')).toBe('active');
+  });
+
+  it('leaves the other tabs unselected', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos">List</Tab>
+        <Tab href="/todos/matrix">Matrix</Tab>
+      </TabBar>,
+    );
+    const matrix = screen.getByRole('tab', { name: 'Matrix' });
+    expect(matrix.getAttribute('aria-selected')).toBe('false');
+    expect(matrix.classList.contains('ui-tab--active')).toBe(false);
+  });
+
+  it('merges className instead of replacing it', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos" className="legacy-hook">List</Tab>
+      </TabBar>,
+    );
+    const classes = classesOf(screen.getByRole('tab', { name: 'List' }));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-tab');
+  });
+});
+
+describe('TabBar', () => {
+  it('renders a tab list named by the aria-label, tabs in order', () => {
+    render(
+      <TabBar aria-label="Todos views">
+        <Tab href="/todos" active>List</Tab>
+        <Tab href="/todos/matrix">Matrix</Tab>
+      </TabBar>,
+    );
+    const list = screen.getByRole('tablist', { name: 'Todos views' });
+    expect(list.getAttribute('data-slot')).toBe('tabs-list');
+    expect(list.classList.contains('ui-tab-bar')).toBe(true);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'List',
       'Matrix',
     ]);
@@ -61,9 +98,8 @@ describe('TabBar', () => {
         <Tab href="/todos">List</Tab>
       </TabBar>,
     );
-    expect(classesOf(screen.getByRole('navigation'))).toEqual([
-      'legacy-hook',
-      'ui-tab-bar',
-    ]);
+    const classes = classesOf(screen.getByRole('tablist'));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-tab-bar');
   });
 });

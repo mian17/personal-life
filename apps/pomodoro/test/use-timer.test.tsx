@@ -129,7 +129,7 @@ describe('useTimer restore', () => {
 });
 
 describe('useTimer initial focus', () => {
-  it('lands focus on the start button at first paint', () => {
+  it('leaves focus on the body when the card mounts', () => {
     render(
       <StrictMode>
         <StartButtonProbe />
@@ -137,7 +137,7 @@ describe('useTimer initial focus', () => {
     );
 
     expect(hook.status).toBe('idle');
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Start' }));
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Start' }));
   });
 
   it('leaves focus alone when a restored running phase renders no start button', () => {

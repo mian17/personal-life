@@ -42,14 +42,19 @@ function todo(overrides: Partial<Todo> = {}): Todo {
 const lists = [{ id: 'l1', name: 'Groceries' }] as any;
 
 function markup(size?: 'default' | 'dense', overrides: Partial<Todo> = {}): string {
-  return renderToStaticMarkup(
-    <TodoItem
-      todo={todo(overrides)}
-      today={TODAY}
-      lists={lists}
-      availableTags={[]}
-      size={size}
-    />,
+  // A real render, so the row's own hooks run and nothing is stubbed.
+  return renderReal(
+    () =>
+      renderToStaticMarkup(
+        <TodoItem
+          todo={todo(overrides)}
+          today={TODAY}
+          lists={lists}
+          availableTags={[]}
+          size={size}
+        />,
+      ),
+    { useState: 0, useContext: 1 },
   );
 }
 
@@ -57,6 +62,45 @@ function markup(size?: 'default' | 'dense', overrides: Partial<Todo> = {}): stri
 // at call time, so spying there intercepts it; the `import * as React`
 // namespace is a frozen copy and cannot be.
 const ReactModule = jest.requireActual<typeof import('react')>('react');
+
+/**
+ * The harness stubs React's hooks globally, because it calls `TodoItem` as a plain function.
+ * A real render of that tree reaches stateful children — the registry `Checkbox` holds its own
+ * `useState` and reads its own context — and those must get the real hook, not the harness's.
+ * `renderReal` counts the calls that still answer with a stub, so exactly the hooks `TodoItem`
+ * itself would call keep the harness behaviour and every hook below it delegates.
+ */
+interface StubbedHookCalls {
+  useState: number;
+  useContext: number;
+}
+
+let realRender: StubbedHookCalls | null = null;
+
+const realHooks = {
+  useState: ReactModule.useState as unknown as (initial: unknown) => [unknown, (next: unknown) => void],
+  useContext: ReactModule.useContext as unknown as (context: unknown) => unknown,
+  useRef: ReactModule.useRef as unknown as (initial: unknown) => { current: unknown },
+  useEffect: ReactModule.useEffect as unknown as (effect: () => void | (() => void)) => void,
+};
+
+/** How many of each hook a tree calls above the components under test; the rest are real. */
+function renderReal<T>(render: () => T, stubbed: StubbedHookCalls): T {
+  realRender = { ...stubbed };
+  try {
+    return render();
+  } finally {
+    realRender = null;
+  }
+}
+
+/** Outside a real render every call is the harness's; inside one, only the counted calls are. */
+function takesStub(hook: keyof StubbedHookCalls): boolean {
+  if (realRender === null) return true;
+  if (realRender[hook] <= 0) return false;
+  realRender[hook] -= 1;
+  return true;
+}
 
 /** `TodoItem`'s element tree; its props surface a node test can drive. */
 type ItemTree = ReactElement<Record<string, unknown>>;
@@ -83,15 +127,19 @@ function snackbarHarness() {
     .mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
   const stateSpy = jest
     .spyOn(ReactModule, 'useState')
-    .mockImplementation((() => [
-      intent,
-      (value: typeof intent) => {
-        intent = value;
-      },
-    ]) as unknown as typeof ReactModule.useState);
+    .mockImplementation(((initial: unknown) => {
+      if (!takesStub('useState')) return realHooks.useState(initial);
+      return [
+        intent,
+        (value: typeof intent) => {
+          intent = value;
+        },
+      ];
+    }) as unknown as typeof ReactModule.useState);
   const refSpy = jest
     .spyOn(ReactModule, 'useRef')
     .mockImplementation(((initial: unknown) => {
+      if (realRender !== null) return realHooks.useRef(initial);
       const slot = refIndex++;
       if (!refs[slot]) refs[slot] = { current: initial };
       return refs[slot];
@@ -99,6 +147,7 @@ function snackbarHarness() {
   const effectSpy = jest
     .spyOn(ReactModule, 'useEffect')
     .mockImplementation(((fn: () => void | (() => void)) => {
+      if (realRender !== null) return realHooks.useEffect(fn);
       effects.push(fn);
     }) as unknown as typeof ReactModule.useEffect);
 
@@ -117,6 +166,12 @@ function snackbarHarness() {
 
   return {
     renderTree,
+    /**
+     * Render the tree the harness built through React. `renderTree` already called `TodoItem`,
+     * so its `useState` keeps the harness intent here and its `useSnackbar` is not re-entered.
+     */
+    renderMarkup: (tree: ItemTree) =>
+      renderReal(() => renderToStaticMarkup(tree), { useState: 1, useContext: 0 }),
     showSnackbar,
     get intent() {
       return intent;
@@ -172,12 +227,13 @@ function doneToggle(tree: ItemTree): any {
 }
 
 describe('TodoItem sizes', () => {
-  it('dense: the ghost done toggle LEADS the row and links to the edit screen', () => {
+  it('dense: the done checkbox LEADS the row and links to the edit screen', () => {
     const html = markup('dense');
     // First child after the <li> open tag is the toggle button.
     expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
-    expect(html).toContain('ui-icon-btn--ghost');
-    expect(html).toMatch(/<a[^>]*class="ui-list-item__link"[^>]*href="\/todos\/t1\/edit"/);
+    expect(html).toContain('ui-checkbox');
+    expect(html).not.toContain('ui-icon-btn');
+    expect(html).toMatch(/<a[^>]*class="ui-list-item__link[^"]*"[^>]*href="\/todos\/t1\/edit"/);
   });
 
   it('dense: the toggle glyph is the square Checkbox atom, checked when done', () => {
@@ -208,11 +264,11 @@ describe('TodoItem sizes', () => {
     expect(html).toContain('ui-due-date--signal');
   });
 
-  it('default: the ghost square Checkbox LEADS the row (no lucide circle)', () => {
+  it('default: the square Checkbox LEADS the row (no lucide circle)', () => {
     const html = markup();
     expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
-    expect(html).toContain('ui-icon-btn--ghost');
     expect(html).toContain('ui-checkbox');
+    expect(html).not.toContain('ui-icon-btn');
     expect(html).not.toContain('<circle');
     expect(html).not.toContain('ui-checkbox--checked');
   });
@@ -284,7 +340,7 @@ describe('TodoItem tick keeps the row visible', () => {
     try {
       const first = harness.renderTree();
       expect(harness.completed).toBe(false);
-      doneToggle(first).props.onToggle();
+      doneToggle(first).props.onCheckedChange();
 
       // The row strikes optimistically on the SAME press; the write waits.
       expect(harness.completed).toBe(true);
@@ -325,7 +381,7 @@ describe('TodoItem tick keeps the row visible', () => {
       const first = harness.renderTree({ overrides: { repeat: 'daily' } });
       const toggle = doneToggle(first);
 
-      toggle.props.onToggle();
+      toggle.props.onCheckedChange();
 
       // Same path as a non-recurring tick: strike optimistically, then write.
       expect(harness.completed).toBe(true);
@@ -365,18 +421,18 @@ describe('TodoItem tick keeps the row visible', () => {
     completeMock.mockClear();
     try {
       const first = harness.renderTree({ overrides: { repeat: 'daily' } });
-      doneToggle(first).props.onToggle();
+      doneToggle(first).props.onCheckedChange();
       expect(harness.intent).toEqual({ version: 0, done: true });
 
       // Still on the ticked version: the row renders struck.
       const struck = harness.renderTree({ overrides: { repeat: 'daily' } });
-      expect(renderToStaticMarkup(struck)).toContain('ui-list-item--done');
+      expect(harness.renderMarkup(struck)).toContain('ui-list-item--done');
 
       // The advance bumped todo.version, so the anchor no longer matches and the
       // strike self-resets — the advanced occurrence renders open.
       const advanced = harness.renderTree({ overrides: { repeat: 'daily', version: 1 } });
       expect(harness.completed).toBe(false);
-      expect(renderToStaticMarkup(advanced)).not.toContain('ui-list-item--done');
+      expect(harness.renderMarkup(advanced)).not.toContain('ui-list-item--done');
     } finally {
       harness.restore();
     }
@@ -391,7 +447,7 @@ describe('TodoItem tick keeps the row visible', () => {
         overrides: { repeat: 'daily', done: true },
       });
 
-      doneToggle(first).props.onToggle();
+      doneToggle(first).props.onCheckedChange();
       jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
 
       // The click un-ticks the row; the write is still version-checked.
@@ -415,9 +471,9 @@ describe('TodoItem tick keeps the row visible', () => {
     completeMock.mockClear();
     try {
       // on → off → on: only the final (done) request is sent, once.
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle();
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
 
       expect(completeMock).not.toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
@@ -440,8 +496,8 @@ describe('TodoItem tick keeps the row visible', () => {
     updateMock.mockClear();
     completeMock.mockClear();
     try {
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle(); // on
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onToggle(); // back off
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // on
+      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // back off
 
       jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
 
@@ -459,7 +515,7 @@ describe('TodoItem tick keeps the row visible', () => {
     updateMock.mockClear();
     completeMock.mockClear();
     try {
-      doneToggle(harness.renderTree()).props.onToggle();
+      doneToggle(harness.renderTree()).props.onCheckedChange();
       expect(completeMock).not.toHaveBeenCalled();
 
       // Unmount before the timer fires: the pending complete write is flushed, not lost.

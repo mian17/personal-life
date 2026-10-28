@@ -1,3 +1,5 @@
+// shadcn/ui registry copy (`button`, icon control), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
+import { cva } from 'class-variance-authority';
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
@@ -7,6 +9,20 @@ export interface IconButtonProps extends ComponentPropsWithRef<'button'> {
   label: string;
   variant?: IconButtonVariant;
 }
+
+/** The registry icon size at this control's 40px square: `size-10`. */
+const iconButtonVariants = cva(
+  'inline-flex size-10 items-center justify-center rounded-md border font-semibold cursor-pointer outline-none transition-colors focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default: 'border-border bg-panel text-text',
+        ghost: 'border-transparent bg-transparent text-text',
+      },
+    },
+    defaultVariants: { variant: 'default' },
+  },
+);
 
 export function IconButton({
   label,
@@ -19,7 +35,13 @@ export function IconButton({
     <button
       type="button"
       aria-label={label}
-      className={cx('ui-icon-btn', variant !== 'default' && `ui-icon-btn--${variant}`, className)}
+      data-slot="button"
+      className={cx(
+        'ui-icon-btn',
+        variant !== 'default' && `ui-icon-btn--${variant}`,
+        iconButtonVariants({ variant }),
+        className,
+      )}
       {...rest}
     >
       {children}

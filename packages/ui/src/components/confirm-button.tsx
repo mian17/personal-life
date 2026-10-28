@@ -1,6 +1,7 @@
+// Composed registry `button`, snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 'use client';
 
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Button, type ButtonProps } from './button';
 
 /**
@@ -13,18 +14,16 @@ export interface ConfirmButtonProps extends Omit<ButtonProps, 'type'> {
 }
 
 export function ConfirmButton({ message, onClick, children, ...rest }: Readonly<ConfirmButtonProps>) {
+  function confirmThenClick(event: MouseEvent<HTMLButtonElement>) {
+    if (!window.confirm(message)) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  }
+
   return (
-    <Button
-      type="submit"
-      onClick={(event) => {
-        if (!window.confirm(message)) {
-          event.preventDefault();
-          return;
-        }
-        onClick?.(event);
-      }}
-      {...rest}
-    >
+    <Button type="submit" onClick={confirmThenClick} {...rest}>
       {children}
     </Button>
   );
