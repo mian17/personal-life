@@ -1,3 +1,4 @@
+// Composed registry `button` (icon control), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,24 +8,28 @@ import { IconButton } from './icon-button';
 
 type Theme = 'system' | 'light' | 'dark';
 
-const ORDER: Theme[] = ['system', 'light', 'dark'];
-const LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
-const ICONS: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
+const THEME_ORDER: Theme[] = ['system', 'light', 'dark'];
+const THEME_LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
+const THEME_ICONS: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
 
-function readStored(): Theme {
+function readStoredTheme(): Theme {
   if (typeof window === 'undefined') {
     return 'system';
   }
-  const value = window.localStorage.getItem('theme');
-  return value === 'light' || value === 'dark' ? value : 'system';
+  const storedTheme = window.localStorage.getItem('theme');
+  return storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'system';
 }
 
-function apply(theme: Theme) {
+function applyTheme(theme: Theme) {
   if (theme === 'system') {
     delete document.documentElement.dataset.theme;
-  } else {
-    document.documentElement.dataset.theme = theme;
+    return;
   }
+  document.documentElement.dataset.theme = theme;
+}
+
+function nextInCycle(theme: Theme): Theme {
+  return THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
 }
 
 export type ThemeToggleProps = Omit<
@@ -36,27 +41,27 @@ export function ThemeToggle({ className, ...rest }: Readonly<ThemeToggleProps>) 
   const [theme, setTheme] = useState<Theme>('system');
 
   useEffect(() => {
-    setTheme(readStored());
+    setTheme(readStoredTheme());
   }, []);
 
-  const nextTheme = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-  const Icon = ICONS[theme];
+  const nextTheme = nextInCycle(theme);
+  const ThemeIcon = THEME_ICONS[theme];
 
-  function cycle() {
+  function cycleTheme() {
     setTheme(nextTheme);
     window.localStorage.setItem('theme', nextTheme);
-    apply(nextTheme);
+    applyTheme(nextTheme);
   }
 
   return (
     <IconButton
-      label={`Theme: ${LABELS[theme]}. Activate for ${LABELS[nextTheme]}.`}
+      label={`Theme: ${THEME_LABELS[theme]}. Activate for ${THEME_LABELS[nextTheme]}.`}
       aria-pressed={theme !== 'system'}
-      onClick={cycle}
+      onClick={cycleTheme}
       className={className}
       {...rest}
     >
-      <Icon size={18} aria-hidden />
+      <ThemeIcon size={18} aria-hidden />
     </IconButton>
   );
 }

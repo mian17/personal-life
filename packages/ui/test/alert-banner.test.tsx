@@ -6,11 +6,22 @@ function classesOf(el: Element): string[] {
 }
 
 describe('AlertBanner', () => {
-  it('renders a ui-alert-banner container with the warning tone by default', () => {
+  it('renders the registry alert slot carrying the ui-alert-banner hook', () => {
     render(<AlertBanner>Changed on another device.</AlertBanner>);
     const banner = document.querySelector('.ui-alert-banner')!;
     expect(banner.tagName).toBe('DIV');
-    expect(classesOf(banner)).toEqual(['ui-alert-banner', 'ui-alert-banner--warning']);
+    // The e2e locator (`meals.spec.ts`) finds `.ui-alert-banner`; the registry
+    // markup hook has to ride the same element, or there is no banner to find.
+    expect(banner.getAttribute('data-slot')).toBe('alert');
+    expect(banner.classList.contains('ui-alert-banner--warning')).toBe(true);
+  });
+
+  it('paints the warning tone from token utilities', () => {
+    render(<AlertBanner>Changed.</AlertBanner>);
+    const banner = document.querySelector('.ui-alert-banner')!;
+    expect(banner.classList.contains('border-danger')).toBe(true);
+    expect(banner.classList.contains('bg-panel')).toBe(true);
+    expect(banner.classList.contains('rounded-[var(--radius-md)]')).toBe(true);
   });
 
   it('forwards role="alert" verbatim (the editor conflict banner contract)', () => {
@@ -60,10 +71,8 @@ describe('AlertBanner', () => {
         Changed.
       </AlertBanner>,
     );
-    expect(classesOf(screen.getByRole('alert'))).toEqual([
-      'legacy-hook',
-      'ui-alert-banner',
-      'ui-alert-banner--warning',
-    ]);
+    expect(classesOf(screen.getByRole('alert'))).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-alert-banner', 'ui-alert-banner--warning']),
+    );
   });
 });

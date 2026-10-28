@@ -239,22 +239,24 @@ export function FoodForm({
               />
             }
           />
-          <SettingsRow
-            label="Unit"
-            description={food === null ? 'Chosen once, for every amount of this food.' : undefined}
-            control={
-              food === null ? (
+          {food === null ? (
+            <SettingsRow
+              label="Unit"
+              description="Chosen once, for every amount of this food."
+              control={
                 <Select
                   aria-label="Unit"
                   value={unit}
                   options={UNIT_OPTIONS}
                   onChange={(event) => setUnit(event.target.value as FoodUnit)}
                 />
-              ) : (
-                <StatusText>{unit}</StatusText>
-              )
-            }
-          />
+              }
+            />
+          ) : (
+            /* `UpdateFoodDto` carries no `unit`: it is fixed at creation, so the edit
+               page states it beside the label and leaves the control column empty. */
+            <SettingsRow label={<>{'Unit '}<StatusText>{unit}</StatusText></>} control={null} />
+          )}
           <StatusText>Facts below are per 100 {unit} — a blank value is 0.</StatusText>
         </Section>
 

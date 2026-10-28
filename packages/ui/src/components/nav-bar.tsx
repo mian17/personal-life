@@ -7,11 +7,19 @@ export interface NavBarProps {
   className?: string;
 }
 
+/** The page's top row: the leading slot, then the trailing controls pushed to the far edge. */
+const navBarStyles = 'flex items-center gap-[var(--space-0-5)] m-[0_0_var(--space-0-25)]';
+
+/** The trailing group keeps the bar's own rhythm, so its controls line up whatever they are. */
+const actionsStyles = 'flex items-center gap-[var(--space-0-5)] ml-auto';
+
 export function NavBar({ leading, trailing, className }: Readonly<NavBarProps>) {
   return (
-    <nav className={cx('ui-nav-bar', className)}>
+    <nav className={cx('ui-nav-bar', navBarStyles, className)}>
       {leading}
-      {trailing != null && <div className="ui-nav-bar__actions">{trailing}</div>}
+      {trailing != null && (
+        <div className={cx('ui-nav-bar__actions', actionsStyles)}>{trailing}</div>
+      )}
     </nav>
   );
 }

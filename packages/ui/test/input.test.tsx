@@ -7,7 +7,7 @@ describe('Input', () => {
     render(<Input aria-label="Search" />);
     const input = screen.getByLabelText('Search');
     expect(input.tagName).toBe('INPUT');
-    expect(input.className.split(/\s+/).filter(Boolean)).toEqual(['ui-input']);
+    expect(input.classList.contains('ui-input')).toBe(true);
   });
 
   it('forwards standard form attributes verbatim', () => {
@@ -36,15 +36,25 @@ describe('Input', () => {
 
   it('merges className instead of replacing it', () => {
     render(<Input aria-label="q" className="legacy-hook" />);
-    expect(screen.getByLabelText('q').className.split(/\s+/).filter(Boolean)).toEqual([
-      'ui-input',
-      'legacy-hook',
-    ]);
+    expect(screen.getByLabelText('q').classList.contains('ui-input')).toBe(true);
+    expect(screen.getByLabelText('q').classList.contains('legacy-hook')).toBe(true);
   });
 
   it('forwards a ref to the rendered element', () => {
     const ref = createRef<HTMLInputElement>();
     render(<Input aria-label="q" ref={ref} />);
     expect(ref.current).toBe(screen.getByLabelText('q'));
+  });
+
+  /**
+   * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
+   * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.
+   * `focus-visible:outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring draws', () => {
+    render(<Input aria-label="q" />);
+    const input = screen.getByLabelText('q');
+    expect(input.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(input.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
   });
 });

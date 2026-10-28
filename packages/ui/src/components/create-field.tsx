@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { Plus } from 'lucide-react';
 
@@ -23,6 +24,9 @@ export interface CreateFieldProps {
  * that submits its trimmed value on Enter, beside an add button. It owns the draft
  * so both callers get identical submit semantics — Enter never submits the
  * surrounding form, and a blank draft cannot be created.
+ *
+ * The row layout is the caller's own BEM element, so both owners keep the spacing
+ * their surface already had; this component contributes no visual CSS.
  */
 export function CreateField({
   className,
@@ -41,6 +45,12 @@ export function CreateField({
     setDraft('');
   };
 
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    create();
+  };
+
   return (
     <div className={className}>
       <Input
@@ -50,12 +60,7 @@ export function CreateField({
         value={draft}
         disabled={disabled}
         onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            create();
-          }
-        }}
+        onKeyDown={submitOnEnter}
       />
       <IconButton label={createLabel} disabled={disabled || !canCreate} onClick={create}>
         <Plus size={16} aria-hidden />

@@ -10,6 +10,16 @@ export interface StatusTextProps extends ComponentPropsWithRef<'span'> {
   invisible?: boolean;
 }
 
+/**
+ * `invisible` is Tailwind's `visibility: hidden`, never `display: none`: a caller hides the line
+ * precisely to stop the layout moving, so the box has to stay. `ui-invisible` rides along as the
+ * hook `apps/pomodoro` asserts on the rendered line.
+ */
+const sizeStyles: Record<StatusTextSize, string> = {
+  default: 'text-[length:var(--space-0-85)]',
+  display: 'text-[length:var(--space-3)]',
+};
+
 export function StatusText({
   size = 'default',
   invisible,
@@ -22,9 +32,10 @@ export function StatusText({
       role="status"
       aria-live="polite"
       className={cx(
-        'ui-status-text',
+        'ui-status-text text-muted',
+        sizeStyles[size],
         size === 'display' && 'ui-status-text--display',
-        invisible && 'ui-invisible',
+        invisible && 'ui-invisible invisible',
         className,
       )}
       {...rest}

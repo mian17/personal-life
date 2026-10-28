@@ -181,7 +181,7 @@ describe('meals day view', () => {
 
     expect(html).toContain('Toast');
     expect(html).toMatch(
-      /ui-list-item__title">Toast<\/span><span class="ui-list-item__sub">123 kcal × 2</,
+      /ui-list-item__title[^"]*">Toast<\/span><span class="ui-list-item__sub[^"]*">123 kcal × 2</,
     );
   });
 
@@ -195,7 +195,7 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toMatch(
-      /ui-list-item__title">Chicken<\/span><span class="ui-list-item__sub">123 kcal × 2</,
+      /ui-list-item__title[^"]*">Chicken<\/span><span class="ui-list-item__sub[^"]*">123 kcal × 2</,
     );
     expect(html).not.toContain(uuid);
   });
@@ -229,7 +229,7 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toMatch(
-      /ui-list-item__title">123 kcal<\/span><span class="ui-list-item__sub">× 1</,
+      /ui-list-item__title[^"]*">123 kcal<\/span><span class="ui-list-item__sub[^"]*">× 1</,
     );
   });
 

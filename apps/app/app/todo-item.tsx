@@ -5,7 +5,6 @@ import {
   Button,
   Checkbox,
   DueDate,
-  IconButton,
   ListItem,
   type ListItemTone,
   type TagOption,
@@ -16,23 +15,6 @@ import { useRef, useState } from 'react';
 import { completeTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
-
-/**
- * The done toggle as a client wrapper: composes the upstream `IconButton`
- * (frozen label, always ghost) with the `Checkbox` glyph. Ticking a row is a
- * plain toggle — the row never hides or collapses.
- */
-export function DoneToggle({
-  done,
-  label,
-  onToggle,
-}: Readonly<{ done: boolean; label: string; onToggle: () => void }>) {
-  return (
-    <IconButton label={label} variant="ghost" onClick={onToggle}>
-      <Checkbox checked={done} />
-    </IconButton>
-  );
-}
 
 /**
  * One todo row at two sizes, from one `ListItem variant="todo"`: a borderless
@@ -108,15 +90,17 @@ export function TodoItem({
     }
   }
 
+  function toggleDone() {
+    const next = !done;
+    setIntent({ version: todo.version, done: next });
+    debouncedFlush(() => flush(next, todo.id, todo.version, todo.done));
+  }
+
   const doneToggle = (
-    <DoneToggle
-      done={done}
+    <Checkbox
+      checked={done}
       label={done ? `Mark ${todo.title} not done` : `Mark ${todo.title} done`}
-      onToggle={() => {
-        const next = !done;
-        setIntent({ version: todo.version, done: next });
-        debouncedFlush(() => flush(next, todo.id, todo.version, todo.done));
-      }}
+      onCheckedChange={toggleDone}
     />
   );
 

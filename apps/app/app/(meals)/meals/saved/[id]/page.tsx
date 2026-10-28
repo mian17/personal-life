@@ -52,9 +52,11 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
           ))}
         </List>
       </Section>
-      <form action={relogMealAction.bind(null, meal.id)}>
-        <Button type="submit">Log this meal again</Button>
-      </form>
+      <Section>
+        <form action={relogMealAction.bind(null, meal.id)}>
+          <Button type="submit">Log this meal again</Button>
+        </form>
+      </Section>
     </PageShell>
   );
 }

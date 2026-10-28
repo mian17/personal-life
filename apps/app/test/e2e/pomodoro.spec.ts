@@ -60,7 +60,9 @@ test.describe('pomodoro timer', () => {
     await expect(page.getByText(/^Session \d of 4$/)).toHaveCount(0);
 
     await expectCountdownSeconds(page, minutesToSeconds(FOCUS_MINUTES));
-    await expect(startButton(page, 'Focus')).toBeFocused();
+    // Cold load leaves focus where the browser put it: grabbing it on mount paints
+    // the focus ring over the Start button before the owner has touched the card.
+    await expect(startButton(page, 'Focus')).not.toBeFocused();
     await startButton(page, 'Focus').click();
 
     // The whole focus phase, in fake time.

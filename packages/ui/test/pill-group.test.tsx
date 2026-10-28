@@ -16,8 +16,22 @@ describe('PillGroup', () => {
     );
     const group = document.querySelector('.ui-pill-group')!;
     expect(group.tagName).toBe('DIV');
-    expect(classesOf(group)).toEqual(['ui-pill-group']);
+    expect(group.classList.contains('ui-pill-group')).toBe(true);
     expect(group.children).toHaveLength(2);
+  });
+
+  it('carries the row geometry as utilities (the retired .ui-pill-group rule)', () => {
+    render(
+      <PillGroup>
+        <Pill>work</Pill>
+      </PillGroup>,
+    );
+    const group = document.querySelector('.ui-pill-group')!;
+    expect(group.classList.contains('flex')).toBe(true);
+    expect(group.classList.contains('flex-wrap')).toBe(true);
+    expect(group.classList.contains('items-center')).toBe(true);
+    expect(group.classList.contains('border-t')).toBe(true);
+    expect(group.classList.contains('border-border')).toBe(true);
   });
 
   it('forwards role and aria-label verbatim (the saved-tags group contract)', () => {
@@ -66,9 +80,7 @@ describe('PillGroup', () => {
         <Pill>work</Pill>
       </PillGroup>,
     );
-    expect(classesOf(document.querySelector('.ui-pill-group')!)).toEqual([
-      'legacy-hook',
-      'ui-pill-group',
-    ]);
+    const group = document.querySelector('.ui-pill-group')!;
+    expect(classesOf(group)).toEqual(expect.arrayContaining(['legacy-hook', 'ui-pill-group']));
   });
 });

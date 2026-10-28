@@ -23,8 +23,15 @@ function setup(disabled = false) {
   return { onCreate, onRename, onDelete };
 }
 
+/**
+ * The registry trigger opens on a primary press, so a click alone would never reach it. jsdom ships
+ * no `PointerEvent`, hence the mouse event carrying that type.
+ */
 const openMenu = (name: string) =>
-  fireEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+  fireEvent(
+    screen.getByRole('button', { name: `Actions for ${name}` }),
+    new MouseEvent('pointerdown', { bubbles: true, button: 0 }),
+  );
 
 describe('TagManager', () => {
   it('lists every tag with a rename and delete affordance', () => {

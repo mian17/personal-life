@@ -1,0 +1,25 @@
+/* Colour names resolve through tokens.css variables, so no literal leaves that file.
+   preflight is deliberately NOT imported: `base.css` owns the resets, and loading
+   Tailwind's reset under it would re-order every app's box model in one step.
+   ponytail: colours only — geometry rides Tailwind's scale; add `--spacing-*` or `--radius-*`
+   mapping here once a primitive needs a token the scale cannot express. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@source '../';
+@source '../../../../apps';
+
+@theme {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-amber: var(--amber);
+  --color-green: var(--green);
+  --color-border: var(--border);
+  --color-on-accent: var(--on-accent);
+}

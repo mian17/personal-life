@@ -30,9 +30,12 @@ describe('IconLink', () => {
     );
   });
 
-  it('uses only the ui-icon-link class by default', () => {
+  it('carries the ui-icon-link hook alongside the registry square', () => {
     render(<IconLink href="/" label="Back">{<span />}</IconLink>);
-    expect(classesOf(screen.getByRole('link'))).toEqual(['ui-icon-link']);
+    const link = screen.getByRole('link');
+    expect(link.classList.contains('ui-icon-link')).toBe(true);
+    expect(link.classList.contains('size-10')).toBe(true);
+    expect(link.classList.contains('bg-panel')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {
@@ -41,11 +44,25 @@ describe('IconLink', () => {
         {<span />}
       </IconLink>,
     );
-    expect(classesOf(screen.getByRole('link'))).toEqual(['legacy-hook', 'ui-icon-link']);
+    const link = screen.getByRole('link');
+    expect(classesOf(link)).toContain('legacy-hook');
+    expect(link.classList.contains('ui-icon-link')).toBe(true);
   });
 
   it('keeps the accessible name verbatim', () => {
     render(<IconLink href="/" label="Go home">{<span />}</IconLink>);
     expect(screen.getByRole('link').getAttribute('aria-label')).toBe('Go home');
+  });
+
+  /**
+   * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
+   * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.
+   * `focus-visible:outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring draws', () => {
+    render(<IconLink href="/" label="Back">{<span />}</IconLink>);
+    const link = screen.getByRole('link');
+    expect(link.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(link.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
   });
 });

@@ -1,16 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import { Card } from '../src/components/card';
-
-function cssBlock(selector: string): string {
-  const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-  return (
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-      [])[1] ?? ''
-  );
-}
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
@@ -21,29 +11,43 @@ describe('Card', () => {
     render(<Card>content</Card>);
     const card = screen.getByText('content');
     expect(card.tagName).toBe('DIV');
-    expect(classesOf(card)).toEqual(['ui-card']);
+    expect(card.classList.contains('ui-card')).toBe(true);
+  });
+
+  it('paints the panel surface from token utilities', () => {
+    render(<Card>content</Card>);
+    const card = screen.getByText('content');
+    expect(card.classList.contains('bg-panel')).toBe(true);
+    expect(card.classList.contains('border-border')).toBe(true);
+    expect(card.classList.contains('rounded-[var(--radius-lg)]')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {
     render(<Card className="legacy-hook">content</Card>);
-    expect(classesOf(screen.getByText('content'))).toEqual(['legacy-hook', 'ui-card']);
+    expect(classesOf(screen.getByText('content'))).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-card']),
+    );
   });
 
   it('defaults to no fill class, keeping the panel at its content height', () => {
     render(<Card>content</Card>);
-    expect(classesOf(screen.getByText('content'))).toEqual(['ui-card']);
+    const card = screen.getByText('content');
+    expect(card.classList.contains('ui-card--fill')).toBe(false);
+    expect(card.classList.contains('overflow-hidden')).toBe(true);
   });
 
   it('fill adds the full-height class and centres content in that box', () => {
     render(<Card fill>content</Card>);
-    expect(classesOf(screen.getByText('content'))).toEqual(['ui-card', 'ui-card--fill']);
+    const card = screen.getByText('content');
+    expect(card.classList.contains('ui-card--fill')).toBe(true);
     // `safe` keeps an over-tall body scrollable from its first row instead of
     // clipping it above the scroll origin, where it could not be reached.
-    expect(cssBlock('.ui-card--fill')).toMatch(/place-content:\s*safe center/);
-    expect(cssBlock('.ui-card--fill')).toMatch(/display:\s*grid/);
+    expect(card.classList.contains('place-content-center-safe')).toBe(true);
+    expect(card.classList.contains('grid')).toBe(true);
     // The base card clips; the fill variant must scroll instead, or a body too
     // tall for a short viewport is unreachable.
-    expect(cssBlock('.ui-card--fill')).toMatch(/overflow:\s*auto/);
+    expect(card.classList.contains('overflow-auto')).toBe(true);
+    expect(card.classList.contains('overflow-hidden')).toBe(false);
   });
 
   it('renders arbitrary children', () => {

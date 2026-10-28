@@ -84,7 +84,6 @@ export function useTimer(durations: Durations): Timer {
   useDurationsApplied(setState, durations);
   useTicking(setState, state.status);
   useModeSaved(state);
-  useInitialFocus(startRef);
   useBoundaryAnnouncement(state, startRef);
 
   return {
@@ -160,17 +159,6 @@ function useModeSaved(state: TimerState) {
   useEffect(() => {
     window.localStorage.setItem(MODE_STORAGE_KEY, serializeMode(state, Date.now()));
   }, [state]);
-}
-
-/**
- * First paint lands on the only control, so the owner starts without tabbing.
- * A restored `running` phase keeps that control mounted but invisible, and focus
- * on a `visibility: hidden` element is a no-op, so nothing is grabbed.
- */
-function useInitialFocus(startRef: RefObject<HTMLButtonElement | null>) {
-  useEffect(() => {
-    startRef.current?.focus();
-  }, [startRef]);
 }
 
 /** Entering the boundary announces once: a beep, the button focus, and a flashing tab title. */
