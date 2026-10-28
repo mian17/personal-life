@@ -69,12 +69,13 @@ const rowSlotStyles = cx(
 );
 
 /**
- * Leading checkbox inset: the removed 40px `IconButton` wrapper (`--icon-btn-size`) centred
- * its control, so the checkbox takes that square's leftover width split around it. Direct
- * child only — a row without a leading checkbox matches nothing.
+ * Leading checkbox inset: a todo row starts its leading checkbox box on `--space-0-9`, the
+ * same inset the trailing delete glyph's outer edge resolves to, so the two ends of the row
+ * sit on one edge. Selector-matched to the direct `.ui-checkbox` child, so a row without one
+ * is untouched. A dense row opts out (`!isDense`): its quadrant lens keeps the checkbox flush
+ * to the clipped row edge.
  */
-const checkboxInsetStyles =
-  '[&>.ui-checkbox]:mx-[calc((var(--icon-btn-size)-var(--checkbox-size,var(--space-0-75)))/2)]';
+const todoCheckboxInsetStyles = 'has-[>.ui-checkbox]:ps-[var(--space-0-9)]';
 
 /**
  * The whole row is the target: the body stretches to the row height and takes its width.
@@ -96,10 +97,15 @@ const linkColumnStyles = cx(
   'flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
 );
 
-/** Dense todo rows are compact rows, exactly as tall as their content, centred on it. */
+/**
+ * Dense todo rows are compact rows, exactly as tall as their content, centred on it.
+ * Start padding is the row's text inset (`--space-0-9`), the token the trailing delete
+ * glyph's right inset resolves to, so a leading checkbox and that glyph sit on one edge.
+ * End padding stays compact: the row body runs to the trailing slot, not the row edge.
+ */
 const linkDenseStyles = cx(
   linkSharedStyles,
-  'items-center gap-[var(--space-0-5)] px-[var(--space-0-4)] py-[var(--space-0-6)]',
+  'items-center gap-[var(--space-0-5)] py-[var(--space-0-6)] ps-[var(--space-0-9)] pe-[var(--space-0-4)]',
 );
 
 /** Title above, meta line below, at the tight token gap. */
@@ -265,7 +271,7 @@ export function ListItem({
         tone && `ui-list-item--${tone}`,
         rowSurfaceStyles,
         isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
-        checkboxInsetStyles,
+        !isDense && todoCheckboxInsetStyles,
         isColumn ? 'items-start' : 'items-center',
         isDense ? 'min-h-0' : rowFloorStyles,
         variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',

@@ -150,6 +150,60 @@ describe('ListItem', () => {
     );
   });
 
+  it('keeps the leading and trailing row insets on one token', () => {
+    render(
+      <ul>
+        <ListItem
+          variant="todo"
+          title="Oats"
+          leading={<input type="checkbox" aria-label="done" className="ui-checkbox" />}
+          deleteAction={<button>x</button>}
+        />
+      </ul>,
+    );
+    const token = (cls: string) => cls.match(/var\(--space-[\w-]+\)/)![0];
+    const rowClasses = classesOf(screen.getByRole('listitem'));
+    const startInset = rowClasses.find((cls) => cls.startsWith('has-[>.ui-checkbox]:ps-'))!;
+    // The row's leading start inset and the trailing glyph's right inset resolve to the same
+    // token, so neither side can drift tighter than the other.
+    expect(token(startInset)).toBe('var(--space-0-9)');
+    const glyphInset = rowClasses.find((cls) => cls.includes('mr-[calc('))!;
+    expect(token(glyphInset)).toBe(token(startInset));
+  });
+
+  it('starts the leading checkbox on the row inset instead of a fixed icon-square slot', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem
+          variant="todo"
+          title="Oats"
+          leading={<input type="checkbox" aria-label="done" className="ui-checkbox" />}
+        />
+      </ul>,
+    );
+    const rowClasses = classesOf(screen.getByRole('listitem'));
+    // The removed 40px `IconButton` wrapper centred its control, which parked the checkbox
+    // inside that square. The row starts the checkbox box on its own inset instead.
+    expect(rowClasses).toContain('has-[>.ui-checkbox]:ps-[var(--space-0-9)]');
+    expect(rowClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
+    unmount();
+
+    render(
+      <ul>
+        <ListItem
+          variant="todo"
+          size="dense"
+          title="Oats"
+          leading={<input type="checkbox" aria-label="done" className="ui-checkbox" />}
+        />
+      </ul>,
+    );
+    // A dense row keeps the checkbox flush to its clipped quadrant edge: no start inset.
+    const denseClasses = classesOf(screen.getByRole('listitem'));
+    expect(denseClasses.some((cls) => cls.includes('ps-[var(--space-0-9)]'))).toBe(false);
+    expect(denseClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
+  });
+
   it('lays the trailing slot out as a flex row, so its form fills the slot', () => {
     render(
       <ul>
