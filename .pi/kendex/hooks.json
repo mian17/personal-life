@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "exec bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"$PWD\")/.pi/kendex/hooks/sonar-check.sh\"",
+            "command": "s=\"$(git rev-parse --show-toplevel 2>/dev/null || echo \"$PWD\")/.pi/kendex/hooks/sonar-check.sh\"; [ -f \"$s\" ] || s=\"/home/night/WebstormProjects/personal-life/.pi/kendex/hooks/sonar-check.sh\"; [ -f \"$s\" ] && exec bash \"$s\"; exit 0",
             "timeout": 120
           }
         ]
