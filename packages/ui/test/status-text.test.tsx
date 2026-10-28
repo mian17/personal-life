@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { StatusText } from '../src/components/status-text';
 
@@ -18,12 +16,14 @@ describe('StatusText', () => {
 
   it('uses the ui-status-text class', () => {
     render(<StatusText>Saving…</StatusText>);
-    expect(classesOf(screen.getByRole('status'))).toEqual(['ui-status-text']);
+    expect(classesOf(screen.getByRole('status'))).toContain('ui-status-text');
   });
 
   it('merges className instead of replacing it', () => {
     render(<StatusText className="legacy-hook">x</StatusText>);
-    expect(classesOf(screen.getByRole('status'))).toEqual(['legacy-hook', 'ui-status-text']);
+    const classes = classesOf(screen.getByRole('status'));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-status-text');
   });
 
   it('adds the display modifier for size="display" and keeps role/aria-live', () => {
@@ -32,15 +32,17 @@ describe('StatusText', () => {
     expect(status.tagName).toBe('SPAN');
     expect(status.getAttribute('aria-live')).toBe('polite');
     expect(status.textContent).toBe('25:00');
-    expect(classesOf(status)).toEqual(['ui-status-text', 'ui-status-text--display']);
+    expect(classesOf(status)).toContain('ui-status-text--display');
   });
 
   it('renders no display modifier when size is omitted or default', () => {
     render(<StatusText>25:00</StatusText>);
     render(<StatusText size="default">25:00</StatusText>);
     const [omitted, explicitDefault] = screen.getAllByRole('status');
-    expect(classesOf(omitted)).toEqual(['ui-status-text']);
-    expect(classesOf(explicitDefault)).toEqual(['ui-status-text']);
+    expect(classesOf(omitted)).toContain('ui-status-text');
+    expect(classesOf(explicitDefault)).toContain('ui-status-text');
+    expect(classesOf(omitted)).not.toContain('ui-status-text--display');
+    expect(classesOf(explicitDefault)).not.toContain('ui-status-text--display');
   });
 
   it('lets a caller override aria-live', () => {
@@ -52,19 +54,18 @@ describe('StatusText', () => {
     expect(screen.getByRole('status').getAttribute('aria-live')).toBe('off');
   });
 
-  it('reserves its height while invisible (invisible)', () => {
+  it('reserves its height while invisible (invisible, never display:none)', () => {
     render(<StatusText invisible>Next: Short break</StatusText>);
     const status = screen.getByRole('status');
-    expect(classesOf(status)).toEqual(['ui-invisible', 'ui-status-text']);
+    expect(status.classList.contains('ui-invisible')).toBe(true);
     expect(status.textContent).toBe('Next: Short break');
 
-    // The rule that makes it safe: hidden, not collapsed. `display: none` would
-    // remove the box, and the caller is hiding it precisely to keep the layout
-    // from moving — the assertion is the property, not just the class name.
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-    const block = (css.match(/\.ui-invisible\s*\{([^}]*)\}/) ?? [])[1] ?? '';
-    expect(block).toMatch(/visibility:\s*hidden/);
-    expect(block).not.toMatch(/display/);
+    // The utility is the rule that makes it safe: `invisible` hides the paint and
+    // keeps the box. `hidden` would collapse it, and the caller is hiding the line
+    // precisely to stop the layout moving.
+    const classes = classesOf(status);
+    expect(classes).toContain('invisible');
+    expect(classes).not.toContain('hidden');
   });
 
   it('forwards arbitrary attributes', () => {

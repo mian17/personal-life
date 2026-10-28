@@ -62,3 +62,21 @@ describe('Switch', () => {
     expect(screen.getByRole('switch').getAttribute('name')).toBe('matrixEnabled');
   });
 });
+
+describe('Switch focus ring', () => {
+  /**
+   * Regression: Tailwind v4's `outline-none` and `outline-hidden` both zero the
+   * `--tw-outline-style` variable that `outline-<width>` draws with, so a ring written as
+   * `outline-none` + `focus-visible:outline-2` computes `outline-style: none` in Chromium and
+   * is invisible. `outline-solid` must be present to re-arm it.
+   */
+  it('re-arms the outline style the reset zeroes, so the focused ring actually draws', () => {
+    render(<Switch checked label="Eisenhower matrix" />);
+    const track = screen.getByRole('switch');
+    expect(track.classList.contains('focus-visible:outline-solid')).toBe(true);
+    expect(track.classList.contains('focus-visible:outline-2')).toBe(true);
+    expect(track.classList.contains('focus-visible:outline-accent')).toBe(true);
+    // The reset itself must not zero anything the ring needs back.
+    expect(track.classList.contains('outline-none')).toBe(false);
+  });
+});

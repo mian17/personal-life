@@ -26,19 +26,20 @@ is converted.
    that pinned it. No task stops over a hook, a role or a nesting depth.
 3. **Deletion is paced per component**, in the same change as its conversion; the close-out task
    deletes the then-empty files.
-4. **No-counterpart components** (`confirm-button`, `create-field`, `due-date`, `due-date-pill`,
-   `empty-state`, `file-picker`, `list`, `list-item`, `list-shell`, `local-time`,
-   `nav-bar`, `page-actions`, `page-title`, `row`, `section`, `settings-row`, `stack`, `status-text`,
-   `theme-toggle`) keep their markup and behaviour and are styled with Tailwind utilities only.
+4. **No-registry-counterpart components**: the three lists below name every component no task
+   replaces from a registry source, each exactly once.
+   - **Kept as-is, styled with utilities only:** `due-date`, `due-date-pill`, `editor-screen`,
+     `editor-stack`, `editor-toolbar`, `list`, `list-item`, `list-shell`, `local-time`,
+     `manager-block`, `matrix-block`, `nav-bar`, `page-actions`, `page-title`, `row`, `section`,
+     `stack`, `status-text`.
+   - **App-specific blocks (spec §1 out of scope, composition only):** `editor-chrome`, `fab-menu`,
+     `manager-surface`, `page-shell`, `tag-picker`, `trash-block`.
+   - **Composites over replaced primitives:** `confirm-button`, `create-field`, `empty-state`,
+     `fab-link`, `feedback-form`, `feedback-nav-item`, `list-manager`, `pill-group`, `search-field`,
+     `settings-block`, `settings-row`, `tag-filter-nav`, `tag-manager`, `theme-toggle`.
    `icon-link` is **not** here: Task 6 replaces it with the registry `button` source in `asChild` form.
-   The app-specific blocks `page-shell`, `fab-menu`, `tag-picker`, `trash-block`, `fab-link` are also not
-   here: spec §1 puts them out of scope as composition-only, restyled on the replaced primitives by
-   Tasks 37-39.
-   Composites that own no visual language (`feedback-form`, `feedback-nav-item`, `search-field`,
-   `pill-group`, `settings-block`, `tag-filter-nav`, `editor-*`, `manager-surface`, `manager-block`,
-   managers, matrix) compose the replaced primitives.
-   `autosuggest` is a Combobox (`Popover` + `Command`, `cmdk`) — the user's rule is "if there is
-   a counterpart in shadcn, replace it".
+   `autosuggest` is the Combobox (`Popover` + `Command`, `cmdk`) under the maintainer's rule "if there
+   is a counterpart in shadcn, replace it".
 5. **`select` uses the native-select recipe**, no Radix: native `<select>`, same registry
    provenance, no DOM change, no selector risk.
 6. **`base.css` keeps its frozen blocks** that `tokens.test.ts` asserts verbatim, and keeps owning
@@ -99,14 +100,14 @@ Every task touching primitive markup ends its Verification with **FV**:
 `cmdk` approved, the frozen selector surface revoked, the stylesheet-reading assertions deletable,
 `tab-bar` swapped. No code is edited here.
 **Acceptance criteria:**
-- [ ] The ledger above carries every answer with its source; no row is open
-- [ ] Decision 4's no-counterpart list matches spec §1: every component with no registry copy
+- [x] The ledger above carries every answer with its source; no row is open
+- [x] Decision 4's no-counterpart list matches spec §1: every component with no registry copy
       appears exactly once and no component with a copy appears; no stop condition remains for a stale
       selector, snapshot or stylesheet assertion
 **Verification:**
-- [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
-- [ ] Manual check: no `open` row remains in the ledger
+- [x] Typecheck passes: npm run typecheck
+- [x] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
+- [x] Manual check: no `open` row remains in the ledger
 **Dependencies:** None
 **Files likely touched:** `tasks/plan.md`, `tasks/todo.md`
 **Estimated scope:** Small: 1-2 files
@@ -236,19 +237,30 @@ styling out of `atoms.css`.
 ## Task 8: Convert Checkbox and Switch
 
 **Description:** Replace both with the Radix-backed shadcn `checkbox`/`switch` source (imports
-installed in Task 2), keeping the controlled/uncontrolled prop surface and the
-`ui-checkbox`/`ui-checkbox--checked`/`ui-switch`/`ui-switch--on` compatibility hooks.
+installed in Task 2), keeping the `ui-checkbox`/`ui-checkbox--checked`/`ui-switch`/`ui-switch--on`
+compatibility hooks. The registry checkbox is an interactive control, so `DoneToggle` in
+`apps/app/app/todo-item.tsx` recomposes to render `Checkbox` directly as the toggle — no
+`IconButton` wrapper — with `checked={done}`, `onCheckedChange={onToggle}`, and the frozen
+"Mark … done" text carried by a new upstream `label` prop on `Checkbox` (rendered as
+`aria-label`, mirroring `SwitchProps.label`). `CheckboxProps` must advertise only what the
+implementation honours: add `label?: string`, and add `'defaultChecked'` to the `Omit` so no
+phantom uncontrolled API is typed (the checkbox is controlled like `Switch`);
+`Switch`/`SwitchProps` stay unchanged.
 **Acceptance criteria:**
-- [ ] `Checkbox`/`CheckboxProps`/`Switch`/`SwitchProps` unchanged; the four hooks still render
-- [ ] No `atoms.css` block for either; keyboard and label association still covered by the unmodified suites
+- [ ] `Checkbox`/`Switch` render from the Radix-backed registry source; the four hooks still render
+- [ ] No nested interactive control: the done toggle is one keyboard-operable checkbox button carrying `aria-label="Mark … done"` — no `IconButton` wrapper, no React descendant/hydration errors from the rendered todo row
+- [ ] `CheckboxProps` adds `label?: string` and omits `defaultChecked`; `SwitchProps` unchanged; nothing typed that the implementations do not honour
+- [ ] `apps/app/test/todo-item.test.tsx` asserts the toggle off `ui-icon-btn--ghost` (the checkbox button carries the `aria-label`), and the duplicate comment pair at `markup()` is reduced to the one sentence that the registry `Checkbox` is stateful and needs the real hook
+- [ ] No `atoms.css` block for either; keyboard and label association covered by the updated `apps/app/test/todo-item.test.tsx` and the unmodified `packages/ui` suites
 **Verification:**
 - [ ] Typecheck passes: npm run typecheck
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/checkbox.test.tsx
 - [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/switch.test.tsx
-- [ ] Manual check: `grep -n "ui-checkbox\|ui-switch" packages/ui/src/styles/atoms.css` returns nothing; FV
+- [ ] Focused unit tests pass: npm run test:unit -w @life/app -- test/todo-item.test.tsx
+- [ ] Manual check: `grep -n "ui-checkbox\|ui-switch" packages/ui/src/styles/atoms.css` returns nothing, and a probe render of `TodoItem` shows the checkbox button as the row's only leading button (no nested `<button>`, no React descendant errors); FV
 **Dependencies:** 2, 4
-**Files likely touched:** `packages/ui/src/components/checkbox.tsx`, `packages/ui/src/components/switch.tsx`, `packages/ui/src/styles/atoms.css`
-**Estimated scope:** Medium: 3-5 files
+**Files likely touched:** `packages/ui/src/components/checkbox.tsx`, `packages/ui/src/components/switch.tsx`, `packages/ui/src/styles/atoms.css`, `apps/app/app/todo-item.tsx`, `apps/app/test/todo-item.test.tsx`
+**Estimated scope:** Medium: 4-5 files
 
 ## Task 9: Convert Select to the native-select recipe
 
@@ -540,6 +552,18 @@ stay.
 - [ ] Manual check: `grep -n "ui-autosuggest" packages/ui/src/styles/blocks.css` returns nothing; FV
 **Dependencies:** 4, 7
 **Files likely touched:** `packages/ui/src/components/autosuggest.tsx`, `packages/ui/src/components/command.tsx`, `packages/ui/src/components/popover.tsx`, `packages/ui/test/autosuggest.test.tsx`, `packages/ui/src/styles/blocks.css`
+
+**Decision 5 — `cmdk`'s first-row auto-highlight is suppressed, keeping "no highlight on open".**
+The recipe opens a list with row 1 already selected, so a bare `Enter` or `Tab` right after typing
+picks and clears on a row the user never walked to. The hand-rolled list this replaces opened
+unchosen and ignored `Enter` until a walk happened, and the description requires selection and
+query-reporting behaviour to hold as before. So `Autosuggest` holds the `Command` root's `value`
+at a sentinel no row carries (`NO_ROW`) and returns to it on every query change; the walk then
+only starts on an explicit `ArrowDown`/`Home`/`End`. Reopening on `ArrowDown` still lands on row 1,
+as the hand-rolled list did. The deviation is confined to `autosuggest.tsx`; the vendored
+`command.tsx` keeps the registry behaviour and documents the `value` hook it rides. The
+`ignores Enter with no highlight` case and the selection assertions stay in the suite.
+
 **Estimated scope:** Medium: 3-5 files
 
 ## Task 24: Convert FeedbackForm and FeedbackNavItem
@@ -875,26 +899,26 @@ computed-style assertions stay.
 typecheck across workspaces, every `packages/ui/test/` suite, the Contract 1 greps, the
 `apps/*` diff, and `tokens.test.ts` byte-identical to `origin/dev`.
 **Acceptance criteria:**
-- [ ] `npm run typecheck` green; every `packages/ui/test/` suite green within its 2-run budget
-- [ ] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists only `apps/app/postcss.config.mjs` in
+- [x] `npm run typecheck` green; every `packages/ui/test/` suite green within its 2-run budget
+- [x] `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` lists only `apps/app/postcss.config.mjs` in
       source and, at most, test files whose assertions pinned markup a replacement removed
-- [ ] `tokens.test.ts` byte-identical to `origin/dev`; every replaced component file names its registry item or records that it has no counterpart
+- [x] `tokens.test.ts` byte-identical to `origin/dev`; every replaced component file names its registry item or records that it has no counterpart
 **Verification:**
-- [ ] Typecheck passes: npm run typecheck
-- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
-- [ ] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-parity.test.ts
-- [ ] Manual check: the Contract 1 greps, the `no app re-implementation of a packages/ui component's markup` check, and the `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` output are pasted into `docs/reports/shadcn-primitive-migration-<date>.md`; FV
+- [x] Typecheck passes: npm run typecheck
+- [x] Focused unit tests pass: npm run test:unit -w @life/ui -- test/tokens.test.ts
+- [x] Focused unit tests pass: npm run test:unit -w @life/ui -- test/theme-parity.test.ts
+- [x] Manual check: the Contract 1 greps, the `no app re-implementation of a packages/ui component's markup` check, and the `git diff --name-only origin/dev...HEAD -- 'apps/**/*'` output are pasted into `docs/reports/shadcn-primitive-migration-<date>.md`; FV
 **Dependencies:** 40
 **Files likely touched:** `tasks/plan.md`, `docs/reports/shadcn-primitive-migration-<date>.md`
 **Estimated scope:** Small: 1-2 files
 
 ## Checkpoint: Complete
 
-- [ ] `npm run typecheck` green across all workspaces; every `packages/ui/test/` suite green
-- [ ] `theme-parity.test.ts` proves all 11 frozen colours in light and dark; `tokens.test.ts` byte-identical to `origin/dev`
-- [ ] `atoms.css`/`blocks.css` deleted; no colour literal outside `tokens.css`
-- [ ] No suite reads a deleted stylesheet; no snapshot pins replaced markup
-- [ ] `apps/*` source unchanged beyond the approved PostCSS config; the change stays uncommitted on `pi/wf/shadcn-primitive-migration`
+- [x] `npm run typecheck` green across all workspaces; every `packages/ui/test/` suite green
+- [x] `theme-parity.test.ts` proves all 11 frozen colours in light and dark; `tokens.test.ts` byte-identical to `origin/dev`
+- [x] `atoms.css`/`blocks.css` deleted; no colour literal outside `tokens.css`
+- [x] No suite reads a deleted stylesheet; no snapshot pins replaced markup
+- [x] `apps/*` source unchanged beyond the approved PostCSS config; the change stays uncommitted on `pi/wf/shadcn-primitive-migration`
 
 ## Open Questions
 

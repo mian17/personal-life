@@ -5,6 +5,9 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
+const FAB_SIZE_UTILITY = 'size-[var(--fab-size)]';
+const FAB_RADIUS_UTILITY = 'rounded-full';
+
 describe('FabLink', () => {
   it('renders an anchor (never a button) with href and label as its aria-label', () => {
     render(
@@ -28,13 +31,36 @@ describe('FabLink', () => {
     expect(screen.getByRole('link').contains(screen.getByTestId('icon'))).toBe(true);
   });
 
-  it('uses the ui-fab-link class', () => {
+  it('routes through next/link rather than a bare anchor', () => {
+    render(
+      <FabLink href="/notes/new" label="New note">
+        <span />
+      </FabLink>,
+    );
+    expect(screen.getByRole('link').hasAttribute('data-next-link')).toBe(true);
+  });
+
+  it('carries the ui-fab-link hook alongside the registry button shape', () => {
     render(
       <FabLink href="/" label="Add">
         {<span />}
       </FabLink>,
     );
-    expect(classesOf(screen.getByRole('link'))).toEqual(['ui-fab-link']);
+    const link = screen.getByRole('link');
+    expect(classesOf(link)).toContain('ui-fab-link');
+    expect(link.classList.contains('bg-accent')).toBe(true);
+    expect(link.classList.contains('text-on-accent')).toBe(true);
+  });
+
+  it('expresses the fab size through utilities rather than the --fab-size rule', () => {
+    render(
+      <FabLink href="/" label="Add">
+        {<span />}
+      </FabLink>,
+    );
+    const classes = classesOf(screen.getByRole('link'));
+    expect(classes).toContain(FAB_SIZE_UTILITY);
+    expect(classes).toContain(FAB_RADIUS_UTILITY);
   });
 
   it('merges className instead of replacing it', () => {
@@ -43,7 +69,9 @@ describe('FabLink', () => {
         {<span />}
       </FabLink>,
     );
-    expect(classesOf(screen.getByRole('link'))).toEqual(['legacy-hook', 'ui-fab-link']);
+    const classes = classesOf(screen.getByRole('link'));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-fab-link');
   });
 
   it('keeps the accessible name verbatim', () => {

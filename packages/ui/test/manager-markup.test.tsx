@@ -15,10 +15,16 @@ const noop = () => {};
 
 /**
  * The manager markup is a frozen surface: `ListManager` and `TagManager` share one
- * `ManagerSurface`, and these snapshots are the element-by-element record that the
- * extraction changed nothing. They were captured against `origin/dev` before the
- * extraction and match it byte for byte.
+ * `ManagerSurface`, and these snapshots are the element-by-element record of the rows
+ * both render. The row menu is registry `dropdown-menu` markup, so its trigger opens on
+ * a primary press that jsdom can only express as a mouse event of that type.
  */
+function press(name: string) {
+  fireEvent(
+    screen.getByRole('button', { name: `Actions for ${name}` }),
+    new MouseEvent('pointerdown', { bubbles: true, button: 0 }),
+  );
+}
 function snapshot(node: React.ReactElement, act?: () => void) {
   const { container } = render(node);
   act?.();
@@ -69,7 +75,7 @@ describe('manager markup', () => {
   it('renders the list manager with its menu open', () => {
     snapshot(
       <ListManager lists={LISTS} onCreate={noop} onRename={noop} onDelete={noop} />,
-      () => fireEvent.click(screen.getByRole('button', { name: 'Actions for Groceries' })),
+      () => press('Groceries'),
     );
   });
 
@@ -77,7 +83,7 @@ describe('manager markup', () => {
     snapshot(
       <ListManager lists={LISTS} onCreate={noop} onRename={noop} onDelete={noop} />,
       () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Actions for Groceries' }));
+        press('Groceries');
         fireEvent.click(screen.getByRole('button', { name: 'Rename list Groceries' }));
       },
     );
@@ -109,7 +115,7 @@ describe('manager markup', () => {
   it('renders the tag manager with its menu open', () => {
     snapshot(
       <TagManager tags={TAGS} onCreate={noop} onRename={noop} onDelete={noop} />,
-      () => fireEvent.click(screen.getByRole('button', { name: 'Actions for home' })),
+      () => press('home'),
     );
   });
 
@@ -117,7 +123,7 @@ describe('manager markup', () => {
     snapshot(
       <TagManager tags={TAGS} onCreate={noop} onRename={noop} onDelete={noop} />,
       () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Actions for home' }));
+        press('home');
         fireEvent.click(screen.getByRole('button', { name: 'Rename tag home' }));
       },
     );

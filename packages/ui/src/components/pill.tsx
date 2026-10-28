@@ -1,5 +1,7 @@
+// shadcn/ui registry copy (`badge`), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 import Link from 'next/link';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
+import { cva } from 'class-variance-authority';
 import { X } from 'lucide-react';
 import { cx } from '../lib/cx';
 
@@ -11,7 +13,7 @@ export interface PillProps extends ComponentPropsWithRef<'span'> {
   size?: PillSize;
   /**
    * Semantic modifier for a status/tone-coloured pill, e.g. `'open' | 'done'`.
-   * Must name an existing `.ui-pill--<tone>` rule in `atoms.css`.
+   * Must name a row of `pillToneStyles`; an unknown tone colours nothing.
    */
   tone?: string;
   active?: boolean;
@@ -23,6 +25,41 @@ export interface PillProps extends ComponentPropsWithRef<'span'> {
   removeLabel?: string;
   children?: ReactNode;
 }
+
+/**
+ * Tone → text colour, one row per feedback status (`FEEDBACK_STATUSES` owns the
+ * vocabulary and the token each value maps to). A colour name is its token name
+ * minus `--`, resolved by the `@theme` block in `theme.css`.
+ */
+export const pillToneStyles: Record<string, string> = {
+  open: 'text-accent',
+  in_progress: 'text-amber',
+  done: 'text-green',
+  wont_do: 'text-muted',
+};
+
+/**
+ * The registry `badge` shell, theme-mapped: `chip` is the bordered status chip,
+ * `filter` the borderless navigation pill. Geometry rides the spacing tokens so
+ * both sizes keep the padding and type they carried as hand-written CSS.
+ */
+const pillVariants = cva('inline-flex items-center rounded-full', {
+  variants: {
+    size: {
+      chip: 'gap-[var(--space-0-3)] border border-border px-[var(--space-0-5)] py-[var(--space-0-2)] text-[length:var(--space-0-8)]',
+      filter:
+        'border-0 px-[var(--space-0-7)] py-[var(--space-0-35)] text-[length:var(--space-0-85)] no-underline',
+    },
+  },
+  defaultVariants: { size: 'chip' },
+});
+
+/** Shed only the UA button chrome, so a button pill matches its span/anchor twin. */
+const toggleStyles =
+  'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+const removeStyles =
+  'min-h-0 cursor-pointer rounded-full border-0 bg-transparent px-[var(--space-0-35)] py-0 text-[length:var(--space-0-95)] font-semibold leading-none text-muted hover:text-danger [font-family:inherit]';
 
 export function Pill({
   size = 'chip',
@@ -43,12 +80,20 @@ export function Pill({
   // and patching that with `role`/`tabIndex`/a hand-written Space handler only
   // reimplements what <button> already does.
   const toggles = as === 'button' || (as === 'a' && href == null);
+  // One colour pair per pill, never two competing utilities: an active pill is the
+  // accent fill, otherwise the panel surface with the tone's text colour.
+  const colours = active
+    ? 'bg-accent text-on-accent'
+    : cx('bg-panel', (tone != null && pillToneStyles[tone]) || 'text-muted');
   const classes = cx(
     'ui-pill',
     `ui-pill--${size}`,
     tone != null && `ui-pill--${tone}`,
     toggles && 'ui-pill--button',
     active && 'ui-pill--active',
+    pillVariants({ size }),
+    colours,
+    toggles && toggleStyles,
     className,
   );
 
@@ -58,7 +103,13 @@ export function Pill({
     // rendered here (a button inside a button is invalid HTML).
     const buttonProps = rest as unknown as ComponentPropsWithRef<'button'>;
     return (
-      <button type={buttonType} className={classes} disabled={disabled} {...buttonProps}>
+      <button
+        type={buttonType}
+        data-slot="badge"
+        className={classes}
+        disabled={disabled}
+        {...buttonProps}
+      >
         {children}
       </button>
     );
@@ -70,7 +121,7 @@ export function Pill({
       {onRemove && (
         <button
           type="button"
-          className="ui-pill__remove"
+          className={cx('ui-pill__remove', removeStyles)}
           aria-label={removeLabel}
           onClick={onRemove}
         >
@@ -84,14 +135,14 @@ export function Pill({
     // The no-href case was handled above as a button, so this branch always navigates.
     const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
     return (
-      <Link href={href} className={classes} {...linkProps}>
+      <Link href={href} data-slot="badge" className={classes} {...linkProps}>
         {content}
       </Link>
     );
   }
 
   return (
-    <span className={classes} {...rest}>
+    <span data-slot="badge" className={classes} {...rest}>
       {content}
     </span>
   );

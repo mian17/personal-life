@@ -1,18 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { render } from '@testing-library/react';
 import { SettingsRow } from '../src/components/settings-row';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
-}
-
-function cssBlock(selector: string): string {
-  const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-  return (
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-      [])[1] ?? ''
-  );
 }
 
 describe('SettingsRow', () => {
@@ -40,7 +30,7 @@ describe('SettingsRow', () => {
     );
     const desc = document.querySelector('.ui-settings-row__desc')!;
     expect(desc.textContent).toBe('System, light, or dark.');
-    expect(cssBlock('.ui-settings-row__desc')).toMatch(/color:\s*var\(--muted\)/);
+    expect(desc.classList.contains('text-muted')).toBe(true);
   });
 
   it('omits the description when undefined', () => {
@@ -50,33 +40,25 @@ describe('SettingsRow', () => {
 
   it('merges className instead of replacing the base class', () => {
     render(<SettingsRow label="Theme" control={<span />} className="legacy-hook" />);
-    expect(classesOf(document.querySelector('.ui-settings-row')!)).toEqual([
-      'legacy-hook',
-      'ui-settings-row',
-    ]);
+    expect(classesOf(document.querySelector('.ui-settings-row')!)).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-settings-row']),
+    );
   });
 
-  // The narrow-screen rule lives in a `@media` block — jsdom never applies
-  // media queries, so the emitted rule text is the assertion surface (lesson
-  // 0025): the CSS is what a narrow device renders.
+  // jsdom never applies media queries, so the narrow-screen behaviour is read
+  // off the classes the row carries: `max-sm` is what a narrow device renders.
   describe('responsive stacking', () => {
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
+    it('keeps the two-column default and stacks below sm', () => {
+      render(<SettingsRow label="Theme" control={<span />} />);
+      const row = document.querySelector('.ui-settings-row')!;
 
-    it('emits the two-column default and the sm stacking override', () => {
       // Default (>= sm): label left, control right, row stays a row.
-      const base = cssBlock('.ui-settings-row');
-      expect(base).toMatch(/display:\s*flex/);
-      expect(base).not.toMatch(/flex-direction:\s*column/);
+      expect(row.classList.contains('flex')).toBe(true);
+      expect(row.classList.contains('flex-col')).toBe(false);
 
-      // Below sm (640px): the row stacks — label above a full-width control.
-      const media = css.match(/@media\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}/)!;
-      expect(media).not.toBeNull();
-      const stacked = media[1];
-      expect(stacked).toMatch(/\.ui-settings-row\s*\{/);
-      expect(stacked).toMatch(/flex-direction:\s*column/);
-      expect(stacked).toMatch(/align-items:\s*stretch/);
-      // The breakpoint is the documented sm value, named in the CSS.
-      expect(css).toMatch(/sm — 640px/);
+      // Below sm: the row stacks — label above a full-width control.
+      expect(row.classList.contains('max-sm:flex-col')).toBe(true);
+      expect(row.classList.contains('max-sm:items-stretch')).toBe(true);
     });
   });
 });

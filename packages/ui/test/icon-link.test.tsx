@@ -30,9 +30,12 @@ describe('IconLink', () => {
     );
   });
 
-  it('uses only the ui-icon-link class by default', () => {
+  it('carries the ui-icon-link hook alongside the registry square', () => {
     render(<IconLink href="/" label="Back">{<span />}</IconLink>);
-    expect(classesOf(screen.getByRole('link'))).toEqual(['ui-icon-link']);
+    const link = screen.getByRole('link');
+    expect(link.classList.contains('ui-icon-link')).toBe(true);
+    expect(link.classList.contains('size-10')).toBe(true);
+    expect(link.classList.contains('bg-panel')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {
@@ -41,7 +44,9 @@ describe('IconLink', () => {
         {<span />}
       </IconLink>,
     );
-    expect(classesOf(screen.getByRole('link'))).toEqual(['legacy-hook', 'ui-icon-link']);
+    const link = screen.getByRole('link');
+    expect(classesOf(link)).toContain('legacy-hook');
+    expect(link.classList.contains('ui-icon-link')).toBe(true);
   });
 
   it('keeps the accessible name verbatim', () => {

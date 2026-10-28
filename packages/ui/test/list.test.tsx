@@ -1,12 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { List } from '../src/components/list';
 
+const STACKING_UTILITY = 'grid';
+const LIST_RESET_UTILITY = 'list-none';
+
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
 describe('List', () => {
-  it('renders a <ul> list landmark with the ui-list class', () => {
+  it('renders a <ul> list landmark with the ui-list hook', () => {
     render(
       <List>
         <li>row</li>
@@ -14,7 +17,20 @@ describe('List', () => {
     );
     const ul = screen.getByRole('list');
     expect(ul.tagName).toBe('UL');
-    expect(classesOf(ul)).toEqual(['ui-list']);
+    expect(classesOf(ul)).toContain('ui-list');
+  });
+
+  it('takes its stacking from utilities rather than a stylesheet rule', () => {
+    render(
+      <List>
+        <li>row</li>
+      </List>,
+    );
+    const classes = classesOf(screen.getByRole('list'));
+    expect(classes).toContain(STACKING_UTILITY);
+    // The browser's own bullet, indent and margin are cleared on the element itself:
+    // `base.css` resets the document box only.
+    expect(classes).toContain(LIST_RESET_UTILITY);
   });
 
   it('renders its list items inside the ul', () => {
@@ -35,7 +51,9 @@ describe('List', () => {
         <li>row</li>
       </List>,
     );
-    expect(classesOf(screen.getByRole('list'))).toEqual(['legacy-hook', 'ui-list']);
+    const classes = classesOf(screen.getByRole('list'));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-list');
   });
 
   it('forwards arbitrary attributes', () => {

@@ -2,24 +2,20 @@ import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Textarea, type TextareaVariant } from '../src/components/textarea';
 
-function classesOf(el: Element): string[] {
-  return el.className.split(/\s+/).filter(Boolean).sort();
-}
-
 describe('Textarea', () => {
-  it('renders a <textarea> carrying only the base class for the default variant', () => {
+  it('renders a <textarea> carrying the base hook and not the editor modifier by default', () => {
     render(<Textarea aria-label="Note body" />);
     const textarea = screen.getByLabelText('Note body');
     expect(textarea.tagName).toBe('TEXTAREA');
-    expect(classesOf(textarea)).toEqual(['ui-textarea']);
+    expect(textarea.classList.contains('ui-textarea')).toBe(true);
+    expect(textarea.classList.contains('ui-textarea--editor')).toBe(false);
   });
 
   it('adds the editor modifier for variant="editor"', () => {
     render(<Textarea aria-label="Note body" variant="editor" />);
-    expect(classesOf(screen.getByLabelText('Note body'))).toEqual([
-      'ui-textarea',
-      'ui-textarea--editor',
-    ]);
+    const textarea = screen.getByLabelText('Note body');
+    expect(textarea.classList.contains('ui-textarea')).toBe(true);
+    expect(textarea.classList.contains('ui-textarea--editor')).toBe(true);
   });
 
   it.each<TextareaVariant>(['default', 'editor'])(
@@ -56,11 +52,10 @@ describe('Textarea', () => {
 
   it('merges className instead of replacing it', () => {
     render(<Textarea aria-label="body" variant="editor" className="legacy-hook" />);
-    expect(classesOf(screen.getByLabelText('body'))).toEqual([
-      'legacy-hook',
-      'ui-textarea',
-      'ui-textarea--editor',
-    ]);
+    const textarea = screen.getByLabelText('body');
+    expect(textarea.classList.contains('ui-textarea')).toBe(true);
+    expect(textarea.classList.contains('ui-textarea--editor')).toBe(true);
+    expect(textarea.classList.contains('legacy-hook')).toBe(true);
   });
 
   it('forwards a ref to the rendered element', () => {

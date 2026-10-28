@@ -28,22 +28,59 @@ export interface MatrixBlockProps {
   className?: string;
 }
 
+/**
+ * The 2×2 grid, unconditional at every width. `minmax(0, 1fr)` tracks keep a long
+ * word from widening a column; `auto-rows-[minmax(0,1fr)]` gives both rows equal
+ * height so an empty quadrant matches a populated one, bounded so a tall cell
+ * scrolls inside its box instead of lengthening the matrix (a bare `1fr` is
+ * `minmax(auto, 1fr)`, which would grow).
+ */
+const gridStyles =
+  'grid grid-cols-[repeat(2,minmax(0,1fr))] auto-rows-[minmax(0,1fr)] gap-[var(--space-0-5)]';
+
+/** A muted panel, separated from its siblings by the grid gap alone — no outer frame. */
+const quadrantStyles =
+  'flex flex-col gap-[var(--space-0-5)] p-[var(--space-1)] min-h-[var(--space-5)] max-h-full overflow-hidden bg-panel rounded-[var(--radius-lg)]';
+
+/** The heading keeps one line: a long label ellipsizes rather than widening the panel. */
+const labelStyles = 'm-0 truncate text-[length:var(--space-0-7)] font-bold';
+
+/** Heading tint per quadrant tone (off by default). */
+const labelToneStyles: Record<MatrixTone, string> = {
+  danger: 'text-danger',
+  amber: 'text-amber',
+  accent: 'text-accent',
+  green: 'text-green',
+};
+
+/** Overflowing content scrolls inside the box; the heading stays put. */
+const itemsStyles = 'grid gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto';
+
+/** Empty quadrant: muted and centred in the remaining box height. */
+const emptyStyles = 'flex-1 grid place-content-center m-0 text-muted text-center text-[length:var(--space-0-85)]';
+
+function quadrantClassName(quadrant: MatrixQuadrant): string {
+  return cx(
+    'ui-matrix__quadrant',
+    quadrantStyles,
+    quadrant.tone && `ui-matrix__quadrant--${quadrant.tone}`,
+  );
+}
+
+function labelClassName(tone: MatrixTone | undefined): string {
+  return cx('ui-matrix__label', labelStyles, tone && labelToneStyles[tone]);
+}
+
 export function MatrixBlock({ quadrants, className }: Readonly<MatrixBlockProps>): JSX.Element {
   return (
-    <div className={cx('ui-matrix', className)}>
+    <div className={cx('ui-matrix', gridStyles, className)}>
       {quadrants.map((quadrant) => (
-        <section
-          key={quadrant.id}
-          className={cx(
-            'ui-matrix__quadrant',
-            quadrant.tone && `ui-matrix__quadrant--${quadrant.tone}`,
-          )}
-        >
-          <h2 className="ui-matrix__label">{quadrant.label}</h2>
+        <section key={quadrant.id} className={quadrantClassName(quadrant)}>
+          <h2 className={labelClassName(quadrant.tone)}>{quadrant.label}</h2>
           {quadrant.items != null ? (
-            <div className="ui-matrix__items">{quadrant.items}</div>
+            <div className={cx('ui-matrix__items', itemsStyles)}>{quadrant.items}</div>
           ) : (
-            <p className="ui-matrix__empty">{quadrant.empty}</p>
+            <p className={cx('ui-matrix__empty', emptyStyles)}>{quadrant.empty}</p>
           )}
         </section>
       ))}

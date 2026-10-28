@@ -5,12 +5,26 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
+const BAR_UTILITY = 'flex';
+const ACTIONS_UTILITY = 'ml-auto';
+
 describe('NavBar', () => {
-  it('renders a <nav> landmark with the ui-nav-bar class', () => {
+  it('renders a <nav> landmark with the ui-nav-bar hook', () => {
     render(<NavBar />);
     const nav = screen.getByRole('navigation');
     expect(nav.tagName).toBe('NAV');
-    expect(classesOf(nav)).toEqual(['ui-nav-bar']);
+    expect(classesOf(nav)).toContain('ui-nav-bar');
+  });
+
+  it('takes its row geometry from utilities rather than a stylesheet rule', () => {
+    render(<NavBar />);
+    expect(classesOf(screen.getByRole('navigation'))).toContain(BAR_UTILITY);
+  });
+
+  it('pushes the actions slot to the trailing edge with a utility', () => {
+    render(<NavBar trailing={<span />} />);
+    const actions = document.querySelector('.ui-nav-bar__actions')!;
+    expect(classesOf(actions)).toContain(ACTIONS_UTILITY);
   });
 
   it('renders the trailing slot inside the ui-nav-bar__actions slot', () => {
@@ -41,6 +55,8 @@ describe('NavBar', () => {
 
   it('merges className instead of replacing it', () => {
     render(<NavBar className="legacy-hook" />);
-    expect(classesOf(screen.getByRole('navigation'))).toEqual(['legacy-hook', 'ui-nav-bar']);
+    const classes = classesOf(screen.getByRole('navigation'));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-nav-bar');
   });
 });

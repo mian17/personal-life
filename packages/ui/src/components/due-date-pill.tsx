@@ -40,11 +40,26 @@ export function DueDatePill({
 
   return (
     <span
-      className={cx('ui-due-pill', `ui-due-pill--${state}`, className)}
+      className={cx(
+        'ui-due-pill text-[length:var(--space-0-85)]',
+        stateColour(state),
+        `ui-due-pill--${state}`,
+        className,
+      )}
       data-state={state}
       {...rest}
     >
       {dated ? <time dateTime={dueDate ?? undefined}>{dueDate}</time> : emptyLabel}
     </span>
   );
+}
+
+/**
+ * State → text colour: overdue is the only state that earns the danger colour,
+ * today is accented, and an absent or later date stays muted.
+ */
+function stateColour(state: DueDateState): string {
+  if (state === 'overdue') return 'text-danger';
+  if (state === 'today') return 'text-accent';
+  return 'text-muted';
 }

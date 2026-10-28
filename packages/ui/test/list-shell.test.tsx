@@ -1,16 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { ListShell } from '../src/components/list-shell';
 
-const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-
-function cssBlock(selector: string): string {
-  return (
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-      [])[1] ?? ''
-  );
-}
+const FILL_PAGE_UTILITIES = ['flex', 'flex-col', 'h-[100dvh]', 'overflow-hidden'];
+const FILL_BODY_UTILITIES = ['flex-1', 'min-h-0', 'grid', '[grid-template-rows:minmax(0,1fr)]'];
 
 function order(root: Element): string[] {
   return Array.from(root.children).map((child) =>
@@ -158,24 +150,30 @@ describe('ListShell', () => {
     expect(wrapper.querySelector('[data-testid="body"]')!.textContent).toBe('nothing here yet');
   });
 
-  it('the fill CSS makes the page a full-height column and the body grow (tokens only)', () => {
-    const page = cssBlock('.ui-page.ui-list-shell--fill');
-    expect(page).toMatch(/display:\s*flex/);
-    expect(page).toMatch(/flex-direction:\s*column/);
-    // Definite height, not min-height: a definite `100dvh` bounds the matrix quadrants.
-    expect(page).toMatch(/(?<!min-)height:\s*100dvh/);
-    expect(page).toMatch(/overflow:\s*hidden/);
+  it('the fill utilities make the page a full-height column and the body grow', () => {
+    const { container } = render(
+      <ListShell
+        title="Matrix"
+        body={<span data-testid="body" />}
+        fabHref="/todos/new"
+        fabLabel="New todo"
+        fabIcon={<span />}
+        fill
+      />,
+    );
 
-    const body = cssBlock('.ui-list-shell__body');
-    expect(body).toMatch(/flex:\s*1/);
-    expect(body).toMatch(/min-height:\s*0/);
-    // Bounded row track: a bare `1fr` (= minmax(auto,1fr)) would let an
-    // overflowing child grow the body instead of scrolling inside it.
-    expect(body).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\)/);
+    const page = container.querySelector('.ui-page')!;
+    for (const utility of FILL_PAGE_UTILITIES) {
+      expect(page.classList.contains(utility)).toBe(true);
+    }
 
-    // Guard: the fill declarations resolve through tokens/allowed keywords, never raw px/hex/rgb.
-    const declarations = `${page}${body}`;
-    expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
-    expect(declarations).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
+    const body = container.querySelector('.ui-list-shell__body')!;
+    for (const utility of FILL_BODY_UTILITIES) {
+      expect(body.classList.contains(utility)).toBe(true);
+    }
+
+    // Guard: the fill geometry resolves through keywords/tokens, never a raw px/hex/rgb value.
+    const classes = `${page.className} ${body.className}`;
+    expect(classes).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(|\b\d+(?:\.\d+)?px\b/);
   });
 });

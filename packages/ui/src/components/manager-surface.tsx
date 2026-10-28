@@ -37,11 +37,32 @@ export interface ManagerSurfaceProps<T extends ManagerItem>
   onDelete: (id: T['id']) => void;
 }
 
+/** The create field sits on one line: the input takes the width, the button follows. */
+const createStyles = 'flex items-center gap-[var(--space-0-5)]';
+
+/** Rows stack below the create field, clear of the browser's list box and markers. */
+const listStyles = 'list-none m-[var(--space-0-5)_0_0] p-0 grid gap-[var(--space-0-4)]';
+
+/** One row is one line: the menu takes the width, so the actions stay at the far end. */
+const rowStyles = 'flex items-center gap-[var(--space-0-5)]';
+
+/** The row menu is the row's only width-taking child. */
+const menuStyles = 'flex-1 min-w-0';
+
+/** The inline rename editor stands in for the row, so it takes the row's width. */
+const editStyles = 'flex items-center gap-[var(--space-0-5)] flex-1';
+
+/** The name fills the summary line and ellipsizes rather than pushing the trigger out. */
+const nameStyles = 'flex-1 min-w-0';
+
 /**
  * The manager row surface shared by `ListManager` and `TagManager`
  * (`SPEC-ui-managers`): a create field, then one row per item with an inline
  * rename editor and a menu holding the row actions. The two managers differ only
  * in the noun, the id type, and the BEM base, so all three are parameters.
+ *
+ * Each element keeps its `${classPrefix}__*` hook beside its utilities: the frozen
+ * selector surface is those hooks, so the layout rides classes and the hooks stay bare.
  */
 export function ManagerSurface<T extends ManagerItem>({
   items,
@@ -82,17 +103,17 @@ export function ManagerSurface<T extends ManagerItem>({
   return (
     <div className={cx(classPrefix, className)} aria-label={label} {...rest}>
       <CreateField
-        className={`${classPrefix}__create`}
+        className={cx(`${classPrefix}__create`, createStyles)}
         placeholder={placeholder}
         createLabel={createLabel}
         disabled={disabled}
         onCreate={create}
       />
-      <ul className={`${classPrefix}__list`}>
+      <ul className={cx(`${classPrefix}__list`, listStyles)}>
         {items.map((item) => (
-          <li key={item.id} className={`${classPrefix}__row`}>
+          <li key={item.id} className={cx(`${classPrefix}__row`, rowStyles)}>
             {editingId === item.id ? (
-              <div className={`${classPrefix}__edit`}>
+              <div className={cx(`${classPrefix}__edit`, editStyles)}>
                 <Input
                   type="text"
                   aria-label={`Rename ${noun} ${item.name}`}
@@ -119,8 +140,9 @@ export function ManagerSurface<T extends ManagerItem>({
               </div>
             ) : (
               <Menu
+                className={menuStyles}
                 label={`Actions for ${item.name}`}
-                summary={<span className={`${classPrefix}__name`}>{item.name}</span>}
+                summary={<span className={cx(`${classPrefix}__name`, nameStyles)}>{item.name}</span>}
                 open={openId === item.id}
                 onOpenChange={(next) => setOpenId(next ? item.id : null)}
                 disabled={disabled}

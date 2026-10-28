@@ -1,6 +1,8 @@
+// shadcn/ui registry copy (`dialog`), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cx } from '../lib/cx';
@@ -17,6 +19,48 @@ export interface DialogProps {
   className?: string;
 }
 
+/**
+ * The registry overlay and panel, theme-mapped: the scrim is the page colour at half strength,
+ * so no colour literal enters our sheets, and the geometry rides the token spacing scale. Radix
+ * portals the panel into the top layer, where an ancestor's `overflow: hidden` cannot clip it,
+ * and owns the focus trap and Escape handling.
+ */
+const dialogOverlay = 'fixed inset-0 z-50 bg-bg/50';
+
+const dialogPanel = cx(
+  'fixed z-50 flex flex-col gap-[var(--space-1)]',
+  'border border-border bg-panel p-[var(--space-1)] text-text',
+  'shadow-[var(--shadow-fab)]',
+);
+
+const centredPanel = cx(
+  'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+  'w-[calc(100%-var(--space-2))] max-w-[var(--content-width)]',
+  'rounded-[var(--radius-lg)]',
+);
+
+/** Full-screen sheet: edge-to-edge and square-cornered, `100dvh` tracking the mobile viewport. */
+const sheetPanel = 'inset-0 h-[100dvh] w-full rounded-none';
+
+const dialogHeader = cx(
+  'ui-dialog__head',
+  'flex items-center justify-between gap-[var(--space-0-5)] mb-[var(--space-1)]',
+);
+
+const dialogTitle = cx('ui-dialog__title', 'm-0 text-[length:var(--space-1-25)] font-bold');
+
+const dialogBody = cx('ui-dialog__body', 'flex flex-col gap-[var(--space-1)]');
+
+const dialogFooter = cx(
+  'ui-dialog__footer',
+  'flex justify-end gap-[var(--space-0-5)] mt-[var(--space-1)]',
+);
+
+/** The element holding focus right now, or nothing when focus sits nowhere focusable. */
+function focusedElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
 export function Dialog({
   open,
   onOpenChange,
@@ -26,63 +70,44 @@ export function Dialog({
   size = 'default',
   className,
 }: Readonly<DialogProps>) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  // Radix would hand focus back to its own trigger, which a controlled surface never renders, so
+  // the opener is remembered as the panel takes focus and handed back once it has closed.
+  const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    // The native element owns the modal state; this component never mirrors it.
-    if (open) {
-      el.showModal();
-    } else {
-      el.close();
-    }
-
-    const handleClose = () => {
-      // The `close` event also fires for the close() we just issued; only a
-      // platform-initiated close (Escape/backdrop) may bubble up.
-      if (open) onOpenChange(false);
-    };
-    // A native listener rather than an `onClick` JSX prop: `<dialog>` is a
-    // non-interactive element, so a click handler belongs on the element itself.
-    const handleBackdropClick = (e: MouseEvent) => {
-      // Only a click on the dialog's own backdrop, outside its box, closes it;
-      // clicks on child content (incl. keyboard-activated controls) do not.
-      if (e.target !== el) return;
-      const rect = el.getBoundingClientRect();
-      const outside =
-        e.clientX < rect.left ||
-        e.clientX > rect.right ||
-        e.clientY < rect.top ||
-        e.clientY > rect.bottom;
-      if (outside) onOpenChange(false);
-    };
-    el.addEventListener('close', handleClose);
-    el.addEventListener('click', handleBackdropClick);
-    return () => {
-      el.removeEventListener('close', handleClose);
-      el.removeEventListener('click', handleBackdropClick);
-    };
-  }, [open, onOpenChange]);
+    if (!open) openerRef.current?.focus();
+  }, [open]);
 
   return (
-    <dialog
-      ref={ref}
-      className={cx('ui-dialog', size === 'full' && 'ui-dialog--full', className)}
-      aria-labelledby={titleId}
-    >
-      <div className="ui-dialog__head">
-        <h2 className="ui-dialog__title" id={titleId}>
-          {title}
-        </h2>
-        <IconButton label="Close" onClick={() => onOpenChange(false)}>
-          <X size={20} aria-hidden />
-        </IconButton>
-      </div>
-      <div className="ui-dialog__body">{children}</div>
-      {footer != null && <div className="ui-dialog__footer">{footer}</div>}
-    </dialog>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay data-slot="dialog-overlay" className={dialogOverlay} />
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          aria-describedby={undefined}
+          onOpenAutoFocus={() => {
+            openerRef.current = focusedElement();
+          }}
+          className={cx(
+            'ui-dialog',
+            size === 'full' && 'ui-dialog--full',
+            dialogPanel,
+            size === 'full' ? sheetPanel : centredPanel,
+            className,
+          )}
+        >
+          <div className={dialogHeader}>
+            <DialogPrimitive.Title className={dialogTitle}>{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <IconButton label="Close">
+                <X size={20} aria-hidden />
+              </IconButton>
+            </DialogPrimitive.Close>
+          </div>
+          <div className={dialogBody}>{children}</div>
+          {footer != null && <div className={dialogFooter}>{footer}</div>}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

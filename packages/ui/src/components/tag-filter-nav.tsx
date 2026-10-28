@@ -17,22 +17,23 @@ export interface TagFilterNavProps {
   'aria-label'?: string;
 }
 
+/** The nav's own geometry: pills wrap on one baseline, with a row's breathing room. */
+const navStyles =
+  'flex flex-wrap items-baseline gap-[var(--space-0-5)] my-[var(--space-1-25)]';
+
+/** A quiet row caption: same size and colour the retired `.ui-field-label` rule gave. */
+const labelStyles = 'shrink-0 text-muted text-[length:var(--space-0-85)]';
+
 export function TagFilterNav({ items, label, className, ...rest }: Readonly<TagFilterNavProps>) {
   return (
     <nav
-      className={cx('ui-tag-filter-nav', className)}
+      className={cx('ui-tag-filter-nav', navStyles, className)}
       aria-label={rest['aria-label'] ?? label}
       {...rest}
     >
-      {label != null && <span className="ui-field-label">{label}</span>}
+      {label != null && <span className={cx('ui-field-label', labelStyles)}>{label}</span>}
       {items.map((item) => (
-        <Pill
-          key={item.name}
-          as="a"
-          size="filter"
-          href={item.href}
-          active={item.active}
-        >
+        <Pill key={item.name} as="a" size="filter" href={item.href} active={item.active}>
           {item.name}
         </Pill>
       ))}

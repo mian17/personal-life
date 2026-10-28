@@ -1,4 +1,4 @@
-import { dueDateState, todayIso } from './due-date-pill';
+import { dueDateState, todayIso, type DueDateState } from './due-date-pill';
 import { dueDateLabel } from '../lib/format-date';
 import { cx } from '../lib/cx';
 
@@ -15,8 +15,8 @@ export interface DueDateProps {
 
 /**
  * Presentational due-date read-out. Renders the shared dd/mm/yyyy / Today /
- * Tomorrow label (lesson 0003: one owner for frontend date reads) and exposes
- * the grouping state as a class so CSS can colour it.
+ * Tomorrow label (lesson 0003: one owner for frontend date reads) and colours the
+ * grouping state through the token utilities.
  */
 export function DueDate({ dueDate, today, tone = 'plain', className }: Readonly<DueDateProps>) {
   const state = dueDateState(dueDate, today ?? todayIso());
@@ -25,6 +25,7 @@ export function DueDate({ dueDate, today, tone = 'plain', className }: Readonly<
     <span
       className={cx(
         'ui-due-date',
+        toneColour(tone, state),
         `ui-due-date--${state}`,
         tone === 'signal' && 'ui-due-date--signal',
         className,
@@ -33,4 +34,15 @@ export function DueDate({ dueDate, today, tone = 'plain', className }: Readonly<
       {dueDateLabel(dueDate, today)}
     </span>
   );
+}
+
+/**
+ * Signal tone → colour: overdue earns the deep danger red, any other dated read-out
+ * the lighter red. `plain` is muted, and so is an undated read-out either way.
+ */
+function toneColour(tone: DueDateTone, state: DueDateState): string {
+  if (tone === 'plain') return 'text-muted';
+  if (state === 'none') return 'text-muted';
+  if (state === 'overdue') return 'text-danger';
+  return 'text-danger-soft';
 }

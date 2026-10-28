@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { render } from '@testing-library/react';
 import { DueDate } from '../src/components/due-date';
 
@@ -52,38 +50,5 @@ describe('DueDate', () => {
   it('merges className', () => {
     render(<DueDate dueDate="2026-10-02" today="2026-10-02" className="legacy-hook" />);
     expect(rootOf().classList.contains('legacy-hook')).toBe(true);
-  });
-});
-
-describe('DueDate CSS (atoms.css)', () => {
-  const css = readFileSync(join(__dirname, '..', 'src/styles/atoms.css'), 'utf8');
-  const start = css.indexOf('/* ------------------------------------------------- DueDate */');
-  const end = css.indexOf('/* ------------------------------------------------------------- Switch */');
-  const section = css.slice(start, end);
-
-  it('finds the DueDate section', () => {
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(end).toBeGreaterThan(start);
-  });
-
-  it('base rule is muted via the token', () => {
-    expect(section).toMatch(/\.ui-due-date\s*\{\s*color:\s*var\(--muted\);\s*\}/);
-  });
-
-  it('signal overdue uses the danger token', () => {
-    expect(section).toMatch(
-      /\.ui-due-date--signal\.ui-due-date--overdue\s*\{\s*color:\s*var\(--danger\);\s*\}/,
-    );
-  });
-
-  it('signal today and later use the danger-soft token', () => {
-    expect(section).toMatch(
-      /\.ui-due-date--signal\.ui-due-date--today,\s*\n?\s*\.ui-due-date--signal\.ui-due-date--later\s*\{\s*color:\s*var\(--danger-soft\);\s*\}/,
-    );
-  });
-
-  it('contains no raw hex or px values', () => {
-    expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(section).not.toMatch(/\d+px\b/);
   });
 });

@@ -1,11 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { IconButton } from '../src/components/icon-button';
-
-function classesOf(el: Element): string[] {
-  return el.className.split(/\s+/).filter(Boolean).sort();
-}
 
 describe('IconButton', () => {
   it('renders a type="button" <button> with the label as its aria-label', () => {
@@ -22,9 +16,11 @@ describe('IconButton', () => {
     expect(button.contains(screen.getByTestId('icon'))).toBe(true);
   });
 
-  it('uses only the base class for the default variant', () => {
+  it('carries the base hook and no modifier for the default variant', () => {
     render(<IconButton label="Back">{<span />}</IconButton>);
-    expect(classesOf(screen.getByRole('button'))).toEqual(['ui-icon-btn']);
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('ui-icon-btn')).toBe(true);
+    expect(button.classList.contains('ui-icon-btn--ghost')).toBe(false);
   });
 
   it('adds the variant modifier for non-default variants', () => {
@@ -33,7 +29,9 @@ describe('IconButton', () => {
         {<span />}
       </IconButton>,
     );
-    expect(classesOf(screen.getByRole('button'))).toEqual(['ui-icon-btn', 'ui-icon-btn--ghost']);
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('ui-icon-btn')).toBe(true);
+    expect(button.classList.contains('ui-icon-btn--ghost')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {
@@ -42,13 +40,12 @@ describe('IconButton', () => {
         {<span />}
       </IconButton>,
     );
-    expect(classesOf(screen.getByRole('button'))).toEqual([
-      'legacy-hook',
-      'ui-icon-btn',
-    ]);
+    const classes = screen.getByRole('button').classList;
+    expect(classes.contains('ui-icon-btn')).toBe(true);
+    expect(classes.contains('legacy-hook')).toBe(true);
   });
 
-  it('forwards disabled and renders its treatment at the cascade level', () => {
+  it('forwards disabled and carries its treatment on the rendered element', () => {
     render(
       <IconButton label="Save" disabled>
         {<span />}
@@ -56,11 +53,8 @@ describe('IconButton', () => {
     );
     const button = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'atoms.css'), 'utf8');
-    const block = (css.match(/\.ui-icon-btn\[disabled\]\s*\{([^}]*)\}/) ?? [])[1] ?? '';
-    expect(block).toMatch(/opacity:\s*0?\.5/);
-    expect(block).toMatch(/cursor:\s*not-allowed/);
+    expect(button.classList.contains('disabled:opacity-50')).toBe(true);
+    expect(button.classList.contains('disabled:cursor-not-allowed')).toBe(true);
   });
 
   it('forwards onClick and arbitrary attributes', () => {

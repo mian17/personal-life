@@ -1,13 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Autosuggest } from '../src/components/autosuggest';
 import type { AutosuggestOption, AutosuggestProps } from '../src/components/autosuggest';
 
-// jsdom 20 has no `showPopover`/`hidePopover` (where the popup lands is the
-// browser's business); the suite stubs them so the component's call order is
-// observable, the same way the Dialog suite stubs `showModal`/`close`.
-type PopoverStub = { showPopover: jest.Mock; hidePopover: jest.Mock };
+/**
+ * jsdom has no layout and no `ResizeObserver`; `cmdk`'s list measures itself to publish
+ * `--cmdk-list-height`, and the suite is not the judge of a height.
+ */
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
 
 const OPTIONS: AutosuggestOption[] = [
   { id: 'apple', label: 'Apple', meta: 'per 100 g · 52 kcal' },
@@ -15,8 +18,6 @@ const OPTIONS: AutosuggestOption[] = [
   { id: 'cherry', label: 'Cherry' },
 ];
 
-const showPopover = jest.fn();
-const hidePopover = jest.fn();
 const scrollIntoView = jest.fn();
 
 function setup(overrides: Partial<AutosuggestProps> = {}) {
@@ -39,18 +40,19 @@ function type(input: HTMLInputElement, value: string) {
   fireEvent.change(input, { target: { value } });
 }
 
-function rowItems() {
-  return screen.getAllByRole('option');
+function rows() {
+  return screen.queryAllByRole('option');
+}
+
+/** The row `aria-activedescendant` points at: the highlight `cmdk` owns and the field names. */
+function activeRow(input: HTMLInputElement) {
+  const id = input.getAttribute('aria-activedescendant');
+  return id == null ? null : document.getElementById(id);
 }
 
 beforeEach(() => {
-  showPopover.mockClear();
-  hidePopover.mockClear();
   scrollIntoView.mockClear();
-  (HTMLElement.prototype as unknown as PopoverStub).showPopover = showPopover;
-  (HTMLElement.prototype as unknown as PopoverStub).hidePopover = hidePopover;
-  // jsdom has no layout; the block still has to ask the browser to keep the
-  // highlighted row on screen, so the call is what the suite can observe.
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
   (Element.prototype as unknown as { scrollIntoView: jest.Mock }).scrollIntoView = scrollIntoView;
 });
 
@@ -65,10 +67,8 @@ describe('Autosuggest', () => {
     expect(input.value).toBe('');
     expect(input.getAttribute('aria-autocomplete')).toBe('list');
     expect(input.getAttribute('aria-expanded')).toBe('false');
-    expect(input.getAttribute('aria-controls')).toBeTruthy();
     expect(input.getAttribute('aria-activedescendant')).toBeNull();
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(showPopover).not.toHaveBeenCalled();
   });
 
   it('stays closed and reports "" below minChars', () => {
@@ -89,41 +89,9 @@ describe('Autosuggest', () => {
     expect(onQueryChange).toHaveBeenLastCalledWith('app');
     expect(screen.getByRole('listbox')).toBeTruthy();
     expect(input.getAttribute('aria-expanded')).toBe('true');
-    expect(rowItems()).toHaveLength(3);
+    expect(input.getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id);
+    expect(rows()).toHaveLength(3);
     expect(screen.getByText('per 100 g · 52 kcal')).toBeTruthy();
-  });
-
-  it('lifts the list into the top layer as a native popover', () => {
-    const { input, view } = setup();
-
-    type(input, 'app');
-    const popup = screen.getByRole('listbox');
-    expect(popup.getAttribute('popover')).toBe('manual');
-    expect(showPopover).toHaveBeenCalledTimes(1);
-    expect(showPopover.mock.contexts[0]).toBe(popup);
-
-    view.unmount();
-    expect(hidePopover).toHaveBeenCalledTimes(1);
-    expect(hidePopover.mock.contexts[0]).toBe(popup);
-  });
-
-  it('wires the list and its rows to the field', () => {
-    const { input } = setup();
-
-    type(input, 'app');
-    const popup = screen.getByRole('listbox');
-    const rows = rowItems();
-
-    expect(popup.id).toBe(input.getAttribute('aria-controls'));
-    expect(rows.map((row) => row.id)).toEqual([
-      `${popup.id}-option-0`,
-      `${popup.id}-option-1`,
-      `${popup.id}-option-2`,
-    ]);
-    expect(rows.map((row) => row.getAttribute('aria-selected'))).toEqual(['false', 'false', 'false']);
-    // Focus stays on the field (`aria-activedescendant`); rows are reachable but
-    // are not tab stops.
-    expect(rows.map((row) => row.getAttribute('tabindex'))).toEqual(['-1', '-1', '-1']);
   });
 
   it('reports every keystroke immediately at the default debounce', () => {
@@ -181,38 +149,36 @@ describe('Autosuggest', () => {
     expect(onQueryChange).not.toHaveBeenCalled();
   });
 
-  it('moves the highlight on ArrowDown/ArrowUp and clamps at both ends', () => {
+  it('opens with no highlight, then moves it on ArrowDown/ArrowUp and clamps at both ends', () => {
     const { input } = setup();
 
     type(input, 'app');
-    const rows = rowItems();
+    expect(activeRow(input)).toBeNull();
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[0].id);
-    expect(rows[0].getAttribute('aria-selected')).toBe('true');
+    expect(activeRow(input)).toBe(rows()[0]);
+    expect(rows()[0].getAttribute('aria-selected')).toBe('true');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[2].id);
-    expect(rows[2].getAttribute('aria-selected')).toBe('true');
+    expect(activeRow(input)).toBe(rows()[2]);
+    expect(rows()[2].getAttribute('aria-selected')).toBe('true');
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[0].id);
+    expect(activeRow(input)).toBe(rows()[0]);
   });
 
   it('jumps to the first and last option on Home and End', () => {
     const { input } = setup();
 
     type(input, 'app');
-    const rows = rowItems();
-
     fireEvent.keyDown(input, { key: 'End' });
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[2].id);
+    expect(activeRow(input)).toBe(rows()[2]);
 
     fireEvent.keyDown(input, { key: 'Home' });
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[0].id);
+    expect(activeRow(input)).toBe(rows()[0]);
   });
 
   it('reopens a dismissed list on ArrowDown with the first option highlighted', () => {
@@ -223,9 +189,9 @@ describe('Autosuggest', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
-    const rows = rowItems();
+
     expect(screen.getByRole('listbox')).toBeTruthy();
-    expect(input.getAttribute('aria-activedescendant')).toBe(rows[0].id);
+    expect(activeRow(input)).toBe(rows()[0]);
   });
 
   it('opens on Alt+ArrowDown without highlighting', () => {
@@ -233,21 +199,22 @@ describe('Autosuggest', () => {
 
     type(input, 'app');
     fireEvent.keyDown(input, { key: 'Escape' });
-
     fireEvent.keyDown(input, { key: 'ArrowDown', altKey: true });
+
     expect(screen.getByRole('listbox')).toBeTruthy();
-    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    expect(activeRow(input)).toBeNull();
+    expect(input.value).toBe('app');
   });
 
   it('drops the highlight when the query changes', () => {
     const { input } = setup();
 
     type(input, 'app');
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(input.getAttribute('aria-activedescendant')).not.toBeNull();
+    fireEvent.keyDown(input, { key: 'End' });
+    expect(activeRow(input)).not.toBeNull();
 
     type(input, 'appl');
-    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    expect(activeRow(input)).toBeNull();
   });
 
   it('selects the highlighted option on Enter and clears the field', () => {
@@ -295,7 +262,7 @@ describe('Autosuggest', () => {
     expect(onQueryChange).toHaveBeenLastCalledWith('');
   });
 
-  it('clears synchronously while a report is pending', () => {
+  it('clears synchronously and drops the pending report', () => {
     jest.useFakeTimers();
     const { input, onQueryChange } = setup({ debounceMs: 300 });
 
@@ -303,6 +270,7 @@ describe('Autosuggest', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     fireEvent.keyDown(input, { key: 'Escape' });
 
+    expect(input.value).toBe('');
     expect(onQueryChange.mock.calls).toEqual([['']]);
     act(() => {
       jest.advanceTimersByTime(1000);
@@ -315,11 +283,9 @@ describe('Autosuggest', () => {
 
     input.focus();
     type(input, 'app');
-    const row = rowItems()[1];
+    const row = rows()[1];
 
-    expect(row.querySelector('button, a, input')).toBeNull();
     // preventDefault on the pointer press is what keeps the field focused.
-    expect(fireEvent.mouseDown(row)).toBe(false);
     expect(fireEvent.pointerDown(row)).toBe(false);
     fireEvent.click(row);
 
@@ -331,7 +297,7 @@ describe('Autosuggest', () => {
     const { input, onSelect } = setup({ clearOnSelect: false });
 
     type(input, 'app');
-    fireEvent.click(rowItems()[0]);
+    fireEvent.click(rows()[0]);
 
     expect(onSelect).toHaveBeenCalledWith(OPTIONS[0]);
     expect(input.value).toBe('app');
@@ -344,7 +310,7 @@ describe('Autosuggest', () => {
     type(input, 'app');
 
     expect(screen.getByText('No foods match')).toBeTruthy();
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(rows()).toHaveLength(0);
   });
 
   it('shows no list at all without emptyLabel when nothing matches', () => {
@@ -355,21 +321,14 @@ describe('Autosuggest', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('caps the visible rows through the caller\'s maxVisible', () => {
+  it('hands the caller\'s maxVisible to the list as its row cap', () => {
     const { input } = setup({ maxVisible: 5 });
 
     type(input, 'app');
-    const popup = screen.getByRole('listbox');
+    const list = screen.getByRole('listbox');
 
-    expect(popup.style.getPropertyValue('--ui-autosuggest-rows')).toBe('5');
-    expect(rowItems()).toHaveLength(3);
-
-    // The cap is CSS: the popup is `maxVisible` rows tall, then scrolls.
-    const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-    const rule = css.slice(css.indexOf('.ui-autosuggest__popup {'));
-    const body = rule.slice(0, rule.indexOf('}'));
-    expect(body).toContain('var(--ui-autosuggest-rows, 8)');
-    expect(body).toContain('overflow-y: auto');
+    expect(list.style.getPropertyValue('--autosuggest-rows')).toBe('5');
+    expect(rows()).toHaveLength(3);
   });
 
   it('scrolls the highlighted row into view as the highlight moves', () => {
@@ -377,10 +336,10 @@ describe('Autosuggest', () => {
     type(input, 'app');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
 
-    expect(scrollIntoView).toHaveBeenCalledTimes(2);
-    expect(scrollIntoView.mock.contexts.at(-1)).toBe(rowItems()[1]);
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollIntoView.mock.calls.at(-1)![0]).toEqual({ block: 'nearest' });
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(rows()[0]);
   });
 
   it('dismisses on a pointer outside the popup and the field, keeping the text', () => {
@@ -409,14 +368,11 @@ describe('Autosuggest', () => {
 
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('listbox')).toBeNull();
-    showPopover.mockClear();
 
     fireEvent.pointerDown(input);
 
     expect(screen.getByRole('listbox')).toBeTruthy();
     expect(input.value).toBe('app');
-    expect(showPopover).toHaveBeenCalledTimes(1);
-    expect(showPopover.mock.contexts[0]).toBe(screen.getByRole('listbox'));
 
     // the press reset still respects minChars
     type(input, 'ap');
@@ -430,13 +386,11 @@ describe('Autosuggest', () => {
 
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
-    showPopover.mockClear();
 
     input.blur();
     act(() => input.focus());
 
     expect(screen.getByRole('listbox')).toBeTruthy();
     expect(input.value).toBe('app');
-    expect(showPopover).toHaveBeenCalledTimes(1);
   });
 });

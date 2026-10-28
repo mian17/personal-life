@@ -13,7 +13,7 @@ describe('Select', () => {
     render(<Select aria-label="Repeat" options={OPTIONS} defaultValue="weekly" />);
     const select = screen.getByLabelText('Repeat') as HTMLSelectElement;
     expect(select.tagName).toBe('SELECT');
-    expect(select.className.split(/\s+/).filter(Boolean)).toEqual(['ui-select']);
+    expect(select.classList.contains('ui-select')).toBe(true);
     expect(select.value).toBe('weekly');
     expect(screen.getByRole('option', { name: 'None' })).toBeDefined();
     expect(select.options).toHaveLength(3);
@@ -36,10 +36,8 @@ describe('Select', () => {
 
   it('merges className instead of replacing it', () => {
     render(<Select aria-label="Repeat" options={OPTIONS} className="legacy-hook" />);
-    expect(screen.getByLabelText('Repeat').className.split(/\s+/).filter(Boolean)).toEqual([
-      'ui-select',
-      'legacy-hook',
-    ]);
+    expect(screen.getByLabelText('Repeat').classList.contains('ui-select')).toBe(true);
+    expect(screen.getByLabelText('Repeat').classList.contains('legacy-hook')).toBe(true);
   });
 
   it('forwards a ref to the rendered element', () => {

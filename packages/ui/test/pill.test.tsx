@@ -10,7 +10,8 @@ describe('Pill', () => {
     render(<Pill>Tag</Pill>);
     const chip = screen.getByText('Tag');
     expect(chip.tagName).toBe('SPAN');
-    expect(classesOf(chip)).toEqual(['ui-pill', 'ui-pill--chip']);
+    expect(chip.classList.contains('ui-pill')).toBe(true);
+    expect(chip.classList.contains('ui-pill--chip')).toBe(true);
   });
 
   it.each<PillSize>(['chip', 'filter'])('maps size="%s" to its modifier class', (size) => {
@@ -20,14 +21,32 @@ describe('Pill', () => {
 
   it('renders a tone modifier only when tone is set', () => {
     const { rerender } = render(<Pill size="filter" tone="open">T</Pill>);
-    expect(classesOf(screen.getByText('T'))).toEqual([
+    const toned = screen.getByText('T');
+    expect(classesOf(toned)).toEqual(expect.arrayContaining([
       'ui-pill',
       'ui-pill--filter',
       'ui-pill--open',
-    ]);
+    ]));
 
     rerender(<Pill size="filter">T</Pill>);
-    expect(classesOf(screen.getByText('T'))).toEqual(['ui-pill', 'ui-pill--filter']);
+    const plain = screen.getByText('T');
+    expect(plain.classList.contains('ui-pill--filter')).toBe(true);
+    expect(plain.classList.contains('ui-pill--open')).toBe(false);
+  });
+
+  it('colours each tone with its token utility', () => {
+    render(
+      <>
+        <Pill tone="open">o</Pill>
+        <Pill tone="in_progress">p</Pill>
+        <Pill tone="done">d</Pill>
+        <Pill tone="wont_do">w</Pill>
+      </>,
+    );
+    expect(screen.getByText('o').classList.contains('text-accent')).toBe(true);
+    expect(screen.getByText('p').classList.contains('text-amber')).toBe(true);
+    expect(screen.getByText('d').classList.contains('text-green')).toBe(true);
+    expect(screen.getByText('w').classList.contains('text-muted')).toBe(true);
   });
 
   it('renders an anchor when as="a", preserving href', () => {
@@ -71,11 +90,10 @@ describe('Pill', () => {
 
   it('merges className instead of replacing it', () => {
     render(<Pill className="legacy-hook">T</Pill>);
-    expect(classesOf(screen.getByText('T'))).toEqual([
-      'legacy-hook',
-      'ui-pill',
-      'ui-pill--chip',
-    ]);
+    const chip = classesOf(screen.getByText('T'));
+    expect(chip).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-pill', 'ui-pill--chip']),
+    );
   });
 
   it('renders no remove button when onRemove is absent', () => {

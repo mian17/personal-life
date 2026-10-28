@@ -6,7 +6,7 @@ verification, dependencies, files, scope). Checkpoints are the phase gates from 
 Step 5; a task is checked only when its own verification block is green.*
 
 ### Phase 0 — Gate
-- [ ] Task 1: Record the maintainer's rulings (ledger settled 2026-10-27: PostCSS config,
+- [x] Task 1: Record the maintainer's rulings (ledger settled 2026-10-27: PostCSS config,
       `cmdk`, selector surface revoked, stylesheet-reading assertions deletable, `tab-bar` swapped)
 ### Phase 1 — Foundation and first vertical slice
 - [ ] Task 2: Stand up the Tailwind v4 theme pipeline (theme + utilities layers, preflight off)

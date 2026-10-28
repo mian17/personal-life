@@ -1,3 +1,4 @@
+// shadcn/ui registry copy (`native-select`), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
@@ -7,25 +8,39 @@ export interface SelectOption {
   label: string;
 }
 
-/**
- * The native `<select>` control, the single owner of `.ui-select`. The atom
- * renders the `<option>` elements from `options`, so consumers pass data, never
- * raw option markup — the same "no raw HTML in apps" rule the other controls
- * follow. Native over a custom popover: the platform gives the OS picker and the
- * combobox semantics for free. Single-select by construction.
- */
 export interface SelectProps extends Omit<ComponentPropsWithRef<'select'>, 'children'> {
   options: SelectOption[];
 }
 
+/**
+ * Registry `native-select` class string, theme-mapped the way `input` is: `border-input`
+ * → `--border`, `text-foreground` → `--text`, `bg-transparent` → `bg-panel` so the picker
+ * reads as the field shell standing beside `Input`. Registry's `h-9` becomes the repo's
+ * 48px `h-12`, and `[font:inherit]` stands in for the preflight this repo never loads.
+ *
+ * Native over a Radix `select`: the platform picker brings OS `<option>` mapping and
+ * combobox semantics for free, and single select needs no portal to get them.
+ */
+const selectStyles = cx(
+  'block w-full min-w-0 h-12 rounded-md border border-border bg-panel px-3 py-2',
+  'text-base text-text [font:inherit] outline-none transition-colors',
+  'cursor-pointer [-webkit-tap-highlight-color:transparent]',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'disabled:cursor-not-allowed disabled:text-muted',
+);
+
 export function Select({ options, className, ...rest }: Readonly<SelectProps>) {
   return (
-    <select className={cx('ui-select', className)} {...rest}>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
+    <select data-slot="select" className={cx('ui-select', selectStyles, className)} {...rest}>
+      {options.map(renderOption)}
     </select>
+  );
+}
+
+function renderOption({ value, label }: SelectOption) {
+  return (
+    <option key={value} value={value}>
+      {label}
+    </option>
   );
 }

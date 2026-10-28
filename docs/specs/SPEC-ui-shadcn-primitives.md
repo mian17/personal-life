@@ -42,9 +42,12 @@ User stories:
 
 Acceptance criteria (one cluster — see §8 for the testable form):
 
-- AC1: `@life/ui` public exports unchanged. `apps/*` **source** untouched — the one added file is
-  `apps/app/postcss.config.mjs`, which is the CSS pipeline entry point, not application code.
-  Tests inside `apps/*` may be updated where they pinned markup a registry replacement removed.
+- AC1: `@life/ui` public exports unchanged. `apps/*` **source** untouched apart from two sanctioned
+  exceptions: the added `apps/app/postcss.config.mjs` (the CSS pipeline entry point, not
+  application code), and app composition a registry replacement's markup change forces at the
+  consuming site — the one case: `DoneToggle` in `apps/app/app/todo-item.tsx`, recomposed to
+  render the now-interactive `Checkbox` directly (no `IconButton` wrapper). Tests inside `apps/*`
+  may be updated where they pinned markup a registry replacement removed.
 - AC2: no hand-written `atoms.css` or `blocks.css`; styling is Tailwind v4 utilities mapped
   to the existing tokens.
 - AC3: the colour theme in light and dark resolves to the exact current values
@@ -174,8 +177,8 @@ owns the resets, and loading a second reset under it would re-order every app's 
 
 **Always do**
 
-- Keep `@life/ui` public exports (component names, prop types, `./styles.css` entry)
-  unchanged.
+- Keep `@life/ui` public exports (component names, prop type names, `./styles.css` entry)
+  unchanged; a replaced primitive's prop type body follows its registry source.
 - Derive each replaced primitive from the vendored shadcn source; adapt theme mapping only.
 - Keep `tokens.test.ts` value table byte-identical; prove colour parity with computed-style
   assertions.
@@ -213,8 +216,8 @@ owns the resets, and loading a second reset under it would re-order every app's 
 ## 8. Success Criteria
 
 1. `npm run typecheck` is green and `git diff --name-only origin/dev...HEAD -- 'apps/**/*'`
-   lists only `apps/app/postcss.config.mjs` in source and, at most, test files whose assertions
-   pinned markup a replacement removed.
+   lists only `apps/app/postcss.config.mjs` and `apps/app/app/todo-item.tsx` in source and,
+   at most, test files whose assertions pinned markup a replacement removed.
 2. `npm run test:unit -w @life/ui -- <file>` is green for every suite in
    `packages/ui/test/`, each within 2 runs.
 3. The colour value table in `packages/ui/test/tokens.test.ts` is byte-identical to

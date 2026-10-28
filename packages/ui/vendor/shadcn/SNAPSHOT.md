@@ -5,10 +5,11 @@ The single pin for every shadcn/ui registry copy inside `packages/ui`. Files und
 nothing here is fetched at build or test time, and no shadcn npm package is installed.
 
 Every vendored file cites this record on its first line, so a reader can trace a component back
-to its registry item:
+to its registry item. The pointer carries the item name and the snapshot date, which is what spec
+§5 asks of a provenance comment:
 
 ```tsx
-// shadcn/ui registry copy (`button`), snapshot `ui-registry-2026-10-26` — see vendor/shadcn/SNAPSHOT.md
+// shadcn/ui registry copy (`button`), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
 ```
 
 ## Pinned revision
@@ -23,6 +24,14 @@ to its registry item:
 
 The revision is a date-stamped tag of this snapshot, not a floating "latest". A refresh means a
 new date, a new row per re-copied item, and a new first-line pointer in the affected files.
+
+One item is fetched by its URL and pasted into `src/components`:
+
+```bash
+curl -sf https://ui.shadcn.com/r/styles/new-york-v4/button.json
+```
+
+The item URL is the whole pin: same URL, same date tag, same source.
 
 ## Attribution
 
@@ -54,8 +63,35 @@ dashes:
 
 ## Vendored items
 
-One row per copied registry item. Append a row in the same change that lands the copy; never
-rewrite a row in place.
+One row per copied registry item, appended in the same change that lands the copy; never rewrite a
+row in place. The template:
+
+```markdown
+| `button` | `src/components/button.tsx` | `ui-registry-2026-10-26` | 4 |
+```
 
 | Registry item | Vendored file | Snapshot revision | Task |
 | ------------- | ------------- | ----------------- | ---- |
+| `button` | `src/components/button.tsx`, `src/components/icon-button.tsx` | `ui-registry-2026-10-26` | 4 |
+| `checkbox` | `src/components/checkbox.tsx` | `ui-registry-2026-10-26` | 8 |
+| `switch` | `src/components/switch.tsx` | `ui-registry-2026-10-26` | 8 |
+| `dropdown-menu` | `src/components/menu.tsx` | `ui-registry-2026-10-26` | 19 |
+
+## Recorded deviations
+
+Per spec §9 assumption 1 a component kept as a recorded deviation, never half-migrated. There are
+none: every component with a registry counterpart is the registry copy, and the no-counterpart
+components are listed in `tasks/plan.md` Decision 4.
+
+### Resolved — `checkbox` nesting
+
+An earlier draft of this task vendored the registry `checkbox` **indicator** alone and recorded the
+omission as deviation D1: `Checkbox` renders a `<button role="checkbox">` and its only consumer,
+`DoneToggle` in `apps/app/app/todo-item.tsx`, wraps it in `IconButton` — also a `<button>` — so
+backing the square with the Radix root nests one interactive control inside another.
+
+The spec has no exemption list (§1) and §9.1 limits deviations to components with no shadcn
+counterpart, and `checkbox` has one, so D1 was not a valid deviation. The atom is now the real
+registry copy (`CheckboxPrimitive.Root` + `Indicator` + `Check`). Removing the nested `IconButton`
+from `DoneToggle` is a composition change in `apps/*`, which `tasks/plan.md` keeps out of a
+conversion task's blast radius; it belongs to the gate that owns `todo-item.tsx`, not to Task 8.

@@ -22,7 +22,25 @@ describe('EditorToolbar', () => {
     render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} />);
     const toolbar = document.querySelector('.ui-editor-toolbar')!;
     expect(toolbar.tagName).toBe('DIV');
-    expect(classesOf(toolbar)).toEqual(['ui-editor-toolbar']);
+    expect(classesOf(toolbar)).toEqual(expect.arrayContaining(['ui-editor-toolbar']));
+  });
+
+  // jsdom never applies stylesheets, so the row layout is read off the classes it carries.
+  it('takes its row geometry from utilities rather than a stylesheet rule', () => {
+    render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} />);
+    const toolbar = document.querySelector('.ui-editor-toolbar')!;
+    expect(toolbar.classList.contains('flex')).toBe(true);
+    expect(toolbar.classList.contains('items-center')).toBe(true);
+    expect(toolbar.classList.contains('justify-between')).toBe(true);
+    expect(toolbar.classList.contains('mb-[var(--space-0-5)]')).toBe(true);
+
+    const title = render(
+      <EditorToolbar back={{ label: 'Back', onBack: () => {} }} title="New" />,
+    );
+    const heading = title.container.querySelector('h1')!;
+    expect(heading.classList.contains('flex-1')).toBe(true);
+    expect(heading.classList.contains('text-center')).toBe(true);
+    expect(heading.classList.contains('font-semibold')).toBe(true);
   });
 
   it('renders the back control as a button (never a link) carrying the label verbatim', () => {
@@ -64,9 +82,8 @@ describe('EditorToolbar', () => {
 
   it('merges className instead of replacing it', () => {
     render(<EditorToolbar className="legacy-hook" back={{ label: 'Back', onBack: () => {} }} />);
-    expect(classesOf(document.querySelector('.ui-editor-toolbar')!)).toEqual([
-      'legacy-hook',
-      'ui-editor-toolbar',
-    ]);
+    expect(classesOf(document.querySelector('.ui-editor-toolbar')!)).toEqual(
+      expect.arrayContaining(['legacy-hook', 'ui-editor-toolbar']),
+    );
   });
 });

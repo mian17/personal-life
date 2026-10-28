@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import { Section, type SectionHeadingLevel } from '../src/components/section';
@@ -9,13 +7,9 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-function cssBlock(selector: string): string {
-  const css = readFileSync(join(__dirname, '..', 'src', 'styles', 'blocks.css'), 'utf8');
-  return (
-    (css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ??
-      [])[1] ?? ''
-  );
-}
+const SECTION_UTILITY = 'mt-[var(--space-2)]';
+const AUTO_HIDE_UTILITY = '[&:has(.ui-list):not(:has(.ui-list-item))]:hidden';
+const HEADING_MARGIN_UTILITY = '[&>:is(h2,h3)]:m-[0_0_var(--space-0-5)]';
 
 describe('Section', () => {
   it('renders a <section> landmark carrying the body', () => {
@@ -26,7 +20,7 @@ describe('Section', () => {
     );
     const section = document.querySelector('.ui-section')!;
     expect(section.tagName).toBe('SECTION');
-    expect(classesOf(section)[0]).toBe('ui-section');
+    expect(classesOf(section)).toContain('ui-section');
     expect(section.contains(screen.getByTestId('body'))).toBe(true);
   });
 
@@ -93,7 +87,7 @@ describe('Section', () => {
     const stack = document.querySelector('.ui-stack')!;
     expect(stack.tagName).toBe('DIV');
     expect(stack.classList.contains(`ui-stack--${gap}`)).toBe(true);
-    expect(cssBlock(`.ui-stack--${gap}`)).toMatch(new RegExp(`gap:\\s*var\\(${token}\\)`));
+    expect(stack.classList.contains(`gap-[var(${token})]`)).toBe(true);
   });
 
   it('defaults the body gap to md', () => {
@@ -104,12 +98,21 @@ describe('Section', () => {
     expect(stack.classList.contains('ui-stack--lg')).toBe(false);
   });
 
-  it('owns margin-block-start --space-2 while the heading owns margin-block-end --space-0-5', () => {
-    const sectionCss = cssBlock('.ui-section');
-    expect(sectionCss).toMatch(/margin-block-start:\s*var\(--space-2\)/);
-    expect(cssBlock('.ui-section__heading')).toMatch(
-      /margin-block-end:\s*var\(--space-0-5\)/,
+  it('owns the outer --space-2 rhythm while the heading owns its --space-0-5 gap', () => {
+    render(<Section label="Today">x</Section>);
+    expect(classesOf(document.querySelector('.ui-section')!)).toContain(SECTION_UTILITY);
+    expect(
+      classesOf(document.querySelector('.ui-section__heading-row')!),
+    ).toContain(HEADING_MARGIN_UTILITY);
+  });
+
+  it('collapses a group section whose every row was removed', () => {
+    render(
+      <Section label="Today">
+        <ul className="ui-list" />
+      </Section>,
     );
+    expect(classesOf(document.querySelector('.ui-section')!)).toContain(AUTO_HIDE_UTILITY);
   });
 
   it('gives the heading no interactive semantics of its own', () => {
@@ -127,10 +130,9 @@ describe('Section', () => {
         x
       </Section>,
     );
-    expect(classesOf(document.querySelector('.ui-section')!)).toEqual([
-      'legacy-hook',
-      'ui-section',
-    ]);
+    const classes = classesOf(document.querySelector('.ui-section')!);
+    expect(classes).toContain('ui-section');
+    expect(classes).toContain('legacy-hook');
   });
 
   it('forwards a ref to the rendered section', () => {
