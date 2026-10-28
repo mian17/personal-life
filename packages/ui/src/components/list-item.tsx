@@ -94,10 +94,10 @@ const linkColumnStyles = cx(
   'flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
 );
 
-/** Dense todo rows are compact top-aligned rows, exactly as tall as their content. */
+/** Dense todo rows are compact rows, exactly as tall as their content, centred on it. */
 const linkDenseStyles = cx(
   linkSharedStyles,
-  'items-start gap-[var(--space-0-5)] px-[var(--space-0-4)] py-[var(--space-0-6)]',
+  'items-center gap-[var(--space-0-5)] px-[var(--space-0-4)] py-[var(--space-0-6)]',
 );
 
 /** Title above, meta line below, at the tight token gap. */
@@ -249,7 +249,7 @@ export function ListItem({
         rowSurfaceStyles,
         isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
         checkboxInsetStyles,
-        isColumn || isDense ? 'items-start' : 'items-center',
+        isColumn ? 'items-start' : 'items-center',
         isDense ? 'min-h-0' : rowFloorStyles,
         variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',
         hasSlot && rowSlotStyles,

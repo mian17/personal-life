@@ -219,7 +219,7 @@ describe('ListItem', () => {
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain('ui-list-item--todo');
     expect(classes).toContain('[--checkbox-size:var(--space-1-25)]');
-    // The default todo row centres its leading control; only the dense scale top-aligns.
+    // The default todo row centres its leading control; the dense scale does too.
     expect(classes).toContain('items-center');
     expect(classes).not.toContain('ui-list-item--dense');
   });
@@ -234,6 +234,25 @@ describe('ListItem', () => {
     expect(classes).not.toContain('ui-list-item--dense');
     expect(classes).not.toContain(DENSE_TYPE_UTILITY);
     expect(classes).toContain('items-center');
+  });
+
+  it('centres the dense todo row on its leading control, and keeps a column row top-aligned', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" />
+      </ul>,
+    );
+    const denseRow = classesOf(screen.getByRole('listitem'));
+    expect(denseRow).toContain('items-center');
+    expect(denseRow).not.toContain('items-start');
+    unmount();
+
+    render(
+      <ul>
+        <ListItem variant="nested" title="Groceries" />
+      </ul>,
+    );
+    expect(classesOf(screen.getByRole('listitem'))).toContain('items-start');
   });
 
   it('adds the nested variant: a column row whose body indents beneath the title', () => {
