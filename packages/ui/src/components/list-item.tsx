@@ -164,6 +164,124 @@ const toneStyles: Record<ListItemTone, string> = {
 const todoCheckboxSize = '[--checkbox-size:var(--space-1-25)]';
 const denseCheckboxSize = '[--checkbox-size:var(--space-0-75)]';
 
+/** The row's computed shape, resolved once so every class and node builder reads one source. */
+interface RowFlags {
+  variant: ListItemVariant | undefined;
+  isDense: boolean;
+  isColumn: boolean;
+  hasSlot: boolean;
+  carriesAction: boolean;
+  done: boolean | undefined;
+  collapsing: boolean | undefined;
+  tone: ListItemTone | undefined;
+}
+
+/** The link body layout: a column row stacks, a dense row packs tight, the base row runs one line. */
+function linkStylesFor({ isColumn, isDense }: Readonly<RowFlags>): string {
+  if (isColumn) return linkColumnStyles;
+  if (isDense) return linkDenseStyles;
+  return linkRowStyles;
+}
+
+function titleNodeFor(
+  { variant, isDense, done, carriesAction }: Readonly<RowFlags>,
+  title: ReactNode,
+  titleAction: ReactNode,
+): ReactNode {
+  return (
+    <span
+      className={cx(
+        'ui-list-item__title',
+        carriesAction && 'ui-list-item__title--with-action',
+        titleBaseStyles,
+        variant === 'todo' ? titleClampedStyles : titleLineStyles,
+        isDense && denseTextStyles,
+        done && doneTitleStyles,
+        carriesAction && actionLineStyles,
+      )}
+    >
+      {title}
+      {carriesAction && (
+        <span className={cx('ui-list-item__title-action', actionStyles)}>{titleAction}</span>
+      )}
+    </span>
+  );
+}
+
+function subNodeFor(
+  { variant, isDense }: Readonly<RowFlags>,
+  meta: ReactNode,
+  snippet: ReactNode,
+): ReactNode {
+  const snippetNode = snippet != null && snippet !== false && (
+    <span className={cx('ui-list-item__snippet', snippetStyles)}>{snippet}</span>
+  );
+
+  /* The base row reads meta and snippet on one line, separated by a `|`. A
+     feedback row gives the description its own line above the meta line, so
+     each line reuses the `__sub` typography and no separator is needed. */
+  return variant === 'feedback' ? (
+    <>
+      {snippetNode && <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>}
+      <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
+    </>
+  ) : (
+    <span className={cx('ui-list-item__sub', subStyles, isDense && denseTextStyles)}>
+      {meta}
+      {snippetNode && (
+        <>
+          <span className={cx('ui-list-item__sep', separatorStyles)}>|</span>
+          {snippetNode}
+        </>
+      )}
+    </span>
+  );
+}
+
+/** The row's locator hooks, kept in one string so consumers can target the shape. */
+function rowHookClassesFor({
+  variant,
+  isDense,
+  done,
+  collapsing,
+  tone,
+}: Readonly<RowFlags>): string {
+  return cx(
+    'ui-list-item',
+    variant === 'todo' && 'ui-list-item--todo',
+    isDense && 'ui-list-item--dense',
+    variant === 'nested' && 'ui-list-item--nested',
+    variant === 'feedback' && 'ui-list-item--feedback',
+    done && 'ui-list-item--done',
+    collapsing && 'ui-list-item--collapsing',
+    tone && `ui-list-item--${tone}`,
+  );
+}
+
+/** The row's utility classes: surface, control insets, alignment, and state treatment. */
+function rowStyleClassesFor({
+  variant,
+  isDense,
+  isColumn,
+  hasSlot,
+  done,
+  collapsing,
+  tone,
+}: Readonly<RowFlags>): string {
+  return cx(
+    rowSurfaceStyles,
+    isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
+    !isDense && todoCheckboxInsetStyles,
+    isColumn ? 'items-start' : 'items-center',
+    isDense ? 'min-h-0' : rowFloorStyles,
+    variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',
+    hasSlot && rowSlotStyles,
+    done && doneRowStyles,
+    tone && !done && toneStyles[tone],
+    collapsing && collapsingRowStyles,
+  );
+}
+
 export function ListItem({
   href,
   title,
@@ -182,72 +300,29 @@ export function ListItem({
   children,
   ...rest
 }: Readonly<ListItemProps>) {
-  const titleLineCarriesAction =
-    (variant === 'nested' || variant === 'feedback') && titleAction != null;
-  const isDense = variant === 'todo' && size === 'dense';
-  const isColumn = variant === 'nested' || variant === 'feedback';
-  const hasSlot = trailing != null || deleteAction != null;
-
-  const linkStyles = isColumn ? linkColumnStyles : isDense ? linkDenseStyles : linkRowStyles;
-
-  const titleNode = (
-    <span
-      className={cx(
-        'ui-list-item__title',
-        titleLineCarriesAction && 'ui-list-item__title--with-action',
-        titleBaseStyles,
-        variant === 'todo' ? titleClampedStyles : titleLineStyles,
-        isDense && denseTextStyles,
-        done && doneTitleStyles,
-        titleLineCarriesAction && actionLineStyles,
-      )}
-    >
-      {title}
-      {titleLineCarriesAction && (
-        <span className={cx('ui-list-item__title-action', actionStyles)}>{titleAction}</span>
-      )}
-    </span>
-  );
-
-  const snippetNode = snippet != null && snippet !== false && (
-    <span className={cx('ui-list-item__snippet', snippetStyles)}>{snippet}</span>
-  );
-
-  /* The base row reads meta and snippet on one line, separated by a `|`. A
-     feedback row gives the description its own line above the meta line, so
-     each line reuses the `__sub` typography and no separator is needed. */
-  const subNode =
-    variant === 'feedback' ? (
-      <>
-        {snippetNode && (
-          <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>
-        )}
-        <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
-      </>
-    ) : (
-      <span className={cx('ui-list-item__sub', subStyles, isDense && denseTextStyles)}>
-        {meta}
-        {snippetNode && (
-          <>
-            <span className={cx('ui-list-item__sep', separatorStyles)}>|</span>
-            {snippetNode}
-          </>
-        )}
-      </span>
-    );
+  const flags: RowFlags = {
+    variant,
+    isDense: variant === 'todo' && size === 'dense',
+    isColumn: variant === 'nested' || variant === 'feedback',
+    hasSlot: trailing != null || deleteAction != null,
+    carriesAction: (variant === 'nested' || variant === 'feedback') && titleAction != null,
+    done,
+    collapsing,
+    tone,
+  };
 
   const body = (
     <>
       <span className={cx('ui-list-item__text', textStyles)}>
-        {titleNode}
-        {subNode}
+        {titleNodeFor(flags, title, titleAction)}
+        {subNodeFor(flags, meta, snippet)}
       </span>
       {variant === 'nested' ? (
         <span
           className={cx(
             'ui-list-item__nested-body',
             nestedBodyStyles,
-            titleLineCarriesAction && nestedBodyActionInsetStyles,
+            flags.carriesAction && nestedBodyActionInsetStyles,
           )}
         >
           {children}
@@ -259,37 +334,14 @@ export function ListItem({
   );
 
   return (
-    <li
-      className={cx(
-        'ui-list-item',
-        variant === 'todo' && 'ui-list-item--todo',
-        isDense && 'ui-list-item--dense',
-        variant === 'nested' && 'ui-list-item--nested',
-        variant === 'feedback' && 'ui-list-item--feedback',
-        done && 'ui-list-item--done',
-        collapsing && 'ui-list-item--collapsing',
-        tone && `ui-list-item--${tone}`,
-        rowSurfaceStyles,
-        isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
-        !isDense && todoCheckboxInsetStyles,
-        isColumn ? 'items-start' : 'items-center',
-        isDense ? 'min-h-0' : rowFloorStyles,
-        variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',
-        hasSlot && rowSlotStyles,
-        done && doneRowStyles,
-        tone && !done && toneStyles[tone],
-        collapsing && collapsingRowStyles,
-        className,
-      )}
-      {...rest}
-    >
+    <li className={cx(rowHookClassesFor(flags), rowStyleClassesFor(flags), className)} {...rest}>
       {leading}
       {href != null ? (
-        <Link href={href} className={cx('ui-list-item__link', linkStyles)}>
+        <Link href={href} className={cx('ui-list-item__link', linkStylesFor(flags))}>
           {body}
         </Link>
       ) : (
-        <span className={cx('ui-list-item__link', linkStyles)}>{body}</span>
+        <span className={cx('ui-list-item__link', linkStylesFor(flags))}>{body}</span>
       )}
       {trailing}
       {deleteAction}
