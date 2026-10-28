@@ -1,0 +1,177 @@
+name: Back-merge
+
+on:
+  push:
+    # Promotions `dev -> main` are squash-merged, so a promotion never records
+    # `dev` as merged into `main` and the next promotion PR conflicts textually
+    # even though nothing diverged. A push to `main` is the promotion landing:
+    # open the back-merge PR that fixes the ancestry.
+    branches: [main]
+  workflow_dispatch:
+
+# Only ever one back-merge PR in flight. A concurrent run must not cancel a
+# first one mid-push; it is skipped by the existing-PR guard instead.
+concurrency:
+  group: backmerge
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backmerge:
+    # Self-hosted runner on the same host as the SonarQube container — the only
+    # runner label this repo has.
+    runs-on: [self-hosted, sonarqube]
+    # Git plus two API calls; no Node, no npm, no build. A hang must not hold
+    # the runner for the six-hour default.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: dev
+
+      # Idempotency guard: after a landed back-merge (or a promotion that was
+      # itself a merge commit) `main` is already an ancestor of `dev` and there
+      # is nothing to do. Covers re-runs and repeated dispatches.
+      - name: No-op guard
+        id: noop
+        run: |
+          if git merge-base --is-ancestor origin/main origin/dev; then
+            echo "origin/main is already an ancestor of origin/dev: nothing to back-merge."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `git merge -s ours` keeps `dev`'s tree, which silently drops every file
+      # that exists on `main` but not on `dev`. Two such deletions are
+      # intentional (shadcn migration, #25). Anything else may be a hotfix that
+      # went straight to `main` — `-s ours` must never quietly drop content, so
+      # the PR is opened as a draft with the unexpected paths listed and a human
+      # decides.
+      - name: Deletion guard
+        id: deletions
+        if: steps.noop.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          unexpected="$(git diff --diff-filter=D --name-only origin/main origin/dev \
+            | grep -v -x -e 'packages/ui/src/styles/atoms.css' -e 'packages/ui/src/styles/blocks.css' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected deletions (on main, missing from dev):"
+            printf '%s\n' "$unexpected"
+            printf '%s\n' "$unexpected" > "$RUNNER_TEMP/backmerge-unexpected.txt"
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f "$RUNNER_TEMP/backmerge-unexpected.txt"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `-s ours` records the merge with `dev`'s tree unchanged: `main` becomes
+      # an ancestor of `dev` again and no content from `main` is taken — `dev`
+      # is the source of truth for content after a squash promotion.
+      - name: Build the back-merge branch
+        id: merge
+        if: steps.noop.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%d%H%M%S)"
+          echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
+          git checkout -b "chore/backmerge-$stamp"
+          git merge -s ours origin/main -m "chore: merge main into dev (bookkeeping)
+
+            Bookkeeping merge only: keeps dev's tree (git merge -s ours) so that
+            main becomes an ancestor of dev again after a squash promotion, which
+            makes the next dev -> main promotion PR conflict-free. Takes no content
+            from main; dev stays the source of truth for content."
+
+      # A back-merge that changes a file is a bug. Prove both halves before
+      # anything is pushed: the tree is byte-identical to `dev`, and HEAD is a
+      # real two-parent merge commit (that is the whole point of the exercise).
+      - name: Proof the merge changed nothing
+        if: steps.noop.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code origin/dev HEAD; then
+            echo "::error::back-merge changed the tree; it must be content-neutral"
+            exit 1
+          fi
+          set -- $(git rev-list --parents -n1 HEAD)
+          if [ "$#" -ne 3 ]; then
+            echo "::error::expected a two-parent merge commit, got: $*"
+            exit 1
+          fi
+          echo "ok: tree identical to origin/dev; merge commit $1 has parents $2 $3"
+
+      # A push to `main` while a back-merge PR is still open must not open a
+      # second one — the open PR picks the newer `main` up when it is merged.
+      - name: Skip if a back-merge PR is already open
+        id: existing
+        if: steps.noop.outputs.needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          resp="$(curl -fsS \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")"
+          if printf '%s' "$resp" | grep -Eq '"ref":[[:space:]]*"chore/backmerge-'; then
+            echo "A back-merge PR is already open; skipping."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Plain git push (checkout persists the token) plus one REST call to open
+      # the PR: `gh` is not guaranteed on this runner and a marketplace PR
+      # action is a dependency this repo does not need.
+      - name: Push the branch and open the PR
+        if: steps.noop.outputs.needed == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STAMP: ${{ steps.merge.outputs.stamp }}
+          DRAFT: ${{ steps.deletions.outputs.draft }}
+        run: |
+          set -euo pipefail
+          branch="chore/backmerge-$STAMP"
+          git push -u origin "$branch"
+          payload="$(python3 - <<'PY'
+          import json, os, pathlib
+          stamp, branch = os.environ["STAMP"], "chore/backmerge-" + os.environ["STAMP"]
+          draft = os.environ["DRAFT"] == "true"
+          body = (
+              "Bookkeeping back-merge of `main` into `dev`.\n\n"
+              "`dev` -> `main` promotions are squash-merged, so a promotion never records "
+              "`dev` as merged into `main`, and the next promotion PR conflicts textually "
+              "even though nothing diverged. This PR merges `main` with `git merge -s ours`, "
+              "keeping `dev`'s tree, so `main` becomes an ancestor of `dev` again.\n\n"
+              "**Merge this PR with \"Create a merge commit\". Never squash it** — squashing "
+              "it recreates the exact problem it fixes.\n\n"
+              "The workflow proved before opening this PR that the tree is identical to `dev` "
+              "and that the merge commit has two parents."
+          )
+          if draft:
+              paths = pathlib.Path(os.environ["RUNNER_TEMP"], "backmerge-unexpected.txt").read_text().split()
+              body += (
+                  "\n\n:warning: **Draft: unexpected deletions.** These files exist on `main` "
+                  "and are missing from `dev`; `merge -s ours` would silently drop them. "
+                  "A human must decide before merging:\n\n"
+                  + "\n".join(f"- `{p}`" for p in paths)
+              )
+          print(json.dumps({
+              "head": branch,
+              "base": "dev",
+              "title": f"chore: back-merge main into dev ({stamp})",
+              "body": body,
+              "draft": draft,
+          }))
+          PY
+          )"
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls" \
+            -d "$payload"
