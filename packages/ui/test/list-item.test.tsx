@@ -607,4 +607,190 @@ describe('ListItem', () => {
     expect(classes).toContain('duration-[var(--duration-base)]');
     expect(classes).toContain('ease-[var(--ease-standard)]');
   });
+
+  it('linkStylesFor: pins the link body class string for row, dense and column shapes', () => {
+    const baseRow = render(
+      <ul>
+        <ListItem href="/notes/1" title="Groceries" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__link')!.className).toBe(
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+    );
+    baseRow.unmount();
+
+    const denseRow = render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__link')!.className).toBe(
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-5)] py-[var(--space-0-6)] ps-[var(--space-0-9)] pe-[var(--space-0-4)]',
+    );
+    denseRow.unmount();
+
+    render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__link')!.className).toBe(
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+    );
+  });
+
+  it('titleNodeFor: pins the title and title-action class strings for base, todo, done and action shapes', () => {
+    const baseTitle = render(
+      <ul>
+        <ListItem title="Groceries" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__title')!.className).toBe(
+      'ui-list-item__title font-semibold truncate',
+    );
+    baseTitle.unmount();
+
+    const doneTodo = render(
+      <ul>
+        <ListItem variant="todo" done title="Groceries" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__title')!.className).toBe(
+      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-muted line-through',
+    );
+    doneTodo.unmount();
+
+    const denseTodo = render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__title')!.className).toBe(
+      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-[length:var(--space-0-7)]',
+    );
+    denseTodo.unmount();
+
+    render(
+      <ul>
+        <ListItem variant="nested" title="Omelette" titleAction={<span />}>
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__title')!.className).toBe(
+      'ui-list-item__title ui-list-item__title--with-action font-semibold truncate flex items-stretch gap-[var(--space-0-5)] [&>:first-child]:flex-1 [&>:first-child]:min-w-0',
+    );
+    expect(document.querySelector('.ui-list-item__title-action')!.className).toBe(
+      'ui-list-item__title-action flex items-center shrink-0',
+    );
+  });
+
+  it('subNodeFor: pins the sub, separator and snippet class strings', () => {
+    const baseRow = render(
+      <ul>
+        <ListItem title="Groceries" meta={<time>Today</time>} snippet="milk and eggs" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
+      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+    );
+    expect(document.querySelector('.ui-list-item__sep')!.className).toBe(
+      'ui-list-item__sep shrink-0 text-border',
+    );
+    expect(document.querySelector('.ui-list-item__snippet')!.className).toBe(
+      'ui-list-item__snippet min-w-0 truncate',
+    );
+    baseRow.unmount();
+
+    const denseRow = render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" meta="Today" />
+      </ul>,
+    );
+    expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
+      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap text-[length:var(--space-0-7)]',
+    );
+    denseRow.unmount();
+
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode" meta="Today" snippet="On cold load" />
+      </ul>,
+    );
+    const subs = document.querySelectorAll('.ui-list-item__sub');
+    expect(subs).toHaveLength(2);
+    expect(subs[0].className).toBe(
+      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+    );
+    expect(subs[1].className).toBe(
+      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+    );
+    expect(document.querySelector('.ui-list-item__sep')).toBeNull();
+  });
+
+  it('rowHookClassesFor: pins the ui-list-item-- hook tokens per shape', () => {
+    const hooksOf = (el: Element) => classesWithPrefix(classesOf(el), 'ui-list-item--');
+    const baseRow = render(
+      <ul>
+        <ListItem title="Groceries" />
+      </ul>,
+    );
+    expect(hooksOf(screen.getByRole('listitem'))).toEqual([]);
+    baseRow.unmount();
+
+    const denseDone = render(
+      <ul>
+        <ListItem variant="todo" size="dense" done collapsing tone="danger" title="Groceries" />
+      </ul>,
+    );
+    expect(hooksOf(screen.getByRole('listitem'))).toEqual([
+      'ui-list-item--collapsing',
+      'ui-list-item--danger',
+      'ui-list-item--dense',
+      'ui-list-item--done',
+      'ui-list-item--todo',
+    ]);
+    denseDone.unmount();
+
+    render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    expect(hooksOf(screen.getByRole('listitem'))).toEqual(['ui-list-item--nested']);
+  });
+
+  it('rowStyleClassesFor: pins the full row class string byte-for-byte, merged with className', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem title="Groceries" />
+      </ul>,
+    );
+    expect(screen.getByRole('listitem').className).toBe(
+      'ui-list-item flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] has-[>.ui-checkbox]:ps-[var(--space-0-9)] items-center min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]',
+    );
+    unmount();
+
+    render(
+      <ul>
+        <ListItem
+          variant="todo"
+          size="dense"
+          done
+          collapsing
+          tone="danger"
+          className="legacy-hook"
+          title="Groceries"
+          deleteAction={<button>x</button>}
+        />
+      </ul>,
+    );
+    expect(screen.getByRole('listitem').className).toBe(
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] [--checkbox-size:var(--space-0-75)] items-center min-h-0 [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--space-0-5)] [&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))] [&>form>.ui-btn--danger]:rounded-[var(--radius-lg)] [&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+    );
+  });
 });
