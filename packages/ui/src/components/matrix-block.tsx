@@ -53,8 +53,15 @@ const labelToneStyles: Record<MatrixTone, string> = {
   green: 'text-green',
 };
 
-/** Overflowing content scrolls inside the box; the heading stays put. */
-const itemsStyles = 'grid content-start gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto';
+/**
+ * Overflowing content scrolls inside the box; the heading stays put. The box's bottom edge
+ * fades into the panel, so a row cut by that edge reads as "more below" instead of as a
+ * rendering fault — a touch browser paints no scrollbar to say the box scrolls. `content-start`
+ * keeps the fade over empty box space when the box has room to spare.
+ */
+const itemsStyles =
+  'grid content-start gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto ' +
+  '[mask-image:linear-gradient(to_bottom,var(--panel)_calc(100%_-_var(--space-1)),transparent)]';
 
 /** Empty quadrant: muted and centred in the remaining box height. */
 const emptyStyles = 'flex-1 grid place-content-center m-0 text-muted text-center text-[length:var(--space-0-85)]';

@@ -131,6 +131,38 @@ describe('MatrixBlock', () => {
     expect(classes).not.toMatch(/\b\d+(?:\.\d+)?px\b/);
   });
 
+  // A quadrant can hold more rows than its cell fits. Every row must stay reachable: the cell
+  // bounds the scroller without pinning it to a height its content cannot scroll past, the
+  // scroller is the inner items box (not a clipping parent), and the box's bottom edge fades so
+  // a cut row reads as "more below" — a touch browser paints no scrollbar to say it scrolls.
+  it('keeps a full quadrant scrolling inside its cell, with a bottom fade as the only cue', () => {
+    render(<MatrixBlock quadrants={quadrants} />);
+    const quadrant = document.querySelector('.ui-matrix__quadrant')!;
+    const items = document.querySelector('.ui-matrix__items')!;
+
+    // The box that overflows is the scroller: the cell clips at its rounded edge, the items box
+    // scrolls inside it, so the heading never scrolls away.
+    expect(items.classList.contains('overflow-y-auto')).toBe(true);
+    expect(quadrant.classList.contains('overflow-y-auto')).toBe(false);
+    expect(quadrant.classList.contains('overflow-auto')).toBe(false);
+
+    // Nothing pins a fixed height: `max-h-full` is the cell's own bound, a length would clip
+    // rows out of the scroller's reach instead of letting it scroll.
+    const pinsHeight = (el: Element): boolean =>
+      el.className.split(/\s+/).filter(Boolean).some((c) => /^h-/.test(c) || /^max-h-\[/.test(c));
+    expect(pinsHeight(quadrant)).toBe(false);
+    expect(pinsHeight(items)).toBe(false);
+
+    const mask = items.className
+      .split(/\s+/)
+      .filter(Boolean)
+      .find((c) => c.startsWith('[mask-image:'));
+    expect(mask).toBeDefined();
+    expect(mask).toContain('to_bottom');
+    expect(mask).toContain('var(--panel)');
+    expect(mask).toContain('var(--space-1)');
+  });
+
   it('tints the heading through a token colour utility per tone', () => {
     const tones = ['danger', 'amber', 'accent', 'green'] as const;
     for (const tone of tones) {
