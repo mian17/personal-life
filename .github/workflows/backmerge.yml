@@ -170,8 +170,48 @@ jobs:
           }))
           PY
           )"
-          curl -fsS -X POST \
+          # Capture the response instead of `-f`: when the API refuses the PR
+          # (the most likely cause is the repo's "Allow GitHub Actions to create
+          # and approve pull requests" setting being off), the job must say so
+          # and leave a human a ready-made PR to open by hand — a bare `curl -f`
+          # would exit on the 403 with the diagnostic body discarded.
+          status="$(curl -sS -o "$RUNNER_TEMP/pr-response.json" -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls" \
-            -d "$payload"
+            -d "$payload")"
+          if [[ "$status" == 2* ]]; then
+            python3 -c 'import json,sys; print("Opened PR:", json.load(open(sys.argv[1]))["html_url"])' \
+              "$RUNNER_TEMP/pr-response.json"
+          else
+            echo "POST /pulls returned HTTP $status; response body:"
+            cat "$RUNNER_TEMP/pr-response.json"
+            if [ "$status" = 403 ]; then
+              echo "::error::GITHUB_TOKEN cannot open pull requests (HTTP 403). Enable Settings -> Actions -> General -> Workflow permissions -> 'Allow GitHub Actions to create and approve pull requests'."
+            else
+              echo "::error::opening the back-merge PR failed with HTTP $status; see the response body above."
+            fi
+            title="$(printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin)["title"])')"
+            {
+              echo "## Back-merge PR could not be opened (HTTP $status)"
+              echo
+              echo "The branch \`$branch\` is pushed but has no PR. Open it by hand:"
+              echo
+              echo "https://github.com/$GITHUB_REPOSITORY/compare/dev...$branch?expand=1"
+              echo
+              echo "Ready-to-paste title:"
+              echo
+              echo "$title"
+              echo
+              echo "Ready-to-paste body:"
+              echo
+              printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body"])'
+              echo
+              echo "API response body:"
+              echo
+              echo '```json'
+              cat "$RUNNER_TEMP/pr-response.json"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

@@ -15,6 +15,14 @@ maintainer never has to run git locally for it.
 - **Merge the PR with "Create a merge commit", never squash** — squashing it recreates the problem.
 - The back-merge commit is content-neutral, so `sonarqube.yml` detects it by tree comparison and
   skips the scan — there is nothing to analyse.
+**Precondition: the repo must allow Actions to open pull requests.** Settings → Actions → General →
+Workflow permissions → "Allow GitHub Actions to create and approve pull requests" must be enabled.
+The workflow's `GITHUB_TOKEN` carries `pull-requests: write`, but that permission is meaningless
+while the repo setting is off. Without it the failure is easy to misread: the branch push succeeds
+and only the PR creation is refused (HTTP 403), so the run ends with an orphaned branch and no PR.
+The job summary then carries the API's response body, the compare link and the ready-to-paste PR
+title and body, so a human can open the PR by hand in a few seconds.
+
 - **The one thing that breaks it:** a hotfix committed straight to `main`, bypassing `dev`.
   `-s ours` would drop it from `dev`'s tree, and if it only edits shared files the deletion guard
   cannot see it. Hotfixes must land on `dev` first, then be promoted like everything else.
