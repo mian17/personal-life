@@ -31,7 +31,15 @@ Acceptance criteria:
   the wrapper draws the targets as one stepped reference line over the bars (a straight
   line when the targets are equal), in the target token colour, labelled accessibly.
 - 375 px: the wrapper thins x-axis ticks so 30 daily bars stay legible (at most 7
-  labelled ticks) and never forces a wider screen.
+  labelled ticks) and never forces a wider screen. `labelsThatFit` decides how many
+  labels the plot can carry; `visibleTickIndexes` decides where they land — first and
+  last bucket always labelled, and consecutive labels at least
+  `ceil((LABEL_WIDTH + LABEL_GAP) / bandWidth)` bands apart, so no two labels overprint
+  on neighbouring bands (the 7-bucket week view labels `0, 2, 4, 6`, not `0, 2, 3, 5, 6`).
+- The y axis writes one number format: every tick keeps its leading zero (`0.25`, never
+  `.25`), so a decimal axis never mixes `.25` with `0.5`. The axis reserves room for its
+  widest tick (`Y_AXIS_WIDTH`) because the plot clips at its left edge — an axis sized
+  narrower than its own text cuts the leading glyph off and reads as that second format.
 - Accessibility is decided here: every chart exposes `role="img"` with an `aria-label`
   summary and a visually-hidden text alternative of its data (the numbers behind the
   bars), so screen-reader users get the same facts.
@@ -128,7 +136,10 @@ them.)
   `target` renders as one stepped reference line at the right values; every colour
   attribute the wrapper renders is a `var(--…)` reference; `role="img"` + `aria-label`
   and the visually-hidden data alternative are present; 30 buckets render at most 7
-  labelled x-ticks (the tick-thinning policy is a pure function the suite pins).
+  labelled x-ticks (the tick-thinning policy is a pure function the suite pins); 7
+  buckets with 5 requested labels and ~40.7 px bands label only `0, 2, 4, 6` — no two
+  kept indexes adjacent; every y-axis tick text starts with a digit and starts inside the
+  plot box (no clipped glyph).
 - `progress-bar.test.tsx` asserts: the fill width is the clamped percent, the
   `progressbar` role semantics, and that it does not depend on recharts.
 - `packages/ui/test/tokens.test.ts` stays byte-identical and green.
@@ -178,7 +189,9 @@ them.)
 4. `packages/ui/test/tokens.test.ts` is byte-identical to `origin/dev` and green.
 5. `bar-chart.test.tsx` proves the target-line semantics (stepped line over per-bucket
    targets), the tick-thinning policy (≤ 7 labelled ticks for 30 buckets, thinned against
-   the plot width recharts measured so neighbouring labels never touch), token-only
+   the plot width recharts measured so neighbouring labels never touch — band spacing,
+   not rounding, decides where the kept labels land), one y-axis number format with the
+   leading zero kept and the axis wide enough to paint it whole, token-only
    colouring, a bar drawn for a zero-minute bucket (a `0` draws a 2 px hairline rather than
    nothing, so an empty day never reads as missing data), and the accessible name +
    visually-hidden data alternative.

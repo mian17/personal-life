@@ -49,6 +49,13 @@ const LABEL_WIDTH = 48;
 const LABEL_GAP = 6;
 
 /**
+ * Room for the widest y tick (`"0.25"`, ~34px) plus the axis's own `tickSize` and
+ * `tickMargin`. The plot clips at its left edge, so a narrower axis cuts off the leading
+ * glyph and reads as a second number format (`.25` beside `0.5`).
+ */
+const Y_AXIS_WIDTH = 44;
+
+/**
  * Plot margins: the right side holds the final tick's half-label, which recharts centres on
  * the last band and would otherwise cut off at the plot edge.
  */
@@ -76,7 +83,7 @@ export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarC
           <RechartsBarChart data={rows} margin={PLOT_MARGIN}>
             <BucketAxis buckets={data} count={rows.length} />
             <YAxis
-              width={32}
+              width={Y_AXIS_WIDTH}
               domain={[0, tallestAmount(rows)]}
               tick={{ fill: 'var(--muted)' }}
               stroke="var(--border)"
@@ -111,7 +118,10 @@ export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarC
  */
 function BucketAxis({ buckets, count }: Readonly<{ buckets: BarChartBucket[]; count: number }>) {
   const plotArea = usePlotArea();
-  const labelledIndexes = new Set(visibleTickIndexes(count, labelsThatFit(plotArea?.width)));
+  const bandWidth = plotArea === undefined || count === 0 ? undefined : plotArea.width / count;
+  const labelledIndexes = new Set(
+    visibleTickIndexes(count, labelsThatFit(plotArea?.width), bandWidth),
+  );
 
   return (
     <XAxis
@@ -137,18 +147,29 @@ export function labelsThatFit(plotWidth: number | undefined): number {
 }
 
 /**
- * The bucket indexes that earn a tick label: at most `maxTicks` labels, spread evenly,
- * first and last always among them so the range a reader sees is exact.
+ * The bucket indexes that earn a tick label: at most `maxTicks` labels, first and last
+ * always among them so the range a reader sees is exact, and no two closer than one
+ * label needs — rounded picks alone can land two labels on neighbouring bands, which
+ * overprints at 375 px.
  */
-export function visibleTickIndexes(count: number, maxTicks: number): number[] {
+export function visibleTickIndexes(
+  count: number,
+  maxTicks: number,
+  bandWidth?: number,
+): number[] {
   if (count <= 0 || maxTicks <= 0) return [];
   if (maxTicks === 1) return [0];
-  if (count <= maxTicks) return Array.from({ length: count }, (_, index) => index);
 
   const lastIndex = count - 1;
-  const gap = lastIndex / (maxTicks - 1);
+  const bandsApart = bandWidth === undefined || bandWidth <= 0
+    ? 1
+    : Math.max(1, Math.ceil((LABEL_WIDTH + LABEL_GAP) / bandWidth));
+  const ticks = Math.min(maxTicks, Math.floor(lastIndex / bandsApart) + 1);
+  if (ticks <= 1) return [0];
 
-  return Array.from({ length: maxTicks }, (_, tick) => Math.round(tick * gap));
+  const gap = lastIndex / (ticks - 1);
+
+  return Array.from({ length: ticks }, (_, tick) => Math.round(tick * gap));
 }
 
 /** Names the ticks `visibleTickIndexes` picked, blanking every other tick's text. */

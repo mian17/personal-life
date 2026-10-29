@@ -95,6 +95,29 @@ describe('BarChart', () => {
     expect(highGoal.height).toBeLessThan(lowGoal.height);
   });
 
+  it('writes every y-axis tick in one number format, leading zero kept', () => {
+    const { container } = render(
+      <BarChart
+        data={[
+          { label: 'Mon', value: 0 },
+          { label: 'Tue', value: 1 },
+        ]}
+        label="Focus minutes per day"
+      />,
+    );
+
+    const yTicks = Array.from(
+      container.querySelectorAll(
+        '.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value',
+      ),
+    ).map((tick) => (tick.textContent ?? '').trim());
+
+    expect(yTicks).toContain('0.25');
+    for (const tick of yTicks) {
+      expect(tick).toMatch(/^-?\d/);
+    }
+  });
+
   it('carries the target line, axis ticks and axis strokes in tokens', () => {
     const { container } = render(<BarChart data={buckets} label="Focus minutes per day" />);
 
@@ -192,5 +215,15 @@ describe('visibleTickIndexes', () => {
 
   it('asks for no ticks when there is nothing to draw', () => {
     expect(visibleTickIndexes(0, 7)).toEqual([]);
+  });
+
+  it('drops every label whose band is narrower than a label, keeping the range ends', () => {
+    // 375 px week view: 7 buckets, 5 requested labels, ~40.7 px bands, 54 px of label.
+    const indexes = visibleTickIndexes(7, 5, 40.7);
+
+    expect(indexes).toEqual([0, 2, 4, 6]);
+    for (let at = 1; at < indexes.length; at += 1) {
+      expect(indexes[at] - indexes[at - 1]).toBeGreaterThan(1);
+    }
   });
 });
