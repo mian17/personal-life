@@ -2,33 +2,33 @@
 
 `life-ops` is one CLI and one MCP stdio server over the same operation registry: each
 `notes_*` tool and each `notes <op>` command is one call rendered twice. Both read the
-one credential store `life-ops login` writes; neither opens a browser except `login`.
+one credential store `npm run ops -- login` writes; neither opens a browser except `login`.
 
 ## Run the CLI by hand
 
-`packages/ops/package.json` publishes the bin as `life-ops` → `dist/cli/run.js`; the dev
-env file carries its ops block (`LIFE_OPS_*` plus `IDP_ISSUER`) — read that block in
-`scripts/setup-dev-env.sh`, whose IdP port is the one `login` dials.
+`packages/ops/package.json` publishes the bin as `life-ops` → `dist/cli/run.js`; the repo
+script `npm run ops` reads it back from `.env.development`, where
+`scripts/setup-dev-env.sh` writes the ops block (`LIFE_OPS_*` plus `IDP_ISSUER`, whose
+IdP port is the one `login` dials). Export nothing by hand.
 
 ```bash
 bash scripts/setup-dev-env.sh        # writes .env.development, never clobbers
 npm run build -w @life/ops
-OPS="node --env-file-if-exists=.env.development packages/ops/dist/cli/run.js"
-$OPS login
-$OPS notes list --limit 5
+npm run ops -- login
+npm run ops -- notes list --limit 5
 ```
 
 `login` is the one prerequisite: it drives the IdP in a browser and writes
 `~/.config/life-ops/credentials.json` (`0600`, `LIFE_OPS_CREDENTIALS_PATH` overrides).
-Shape is `life-ops <resource> <op> [flags]`, flags in kebab case (`--expected-version`):
+Shape is `npm run ops -- <resource> <op> [flags]`, flags in kebab case (`--expected-version`):
 
 ```bash
-$OPS notes create --body "runbook check"
-$OPS notes list --limit 5
-$OPS notes get --id <id>
-$OPS notes update --id <id> --body "edited" --expected-version 0
-$OPS notes delete --id <id>
-$OPS notes restore --id <id>
+npm run ops -- notes create --body "runbook check"
+npm run ops -- notes list --limit 5
+npm run ops -- notes get --id <id>
+npm run ops -- notes update --id <id> --body "edited" --expected-version 0
+npm run ops -- notes delete --id <id>
+npm run ops -- notes restore --id <id>
 ```
 
 Reusing a moved version exits 1 with `notes.update failed (conflict): Note was
@@ -36,18 +36,16 @@ modified`; codes: `invalidInput`, `unauthenticated`, `notFound`, `requestFailed`
 
 ## Drive it over MCP
 
-Same registry on stdio, but the server never logs in: run `life-ops login` once first.
-`args` needs the absolute path to `dist/mcp/server.js`; the env values below are dev's:
+Same registry on stdio, but the server never logs in: run `npm run ops -- login` once first.
+`npm run ops:mcp` is that same wrapper — this env file, this cwd — so the config carries no env:
 
 ```json
-{"mcpServers":{"life-ops":{"command":"node","args":["<repo>/packages/ops/dist/mcp/server.js"],
- "env":{"LIFE_OPS_SERVICE":"notes","LIFE_OPS_API_BASE":"http://127.0.0.1:3101","LIFE_OPS_CLIENT_ID":"dev",
-        "LIFE_OPS_RESOURCE":"https://note-service","IDP_ISSUER":"http://127.0.0.1:3102"}}}}
+{"mcpServers":{"life-ops":{"command":"npm","args":["run","ops:mcp"],"cwd":"<repo>"}}}
 ```
 
 Six tools: `notes_create`, `notes_get`, `notes_list`, `notes_update`, `notes_delete`,
 `notes_restore`. A missing store is a tool result, not a crash — `notes.list failed
-(unauthenticated): no token found, run \`life-ops login\` first`, `isError: true`, exit 0.
+(unauthenticated): no token found, run \`npm run ops -- login\` first`, `isError: true`, exit 0.
 Refresh is the server's job: a call near or past expiry refreshes inside the live
 process, so one login outlives one access token.
 
@@ -64,6 +62,6 @@ returns `invalid_redirect_uri`, and the CLI names the port instead of falling ba
 
 ## What to check when it does not work
 
-- `no token found, run \`life-ops login\` first` → run `life-ops login`.
+- `no token found, run \`npm run ops -- login\` first` → run `npm run ops -- login`.
 - `invalid_redirect_uri` → 8080 is not free, or the IdP redirect list changed.
 - `notes_list` rejects a token the CLI accepted → service is in development mode.

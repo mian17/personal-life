@@ -1,5 +1,5 @@
 /**
- * `life-ops login` (SPEC.md §3): OIDC authorization code + PKCE against the
+ * `npm run ops -- login` (SPEC.md §3): OIDC authorization code + PKCE against the
  * existing IdP, audience `life-api` (SPEC-service-kernel token model), client
  * `LIFE_OPS_CLIENT_ID` (default `dev` — a dedicated CLI registration would
  * touch `apps/idp`, which is out of scope). The browser lands back on a

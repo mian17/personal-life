@@ -100,7 +100,7 @@ describe('the executor token gate', () => {
     const executor = executorWith({ baseUrl: stub.baseUrl, token: undefined });
 
     await expect(executor.run('get', { id: SEEDED_IDS[0] })).rejects.toThrow(
-      'sample.get failed (unauthenticated): no token found, run `life-ops login` first',
+      'sample.get failed (unauthenticated): no token found, run `npm run ops -- login` first',
     );
     expect(stub.requestLog).toHaveLength(0);
   });
@@ -213,7 +213,7 @@ describe('the per-call deadline', () => {
     try {
       const exit = await runCli({
         argv: ['sample', 'get', '--id', 'row-a'],
-        service: { registry: sampleRegistry },
+        service: async () => ({ registry: sampleRegistry }),
         env: { LIFE_OPS_API_BASE: silentApi.baseUrl, LIFE_OPS_DEADLINE_MS: '100' },
         stdout: () => {},
         stderr: (line) => stderr.push(line),

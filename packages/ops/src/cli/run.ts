@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * The `life-ops` bin entry (SPEC.md §3 CLI): the CLI adapter itself. It loads the
- * service module pointed to by `LIFE_OPS_SERVICE`, parses the user's arguments,
+ * The `life-ops` bin entry (SPEC.md §3 CLI): the CLI adapter itself. A `call` loads
+ * the service module pointed to by `LIFE_OPS_SERVICE`, parses the user's arguments,
  * validates them locally through the shared core executor, sends them to the
  * service API over the shared HTTP executor, and renders one canonical output
  * shape. It defines no validation, wire, transport, auth, or error logic — an
@@ -27,8 +27,11 @@ export interface ServiceModule {
 
 export interface MainOptions {
   argv: string[];
-  /** The loaded service; the runner stays free of module resolution. */
-  service: ServiceModule;
+  /**
+   * Resolves the service; the runner stays free of module resolution. Only a `call`
+   * calls it, so `login`/`logout` work with no `LIFE_OPS_SERVICE` set.
+   */
+  service: () => Promise<ServiceModule>;
   env: NodeJS.ProcessEnv;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
@@ -69,10 +72,11 @@ async function logOut(options: MainOptions): Promise<number> {
 }
 
 async function runCall(options: MainOptions): Promise<number> {
-  const command = parseCallCommand(options.argv, options.service.registry);
+  const service = await options.service();
+  const command = parseCallCommand(options.argv, service.registry);
   const executor = createExecutor({
-    registry: options.service.registry,
-    baseUrl: apiBase(options),
+    registry: service.registry,
+    baseUrl: apiBase(service, options),
     readToken: currentAccessToken,
     deadlineMs: resolveDeadlineMs(options.env),
   });
@@ -80,8 +84,8 @@ async function runCall(options: MainOptions): Promise<number> {
   return SUCCESS_EXIT;
 }
 
-function apiBase(options: MainOptions): string {
-  const configured = options.service.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
+function apiBase(service: ServiceModule, options: MainOptions): string {
+  const configured = service.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
   if (!configured) throw new Error('LIFE_OPS_API_BASE is not set; point it at the service API base');
   return configured;
 }
@@ -139,12 +143,12 @@ async function importServiceModule(specifier: string): Promise<ServiceModule> {
   throw new Error(`LIFE_OPS_SERVICE module ${specifier} exports no service registry`);
 }
 
-/** The `bin` runner: read the environment, load the service, dispatch, exit. */
+/** The `bin` runner: read the environment, hand over service loading, dispatch, exit. */
 async function runBin(): Promise<void> {
   try {
     process.exitCode = await main({
       argv: process.argv.slice(2),
-      service: await loadService(process.env),
+      service: () => loadService(process.env),
       env: process.env,
       stdout: (line) => process.stdout.write(`${line}\n`),
       stderr: (line) => process.stderr.write(`${line}\n`),
