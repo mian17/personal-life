@@ -14,6 +14,8 @@ backup/
 .worktrees/
 # pi's own worktrees and handoff files
 .pi/worktrees/
+# intent docs are per-run scratch, never committed
+docs/intent/
 # security scan artifacts (generated)
 vbsec-reports/
 __pycache__/
