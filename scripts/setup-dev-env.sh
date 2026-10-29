@@ -113,6 +113,7 @@ LIFE_OPS_RESOURCE=https://note-service
 #   node --env-file-if-exists=.env.development packages/ops/dist/cli/run.js notes list --limit 5
 # MCP server (same env, JSON-RPC on stdio):
 #   node --env-file-if-exists=.env.development packages/ops/dist/mcp/server.js
+# CLI sequence, MCP client config and the life-ops login prerequisite: docs/runbooks/ops-cli-mcp.md
 
 # --- meal-service photo pipeline (optional; each degrades gracefully) -------
 # GEMINI_API_KEY=        # photo estimate off until set
