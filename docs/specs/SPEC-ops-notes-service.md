@@ -73,6 +73,8 @@ is destructive by kind default.
 - Terminal user: `LIFE_OPS_SERVICE=notes life-ops notes create --body "hello"`,
   `life-ops notes list --limit 20`, `life-ops notes restore --id <id>` … perform
   the operation against `note-service` and render the one canonical output shape.
+  In this repo the wrapper is `npm run ops -- …`: it loads `.env.development`, which
+  `scripts/setup-dev-env.sh` generates, so no variable is exported by hand.
 - AI agent (MCP): the server exposes `notes_create`, `notes_get`, `notes_list`,
   `notes_update`, `notes_delete`, `notes_restore`; `tools/call` runs the same
   executor the CLI runs and renders the same canonical shape.

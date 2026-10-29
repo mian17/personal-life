@@ -109,11 +109,12 @@ LIFE_OPS_SERVICE=notes
 LIFE_OPS_API_BASE=http://127.0.0.1:3101
 LIFE_OPS_CLIENT_ID=dev
 LIFE_OPS_RESOURCE=https://note-service
-# Run from the arc root after npm run build (omit --limit to page further):
-#   node --env-file-if-exists=.env.development packages/ops/dist/cli/run.js notes list --limit 5
-# MCP server (same env, JSON-RPC on stdio):
-#   node --env-file-if-exists=.env.development packages/ops/dist/mcp/server.js
-# CLI sequence, MCP client config and the life-ops login prerequisite: docs/runbooks/ops-cli-mcp.md
+# Run from the arc root after `npm run build` (`npm run ops` reads this file; omit
+# --limit to page further):
+#   npm run ops -- notes list --limit 5
+# MCP server, same wrapper (JSON-RPC on stdio):
+#   npm run ops:mcp
+# CLI sequence, MCP client config and the `login` prerequisite: docs/runbooks/ops-cli-mcp.md
 
 # --- meal-service photo pipeline (optional; each degrades gracefully) -------
 # GEMINI_API_KEY=        # photo estimate off until set
