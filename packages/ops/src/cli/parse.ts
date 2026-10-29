@@ -46,9 +46,28 @@ function flagsToInput(operation: OpSpec, flags: string[]): Record<string, unknow
 
 /** One option per field spec: booleans flag, arrays repeat, numbers arrive as text. */
 function optionSpecs(operation: OpSpec): ParseArgsOptionsConfig {
-  return Object.fromEntries(
-    fieldNames(operation).map((fieldName) => [fieldName, optionFor(operation.fields[fieldName])]),
-  );
+  const specs: ParseArgsOptionsConfig = {};
+  for (const fieldName of fieldNames(operation)) {
+    const option = optionFor(operation.fields[fieldName]);
+    specs[fieldName] = option;
+    const kebab = kebabName(fieldName);
+    if (kebab !== fieldName) specs[kebab] = option;
+  }
+  return specs;
+}
+
+/**
+ * Users type CLI flags in kebab case (`--expected-version`), while the registry
+ * field keeps its camelCase name; the camelCase spelling stays accepted because
+ * `SPEC-ops-notes-service.md` documents `--tagIds`.
+ */
+function kebabName(fieldName: string): string {
+  return fieldName.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+/** The registry field a parsed flag names, whichever spelling reached `parseArgs`. */
+function fieldNameFor(operation: OpSpec, flagName: string): string {
+  return fieldNames(operation).find((name) => kebabName(name) === flagName) ?? flagName;
 }
 
 function optionFor(field: FieldSpec): { type: 'string' | 'boolean'; multiple?: boolean } {
@@ -62,9 +81,11 @@ function convertValues(
   values: Record<string, string | boolean | (string | boolean)[] | undefined>,
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(values).flatMap(([fieldName, value]) =>
-      value === undefined ? [] : [[fieldName, toInputValue(operation.fields[fieldName], value)]],
-    ),
+    Object.entries(values).flatMap(([flagName, value]) => {
+      if (value === undefined) return [];
+      const fieldName = fieldNameFor(operation, flagName);
+      return [[fieldName, toInputValue(operation.fields[fieldName], value)]];
+    }),
   );
 }
 

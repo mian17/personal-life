@@ -185,6 +185,15 @@ describe('the canonical failure text', () => {
 });
 
 describe('the call flag parser', () => {
+  it('accepts the kebab-case spelling of a camelCase field', () => {
+    const call = parseCallCommand(
+      ['notes', 'update', '--id', 'note-a', '--body', 'b', '--expected-version', '2'],
+      notesService.registry,
+    );
+
+    expect(call.input['expectedVersion']).toBe(2);
+  });
+
   it('turns a repeated numeric flag into a number array', () => {
     const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', '1', '--tagIds', '2'], tagRegistry);
 

@@ -110,7 +110,7 @@ LIFE_OPS_API_BASE=http://127.0.0.1:3101
 LIFE_OPS_CLIENT_ID=dev
 LIFE_OPS_RESOURCE=https://note-service
 # Run from the arc root after npm run build (omit --limit to page further):
-#   node --env-file-if-exists=.env.development node_modules/.bin/life-ops notes list --limit 5
+#   node --env-file-if-exists=.env.development packages/ops/dist/cli/run.js notes list --limit 5
 # MCP server (same env, JSON-RPC on stdio):
 #   node --env-file-if-exists=.env.development packages/ops/dist/mcp/server.js
 
