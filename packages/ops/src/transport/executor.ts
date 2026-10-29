@@ -20,7 +20,7 @@ import {
 export interface ExecutorOptions {
   registry: ResourceRegistry;
   baseUrl: string;
-  /** Reads the stored IdP access token; `undefined` means "run `life-ops login`". */
+  /** Reads the stored IdP access token; `undefined` means "run `npm run ops -- login`". */
   readToken: () => Promise<string | undefined>;
   /** Per-call deadline in ms; defaults to `30_000`, and `0` waits for the service forever. */
   deadlineMs?: number;

@@ -4,7 +4,7 @@
  * over untouched; one inside it is rotated once through `refresh()`, which
  * persists the rotated pair itself — this module never writes the store.
  *
- * Every failure reads as `undefined`, so the canonical `run \`life-ops login\``
+ * Every failure reads as `undefined`, so the canonical `run \`npm run ops -- login\``
  * hint surfaces: a stale token is worth no retry, and the fix is the same.
  */
 import { refresh } from './refresh';

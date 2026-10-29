@@ -104,6 +104,24 @@ OIDC_APP_REDIRECT_URIS=http://localhost:3100/auth/callback,http://127.0.0.1:3100
 OIDC_DEFAULT_RESOURCE=https://note-service
 OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api
 
+# --- @life/ops CLI + MCP (packages/ops) -------------------------------------
+# LIFE_OPS_SERVICE is the bare module name the CLI accepts (notes).
+# LIFE_OPS_API_BASE is the only address here: dev:build runs every service on
+# the host (ports 3100-3108), so this stays 127.0.0.1:3101. The CLI dials it.
+# LIFE_OPS_CLIENT_ID is the seeded public PKCE client (dev).
+# LIFE_OPS_RESOURCE is never dialled: the IdP maps it via OIDC_AUDIENCE_MAP
+# to the life-api audience. Must be absolute; node-oidc-provider rejects else.
+LIFE_OPS_SERVICE=notes
+LIFE_OPS_API_BASE=http://127.0.0.1:3101
+LIFE_OPS_CLIENT_ID=dev
+LIFE_OPS_RESOURCE=https://note-service
+# Run from the arc root after `npm run build` (`npm run ops` reads this file; omit
+# --limit to page further):
+#   npm run ops -- notes list --limit 5
+# MCP server, same wrapper (JSON-RPC on stdio):
+#   npm run ops:mcp
+# CLI sequence, MCP client config and the `login` prerequisite: docs/runbooks/ops-cli-mcp.md
+
 # --- meal-service photo pipeline (optional; each degrades gracefully) -------
 # GEMINI_API_KEY=        # photo estimate off until set
 # GEMINI_MODEL=

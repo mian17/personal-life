@@ -66,7 +66,7 @@ export function missingTokenError(operation: string): OpsError {
     operation,
     code: 'unauthenticated',
     status: 401,
-    detail: 'no token found, run `life-ops login` first',
+    detail: 'no token found, run `npm run ops -- login` first',
   });
 }
 

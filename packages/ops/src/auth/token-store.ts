@@ -1,11 +1,11 @@
 /**
  * The one token store (SPEC.md §3, auth): both adapters read the credentials
- * `life-ops login` writes, so this file is the single source of truth for auth
+ * `npm run ops -- login` writes, so this file is the single source of truth for auth
  * and the only place a token exists at rest. It is written `0600` inside a
  * `0700` directory, replaced atomically, and never logged or printed.
  *
  * A missing, unreadable, or malformed file reads as "no credentials": callers
- * surface the canonical `run \`life-ops login\`` error instead of a parse crash,
+ * surface the canonical `run \`npm run ops -- login\`` error instead of a parse crash,
  * so a stale file is a recoverable state, never a broken tool.
  */
 import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';

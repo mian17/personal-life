@@ -31,6 +31,7 @@ const DESTRUCTIVE_KINDS: Readonly<Record<OpSpec['kind'], boolean>> = {
   list: false,
   update: true,
   delete: true,
+  restore: true,
 };
 
 /**
