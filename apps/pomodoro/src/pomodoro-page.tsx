@@ -2,6 +2,7 @@
 
 import { Button, Card, ConfirmButton, Row, StatusText, Stack } from '@life/ui';
 import { Countdown } from './countdown';
+import { useFocusRecorded } from './focus-recorder';
 import { SessionPills } from './session-pills';
 import type { Durations, Phase, Status } from './timer';
 import { useTimer } from './use-timer';
@@ -14,11 +15,18 @@ const PHASE_LABELS: Record<Phase, string> = {
 
 export interface PomodoroPageProps {
   durations: Durations;
+  /** Told the minutes of every focus block that ends, so the owner's day keeps them. */
+  onFocusBlockEnd?: (minutes: number) => void;
 }
 
-export function PomodoroPage({ durations }: Readonly<PomodoroPageProps>) {
+export function PomodoroPage({ durations, onFocusBlockEnd }: Readonly<PomodoroPageProps>) {
   const timer = useTimer(durations);
   const canReset = resetAllowed(timer.status);
+
+  useFocusRecorded(
+    { phase: timer.phase, durations, remainingMs: timer.remainingMs, status: timer.status },
+    onFocusBlockEnd,
+  );
 
   return (
     <Card fill>

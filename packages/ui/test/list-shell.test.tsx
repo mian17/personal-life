@@ -150,6 +150,36 @@ describe('ListShell', () => {
     expect(wrapper.querySelector('[data-testid="body"]')!.textContent).toBe('nothing here yet');
   });
 
+  it('drops the fab clearance when no fab renders, so the page reaches the safe area', () => {
+    const { container } = render(<ListShell title="Pomodoro" body={<span />} fill />);
+
+    const page = container.querySelector('.ui-page')!;
+    expect(page.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!')).toBe(
+      true,
+    );
+  });
+
+  it('keeps the fab clearance while a fab renders', () => {
+    const { container } = render(
+      <ListShell
+        title="Matrix"
+        body={<span />}
+        fabHref="/todos/new"
+        fabLabel="New todo"
+        fabIcon={<span />}
+        fill
+      />,
+    );
+
+    const page = container.querySelector('.ui-page')!;
+    expect(page.classList.contains('pb-[calc(var(--space-5)+env(safe-area-inset-bottom))]')).toBe(
+      true,
+    );
+    expect(page.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!')).toBe(
+      false,
+    );
+  });
+
   it('the fill utilities make the page a full-height column and the body grow', () => {
     const { container } = render(
       <ListShell

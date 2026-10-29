@@ -14,6 +14,9 @@ import type { PgRunner } from '../src/pg-client';
 
 const STAMP = '2026-10-01T12-34-56-789Z';
 const DB = 'feedback';
+const FOCUS = 'focus';
+/** The two databases `resolvePgDatabases` reports, in order. */
+const DATABASES = [DB, FOCUS];
 
 /** Canned stdout that satisfies `tableCounts`' table list + per-table COUNT(*). */
 const TABLE_NAMES = ['events', 'notes'];
@@ -103,23 +106,31 @@ describe('runBackupPg naming + manifest', () => {
 
     expect(result.destination).toBe(join(fx.backupRoot, STAMP));
     expect(result.mode).toBe('routine');
-    expect(existsSync(join(fx.backupRoot, STAMP, `${DB}.dump`))).toBe(true);
+    for (const database of DATABASES) {
+      expect(existsSync(join(fx.backupRoot, STAMP, `${database}.dump`))).toBe(true);
+    }
 
-    expect(runner.copies).toEqual([
-      { from: `/tmp/db-backup-${STAMP}/${DB}.dump`, to: join(fx.backupRoot, STAMP, `${DB}.dump`) },
-    ]);
-    const dump = runner.calls.find((argv) => argv[0] === 'pg_dump');
-    expect(dump).toEqual([
-      'pg_dump',
-      '-Fc',
-      '--no-owner',
-      '-U',
-      DB,
-      '-d',
-      DB,
-      '-f',
-      `/tmp/db-backup-${STAMP}/${DB}.dump`,
-    ]);
+    // One `backup/` directory holds both archives.
+    expect(runner.copies).toEqual(
+      DATABASES.map((database) => ({
+        from: `/tmp/db-backup-${STAMP}/${database}.dump`,
+        to: join(fx.backupRoot, STAMP, `${database}.dump`),
+      })),
+    );
+    const dumps = runner.calls.filter((argv) => argv[0] === 'pg_dump');
+    expect(dumps).toEqual(
+      DATABASES.map((database) => [
+        'pg_dump',
+        '-Fc',
+        '--no-owner',
+        '-U',
+        database,
+        '-d',
+        database,
+        '-f',
+        `/tmp/db-backup-${STAMP}/${database}.dump`,
+      ]),
+    );
 
     // `pg_dump -f` never creates its parent directory, so the backup must `mkdir -p`
     // the container dump directory *before* it dumps (`restore-pg.ts` does the same).
@@ -141,16 +152,40 @@ describe('runBackupPg naming + manifest', () => {
     expect(manifest.mode).toBe('routine');
     expect(manifest.createdAt).toBe('2026-10-01T12:34:56.789Z');
     expect(manifest.pinned).toBe(false);
-    expect(manifest.databases).toHaveLength(1);
+    expect(manifest.databases.map((entry) => entry.name)).toEqual(DATABASES);
 
-    const entry = manifest.databases[0] as PgManifestEntry;
-    expect(entry.name).toBe(DB);
-    expect(entry.file).toBe(`${DB}.dump`);
-    expect(entry.source).toBe(DB);
-    expect(entry.pgRestoreList).toBe('ok');
-    expect(entry.bytes).toBeGreaterThan(0);
-    expect(entry.tables).toEqual(TABLE_COUNTS);
-    expect(result.snapshots[0]).toEqual(entry);
+    for (const [index, database] of DATABASES.entries()) {
+      const entry = manifest.databases[index] as PgManifestEntry;
+      expect(entry.name).toBe(database);
+      expect(entry.file).toBe(`${database}.dump`);
+      expect(entry.source).toBe(database);
+      expect(entry.pgRestoreList).toBe('ok');
+      expect(entry.bytes).toBeGreaterThan(0);
+      expect(entry.tables).toEqual(TABLE_COUNTS);
+      expect(result.snapshots[index]).toEqual(entry);
+    }
+  });
+
+  it('--only focus dumps the focus database alone, with its manifest entry', () => {
+    const fx = makeFixture();
+    dirs.push(fx.root);
+    const runner = makeRunner();
+
+    const result = runBackupPg({
+      argv: ['--only', FOCUS],
+      env: fx.env,
+      runner,
+      now: at,
+    });
+
+    expect(result.snapshots.map((snapshot) => snapshot.name)).toEqual([FOCUS]);
+    expect(existsSync(join(result.destination, `${DB}.dump`))).toBe(false);
+    expect(readManifestOf(result.destination).databases.map((entry) => entry.name)).toEqual([
+      FOCUS,
+    ]);
+    const dumps = runner.calls.filter((argv) => argv[0] === 'pg_dump');
+    expect(dumps).toHaveLength(1);
+    expect(dumps[0]).toContain(FOCUS);
   });
 
   it('--only feedback is accepted and the archived file is feedback.dump', () => {
@@ -280,10 +315,13 @@ describe('CLI exit codes', () => {
       console.log = original;
     }
     expect(codes).toEqual([0, 0]);
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(2 * DATABASES.length);
     for (const line of lines) {
-      expect(line).toContain('db:backup:pg [routine] feedback.dump -> ');
+      expect(line).toContain('db:backup:pg [routine] ');
       expect(line).toContain('pg_restore_list=ok');
+    }
+    for (const database of DATABASES) {
+      expect(lines.join('\n')).toContain(`${database}.dump -> `);
     }
   });
 

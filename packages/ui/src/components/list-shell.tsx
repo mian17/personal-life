@@ -47,6 +47,14 @@ const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
  */
 const fillBodyStyles = 'flex-1 min-h-0 grid [grid-template-rows:minmax(0,1fr)]';
 
+/**
+ * A page with no `FabLink` has no fab to clear, so its bottom padding is the screen edge
+ * alone — `PageShell`'s `--space-5` band would otherwise float the content above the safe
+ * area. Important because both paddings are utilities of one layer, where the later one in
+ * the generated sheet wins regardless of attribute order.
+ */
+const fablessPageStyles = 'pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!';
+
 export function ListShell({
   title,
   navTrailing,
@@ -60,7 +68,12 @@ export function ListShell({
   fill,
 }: Readonly<ListShellProps>): JSX.Element {
   return (
-    <PageShell className={fill ? cx('ui-list-shell--fill', fillPageStyles) : undefined}>
+    <PageShell
+      className={cx(
+        fill && cx('ui-list-shell--fill', fillPageStyles),
+        fabHref == null && fablessPageStyles,
+      )}
+    >
       <NavBar trailing={navTrailing} />
       <PageTitle>{title}</PageTitle>
       {tabs}

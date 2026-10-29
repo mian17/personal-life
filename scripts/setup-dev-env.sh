@@ -58,6 +58,7 @@ TAGS_API_URL=http://127.0.0.1:3104
 TODO_API_URL=http://127.0.0.1:3105
 FEEDBACK_API_URL=http://127.0.0.1:3108
 MEAL_API_URL=http://127.0.0.1:3106
+FOCUS_API_URL=http://127.0.0.1:3107
 
 # --- content-encryption master keys (per-service custody) -------------------
 NOTE_MASTER_KEY=$(secret_or_gen NOTE_MASTER_KEY)
@@ -65,6 +66,7 @@ TAGS_MASTER_KEY=$(secret_or_gen TAGS_MASTER_KEY)
 TODO_MASTER_KEY=$(secret_or_gen TODO_MASTER_KEY)
 MEAL_MASTER_KEY=$(secret_or_gen MEAL_MASTER_KEY)
 FEEDBACK_MASTER_KEY=$(secret_or_gen FEEDBACK_MASTER_KEY)
+FOCUS_MASTER_KEY=$(secret_or_gen FOCUS_MASTER_KEY)
 
 # --- feedback service: throwaway pair from scripts/dev-infra.sh
 # 5433/5673, never the compose pair on 5432/5672: production owns those ports.
@@ -74,6 +76,10 @@ FEEDBACK_DB_PASSWORD=${FB_DB_PW}
 FEEDBACK_RABBITMQ_PASSWORD=${FB_MQ_PW}
 FEEDBACK_DB_URL=postgresql://feedback:${FB_DB_PW}@127.0.0.1:5433/feedback
 RABBITMQ_URL=amqp://feedback:${FB_MQ_PW}@127.0.0.1:5673
+
+# --- focus-service: its own database on the same throwaway Postgres
+# dev-infra.sh creates the focus database on its up step.
+FOCUS_DB_URL=postgresql://feedback:${FB_DB_PW}@127.0.0.1:5433/focus
 
 # --- todo-service -----------------------------------------------------------
 TODO_TIMEZONE=Asia/Ho_Chi_Minh

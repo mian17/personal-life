@@ -173,6 +173,11 @@ export type { FeedbackNavItemProps } from './components/feedback-nav-item';
 export { FEEDBACK_STATUSES, feedbackStatusOption } from './components/feedback-status';
 export type { FeedbackStatusOption, FeedbackStatusToken } from './components/feedback-status';
 
+export { BarChart, visibleTickIndexes } from './components/bar-chart';
+export type { BarChartBucket, BarChartProps } from './components/bar-chart';
+export { ProgressBar } from './components/progress-bar';
+export type { ProgressBarProps } from './components/progress-bar';
+
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 

@@ -61,6 +61,12 @@ export interface StackConfig {
    * either way: the slot owns them, so its teardown removes them.
    */
   feedbackPort?: number;
+  /**
+   * focus-service: 3109 in the test harness, 3209 in the dev harness, never the
+   * dev stack's 3107 (feedback owns 3107 on the test band). Spawned on the slot's
+   * own throwaway Postgres, in a `focus` database beside feedback's.
+   */
+  focusPort: number;
   mealPort: number;
   /** Browser origin the app is reached on (`localhost` or `127.0.0.1`). */
   appOrigin: string;
@@ -224,6 +230,20 @@ function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
+function focusEnv(cfg: StackConfig, dbUrl: string): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(cfg.focusPort),
+    HOST: '127.0.0.1',
+    FOCUS_DB_URL: dbUrl,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    FOCUS_IDP_JWKS_URL: `http://127.0.0.1:${cfg.idpPort}/jwks`,
+    FOCUS_SERVICE_AUDIENCE: 'life-api',
+    FOCUS_MASTER_KEY: HARNESS_MASTER_KEY,
+    REDIS_URL: undefined,
+  };
+}
+
 function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   const origin = cfg.appOrigin;
   return {
@@ -237,6 +257,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
       ? { FEEDBACK_API_URL: `http://127.0.0.1:${cfg.feedbackPort}` }
       : {}),
     MEAL_API_URL: `http://127.0.0.1:${cfg.mealPort}`,
+    FOCUS_API_URL: `http://127.0.0.1:${cfg.focusPort}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
@@ -262,15 +283,15 @@ const HARNESS_RABBITMQ_PASSWORD = 'test-only';
 
 /**
  * Boots the three throwaway containers the slot owns and returns the Postgres
- * URL feedback-service is wired to. Every harness boots all three, whatever it
- * consumes: the slot owns them, so its teardown is the only thing that removes
- * them. Postgres comes first because feedback-service fails closed without a DB.
+ * URLs on it. Every harness boots all three, whatever it consumes: the slot owns
+ * them, so its teardown is the only thing that removes them. Postgres comes
+ * first because feedback-service and focus-service fail closed without a DB.
  */
-async function bootSlotContainers(slot: number): Promise<string> {
-  const feedbackDbUrl = await startThrowawayPostgres(slot);
+async function bootSlotContainers(slot: number): Promise<SlotPostgres> {
+  const postgres = await startThrowawayPostgres(slot);
   await startThrowawayRabbitMq(slot);
   await bootSlotRedis(slot);
-  return feedbackDbUrl;
+  return postgres;
 }
 
 /**
@@ -283,21 +304,38 @@ async function bootSlotRedis(slot: number): Promise<void> {
   await startThrowawayRedis(slot);
 }
 
+/** One database per service on the slot's throwaway Postgres server. */
+interface SlotPostgres {
+  feedbackDbUrl: string;
+  focusDbUrl: string;
+}
+
 /**
- * A throwaway Postgres for feedback-service (the `pg-integration.test.ts`
- * pattern): slot-named `postgres:17-alpine` container, ephemeral loopback port,
- * never the compose `postgres-feedback`. A host without Docker fails fast — this e2e is
- * the feedback chapter's final proof, so a silent skip would hide it.
+ * A throwaway Postgres for the two database-backed services (the
+ * `pg-integration.test.ts` pattern): slot-named `postgres:17-alpine` container,
+ * ephemeral loopback port, never the compose `postgres-feedback`. A host without
+ * Docker fails fast — this e2e is the feedback chapter's final proof, so a silent
+ * skip would hide it.
  */
-async function startThrowawayPostgres(slot: number): Promise<string> {
+async function startThrowawayPostgres(slot: number): Promise<SlotPostgres> {
+  const container = feedbackPgContainer(slot);
   const port = await startThrowawayContainer({
-    name: feedbackPgContainer(slot),
+    name: container,
     image: 'postgres:17-alpine',
     environment: ['POSTGRES_PASSWORD=test-only', 'POSTGRES_DB=feedback'],
     containerPort: 5432,
-    readinessCommand: ['pg_isready', '-U', 'postgres'],
+    // TCP, not the socket: `pg_isready` with no host answers during initdb's
+    // temporary server, so the probe would report ready before the real one listens.
+    readinessCommand: ['pg_isready', '-h', '127.0.0.1', '-U', 'postgres'],
   });
-  return `postgresql://postgres:test-only@127.0.0.1:${port}/feedback`;
+  createFocusDatabase(container);
+  const serverUrl = `postgresql://postgres:test-only@127.0.0.1:${port}`;
+  return { feedbackDbUrl: `${serverUrl}/feedback`, focusDbUrl: `${serverUrl}/focus` };
+}
+
+/** `focus-service` fails closed without its own database, so the boot creates it. */
+function createFocusDatabase(container: string): void {
+  runDocker(['exec', container, 'psql', '-U', 'postgres', '-c', 'CREATE DATABASE focus']);
 }
 
 /**
@@ -477,9 +515,12 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
   if (cfg.feedbackPort !== undefined) {
     await ensurePortFree(cfg.feedbackPort, 'feedback-service', host);
   }
+  await ensurePortFree(cfg.focusPort, 'focus-service', host);
 
   rmSync(cfg.stateDir, { recursive: true, force: true });
   mkdirSync(cfg.stateDir, { recursive: true });
+
+  const slotPostgres = await bootSlotContainers(cfg.slot ?? 0);
 
   await build('apps/idp');
   execFileSync(bin('npm'), ['run', 'seed', '-w', 'apps/idp'], {
@@ -496,6 +537,17 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
         args: ['dist/main.js'],
         cwd: `${repoRoot()}/apps/idp`,
         env: idpEnv(cfg),
+      }),
+    );
+
+    await build('apps/focus-service');
+    services.push(
+      await spawnService({
+        name: 'focus-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/focus-service`,
+        env: focusEnv(cfg, slotPostgres.focusDbUrl),
       }),
     );
 
@@ -543,8 +595,6 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
       }),
     );
 
-    const feedbackDbUrl = await bootSlotContainers(cfg.slot ?? 0);
-
     const feedbackPort = cfg.feedbackPort;
     if (feedbackPort !== undefined) {
       await build('apps/feedback-service');
@@ -554,7 +604,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
           command: 'node',
           args: ['dist/main.js'],
           cwd: `${repoRoot()}/apps/feedback-service`,
-          env: feedbackEnv(cfg, feedbackPort, feedbackDbUrl),
+          env: feedbackEnv(cfg, feedbackPort, slotPostgres.feedbackDbUrl),
         }),
       );
     }
@@ -570,6 +620,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     if (cfg.feedbackPort !== undefined) {
       await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
     }
+    await waitForHttp(`http://127.0.0.1:${cfg.focusPort}/health/ready`, 60_000);
     await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
 
     return services;

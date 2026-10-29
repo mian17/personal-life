@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { readPrefNumber } from '@life/app-kit';
 import { ListShell } from '@life/ui';
-import { DEFAULT_DURATIONS, PomodoroPage, type Durations } from '@life/pomodoro';
+import { DEFAULT_DURATIONS, type Durations } from '@life/pomodoro';
 import { PomodoroNav } from './pomodoro-nav';
+import { TimerRecorder } from './timer-recorder';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default async function PomodoroRoute() {
     <ListShell
       title="Pomodoro"
       navTrailing={<PomodoroNav />}
-      body={<PomodoroPage durations={durations} />}
+      body={<TimerRecorder durations={durations} />}
       fill
     />
   );
