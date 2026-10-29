@@ -182,7 +182,7 @@ describe('the adapters', () => {
 
     const exit = await runCli({
       argv: ['sample', 'list'],
-      service: { registry: sampleRegistry },
+      service: async () => ({ registry: sampleRegistry }),
       env: { ...process.env, LIFE_OPS_API_BASE: api.baseUrl },
       stdout: () => {},
       stderr: (line) => stderr.push(line),

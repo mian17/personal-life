@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * The `life-ops` bin entry (SPEC.md §3 CLI): the CLI adapter itself. It loads the
- * service module pointed to by `LIFE_OPS_SERVICE`, parses the user's arguments,
+ * The `life-ops` bin entry (SPEC.md §3 CLI): the CLI adapter itself. A `call` loads
+ * the service module pointed to by `LIFE_OPS_SERVICE`, parses the user's arguments,
  * validates them locally through the shared core executor, sends them to the
  * service API over the shared HTTP executor, and renders one canonical output
  * shape. It defines no validation, wire, transport, auth, or error logic — an
@@ -27,8 +27,11 @@ export interface ServiceModule {
 
 export interface MainOptions {
   argv: string[];
-  /** The loaded service; the runner stays free of module resolution. */
-  service: ServiceModule;
+  /**
+   * Resolves the service; the runner stays free of module resolution. Only a `call`
+   * calls it, so `login`/`logout` work with no `LIFE_OPS_SERVICE` set.
+   */
+  service: () => Promise<ServiceModule>;
   env: NodeJS.ProcessEnv;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
@@ -69,10 +72,11 @@ async function logOut(options: MainOptions): Promise<number> {
 }
 
 async function runCall(options: MainOptions): Promise<number> {
-  const command = parseCallCommand(options.argv, options.service.registry);
+  const service = await options.service();
+  const command = parseCallCommand(options.argv, service.registry);
   const executor = createExecutor({
-    registry: options.service.registry,
-    baseUrl: apiBase(options),
+    registry: service.registry,
+    baseUrl: apiBase(service, options),
     readToken: currentAccessToken,
     deadlineMs: resolveDeadlineMs(options.env),
   });
@@ -80,32 +84,71 @@ async function runCall(options: MainOptions): Promise<number> {
   return SUCCESS_EXIT;
 }
 
-function apiBase(options: MainOptions): string {
-  const configured = options.service.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
+function apiBase(service: ServiceModule, options: MainOptions): string {
+  const configured = service.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
   if (!configured) throw new Error('LIFE_OPS_API_BASE is not set; point it at the service API base');
   return configured;
 }
 
 /** Loads the service module named by `LIFE_OPS_SERVICE`; exportable for test-only loading in-process. */
 export async function loadService(env: NodeJS.ProcessEnv): Promise<ServiceModule> {
-  const modulePath = env.LIFE_OPS_SERVICE?.trim();
-  if (!modulePath) throw new Error('LIFE_OPS_SERVICE is not set; point it at a registry module');
-  const exported = (await import(modulePath)) as {
+  const requested = env.LIFE_OPS_SERVICE?.trim();
+  if (!requested) throw new Error('LIFE_OPS_SERVICE is not set; point it at a registry module');
+  return await importServiceModule(moduleSpecifier(requested));
+}
+
+/**
+ * The in-package service modules a bare name may select (SPEC-ops-notes-service §9.2).
+ * A bare name outside this list fails by name instead of reaching a directory scan
+ * or an import of the literal string.
+ *
+ * ponytail: hand-listed, so a second service edits one line here. Add a
+ * `src/services` directory read when the list outgrows a screen.
+ */
+const IN_PACKAGE_SERVICE_NAMES = ['notes'] as const;
+
+/** A bare name is an in-package service; anything path-like stays a module specifier. */
+function moduleSpecifier(requested: string): string {
+  if (!isBareServiceName(requested)) return requested;
+  return inPackageServiceSpecifier(requested);
+}
+
+function isBareServiceName(requested: string): boolean {
+  return !/[/\\]/.test(requested);
+}
+
+function inPackageServiceSpecifier(serviceName: string): string {
+  if (!isInPackageService(serviceName)) throw new Error(unknownServiceMessage(serviceName));
+  return `../services/${serviceName}`;
+}
+
+function isInPackageService(serviceName: string): boolean {
+  return (IN_PACKAGE_SERVICE_NAMES as readonly string[]).includes(serviceName);
+}
+
+function unknownServiceMessage(serviceName: string): string {
+  const known = IN_PACKAGE_SERVICE_NAMES.join(', ');
+  return `LIFE_OPS_SERVICE names unknown service ${serviceName}; known services: ${known}`;
+}
+
+/** Reads whichever registry shape the module exports: a whole service, or a bare registry. */
+async function importServiceModule(specifier: string): Promise<ServiceModule> {
+  const exported = (await import(specifier)) as {
     service?: ServiceModule;
     registry?: ResourceRegistry;
     apiBase?: string;
   };
   if (exported.service !== undefined) return exported.service;
   if (exported.registry !== undefined) return { registry: exported.registry, apiBase: exported.apiBase };
-  throw new Error(`LIFE_OPS_SERVICE module ${modulePath} exports no service registry`);
+  throw new Error(`LIFE_OPS_SERVICE module ${specifier} exports no service registry`);
 }
 
-/** The `bin` runner: read the environment, load the service, dispatch, exit. */
+/** The `bin` runner: read the environment, hand over service loading, dispatch, exit. */
 async function runBin(): Promise<void> {
   try {
     process.exitCode = await main({
       argv: process.argv.slice(2),
-      service: await loadService(process.env),
+      service: () => loadService(process.env),
       env: process.env,
       stdout: (line) => process.stdout.write(`${line}\n`),
       stderr: (line) => process.stderr.write(`${line}\n`),

@@ -91,6 +91,12 @@ const HINTS_BY_KIND: Readonly<Record<OpSpec['kind'], ToolAnnotations>> = {
     idempotentHint: true,
     openWorldHint: false,
   },
+  restore: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
 };
 
 function describe(registry: ResourceRegistry, operation: OpSpec): string {

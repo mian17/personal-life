@@ -49,12 +49,18 @@ function hasExpectedShape(value: unknown, field: FieldSpec): boolean {
     case 'string':
       return typeof value === 'string';
     case 'number':
-      return typeof value === 'number' && Number.isFinite(value);
+      return isFiniteNumber(value);
     case 'boolean':
       return typeof value === 'boolean';
     case 'string[]':
       return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+    case 'number[]':
+      return Array.isArray(value) && value.every(isFiniteNumber);
   }
+}
+
+function isFiniteNumber(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 /** The canonical failure text adapters render before any network call. */

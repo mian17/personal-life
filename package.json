@@ -27,6 +27,8 @@
     "dev:build": "{ trap 'bash scripts/dev-infra.sh down' EXIT INT TERM; bash scripts/dev-infra.sh up && npm run dev:seed && npm run build && node --env-file-if-exists=.env.development node_modules/concurrently/dist/bin/concurrently.js -n note-service,tags-service,todo-service,meal-service,feedback-service,app,idp -c blue,yellow,cyan,green,magenta,white,red \"PORT=3101 npm run start -w apps/note-service\" \"PORT=3104 npm run start -w apps/tags-service\" \"PORT=3105 npm run start -w apps/todo-service\" \"PORT=3106 npm run start -w apps/meal-service\" \"PORT=3108 npm run start -w apps/feedback-service\" \"WEB_PORT=3100 APP_DEV_SKIP_ACCESS_GATE=1 npm run start -w apps/app\" \"PORT=3102 APP_DEV_SKIP_ACCESS_GATE=1 npm run start -w apps/idp\"; }",
     "dev:infra:up": "bash scripts/dev-infra.sh up",
     "dev:infra:down": "bash scripts/dev-infra.sh down",
+    "ops": "node --env-file-if-exists=.env.development packages/ops/dist/cli/run.js",
+    "ops:mcp": "node --env-file-if-exists=.env.development packages/ops/dist/mcp/server.js",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "node scripts/coverage.mjs",

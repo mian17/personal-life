@@ -9,6 +9,8 @@
  *   passes through untouched, the core never interprets the cursor payload.
  * - `update` patches the addressed row; `expectedVersion` rides in the body and
  *   the service raises `409` on a stale value (kernel concurrency rule).
+ * - `restore` posts to the addressed row's `restore` sub-path and carries no body:
+ *   the address is the whole request (SPEC-ops-agent-contract §3.2).
  */
 import type { OpSpec, ResourceRegistry, WireRequest } from './types';
 import { findOp } from './registry';
@@ -41,6 +43,8 @@ function methodFor(operation: OpSpec): WireRequest['method'] {
       return 'PATCH';
     case 'delete':
       return 'DELETE';
+    case 'restore':
+      return 'POST';
   }
 }
 
@@ -50,15 +54,18 @@ function pathFor(
   supplied: Record<string, unknown>,
 ): string {
   if (!addressesOneRow(operation)) return registry.basePath;
-  return `${registry.basePath}/${encodeURIComponent(String(supplied[ADDRESSING_FIELD]))}`;
+  const rowPath = `${registry.basePath}/${encodeURIComponent(String(supplied[ADDRESSING_FIELD]))}`;
+  return operation.kind === 'restore' ? `${rowPath}/${RESTORE_SEGMENT}` : rowPath;
 }
 
+const RESTORE_SEGMENT = 'restore';
+
 function addressesOneRow(operation: OpSpec): boolean {
-  return (
-    (operation.kind === 'get' || operation.kind === 'update' || operation.kind === 'delete') &&
-    ADDRESSING_FIELD in operation.fields
-  );
+  return ROW_KINDS.has(operation.kind) && ADDRESSING_FIELD in operation.fields;
 }
+
+/** The kinds whose request names a single row; the rest act on the collection. */
+const ROW_KINDS: ReadonlySet<OpSpec['kind']> = new Set(['get', 'update', 'delete', 'restore']);
 
 function queryFor(operation: OpSpec, supplied: Record<string, unknown>): Record<string, string> {
   if (operation.kind !== 'list') return {};
@@ -70,9 +77,12 @@ function asQueryPair([fieldName, value]: [string, unknown]): [string, string] {
 }
 
 function bodyFor(operation: OpSpec, supplied: Record<string, unknown>): WireRequest['body'] {
-  if (operation.kind === 'get' || operation.kind === 'delete') return undefined;
+  if (BODYLESS_KINDS.has(operation.kind)) return undefined;
   return Object.fromEntries(payloadEntries(operation, supplied));
 }
+
+/** Kinds whose request carries its whole meaning in method and path. */
+const BODYLESS_KINDS: ReadonlySet<OpSpec['kind']> = new Set(['get', 'delete', 'restore']);
 
 /** Supplied fields only, minus the address: absent optionals never reach the wire. */
 function payloadEntries(operation: OpSpec, supplied: Record<string, unknown>): [string, unknown][] {
