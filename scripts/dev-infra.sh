@@ -87,8 +87,18 @@ up() {
       rabbitmq:4.1-alpine >/dev/null
   fi
   wait_ready postgres docker exec "$PG" pg_isready -U feedback -d feedback
+  ensure_focus_database
   wait_ready rabbitmq docker exec "$MQ" rabbitmq-diagnostics -q ping
   echo "dev-infra: postgres 127.0.0.1:$PG_PORT  rabbitmq 127.0.0.1:$MQ_PORT"
+}
+
+# focus-service owns its own database on this server (FOCUS_DB_URL in
+# .env.development). Creating it here keeps `npm run dev` free of a manual step;
+# `CREATE DATABASE` has no IF NOT EXISTS, so the check runs first.
+ensure_focus_database() {
+  docker exec "$PG" psql -U feedback -d feedback -tAc \
+    "SELECT 1 FROM pg_database WHERE datname='focus'" | grep -q 1 && return 0
+  docker exec "$PG" psql -U feedback -d feedback -c "CREATE DATABASE focus OWNER feedback" >/dev/null
 }
 
 down() {

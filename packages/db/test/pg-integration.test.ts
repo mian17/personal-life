@@ -36,6 +36,8 @@ function docker(args: string[]): { status: number | null; stdout: string; stderr
 describeDocker('pg backup/restore against a throwaway container', () => {
   let root = '';
   let runner: PgRunner;
+  // The throwaway container holds the `feedback` database only, so this run dumps and
+  // restores that one; the two-database path is the fake-runner suites' subject.
   const env = () => ({
     INIT_CWD: root,
     FEEDBACK_DB_URL: 'postgresql://postgres@postgres-feedback:5432/feedback',
@@ -106,7 +108,7 @@ describeDocker('pg backup/restore against a throwaway container', () => {
     sql("INSERT INTO public.\"items\" (note) VALUES ('a'), ('b'), ('c');");
 
     const backup = runBackupPg({
-      argv: [],
+      argv: ['--only', 'feedback'],
       env: env(),
       runner,
       now: () => new Date('2026-10-01T12:34:56.789Z'),

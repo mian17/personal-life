@@ -26,7 +26,8 @@ export default async function globalSetup(): Promise<void> {
 }
 
 function productionStackConfig(slot: number): StackConfig {
-  const { idpPort, notePort, tagsPort, todoPort, mealPort, feedbackPort, appPort } = testPorts(slot);
+  const { idpPort, notePort, tagsPort, todoPort, mealPort, feedbackPort, focusPort, appPort } =
+    testPorts(slot);
 
   return {
     mode: 'production',
@@ -36,6 +37,7 @@ function productionStackConfig(slot: number): StackConfig {
     todoPort,
     mealPort,
     feedbackPort,
+    focusPort,
     appPort,
     appOrigin: `http://localhost:${appPort}`,
     // Never under any service's real `data/` directory — and never inside the
