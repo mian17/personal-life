@@ -5,13 +5,20 @@
  */
 export interface FieldSpec {
   /**
-   * The closed type set: `string`, `number`, `boolean`, `string[]`, `number[]`.
-   * `number[]` carries service ids (`tagIds`); the service rejects text entries,
-   * so the CLI converts repeated numeric flags rather than the wire.
+   * The closed type set: `string`, `number`, `boolean`, `string[]`, `number[]`,
+   * `object`, `object[]`. `number[]` carries service ids (`tagIds`); the service
+   * rejects text entries, so the CLI converts repeated numeric flags rather than
+   * the wire. The nested types carry their key set in `properties`.
    */
-  type: 'string' | 'number' | 'boolean' | 'string[]' | 'number[]';
+  type: 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'object' | 'object[]';
   required?: boolean;
   enum?: readonly string[];
+  /**
+   * The keys of one nested value, legal exactly on `object` and `object[]` and
+   * forbidden on every flat type. Recursive: an `object[]`'s `properties`
+   * describe one element, which may nest again (saved-meal item nutrients).
+   */
+  properties?: Record<string, FieldSpec>;
   description: string;
 }
 

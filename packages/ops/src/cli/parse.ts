@@ -3,6 +3,8 @@
  * plus the `login`/`logout` commands. Flags derive from the op's field specs, so
  * registering a new op needs no parser change. The parser shapes values; it never
  * decides whether they are valid — `core/validate` owns accept/reject (DRY rule).
+ * A nested field (`object`, `object[]`) takes its value as JSON text, so the CLI
+ * expresses exactly what an MCP object argument carries (SPEC-ops-all-services §1.1.1).
  */
 import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
 import type { FieldSpec, OpSpec, ResourceRegistry } from '../core/types';
@@ -96,7 +98,26 @@ function convertValues(
 function toInputValue(field: FieldSpec | undefined, value: unknown): unknown {
   if (field?.type === 'number') return Number(value);
   if (field?.type === 'number[]') return toNumberArray(value);
+  if (isNestedType(field?.type)) return toJsonValue(value);
   return value;
+}
+
+/**
+ * A nested flag carries JSON text: `--nutrients '{"calories":400}'`. Text that does not
+ * parse travels on as its own string, so the validator rejects it as `expected object`
+ * — one canonical failure shape for the CLI and the MCP adapter, never a `SyntaxError`.
+ */
+function toJsonValue(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function isNestedType(type: FieldSpec['type'] | undefined): boolean {
+  return type === 'object' || type === 'object[]';
 }
 
 function toNumberArray(value: unknown): unknown[] {

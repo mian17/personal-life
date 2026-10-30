@@ -11,6 +11,10 @@
  *   the service raises `409` on a stale value (kernel concurrency rule).
  * - `restore` posts to the addressed row's `restore` sub-path and carries no body:
  *   the address is the whole request (SPEC-ops-agent-contract §3.2).
+ * - a nested value travels in the body exactly as supplied: the core decides which
+ *   fields travel, never what a value becomes. Nested fields are body-only, so a
+ *   query-bearing `list` op may not declare one — that declaration is refused by
+ *   the shape guard before any schema or request exists (core/validate.ts).
  */
 import type { OpSpec, ResourceRegistry, WireRequest } from './types';
 import { findOp } from './registry';

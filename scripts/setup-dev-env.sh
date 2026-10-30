@@ -102,25 +102,33 @@ OIDC_APP_CLIENT_SECRET=dev-secret-not-a-real-secret
 OIDC_APP_REDIRECT_URI=http://127.0.0.1:3100/auth/callback
 OIDC_APP_REDIRECT_URIS=http://localhost:3100/auth/callback,http://127.0.0.1:3100/auth/callback
 OIDC_DEFAULT_RESOURCE=https://note-service
-OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api
+OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api,https://life-ops=life-api
 
 # --- @life/ops CLI + MCP (packages/ops) -------------------------------------
-# LIFE_OPS_SERVICE is the bare module name the CLI accepts (notes).
-# LIFE_OPS_API_BASE is the only address here: dev:build runs every service on
-# the host (ports 3100-3108), so this stays 127.0.0.1:3101. The CLI dials it.
-# LIFE_OPS_CLIENT_ID is the seeded public PKCE client (dev).
-# LIFE_OPS_RESOURCE is never dialled: the IdP maps it via OIDC_AUDIENCE_MAP
-# to the life-api audience. Must be absolute; node-oidc-provider rejects else.
-LIFE_OPS_SERVICE=notes
+# LIFE_OPS_SERVICE is the list of bare module names the CLI loads, comma-separated,
+# so one process drives all six dev services.
+# LIFE_OPS_API_BASE_<NAME> is each service's own address on this host
+# (ports 3100-3108). A lone service also accepts the shared LIFE_OPS_API_BASE
+# below; several services never share one base.
+# LIFE_OPS_CLIENT_ID is the seeded public PKCE client (dev), one token per process.
+# LIFE_OPS_RESOURCE is never dialled: the IdP maps it via OIDC_AUDIENCE_MAP to
+# the life-api audience every service verifies. Must be absolute; node-oidc-provider rejects else.
+LIFE_OPS_SERVICE=notes,todo,meal,tags,focus,feedback
+LIFE_OPS_API_BASE_NOTES=http://127.0.0.1:3101
+LIFE_OPS_API_BASE_TAGS=http://127.0.0.1:3104
+LIFE_OPS_API_BASE_TODO=http://127.0.0.1:3105
+LIFE_OPS_API_BASE_MEAL=http://127.0.0.1:3106
+LIFE_OPS_API_BASE_FOCUS=http://127.0.0.1:3107
+LIFE_OPS_API_BASE_FEEDBACK=http://127.0.0.1:3108
 LIFE_OPS_API_BASE=http://127.0.0.1:3101
 LIFE_OPS_CLIENT_ID=dev
-LIFE_OPS_RESOURCE=https://note-service
-# Run from the arc root after `npm run build` (`npm run ops` reads this file; omit
+LIFE_OPS_RESOURCE=https://life-ops
+# Run from the arc root after \`npm run build\` (\`npm run ops\` reads this file; omit
 # --limit to page further):
 #   npm run ops -- notes list --limit 5
 # MCP server, same wrapper (JSON-RPC on stdio):
 #   npm run ops:mcp
-# CLI sequence, MCP client config and the `login` prerequisite: docs/runbooks/ops-cli-mcp.md
+# CLI sequence, MCP client config and the \`login\` prerequisite: docs/runbooks/ops-cli-mcp.md
 
 # --- meal-service photo pipeline (optional; each degrades gracefully) -------
 # GEMINI_API_KEY=        # photo estimate off until set

@@ -13,6 +13,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { storeTokens } from '../src/auth/token-store';
 import { renderOpsResult } from '../src/cli/render';
+import type { LoadedModule } from '../src/cli/run';
+import type { ResourceRegistry } from '../src/core/types';
 import { sampleRegistry } from '../src/fixtures/sample';
 import { createMcpServer, main, type McpServer, type McpServerOptions } from '../src/mcp/server';
 import { resolveDeadlineMs } from '../src/transport/executor';
@@ -290,6 +292,55 @@ describe('structuredContent', () => {
   });
 });
 
+describe('a union of loaded modules', () => {
+  it('lists the tools of every loaded module, in load order then registry order', async () => {
+    const reply = await ask(serverOverUnion(unionRun({})), 'tools/list');
+
+    expect(toolNamesOf(reply)).toEqual([
+      'sample_create',
+      'sample_get',
+      'sample_list',
+      'sample_update',
+      'sample_delete',
+      'lists_list',
+    ]);
+  });
+
+  it('dials each tool at the base of the module that owns it', async () => {
+    const sampleApi = await startCannedApi({ status: 200, body: '{"id":"row-a","name":"sample"}' });
+    const listsApi = await startCannedApi({ status: 200, body: '{"items":[]}' });
+    try {
+      const server = serverOverUnion(
+        unionRun({
+          LIFE_OPS_API_BASE_SAMPLE: sampleApi.baseUrl,
+          LIFE_OPS_API_BASE_LISTS: listsApi.baseUrl,
+        }),
+      );
+
+      const sampleReply = await ask(server, 'tools/call', {
+        name: 'sample_get',
+        arguments: { id: 'row-a' },
+      });
+      const listsReply = await ask(server, 'tools/call', { name: 'lists_list', arguments: {} });
+
+      expect(renderedBodyOf(sampleReply)).toEqual({ id: 'row-a', name: 'sample' });
+      expect(renderedBodyOf(listsReply)).toEqual({ items: [] });
+    } finally {
+      await sampleApi.stop();
+      await listsApi.stop();
+    }
+  });
+
+  it('names an unknown tool rather than reaching any served base', async () => {
+    const reply = await ask(serverOverUnion(unionRun({})), 'tools/call', {
+      name: 'lists_nope',
+      arguments: {},
+    });
+
+    expect(reply.error).toEqual({ code: -32602, message: 'unknown tool: lists_nope' });
+  });
+});
+
 describe('the per-call deadline', () => {
   it.each([
     { name: 'no setting', env: {}, expected: 30_000 },
@@ -334,6 +385,37 @@ describe('the per-call deadline', () => {
 /** A server over the sample registry with writers a test never reads. */
 function serverOver(apiBase: string): McpServer {
   return serverOverConfigured(apiBase, process.env);
+}
+
+/** The second loaded module's registry, so a union server has two resources to serve. */
+const listsRegistry: ResourceRegistry = {
+  name: 'lists',
+  basePath: '/api/lists',
+  ops: [{ kind: 'list', fields: {} }],
+};
+
+/** A run over two loaded modules, under the environment a test adds to. */
+function unionRun(settings: NodeJS.ProcessEnv): McpServerOptions {
+  const modules: LoadedModule[] = [
+    { entry: 'sample', name: 'sample', resources: [sampleRegistry] },
+    { entry: 'lists', name: 'lists', resources: [listsRegistry] },
+  ];
+  return {
+    registry: modules.flatMap((module) => module.resources),
+    modules,
+    env: { ...process.env, ...settings },
+    stdout: () => {},
+    stderr: () => {},
+  };
+}
+
+function serverOverUnion(options: McpServerOptions): McpServer {
+  return createMcpServer(options);
+}
+
+/** The tool names a `tools/list` reply carries, in the order it declared them. */
+function toolNamesOf(reply: Reply): string[] {
+  return (reply.result as { tools: { name: string }[] }).tools.map((tool) => tool.name);
 }
 
 /** The same server under a given environment, so the deadline knob is a test's to set. */

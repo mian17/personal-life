@@ -6,18 +6,23 @@
  *
  * The case table exercises every `FieldSpec` type the sample registry declares
  * (string, number, boolean, string[]) plus the `number[]` type through a local
- * registry, required fields, unknown fields, and enums.
+ * registry, and both nested types through the saved-meals table: required
+ * fields, unknown fields, enums, nested required keys, nested unknown keys, and
+ * two-level nesting. The schema judgement lives in `support/schema-accepts.ts`
+ * and recurses, so nested drift is a failure rather than an unchecked region.
  */
 import { defineResource, kindIsDestructive } from '../src/core/registry';
-import { deriveInputSchema, type JsonSchema, type JsonSchemaProperty } from '../src/core/schema';
-import { validateInput } from '../src/core/validate';
+import { deriveInputSchema } from '../src/core/schema';
+import { shapeProblems, validateInput } from '../src/core/validate';
 import { describeIssues } from '../src/core/validate';
 import { fieldNames, findOp } from '../src/core/registry';
 import { sampleRegistry } from '../src/fixtures/sample';
-import type { OpSpec, ResourceRegistry } from '../src/core/types';
+import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types';
 import { listTools } from '../src/mcp/tools';
 import { parseCallCommand } from '../src/cli/parse';
+import { wireFor } from '../src/core/wire';
 import { service as notesService } from '../src/services/notes';
+import { accepts } from './support/schema-accepts';
 
 interface Case {
   name: string;
@@ -55,6 +60,99 @@ const tagRegistry = defineResource({
     },
   ],
 });
+
+/** The 27 nutrient keys of SPEC-ops-all-services §1.3, in `NUTRIENTS` order. */
+const NUTRIENT_KEYS = [
+  'calories',
+  'fat',
+  'monounsaturatedFat',
+  'polyunsaturatedFat',
+  'saturatedFat',
+  'transFat',
+  'cholesterol',
+  'sodium',
+  'carbohydrates',
+  'fiber',
+  'sugar',
+  'protein',
+  'vitaminA',
+  'vitaminC',
+  'thiaminB1',
+  'riboflavinB2',
+  'niacinB3',
+  'folateB9',
+  'vitaminB6',
+  'vitaminB12',
+  'calcium',
+  'iron',
+  'magnesium',
+  'phosphorus',
+  'potassium',
+  'zinc',
+  'caffeine',
+] as const;
+
+const nutrientProperties: Record<string, FieldSpec> = Object.fromEntries(
+  NUTRIENT_KEYS.map((key) => [
+    key,
+    { type: 'number' as const, required: true, description: `Amount of ${key}` },
+  ]),
+);
+
+/** A full 27-key nutrient vector, for the accepted nested cases. */
+const nutrientVector: Record<string, number> = Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, 1]));
+
+/**
+ * The field table of the saved-meals `create` op (SPEC-ops-all-services §1.3),
+ * carrying the two nested types §1.1.1 adds. Kept as a raw table, without a
+ * `defineResource` round trip, so the nested cases below judge the validator and the
+ * shape guard directly; `meal-parity.test.ts` covers the same tables through the registry.
+ */
+const mealFields: Record<string, FieldSpec> = {
+  name: { type: 'string', required: true, description: 'Saved meal name' },
+  nutrients: {
+    type: 'object',
+    required: true,
+    properties: nutrientProperties,
+    description: 'Nutrient vector (27 known keys)',
+  },
+  portions: {
+    type: 'object[]',
+    description: 'Portions of one food',
+    properties: {
+      label: { type: 'string', required: true, description: 'Portion label' },
+      amount: { type: 'number', required: true, description: 'Amount in the food unit' },
+    },
+  },
+  items: {
+    type: 'object[]',
+    description: 'Foods the saved meal holds',
+    properties: {
+      foodId: { type: 'string', required: true, description: 'Food identifier' },
+      quantity: { type: 'number', required: true, description: 'Amount in the food unit' },
+      nutrients: {
+        type: 'object',
+        required: true,
+        properties: nutrientProperties,
+        description: 'Nutrient vector of this item',
+      },
+    },
+  },
+};
+
+/** One `create` op over the nested table — the descriptor the validator reads. */
+const mealOperation: OpSpec = {
+  kind: 'create',
+  fields: mealFields,
+  isDestructive: true,
+};
+
+/** The same nested op as a registry, so the case table's schema half can read it. */
+const mealRegistry: ResourceRegistry = {
+  name: 'saved-meals',
+  basePath: '/api/saved-meals',
+  ops: [mealOperation],
+};
 
 /** The real notes registry (SPEC-ops-notes-service §1.1) — the module both adapters render. */
 const notesRegistry = notesService.registry;
@@ -118,6 +216,84 @@ const CASES: Case[] = [
   { name: 'omitting the notes delete id', registry: notesRegistry, kind: 'delete', supplied: {}, accepted: false },
   { name: 'a notes restore id', registry: notesRegistry, kind: 'restore', supplied: { id: 'n1' }, accepted: true },
   { name: 'omitting the notes restore id', registry: notesRegistry, kind: 'restore', supplied: {}, accepted: false },
+  {
+    name: 'a complete nested meal',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half', amount: 2 }] },
+    accepted: true,
+  },
+  {
+    name: 'a text nutrient amount',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: { ...nutrientVector, sodium: 'lots' } },
+    accepted: false,
+  },
+  {
+    name: 'an undeclared nutrient key',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: { ...nutrientVector, sodiumX: 1 } },
+    accepted: false,
+  },
+  {
+    name: 'a nutrient vector missing a required key',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: { calories: 400 } },
+    accepted: false,
+  },
+  {
+    name: 'an omitted nested nutrient vector',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a' },
+    accepted: false,
+  },
+  {
+    name: 'a non-object portion element',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: nutrientVector, portions: ['half'] },
+    accepted: false,
+  },
+  {
+    name: 'a portion element missing its required amount',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half' }] },
+    accepted: false,
+  },
+  {
+    name: 'an undeclared portion key',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half', amount: 2, unit: 'g' }] },
+    accepted: false,
+  },
+  {
+    name: 'a nested nutrient failure two levels down',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: {
+      name: 'a',
+      nutrients: nutrientVector,
+      items: [{ foodId: 'f1', quantity: 2, nutrients: { ...nutrientVector, sodium: 'lots' } }],
+    },
+    accepted: false,
+  },
+  {
+    name: 'a nested nutrient vector two levels down',
+    registry: mealRegistry,
+    kind: 'create',
+    supplied: {
+      name: 'a',
+      nutrients: nutrientVector,
+      items: [{ foodId: 'f1', quantity: 2, nutrients: nutrientVector }],
+    },
+    accepted: true,
+  },
 ];
 
 describe('the shared case table', () => {
@@ -132,6 +308,118 @@ describe('the shared case table', () => {
     });
   }
 });
+
+describe('the nested field paths', () => {
+  it('names the unknown nutrient by its dotted path', () => {
+    const issues = validateInput(mealOperation, {
+      name: 'a',
+      nutrients: { ...nutrientVector, sodiumX: 1 },
+    });
+
+    expect(describeIssues('saved-meals', 'create', issues)).toBe(
+      'invalid input for saved-meals.create: nutrients.sodiumX: unknown field',
+    );
+  });
+
+  it('names the omitted nutrient by its dotted path', () => {
+    const issues = validateInput(mealOperation, { name: 'a', nutrients: { calories: 400 } });
+
+    expect(issues).toContainEqual({ field: 'nutrients.sodium', reason: 'required' });
+  });
+
+  it('reports a two-level failure at items.0.nutrients.sodium', () => {
+    const issues = validateInput(mealOperation, {
+      name: 'a',
+      nutrients: nutrientVector,
+      items: [{ foodId: 'f1', quantity: 2, nutrients: { ...nutrientVector, sodium: 'lots' } }],
+    });
+
+    expect(issues).toEqual([{ field: 'items.0.nutrients.sodium', reason: 'expected number' }]);
+  });
+
+  it('reports a non-object array element by its index', () => {
+    const issues = validateInput(mealOperation, {
+      name: 'a',
+      nutrients: nutrientVector,
+      portions: ['half'],
+    });
+
+    expect(issues).toEqual([{ field: 'portions.0', reason: 'expected object' }]);
+  });
+
+  it('reports a missing required property of one array element', () => {
+    const issues = validateInput(mealOperation, {
+      name: 'a',
+      nutrients: nutrientVector,
+      portions: [{ label: 'half' }],
+    });
+
+    expect(issues).toEqual([{ field: 'portions.0.amount', reason: 'required' }]);
+  });
+});
+
+describe('the descriptor shape guard', () => {
+  it('accepts the nested declaration table', () => {
+    expect(shapeProblems(mealOperation)).toEqual([]);
+  });
+
+  it('names a nested field that declares no properties', () => {
+    expect(shapeProblems(operationOver({ nutrients: { type: 'object', description: 'Nutrients' } }))).toEqual([
+      'nutrients: object without properties',
+    ]);
+  });
+
+  it('names a flat field that declares properties', () => {
+    expect(
+      shapeProblems(
+        operationOver({
+          title: { type: 'string', description: 'Title', properties: { inner: { type: 'string', description: 'Inner' } } },
+        }),
+      ),
+    ).toEqual(['title: properties on flat field string']);
+  });
+
+  it('names a malformed declaration nested one level down', () => {
+    expect(
+      shapeProblems(
+        operationOver({
+          items: {
+            type: 'object[]',
+            description: 'Items',
+            properties: { nutrients: { type: 'object', description: 'Nutrients' } },
+          },
+        }),
+      ),
+    ).toEqual(['items.nutrients: object without properties']);
+  });
+
+  it('refuses a nested filter on a query op, before any tool schema exists', () => {
+    const nestedFilterOperation: OpSpec = {
+      kind: 'list',
+      fields: mealFields,
+      isDestructive: false,
+    };
+
+    expect(shapeProblems(nestedFilterOperation)).toContain('nutrients: object on a query op');
+  });
+
+  it('fails the derivation the MCP adapter calls, not a request assembly', () => {
+    const malformedRegistry: ResourceRegistry = {
+      name: 'saved-meals',
+      basePath: '/api/saved-meals',
+      ops: [{ kind: 'list', fields: mealFields, isDestructive: false }],
+    };
+
+    expect(() => deriveInputSchema(malformedRegistry, 'list')).toThrow(
+      'malformed list declaration: nutrients: object on a query op',
+    );
+  });
+});
+
+/** A `create` op over an arbitrary table — the shape guard judges ops, not bare tables. */
+function operationOver(fields: Record<string, FieldSpec>): OpSpec {
+  return { kind: 'create', fields, isDestructive: true };
+}
 
 describe('the derived schema', () => {
   it('rejects undeclared fields', () => {
@@ -219,6 +507,70 @@ describe('the call flag parser', () => {
     expect(describeIssues('notes', 'create', issues)).toBe(
       'invalid input for notes.create: tagIds: expected number[]',
     );
+  });
+
+  it('parses a JSON object flag into the object value', () => {
+    const call = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--nutrients', JSON.stringify(nutrientVector)],
+      mealRegistry,
+    );
+
+    expect(call.input['nutrients']).toEqual(nutrientVector);
+  });
+
+  it('parses a JSON array flag into the array of objects', () => {
+    const call = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--portions', '[{"label":"half","amount":2}]'],
+      mealRegistry,
+    );
+
+    expect(call.input['portions']).toEqual([{ label: 'half', amount: 2 }]);
+  });
+
+  it('renders malformed JSON as the canonical validation message, not a SyntaxError', () => {
+    const call = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--nutrients', 'not-json'],
+      mealRegistry,
+    );
+    const issues = validateInput(call.operation, call.input);
+
+    expect(describeIssues('saved-meals', 'create', issues)).toBe(
+      'invalid input for saved-meals.create: nutrients: expected object',
+    );
+  });
+
+  it('rejects a non-object JSON literal through the validator', () => {
+    const call = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--nutrients', '5'],
+      mealRegistry,
+    );
+    const issues = validateInput(call.operation, call.input);
+
+    expect(describeIssues('saved-meals', 'create', issues)).toBe(
+      'invalid input for saved-meals.create: nutrients: expected object',
+    );
+  });
+
+  it('reaches the wire body unchanged from the CLI flag', () => {
+    const parsed = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--nutrients', JSON.stringify(nutrientVector)],
+      mealRegistry,
+    );
+
+    expect(wireFor(mealRegistry, 'create', parsed.input).body).toEqual({
+      name: 'a',
+      nutrients: nutrientVector,
+    });
+  });
+
+  it('records the same request from the CLI and from an MCP object input', () => {
+    const supplied = { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half', amount: 2 }] };
+    const call = parseCallCommand(
+      ['saved-meals', 'create', '--name', 'a', '--nutrients', JSON.stringify(nutrientVector), '--portions', '[{"label":"half","amount":2}]'],
+      mealRegistry,
+    );
+
+    expect(wireFor(mealRegistry, 'create', call.input)).toEqual(wireFor(mealRegistry, 'create', supplied));
   });
 });
 
@@ -418,37 +770,4 @@ function toolOf(registry: ResourceRegistry, kind: OpSpec['kind']) {
 
 function annotationsOf(registry: ResourceRegistry, kind: OpSpec['kind']) {
   return toolOf(registry, kind).annotations;
-}
-
-/** True when `supplied` passes `schema` — the same judgement the validator makes. */
-function accepts(schema: JsonSchema, supplied: Record<string, unknown>): boolean {
-  if (schema.required.some((name) => supplied[name] === undefined)) return false;
-  return Object.entries(supplied).every(([name, value]) => declares(schema, name) && matches(schema.properties[name], value));
-}
-
-function declares(schema: JsonSchema, name: string): boolean {
-  if (name in schema.properties) return true;
-  return schema.additionalProperties !== false;
-}
-
-function matches(property: JsonSchemaProperty, value: unknown): boolean {
-  if (value === undefined) return true;
-  if (!hasType(property, value)) return false;
-  return property.enum === undefined || property.enum.includes(value as string);
-}
-
-function hasType(property: JsonSchemaProperty, value: unknown): boolean {
-  if (property.type === 'array') return hasItemType(property.items?.type, value);
-  if (property.type === 'number') return isFiniteNumber(value);
-  return typeof value === property.type;
-}
-
-function hasItemType(itemType: 'string' | 'number' | undefined, value: unknown): boolean {
-  if (!Array.isArray(value)) return false;
-  if (itemType === 'number') return value.every(isFiniteNumber);
-  return value.every((entry) => typeof entry === 'string');
-}
-
-function isFiniteNumber(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value);
 }

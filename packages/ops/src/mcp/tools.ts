@@ -3,8 +3,10 @@
  * is one registry op, named `<resource>_<op>`, titled `"<Verb> <resource>"`,
  * carrying the `inputSchema` derived from the same `FieldSpec` table the core
  * validator reads, and carrying the four behavior hints a human-in-the-loop gate
- * reads. This file owns nothing but that projection — a tool that restated a
- * schema or a wire shape would be a bug.
+ * reads. Every served registry contributes its ops, in load order then registry
+ * order, so one server serves the union one multi-service run loaded
+ * (SPEC-ops-all-services §1.1.2). This file owns nothing but that projection — a
+ * tool that restated a schema or a wire shape would be a bug.
  */
 import type { JsonSchema } from '../core/schema';
 import { deriveInputSchema, toolName } from '../core/schema';
@@ -27,13 +29,37 @@ export interface McpTool {
   annotations: ToolAnnotations;
 }
 
-/** Every registry op as one MCP tool, in registry order. */
-export function listTools(registry: ResourceRegistry): McpTool[] {
-  return registry.ops.map((operation) => toolFor(registry, operation));
+/** One registry, or the whole union one multi-service run loaded. */
+export type RegistryUnion = ResourceRegistry | ResourceRegistry[];
+
+/** The registry that owns one `tools/call` name, and the op there it names. */
+export interface ToolLocation {
+  registry: ResourceRegistry;
+  operation: OpSpec;
 }
 
-/** The op a `tools/call` name selects, or `undefined` when the name is not in the registry. */
-export function findTool(registry: ResourceRegistry, name: string): OpSpec | undefined {
+/** Every served registry's ops as MCP tools, in load order then registry order. */
+export function listTools(registrySet: RegistryUnion): McpTool[] {
+  return everyRegistry(registrySet).flatMap((registry) =>
+    registry.ops.map((operation) => toolFor(registry, operation)),
+  );
+}
+
+/** The registry and op a `tools/call` name selects; `undefined` when no served registry holds it. */
+export function findTool(registrySet: RegistryUnion, name: string): ToolLocation | undefined {
+  for (const registry of everyRegistry(registrySet)) {
+    const operation = operationNamed(registry, name);
+    if (operation !== undefined) return { registry, operation };
+  }
+  return undefined;
+}
+
+/** The registries one argument stands for: a single-service run names one, a union names all. */
+export function everyRegistry(registrySet: RegistryUnion): ResourceRegistry[] {
+  return Array.isArray(registrySet) ? registrySet : [registrySet];
+}
+
+function operationNamed(registry: ResourceRegistry, name: string): OpSpec | undefined {
   return registry.ops.find((operation) => toolName(registry, operation) === name);
 }
 
