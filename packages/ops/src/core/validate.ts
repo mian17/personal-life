@@ -68,8 +68,17 @@ function judgedInput(context: FieldTable, supplied: Record<string, unknown>): Va
 function missingProperties(context: FieldTable, supplied: Record<string, unknown>): ValidationIssue[] {
   return Object.entries(context.fields)
     .filter(([, field]) => field.required === true)
-    .filter(([fieldName]) => supplied[fieldName] === undefined)
+    .filter(([fieldName, field]) => holdsNothing(field, supplied[fieldName]))
     .map(([fieldName]) => ({ field: joinPath(context.fieldPath, fieldName), reason: 'required' }));
+}
+
+/**
+ * A flag whose value carries no address: an empty string is one `--id` with no value
+ * arrives as, and it must fail here rather than compile into a collection path.
+ */
+function holdsNothing(field: FieldSpec, value: unknown): boolean {
+  if (value === undefined) return true;
+  return field.type === 'string' && value === '';
 }
 
 function wrongValues(context: FieldTable, supplied: Record<string, unknown>): ValidationIssue[] {

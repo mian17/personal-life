@@ -58,8 +58,18 @@ function pathFor(
   supplied: Record<string, unknown>,
 ): string {
   if (!addressesOneRow(operation)) return registry.basePath;
-  const rowPath = `${registry.basePath}/${encodeURIComponent(String(supplied[ADDRESSING_FIELD]))}`;
+  const rowPath = `${registry.basePath}/${encodeURIComponent(addressedRowId(supplied))}`;
   return operation.kind === 'restore' ? `${rowPath}/${RESTORE_SEGMENT}` : rowPath;
+}
+
+/**
+ * Validation refuses an empty required `id` before the wire exists; this is the last gate,
+ * so a request can never quietly address the collection in place of one row.
+ */
+function addressedRowId(supplied: Record<string, unknown>): string {
+  const id = String(supplied[ADDRESSING_FIELD]);
+  if (id === '') throw new Error(`cannot address one row of ${ADDRESSING_FIELD}: empty value`);
+  return id;
 }
 
 const RESTORE_SEGMENT = 'restore';

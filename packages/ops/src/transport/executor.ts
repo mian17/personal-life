@@ -10,11 +10,15 @@ import { validateInput } from '../core/validate';
 import { wireFor } from '../core/wire';
 import {
   deadlineExceededError,
+  expiredCredentialsError,
   failureFromResponse,
   invalidInputError,
   missingTokenError,
   operationLabel,
+  OpsError,
   parseServiceBody,
+  RefreshRejected,
+  transportFailureError,
 } from './errors';
 
 export interface ExecutorOptions {
@@ -69,9 +73,10 @@ interface AuthorizedWire {
   token: string;
 }
 
-/** The budget governing one call: the operation name it names and its millisecond deadline. */
+/** The budget governing one call: the operation it names, where it went, and its deadline. */
 interface CallDeadline {
   operation: string;
+  baseUrl: string;
   deadlineMs: number;
 }
 
@@ -122,19 +127,28 @@ async function sendWire(endpoint: ServiceEndpoint, authorized: AuthorizedWire): 
 /**
  * The deadline covers the whole call — request, headers, and body stream — because
  * `AbortSignal.timeout` also rejects a body read that outlives it. An abort leaves as the
- * `timeout` OpsError; every other failure is rethrown untouched.
+ * `timeout` OpsError; a typed failure passes through; anything else means the service was
+ * never reached (or never answered coherently), so it leaves typed and naming its origin.
  */
 async function withinDeadline<T>(budget: CallDeadline, work: Promise<T>): Promise<T> {
   try {
     return await work;
   } catch (error) {
-    if (budget.deadlineMs === 0 || !isAbort(error)) throw error;
-    throw deadlineExceededError(budget.operation, budget.deadlineMs);
+    if (isAbort(error) && budget.deadlineMs !== 0) {
+      throw deadlineExceededError(budget.operation, budget.deadlineMs);
+    }
+    if (error instanceof OpsError) throw error;
+    throw transportFailureError(budget.operation, originOf(budget.baseUrl), error);
   }
 }
 
 function deadlineFor(endpoint: ServiceEndpoint, call: OperationCall): CallDeadline {
-  return { operation: labelFor(call), deadlineMs: endpoint.deadlineMs };
+  return { operation: labelFor(call), baseUrl: endpoint.baseUrl, deadlineMs: endpoint.deadlineMs };
+}
+
+/** Scheme, host and port only: a user's query never reaches a rendered detail. */
+function originOf(baseUrl: string): string {
+  return new URL(baseUrl).origin;
 }
 
 /** Node throws a `DOMException` here, which is not an `Error` subclass, so only its name is reliable. */
@@ -144,7 +158,15 @@ function isAbort(error: unknown): boolean {
 }
 
 async function requireToken(endpoint: ServiceEndpoint, call: OperationCall): Promise<string> {
-  const token = await endpoint.readToken();
+  let token: string | undefined;
+  try {
+    token = await endpoint.readToken();
+  } catch (error) {
+    if (error instanceof RefreshRejected) {
+      throw expiredCredentialsError(labelFor(call), error.message);
+    }
+    throw error;
+  }
   if (token === undefined) throw missingTokenError(labelFor(call));
   return token;
 }

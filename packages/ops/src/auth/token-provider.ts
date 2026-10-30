@@ -4,16 +4,19 @@
  * over untouched; one inside it is rotated once through `refresh()`, which
  * persists the rotated pair itself — this module never writes the store.
  *
- * Every failure reads as `undefined`, so the canonical `run \`npm run ops -- login\``
- * hint surfaces: a stale token is worth no retry, and the fix is the same.
+ * A store that is absent reads as `undefined`, so the canonical `run \`npm run ops -- login\``
+ * hint surfaces. A store that is present but holds a dead credential raises
+ * `RefreshRejected` instead: rotation was needed and could not deliver, which is a
+ * different fix from logging in, and the executor names the operation it happened on.
  */
+import { RefreshRejected, REFRESH_REJECTED_DETAIL } from '../transport/errors';
 import { refresh } from './refresh';
 import { readTokens, type StoredTokens } from './token-store';
 
 const DEFAULT_REFRESH_SKEW_MS = 60_000;
 
 /** The rotation in flight, shared by every concurrent reader; cleared when it settles. */
-let inFlightRotation: Promise<string | undefined> | undefined;
+let inFlightRotation: Promise<string> | undefined;
 
 /** The access token to send now: the stored one, or a rotation's when it is near expiry. */
 export async function currentAccessToken(): Promise<string | undefined> {
@@ -37,8 +40,8 @@ function expiresSoon(stored: StoredTokens, skewMs: number): boolean {
 }
 
 /** One rotation however many readers ask: the first starts it, the rest join it. */
-function rotateAccessToken(): Promise<string | undefined> {
-  inFlightRotation ??= rotateAndForgetFailure().finally(clearRotation);
+function rotateAccessToken(): Promise<string> {
+  inFlightRotation ??= rotateOrRaise().finally(clearRotation);
   return inFlightRotation;
 }
 
@@ -46,9 +49,17 @@ function clearRotation(): void {
   inFlightRotation = undefined;
 }
 
-async function rotateAndForgetFailure(): Promise<string | undefined> {
+/** A rotation that yields no pair leaves the credential dead, so it raises rather than answers. */
+async function rotateOrRaise(): Promise<string> {
+  const rotated = await attemptRefresh();
+  if (rotated === undefined) throw new RefreshRejected(REFRESH_REJECTED_DETAIL);
+  return rotated.accessToken;
+}
+
+/** `refresh` answers `undefined` when login is required and throws when the IdP is unreachable; both are one dead credential here. */
+async function attemptRefresh(): Promise<StoredTokens | undefined> {
   try {
-    return (await refresh())?.accessToken;
+    return await refresh();
   } catch {
     return undefined;
   }
