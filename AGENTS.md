@@ -36,8 +36,11 @@ contracts, so a lane never has to guess what a slot should say.
 Two rules sit in every prompt's `[IMPLEMENTATION REQUIREMENTS]`, in addition to the
 slots above:
 
-- The lane never `git commit`s, never stages, and never pushes — the parent owns the
-  commit, and a lane that commits hides its own diff from review.
+- A lane commits when its prompt says so — the prompt states either way, and a
+  commit is never a scope violation. A lane never pushes, never opens or merges a
+  pull request, and never stages a file outside the allowed list. Stage explicit
+  paths, never `git add -A`, and report the commit hash so the diff stays in view.
+  The parent keeps the decision and the review.
 - No intent, spec, report or task-plan file may be staged, because `docs/intent/`,
   `docs/specs/`, `docs/reports/` and `tasks/` are gitignored run scratch that never
   enters a commit.
