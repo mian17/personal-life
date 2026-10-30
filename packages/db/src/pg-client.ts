@@ -22,7 +22,6 @@ export interface PgIdentity {
 }
 
 export const DEFAULT_FEEDBACK_DB_URL = 'postgresql://feedback@postgres-feedback:5432/feedback';
-export const DEFAULT_FOCUS_DB_URL = 'postgresql://focus@postgres-focus:5432/focus';
 
 /** Parse a `postgresql://` URL into `{ user, database }` via `new URL()`. */
 export function parsePgDbUrl(raw: string): PgIdentity {
@@ -39,14 +38,12 @@ export function resolveFeedbackDb(env: NodeJS.ProcessEnv = process.env): PgIdent
   return parsePgDbUrl(env.FEEDBACK_DB_URL ?? DEFAULT_FEEDBACK_DB_URL);
 }
 
-/** `FOCUS_DB_URL` with the spec default (`SPEC-focus-service` §2). */
-export function resolveFocusDb(env: NodeJS.ProcessEnv = process.env): PgIdentity {
-  return parsePgDbUrl(env.FOCUS_DB_URL ?? DEFAULT_FOCUS_DB_URL);
-}
-
-/** Every Postgres database the backup and restore tools cover, in archive order. */
+/**
+ * Every Postgres database the backup and restore tools cover, in archive order.
+ * `focus-service` is SQLite (`SPEC-focus-service` Storage), so `feedback` is the only one.
+ */
 export function resolvePgDatabases(env: NodeJS.ProcessEnv = process.env): PgIdentity[] {
-  return [resolveFeedbackDb(env), resolveFocusDb(env)];
+  return [resolveFeedbackDb(env)];
 }
 
 /**

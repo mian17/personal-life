@@ -76,10 +76,8 @@ FEEDBACK_DB_PASSWORD=${FB_DB_PW}
 FEEDBACK_RABBITMQ_PASSWORD=${FB_MQ_PW}
 FEEDBACK_DB_URL=postgresql://feedback:${FB_DB_PW}@127.0.0.1:5433/feedback
 RABBITMQ_URL=amqp://feedback:${FB_MQ_PW}@127.0.0.1:5673
-
-# --- focus-service: its own database on the same throwaway Postgres
-# dev-infra.sh creates the focus database on its up step.
-FOCUS_DB_URL=postgresql://feedback:${FB_DB_PW}@127.0.0.1:5433/focus
+# --- focus-service: SQLite beside the other file-backed services
+FOCUS_DB_PATH=data/focus.db
 
 # --- todo-service -----------------------------------------------------------
 TODO_TIMEZONE=Asia/Ho_Chi_Minh

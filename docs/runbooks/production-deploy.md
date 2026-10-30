@@ -22,9 +22,12 @@ That pin already contains `pi/wf/feedback-status` (the status workflow), the mea
 body-limit fix, the ops agent contract and the whole pomodoro app (`/pomodoro`,
 `/pomodoro/settings`, its own PWA manifest). Record the exact commit you deploy in §3:
 the runbook pins a hash, and the hash moves as master advances.
-`compose.yaml` defines **16 services**: 7 built images (`app`, `idp`,
-`note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`) plus 7
-Redis instances, `postgres-feedback` and `rabbitmq-feedback`.
+`compose.yaml` defines **18 services**: 8 built images (`app`, `idp`,
+`note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`,
+`focus-service`) plus 8 Redis instances, `postgres-feedback` and
+`rabbitmq-feedback`. `focus-service` stores its rows in SQLite
+(`apps/focus-service/data/focus.db`), so it brings a cache and a bind mount but no
+database server.
 
 **Run by a human. Deploy and every data migration are hard lines.** This document is the
 checklist; it is not authority to run it.
@@ -37,9 +40,10 @@ checklist; it is not authority to run it.
   scripts — `scripts/encrypt-backfill.ts`, `scripts/rotate-master-key.ts`,
   `src/keys/backfill.ts` — none of which is a migration.) Schema is created at boot by
   TypeORM `synchronize: true` in all
-  six data services: `apps/note-service/src/app.module.ts:17`,
-  `apps/tags-service/src/app.module.ts:16`, `apps/todo-service/src/app.module.ts:25`,
-  `apps/meal-service/src/app.module.ts:25`, `apps/feedback-service/src/app.module.ts:24`,
+  seven data services: `apps/note-service/src/app.module.ts:16`,
+  `apps/tags-service/src/app.module.ts:15`, `apps/todo-service/src/app.module.ts:24`,
+  `apps/meal-service/src/app.module.ts:24`, `apps/feedback-service/src/app.module.ts:23`,
+  `apps/focus-service/src/app.module.ts:23`,
   `apps/idp/src/app.module.ts:18`.
 - **Human-run data migrations exist, and the one-shot ones below have already run on this
   host:**
@@ -69,6 +73,12 @@ checklist; it is not authority to run it.
   `feedback_events` NOTIFY trigger is re-ensured idempotently every boot
   (`apps/feedback-service/src/event/trigger-ddl.ts`). Nothing to declare, seed or create by
   hand.
+- **The focus store is new and it is a file, not a server.** `focus-service` is the
+  sixth SQLite service: `compose.yaml` mounts `./apps/focus-service/data:/data` and sets
+  `FOCUS_DB_PATH=/data/focus.db`. Its tables arrive by `synchronize` on the first boot and
+  `db:backup` covers the file from that point on, so no Postgres server, no
+  `FOCUS_DB_PASSWORD` and no `db:backup:pg` step exists for it. `db:backup:pg` keeps
+  dumping `feedback` only.
 - **No crontab is installed.** `backup/cron.log` does not exist, so neither §8 backup line
   has ever fired here. Scheduled backups are a first-time setup, not a running fixture.
 
@@ -85,35 +95,41 @@ checklist; it is not authority to run it.
 | `todo-service` | `apps/todo-service/Dockerfile` | internal `3005` | `apps/todo-service/data/todo.db` |
 | `feedback-service` | `apps/feedback-service/Dockerfile` | internal `3008` | `postgres-feedback` (Postgres) |
 | `meal-service` | `apps/meal-service/Dockerfile` | internal `3106` | `apps/meal-service/data/meal.db` |
+| `focus-service` | `apps/focus-service/Dockerfile` | internal `3107` | `apps/focus-service/data/focus.db` |
 | `postgres-feedback` | `postgres:17-alpine` | **published** `127.0.0.1:5432` | volume `postgres-feedback-data` |
 | `rabbitmq-feedback` | `rabbitmq:4.1-alpine` | **published** `127.0.0.1:5672` | volume `rabbitmq-feedback-data` |
 | `redis-app` | `redis:8-alpine` | — | volume `redis-app-data` (session store, AOF) |
 | `redis-idp`, `redis-note`, `redis-tags`, `redis-todo`, `redis-meal` | `redis:8-alpine` | — | none (caches; RDB+AOF off) |
 | `redis-feedback` | `redis:8-alpine` | — | volume `redis-feedback-data` (cache; RDB+AOF off) |
+| `redis-focus` | `redis:8-alpine` | — | volume `redis-focus-data` (cache; RDB+AOF off) |
 
 Facts that decide the steps below:
 
-- **Five SQLite bind mounts**: `./apps/{note,tags,todo,meal}-service/data:/data` and
-  `./apps/idp/data:/data`. `meal-service` writes `meal.db` (compose sets `DB_PATH:
-  /data/meal.db` — the app module's `life.db` default is dev-only). Containers
-  run as `node` (uid 1000), so each `data/` directory must be writable by uid
-  1000 or the service cannot create its database.
+- **Six SQLite bind mounts**: `./apps/{note,tags,todo,meal,focus}-service/data:/data`
+  and `./apps/idp/data:/data`. `meal-service` writes `meal.db` (compose sets `DB_PATH:
+  /data/meal.db` — the app module's `life.db` default is dev-only); `focus-service` writes
+  `focus.db` the same way. Containers run as `node` (uid 1000), so each `data/` directory
+  must be writable by uid 1000 or the service cannot create its database.
 - **Only four ports leave the host**: `3002` (app), `3003` (idp), `5432`
   (postgres-feedback), `5672` (rabbitmq-feedback) — all `127.0.0.1`-only. `tailscale serve`
-  proxies 443 → `127.0.0.1:3002` and 8443 → `127.0.0.1:3003`; the other four app services
+  proxies 443 → `127.0.0.1:3002` and 8443 → `127.0.0.1:3003`; the other six app services
   and every Redis are compose-network only.
 - **Named volumes are never removed** by an ordinary `docker compose down`/`up`; only `-v`
   destroys them, and `-v` takes `redis-app-data` (sessions) with it.
-- `app` is rebuilt by every deploy here: it carries the BFF base URLs
-  (`TAGS_API_URL`, `TODO_API_URL`, `FEEDBACK_API_URL`, `MEAL_API_URL`) and
-  `depends_on` all five backends.
+- The `app` service is rebuilt by every deploy here: it carries the BFF base URLs
+  (`TAGS_API_URL`, `TODO_API_URL`, `FEEDBACK_API_URL`, `MEAL_API_URL`, `FOCUS_API_URL`)
+  and `depends_on` all six backends. Without `FOCUS_API_URL` the pomodoro BFF falls back
+  to container-local loopback and every `/pomodoro` session and goal call fails.
 - **New surface in this ref**: `feedback-service` + its three infra containers and two
-  named volumes; the meals food catalog (`/meals/foods`, `/meals/foods/new`,
-  `/meals/foods/[id]`), the manual-log door (`/meals/entry/new?door=food`) and the
-  `Autosuggest` block in `packages/ui`; per-route PWA identity for `/meals` and
- `/feedback`, and the pomodoro app (`/pomodoro`, `/pomodoro/settings`) carrying its own
- manifest. `apps/app/Dockerfile` copies `@life/pomodoro` into the `app` image, so no new
- container, volume, published port or env name arrives with it.
+  named volumes; the pomodoro focus stack (`focus-service` + `redis-focus`, one more
+  named volume — the database is a file under the existing SQLite bind-mount pattern, so
+  no new published port); the meals food
+  catalog (`/meals/foods`, `/meals/foods/new`, `/meals/foods/[id]`), the manual-log door
+  (`/meals/entry/new?door=food`) and the `Autosuggest` block in `packages/ui`; per-route
+  PWA identity for `/meals` and `/feedback`, and the pomodoro app (`/pomodoro`,
+  `/pomodoro/settings`) carrying its own manifest. `apps/app/Dockerfile` copies
+  `@life/pomodoro` into the `app` image, so the app-side half of pomodoro brings no
+  container of its own; the service half is the focus stack above.
 - **New in the feedback status workflow** (already in this pin — no step of its own): the
   `feedback.status` column, the `PATCH /api/feedback/:id` status route, the row status
   pill and dropdown in `/feedback`, the URL-param status filter
@@ -124,9 +140,9 @@ Facts that decide the steps below:
 ## 2. Env (names only)
 
 `.env` values never touch a doc, a log or a chat — only the **names** are here. Compose
-reads the primary checkout's `.env` via `env_file: .env` (all seven built services).
+reads the primary checkout's `.env` via `env_file: .env` (all eight built services).
 
-**Compose refuses to start without these seven** (`${VAR:?…}`, `grep -n ':?' compose.yaml`):
+**Compose refuses to start without these eight** (`${VAR:?…}`, `grep -n ':?' compose.yaml`):
 
 | Var | Line | Notes |
 |---|---|---|
@@ -135,28 +151,30 @@ reads the primary checkout's `.env` via `env_file: .env` (all seven built servic
 | `TODO_MASTER_KEY` | `compose.yaml:101` | idem |
 | `FEEDBACK_MASTER_KEY` | `compose.yaml:151` | idem |
 | `MEAL_MASTER_KEY` | `compose.yaml:193` | idem |
-| `FEEDBACK_DB_PASSWORD` | `compose.yaml:472` | Postgres role password (`POSTGRES_PASSWORD`) |
-| `FEEDBACK_RABBITMQ_PASSWORD` | `compose.yaml:494` | broker `feedback` user password |
+| `FOCUS_MASTER_KEY` | `compose.yaml:242` | idem |
+| `FEEDBACK_DB_PASSWORD` | `compose.yaml:521` | Postgres role password (`POSTGRES_PASSWORD`) |
+| `FEEDBACK_RABBITMQ_PASSWORD` | `compose.yaml:543` | broker `feedback` user password |
 
-Master-key rules, all five alike:
+Master-key rules, all six alike:
 
-- Generate with `openssl rand -base64 32` — **once per service**, five distinct values,
+- Generate with `openssl rand -base64 32` — **once per service**, six distinct values,
   independent custody.
 - Verify before pasting: `printf '%s' "$K" | base64 -d | wc -c` → `32`. The loader
   (`packages/crypto/src/keys.ts:110-128`) fails closed on anything else.
 - **Write-once.** Changing a key makes that service's existing encrypted rows permanently
   undecryptable. Losing one loses that service's data.
 - Never regenerate `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`,
-  `MEAL_MASTER_KEY` or `FEEDBACK_MASTER_KEY` on the running stack.
+  `MEAL_MASTER_KEY`, `FEEDBACK_MASTER_KEY` or `FOCUS_MASTER_KEY` on the running stack.
 
 Passwords generated the same way (`openssl rand -hex 32`) must be set **before the first
-boot** of `postgres-feedback`/`rabbitmq-feedback`: both are used as the server's
+boot** of `postgres-feedback`/`rabbitmq-feedback`: each is used as the server's
 initialisation values, and changing them once `postgres-feedback-data` exists does not
 change the stored role password.
 
 Every other variable compose interpolates (names only):
 
 `FEEDBACK_IDP_JWKS_URL`, `FEEDBACK_RABBITMQ_USER`, `FEEDBACK_SERVICE_AUDIENCE`,
+`FOCUS_IDP_JWKS_URL`, `FOCUS_SERVICE_AUDIENCE`,
 `GEMINI_API_BASE`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `IDP_ISSUER`, `MEAL_IDP_JWKS_URL`,
 `MEAL_SERVICE_AUDIENCE`, `NOTE_SERVICE_AUDIENCE`, `NOTE_SERVICE_IDP_JWKS_URL`,
 `OIDC_APP_CLIENT_ID`, `OIDC_APP_CLIENT_SECRET`, `OIDC_APP_REDIRECT_URI`,
@@ -168,10 +186,10 @@ Two more reach containers through `env_file` without a compose default, so they 
 the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path) and
 `OWNER_LOGIN` (app access gate, `apps/app/middleware.ts:42`).
 
-- [ ] All seven fail-fast names are set in `.env`.
-- [ ] Five master keys generated and verified as 32 decoded bytes, each distinct.
+- [ ] All eight fail-fast names are set in `.env`.
+- [ ] Six master keys generated and verified as 32 decoded bytes, each distinct.
 - [ ] **`OIDC_AUDIENCE_MAP` contains `https://meal-service=life-api`** — the compose
-      default at `compose.yaml:245` now carries note/tags/todo/meal; a `.env` carried from
+      default at `compose.yaml:291` now carries note/tags/todo/meal; a `.env` carried from
       an older deploy stops at `todo-service` and every meal API call answers 401. Value
       form (a **comma**-separated list) is at `.env.example:43`.
 - [ ] The optional trios are present if you want the features: `GEMINI_API_KEY`,
@@ -202,9 +220,9 @@ cd /home/night/WebstormProjects/personal-life
 - [ ] Baseline the running stack: `docker compose ps` — the services you expect healthy
       before the change.
 - [ ] Build preflight: `bash scripts/preflight-build.sh` → `preflight: ok — 1 dependency
-      block across 7 Dockerfiles`. It asserts the seven Dockerfiles' `npm ci` dependency
+      block across 8 Dockerfiles`. It asserts the eight Dockerfiles' `npm ci` dependency
       block hashes identically (one shared BuildKit layer; without dedupe the build runs
-      seven monorepo installs and takes >30 minutes), that the daemon is reachable, and
+      eight monorepo installs and takes >30 minutes), that the daemon is reachable, and
       that the host has headroom (`PREFLIGHT_MIN_DISK_GB`, default `30`).
 - [ ] Check whether the feedback volumes survive from the last deploy — this decides whether
       §6 continues the old Postgres/RabbitMQ store or initialises a fresh empty one:
@@ -218,11 +236,11 @@ cd /home/night/WebstormProjects/personal-life
 - [ ] `.env` satisfies §2 — in particular a value in every fail-fast slot.
 - [ ] Compose interpolation resolves before building anything:
       `docker compose config >/dev/null` → exits 0 (it fails fast on a missing secret).
-- [ ] The five SQLite `data/` directories exist (`apps/note-service/data`,
+- [ ] The six SQLite `data/` directories exist (`apps/note-service/data`,
       `apps/tags-service/data`, `apps/todo-service/data`, `apps/meal-service/data`,
-      `apps/idp/data`) **and are owned by uid 1000** — containers run as `node`,
-      so a root-owned directory fails the service on its first database write.
-      Create any missing one yourself rather than letting Docker create it
+      `apps/focus-service/data`, `apps/idp/data`) **and are owned by uid 1000** — containers
+      run as `node`, so a root-owned directory fails the service on its first database
+      write. Create any missing one yourself rather than letting Docker create it
       root-owned: `mkdir -p apps/meal-service/data`; repair an existing one with
       `chown -R 1000:1000 apps/*/data`.
 - [ ] Published ports free on loopback: 3002, 3003, 5432, 5672 —
@@ -237,39 +255,45 @@ The Postgres dump needs its server **up**; the SQLite dumps want their writers s
 run them in that order — Postgres first, then stop everything, then the files.
 
 ```bash
-# 1. Feedback Postgres, while the server can still serve it
+# 1. feedback Postgres database, while its server still serves it
 npm run db:backup:pg -w @life/db -- --pin
 
 # 2. Stop the stack. NO -v : -v also removes redis-app-data (your sessions)
 docker compose down
 
-# 3. The five SQLite files, now quiescent
+# 3. The six SQLite files, now quiescent
 npm run db:backup -w @life/db -- --pin
 ```
 
-- `db:backup:pg` dumps the database named by `FEEDBACK_DB_URL`
-  (`postgresql://feedback@postgres-feedback:5432/feedback`) with `pg_dump -Fc --no-owner`
-  **inside** the `postgres-feedback` container, verifies the archive with `pg_restore
-  --list`, and records per-table counts. The host deliberately has no `pg_dump` of its own,
-  so this fails unless `postgres-feedback` is running — bring up just that service
-  (`docker compose up -d postgres-feedback`) and let it reach `(healthy)` first.
-- `db:backup` snapshots the **five** SQLite databases (`life`, `tags`, `todo`, `idp`,
-  `meal`) into `backup/<stamp>-pinned/`, each verified with `PRAGMA quick_check`. It is
-  read-only against its inputs. `--only life,tags,todo,idp` narrows the set (needed only
-  before `meal.db` exists — it does now).
+- `db:backup:pg` dumps the one Postgres database — `feedback` (from `FEEDBACK_DB_URL`, or
+  `DEFAULT_FEEDBACK_DB_URL`) — with `pg_dump -Fc --no-owner` run **inside its own
+  container** (`postgres-feedback`). It verifies the archive with `pg_restore --list` and
+  records per-table counts. The host deliberately has no `pg_dump` of its own, so this
+  fails unless that container is running — bring it up and let it reach `(healthy)` first
+  (`docker compose up -d postgres-feedback`). `--only feedback` is the whole set, so the
+  flag changes nothing here. `focus-service` is not in this dump: its rows live in SQLite
+  and arrive in step 3.
+- `db:backup` snapshots the **six** SQLite databases (`life`, `tags`, `todo`, `idp`,
+  `meal`, `focus`) into `backup/<stamp>-pinned/`, each verified with `PRAGMA quick_check`.
+  It is read-only against its inputs. `--only life,tags,todo,idp` narrows the set (needed
+  only before `meal.db` exists — it does now).
 - Each run writes its own UTC-stamped directory, and `--pin` appends `-pinned` to the name.
   The two kinds land seconds apart in separate directories — the newest pair here is
   `…2026-10-16T12-34-08-493Z-pinned` (Postgres) and `…12-34-39-247Z-pinned` (SQLite).
-- [ ] From `db:backup:pg`: a `feedback.dump -> … pg_restore_list=ok` line, and a new
-      `backup/<stamp>-pinned/` holding `feedback.dump` + `manifest.json` + a `PINNED`
+- [ ] From `db:backup:pg`: one `-> … pg_restore_list=ok` line (for `feedback`) and a new
+      `backup/<stamp>-pinned/` holding `feedback.dump`, `manifest.json` and a `PINNED`
       marker.
-- [ ] From `db:backup`: five `quick_check=ok` lines, and a second `backup/<stamp>-pinned/`.
+- [ ] From `db:backup`: six `quick_check=ok` lines, and a second `backup/<stamp>-pinned/`.
 - [ ] Retained until a routine backup lands on top of this stack. Rollback depends
       entirely on this — do not continue otherwise.
 - [ ] **The one permitted skip.** Only if `postgres-feedback` cannot be started at all,
-      `db:backup:pg` is skipped, and the run says so out loud: the store is created empty
-      in §6 and its first real snapshot is §8. That is a deliberate, named gap — not the
-      default. On this host Postgres *can* run, so take the dump.
+      `db:backup:pg` is skipped, and the run says so out loud: the feedback store is
+      created empty in §6 and its first real snapshot is §8. That is a deliberate, named
+      gap — not the default. On this host Postgres *can* run, so take the dump.
+
+      This skip does **not** extend to `focus`: `apps/focus-service/data/focus.db` is a
+      file, so step 3 always covers it, including on a first-ever boot where it holds no
+      rows yet.
 
 ## 5. Migration
 
@@ -308,13 +332,13 @@ node -e "const D=require('better-sqlite3');const db=new D('apps/note-service/dat
 docker compose up -d --build
 ```
 
-- [ ] Ordering is enforced by `depends_on` + healthchecks: `redis-*` → the five backends
+- [ ] Ordering is enforced by `depends_on` + healthchecks: `redis-*` → the six backends
       plus `idp` → `app`. Do not start `app` ahead of its backends.
 - [ ] Fresh host only: seed the IdP before booting the app —
       `NODE_ENV=production SEED_USERNAME=… SEED_PASSWORD=… npm run seed -w @life/idp`.
       On this host the identity DB is already seeded; the script refuses to overwrite an
       existing user.
-- [ ] `docker compose ps` — all 16 services up; every service that declares a healthcheck
+- [ ] `docker compose ps` — all 18 services up; every service that declares a healthcheck
       reports `(healthy)`. `app` declares none (it is the last dependency, not a target).
 - [ ] Any failure naming a `* is required` secret means §2 was not applied — fix `.env`
       and re-run the same `up`.
@@ -324,7 +348,7 @@ docker compose up -d --build
 ### Health and wiring
 
 ```bash
-for s in note-service:3001 tags-service:3004 todo-service:3005 feedback-service:3008 meal-service:3106; do
+for s in note-service:3001 tags-service:3004 todo-service:3005 feedback-service:3008 meal-service:3106 focus-service:3107; do
   n=${s%%:*}; p=${s##*:}; printf '%s ' "$n"
   docker compose exec -T "$n" node -e "fetch('http://127.0.0.1:$p/health/ready').then(r=>console.log(r.status)).catch(()=>console.log('fail'))"
 done
@@ -333,21 +357,28 @@ curl -fsS http://127.0.0.1:3003/health/ready -o /dev/null -w 'idp %{http_code}\n
 ```
 
 - [ ] Every readiness endpoint answers `200`; `app` answers on 3002.
-- [ ] `docker compose ps` shows `postgres-feedback`, `rabbitmq-feedback`, `redis-feedback`
-      and `feedback-service` healthy.
-- [ ] Volume state after boot — confirm both feedback volumes now exist (compose prefixes its
-      project name, so the real names are `personal-life_postgres-feedback-data` and
-      `personal-life_rabbitmq-feedback-data`):
-      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data'`.
-      If §3 found them absent, they are created here for the first time.
+- [ ] `docker compose ps` shows `postgres-feedback`, `rabbitmq-feedback`, `redis-focus`,
+      and `feedback-service` / `focus-service` healthy.
+- [ ] Volume state after boot — confirm the feedback pair and the focus cache volume now
+      exist (compose prefixes its project name, so the real names are
+      `personal-life_postgres-feedback-data`, `personal-life_rabbitmq-feedback-data` and
+      `personal-life_redis-focus-data`):
+      `docker volume ls | grep -E 'postgres-feedback-data|rabbitmq-feedback-data|redis-focus-data'`.
+      If §3 found the feedback pair absent, they are created here for the first time. The
+      focus store itself has no volume — it is `apps/focus-service/data/focus.db`, which
+      must show up as a file on the host after boot.
 - [ ] **Auth is on**: a tokenless internal request is 401 —
       `docker compose exec -T meal-service node -e "fetch('http://127.0.0.1:3106/api/foods').then(r=>console.log(r.status))"`
       → `401`.
 - [ ] `docker compose logs feedback-service --since 3m` — master key accepted, Postgres
       connected, exchange `feedback` created, no JWKS/audience error. A short RabbitMQ
       retry while the broker finishes booting is expected; a permanent failure is not.
+- [ ] `docker compose logs focus-service --since 3m` — `FOCUS_MASTER_KEY` accepted,
+      `better-sqlite3` opened `/data/focus.db` (no `SQLITE_CANTOPEN`, no permission error),
+      tables synced, no JWKS/audience error. `redis-focus` staying quiet is expected: the
+      cache is fail-open, so a cache miss degrades to the loader rather than logging errors.
 - [ ] `docker compose logs app --since 2m` — no BFF error for `/feedback`, `/meals`,
-      `/todos` or `/notes`.
+      `/todos`, `/pomodoro` or `/notes`.
 
 ### Notes (the ordering change is a real regression risk)
 
@@ -447,6 +478,18 @@ curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:3002/pomodoro/setti
       confirm-gated, disabled before any progress exists, and reaches a finished focus so
       it can drop straight into the break.
 - [ ] The phase-boundary beep plays once per boundary, not again on reload.
+- [ ] **The focus store is really being written** (this deploy's new triple): finish a
+      session, then read the row out of its own database file —
+      `docker compose exec -T focus-service node -e "const D=require('better-sqlite3');console.log(new D('/data/focus.db',{readonly:true}).prepare('select count(*) c from focus_session').get())"`
+      (goals live in `focus_goal`). A non-zero count proves `focus-service` → `focus.db`
+      end to end. Zero rows after a completed session means the BFF is still on its
+      `127.0.0.1:3107` fallback (`FOCUS_API_URL` unset) and every `/pomodoro` call failed
+      inside the `app` container.
+- [ ] Set a goal in `/pomodoro/settings`, reload, and confirm it survives — a write plus a
+      read through `redis-focus`. Fail-open check: `docker compose stop redis-focus` must
+      leave the page working (at most slower); `docker compose start redis-focus` after.
+- [ ] Nothing decrypted sits in the cache: `docker compose exec -T redis-focus redis-cli --scan`
+      lists keys only (`focus:<sub>:v<gen>:…`); the values are persisted rows, never DTOs.
 
 ### Per-route PWA identity
 
@@ -470,9 +513,10 @@ done
       0 3 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       0 4 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup:pg -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       ```
-      The first covers the five SQLite databases, the second the feedback dump.
-- [ ] Take a feedback Postgres snapshot once the stack is healthy, so the newly installed
-      cron is not the first thing that ever exercises `db:backup:pg`:
+      The first covers the six SQLite databases, the second the one Postgres database
+      (`feedback`).
+- [ ] Take a Postgres snapshot once the stack is healthy, so the newly installed cron is not
+      the first thing that ever exercises `db:backup:pg`:
       `npm run db:backup:pg -w @life/db -- --pin`.
 - [ ] Retention: newest 10 routine snapshots per kind; pinned and pre-restore snapshots
       never auto-pruned.
@@ -487,23 +531,24 @@ Code and data roll back together: older code cannot read an arrangement it never
       3002/3003 and fail closed (**exit 2**, `StackRunningError`) on a live stack, so the
       SQLite restore cannot run while `app` and `idp` are up — and it would replace
       nothing. `docker compose down` (no `-v`) before any restore line below.
-- [ ] **SQLite data** (all five databases):
+- [ ] **SQLite data** (all six databases):
       `npm run db:restore -w @life/db -- --from backup/<§4-stamp>-pinned`. It banks a pinned
       pre-restore snapshot of its own before overwriting anything.
-- [ ] **Feedback Postgres data**, when that store is in scope — the only step that needs a
+- [ ] **Postgres data**, when the feedback store is in scope — the only step that needs a
       server *up*: `docker compose up -d postgres-feedback` →
       `npm run db:restore:pg -w @life/db -- --from backup/<§8-stamp>-pinned` →
-      `docker compose down`. The `pg_restore` runs **inside** the container, so
-      `postgres-feedback` must be up while every client is down. The `--pin` in §8 means the
-      snapshot directory always carries a `-pinned` suffix; `<§8-stamp>` without it does not
-      exist and the restore exits 1.
+      `docker compose down`. Each `pg_restore` runs **inside that database's own container**
+      (`feedback` in `postgres-feedback`), so it must be up while every client is down;
+      `--only feedback` is the whole set. The
+      `--pin` in §8 means the snapshot directory always carries a `-pinned` suffix;
+      `<§8-stamp>` without it does not exist and the restore exits 1.
 - [ ] **Code**: `git checkout <the pre-merge ref you recorded in §3>`, then
       `docker compose up -d --build`.
 - [ ] `meal.db` is additive on the way in, **not on the way back**: this deploy only adds
       the `food.unit` column, but TypeORM `synchronize` reconciles *down* as well, so older
       code booting against the new file drops it again. No user data is at risk (the live
       `food` table holds 0 rows). Leave the file in place; do not delete it, and do not
-      delete `postgres-feedback-data` / `rabbitmq-feedback-data`.
+      delete `postgres-feedback-data` / `rabbitmq-feedback-data` / `redis-focus-data`.
 - [ ] **`feedback.status` is not additive on the way back either**, and this one *does* drop
       user-entered state: older code booting against the same Postgres makes `synchronize`
       drop the column, taking every status with it (existing rows go back to "no such
@@ -518,6 +563,11 @@ Code and data roll back together: older code cannot read an arrangement it never
       `docker compose up -d postgres-feedback` → `db:restore:pg` → `docker compose down`,
       and the pinned pre-restore snapshot that command takes is the undo path if the counts
       do not match.
+- [ ] **Focus store**: this deploy *introduces* `apps/focus-service/data/focus.db`, so a
+      code rollback leaves a file the older code never reads. Harmless, and the only reason
+      it exists is a forward deploy; leave it in place and the next `up` picks it up. Do not
+      delete it to "clean up" — it is the only copy of every pomodoro session recorded
+      since this deploy (and the first one §4/§8 ever snapshot).
 - [ ] **Never** rotate or regenerate a master key during rollback; **never**
       `docker compose down -v`; **never** delete `apps/*/data/`, `backup/` or `.env`.
 
@@ -550,7 +600,7 @@ disagree (they predate `master`'s current service set):
   not a production path.
 - `docs/intent/docker-deploy.md` — the original two-service intent (`api` 3003 + `web`
   3002, `API_TOKEN`/`OWNER_LOGIN` secrets, "zero migration"). **Stale**: it describes 2
-  containers where compose.yaml now defines 16, and its "zero migration" claim misses both
+  containers where compose.yaml now defines 18, and its "zero migration" claim misses both
   human-run migrations of §0. Keep for history; do not follow.
 
 Contracts (all at `d1f54c9^`): `docs/specs/SPEC-compose-build.md` (the shared build layer this runbook's

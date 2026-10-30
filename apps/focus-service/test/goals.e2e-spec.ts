@@ -2,11 +2,10 @@ import request from 'supertest';
 import { FakeRedisClient } from './fake-redis';
 import { JwtTestHarness } from './jwt-harness';
 import {
-  canProvidePostgres,
   startFocusApp,
-  startThrowawayPostgres,
+  startThrowawayDatabase,
   type FocusApp,
-  type ThrowawayPostgres,
+  type ThrowawayDatabase,
 } from './setup-env';
 
 /**
@@ -20,10 +19,8 @@ const SECOND_DAY = '2026-09-04';
 const THIRD_DAY = '2026-09-05';
 const OTHER_OWNER = 'user-b';
 
-const describeDb = canProvidePostgres() ? describe : describe.skip;
-
-describeDb('Daily focus goal (e2e)', () => {
-  let postgres: ThrowawayPostgres;
+describe('Daily focus goal (e2e)', () => {
+  let database: ThrowawayDatabase;
   let jwt: JwtTestHarness;
   let running: FocusApp;
   let redis: FakeRedisClient;
@@ -32,7 +29,7 @@ describeDb('Daily focus goal (e2e)', () => {
 
   const boot = async (): Promise<FocusApp> => {
     redis = new FakeRedisClient();
-    return startFocusApp({ databaseUrl: postgres.url, jwksUrl: jwt.jwksUrl, redis });
+    return startFocusApp({ databasePath: database.path, jwksUrl: jwt.jwksUrl, redis });
   };
 
   const putGoal = (token: string, body: Record<string, unknown>) =>
@@ -46,7 +43,7 @@ describeDb('Daily focus goal (e2e)', () => {
       .set('Authorization', `Bearer ${token}`);
 
   beforeAll(async () => {
-    postgres = await startThrowawayPostgres('goals');
+    database = await startThrowawayDatabase('goals');
     jwt = await new JwtTestHarness().start();
     running = await boot();
     ownerToken = await jwt.sign('user-a');
@@ -54,7 +51,8 @@ describeDb('Daily focus goal (e2e)', () => {
   });
 
   afterEach(async () => {
-    await running.dataSource.query('TRUNCATE TABLE "focus_session", "focus_goal"');
+    await running.dataSource.query('DELETE FROM "focus_session"');
+    await running.dataSource.query('DELETE FROM "focus_goal"');
     await running.close();
     running = await boot();
   });
@@ -62,7 +60,7 @@ describeDb('Daily focus goal (e2e)', () => {
   afterAll(async () => {
     await running?.close();
     await jwt?.stop();
-    await postgres?.stop();
+    await database?.stop();
   });
 
   it('keeps the past day on its own goal while a later day gets a new one', async () => {

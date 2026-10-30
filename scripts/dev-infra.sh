@@ -104,7 +104,6 @@ up() {
       rabbitmq:4.1-alpine >/dev/null
   fi
   wait_ready postgres "$PG" docker exec "$PG" pg_isready -U feedback -d feedback
-  ensure_focus_database
   # Exec as `rabbitmq`, never root: a root-run CLI node writes
   # /var/lib/rabbitmq/.erlang.cookie owned by root, and the server (same user
   # `rabbitmq`) then dies at prelaunch with `eacces`.
@@ -113,15 +112,6 @@ up() {
   # Containers must outlive `up` on success: the services run against them. The
   # parent subshell's own EXIT/INT trap removes them at teardown.
   trap - INT TERM
-}
-
-# focus-service owns its own database on this server (FOCUS_DB_URL in
-# .env.development). Creating it here keeps `npm run dev` free of a manual step;
-# `CREATE DATABASE` has no IF NOT EXISTS, so the check runs first.
-ensure_focus_database() {
-  docker exec "$PG" psql -U feedback -d feedback -tAc \
-    "SELECT 1 FROM pg_database WHERE datname='focus'" | grep -q 1 && return 0
-  docker exec "$PG" psql -U feedback -d feedback -c "CREATE DATABASE focus OWNER feedback" >/dev/null
 }
 
 down() {

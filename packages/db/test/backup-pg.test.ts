@@ -14,9 +14,8 @@ import type { PgRunner } from '../src/pg-client';
 
 const STAMP = '2026-10-01T12-34-56-789Z';
 const DB = 'feedback';
-const FOCUS = 'focus';
-/** The two databases `resolvePgDatabases` reports, in order. */
-const DATABASES = [DB, FOCUS];
+/** The one database `resolvePgDatabases` reports (`focus-service` is SQLite). */
+const DATABASES = [DB];
 
 /** Canned stdout that satisfies `tableCounts`' table list + per-table COUNT(*). */
 const TABLE_NAMES = ['events', 'notes'];
@@ -110,7 +109,7 @@ describe('runBackupPg naming + manifest', () => {
       expect(existsSync(join(fx.backupRoot, STAMP, `${database}.dump`))).toBe(true);
     }
 
-    // One `backup/` directory holds both archives.
+    // One `backup/` directory holds the single archive.
     expect(runner.copies).toEqual(
       DATABASES.map((database) => ({
         from: `/tmp/db-backup-${STAMP}/${database}.dump`,
@@ -164,28 +163,6 @@ describe('runBackupPg naming + manifest', () => {
       expect(entry.tables).toEqual(TABLE_COUNTS);
       expect(result.snapshots[index]).toEqual(entry);
     }
-  });
-
-  it('--only focus dumps the focus database alone, with its manifest entry', () => {
-    const fx = makeFixture();
-    dirs.push(fx.root);
-    const runner = makeRunner();
-
-    const result = runBackupPg({
-      argv: ['--only', FOCUS],
-      env: fx.env,
-      runner,
-      now: at,
-    });
-
-    expect(result.snapshots.map((snapshot) => snapshot.name)).toEqual([FOCUS]);
-    expect(existsSync(join(result.destination, `${DB}.dump`))).toBe(false);
-    expect(readManifestOf(result.destination).databases.map((entry) => entry.name)).toEqual([
-      FOCUS,
-    ]);
-    const dumps = runner.calls.filter((argv) => argv[0] === 'pg_dump');
-    expect(dumps).toHaveLength(1);
-    expect(dumps[0]).toContain(FOCUS);
   });
 
   it('--only feedback is accepted and the archived file is feedback.dump', () => {
