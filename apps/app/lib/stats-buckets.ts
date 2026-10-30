@@ -54,7 +54,7 @@ export function bucketsFor(period: Period, rows: SessionRow[], goals: GoalRow[])
 export function windowFor(period: Period, offset: number, today: string): StatsWindow {
   const end = windowEnd(period, offset, today);
   const days = daysFrom(windowStart(period, end), end);
-  return { from: days[0], to: days[days.length - 1], days };
+  return { from: days[0], to: days.at(-1)!, days };
 }
 
 /**
@@ -153,7 +153,11 @@ function monthLabel(month: string): string {
 /** Every day from `start` to `end` inclusive, stepped one day at a time. */
 function daysFrom(start: string, end: string): string[] {
   const days = [start];
-  while (days[days.length - 1] !== end) days.push(neighbouringDay(days[days.length - 1], 1));
+  let day = start;
+  while (day !== end) {
+    day = neighbouringDay(day, 1);
+    days.push(day);
+  }
   return days;
 }
 

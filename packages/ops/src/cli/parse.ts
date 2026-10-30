@@ -122,5 +122,5 @@ function isNestedType(type: FieldSpec['type'] | undefined): boolean {
 
 function toNumberArray(value: unknown): unknown[] {
   const entries = Array.isArray(value) ? value : [value];
-  return entries.map((entry) => Number(entry));
+  return entries.map(Number);
 }

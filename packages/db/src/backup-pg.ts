@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { pruneRoutineSnapshots } from './backup';
+import { finalizeBackup } from './backup';
 import {
   createComposePgRunner,
   pgDump,
@@ -122,21 +122,18 @@ export function runBackupPg(options: {
   runner.exec(['mkdir', '-p', target.containerDirectory]);
   const snapshots = databases.map((db) => dumpDatabase(target, db));
 
-  const manifest: PgBackupManifest = {
-    mode: pinned ? 'deliberate' : 'routine',
-    createdAt: at.toISOString(),
+  const mode: BackupPgMode = pinned ? 'deliberate' : 'routine';
+  finalizeBackup({
+    destination,
+    backupRoot,
     pinned,
-    databases: snapshots,
-  };
-  writeFileSync(join(destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  if (pinned) writeFileSync(join(destination, 'PINNED'), '');
+    mode,
+    createdAt: at.toISOString(),
+    entries: snapshots,
+    warnPrefix: 'db:backup:pg',
+  });
 
-  if (!pinned) {
-    const { failed } = pruneRoutineSnapshots(backupRoot);
-    for (const dir of failed) console.warn(`db:backup:pg: could not prune ${dir}`);
-  }
-
-  return { destination, mode: manifest.mode, snapshots };
+  return { destination, mode, snapshots };
 }
 
 /**
