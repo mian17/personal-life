@@ -81,6 +81,16 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: mkdir -p apps/{idp,meal-service,note-service,tags-service,todo-service}/data
 
+      # The pg integration suite runs against a throwaway `postgres:17-alpine`
+      # container. Pulling the image here keeps the registry fetch out of the
+      # jest hook: a cold pull inside it would park the event loop under the
+      # suite's own timeout and surface as a silent hook timeout, not a fetch
+      # error. A failed pull fails this step with the registry's message.
+      - name: Pull Postgres test image
+        if: steps.guard.outputs.skip != 'true'
+        timeout-minutes: 10
+        run: docker pull postgres:17-alpine
+
       # Produces `.coverage/lcov.info`, the report the scan step below ingests -
       # without it every line counts as uncovered, which is why the project read
       # 0.0% for so long. A failing suite fails the job on purpose: scanning a
