@@ -46,9 +46,11 @@ JSON-RPC line, and a client that treats a parse error as fatal dies before `init
 {"mcpServers":{"life-ops":{"command":"node","args":["--env-file-if-exists=.env.development","packages/ops/dist/mcp/server.js"],"cwd":"<repo>"}}}
 ```
 
-Six tools: `notes_create`, `notes_get`, `notes_list`, `notes_update`, `notes_delete`,
-`notes_restore`. A missing store is a tool result, not a crash — `notes.list failed
-(unauthenticated): no token found, run \`npm run ops -- login\` first`, `isError: true`, exit 0.
+Every operation of every loaded service module is one tool, named `<resource>_<op>`:
+`notes_list`, `notes_restore`, `foods_create`, and the rest of the registry — `tools/list`
+is the authority on the count. A missing store is a tool result, not a crash —
+`notes.list failed (unauthenticated): no token found, run \`npm run ops -- login\` first`,
+`isError: true`, exit 0.
 Refresh is the server's job: a call near or past expiry refreshes inside the live
 process, so a login outlives one access token. The IdP rotates the refresh token on every
 use and treats a replayed one as a stolen grant (`apps/idp/src/oidc/refresh-token.policy.ts`),
