@@ -5,7 +5,7 @@ import { FocusCache, generationKey } from '../src/cache/focus-cache';
 import { Session } from '../src/sessions/session.entity';
 import { SessionsService } from '../src/sessions/sessions.service';
 import { FakeRedisClient, UnreachableRedisClient } from './fake-redis';
-import { canProvidePostgres, startThrowawayPostgres, type ThrowawayPostgres } from './setup-env';
+import { startThrowawayDatabase, type ThrowawayDatabase } from './setup-env';
 
 /**
  * The read-through cache contract for `focus-service` (`SPEC-focus-service`
@@ -23,9 +23,10 @@ import { canProvidePostgres, startThrowawayPostgres, type ThrowawayPostgres } fr
  * `apps/meal-service/test/entries-cache.e2e-spec.ts`, whose tripwire this suite's
  * deviation replaces.
  *
- * Postgres is real, so "cached value equals the persisted row" is compared against the
- * table itself; Redis is the recording stand-in, so "was the loader consulted" and
- * "was a populate attempted" are observable rather than inferred.
+ * The database is the real SQLite file (`better-sqlite3`, the service's only engine),
+ * so "cached value equals the persisted row" is compared against the table itself;
+ * Redis is the recording stand-in, so "was the loader consulted" and "was a populate
+ * attempted" are observable rather than inferred.
  */
 
 const OWNER = 'user-a';
@@ -34,8 +35,6 @@ const DAY = '2026-09-03';
 const NEXT_DAY = '2026-09-04';
 const RANGE = { from: DAY, to: NEXT_DAY };
 
-const describeDb = canProvidePostgres() ? describe : describe.skip;
-
 interface Harness {
   sessions: SessionsService;
   goals: GoalsService;
@@ -43,10 +42,10 @@ interface Harness {
   dataSource: DataSource;
 }
 
-async function openDatabase(url: string): Promise<DataSource> {
+async function openDatabase(databasePath: string): Promise<DataSource> {
   const dataSource = new DataSource({
-    type: 'postgres',
-    url,
+    type: 'better-sqlite3',
+    database: databasePath,
     entities: [Session, Goal],
     synchronize: true,
   });
@@ -54,63 +53,44 @@ async function openDatabase(url: string): Promise<DataSource> {
   return dataSource;
 }
 
-/** Sessions exactly as the table holds them, in the loader's own order. */
+/**
+ * Sessions exactly as the table holds them, in the loader's own order. SQLite keeps a
+ * `datetime` column as `YYYY-MM-DD HH:MM:SS.mmm` text, so the select renders it back to
+ * the ISO string TypeORM hydrates into a `Date`.
+ */
 async function persistedSessions(dataSource: DataSource): Promise<unknown[]> {
-  const rows: Array<{
-    id: string;
-    ownerSub: string | null;
-    date: string;
-    minutes: number;
-    createdAt: Date;
-  }> = await dataSource.query(
-    `SELECT id, "ownerSub", date, minutes, "createdAt" FROM "focus_session"
-     WHERE "ownerSub" = $1 ORDER BY date ASC, "createdAt" ASC, id ASC`,
+  return dataSource.query(
+    `SELECT id, "ownerSub", date, minutes, strftime('%Y-%m-%dT%H:%M:%fZ', "createdAt") AS "createdAt"
+     FROM "focus_session" WHERE "ownerSub" = ? ORDER BY date ASC, "createdAt" ASC, id ASC`,
     [OWNER],
   );
-  return rows.map((row) => ({
-    id: row.id,
-    ownerSub: row.ownerSub,
-    date: row.date,
-    minutes: row.minutes,
-    createdAt: row.createdAt.toISOString(),
-  }));
 }
 
 /** Goal rows exactly as the table holds them, oldest first. */
 async function persistedGoals(dataSource: DataSource): Promise<unknown[]> {
   return dataSource.query(
-    `SELECT "validFrom", minutes FROM "focus_goal" WHERE "ownerSub" = $1 ORDER BY "validFrom" ASC`,
+    `SELECT "validFrom", minutes FROM "focus_goal" WHERE "ownerSub" = ? ORDER BY "validFrom" ASC`,
     [OWNER],
   );
 }
 
-describeDb('FocusCache (read-through, generation invalidation, fail-open)', () => {
-  let postgres: ThrowawayPostgres;
-
-  beforeAll(async () => {
-    postgres = await startThrowawayPostgres('cache');
-  });
-
-  afterAll(async () => {
-    await postgres?.stop();
-  });
-
+describe('FocusCache (read-through, generation invalidation, fail-open)', () => {
   /** A fresh pair of services over an empty database and a recording cache. */
   async function withHarness(run: (harness: Harness) => Promise<void>): Promise<void> {
-    const dataSource = await openDatabase(postgres.url);
-    await dataSource.query('TRUNCATE TABLE "focus_session", "focus_goal"');
+    const database: ThrowawayDatabase = await startThrowawayDatabase('cache');
+    const dataSource = await openDatabase(database.path);
     const redis = new FakeRedisClient();
     const cache = new FocusCache(redis);
-    const harness: Harness = {
-      sessions: new SessionsService(dataSource.getRepository(Session), cache),
-      goals: new GoalsService(dataSource.getRepository(Goal), cache),
-      redis,
-      dataSource,
-    };
     try {
-      await run(harness);
+      await run({
+        sessions: new SessionsService(dataSource.getRepository(Session), cache),
+        goals: new GoalsService(dataSource.getRepository(Goal), cache),
+        redis,
+        dataSource,
+      });
     } finally {
       await dataSource.destroy();
+      await database.stop();
     }
   }
 
@@ -180,8 +160,8 @@ describeDb('FocusCache (read-through, generation invalidation, fail-open)', () =
   });
 
   it('answers a read from the database with no populate attempted when every cache command rejects', async () => {
-    const dataSource = await openDatabase(postgres.url);
-    await dataSource.query('TRUNCATE TABLE "focus_session", "focus_goal"');
+    const database = await startThrowawayDatabase('cache-fail-open');
+    const dataSource = await openDatabase(database.path);
     const unreachable = new UnreachableRedisClient();
     const cache = new FocusCache(unreachable);
     const sessions = new SessionsService(dataSource.getRepository(Session), cache);
@@ -199,6 +179,7 @@ describeDb('FocusCache (read-through, generation invalidation, fail-open)', () =
       expect(unreachable.sets).toEqual([]);
     } finally {
       await dataSource.destroy();
+      await database.stop();
     }
   });
 });

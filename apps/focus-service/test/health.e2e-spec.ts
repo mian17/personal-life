@@ -1,13 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { bin, childEnv } from '../../../packages/shared/src/child-process';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * `SPEC-focus-service` §6 — the service-kernel health dialect, against a throwaway
- * Postgres:
+ * SQLite file:
  *
  * - `/health/live` answers 200 with no dependency check at all (a DB blip must
  *   never restart the service);
@@ -19,159 +18,24 @@ import { bin, childEnv } from '../../../packages/shared/src/child-process';
  * global whitelist pipe), with `NODE_ENV` pinned away from `development` so the
  * unauthenticated trio proves the `@Public()` metadata exemption, not the guard's
  * dev bypass.
- *
- * Skipped — never failed — when Docker is absent and no `FOCUS_TEST_DB_URL` is set.
  */
-jest.setTimeout(180_000);
+jest.setTimeout(60_000);
 
-const TEST_DB_IMAGE = 'postgres:17-alpine';
-const TEST_DB_PASSWORD = 'test-only';
+const TEST_DB = join(__dirname, 'test-focus-health.db');
 const TEST_ISSUER = 'https://idp.test';
 const TEST_AUDIENCE = 'life-api';
 /** Obviously-fake key: a public test artifact, never a real secret. */
 const TEST_MASTER_KEY = Buffer.alloc(32, 0x2b).toString('base64');
 const BASE_NODE_ENV = 'test';
 
-interface ThrowawayPostgres {
-  url: string;
-  stop(): Promise<void>;
-}
-
-function runSilently(args: string[]): void {
-  execFileSync(bin('docker'), args, { env: childEnv(), stdio: 'ignore' });
-}
-
-function runCaptured(args: string[]): string {
-  return execFileSync(bin('docker'), args, {
-    env: childEnv(),
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-}
-
-function pause(milliseconds: number): Promise<void> {
-  return new Promise((settle) => setTimeout(settle, milliseconds));
-}
-
-function canProvidePostgres(): boolean {
-  if (process.env.FOCUS_TEST_DB_URL?.trim()) return true;
-  try {
-    runSilently(['version']);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function createDatabase(serverUrl: string, label: string): Promise<string> {
-  const name = `focus_${label}`;
-  const admin = new DataSource({ type: 'postgres', url: serverUrl, entities: [] });
-  await admin.initialize();
-  try {
-    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-    await admin.query(`CREATE DATABASE "${name}"`);
-  } finally {
-    await admin.destroy();
-  }
-  const parsed = new URL(serverUrl);
-  parsed.pathname = `/${name}`;
-  return parsed.href;
-}
-
-async function publishedPort(name: string): Promise<string> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const mapped = runCaptured(['port', name, '5432/tcp']).trim();
-    const match = /:(\d+)$/.exec(mapped.split('\n')[0] ?? '');
-    if (match) return match[1]!;
-    await pause(250);
-  }
-  throw new Error('postgres container never published a port');
-}
-
-/**
- * Probe the published TCP path rather than the container's unix socket: the
- * entrypoint's bootstrap server answers `psql` long before the real postmaster
- * accepts connections, and connecting into that window fails mid-suite.
- */
-async function awaitPostmaster(name: string): Promise<void> {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      runCaptured([
-        'exec',
-        name,
-        'psql',
-        '-h',
-        '127.0.0.1',
-        '-U',
-        'postgres',
-        '-d',
-        'postgres',
-        '-c',
-        'select 1',
-      ]);
-      return;
-    } catch {
-      if (attempt >= 60) throw new Error('postgres never became ready');
-      await pause(500);
-    }
-  }
-}
-
-async function startContainer(): Promise<{ url: string; stop(): Promise<void> }> {
-  const name = `focus-test-${process.pid}-${randomUUID().slice(0, 8)}`;
-  const stop = async (): Promise<void> => {
-    try {
-      runSilently(['rm', '-f', name]);
-    } catch {
-      /* already gone */
-    }
-  };
-  try {
-    runSilently([
-      'run',
-      '--rm',
-      '-d',
-      '--name',
-      name,
-      '-e',
-      `POSTGRES_PASSWORD=${TEST_DB_PASSWORD}`,
-      '-e',
-      'POSTGRES_DB=postgres',
-      '-p',
-      '127.0.0.1::5432',
-      TEST_DB_IMAGE,
-    ]);
-    const port = await publishedPort(name);
-    await awaitPostmaster(name);
-    return { url: `postgresql://postgres:${TEST_DB_PASSWORD}@127.0.0.1:${port}/postgres`, stop };
-  } catch (error) {
-    await stop();
-    throw error;
-  }
-}
-
-async function startThrowawayPostgres(label: string): Promise<ThrowawayPostgres> {
-  const configured = process.env.FOCUS_TEST_DB_URL?.trim();
-  const server = configured
-    ? { url: configured, stop: async (): Promise<void> => undefined }
-    : await startContainer();
-  const url = await createDatabase(server.url, label);
-  return { url, stop: server.stop };
-}
-
-const describeDb = canProvidePostgres() ? describe : describe.skip;
-
-describeDb('Health dialect (e2e)', () => {
-  let postgres: ThrowawayPostgres;
+describe('Health dialect (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeAll(async () => {
     originalEnv = { ...process.env };
-    postgres = await startThrowawayPostgres('health');
-    process.env.FOCUS_DB_URL = postgres.url;
+    process.env.FOCUS_DB_PATH = TEST_DB;
     process.env.FOCUS_MASTER_KEY = TEST_MASTER_KEY;
     process.env.IDP_ISSUER = TEST_ISSUER;
     process.env.FOCUS_IDP_JWKS_URL = 'http://127.0.0.1:9/jwks';
@@ -194,7 +58,7 @@ describeDb('Health dialect (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-    await postgres?.stop();
+    rmSync(TEST_DB, { force: true });
     process.env = originalEnv;
   });
 

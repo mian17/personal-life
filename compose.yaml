@@ -219,6 +219,50 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  focus-service:
+    build:
+      context: .
+      dockerfile: apps/focus-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3107"
+      HOST: 0.0.0.0
+      # SQLite for the pomodoro session/goal rows (`SPEC-focus-service` Storage),
+      # the note/tags/todo/meal shape: rows are numbers, dates and ids.
+      FOCUS_DB_PATH: /data/focus.db
+      # JWT-only auth, same offline-JWKS pattern as note/tags/todo/meal/feedback:
+      # `iss` must equal the IdP's browser-facing issuer, while the JWKS is
+      # fetched over the internal compose network.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      FOCUS_IDP_JWKS_URL: ${FOCUS_IDP_JWKS_URL:-http://idp:3003/jwks}
+      FOCUS_SERVICE_AUDIENCE: ${FOCUS_SERVICE_AUDIENCE:-life-api}
+      # Master key for the owner-key table (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      FOCUS_MASTER_KEY: ${FOCUS_MASTER_KEY:?FOCUS_MASTER_KEY is required (openssl rand -base64 32)}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-focus:6379
+    volumes:
+      - ./apps/focus-service/data:/data
+    depends_on:
+      redis-focus:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3107/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   idp:
     build:
       context: .
@@ -289,6 +333,9 @@ services:
       # Without this the meals BFF falls back to container-local loopback and
       # every meal call dies inside the app container.
       MEAL_API_URL: http://meal-service:3106
+      # Without this the pomodoro BFF falls back to container-local loopback and
+      # every session/goal call dies inside the app container.
+      FOCUS_API_URL: http://focus-service:3107
       # The app's fallback "today" zone, before the browser's `tz` cookie lands.
       # Must match the backend's TODO_TIMEZONE so SSR today agrees with storage.
       TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -315,6 +362,8 @@ services:
       feedback-service:
         condition: service_healthy
       meal-service:
+        condition: service_healthy
+      focus-service:
         condition: service_healthy
       idp:
         condition: service_healthy
@@ -566,6 +615,36 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis-focus:
+    image: redis:8-alpine
+    # Cache only, owned by focus-service (one instance per service). `--save ""` +
+    # `--appendonly no` turn off both RDB and AOF: the cached rows never hit a
+    # second disk, and the image's default snapshot points would otherwise write
+    # them to /data/dump.rdb.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes:
+      - redis-focus-data:/data
+    networks:
+      - life
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
 networks:
   life:
     driver: bridge
@@ -576,3 +655,4 @@ volumes:
   postgres-feedback-data:
   rabbitmq-feedback-data:
   redis-feedback-data:
+  redis-focus-data:

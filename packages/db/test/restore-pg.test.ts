@@ -14,7 +14,6 @@ import type { PgRunner } from '../src/pg-client';
 
 const STAMP = '2026-10-01T12-34-56-789Z';
 const DB = 'feedback';
-const FOCUS = 'focus';
 const SNAPSHOT_NAME = STAMP;
 const at = () => new Date('2026-10-01T12:34:56.789Z');
 
@@ -423,81 +422,22 @@ describe('runRestorePg ordering and post-write verification', () => {
   });
 });
 
-describe('runRestorePg across the two Postgres databases', () => {
-  const countsByDatabase = { feedback: TABLE_COUNTS, focus: { sessions: 7, goals: 2 } };
-
-  it('--only focus replaces focus, pins its own pre-restore entry, and checks focus counts', async () => {
-    const fx = makeFixture();
-    dirs.push(fx.root);
-    seedSnapshot(fx.backupRoot, SNAPSHOT_NAME, { tablesByDatabase: countsByDatabase });
-    const runner = makeRunner({ tablesByDatabase: countsByDatabase });
-
-    const { code, out } = await runCli(
-      ['--from', `backup/${SNAPSHOT_NAME}`, '--only', FOCUS],
-      fx.env,
-      runner,
-      () => 'down',
-    );
-
-    expect(code).toBe(0);
-    expect(out).toContain(`db:restore:pg ${FOCUS} <- `);
-    // Only the focus archive crossed in, and only the focus database was replaced.
-    expect(runner.copiesIn).toEqual([
-      {
-        from: join(fx.root, 'backup', SNAPSHOT_NAME, `${FOCUS}.dump`),
-        to: `/tmp/db-restore-${STAMP}/${FOCUS}.dump`,
-      },
-    ]);
-    const psqlDatabases = runner.calls
-      .filter((argv) => argv[0] === 'psql' && argv.includes('-d'))
-      .map((argv) => argv[argv.indexOf('-d') + 1]);
-    expect(psqlDatabases).not.toContain(DB);
-
-    const manifest = JSON.parse(
-      readFileSync(join(fx.backupRoot, `pre-restore-${STAMP}`, 'manifest.json'), 'utf8'),
-    ) as { databases: PgManifestEntry[] };
-    expect(manifest.databases.map((entry) => entry.name)).toEqual([FOCUS]);
-    expect(manifest.databases[0]?.tables).toEqual(countsByDatabase.focus);
-  });
-
-  it('a snapshot without the focus archive exits 1 before any write', async () => {
+describe('runRestorePg Postgres database set', () => {
+  it('--only focus exits 1 before any write: focus lives in SQLite, not Postgres', async () => {
     const fx = makeFixture();
     dirs.push(fx.root);
     seedSnapshot(fx.backupRoot, SNAPSHOT_NAME);
     const runner = makeRunner();
 
     const { code, err } = await runCli(
-      ['--from', `backup/${SNAPSHOT_NAME}`, '--only', FOCUS],
+      ['--from', `backup/${SNAPSHOT_NAME}`, '--only', 'focus'],
       fx.env,
       runner,
       () => 'down',
     );
 
-    const missing = join(fx.backupRoot, SNAPSHOT_NAME, `${FOCUS}.dump`);
     expect(code).toBe(1);
-    expect(err).toContain(`snapshot file does not exist: ${missing}`);
+    expect(err).toContain('unknown database name: focus');
     expect(runner.calls).toEqual([]);
-  });
-
-  it('no --only restores every database the snapshot holds and checks each one\'s own entry', async () => {
-    const fx = makeFixture();
-    dirs.push(fx.root);
-    seedSnapshot(fx.backupRoot, SNAPSHOT_NAME, { tablesByDatabase: countsByDatabase });
-    const runner = makeRunner({ tablesByDatabase: countsByDatabase });
-
-    const { code, out } = await runCli(
-      ['--from', `backup/${SNAPSHOT_NAME}`],
-      fx.env,
-      runner,
-      () => 'down',
-    );
-
-    expect(code).toBe(0);
-    expect(out).toContain(`db:restore:pg ${DB} <- `);
-    expect(out).toContain(`db:restore:pg ${FOCUS} <- `);
-    const manifest = JSON.parse(
-      readFileSync(join(fx.backupRoot, `pre-restore-${STAMP}`, 'manifest.json'), 'utf8'),
-    ) as { databases: PgManifestEntry[] };
-    expect(manifest.databases.map((entry) => entry.name)).toEqual([DB, FOCUS]);
   });
 });

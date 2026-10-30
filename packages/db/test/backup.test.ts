@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'os';
 import { basename, dirname, join } from 'path';
 import {
+  DEFAULT_FOCUS_DB_PATH,
   DEFAULT_IDP_DB_PATH,
   DEFAULT_MEAL_DB_PATH,
   DEFAULT_NOTE_DB_PATH,
@@ -26,22 +27,23 @@ import type { DatabaseName } from '../src/index';
 import { main } from '../scripts/backup';
 
 /**
- * Path-resolution contract for the backup/restore CLIs (plan T2): the five
+ * Path-resolution contract for the backup/restore CLIs (plan T2): the six
  * repo-anchored defaults, `resolvePaths` delegation to `@life/shared`'s
  * `resolveDbPath`, and `selectPaths`' `--only` subset. Every assertion is a
  * string comparison; no database under `apps/*\/data/**` is opened.
  */
 
 describe('resolvePaths / selectPaths', () => {
-  it('returns the five databases in order with their env names', () => {
+  it('returns the six databases in order with their env names', () => {
     const paths = resolvePaths({});
-    expect(paths.map((p) => p.name)).toEqual(['life', 'tags', 'todo', 'idp', 'meal']);
+    expect(paths.map((p) => p.name)).toEqual(['life', 'tags', 'todo', 'idp', 'meal', 'focus']);
     expect(paths.map((p) => p.envName)).toEqual([
       'NOTE_DB_PATH',
       'TAGS_DB_PATH',
       'TODO_DB_PATH',
       'IDP_DB_PATH',
       'MEAL_DB_PATH',
+      'FOCUS_DB_PATH',
     ]);
   });
 
@@ -52,11 +54,15 @@ describe('resolvePaths / selectPaths', () => {
     expect(paths[2].source).toBe(DEFAULT_TODO_DB_PATH);
     expect(paths[3].source).toBe(DEFAULT_IDP_DB_PATH);
     expect(paths[4].source).toBe(DEFAULT_MEAL_DB_PATH);
+    expect(paths[5].source).toBe(DEFAULT_FOCUS_DB_PATH);
     expect(DEFAULT_NOTE_DB_PATH.endsWith(join('apps', 'note-service', 'data', 'life.db'))).toBe(true);
     expect(DEFAULT_TAGS_DB_PATH.endsWith(join('apps', 'tags-service', 'data', 'tags.db'))).toBe(true);
     expect(DEFAULT_TODO_DB_PATH.endsWith(join('apps', 'todo-service', 'data', 'todo.db'))).toBe(true);
     expect(DEFAULT_IDP_DB_PATH.endsWith(join('apps', 'idp', 'data', 'idp.db'))).toBe(true);
     expect(DEFAULT_MEAL_DB_PATH.endsWith(join('apps', 'meal-service', 'data', 'meal.db'))).toBe(true);
+    expect(DEFAULT_FOCUS_DB_PATH.endsWith(join('apps', 'focus-service', 'data', 'focus.db'))).toBe(
+      true,
+    );
   });
 
   it('honours a MEAL_DB_PATH override', () => {
@@ -124,7 +130,7 @@ function seedDatabase(path: string, rows: number): void {
   }
 }
 
-/** A repo-root stand-in: `backup/` plus five seeded `apps/<svc>/data/<name>.db` sources. */
+/** A repo-root stand-in: `backup/` plus six seeded `apps/<svc>/data/<name>.db` sources. */
 function makeBackupFixture(): BackupFixture {
   const root = mkdtempSync(join(tmpdir(), 'life-db-backup-'));
   dirs.push(root);
@@ -134,6 +140,7 @@ function makeBackupFixture(): BackupFixture {
     todo: join(root, 'apps', 'todo-service', 'data', 'todo.db'),
     idp: join(root, 'apps', 'idp', 'data', 'idp.db'),
     meal: join(root, 'apps', 'meal-service', 'data', 'meal.db'),
+    focus: join(root, 'apps', 'focus-service', 'data', 'focus.db'),
   };
   for (const name of Object.keys(sources) as DatabaseName[]) {
     seedDatabase(sources[name], 2);
@@ -142,7 +149,10 @@ function makeBackupFixture(): BackupFixture {
 }
 
 /** The env seam: `INIT_CWD` anchors `backup/` and every override resolves against it. */
-function envFor(fixture: BackupFixture, only: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal']) {
+function envFor(
+  fixture: BackupFixture,
+  only: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'],
+) {
   const env: NodeJS.ProcessEnv = { INIT_CWD: fixture.root };
   const vars: Record<DatabaseName, string> = {
     life: 'NOTE_DB_PATH',
@@ -150,6 +160,7 @@ function envFor(fixture: BackupFixture, only: DatabaseName[] = ['life', 'tags', 
     todo: 'TODO_DB_PATH',
     idp: 'IDP_DB_PATH',
     meal: 'MEAL_DB_PATH',
+    focus: 'FOCUS_DB_PATH',
   };
   for (const name of only) env[vars[name]] = fixture.sources[name];
   return env;
@@ -187,7 +198,14 @@ describe('db:backup run', () => {
 
     expect(result.mode).toBe('routine');
     expect(result.destination).toBe(join(fx.backupRoot, STAMP));
-    expect(result.snapshots.map((s) => s.name)).toEqual(['life', 'tags', 'todo', 'idp', 'meal']);
+    expect(result.snapshots.map((s) => s.name)).toEqual([
+      'life',
+      'tags',
+      'todo',
+      'idp',
+      'meal',
+      'focus',
+    ]);
 
     for (const snapshot of result.snapshots) {
       const target = join(result.destination, snapshot.file);
@@ -215,6 +233,7 @@ describe('db:backup run', () => {
       'todo',
       'idp',
       'meal',
+      'focus',
     ]);
     expect(existsSync(join(result.destination, 'PINNED'))).toBe(false);
   });
@@ -324,7 +343,7 @@ describe('db:backup run', () => {
     } finally {
       console.log = original;
     }
-    expect(print).toHaveBeenCalledTimes(5);
+    expect(print).toHaveBeenCalledTimes(6);
     expect(print.mock.calls[0][0]).toContain('db:backup [routine] life.db -> ');
     expect(print.mock.calls[0][0]).toContain('quick_check=ok');
   });
