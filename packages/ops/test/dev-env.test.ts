@@ -11,7 +11,9 @@
  * key (`env[name]`) is invisible to it and falls back to the hand-lists below;
  * widen the scan if ops ever reads env through a helper.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const packageDirectory = resolve(__dirname, '..');
@@ -26,6 +28,23 @@ const GENERATED_KEYS = [
   'LIFE_OPS_CLIENT_ID',
   'LIFE_OPS_RESOURCE',
 ];
+
+/**
+ * Per-service base variables whose names the source computes
+ * (`LIFE_OPS_API_BASE_${name.toUpperCase()}`), so the literal scan cannot see them;
+ * the generator still owns every one.
+ */
+const COMPUTED_KEYS = [
+  'LIFE_OPS_API_BASE_NOTES',
+  'LIFE_OPS_API_BASE_TAGS',
+  'LIFE_OPS_API_BASE_TODO',
+  'LIFE_OPS_API_BASE_MEAL',
+  'LIFE_OPS_API_BASE_FOCUS',
+  'LIFE_OPS_API_BASE_FEEDBACK',
+];
+
+/** Every key the generator template must carry. */
+const TEMPLATE_KEYS = [...GENERATED_KEYS, ...COMPUTED_KEYS];
 
 /** Variables with an in-code default or a platform meaning; deliberately absent from the generator. */
 const DEFAULTED_KEYS = [
@@ -73,6 +92,38 @@ describe('the dev env generator covers what @life/ops reads', () => {
   });
 
   it('defines each generated variable in scripts/setup-dev-env.sh', () => {
-    expect(GENERATED_KEYS.filter((key) => !generatorDefines(key))).toEqual([]);
+    expect(TEMPLATE_KEYS.filter((key) => !generatorDefines(key))).toEqual([]);
+  });
+
+  it('carries each generated variable into the file it writes, once', () => {
+    const target = mkdtempSync(join(tmpdir(), 'dev-env-'));
+    try {
+      runGenerator(target);
+      const written = readFileSync(join(target, '.env.development'), 'utf8');
+      for (const key of TEMPLATE_KEYS) {
+        expect(written.match(new RegExp(`^${key}=`, 'gm'))).toHaveLength(1);
+      }
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves an up-to-date env file untouched on a rerun', () => {
+    const target = mkdtempSync(join(tmpdir(), 'dev-env-'));
+    try {
+      runGenerator(target);
+      const firstRun = readFileSync(join(target, '.env.development'), 'utf8');
+
+      runGenerator(target);
+
+      expect(readFileSync(join(target, '.env.development'), 'utf8')).toBe(firstRun);
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
   });
 });
+
+/** Writes the env file the way `npm run dev:build` expects to find it. */
+function runGenerator(target: string): void {
+  execFileSync('bash', [generatorPath, target], { stdio: 'pipe' });
+}

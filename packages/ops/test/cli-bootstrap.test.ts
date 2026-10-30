@@ -83,9 +83,11 @@ describe('main service resolution', () => {
   });
 
   it('still names an unknown service instead of importing it', async () => {
-    const outcome = await runCli(['notes', 'list'], { LIFE_OPS_SERVICE: 'tags' });
+    const outcome = await runCli(['notes', 'list'], { LIFE_OPS_SERVICE: 'unknown-svc' });
 
     expect(outcome.exit).toBe(1);
-    expect(outcome.stderr).toEqual(['LIFE_OPS_SERVICE names unknown service tags; known services: notes']);
+    expect(outcome.stderr).toEqual([
+      'LIFE_OPS_SERVICE names unknown service unknown-svc; known services: notes, todo, meal, tags, focus, feedback',
+    ]);
   });
 });

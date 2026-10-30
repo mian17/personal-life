@@ -55,7 +55,11 @@ function normalizeField(field: FieldSpec): FieldSpec {
     required: field.required ?? false,
     description: field.description,
   };
-  return field.enum === undefined ? normalized : { ...normalized, enum: [...field.enum] };
+  const withEnum =
+    field.enum === undefined ? normalized : { ...normalized, enum: [...field.enum] };
+  return field.properties === undefined
+    ? withEnum
+    : { ...withEnum, properties: normalizeFields(field.properties) };
 }
 
 function deepFreeze<T>(registry: T): T {

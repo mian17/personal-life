@@ -8,13 +8,15 @@
  * one shared executor and the one canonical render the CLI uses, so adapter
  * parity is a string comparison, not a convention.
  */
-import type { OpSpec, ResourceRegistry } from '../core/types';
+import type { ResourceRegistry } from '../core/types';
 import { createExecutor, resolveDeadlineMs } from '../transport/executor';
 import type { Executor } from '../transport/executor';
 import { currentAccessToken } from '../auth/token-provider';
 import { renderFailure, renderOpsResult } from '../cli/render';
-import { loadService } from '../cli/run';
-import { findTool, listTools } from './tools';
+import { apiBaseFor, loadService } from '../cli/run';
+import type { LoadedModule, ServiceModule } from '../cli/run';
+import { everyRegistry, findTool, listTools } from './tools';
+import type { RegistryUnion, ToolLocation } from './tools';
 
 const SERVER_NAME = 'life-ops';
 
@@ -24,9 +26,15 @@ const PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25', '2025-06-18'];
 /** `serverInfo.version`, pinned to the published package version by `test/mcp-lifecycle.test.ts`. */
 const SERVER_VERSION: string = (require('../../package.json') as { version: string }).version;
 
-/** The stdio-facing server contract: registry + env + injected writers (tests drive stubs). */
+/**
+ * The stdio-facing server contract: the resources it serves, the loaded modules, the
+ * environment, and the injected writers (tests drive stubs).
+ */
 export interface McpServerOptions {
-  registry: ResourceRegistry;
+  /** Every resource the loaded modules register, in load order; a single-service run names one. */
+  registry: RegistryUnion;
+  /** The modules `LIFE_OPS_SERVICE` loaded, when it named several; the base precedence reads them. */
+  modules?: LoadedModule[];
   /** Overrides `LIFE_OPS_API_BASE` when the service module knows its own base. */
   apiBase?: string;
   env: NodeJS.ProcessEnv;
@@ -44,15 +52,7 @@ export interface McpServer {
 }
 
 export function createMcpServer(options: McpServerOptions): McpServer {
-  const session: Session = {
-    options,
-    executor: createExecutor({
-      registry: options.registry,
-      baseUrl: apiBase(options),
-      readToken: currentAccessToken,
-      deadlineMs: resolveDeadlineMs(options.env),
-    }),
-  };
+  const session: Session = { options, service: servedService(options) };
   return { handle: (message) => answer(message, session) };
 }
 
@@ -61,12 +61,13 @@ export async function main(options: McpServerOptions): Promise<number> {
   return await answerRequestsUntilStdinCloses({ server: createMcpServer(options), options });
 }
 
-/** The stdio entry: the service module named by `LIFE_OPS_SERVICE`, then the loop. */
+/** The stdio entry: the service modules named by `LIFE_OPS_SERVICE`, then the loop. */
 async function serveFromEnvironment(): Promise<void> {
   try {
     const service = await loadService(process.env);
     process.exitCode = await main({
-      registry: service.registry,
+      registry: service.resources ?? service.registry,
+      modules: service.modules,
       apiBase: service.apiBase,
       env: process.env,
       stdout: (line) => process.stdout.write(`${line}\n`),
@@ -159,8 +160,8 @@ function pingAnswer(request: RpcRequest): unknown {
   return { jsonrpc: '2.0', id: idOf(request), result: {} };
 }
 
-function listAnswer(request: RpcRequest, registry: ResourceRegistry): unknown {
-  return { jsonrpc: '2.0', id: idOf(request), result: { tools: listTools(registry) } };
+function listAnswer(request: RpcRequest, registrySet: RegistryUnion): unknown {
+  return { jsonrpc: '2.0', id: idOf(request), result: { tools: listTools(registrySet) } };
 }
 
 async function callAnswer(request: RpcRequest, session: Session): Promise<unknown> {
@@ -209,13 +210,38 @@ function invalidCallAnswer(request: RpcRequest, error: unknown): unknown {
 }
 
 async function runTool(request: RpcRequest, session: Session): Promise<ToolOutcome> {
-  const operation = nameOf(request, session.options.registry);
+  const { registry, operation } = locateTool(request, session.options.registry);
   try {
-    const result = await session.executor.run(operation, inputOf(request));
+    const result = await executorFor(session, registry).run(operation.kind, inputOf(request));
     return { text: renderOpsResult(result), body: result.body, failed: false };
   } catch (error) {
     return { text: renderFailure(error), body: undefined, failed: true };
   }
+}
+
+/** The registry that owns the named tool, and the op there; a thrown error when none serves it. */
+function locateTool(request: RpcRequest, registrySet: RegistryUnion): ToolLocation {
+  const name = paramsOf(request)?.['name'];
+  if (typeof name !== 'string') throw new Error('tools/call has no tool name string');
+  const location = findTool(registrySet, name);
+  if (location === undefined) throw new Error(`unknown tool: ${name}`);
+  return location;
+}
+
+/** The executor one call runs: it dials the owning resource's own base, resolved per call. */
+function executorFor(session: Session, registry: ResourceRegistry): Executor {
+  return createExecutor({
+    registry,
+    baseUrl: apiBaseFor({ service: session.service, registry, env: session.options.env }),
+    readToken: currentAccessToken,
+    deadlineMs: resolveDeadlineMs(session.options.env),
+  });
+}
+
+/** The service a session serves, in the shape the CLI's base precedence reads. */
+function servedService(options: McpServerOptions): ServiceModule {
+  const resources = everyRegistry(options.registry);
+  return { registry: resources[0], resources, apiBase: options.apiBase, modules: options.modules };
 }
 
 function methodNotSupportedAnswer(request: RpcRequest): unknown {
@@ -232,7 +258,8 @@ function errorAnswer(failure: RpcFailure): unknown {
 
 interface Session {
   options: McpServerOptions;
-  executor: Executor;
+  /** The service the CLI's base precedence reads, built once from the served resources. */
+  service: ServiceModule;
 }
 
 interface ServerLoop {
@@ -301,15 +328,6 @@ function idOf(request: RpcRequest): string | number | null {
   return request.id ?? null;
 }
 
-/** The op kind a `tools/call` names, or a thrown error when the registry has no such tool. */
-function nameOf(request: RpcRequest, registry: ResourceRegistry): OpSpec['kind'] {
-  const name = paramsOf(request)?.['name'];
-  if (typeof name !== 'string') throw new Error('tools/call has no tool name string');
-  const operation = findTool(registry, name);
-  if (operation === undefined) throw new Error(`unknown tool: ${name}`);
-  return operation.kind;
-}
-
 /** The `arguments` object of the call; an absent one behaves as an empty input. */
 function inputOf(request: RpcRequest): Record<string, unknown> {
   const args = paramsOf(request)?.['arguments'];
@@ -328,13 +346,6 @@ function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
   const params = request.params;
   if (typeof params !== 'object' || params === null || Array.isArray(params)) return undefined;
   return params as Record<string, unknown>;
-}
-
-/** `service.apiBase` wins over `LIFE_OPS_API_BASE`, the same rule the CLI applies. */
-function apiBase(options: McpServerOptions): string {
-  const configured = options.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
-  if (!configured) throw new Error('LIFE_OPS_API_BASE is not set; point it at the service API base');
-  return configured;
 }
 
 if (require.main === module) {
