@@ -36,11 +36,12 @@ contracts, so a lane never has to guess what a slot should say.
 Two rules sit in every prompt's `[IMPLEMENTATION REQUIREMENTS]`, in addition to the
 slots above:
 
-- A lane commits, pushes, and opens or merges a pull request when its prompt says so —
-  none of those is a scope violation. A lane never force-pushes or rewrites shared
-  history, and never stages a file outside its allowed list. Stage explicit paths, never
-  `git add -A`; report the commit hash and the PR URL so the diff stays in view. The
-  parent keeps the decision and the review.
+- A lane commits, pushes, and opens a pull request when its prompt says so — none of
+  those is a scope violation. Merging is the parent's alone: a lane never merges a pull
+  request. A lane never force-pushes or rewrites shared history, and never stages a file
+  outside its allowed list. Stage explicit paths, never `git add -A`; report the commit
+  hash and the PR URL so the diff stays in view. The parent keeps the decision, the
+  review and the merge.
 - No intent, spec, report or task-plan file may be staged, because `docs/intent/`,
   `docs/specs/`, `docs/reports/` and `tasks/` are gitignored run scratch that never
   enters a commit.
@@ -66,7 +67,8 @@ that conflicts), stop and report it rather than branching anyway: a branch built
 on a diverged base is worse than no branch.
 
 Never branch from `main`, never rebase onto `main`, never push to `main` or to `dev`
-directly, and never merge a pull request without the user asking. Promotion from
+directly, and never merge a pull request — the parent merges, and only when the user
+asks. Promotion from
 `dev` to `main` is a human decision, not part of any task.
 
 This applies to agents too, including short mechanical ones such as the
@@ -117,11 +119,12 @@ a visual element and Rule 3 applies.
 ### Rule 3 — when no primitive fits
 
 1. Extend `@life/ui` upstream. Prop/slot/variant first; a new atom/block only when the
-   concept is genuinely reusable across apps. Spec-first, always: update
-   `docs/specs/SPEC-ui-*.md` (and `MAP-ui-primitives.md` for a new component) in the
-   same change, implement in `packages/ui` with tests, then consume from the app. Those
-   specs were removed from the tree in `d1f54c9` — restore the one you need from
-   `git show d1f54c9^:<path>` instead of starting a competing copy.
+   concept is genuinely reusable across apps. Spec-first, always: write the spec
+   `docs/specs/SPEC-ui-*.md` (and a `MAP-ui-primitives.md` entry for a new component)
+   before the code, implement in `packages/ui` with tests, then consume from the app.
+   The spec lives on disk only — `docs/specs/` is gitignored per-run scratch, so it is
+   never staged and never committed. It is still the standard the change is judged
+   against, so being uncommitted does not lower the bar.
 2. Genuinely app-specific **behavior** (page glue, domain widgets like the editor's
    autosave engine) stays in `apps/*` — but it must be composed FROM primitives and
    may not introduce new visual language. A new visual concept is case 1, not case 2.
@@ -207,8 +210,9 @@ improvised at implementation time.
   read-through cache into a shared workspace package first (same no-fork rule as
   `@life/ui`).
 - Content-bearing services additionally follow the notes at-rest contract — envelope at
-  rest, `@life/crypto` consumption (`docs/specs/SPEC-notes-at-rest.md` at `d1f54c9^` when
-  you need the wording). This cache contract is one half of that at-rest contract.
+  rest, `@life/crypto` consumption, written per run as
+  `docs/specs/SPEC-notes-at-rest.md`. This cache contract is one half of that at-rest
+  contract.
 
 ### Mechanical checks (tech lead runs at every review touching a backend service)
 
@@ -218,8 +222,8 @@ improvised at implementation time.
   asserts serialized values contain `enc.v1.` and no known plaintext (pattern:
   `apps/note-service/test/notes-cache.e2e-spec.ts`).
 - Every backend service spec carries a `## Cache Rules` section → the service has one.
-  The spec corpus was removed in `d1f54c9`, so a service you touch needs its spec
-  restored from `d1f54c9^` before the check can see it.
+  A service you touch gets its spec written or updated for the change, on disk only
+  (`docs/specs/` is gitignored), because the review checks the service against it.
 - No content matching in SQL over encrypted columns — filters run in memory
   post-decrypt (`content-match.ts` pattern).
 
