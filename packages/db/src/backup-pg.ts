@@ -12,9 +12,9 @@ import {
 import type { PgIdentity, PgRunner } from './pg-client';
 
 /**
- * `db:backup:pg` core (`SPEC-feedback-infra.md` "Backup behavior", `SPEC-focus-service`
- * §2). Dumps every Postgres database `resolvePgDatabases` reports — feedback then focus —
- * via `pg_dump -Fc --no-owner` inside the DB container, verifies each with
+ * `db:backup:pg` core (`SPEC-feedback-infra.md` "Backup behavior"). Dumps every Postgres
+ * database `resolvePgDatabases` reports (feedback only — `focus-service` is SQLite) via
+ * `pg_dump -Fc --no-owner` inside the DB container, verifies each with
  * `pg_restore --list`, records per-table counts, and archives `<database>.dump` +
  * `manifest.json` into one UTC-stamped `backup/` directory. `--only <name>` restricts the
  * run to the named databases. Retention reuses `pruneRoutineSnapshots` unchanged (shared
@@ -45,7 +45,7 @@ export interface BackupPgResult {
   snapshots: PgManifestEntry[];
 }
 
-/** `--only feedback[,focus]` (or `--only=…`); `undefined` selects every database. */
+/** `--only feedback` (or `--only=…`); `undefined` selects every database. */
 function parseOnly(argv: string[]): string | undefined {
   const index = argv.findIndex((arg) => arg === '--only' || arg.startsWith('--only='));
   if (index === -1) return undefined;
@@ -86,8 +86,8 @@ function dumpDatabase(target: BackupTarget, db: PgIdentity): PgManifestEntry {
 
 /**
  * Run one backup. Unknown `--only` names and an existing destination throw before anything
- * is written; a routine run prunes after its own snapshot is verified. The URLs come from
- * the passed `env` (`FEEDBACK_DB_URL`, `FOCUS_DB_URL`, explicit) — a test var is never read
+ * is written; a routine run prunes after its own snapshot is verified. The URL comes from
+ * the passed `env` (`FEEDBACK_DB_URL`, explicit) — a test var is never read
  * implicitly.
  */
 export function runBackupPg(options: {

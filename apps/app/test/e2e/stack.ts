@@ -230,12 +230,12 @@ function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
-function focusEnv(cfg: StackConfig, dbUrl: string): NodeJS.ProcessEnv {
+function focusEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'production',
     PORT: String(cfg.focusPort),
     HOST: '127.0.0.1',
-    FOCUS_DB_URL: dbUrl,
+    FOCUS_DB_PATH: `${cfg.stateDir}/focus-service.db`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     FOCUS_IDP_JWKS_URL: `http://127.0.0.1:${cfg.idpPort}/jwks`,
     FOCUS_SERVICE_AUDIENCE: 'life-api',
@@ -285,7 +285,7 @@ const HARNESS_RABBITMQ_PASSWORD = 'test-only';
  * Boots the three throwaway containers the slot owns and returns the Postgres
  * URLs on it. Every harness boots all three, whatever it consumes: the slot owns
  * them, so its teardown is the only thing that removes them. Postgres comes
- * first because feedback-service and focus-service fail closed without a DB.
+ * first because feedback-service fails closed without a DB.
  */
 async function bootSlotContainers(slot: number): Promise<SlotPostgres> {
   const postgres = await startThrowawayPostgres(slot);
@@ -304,18 +304,17 @@ async function bootSlotRedis(slot: number): Promise<void> {
   await startThrowawayRedis(slot);
 }
 
-/** One database per service on the slot's throwaway Postgres server. */
+/** The feedback database on the slot's throwaway Postgres server. */
 interface SlotPostgres {
   feedbackDbUrl: string;
-  focusDbUrl: string;
 }
 
 /**
- * A throwaway Postgres for the two database-backed services (the
+ * A throwaway Postgres for the Postgres-backed service (the
  * `pg-integration.test.ts` pattern): slot-named `postgres:17-alpine` container,
  * ephemeral loopback port, never the compose `postgres-feedback`. A host without
  * Docker fails fast — this e2e is the feedback chapter's final proof, so a silent
- * skip would hide it.
+ * skip would hide it. `focus-service` uses SQLite and needs no server.
  */
 async function startThrowawayPostgres(slot: number): Promise<SlotPostgres> {
   const container = feedbackPgContainer(slot);
@@ -328,14 +327,8 @@ async function startThrowawayPostgres(slot: number): Promise<SlotPostgres> {
     // temporary server, so the probe would report ready before the real one listens.
     readinessCommand: ['pg_isready', '-h', '127.0.0.1', '-U', 'postgres'],
   });
-  createFocusDatabase(container);
   const serverUrl = `postgresql://postgres:test-only@127.0.0.1:${port}`;
-  return { feedbackDbUrl: `${serverUrl}/feedback`, focusDbUrl: `${serverUrl}/focus` };
-}
-
-/** `focus-service` fails closed without its own database, so the boot creates it. */
-function createFocusDatabase(container: string): void {
-  runDocker(['exec', container, 'psql', '-U', 'postgres', '-c', 'CREATE DATABASE focus']);
+  return { feedbackDbUrl: `${serverUrl}/feedback` };
 }
 
 /**
@@ -547,7 +540,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
         command: 'node',
         args: ['dist/main.js'],
         cwd: `${repoRoot()}/apps/focus-service`,
-        env: focusEnv(cfg, slotPostgres.focusDbUrl),
+        env: focusEnv(cfg),
       }),
     );
 

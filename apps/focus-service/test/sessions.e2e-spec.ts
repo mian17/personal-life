@@ -2,11 +2,10 @@ import request from 'supertest';
 import { FakeRedisClient } from './fake-redis';
 import { JwtTestHarness } from './jwt-harness';
 import {
-  canProvidePostgres,
   startFocusApp,
-  startThrowawayPostgres,
+  startThrowawayDatabase,
   type FocusApp,
-  type ThrowawayPostgres,
+  type ThrowawayDatabase,
 } from './setup-env';
 
 /**
@@ -14,20 +13,18 @@ import {
  * criteria 3 and 6): a recorded focus block outlives the cache and the process, and
  * no owner ever observes another owner's rows.
  *
- * Durability is proved the only way it can be: a real Postgres, a real boot of
+ * Durability is proved the only way it can be: a real SQLite file, a real boot of
  * `AppModule` behind the real guard, then the cache is flushed and the application
- * instance is rebuilt against the *same* database. The rebuilt app answers with the
- * row, so the row lives in Postgres and nowhere else.
+ * instance is rebuilt against the *same* file. The rebuilt app answers with the row,
+ * so the row lives in the database and nowhere else.
  */
 
 const DAY = '2026-09-03';
 const NEXT_DAY = '2026-09-04';
 const OTHER_OWNER = 'user-b';
 
-const describeDb = canProvidePostgres() ? describe : describe.skip;
-
-describeDb('Focus sessions (e2e)', () => {
-  let postgres: ThrowawayPostgres;
+describe('Focus sessions (e2e)', () => {
+  let database: ThrowawayDatabase;
   let jwt: JwtTestHarness;
   let running: FocusApp;
   let redis: FakeRedisClient;
@@ -36,7 +33,7 @@ describeDb('Focus sessions (e2e)', () => {
 
   const boot = async (): Promise<FocusApp> => {
     redis = new FakeRedisClient();
-    return startFocusApp({ databaseUrl: postgres.url, jwksUrl: jwt.jwksUrl, redis });
+    return startFocusApp({ databasePath: database.path, jwksUrl: jwt.jwksUrl, redis });
   };
 
   const postSession = (token: string, body: Record<string, unknown>) =>
@@ -52,7 +49,7 @@ describeDb('Focus sessions (e2e)', () => {
     postSession(token, body).expect(201);
 
   beforeAll(async () => {
-    postgres = await startThrowawayPostgres('sessions');
+    database = await startThrowawayDatabase('sessions');
     jwt = await new JwtTestHarness().start();
     running = await boot();
     ownerToken = await jwt.sign('user-a');
@@ -61,7 +58,7 @@ describeDb('Focus sessions (e2e)', () => {
 
   afterEach(async () => {
     // Every case starts from an empty database and an empty cache.
-    await running.dataSource.query('TRUNCATE TABLE "focus_session", "focus_goal"');
+    await running.dataSource.query('DELETE FROM "focus_session"');
     await running.close();
     running = await boot();
   });
@@ -69,7 +66,7 @@ describeDb('Focus sessions (e2e)', () => {
   afterAll(async () => {
     await running?.close();
     await jwt?.stop();
-    await postgres?.stop();
+    await database?.stop();
   });
 
   it('still returns a posted session after the cache is flushed and the app is rebuilt', async () => {
@@ -79,13 +76,13 @@ describeDb('Focus sessions (e2e)', () => {
     expect(served.body).toEqual([created.body]);
     expect(redis.setCalls).toContain(`focus:user-a:v1:sessions:${DAY}:${DAY}`);
 
-    // Flush the cache, drop the process: nothing but Postgres survives this.
+    // Flush the cache, drop the process: nothing but the SQLite file survives this.
     const { body: beforeRebuild } = await listSessions(ownerToken, DAY, DAY).expect(200);
     redis.store.clear();
     const rebuiltRedis = new FakeRedisClient();
     await running.close();
     running = await startFocusApp({
-      databaseUrl: postgres.url,
+      databasePath: database.path,
       jwksUrl: jwt.jwksUrl,
       redis: rebuiltRedis,
     });
@@ -93,7 +90,7 @@ describeDb('Focus sessions (e2e)', () => {
     const afterRebuild = await listSessions(ownerToken, DAY, DAY).expect(200);
     expect(afterRebuild.body).toEqual(beforeRebuild);
     expect(afterRebuild.body).toEqual([created.body]);
-    // The rebuilt app had to reach Postgres: its fresh cache starts at generation 0.
+    // The rebuilt app had to reach the database: its fresh cache starts at generation 0.
     expect(rebuiltRedis.setCalls).toEqual([`focus:user-a:v0:sessions:${DAY}:${DAY}`]);
   });
 

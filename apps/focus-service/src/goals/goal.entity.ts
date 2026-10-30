@@ -26,6 +26,6 @@ export class Goal {
   @Column({ type: 'integer' })
   minutes: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }

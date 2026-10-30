@@ -17,7 +17,7 @@ import type { StackProbe, StackState } from './restore';
 
 /**
  * `db:restore:pg` core (`SPEC-feedback-infra.md` "Restore behavior", "Restore safety
- * check", `SPEC-focus-service` §2). Replaces the whole selected database from a chosen
+ * check"). Replaces the whole selected database from a chosen
  * snapshot, but only after fail-closed preconditions (snapshot verified by
  * `pg_restore --list`, stack probed stopped) and after taking a verified, pinned
  * pre-restore snapshot of the database it is about to overwrite. Post-write table counts

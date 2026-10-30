@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # Build context is repo root so the npm workspace (@life/shared, @life/crypto,
-# @life/cache) is available. Mirrors apps/feedback-service/Dockerfile: focus-service
-# is Postgres-only, so no SQLite packages are built.
+# @life/cache) is available. Mirrors apps/note-service/Dockerfile: focus-service
+# stores its rows in SQLite, so the native build toolchain stays in the image.
 FROM node:22-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update \
@@ -36,7 +36,8 @@ RUN npm run build -w @life/shared \
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=3107 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    FOCUS_DB_PATH=/data/focus.db
 WORKDIR /app
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared/package.json ./packages/shared/package.json
