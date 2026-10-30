@@ -150,7 +150,8 @@ export const resources: ResourceRegistry[] = [
           },
           servingGrams: {
             type: 'number',
-            description: 'Grams one serving of this food weighs',
+            required: true,
+            description: 'Grams one serving of this food weighs, 1 to 5000',
           },
           portions: portionList(),
           nutrients: nutrientVector(),
@@ -235,13 +236,15 @@ function requiredVector(): FieldSpec {
 
 /**
  * One nutrient vector: the 27 amounts a food, entry, or saved-meal item carries.
- * Every key is optional here — the service owns the completeness rule for a snapshot.
+ * All 27 keys are required inside it, because the service stores no partial vector
+ * (`completeVector()` in `apps/meal-service/src/foods/content.ts`); whether the vector
+ * itself may be omitted is the caller's choice per op, stated by `requiredVector()`.
  */
 function nutrientVector(): FieldSpec {
   return {
     type: 'object',
     properties: nutrientProperties(),
-    description: 'Nutrient amounts keyed by the 27 nutrients the app tracks',
+    description: 'Nutrient amounts: all 27 keys, or no vector at all',
   };
 }
 
@@ -250,9 +253,9 @@ function nutrientProperties(): Record<string, FieldSpec> {
   return Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, nutrientAmount(key)]));
 }
 
-/** One nutrient's amount, in that nutrient's own unit. */
+/** One nutrient's amount, in that nutrient's own unit; a complete vector carries all 27. */
 function nutrientAmount(key: string): FieldSpec {
-  return { type: 'number', description: `Amount of ${key}, in its own unit` };
+  return { type: 'number', required: true, description: `Amount of ${key}, in its own unit` };
 }
 
 /** The pickable measures of one food: each an amount in the food's own unit. */

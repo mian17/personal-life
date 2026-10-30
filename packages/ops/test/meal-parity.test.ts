@@ -21,6 +21,7 @@ import { NUTRIENTS } from '../../nutrition/src/nutrients';
 import { main as runCli } from '../src/cli/run';
 import { createMcpServer } from '../src/mcp/server';
 import { findOp, kindIsDestructive } from '../src/core/registry';
+import { deriveInputSchema } from '../src/core/schema';
 import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types';
 import * as mealService from '../src/services/meal';
 import { storeTokens } from '../src/auth/token-store';
@@ -161,6 +162,53 @@ describe('the meal registry', () => {
     expect(Object.keys(items.properties ?? {})).toEqual(['foodId', 'quantity', 'nutrients']);
     expect(items.properties?.['quantity'].required).toBe(true);
     expect(items.properties?.['nutrients'].type).toBe('object');
+  });
+
+  it('requires the fields each creating body declares without `@IsOptional()`', () => {
+    // `apps/meal-service/src/**/dto/*.dto.ts` is the storage contract: a field it
+    // declares without `@IsOptional()` is a 400 when omitted, so an op that leaves
+    // it optional advertises a request the service refuses.
+    expect(requiredFieldsOf('entries', 'create')).toEqual([
+      'date',
+      'mealGroup',
+      'foodId',
+      'quantity',
+      'nutrients',
+    ]);
+    expect(requiredFieldsOf('foods', 'create')).toEqual(['name', 'servingGrams']);
+    expect(requiredFieldsOf('saved-meals', 'create')).toEqual(['name', 'mealGroup', 'items']);
+    expect(requiredFieldsOf('target', 'list')).toEqual(['date']);
+  });
+
+  it('updates every row field as optional, because each update DTO is a full patch', () => {
+    expect(requiredFieldsOf('entries', 'update')).toEqual(['id']);
+    expect(requiredFieldsOf('foods', 'update')).toEqual(['id']);
+  });
+
+  it('requires all 27 keys inside a vector, and the vector itself only where the DTO does', () => {
+    const shipped = NUTRIENTS.map((nutrient) => nutrient.key);
+    for (const vector of declaredNutrientVectors()) {
+      const missing = shipped.filter((key) => vector[key].required !== true);
+      expect(missing).toEqual([]);
+    }
+
+    // A vector is omitted-or-complete (`completeVector()`): `foods` and both updates
+    // carry it optionally, an entry and a saved-meal item never do.
+    expect(fieldOf('entries', 'create', 'nutrients').required).toBe(true);
+    expect(fieldOf('foods', 'create', 'nutrients').required).toBe(false);
+    expect(fieldOf('entries', 'update', 'nutrients').required).toBe(false);
+    expect(fieldOf('foods', 'update', 'nutrients').required).toBe(false);
+    expect(itemField('nutrients').required).toBe(true);
+  });
+
+  it('advertises exactly that over MCP `tools/list`', () => {
+    expect(deriveInputSchema(registryOf('foods'), 'create').required).toEqual([
+      'name',
+      'servingGrams',
+    ]);
+
+    const vector = deriveInputSchema(registryOf('entries'), 'create').properties['nutrients'];
+    expect(vector.required).toEqual(NUTRIENTS.map((nutrient) => nutrient.key));
   });
 });
 
@@ -628,6 +676,25 @@ function opNames(): string[] {
 /** One field the resource's `create` op declares. */
 function createField(resourceName: string, fieldName: string): FieldSpec {
   return findOp(registryOf(resourceName), 'create').fields[fieldName];
+}
+
+/** One field of any op the resource declares. */
+function fieldOf(resourceName: string, kind: OpSpec['kind'], fieldName: string): FieldSpec {
+  return findOp(registryOf(resourceName), kind).fields[fieldName];
+}
+
+/** One key of the saved-meal item the `items` field nests. */
+function itemField(fieldName: string): FieldSpec {
+  const item = createField('saved-meals', 'items').properties?.[fieldName];
+  if (item === undefined) throw new Error(`saved-meal item declares no ${fieldName}`);
+  return item;
+}
+
+/** The fields one op marks required, in declaration order. */
+function requiredFieldsOf(resourceName: string, kind: OpSpec['kind']): string[] {
+  return Object.entries(findOp(registryOf(resourceName), kind).fields)
+    .filter(([, field]) => field.required === true)
+    .map(([fieldName]) => fieldName);
 }
 
 /** The keys of the three `nutrients` declarations, each in declaration order. */

@@ -2,9 +2,10 @@
  * Token-provider suite (SPEC-ops-agent-contract §3.5): the MCP adapter's
  * refreshing read. A token outside the skew window passes through untouched; one
  * inside it rotates once through `refresh()` against the stub IdP, which is what
- * persists the rotated pair. Every failure — no store, no refresh token, a
- * refused grant, a throwing issuer — reads as `undefined`, and concurrent readers
- * share one rotation.
+ * persists the rotated pair. An absent store reads as `undefined`; a store whose
+ * rotation was refused, unreachable, or never had a refresh token raises
+ * `RefreshRejected` — a dead credential, not a forgotten login — and concurrent
+ * readers share one rotation.
  *
  * The suite is also the boundary check: both adapters get the refreshing read, so
  * an executor wired as `cli/run.ts` wires it rotates exactly like the MCP one. No
@@ -22,6 +23,7 @@ import { sampleRegistry } from '../src/fixtures/sample';
 import { createMcpServer } from '../src/mcp/server';
 import { main as runCli } from '../src/cli/run';
 import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
+import { REFRESH_REJECTED_DETAIL } from '../src/transport/errors';
 import { startStubIdp, type StubIdp } from './support/stub-idp';
 
 const ONE_HOUR_MS = 3_600_000;
@@ -101,27 +103,27 @@ describe('refreshing cannot happen', () => {
     expect(await currentAccessToken()).toBeUndefined();
   });
 
-  it('answers undefined without rotating when the store holds no refresh token', async () => {
+  it('raises a dead credential when the store holds no refresh token', async () => {
     await storeTokens({ accessToken: sampleApiToken, refreshToken: undefined, expiresAt: Date.now() + EXPIRING_SOON_MS });
 
-    expect(await currentAccessToken()).toBeUndefined();
+    await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
     expect(idp.rotations()).toBe(0);
   });
 
-  it('answers undefined when the IdP refuses the grant', async () => {
+  it('raises a dead credential when the IdP refuses the grant', async () => {
     await storeTokens({ accessToken: sampleApiToken, refreshToken: 'not-a-live-refresh', expiresAt: Date.now() + EXPIRING_SOON_MS });
 
-    expect(await currentAccessToken()).toBeUndefined();
+    await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
     expect(idp.rotations()).toBe(0);
   });
 
-  it('answers undefined when the issuer throws, and asks it only once', async () => {
+  it('raises a dead credential when the issuer throws, and asks it only once', async () => {
     const brokenIssuer = await startBrokenIssuer();
     try {
       await storeExpiringTokens();
       process.env.IDP_ISSUER = brokenIssuer.issuer;
 
-      expect(await currentAccessToken()).toBeUndefined();
+      await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
       expect(brokenIssuer.requestCount()).toBe(1);
     } finally {
       await brokenIssuer.stop();
@@ -143,6 +145,23 @@ describe('concurrent readers', () => {
     await currentAccessToken();
 
     expect(idp.rotations()).toBe(2);
+  });
+
+  it('share one rejection, and a later call after settle raises again', async () => {
+    process.env.LIFE_OPS_REFRESH_SKEW_MS = ALWAYS_ROTATE_SKEW_MS;
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: 'not-a-live-refresh',
+      expiresAt: Date.now() + EXPIRING_SOON_MS,
+    });
+
+    const readers = await Promise.all(
+      Array.from({ length: 5 }, () => currentAccessToken().catch((error: Error) => error.message)),
+    );
+
+    expect(readers).toEqual(Array.from({ length: 5 }, () => REFRESH_REJECTED_DETAIL));
+
+    await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
   });
 });
 
@@ -194,6 +213,30 @@ describe('the adapters', () => {
     expect(idp.rotations()).toBe(1);
     expect(api.requestLog[0]?.headers['authorization']).toBe(
       `Bearer ${(await readTokens())?.accessToken}`,
+    );
+  });
+
+  it('tells a CLI reader the credential expired, not that no token was found', async () => {
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: 'not-a-live-refresh',
+      expiresAt: Date.now() + EXPIRING_SOON_MS,
+    });
+    const stderr: string[] = [];
+
+    const exit = await runCli({
+      argv: ['sample', 'list'],
+      service: async () => ({ registry: sampleRegistry }),
+      env: { ...process.env, LIFE_OPS_API_BASE: api.baseUrl },
+      stdout: () => {},
+      stderr: (line) => stderr.push(line),
+      signIn: async () => {},
+    });
+
+    expect(exit).toBe(1);
+    expect(stderr.join('\n')).toBe(
+      'sample.list failed (unauthenticated): ' +
+        `${REFRESH_REJECTED_DETAIL}, run \`npm run ops -- login\``,
     );
   });
 });

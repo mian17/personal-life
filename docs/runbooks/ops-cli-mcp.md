@@ -37,17 +37,22 @@ modified`; codes: `invalidInput`, `unauthenticated`, `notFound`, `requestFailed`
 ## Drive it over MCP
 
 Same registry on stdio, but the server never logs in: run `npm run ops -- login` once first.
-`npm run ops:mcp` is that same wrapper — this env file, this cwd — so the config carries no env:
+`npm run ops:mcp` is that same wrapper — this env file, this cwd — so the config carries no env.
+Point the client at `node` with that script's own arguments rather than at `npm run ops:mcp`:
+npm prints two `> personal-life@… ops:mcp` banner lines on **stdout** before the server's first
+JSON-RPC line, and a client that treats a parse error as fatal dies before `initialize`:
 
 ```json
-{"mcpServers":{"life-ops":{"command":"npm","args":["run","ops:mcp"],"cwd":"<repo>"}}}
+{"mcpServers":{"life-ops":{"command":"node","args":["--env-file-if-exists=.env.development","packages/ops/dist/mcp/server.js"],"cwd":"<repo>"}}}
 ```
 
 Six tools: `notes_create`, `notes_get`, `notes_list`, `notes_update`, `notes_delete`,
 `notes_restore`. A missing store is a tool result, not a crash — `notes.list failed
 (unauthenticated): no token found, run \`npm run ops -- login\` first`, `isError: true`, exit 0.
 Refresh is the server's job: a call near or past expiry refreshes inside the live
-process, so one login outlives one access token.
+process, so a login outlives one access token. The IdP rotates the refresh token on every
+use and treats a replayed one as a stolen grant (`apps/idp/src/oidc/refresh-token.policy.ts`),
+so the chain holds only while each rotation is written back; once one is rejected, log in again.
 
 ## Two traps worth knowing
 
