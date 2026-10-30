@@ -13,7 +13,37 @@
 | `base-branch` | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main` |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
-thinking discipline) are in the global protocol at `~/.config/opencode/AGENTS.md`.
+thinking discipline) are in the global protocol at `~/.pi/agent/AGENTS.md`.
+
+## Delegation — the mandatory task template
+
+Every subagent prompt in this repo is written in the global protocol's
+`## 5. Mandatory Subagent Task Template`, because a lane's scope and testing budget
+are only enforceable when they are checkable strings in the prompt. The template
+itself lives there and is not copied here — a second copy drifts from the first.
+This repo contributes the values below and the two plan-field bullets from the
+contracts, so a lane never has to guess what a slot should say.
+
+| Template slot | Where the value comes from |
+|---|---|
+| `[VERIFICATION & TESTING RULES]` → `Permitted test command` | the profile's `unit-test` row — `npm run test:unit -- <file>` from the owning workspace |
+| `[VERIFICATION & TESTING RULES]` → `max test executions` | the profile's `max-test-runs` row, `2` |
+| `[DEFINITION OF DONE]` → typecheck box | the profile's `typecheck` row — `npm run typecheck` in the touched workspace |
+| `[IMPLEMENTATION REQUIREMENTS]` | the profile's `frozen-surfaces` row, named as paths the lane may not change, and the `hard-lines` row for anything the human has to run |
+| `[SCOPE & REPOSITORY CONTEXT]` | the profile's `base-branch` row — the worktree is cut from `origin/dev`, so the prompt names that branch and never `main` |
+| `[IMPLEMENTATION REQUIREMENTS]` → plan fields | Contract 1's delegation plan fields for a UI task (the primitive reuse plan) and Contract 2's for a backend service task (the cache plan) |
+
+Two rules sit in every prompt's `[IMPLEMENTATION REQUIREMENTS]`, in addition to the
+slots above:
+
+- A lane commits when its prompt says so — the prompt states either way, and a
+  commit is never a scope violation. A lane never pushes, never opens or merges a
+  pull request, and never stages a file outside the allowed list. Stage explicit
+  paths, never `git add -A`, and report the commit hash so the diff stays in view.
+  The parent keeps the decision and the review.
+- No intent, spec, report or task-plan file may be staged, because `docs/intent/`,
+  `docs/specs/`, `docs/reports/` and `tasks/` are gitignored run scratch that never
+  enters a commit.
 
 ## Branching — always from `dev`
 
