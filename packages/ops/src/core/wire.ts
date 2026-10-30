@@ -5,6 +5,8 @@
  *
  * Conventions the service contract fixes:
  * - `id` addresses one row (path segment); everything else carries the payload.
+ *   A create addresses nothing, so an `id` one declares travels in the body —
+ *   the client-supplied idempotency key a submission sends.
  * - `list` sends every supplied field as a query parameter — cursor pagination
  *   passes through untouched, the core never interprets the cursor payload.
  * - `update` patches the addressed row; `expectedVersion` rides in the body and
@@ -98,15 +100,26 @@ function bodyFor(operation: OpSpec, supplied: Record<string, unknown>): WireRequ
 /** Kinds whose request carries its whole meaning in method and path. */
 const BODYLESS_KINDS: ReadonlySet<OpSpec['kind']> = new Set(['get', 'delete', 'restore']);
 
-/** Supplied fields only, minus the address: absent optionals never reach the wire. */
-function payloadEntries(operation: OpSpec, supplied: Record<string, unknown>): [string, unknown][] {
-  if (operation.kind === 'list') return [];
-  return suppliedEntries(operation, supplied).filter(([fieldName]) => fieldName !== ADDRESSING_FIELD);
-}
-
 /** Supplied fields only: absent optional fields must never appear on the wire. */
 function suppliedEntries(operation: OpSpec, supplied: Record<string, unknown>): [string, unknown][] {
   return Object.entries(supplied).filter(
     ([fieldName, value]) => value !== undefined && fieldName in operation.fields,
   );
+}
+
+/** The fields that ride in a body: every supplied field, minus the address when a row op holds it. */
+function payloadEntries(operation: OpSpec, supplied: Record<string, unknown>): [string, unknown][] {
+  if (operation.kind === 'list') return [];
+  return suppliedEntries(operation, supplied).filter(([fieldName]) =>
+    carriesPayload(operation, fieldName),
+  );
+}
+
+/**
+ * A row op carries its `id` in the path, so the body must not repeat it. A create
+ * carries no address, so an `id` it declares is payload — the client-supplied
+ * idempotency key a feedback submission sends.
+ */
+function carriesPayload(operation: OpSpec, fieldName: string): boolean {
+  return fieldName !== ADDRESSING_FIELD || !addressesOneRow(operation);
 }

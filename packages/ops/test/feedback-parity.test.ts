@@ -4,21 +4,24 @@
  * call runs through the CLI adapter and through the MCP adapter (`tools/call`),
  * each against a freshly started, identically seeded stub service, and the
  * recorded HTTP request (method, path, query, JSON body) plus the rendered output
- * must match — both ops, the status change included. Error parity covers validator
- * failure, `401`, and `404`. No test contacts a real service or IdP.
+ * must match — all three ops, the submission and the status change included.
+ * Error parity covers validator failure, `401`, and `404`. No test contacts a real
+ * service or IdP.
  *
- * The registry block above the parity block pins the three decisions the spec
- * argues rather than derives: `POST /api/feedback` exists nowhere (§1.7, Open
- * Question 10.1), the status vocabulary appears in `FEEDBACK_STATUS_VALUES` order,
- * and `id` stays a plain string — the service owns the UUIDv4 parse, so no pattern
- * is restated here. The vocabulary is imported by path because `@life/ops`
- * declares no dependency on `@life/shared`; jest still reads the one constant the
- * DTO validates against, which is what keeps two lists from drifting.
+ * The registry block above the parity block pins the four decisions the spec argues
+ * rather than derives: `POST /api/feedback` is reachable and takes the client's own
+ * UUIDv4 idempotency key in the body (§1.7, Open Question 10.1), the `app`, `type`,
+ * and status vocabularies appear in `FEEDBACK_APPS`, `FEEDBACK_TYPE_VALUES`, and
+ * `FEEDBACK_STATUS_VALUES` order, and every `id` stays a plain string — the service
+ * owns the UUIDv4 parse, so no pattern is restated here. The vocabularies are
+ * imported by path because `@life/ops` declares no dependency on `@life/shared`;
+ * jest still reads the constants the DTO validates against, which is what keeps the
+ * two lists from drifting (`meal-parity.test.ts` holds the nutrient keys the same way).
  */
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { FEEDBACK_STATUS_VALUES } from '../../shared/src';
+import { FEEDBACK_APPS, FEEDBACK_STATUS_VALUES, FEEDBACK_TYPE_VALUES } from '../../shared/src';
 import { main as runCli } from '../src/cli/run';
 import { createMcpServer } from '../src/mcp/server';
 import { findOp } from '../src/core/registry';
@@ -38,11 +41,24 @@ const ONE_HOUR_MS = 3_600_000;
 const REFUSED_TOKEN_MESSAGE = 'feedback.update failed (unauthenticated): Unauthorized';
 const ABSENT_FEEDBACK_MESSAGE = 'feedback.update failed (notFound): Sample not found';
 const EMPTY_UPDATE_MESSAGE = 'feedback.update failed (invalidInput): id: required; status: required';
+const EMPTY_CREATE_MESSAGE = 'feedback.create failed (invalidInput): id: required';
 const UNKNOWN_STATUS_MESSAGE =
   'feedback.update failed (invalidInput): status: expected one of open, in_progress, done, wont_do';
 /** A row id no UUIDv4 pattern accepts: the stub holds it, so a `200` proves it travelled verbatim. */
 const NOT_A_UUID = 'not-a-uuid-42';
 const FEEDBACK_ROW_ID = '2f1c9d7e-8b3a-4c6d-9e0f-1a2b3c4d5e6f';
+/**
+ * What one submission sends: the client's own UUIDv4 idempotency key beside the four
+ * payload fields `CreateFeedbackDto` declares. The stub answers its own id, so the
+ * rendered comparison redacts that one volatile field.
+ */
+const SUBMISSION = {
+  id: '9d1c2f44-0a3c-4b9e-9f21-6a5c8d7e0b13',
+  app: 'meals',
+  type: 'bug_report',
+  title: 'Sodium entry lost',
+  description: 'Logging 300 mg of sodium stored nothing',
+};
 
 /** The same call in both dialects: CLI flags and MCP tool arguments. */
 interface AdapterCall {
@@ -100,18 +116,62 @@ describe('the feedback registry', () => {
     expect(registryOf().basePath).toBe('/api/feedback');
   });
 
-  it('declares exactly two ops, the listing and the status change', () => {
-    expect(opNames()).toEqual(['feedback_list', 'feedback_update']);
-    expect(registryOf().ops.map((operation) => operation.kind)).toEqual(['list', 'update']);
-  });
-
-  it('publishes no create, so `POST /api/feedback` is unaddressable', () => {
-    expect(opNames()).not.toContain('feedback_create');
-    expect(registryOf().ops.some((operation) => operation.kind === 'create')).toBe(false);
+  it('declares exactly three ops, the listing, the submission, and the status change', () => {
+    expect(opNames()).toEqual(['feedback_list', 'feedback_create', 'feedback_update']);
+    expect(registryOf().ops.map((operation) => operation.kind)).toEqual([
+      'list',
+      'create',
+      'update',
+    ]);
   });
 
   it('addresses the listing with no fields at all', () => {
     expect(Object.keys(findOp(registryOf(), 'list').fields)).toEqual([]);
+  });
+
+  it('takes the five fields `CreateFeedbackDto` declares, in its order', () => {
+    const create = findOp(registryOf(), 'create');
+
+    expect(Object.keys(create.fields)).toEqual(['id', 'app', 'type', 'title', 'description']);
+    expect(Object.entries(create.fields).map(([name, field]) => [name, field.required])).toEqual([
+      ['id', true],
+      ['app', true],
+      ['type', true],
+      ['title', true],
+      ['description', true],
+    ]);
+  });
+
+  it('sends the id as a client-supplied idempotency key, not a server id', () => {
+    const id = findOp(registryOf(), 'create').fields['id'];
+
+    expect(id.type).toBe('string');
+    expect(id.enum).toBeUndefined();
+    expect(id.description).toContain('UUIDv4');
+    expect(id.description).toContain('idempotency key');
+  });
+
+  it('spells the app vocabulary in FEEDBACK_APPS order', () => {
+    const app = findOp(registryOf(), 'create').fields['app'];
+
+    expect(app.type).toBe('string');
+    expect(app.enum).toEqual(['notes', 'todos', 'meals', 'pomodoro', 'feedback']);
+    expect(app.enum).toEqual(FEEDBACK_APPS);
+  });
+
+  it('spells the report vocabulary in FEEDBACK_TYPE_VALUES order', () => {
+    const type = findOp(registryOf(), 'create').fields['type'];
+
+    expect(type.type).toBe('string');
+    expect(type.enum).toEqual(['feature_request', 'enhancement', 'bug_report']);
+    expect(type.enum).toEqual(FEEDBACK_TYPE_VALUES);
+  });
+
+  it('states the two server-enforced length bounds', () => {
+    const create = findOp(registryOf(), 'create');
+
+    expect(create.fields['title'].description).toContain('200 characters');
+    expect(create.fields['description'].description).toContain('2000 characters');
   });
 
   it('requires an id and a status to restatus a row', () => {
@@ -149,6 +209,34 @@ describe('feedback operation parity', () => {
     expect(pair.cliWire?.path).toBe('/api/feedback');
     expect(pair.cliWire?.body).toBeUndefined();
     expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
+  it('sends the same submission and renders the same new row', async () => {
+    const pair = await runBoth({
+      argv: [
+        'feedback',
+        'create',
+        '--id',
+        SUBMISSION.id,
+        '--app',
+        SUBMISSION.app,
+        '--type',
+        SUBMISSION.type,
+        '--title',
+        SUBMISSION.title,
+        '--description',
+        SUBMISSION.description,
+      ],
+      tool: 'feedback_create',
+      args: SUBMISSION,
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.method).toBe('POST');
+    expect(pair.cliWire?.path).toBe('/api/feedback');
+    expect(pair.cliWire?.query).toEqual({});
+    expect(pair.cliWire?.body).toEqual(SUBMISSION);
+    expect(redactedId(pair.mcp.text)).toBe(redactedId(pair.cli.text));
   });
 
   it('sends the same status change and renders the same row', async () => {
@@ -193,6 +281,36 @@ describe('feedback operation parity', () => {
 });
 
 describe('feedback error parity', () => {
+  it('renders a submission missing its required id identically and sends nothing', async () => {
+    const pair = await runBoth({
+      argv: [
+        'feedback',
+        'create',
+        '--app',
+        SUBMISSION.app,
+        '--type',
+        SUBMISSION.type,
+        '--title',
+        SUBMISSION.title,
+        '--description',
+        SUBMISSION.description,
+      ],
+      tool: 'feedback_create',
+      args: {
+        app: SUBMISSION.app,
+        type: SUBMISSION.type,
+        title: SUBMISSION.title,
+        description: SUBMISSION.description,
+      },
+    });
+
+    expectFailed(pair);
+    expect(pair.cli.text).toBe(EMPTY_CREATE_MESSAGE);
+    expect(pair.mcp.text).toBe(pair.cli.text);
+    expect(pair.cliWire).toBeUndefined();
+    expect(pair.mcpWire).toBeUndefined();
+  });
+
   it('renders a validator failure identically and sends nothing', async () => {
     const pair = await runBoth({
       argv: ['feedback', 'update'],
@@ -362,6 +480,12 @@ function feedbackRow(fields: { id: string; status: string; ownerSub?: string }):
 
 function statusById(rows: readonly SampleRow[], id: string): unknown {
   return rows.find((row) => row.id === id)?.['status'];
+}
+
+/** A create answers the stub's own id, so the comparison redacts that one volatile field. */
+function redactedId(rendered: string): string {
+  const parsed = JSON.parse(rendered) as Record<string, unknown>;
+  return JSON.stringify({ ...parsed, id: '<id>' });
 }
 
 /** The adapter-owned shape of the last recorded request; `undefined` when none arrived. */

@@ -3,9 +3,9 @@
  * request, and `restore` — the sixth and newest kind — compiles without giving
  * the registry a per-operation route override. The regression table pins the
  * five kinds that existed before it byte for byte, so the kind's arrival is
- * provably additive. The table after the notes module pins the whole 36-route
+ * provably additive. The table after the notes module pins the whole 37-route
  * surface the five new service modules add (SPEC-ops-all-services §8.3), and the
- * eleven routes the intent cuts beside it as unreachable (§1.7). The nested suites
+ * ten routes the intent cuts beside it as unreachable (§1.7). The nested suites
  * at the end prove a body carries a nested value untouched, while a nested filter
  * is refused at the schema derivation every adapter calls — before any request
  * exists to assemble.
@@ -247,7 +247,7 @@ describe('the notes module declaration', () => {
 });
 /**
  * The route surface the five new modules add (SPEC-ops-all-services §1.2–§1.6):
- * one row per route, 36 in all, each compiled from a fully supplied input, so the
+ * one row per route, 37 in all, each compiled from a fully supplied input, so the
  * method, path, query, and body of that route are pinned together. Every row names
  * its resource, which the suites below also read as a CLI command and a tool prefix.
  */
@@ -381,6 +381,13 @@ const suppliedSessionCreate = { date: '2026-03-01', minutes: 25 };
 const sessionRange = { from: '2026-03-01', to: '2026-03-07' };
 
 const suppliedFeedbackId = '9d1c2f44-0a3c-4b9e-9f21-6a5c8d7e0b13';
+const suppliedFeedbackCreate = {
+  id: suppliedFeedbackId,
+  app: 'meals',
+  type: 'bug_report',
+  title: 'Sodium entry lost',
+  description: 'Logging 300 mg of sodium stored nothing',
+};
 const suppliedFeedbackPatch = { status: 'in_progress' };
 
 /** One route: the module it belongs to, the input it takes, the request it must compile to. */
@@ -604,6 +611,17 @@ const routeTable: RouteCase[] = [
   },
   {
     resource: 'feedback',
+    kind: 'create',
+    supplied: suppliedFeedbackCreate,
+    expected: {
+      method: 'POST',
+      path: '/api/feedback',
+      query: {},
+      body: suppliedFeedbackCreate,
+    },
+  },
+  {
+    resource: 'feedback',
     kind: 'update',
     supplied: { id: suppliedFeedbackId, ...suppliedFeedbackPatch },
     expected: {
@@ -628,8 +646,8 @@ describe('the routes the five new modules compile to', () => {
     },
   );
 
-  it('pins 36 routes, counted per resource', () => {
-    expect(routeTable).toHaveLength(36);
+  it('pins 37 routes, counted per resource', () => {
+    expect(routeTable).toHaveLength(37);
     expect(
       Object.fromEntries(
         everyServiceResource.map((resource) => [resource.name, rowsFor(resource.name).length]),
@@ -648,7 +666,7 @@ describe('the routes the five new modules compile to', () => {
       'tags-resolve': 1,
       goal: 1,
       sessions: 2,
-      feedback: 2,
+      feedback: 3,
     });
   });
 
@@ -708,7 +726,6 @@ const absentRoutes: CutRoute[] = [
   { resource: 'estimates', kind: 'create', method: 'POST', path: '/api/estimates/photo' },
   { resource: 'tags', kind: 'delete', method: 'DELETE', path: '/api/tags/x' },
   { resource: 'lists', kind: 'delete', method: 'DELETE', path: '/api/lists/x' },
-  { resource: 'feedback', kind: 'create', method: 'POST', path: '/api/feedback' },
 ];
 
 /** The request the five modules compile for one resource's op, or `undefined` when neither exists. */
@@ -720,8 +737,8 @@ function compiledRoute({ resource, kind }: CutRoute): WireRequest | undefined {
 }
 
 describe('the routes the intent cuts', () => {
-  it('counts the eleven routes §1.7 cuts', () => {
-    expect(absentRoutes).toHaveLength(11);
+  it('counts the ten routes §1.7 cuts', () => {
+    expect(absentRoutes).toHaveLength(10);
   });
 
   it.each(absentRoutes)('reaches no $method $path', ({ resource, kind, method, path }) => {
