@@ -330,10 +330,13 @@ export async function runRestorePg(options: {
     at,
     preRestoreEntries: [],
   };
-  const replaced: RestorePgResult['replaced'] = [];
-  for (const target of targets) {
-    replaced.push(await restoreOne(run, target));
-  }
+  // Strictly sequential: each restore appends its own undo path to `run` and rewrites the
+  // shared pre-restore manifest, so the databases must be replaced one at a time and in
+  // order. A reducer over an async accumulator keeps that ordering explicit.
+  const replaced = await targets.reduce<Promise<RestorePgResult['replaced']>>(
+    async (done, target) => [...(await done), await restoreOne(run, target)],
+    Promise.resolve([]),
+  );
 
   return { preRestoreDir, replaced };
 }
