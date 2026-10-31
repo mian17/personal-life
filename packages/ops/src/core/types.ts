@@ -26,9 +26,21 @@ export interface OpSpec {
   /**
    * create | get | list | update | delete | restore — the closed op set
    * (SPEC.md §3). `restore` brings one deleted row back and addresses it with
-   * the same `id` segment the other row ops use.
+   * the same `id` segment the other row ops use. The four `getMany`… kinds are
+   * bulk ops, derived from their single-row sibling rather than written by hand
+   * (SPEC-bulk-ops §2.1, §2.2); core/bulk.ts owns their vocabulary.
    */
-  kind: 'create' | 'get' | 'list' | 'update' | 'delete' | 'restore';
+  kind:
+    | 'create'
+    | 'get'
+    | 'list'
+    | 'update'
+    | 'delete'
+    | 'restore'
+    | 'getMany'
+    | 'createMany'
+    | 'updateMany'
+    | 'deleteMany';
   fields: Record<string, FieldSpec>;
   /**
    * Overrides the kind default. Defaults: true for create/update/delete/restore,
@@ -42,6 +54,12 @@ export interface ResourceSpec {
   name: string;
   basePath: string;
   ops: OpSpec[];
+  /**
+   * Whether this resource offers the four bulk kinds, derived from its own
+   * single-row ops (SPEC-bulk-ops §2.2). Absent or `false` keeps the resource
+   * holding zero bulk ops, so bulk stays invisible until a resource asks for it.
+   */
+  bulk?: boolean;
 }
 
 export type ResourceRegistry = ResourceSpec;
