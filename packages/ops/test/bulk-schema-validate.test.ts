@@ -228,6 +228,20 @@ describe('the items of a batch', () => {
     ]);
   });
 
+  // §2.5/§7: an item is judged against the sibling's own table, so a key that table
+  // never declares is refused at its dotted path — and the advertised item schema is
+  // closed for the same key, so the two never disagree.
+  it('reports an unknown key inside an item at its dotted path', () => {
+    const supplied = { items: [{ title: 'a' }, { title: 'b', colour: 'red' }] };
+    const itemSchema = itemsPropertyOf(journals, 'createMany').items;
+
+    expect(validateInput(findOp(journals, 'createMany'), supplied)).toEqual([
+      { field: 'items.1.colour', reason: 'unknown field' },
+    ]);
+    expect(itemSchema).toMatchObject({ additionalProperties: false });
+    expect(accepts(deriveInputSchema(journals, 'createMany'), supplied)).toBe(false);
+  });
+
   it('reports a missing required field of one item', () => {
     expect(
       validateInput(findOp(journals, 'createMany'), { items: [{ title: 'a' }, { body: 'b' }] }),
