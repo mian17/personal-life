@@ -11,21 +11,33 @@
  * once on stderr and its tools are left out; the other upstreams are still served. The page is
  * complete and carries no `nextCursor`, because the client's own tool search does the deferring.
  *
+ * A slice the cache holds is never re-read, so the only party that can report it stale is its own
+ * upstream: an upstream that writes `notifications/tools/list_changed` inside its handshake has
+ * just said its table moved, so the slice that handshake returned is served for this answer and
+ * then dropped, and the next `tools/list` re-handshakes that one upstream alone (spec §1 "Cache
+ * invalidation").
+ *
  * `tools/call` is lazy, and costs one spawn: the name's `<configkey>__` prefix picks the one
  * upstream that owns it, that upstream is called with the unprefixed name and the caller's own
  * `arguments`, and its whole result object travels back untouched — an `isError: true` result is
  * the upstream's business, not a gateway error. The child is closed before the reply resolves.
  *
+ * A `tools/list` answer that differs from the table this session handed its client before is a
+ * mid-session move, and the client hears about it once: `notifications/tools/list_changed`, one
+ * framed JSON line with no `id` and no reply. The session's first table is its baseline, so it
+ * announces nothing.
+ *
  * The composition is `config → upstream → merge → cache`, the order the modules document: this
  * file knows JSON-RPC and nothing about how an upstream is reached.
  */
-import { readToolSlices, toolCacheFileFor, writeToolSlices } from './cache';
+import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from './cache';
 import type { ToolCacheLocation } from './cache';
 import { loadGatewayConfig } from './config';
 import type { GatewayConfig, UpstreamEntry } from './config';
 import { mergeToolTables } from './merge';
 import type { ForwardedTool, UpstreamSlice, UpstreamTool } from './merge';
 import { UpstreamError, callUpstreamTool, listUpstreamTools } from './upstream';
+import type { UpstreamNotices } from './upstream';
 
 /** The `serverInfo` name a client sees; the version is the package's own. */
 const SERVER_NAME = 'mcp-gateway';
@@ -62,8 +74,15 @@ export interface McpServer {
   handle(message: unknown): Promise<unknown>;
 }
 
+/** One server instance's memory: the writers it answers through, and the table it last handed out. */
+interface GatewaySession {
+  readonly options: McpServerOptions;
+  lastMergedTable: string | undefined;
+}
+
 export function createMcpServer(options: McpServerOptions): McpServer {
-  return { handle: (message) => answer(message, options) };
+  const session: GatewaySession = { options, lastMergedTable: undefined };
+  return { handle: (message) => answer(message, session) };
 }
 
 /** Serve stdin until it closes, answering every JSON-RPC request. */
@@ -113,11 +132,11 @@ async function respondToLine(loop: ServerLoop, line: string): Promise<void> {
   }
 }
 
-async function answer(message: unknown, options: McpServerOptions): Promise<unknown> {
+async function answer(message: unknown, session: GatewaySession): Promise<unknown> {
   const read = readMessage(message);
-  if (read.kind === 'unparseable') return unparseableLineAnswer(options.stderr);
+  if (read.kind === 'unparseable') return unparseableLineAnswer(session.options.stderr);
   if (read.kind === 'notARequest') return notARequestAnswer();
-  return await answerRequest(read.request, options);
+  return await answerRequest(read.request, session);
 }
 
 /** A bad line gets both answers: `-32700` on stdout and a diagnostic on stderr. */
@@ -135,12 +154,12 @@ function notARequestAnswer(): unknown {
   });
 }
 
-async function answerRequest(request: RpcRequest, options: McpServerOptions): Promise<unknown> {
+async function answerRequest(request: RpcRequest, session: GatewaySession): Promise<unknown> {
   if (request.id === undefined) return null; // a notification gets no answer
   if (request.method === 'initialize') return initializeAnswer(request);
   if (request.method === 'ping') return pingAnswer(request);
-  if (request.method === 'tools/list') return await listAnswer(request, options);
-  if (request.method === 'tools/call') return await callAnswer(request, options);
+  if (request.method === 'tools/list') return await listAnswer(request, session);
+  if (request.method === 'tools/call') return await callAnswer(request, session);
   return methodNotFoundAnswer(request);
 }
 
@@ -172,23 +191,44 @@ function methodNotFoundAnswer(request: RpcRequest): unknown {
 }
 
 /** The merged table, or the typed failure that stopped it — a config or merge failure is a reply. */
-async function listAnswer(request: RpcRequest, options: McpServerOptions): Promise<unknown> {
+async function listAnswer(request: RpcRequest, session: GatewaySession): Promise<unknown> {
   try {
-    return resultAnswer(request, { tools: await mergedTools(options) });
+    const tools = await mergedTools(session);
+    announceTableChange(session, tools);
+    return resultAnswer(request, { tools });
   } catch (error) {
     return failureAnswer(request, error);
   }
 }
 
+/** The one line a client's tool table moving mid-session produces: no `id`, so no reply is owed. */
+const LIST_CHANGED_NOTIFICATION = JSON.stringify({
+  jsonrpc: '2.0',
+  method: 'notifications/tools/list_changed',
+});
+
+/** Tell the client its table moved, once per change, as one framed JSON line. */
+function announceTableChange(session: GatewaySession, tools: readonly ForwardedTool[]): void {
+  const table = tableSignature(tools);
+  const didTableMove = session.lastMergedTable !== undefined && session.lastMergedTable !== table;
+  session.lastMergedTable = table;
+  if (didTableMove) session.options.stdout(LIST_CHANGED_NOTIFICATION);
+}
+
+/** A table's whole content, order included; merge order is deterministic, so this compares stably. */
+function tableSignature(tools: readonly ForwardedTool[]): string {
+  return JSON.stringify(tools);
+}
+
 /** One upstream does the work; its result object is the answer, `isError` and all. */
-async function callAnswer(request: RpcRequest, options: McpServerOptions): Promise<unknown> {
+async function callAnswer(request: RpcRequest, session: GatewaySession): Promise<unknown> {
   const requestedName = toolNameOf(request);
   if (requestedName === undefined) {
     return invalidParamsAnswer(request, 'tools/call needs a params.name string');
   }
 
   try {
-    const config = loadGatewayConfig(options.env);
+    const config = loadGatewayConfig(session.options.env);
     const lookup = routeForTool(requestedName, config);
     if (lookup.kind === 'unknownTool') return invalidParamsAnswer(request, lookup.reason);
 
@@ -204,14 +244,14 @@ async function callAnswer(request: RpcRequest, options: McpServerOptions): Promi
 }
 
 /** The complete table: the cached slices as they stand, plus whatever this call re-handshook. */
-async function mergedTools(options: McpServerOptions): Promise<ForwardedTool[]> {
-  const config = loadGatewayConfig(options.env);
+async function mergedTools(session: GatewaySession): Promise<ForwardedTool[]> {
+  const config = loadGatewayConfig(session.options.env);
   const location = cacheLocationFor(config.path, config.hash);
   const cachedSlices = readToolSlices(location);
   const refreshedSlices = await refreshMissingSlices(config.entries, {
     location,
     cachedSlices,
-    reportUpstreamDown: options.stderr,
+    reportUpstreamDown: session.options.stderr,
   });
   const slices = slicesInDeclaredOrder(config.entries, [...cachedSlices, ...refreshedSlices]);
   return mergeToolTables(slices);
@@ -231,27 +271,56 @@ interface RefreshRequest {
 /**
  * Handshake every upstream that holds no cached slice, all at once. What comes back is written
  * as per-upstream slices, so a down upstream keeps its absence instead of persisting an empty
- * table, and a later success fills its key in without disturbing the others.
+ * table, and a later success fills its key in without disturbing the others. An upstream that
+ * announced a change while we read it is served now and forgotten afterwards, so its slice never
+ * outlives the announcement.
  */
 async function refreshMissingSlices(
   entries: readonly UpstreamEntry[],
   request: RefreshRequest,
 ): Promise<UpstreamSlice[]> {
   const missing = entries.filter((entry) => !holdsSlice(request.cachedSlices, entry.configKey));
-  const slices = await Promise.all(missing.map((entry) => sliceFromUpstream(entry, request)));
-  const refreshed = slices.filter(isSlice);
+  const handshaken = await Promise.all(missing.map((entry) => sliceFromUpstream(entry, request)));
+  const answered = handshaken.filter(isAnsweredSlice);
+  if (answered.length === 0) return [];
 
-  if (refreshed.length > 0) writeToolSlices(request.location, refreshed);
-  return refreshed;
+  writeToolSlices(request.location, answered.map((slice) => slice.slice));
+  forgetAnnouncedChanges(request.location, answered);
+  return answered.map((slice) => slice.slice);
+}
+
+/** One upstream's fresh slice, and whether that upstream claimed its table had moved. */
+interface AnsweredSlice {
+  readonly slice: UpstreamSlice;
+  readonly announcedTableChange: boolean;
+}
+
+/**
+ * An upstream that announced a change keeps no cached slice: its table moved while we were reading
+ * it, so the next `tools/list` re-handshakes that upstream rather than trust this read as the
+ * table's settled state. The other upstreams' slices are left exactly as they were.
+ */
+function forgetAnnouncedChanges(
+  location: ToolCacheLocation,
+  answered: readonly AnsweredSlice[],
+): void {
+  for (const upstream of answered.filter((slice) => slice.announcedTableChange)) {
+    dropToolSlice(location, upstream.slice.configKey);
+  }
 }
 
 /** One upstream's slice, or nothing when it is unreachable — reported once, on stderr. */
 async function sliceFromUpstream(
   entry: UpstreamEntry,
   request: RefreshRequest,
-): Promise<UpstreamSlice | undefined> {
+): Promise<AnsweredSlice | undefined> {
+  const notices: UpstreamNotices = { toolTableChanged: false };
   try {
-    return { configKey: entry.configKey, tools: namedTools(await listUpstreamTools(entry), entry) };
+    const tools = namedTools(await listUpstreamTools(entry, notices), entry);
+    return {
+      slice: { configKey: entry.configKey, tools },
+      announcedTableChange: notices.toolTableChanged,
+    };
   } catch (error) {
     request.reportUpstreamDown(reasonFor(error));
     return undefined;
@@ -269,7 +338,7 @@ function holdsSlice(slices: readonly UpstreamSlice[], configKey: string): boolea
   return slices.some((slice) => slice.configKey === configKey);
 }
 
-function isSlice(slice: UpstreamSlice | undefined): slice is UpstreamSlice {
+function isAnsweredSlice(slice: AnsweredSlice | undefined): slice is AnsweredSlice {
   return slice !== undefined;
 }
 
