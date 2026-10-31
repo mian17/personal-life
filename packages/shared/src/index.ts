@@ -1,5 +1,4 @@
 export { likeMatch } from './like-match';
-export { resolveDbPath } from './db-path';
 
 /**
  * The JSON-RPC stdio seam the MCP servers share (`SPEC-mcp-gateway`,

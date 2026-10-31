@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
-import { resolveDbPath } from '@life/shared';
+import { resolveDbPath } from '@life/shared/node';
 
 /**
  * `cleanup-tags` core (`SPEC-tags-service` `## Maintenance scripts`). Operator-run
