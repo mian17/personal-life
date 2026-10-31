@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Life — screen gallery</title>
+<style>
+  /* Every value below is a token from docs/design-systems/personal-life/DESIGN.md
+     (dark palette); keep the gallery and the app on one set of numbers. */
+  :root {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --panel: #181b22;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #5b8cff;
+    --border: #2a2f3a;
+    --danger: #ff6b6b;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --font: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --phone-w: 414;
+    --phone-h: 896;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    max-width: 72rem;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 var(--font);
+  }
+
+  h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.25rem; line-height: 1.25; margin: 2rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1rem; line-height: 1.25; margin: 0 0 0.25rem; }
+
+  a { color: var(--accent); }
+  a:hover { text-decoration: underline; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  p { margin: 0.25rem 0; }
+  .note { color: var(--muted); font-size: 0.9375rem; }
+  .mono { font-family: var(--mono); font-size: 0.875rem; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05em 0.3em;
+  }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem 1rem; overflow-x: auto; }
+  pre code { background: none; border: 0; padding: 0; }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin: 1rem 0; padding: 0.75rem 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .facts div { margin: 0; }
+  .facts dt { color: var(--muted); font-size: 0.8125rem; }
+  .facts dd { margin: 0; font-weight: 600; }
+
+  .count { color: var(--muted); font-weight: 400; font-size: 0.9375rem; }
+
+  .filter { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
+  .filter input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.4rem 0.625rem; min-width: 18rem; }
+  /* Full-opacity muted, not the browser's faded default: #8b93a7 on #181b22 is 5.60:1. */
+  .filter input::placeholder { color: var(--muted); opacity: 1; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1.25rem; }
+
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; }
+  .tile[hidden] { display: none; }
+
+  /* Natural flow at the PNG's own ratio: the full screen stays visible however
+     narrow the column gets, never cropped to a different aspect. */
+  .shot { display: block; margin-bottom: 0.5rem; }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--phone-w) / var(--phone-h);
+    object-fit: contain;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .meta { color: var(--muted); font-size: 0.8125rem; font-family: var(--mono); overflow-wrap: anywhere; }
+  .route { color: var(--text); }
+
+  .failed { border-color: var(--danger); }
+  .failure { color: var(--danger); font-size: 0.9375rem; overflow-wrap: anywhere; }
+
+  .empty { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-top: 1.5rem; }
+  .empty h2 { border: 0; margin-top: 0; padding-top: 0; }
+
+  @media print {
+    :root { color-scheme: light; --bg: #ffffff; --panel: #ffffff; --text: #000000; --muted: #333333; --accent: #000000; --border: #999999; --danger: #000000; }
+    body { max-width: none; padding: 0; background: #ffffff; color: #000000; }
+    .filter { display: none; }
+    .tiles { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .tile, .shot, .shot img { break-inside: avoid; page-break-inside: avoid; }
+    .shot img { border-color: #999999; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Personal Life — screen gallery</h1>
+  <dl class="facts">
+      <div><dt>Total</dt><dd>29</dd></div>
+      <div><dt>Captured</dt><dd>29</dd></div>
+      <div><dt>Failed</dt><dd>0</dd></div>
+      <div><dt>Viewport</dt><dd>414×896 CSS px @2x</dd></div>
+      <div><dt>Git SHA</dt><dd class="mono">a2d6b24969dd66ac51de687a0c1a91b6652ec887</dd></div>
+      <div><dt>Captured at</dt><dd>2026-10-31 10:43 UTC</dd></div>
+    </dl>
+</header>
+<p class="note">Capture at 414×896 CSS px, device pixel ratio
+      2. Regenerate after UI changes with
+      <code>npm run screens -w apps/app</code> against a dev server on port 3100.</p>
+    <label class="filter">Filter <input type="search" id="filter" placeholder="route, title or slug" autocomplete="off"></label>
+    <section aria-labelledby="module-notes">
+    <h2 id="module-notes">Notes <span class="count">6</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Notes</h3>
+    <a class="shot" href="screens/notes-index.png" title="Open notes-index full size">
+      <img src="screens/notes-index.png" width="414" height="896" loading="lazy"
+        alt="Notes screen at /notes">
+    </a>
+    <p class="meta"><span class="route">/notes</span> · notes-index.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>New note</h3>
+    <a class="shot" href="screens/notes-new.png" title="Open notes-new full size">
+      <img src="screens/notes-new.png" width="414" height="896" loading="lazy"
+        alt="New note screen at /notes/new">
+    </a>
+    <p class="meta"><span class="route">/notes/new</span> · notes-new.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Note editor</h3>
+    <a class="shot" href="screens/notes-detail.png" title="Open notes-detail full size">
+      <img src="screens/notes-detail.png" width="414" height="896" loading="lazy"
+        alt="Note editor screen at /notes/58a730c0-af87-4452-acbf-c256a28f6eb8">
+    </a>
+    <p class="meta"><span class="route">/notes/58a730c0-af87-4452-acbf-c256a28f6eb8</span> · notes-detail.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Notes settings</h3>
+    <a class="shot" href="screens/notes-settings.png" title="Open notes-settings full size">
+      <img src="screens/notes-settings.png" width="414" height="896" loading="lazy"
+        alt="Notes settings screen at /notes/settings">
+    </a>
+    <p class="meta"><span class="route">/notes/settings</span> · notes-settings.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Tag manager</h3>
+    <a class="shot" href="screens/notes-tags.png" title="Open notes-tags full size">
+      <img src="screens/notes-tags.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /notes/tags">
+    </a>
+    <p class="meta"><span class="route">/notes/tags</span> · notes-tags.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Trash</h3>
+    <a class="shot" href="screens/notes-trash.png" title="Open notes-trash full size">
+      <img src="screens/notes-trash.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /notes/trash">
+    </a>
+    <p class="meta"><span class="route">/notes/trash</span> · notes-trash.png · 2026-10-31 10:43 UTC</p>
+  </article></div>
+  </section>
+<section aria-labelledby="module-todos">
+    <h2 id="module-todos">Todos <span class="count">8</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Today</h3>
+    <a class="shot" href="screens/todos-today.png" title="Open todos-today full size">
+      <img src="screens/todos-today.png" width="414" height="896" loading="lazy"
+        alt="Today screen at /todos">
+    </a>
+    <p class="meta"><span class="route">/todos</span> · todos-today.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>New todo</h3>
+    <a class="shot" href="screens/todos-new.png" title="Open todos-new full size">
+      <img src="screens/todos-new.png" width="414" height="896" loading="lazy"
+        alt="New todo screen at /todos/new">
+    </a>
+    <p class="meta"><span class="route">/todos/new</span> · todos-new.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Matrix</h3>
+    <a class="shot" href="screens/todos-matrix.png" title="Open todos-matrix full size">
+      <img src="screens/todos-matrix.png" width="414" height="896" loading="lazy"
+        alt="Matrix screen at /todos/matrix">
+    </a>
+    <p class="meta"><span class="route">/todos/matrix</span> · todos-matrix.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Edit todo</h3>
+    <a class="shot" href="screens/todos-edit.png" title="Open todos-edit full size">
+      <img src="screens/todos-edit.png" width="414" height="896" loading="lazy"
+        alt="Edit todo screen at /todos/a64779ba-5f5c-4a10-9c38-6afe756dcb25/edit">
+    </a>
+    <p class="meta"><span class="route">/todos/a64779ba-5f5c-4a10-9c38-6afe756dcb25/edit</span> · todos-edit.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Todos settings</h3>
+    <a class="shot" href="screens/todos-settings.png" title="Open todos-settings full size">
+      <img src="screens/todos-settings.png" width="414" height="896" loading="lazy"
+        alt="Todos settings screen at /todos/settings">
+    </a>
+    <p class="meta"><span class="route">/todos/settings</span> · todos-settings.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Tag manager</h3>
+    <a class="shot" href="screens/todos-tags.png" title="Open todos-tags full size">
+      <img src="screens/todos-tags.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /todos/tags">
+    </a>
+    <p class="meta"><span class="route">/todos/tags</span> · todos-tags.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>List manager</h3>
+    <a class="shot" href="screens/todos-lists.png" title="Open todos-lists full size">
+      <img src="screens/todos-lists.png" width="414" height="896" loading="lazy"
+        alt="List manager screen at /todos/lists">
+    </a>
+    <p class="meta"><span class="route">/todos/lists</span> · todos-lists.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Trash</h3>
+    <a class="shot" href="screens/todos-trash.png" title="Open todos-trash full size">
+      <img src="screens/todos-trash.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /todos/trash">
+    </a>
+    <p class="meta"><span class="route">/todos/trash</span> · todos-trash.png · 2026-10-31 10:43 UTC</p>
+  </article></div>
+  </section>
+<section aria-labelledby="module-meals">
+    <h2 id="module-meals">Meals <span class="count">10</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Meals today</h3>
+    <a class="shot" href="screens/meals-today.png" title="Open meals-today full size">
+      <img src="screens/meals-today.png" width="414" height="896" loading="lazy"
+        alt="Meals today screen at /meals">
+    </a>
+    <p class="meta"><span class="route">/meals</span> · meals-today.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Meals day</h3>
+    <a class="shot" href="screens/meals-day.png" title="Open meals-day full size">
+      <img src="screens/meals-day.png" width="414" height="896" loading="lazy"
+        alt="Meals day screen at /meals/2026-10-31">
+    </a>
+    <p class="meta"><span class="route">/meals/2026-10-31</span> · meals-day.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Meal entry</h3>
+    <a class="shot" href="screens/meals-entry.png" title="Open meals-entry full size">
+      <img src="screens/meals-entry.png" width="414" height="896" loading="lazy"
+        alt="Meal entry screen at /meals/entry/548b8903-36b9-423f-b57b-9c1380dc8da6">
+    </a>
+    <p class="meta"><span class="route">/meals/entry/548b8903-36b9-423f-b57b-9c1380dc8da6</span> · meals-entry.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Food catalog</h3>
+    <a class="shot" href="screens/meals-foods.png" title="Open meals-foods full size">
+      <img src="screens/meals-foods.png" width="414" height="896" loading="lazy"
+        alt="Food catalog screen at /meals/foods">
+    </a>
+    <p class="meta"><span class="route">/meals/foods</span> · meals-foods.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>New food</h3>
+    <a class="shot" href="screens/meals-food-new.png" title="Open meals-food-new full size">
+      <img src="screens/meals-food-new.png" width="414" height="896" loading="lazy"
+        alt="New food screen at /meals/foods/new">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/new</span> · meals-food-new.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Edit food</h3>
+    <a class="shot" href="screens/meals-food-detail.png" title="Open meals-food-detail full size">
+      <img src="screens/meals-food-detail.png" width="414" height="896" loading="lazy"
+        alt="Edit food screen at /meals/foods/1bd08c17-0600-428a-83e0-db4747098d91">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/1bd08c17-0600-428a-83e0-db4747098d91</span> · meals-food-detail.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Saved meals</h3>
+    <a class="shot" href="screens/meals-saved.png" title="Open meals-saved full size">
+      <img src="screens/meals-saved.png" width="414" height="896" loading="lazy"
+        alt="Saved meals screen at /meals/saved">
+    </a>
+    <p class="meta"><span class="route">/meals/saved</span> · meals-saved.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Saved meal</h3>
+    <a class="shot" href="screens/meals-saved-detail.png" title="Open meals-saved-detail full size">
+      <img src="screens/meals-saved-detail.png" width="414" height="896" loading="lazy"
+        alt="Saved meal screen at /meals/saved/421eb655-b4f3-4ea6-a59f-b1c8bf488884">
+    </a>
+    <p class="meta"><span class="route">/meals/saved/421eb655-b4f3-4ea6-a59f-b1c8bf488884</span> · meals-saved-detail.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Meals settings</h3>
+    <a class="shot" href="screens/meals-settings.png" title="Open meals-settings full size">
+      <img src="screens/meals-settings.png" width="414" height="896" loading="lazy"
+        alt="Meals settings screen at /meals/settings">
+    </a>
+    <p class="meta"><span class="route">/meals/settings</span> · meals-settings.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Nutrition target</h3>
+    <a class="shot" href="screens/meals-target.png" title="Open meals-target full size">
+      <img src="screens/meals-target.png" width="414" height="896" loading="lazy"
+        alt="Nutrition target screen at /meals/target">
+    </a>
+    <p class="meta"><span class="route">/meals/target</span> · meals-target.png · 2026-10-31 10:43 UTC</p>
+  </article></div>
+  </section>
+<section aria-labelledby="module-pomodoro">
+    <h2 id="module-pomodoro">Pomodoro <span class="count">3</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Timer</h3>
+    <a class="shot" href="screens/pomodoro-timer.png" title="Open pomodoro-timer full size">
+      <img src="screens/pomodoro-timer.png" width="414" height="896" loading="lazy"
+        alt="Timer screen at /pomodoro">
+    </a>
+    <p class="meta"><span class="route">/pomodoro</span> · pomodoro-timer.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Stats</h3>
+    <a class="shot" href="screens/pomodoro-stats.png" title="Open pomodoro-stats full size">
+      <img src="screens/pomodoro-stats.png" width="414" height="896" loading="lazy"
+        alt="Stats screen at /pomodoro/stats">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/stats</span> · pomodoro-stats.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Pomodoro settings</h3>
+    <a class="shot" href="screens/pomodoro-settings.png" title="Open pomodoro-settings full size">
+      <img src="screens/pomodoro-settings.png" width="414" height="896" loading="lazy"
+        alt="Pomodoro settings screen at /pomodoro/settings">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/settings</span> · pomodoro-settings.png · 2026-10-31 10:43 UTC</p>
+  </article></div>
+  </section>
+<section aria-labelledby="module-shared">
+    <h2 id="module-shared">Shared <span class="count">2</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Feedback inbox</h3>
+    <a class="shot" href="screens/feedback-inbox.png" title="Open feedback-inbox full size">
+      <img src="screens/feedback-inbox.png" width="414" height="896" loading="lazy"
+        alt="Feedback inbox screen at /feedback">
+    </a>
+    <p class="meta"><span class="route">/feedback</span> · feedback-inbox.png · 2026-10-31 10:43 UTC</p>
+  </article>
+<article class="tile">
+    <h3>Feedback settings</h3>
+    <a class="shot" href="screens/feedback-settings.png" title="Open feedback-settings full size">
+      <img src="screens/feedback-settings.png" width="414" height="896" loading="lazy"
+        alt="Feedback settings screen at /feedback/settings">
+    </a>
+    <p class="meta"><span class="route">/feedback/settings</span> · feedback-settings.png · 2026-10-31 10:43 UTC</p>
+  </article></div>
+  </section>
+<script>
+  // Progressive: without this script every tile stays visible, because hiding is
+  // done with the HTML "hidden" attribute, never by the markup itself.
+  (function () {
+    var input = document.getElementById('filter');
+    if (!input) return;
+    var tiles = Array.prototype.slice.call(document.querySelectorAll('.tile'));
+    input.addEventListener('input', function () {
+      var query = input.value.trim().toLowerCase();
+      tiles.forEach(function (tile) {
+        tile.hidden = query !== '' && tile.textContent.toLowerCase().indexOf(query) === -1;
+      });
+    });
+  })();
+</script>
+</body>
+</html>
