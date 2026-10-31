@@ -11,6 +11,7 @@
     "test:e2e": "npm run test:e2e:prod-build && npm run test:e2e:dev-server",
     "test:e2e:prod-build": "playwright test --config playwright.config.ts",
     "test:e2e:dev-server": "playwright test --config playwright.dev.config.ts",
+    "screens": "node test/screens/capture.mjs && node test/screens/gallery.mjs",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },

@@ -1,0 +1,33 @@
+{
+  "screens": [
+    { "slug": "notes-index", "title": "Notes", "module": "notes", "route": "/notes" },
+    { "slug": "notes-new", "title": "New note", "module": "notes", "route": "/notes/new" },
+    { "slug": "notes-detail", "title": "Note editor", "module": "notes", "route": "/notes/{note}" },
+    { "slug": "notes-settings", "title": "Notes settings", "module": "notes", "route": "/notes/settings" },
+    { "slug": "notes-tags", "title": "Tag manager", "module": "notes", "route": "/notes/tags" },
+    { "slug": "notes-trash", "title": "Trash", "module": "notes", "route": "/notes/trash" },
+    { "slug": "todos-today", "title": "Today", "module": "todos", "route": "/todos" },
+    { "slug": "todos-new", "title": "New todo", "module": "todos", "route": "/todos/new" },
+    { "slug": "todos-matrix", "title": "Matrix", "module": "todos", "route": "/todos/matrix" },
+    { "slug": "todos-edit", "title": "Edit todo", "module": "todos", "route": "/todos/{todo}/edit" },
+    { "slug": "todos-settings", "title": "Todos settings", "module": "todos", "route": "/todos/settings" },
+    { "slug": "todos-tags", "title": "Tag manager", "module": "todos", "route": "/todos/tags" },
+    { "slug": "todos-lists", "title": "List manager", "module": "todos", "route": "/todos/lists" },
+    { "slug": "todos-trash", "title": "Trash", "module": "todos", "route": "/todos/trash" },
+    { "slug": "meals-today", "title": "Meals today", "module": "meals", "route": "/meals" },
+    { "slug": "meals-day", "title": "Meals day", "module": "meals", "route": "/meals/{mealDate}" },
+    { "slug": "meals-entry", "title": "Meal entry", "module": "meals", "route": "/meals/entry/{entry}" },
+    { "slug": "meals-foods", "title": "Food catalog", "module": "meals", "route": "/meals/foods" },
+    { "slug": "meals-food-new", "title": "New food", "module": "meals", "route": "/meals/foods/new" },
+    { "slug": "meals-food-detail", "title": "Edit food", "module": "meals", "route": "/meals/foods/{food}" },
+    { "slug": "meals-saved", "title": "Saved meals", "module": "meals", "route": "/meals/saved" },
+    { "slug": "meals-saved-detail", "title": "Saved meal", "module": "meals", "route": "/meals/saved/{savedMeal}" },
+    { "slug": "meals-settings", "title": "Meals settings", "module": "meals", "route": "/meals/settings" },
+    { "slug": "meals-target", "title": "Nutrition target", "module": "meals", "route": "/meals/target" },
+    { "slug": "pomodoro-timer", "title": "Timer", "module": "pomodoro", "route": "/pomodoro" },
+    { "slug": "pomodoro-stats", "title": "Stats", "module": "pomodoro", "route": "/pomodoro/stats" },
+    { "slug": "pomodoro-settings", "title": "Pomodoro settings", "module": "pomodoro", "route": "/pomodoro/settings" },
+    { "slug": "feedback-inbox", "title": "Feedback inbox", "module": "shared", "route": "/feedback" },
+    { "slug": "feedback-settings", "title": "Feedback settings", "module": "shared", "route": "/feedback/settings" }
+  ]
+}
