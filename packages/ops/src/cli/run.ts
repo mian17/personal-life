@@ -12,8 +12,8 @@
  * and `renderFailure`, so both adapters render through `./render`.
  */
 import type { BulkEnvelope } from '../core/bulk';
-import { resolveBulkLimit } from '../core/bulk';
-import type { ResourceRegistry } from '../core/types';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk';
+import type { OpSpec, ResourceRegistry } from '../core/types';
 import { toolName } from '../core/schema';
 import { createExecutor, resolveDeadlineMs } from '../transport/executor';
 import { currentAccessToken } from '../auth/token-provider';
@@ -105,17 +105,20 @@ async function runCall(options: MainOptions): Promise<number> {
   });
   const result = await executor.run(command.operation.kind, command.input);
   options.stdout(renderOpsResult(result));
-  return exitCodeFor(result.body);
+  return exitCodeFor(command.operation.kind, result.body);
 }
 
-/** A batch where no item succeeded is the one failing call; a partial failure still exits 0. */
-function exitCodeFor(body: unknown): number {
-  return failedEveryItem(body) ? FAILURE_EXIT : SUCCESS_EXIT;
+/**
+ * A batch where no item succeeded is the one failing call; a partial failure still
+ * exits 0. Only a bulk kind reports item counts, so only a bulk call reads them —
+ * the MCP adapter gates its own failure signal the same way (§2.7).
+ */
+function exitCodeFor(kind: OpSpec['kind'], body: unknown): number {
+  return failedEveryItem(kind, body) ? FAILURE_EXIT : SUCCESS_EXIT;
 }
 
-/** The batch envelope is the only body that counts its successes, and nothing succeeding fails the call. */
-function failedEveryItem(body: unknown): boolean {
-  return (body as Partial<BulkEnvelope> | undefined)?.succeeded === 0;
+function failedEveryItem(kind: OpSpec['kind'], body: unknown): boolean {
+  return isBulkKind(kind) && (body as Partial<BulkEnvelope> | undefined)?.succeeded === 0;
 }
 
 /** The resources a loaded module registers, in declaration order. */

@@ -243,4 +243,19 @@ describe('the entry point a resource module imports', () => {
     expect(resolveBulkLimit({})).toBe(DEFAULT_BULK_LIMIT);
     expect(resolveBulkLimit({ LIFE_OPS_BULK_LIMIT: '25' })).toBe(25);
   });
+
+  // §2.4: `0` is not "unlimited" — a value the reader cannot use falls back, never uncaps.
+  it.each([
+    ['unset', undefined],
+    ['empty', ''],
+    ['blank', '   '],
+    ['non-numeric', 'twenty'],
+    ['fractional', '2.5'],
+    ['zero', '0'],
+    ['negative', '-3'],
+  ])('falls back to the default when the cap is %s', (_case, configured) => {
+    const env = configured === undefined ? {} : { LIFE_OPS_BULK_LIMIT: configured };
+
+    expect(resolveBulkLimit(env)).toBe(DEFAULT_BULK_LIMIT);
+  });
 });

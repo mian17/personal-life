@@ -64,17 +64,31 @@ export function validateInput(
   return bulkBatchIssues(operation, { kind: operation.kind, supplied, bulkLimit });
 }
 
-/** The batch-level refusals, or the items — a call-level failure reaches no request (§2.5). */
+/**
+ * The batch-level refusals, or the items — a call-level failure reaches no request
+ * (§2.5). The envelope is judged with the same unknown-key rule every other op
+ * takes (`additionalProperties: false`), so a key the schema never advertises is
+ * refused here rather than riding along unread.
+ */
 function bulkBatchIssues(operation: OpSpec, batch: SubmittedBatch): ValidationIssue[] {
   const items = batch.supplied[BULK_WRAPPER_FIELD];
   if (!Array.isArray(items)) {
     return [{ field: BULK_WRAPPER_FIELD, reason: batchEnvelopeReason(items) }];
   }
+  const envelopeIssues = unknownEnvelopeFields(
+    Object.keys(batch.supplied).filter((fieldName) => fieldName !== BULK_WRAPPER_FIELD),
+  );
+  if (envelopeIssues.length > 0) return envelopeIssues;
   const sizeReason = batchSizeReason(items.length, batch.bulkLimit);
   if (sizeReason !== undefined) return [{ field: BULK_WRAPPER_FIELD, reason: sizeReason }];
   return items.flatMap((item, index) =>
     bulkItemIssues(operation, { kind: batch.kind, index, item }),
   );
+}
+
+/** A bulk call takes `items` and nothing else, so every other supplied key is unknown (§2.3). */
+function unknownEnvelopeFields(fieldNames: string[]): ValidationIssue[] {
+  return fieldNames.map((fieldName) => ({ field: fieldName, reason: 'unknown field' }));
 }
 
 /** A batch nobody sent is missing; a batch that is not a list is the wrong type. */

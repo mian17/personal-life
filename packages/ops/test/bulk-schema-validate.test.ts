@@ -12,6 +12,8 @@ import { BULK_KINDS, resolveBulkLimit } from '../src/core/bulk';
 import { deriveInputSchema } from '../src/core/schema';
 import type { JsonSchema, JsonSchemaProperty } from '../src/core/schema';
 import { findOp } from '../src/core/registry';
+import { accepts } from './support/schema-accepts';
+import { listTools } from '../src/mcp/tools';
 import { BULK_WRAPPER_FIELD, describeIssues, validateInput } from '../src/core/validate';
 import type { OpSpec, ResourceRegistry, WireRequest } from '../src/core/types';
 import { wireFor } from '../src/core/wire';
@@ -128,6 +130,38 @@ describe('the schemas that already shipped', () => {
   });
 });
 
+/** Every bulk kind's title word, description tail, and hint row (§2.8, Task 5 AC 1 and 3). */
+const BULK_TOOL_ROWS: Array<
+  [OpSpec['kind'], string, { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean }]
+> = [
+  ['getMany', 'Get many', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
+  ['createMany', 'Create many', { readOnlyHint: false, destructiveHint: true, idempotentHint: false }],
+  ['updateMany', 'Update many', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
+  ['deleteMany', 'Delete many', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
+];
+
+describe('the bulk tool a model reads', () => {
+  for (const [kind, words, hints] of BULK_TOOL_ROWS) {
+    it(`titles and describes ${kind} with its own words, and carries its hint row`, () => {
+      const tool = toolOf(kind);
+
+      expect(tool.title).toBe(`${words} journals`);
+      expect(tool.description).toBe(
+        `${words} journals through /api/journals, one result per item`,
+      );
+      expect(tool.annotations).toEqual({ ...hints, openWorldHint: false });
+    });
+  }
+});
+
+/** The one advertised tool for a fixture bulk kind, or a failure naming the kind that lost it. */
+function toolOf(kind: OpSpec['kind']) {
+  const name = `journals_${kind.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
+  const tool = listTools(journals).find((candidate) => candidate.name === name);
+  if (tool === undefined) throw new Error(`tools/list advertised no tool for ${kind}`);
+  return tool;
+}
+
 describe('the batch envelope', () => {
   it('refuses a batch nobody sent', () => {
     expect(validateInput(findOp(journals, 'getMany'), {})).toEqual([
@@ -139,6 +173,17 @@ describe('the batch envelope', () => {
     expect(validateInput(findOp(journals, 'getMany'), { items: [] })).toEqual([
       { field: BULK_WRAPPER_FIELD, reason: 'at least one item required' },
     ]);
+  });
+
+  // §2.3/§2.5: the derived schema declares `additionalProperties: false`, so the
+  // validator refuses the same key rather than executing a batch around it.
+  it('refuses a supplied top-level key the schema never advertises', () => {
+    const supplied = { items: ['j1'], limit: 5 };
+
+    expect(validateInput(findOp(journals, 'getMany'), supplied)).toEqual([
+      { field: 'limit', reason: 'unknown field' },
+    ]);
+    expect(accepts(deriveInputSchema(journals, 'getMany'), supplied)).toBe(false);
   });
 
   it('refuses a batch that is not a list', () => {

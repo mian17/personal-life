@@ -186,7 +186,29 @@ describe('one bulk call on both adapters', () => {
     expect(pair.mcp.jsonRpcResult).not.toHaveProperty('isError');
     expect(pair.mcpWires).toEqual(pair.cliWires);
     expect(pair.cliWires.map((wire) => wire.method)).toEqual(['PATCH', 'PATCH']);
+    expect(pair.cliWires.map((wire) => wire.path)).toEqual([
+      `${COLLECTION_PATH}/journal-a`,
+      `${COLLECTION_PATH}/journal-b`,
+    ]);
+    // §2.3: an item's wire carries exactly the fields that item submitted.
+    expect(pair.cliWires.map((wire) => wire.body)).toEqual([
+      { title: 'Morning pages, retitled' },
+      { title: 'Evening pages, retitled' },
+    ]);
     expect(pair.mcp.text).toBe(pair.cli.stdout);
+  });
+
+  // Task 6 AC 1 (§2.8): the camelCase op spelling resolves to the same call as the kebab one.
+  it('resolves a camelCase bulk kind exactly as its kebab spelling', async () => {
+    const kebab = await runBoth(GET_MANY);
+    const camel = await runBoth({
+      ...GET_MANY,
+      argv: ['journals', 'getMany', '--items', 'journal-a', '--items', 'journal-b'],
+    });
+
+    expect(camel.cli.exit).toBe(0);
+    expect(camel.cliWires).toEqual(kebab.cliWires);
+    expect(camel.cli.stdout).toBe(kebab.cli.stdout);
   });
 
   it('sends the same deleteMany items and renders the same envelope', async () => {
