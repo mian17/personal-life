@@ -49,40 +49,65 @@ function stamp(iso) {
   return iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : 'unknown';
 }
 
-function tile(screen, manifest) {
-  const meta = `<p class="meta"><span class="route">${escape(screen.route)}</span> · ${escape(screen.file)} · ${escape(stamp(manifest.capturedAt))}</p>`;
-  const heading = `<h3>${escape(screen.title)}</h3>`;
+function meta(screen, manifest) {
+  return `<p class="meta"><span class="route">${escape(screen.route)}</span> · ${escape(screen.file)} · ${escape(stamp(manifest.capturedAt))}</p>`;
+}
+
+/**
+ * One theme's row inside a screen card. A theme that failed keeps its row and
+ * states the reason, so a card never shows a dark shot with the light one missing.
+ */
+function themeRow(screen, manifest) {
+  const label = `<p class="theme">${escape(screen.theme ?? 'theme not recorded')}</p>`;
   if (screen.status !== 'ok') {
-    // A failure keeps its slot and states the reason; an empty frame reads as a
-    // broken page rather than a missing capture.
-    return `<article class="tile failed">
-      ${heading}
+    // An empty frame reads as a broken page rather than a missing capture.
+    return `<div class="row failed">
+      ${label}
       <p class="failure"><strong>Not captured.</strong> ${escape(screen.reason ?? 'reason not recorded')}</p>
-      ${meta}
-    </article>`;
+      ${meta(screen, manifest)}
+    </div>`;
   }
-  return `<article class="tile">
-    ${heading}
-    <a class="shot" href="screens/${escape(screen.file)}" title="Open ${escape(screen.slug)} full size">
+  return `<div class="row">
+    ${label}
+    <a class="shot" href="screens/${escape(screen.file)}" title="Open ${escape(screen.file)} full size">
       <img src="screens/${escape(screen.file)}" width="${manifest.viewport.width}" height="${manifest.viewport.height}" loading="lazy"
-        alt="${escape(screen.title)} screen at ${escape(screen.route)}">
+        alt="${escape(screen.title)} screen at ${escape(screen.route)}, ${escape(screen.theme ?? 'default')} theme">
     </a>
-    ${meta}
+    ${meta(screen, manifest)}
+  </div>`;
+}
+
+/** One card per screen, holding the same route's row for every theme it was shot in. */
+function screenCard(group) {
+  const [first] = group;
+  return `<article class="tile">
+    <h3>${escape(first.title)}</h3>
+    ${group.map((screen) => themeRow(screen, manifest)).join('\n')}
   </article>`;
 }
 
 function section([key, label], group) {
   return `<section aria-labelledby="module-${key}">
     <h2 id="module-${key}">${escape(label)} <span class="count">${group.length}</span></h2>
-    <div class="tiles">${group.map((screen) => tile(screen, manifest)).join('\n')}</div>
+    <div class="tiles">${group.map(screenCard).join('\n')}</div>
   </section>`;
 }
 
-const byModule = new Map();
+// The manifest is a flat list of captures; one card per slug keeps a screen's
+// themes together however many there are.
+const bySlug = new Map();
 for (const screen of screens) {
-  if (!byModule.has(screen.module)) byModule.set(screen.module, []);
-  byModule.get(screen.module).push(screen);
+  if (!bySlug.has(screen.slug)) bySlug.set(screen.slug, []);
+  bySlug.get(screen.slug).push(screen);
 }
+
+const byModule = new Map();
+for (const group of bySlug.values()) {
+  const module = group[0].module;
+  if (!byModule.has(module)) byModule.set(module, []);
+  byModule.get(module).push(group);
+}
+const themesSeen = [...new Set(screens.map((screen) => screen.theme).filter(Boolean))];
 const known = new Set(MODULES.map(([key]) => key));
 // Fixed order for the five app modules; anything unrecognised keeps its own
 // section afterwards instead of being dropped.
@@ -96,6 +121,8 @@ const summary = manifest
       <div><dt>Total</dt><dd>${screens.length}</dd></div>
       <div><dt>Captured</dt><dd>${okCount}</dd></div>
       <div><dt>Failed</dt><dd>${failedCount}</dd></div>
+      <div><dt>Screens</dt><dd>${bySlug.size}</dd></div>
+      <div><dt>Themes</dt><dd>${escape(themesSeen.join(', ') || 'not recorded')}</dd></div>
       <div><dt>Viewport</dt><dd>${manifest.viewport.width}×${manifest.viewport.height} CSS px @${manifest.viewport.dpr}x</dd></div>
       <div><dt>Git SHA</dt><dd class="mono">${escape(manifest.gitSha || 'unknown')}</dd></div>
       <div><dt>Captured at</dt><dd>${escape(stamp(manifest.capturedAt))}</dd></div>
@@ -193,6 +220,12 @@ const html = `<!doctype html>
   .tile { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; }
   .tile[hidden] { display: none; }
 
+  /* Each theme is its own labelled row; the label is what makes a light shot
+     next to a dark one readable without opening the file name. */
+  .row { margin-bottom: 0.75rem; }
+  .row:last-child { margin-bottom: 0; }
+  .theme { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
+
   /* Natural flow at the PNG's own ratio: the full screen stays visible however
      narrow the column gets, never cropped to a different aspect. */
   .shot { display: block; margin-bottom: 0.5rem; }
@@ -210,7 +243,7 @@ const html = `<!doctype html>
   .meta { color: var(--muted); font-size: 0.8125rem; font-family: var(--mono); overflow-wrap: anywhere; }
   .route { color: var(--text); }
 
-  .failed { border-color: var(--danger); }
+  .row.failed { border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 0.5rem 0.75rem; }
   .failure { color: var(--danger); font-size: 0.9375rem; overflow-wrap: anywhere; }
 
   .empty { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-top: 1.5rem; }
@@ -254,6 +287,6 @@ ${body}
 writeFileSync(galleryPath, html);
 console.log(
   screens.length
-    ? `gallery: ${screens.length} screens (${okCount} captured, ${failedCount} failed) → ${galleryPath}`
+    ? `gallery: ${bySlug.size} screens, ${screens.length} captures (${okCount} captured, ${failedCount} failed) → ${galleryPath}`
     : `gallery: no captures yet → ${galleryPath}`,
 );

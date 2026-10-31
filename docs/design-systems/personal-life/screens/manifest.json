@@ -4,15 +4,16 @@
     "height": 896,
     "dpr": 2
   },
-  "gitSha": "a2d6b24969dd66ac51de687a0c1a91b6652ec887",
-  "capturedAt": "2026-10-31T10:43:12.762Z",
+  "gitSha": "1abb25c37bc95d87263395432b47ca96e3662d54",
+  "capturedAt": "2026-10-31T15:36:23.926Z",
   "screens": [
     {
       "slug": "notes-index",
       "title": "Notes",
       "module": "notes",
       "route": "/notes",
-      "file": "notes-index.png",
+      "theme": "light",
+      "file": "notes-index-light.png",
       "status": "ok"
     },
     {
@@ -20,7 +21,8 @@
       "title": "New note",
       "module": "notes",
       "route": "/notes/new",
-      "file": "notes-new.png",
+      "theme": "light",
+      "file": "notes-new-light.png",
       "status": "ok"
     },
     {
@@ -28,7 +30,8 @@
       "title": "Note editor",
       "module": "notes",
       "route": "/notes/58a730c0-af87-4452-acbf-c256a28f6eb8",
-      "file": "notes-detail.png",
+      "theme": "light",
+      "file": "notes-detail-light.png",
       "status": "ok"
     },
     {
@@ -36,7 +39,8 @@
       "title": "Notes settings",
       "module": "notes",
       "route": "/notes/settings",
-      "file": "notes-settings.png",
+      "theme": "light",
+      "file": "notes-settings-light.png",
       "status": "ok"
     },
     {
@@ -44,7 +48,8 @@
       "title": "Tag manager",
       "module": "notes",
       "route": "/notes/tags",
-      "file": "notes-tags.png",
+      "theme": "light",
+      "file": "notes-tags-light.png",
       "status": "ok"
     },
     {
@@ -52,7 +57,8 @@
       "title": "Trash",
       "module": "notes",
       "route": "/notes/trash",
-      "file": "notes-trash.png",
+      "theme": "light",
+      "file": "notes-trash-light.png",
       "status": "ok"
     },
     {
@@ -60,7 +66,8 @@
       "title": "Today",
       "module": "todos",
       "route": "/todos",
-      "file": "todos-today.png",
+      "theme": "light",
+      "file": "todos-today-light.png",
       "status": "ok"
     },
     {
@@ -68,7 +75,8 @@
       "title": "New todo",
       "module": "todos",
       "route": "/todos/new",
-      "file": "todos-new.png",
+      "theme": "light",
+      "file": "todos-new-light.png",
       "status": "ok"
     },
     {
@@ -76,7 +84,8 @@
       "title": "Matrix",
       "module": "todos",
       "route": "/todos/matrix",
-      "file": "todos-matrix.png",
+      "theme": "light",
+      "file": "todos-matrix-light.png",
       "status": "ok"
     },
     {
@@ -84,7 +93,8 @@
       "title": "Edit todo",
       "module": "todos",
       "route": "/todos/a64779ba-5f5c-4a10-9c38-6afe756dcb25/edit",
-      "file": "todos-edit.png",
+      "theme": "light",
+      "file": "todos-edit-light.png",
       "status": "ok"
     },
     {
@@ -92,7 +102,8 @@
       "title": "Todos settings",
       "module": "todos",
       "route": "/todos/settings",
-      "file": "todos-settings.png",
+      "theme": "light",
+      "file": "todos-settings-light.png",
       "status": "ok"
     },
     {
@@ -100,7 +111,8 @@
       "title": "Tag manager",
       "module": "todos",
       "route": "/todos/tags",
-      "file": "todos-tags.png",
+      "theme": "light",
+      "file": "todos-tags-light.png",
       "status": "ok"
     },
     {
@@ -108,7 +120,8 @@
       "title": "List manager",
       "module": "todos",
       "route": "/todos/lists",
-      "file": "todos-lists.png",
+      "theme": "light",
+      "file": "todos-lists-light.png",
       "status": "ok"
     },
     {
@@ -116,7 +129,8 @@
       "title": "Trash",
       "module": "todos",
       "route": "/todos/trash",
-      "file": "todos-trash.png",
+      "theme": "light",
+      "file": "todos-trash-light.png",
       "status": "ok"
     },
     {
@@ -124,7 +138,8 @@
       "title": "Meals today",
       "module": "meals",
       "route": "/meals",
-      "file": "meals-today.png",
+      "theme": "light",
+      "file": "meals-today-light.png",
       "status": "ok"
     },
     {
@@ -132,7 +147,8 @@
       "title": "Meals day",
       "module": "meals",
       "route": "/meals/2026-10-31",
-      "file": "meals-day.png",
+      "theme": "light",
+      "file": "meals-day-light.png",
       "status": "ok"
     },
     {
@@ -140,7 +156,8 @@
       "title": "Meal entry",
       "module": "meals",
       "route": "/meals/entry/548b8903-36b9-423f-b57b-9c1380dc8da6",
-      "file": "meals-entry.png",
+      "theme": "light",
+      "file": "meals-entry-light.png",
       "status": "ok"
     },
     {
@@ -148,7 +165,8 @@
       "title": "Food catalog",
       "module": "meals",
       "route": "/meals/foods",
-      "file": "meals-foods.png",
+      "theme": "light",
+      "file": "meals-foods-light.png",
       "status": "ok"
     },
     {
@@ -156,7 +174,8 @@
       "title": "New food",
       "module": "meals",
       "route": "/meals/foods/new",
-      "file": "meals-food-new.png",
+      "theme": "light",
+      "file": "meals-food-new-light.png",
       "status": "ok"
     },
     {
@@ -164,7 +183,8 @@
       "title": "Edit food",
       "module": "meals",
       "route": "/meals/foods/1bd08c17-0600-428a-83e0-db4747098d91",
-      "file": "meals-food-detail.png",
+      "theme": "light",
+      "file": "meals-food-detail-light.png",
       "status": "ok"
     },
     {
@@ -172,7 +192,8 @@
       "title": "Saved meals",
       "module": "meals",
       "route": "/meals/saved",
-      "file": "meals-saved.png",
+      "theme": "light",
+      "file": "meals-saved-light.png",
       "status": "ok"
     },
     {
@@ -180,7 +201,8 @@
       "title": "Saved meal",
       "module": "meals",
       "route": "/meals/saved/421eb655-b4f3-4ea6-a59f-b1c8bf488884",
-      "file": "meals-saved-detail.png",
+      "theme": "light",
+      "file": "meals-saved-detail-light.png",
       "status": "ok"
     },
     {
@@ -188,7 +210,8 @@
       "title": "Meals settings",
       "module": "meals",
       "route": "/meals/settings",
-      "file": "meals-settings.png",
+      "theme": "light",
+      "file": "meals-settings-light.png",
       "status": "ok"
     },
     {
@@ -196,7 +219,8 @@
       "title": "Nutrition target",
       "module": "meals",
       "route": "/meals/target",
-      "file": "meals-target.png",
+      "theme": "light",
+      "file": "meals-target-light.png",
       "status": "ok"
     },
     {
@@ -204,7 +228,8 @@
       "title": "Timer",
       "module": "pomodoro",
       "route": "/pomodoro",
-      "file": "pomodoro-timer.png",
+      "theme": "light",
+      "file": "pomodoro-timer-light.png",
       "status": "ok"
     },
     {
@@ -212,7 +237,8 @@
       "title": "Stats",
       "module": "pomodoro",
       "route": "/pomodoro/stats",
-      "file": "pomodoro-stats.png",
+      "theme": "light",
+      "file": "pomodoro-stats-light.png",
       "status": "ok"
     },
     {
@@ -220,7 +246,8 @@
       "title": "Pomodoro settings",
       "module": "pomodoro",
       "route": "/pomodoro/settings",
-      "file": "pomodoro-settings.png",
+      "theme": "light",
+      "file": "pomodoro-settings-light.png",
       "status": "ok"
     },
     {
@@ -228,7 +255,8 @@
       "title": "Feedback inbox",
       "module": "shared",
       "route": "/feedback",
-      "file": "feedback-inbox.png",
+      "theme": "light",
+      "file": "feedback-inbox-light.png",
       "status": "ok"
     },
     {
@@ -236,7 +264,269 @@
       "title": "Feedback settings",
       "module": "shared",
       "route": "/feedback/settings",
-      "file": "feedback-settings.png",
+      "theme": "light",
+      "file": "feedback-settings-light.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-index",
+      "title": "Notes",
+      "module": "notes",
+      "route": "/notes",
+      "theme": "dark",
+      "file": "notes-index-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-new",
+      "title": "New note",
+      "module": "notes",
+      "route": "/notes/new",
+      "theme": "dark",
+      "file": "notes-new-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-detail",
+      "title": "Note editor",
+      "module": "notes",
+      "route": "/notes/58a730c0-af87-4452-acbf-c256a28f6eb8",
+      "theme": "dark",
+      "file": "notes-detail-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-settings",
+      "title": "Notes settings",
+      "module": "notes",
+      "route": "/notes/settings",
+      "theme": "dark",
+      "file": "notes-settings-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-tags",
+      "title": "Tag manager",
+      "module": "notes",
+      "route": "/notes/tags",
+      "theme": "dark",
+      "file": "notes-tags-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "notes-trash",
+      "title": "Trash",
+      "module": "notes",
+      "route": "/notes/trash",
+      "theme": "dark",
+      "file": "notes-trash-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-today",
+      "title": "Today",
+      "module": "todos",
+      "route": "/todos",
+      "theme": "dark",
+      "file": "todos-today-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-new",
+      "title": "New todo",
+      "module": "todos",
+      "route": "/todos/new",
+      "theme": "dark",
+      "file": "todos-new-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-matrix",
+      "title": "Matrix",
+      "module": "todos",
+      "route": "/todos/matrix",
+      "theme": "dark",
+      "file": "todos-matrix-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-edit",
+      "title": "Edit todo",
+      "module": "todos",
+      "route": "/todos/a64779ba-5f5c-4a10-9c38-6afe756dcb25/edit",
+      "theme": "dark",
+      "file": "todos-edit-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-settings",
+      "title": "Todos settings",
+      "module": "todos",
+      "route": "/todos/settings",
+      "theme": "dark",
+      "file": "todos-settings-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-tags",
+      "title": "Tag manager",
+      "module": "todos",
+      "route": "/todos/tags",
+      "theme": "dark",
+      "file": "todos-tags-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-lists",
+      "title": "List manager",
+      "module": "todos",
+      "route": "/todos/lists",
+      "theme": "dark",
+      "file": "todos-lists-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "todos-trash",
+      "title": "Trash",
+      "module": "todos",
+      "route": "/todos/trash",
+      "theme": "dark",
+      "file": "todos-trash-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-today",
+      "title": "Meals today",
+      "module": "meals",
+      "route": "/meals",
+      "theme": "dark",
+      "file": "meals-today-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-day",
+      "title": "Meals day",
+      "module": "meals",
+      "route": "/meals/2026-10-31",
+      "theme": "dark",
+      "file": "meals-day-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-entry",
+      "title": "Meal entry",
+      "module": "meals",
+      "route": "/meals/entry/548b8903-36b9-423f-b57b-9c1380dc8da6",
+      "theme": "dark",
+      "file": "meals-entry-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-foods",
+      "title": "Food catalog",
+      "module": "meals",
+      "route": "/meals/foods",
+      "theme": "dark",
+      "file": "meals-foods-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-food-new",
+      "title": "New food",
+      "module": "meals",
+      "route": "/meals/foods/new",
+      "theme": "dark",
+      "file": "meals-food-new-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-food-detail",
+      "title": "Edit food",
+      "module": "meals",
+      "route": "/meals/foods/1bd08c17-0600-428a-83e0-db4747098d91",
+      "theme": "dark",
+      "file": "meals-food-detail-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-saved",
+      "title": "Saved meals",
+      "module": "meals",
+      "route": "/meals/saved",
+      "theme": "dark",
+      "file": "meals-saved-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-saved-detail",
+      "title": "Saved meal",
+      "module": "meals",
+      "route": "/meals/saved/421eb655-b4f3-4ea6-a59f-b1c8bf488884",
+      "theme": "dark",
+      "file": "meals-saved-detail-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-settings",
+      "title": "Meals settings",
+      "module": "meals",
+      "route": "/meals/settings",
+      "theme": "dark",
+      "file": "meals-settings-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "meals-target",
+      "title": "Nutrition target",
+      "module": "meals",
+      "route": "/meals/target",
+      "theme": "dark",
+      "file": "meals-target-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "pomodoro-timer",
+      "title": "Timer",
+      "module": "pomodoro",
+      "route": "/pomodoro",
+      "theme": "dark",
+      "file": "pomodoro-timer-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "pomodoro-stats",
+      "title": "Stats",
+      "module": "pomodoro",
+      "route": "/pomodoro/stats",
+      "theme": "dark",
+      "file": "pomodoro-stats-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "pomodoro-settings",
+      "title": "Pomodoro settings",
+      "module": "pomodoro",
+      "route": "/pomodoro/settings",
+      "theme": "dark",
+      "file": "pomodoro-settings-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "feedback-inbox",
+      "title": "Feedback inbox",
+      "module": "shared",
+      "route": "/feedback",
+      "theme": "dark",
+      "file": "feedback-inbox-dark.png",
+      "status": "ok"
+    },
+    {
+      "slug": "feedback-settings",
+      "title": "Feedback settings",
+      "module": "shared",
+      "route": "/feedback/settings",
+      "theme": "dark",
+      "file": "feedback-settings-dark.png",
       "status": "ok"
     }
   ]
