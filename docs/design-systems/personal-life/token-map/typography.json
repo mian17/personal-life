@@ -1,0 +1,214 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "family": "typography",
+  "source": "packages/ui/src/styles/tokens.css",
+  "tokens": [
+    {
+      "family": "typography",
+      "target": "--ds-font-size-base",
+      "source": "--font-size",
+      "value": "16px",
+      "computedPx": 16,
+      "declaredAt": "packages/ui/src/styles/tokens.css:34",
+      "role": "root font size on html/body (16px)",
+      "usageSites": [
+        "packages/ui/src/styles/base.css:21",
+        "packages/ui/test/tokens.test.ts:264"
+      ],
+      "status": "derived-name",
+      "note": "declared token"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-editor",
+      "source": "--fs-editor",
+      "value": "1.05rem",
+      "computedPx": 16.8,
+      "declaredAt": "packages/ui/src/styles/tokens.css:37",
+      "role": ".editor-body font size (1.05rem)",
+      "usageSites": [
+        "packages/ui/src/components/textarea.tsx:30"
+      ],
+      "status": "derived-name",
+      "note": "declared token"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-xs",
+      "source": "--space-0-7",
+      "value": "0.7rem",
+      "computedPx": 11.2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:56",
+      "role": "dense row text (0.7rem)",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:120",
+        "packages/ui/src/components/matrix-block.tsx:46",
+        "packages/ui/src/components/pill.tsx:51",
+        "packages/ui/test/list-item.test.tsx:19",
+        "packages/ui/test/list-item.test.tsx:671",
+        "packages/ui/test/list-item.test.tsx:713"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-sm",
+      "source": "--space-0-8",
+      "value": "0.8rem",
+      "computedPx": 12.8,
+      "declaredAt": "packages/ui/src/styles/tokens.css:58",
+      "role": "status chip text (0.8rem)",
+      "usageSites": [
+        "packages/ui/src/components/pill.tsx:49"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-label",
+      "source": "--space-0-85",
+      "value": "0.85rem",
+      "computedPx": 13.6,
+      "declaredAt": "packages/ui/src/styles/tokens.css:59",
+      "role": "meta/label line under a title (0.85rem)",
+      "usageSites": [
+        "packages/ui/src/components/due-date-pill.tsx:44",
+        "packages/ui/src/components/feedback-form.tsx:44",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:124",
+        "packages/ui/src/components/matrix-block.tsx:67",
+        "packages/ui/src/components/pill.tsx:51",
+        "packages/ui/src/components/settings-row.tsx:31",
+        "packages/ui/src/components/status-text.tsx:19"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-md",
+      "source": "--space-0-9",
+      "value": "0.9rem",
+      "computedPx": 14.4,
+      "declaredAt": "packages/ui/src/styles/tokens.css:60",
+      "role": "alert banner text, snackbar message (0.9rem)",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:35",
+        "packages/ui/src/components/card.tsx:21",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:67",
+        "packages/ui/src/components/list-item.tsx:78",
+        "packages/ui/src/components/list-item.tsx:91",
+        "packages/ui/src/components/list-item.tsx:97",
+        "packages/ui/src/components/list-item.tsx:108"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-lg",
+      "source": "--space-0-95",
+      "value": "0.95rem",
+      "computedPx": 15.2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:61",
+      "role": "pill remove glyph (0.95rem)",
+      "usageSites": [
+        "packages/ui/src/components/editor-toolbar.tsx:26",
+        "packages/ui/src/components/pill.tsx:62"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-xl",
+      "source": "--space-1-25",
+      "value": "1.25rem",
+      "computedPx": 20,
+      "declaredAt": "packages/ui/src/styles/tokens.css:63",
+      "role": "dialog title and section heading (1.25rem, bold)",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx:50",
+        "packages/ui/src/components/list-item.tsx:164",
+        "packages/ui/src/components/page-actions.tsx:7",
+        "packages/ui/src/components/section.tsx:28",
+        "packages/ui/src/components/switch.tsx:31",
+        "packages/ui/src/components/switch.tsx:45",
+        "packages/ui/src/components/tag-filter-nav.tsx:22",
+        "packages/ui/test/list-item.test.tsx:292"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-2xl",
+      "source": "--space-2",
+      "value": "2rem",
+      "computedPx": 32,
+      "declaredAt": "packages/ui/src/styles/tokens.css:64",
+      "role": "oversized numeric display (2rem)",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx:38",
+        "packages/ui/src/components/editor-stack.tsx:27",
+        "packages/ui/src/components/page-title.tsx:12",
+        "packages/ui/src/components/row.tsx:17",
+        "packages/ui/src/components/section.tsx:15",
+        "packages/ui/src/components/stack.tsx:26",
+        "packages/ui/test/page-title.test.tsx:8",
+        "packages/ui/test/row.test.tsx:14"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-size-3xl",
+      "source": "--space-3",
+      "value": "3rem",
+      "computedPx": 48,
+      "declaredAt": "packages/ui/src/styles/tokens.css:65",
+      "role": "oversized numeric display (3rem)",
+      "usageSites": [
+        "packages/ui/src/components/empty-state.tsx:19",
+        "packages/ui/src/components/status-text.tsx:20"
+      ],
+      "status": "derived-name",
+      "note": "no declared type-scale token exists; this spacing token is used in a font-size position (`text-[length:var(--space-…)]`)"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-family-sans",
+      "source": "--font-stack",
+      "value": "system-ui, -apple-system, sans-serif",
+      "declaredAt": "packages/ui/src/styles/tokens.css:36",
+      "role": "the only font stack in the repo: system UI sans",
+      "usageSites": [
+        "packages/ui/src/styles/base.css:21",
+        "packages/ui/test/tokens.test.ts:264"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "typography",
+      "target": "--ds-font-leading-base",
+      "source": "--leading",
+      "value": "1.5",
+      "declaredAt": "packages/ui/src/styles/tokens.css:35",
+      "role": "base line height, set on html/body via the `font` shorthand",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/styles/base.css:21",
+        "packages/ui/test/checkbox.test.tsx:56",
+        "packages/ui/test/list-item.test.tsx:774",
+        "packages/ui/test/list-item.test.tsx:774",
+        "packages/ui/test/tokens.test.ts:264"
+      ],
+      "status": "matched"
+    }
+  ]
+}

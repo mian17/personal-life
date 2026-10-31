@@ -1,0 +1,844 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "family": "color",
+  "source": "packages/ui/src/styles/tokens.css",
+  "targetConvention": "--ds-color-* (crosswalk of the repo --color names, values copied verbatim)",
+  "themes": {
+    "dark (:root default, :root[data-theme=\"dark\"])": {
+      "--bg": "#0f1115",
+      "--panel": "#181b22",
+      "--text": "#e8eaf0",
+      "--muted": "#8b93a7",
+      "--accent": "#5b8cff",
+      "--danger": "#ff6b6b",
+      "--danger-soft": "#ff9e9e",
+      "--amber": "#f2b64c",
+      "--green": "#4cc38a",
+      "--border": "#2a2f3a",
+      "--on-accent": "white"
+    },
+    "light (:root[data-theme=\"light\"] and prefers-color-scheme: light)": {
+      "--bg": "#f4f5f7",
+      "--panel": "#ffffff",
+      "--text": "#1a1d24",
+      "--muted": "#5c6577",
+      "--accent": "#2f6bff",
+      "--danger": "#d64545",
+      "--danger-soft": "#d97070",
+      "--amber": "#b45309",
+      "--green": "#15803d",
+      "--border": "#dfe3ea",
+      "--on-accent": "white"
+    }
+  },
+  "contrast": {
+    "dark": [
+      {
+        "foreground": "--text",
+        "background": "--bg",
+        "ratio": 15.71,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--text",
+        "background": "--panel",
+        "ratio": 14.33,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--muted",
+        "background": "--bg",
+        "ratio": 6.15,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--muted",
+        "background": "--panel",
+        "ratio": 5.6,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--accent",
+        "background": "--bg",
+        "ratio": 5.97,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--accent",
+        "background": "--panel",
+        "ratio": 5.45,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--on-accent",
+        "background": "--accent",
+        "ratio": 3.16,
+        "wcag": "AA large text only"
+      },
+      {
+        "foreground": "--danger",
+        "background": "--panel",
+        "ratio": 6.21,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--danger-soft",
+        "background": "--panel",
+        "ratio": 8.73,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--amber",
+        "background": "--panel",
+        "ratio": 9.49,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--green",
+        "background": "--panel",
+        "ratio": 7.78,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--border",
+        "background": "--panel",
+        "ratio": 1.29,
+        "wcag": "below AA"
+      },
+      {
+        "foreground": "--border",
+        "background": "--bg",
+        "ratio": 1.41,
+        "wcag": "below AA"
+      }
+    ],
+    "light": [
+      {
+        "foreground": "--text",
+        "background": "--bg",
+        "ratio": 15.46,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--text",
+        "background": "--panel",
+        "ratio": 16.87,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--muted",
+        "background": "--bg",
+        "ratio": 5.37,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--muted",
+        "background": "--panel",
+        "ratio": 5.86,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--accent",
+        "background": "--bg",
+        "ratio": 4.12,
+        "wcag": "AA large text only"
+      },
+      {
+        "foreground": "--accent",
+        "background": "--panel",
+        "ratio": 4.5,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--on-accent",
+        "background": "--accent",
+        "ratio": 4.5,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--danger",
+        "background": "--panel",
+        "ratio": 4.38,
+        "wcag": "AA large text only"
+      },
+      {
+        "foreground": "--danger-soft",
+        "background": "--panel",
+        "ratio": 3.23,
+        "wcag": "AA large text only"
+      },
+      {
+        "foreground": "--amber",
+        "background": "--panel",
+        "ratio": 5.02,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--green",
+        "background": "--panel",
+        "ratio": 5.02,
+        "wcag": "AA normal text"
+      },
+      {
+        "foreground": "--border",
+        "background": "--panel",
+        "ratio": 1.29,
+        "wcag": "below AA"
+      },
+      {
+        "foreground": "--border",
+        "background": "--bg",
+        "ratio": 1.18,
+        "wcag": "below AA"
+      }
+    ]
+  },
+  "tokens": [
+    {
+      "family": "color",
+      "target": "--ds-color-bg",
+      "source": "--bg",
+      "value": "#0f1115",
+      "declaredAt": "packages/ui/src/styles/tokens.css:3",
+      "role": "page ground; the document and body background",
+      "themes": {
+        "dark": "#0f1115",
+        "light": "#f4f5f7"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/base.css:19",
+        "packages/ui/src/styles/theme.css:14",
+        "packages/ui/test/tokens.test.ts:262"
+      ],
+      "utilityUsage": {
+        "count": 1,
+        "sites": [
+          "packages/ui/src/components/dialog.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--text",
+            "background": "--bg",
+            "ratio": 15.71,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--bg",
+            "ratio": 6.15,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--bg",
+            "ratio": 5.97,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--border",
+            "background": "--bg",
+            "ratio": 1.41,
+            "wcag": "below AA"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--text",
+            "background": "--bg",
+            "ratio": 15.46,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--bg",
+            "ratio": 5.37,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--bg",
+            "ratio": 4.12,
+            "wcag": "AA large text only"
+          },
+          {
+            "foreground": "--border",
+            "background": "--bg",
+            "ratio": 1.18,
+            "wcag": "below AA"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-surface",
+      "source": "--panel",
+      "value": "#181b22",
+      "declaredAt": "packages/ui/src/styles/tokens.css:4",
+      "role": "raised surface for cards, rows, fields, menus, toasts",
+      "themes": {
+        "dark": "#181b22",
+        "light": "#ffffff"
+      },
+      "usageSites": [
+        "packages/ui/src/components/matrix-block.tsx:64",
+        "packages/ui/src/styles/theme.css:15",
+        "packages/ui/test/matrix-block.test.tsx:162"
+      ],
+      "utilityUsage": {
+        "count": 30,
+        "sites": [
+          "packages/ui/src/components/alert-banner.tsx",
+          "packages/ui/src/components/card.tsx",
+          "packages/ui/src/components/checkbox.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--text",
+            "background": "--panel",
+            "ratio": 14.33,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--panel",
+            "ratio": 5.6,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--panel",
+            "ratio": 5.45,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--danger",
+            "background": "--panel",
+            "ratio": 6.21,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--danger-soft",
+            "background": "--panel",
+            "ratio": 8.73,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--amber",
+            "background": "--panel",
+            "ratio": 9.49,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--green",
+            "background": "--panel",
+            "ratio": 7.78,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--border",
+            "background": "--panel",
+            "ratio": 1.29,
+            "wcag": "below AA"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--text",
+            "background": "--panel",
+            "ratio": 16.87,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--panel",
+            "ratio": 5.86,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--panel",
+            "ratio": 4.5,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--danger",
+            "background": "--panel",
+            "ratio": 4.38,
+            "wcag": "AA large text only"
+          },
+          {
+            "foreground": "--danger-soft",
+            "background": "--panel",
+            "ratio": 3.23,
+            "wcag": "AA large text only"
+          },
+          {
+            "foreground": "--amber",
+            "background": "--panel",
+            "ratio": 5.02,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--green",
+            "background": "--panel",
+            "ratio": 5.02,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--border",
+            "background": "--panel",
+            "ratio": 1.29,
+            "wcag": "below AA"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-text",
+      "source": "--text",
+      "value": "#e8eaf0",
+      "declaredAt": "packages/ui/src/styles/tokens.css:5",
+      "role": "primary text and default glyph colour",
+      "themes": {
+        "dark": "#e8eaf0",
+        "light": "#1a1d24"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/base.css:20",
+        "packages/ui/src/styles/theme.css:16",
+        "packages/ui/test/tokens.test.ts:263"
+      ],
+      "utilityUsage": {
+        "count": 19,
+        "sites": [
+          "packages/ui/src/components/alert-banner.tsx",
+          "packages/ui/src/components/button.tsx",
+          "packages/ui/src/components/card.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--text",
+            "background": "--bg",
+            "ratio": 15.71,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--text",
+            "background": "--panel",
+            "ratio": 14.33,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--text",
+            "background": "--bg",
+            "ratio": 15.46,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--text",
+            "background": "--panel",
+            "ratio": 16.87,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-text-muted",
+      "source": "--muted",
+      "value": "#8b93a7",
+      "declaredAt": "packages/ui/src/styles/tokens.css:6",
+      "role": "secondary text, meta lines, inactive tabs, disabled text",
+      "themes": {
+        "dark": "#8b93a7",
+        "light": "#5c6577"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:17"
+      ],
+      "utilityUsage": {
+        "count": 40,
+        "sites": [
+          "packages/ui/src/components/autosuggest.tsx",
+          "packages/ui/src/components/command.tsx",
+          "packages/ui/src/components/due-date-pill.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--muted",
+            "background": "--bg",
+            "ratio": 6.15,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--panel",
+            "ratio": 5.6,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--muted",
+            "background": "--bg",
+            "ratio": 5.37,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--muted",
+            "background": "--panel",
+            "ratio": 5.86,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-accent",
+      "source": "--accent",
+      "value": "#5b8cff",
+      "declaredAt": "packages/ui/src/styles/tokens.css:7",
+      "role": "primary action fill, active tab fill, focus outline colour, selected switch track",
+      "themes": {
+        "dark": "#5b8cff",
+        "light": "#2f6bff"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:18"
+      ],
+      "utilityUsage": {
+        "count": 34,
+        "sites": [
+          "packages/ui/src/components/button.tsx",
+          "packages/ui/src/components/checkbox.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--accent",
+            "background": "--bg",
+            "ratio": 5.97,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--panel",
+            "ratio": 5.45,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--on-accent",
+            "background": "--accent",
+            "ratio": 3.16,
+            "wcag": "AA large text only"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--accent",
+            "background": "--bg",
+            "ratio": 4.12,
+            "wcag": "AA large text only"
+          },
+          {
+            "foreground": "--accent",
+            "background": "--panel",
+            "ratio": 4.5,
+            "wcag": "AA normal text"
+          },
+          {
+            "foreground": "--on-accent",
+            "background": "--accent",
+            "ratio": 4.5,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-danger",
+      "source": "--danger",
+      "value": "#ff6b6b",
+      "declaredAt": "packages/ui/src/styles/tokens.css:8",
+      "role": "destructive action text/glyph, warning banner border, done-row negation",
+      "themes": {
+        "dark": "#ff6b6b",
+        "light": "#d64545"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:19"
+      ],
+      "utilityUsage": {
+        "count": 15,
+        "sites": [
+          "packages/ui/src/components/alert-banner.tsx",
+          "packages/ui/src/components/button.tsx",
+          "packages/ui/src/components/due-date-pill.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--danger",
+            "background": "--panel",
+            "ratio": 6.21,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--danger",
+            "background": "--panel",
+            "ratio": 4.38,
+            "wcag": "AA large text only"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-danger-soft",
+      "source": "--danger-soft",
+      "value": "#ff9e9e",
+      "declaredAt": "packages/ui/src/styles/tokens.css:9",
+      "role": "softer destructive text (danger accent variant declare)",
+      "themes": {
+        "dark": "#ff9e9e",
+        "light": "#d97070"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:20"
+      ],
+      "utilityUsage": {
+        "count": 1,
+        "sites": [
+          "packages/ui/src/components/due-date.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--danger-soft",
+            "background": "--panel",
+            "ratio": 8.73,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--danger-soft",
+            "background": "--panel",
+            "ratio": 3.23,
+            "wcag": "AA large text only"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-warning",
+      "source": "--amber",
+      "value": "#f2b64c",
+      "declaredAt": "packages/ui/src/styles/tokens.css:10",
+      "role": "in-progress status text, due-soon rows",
+      "themes": {
+        "dark": "#f2b64c",
+        "light": "#b45309"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:21"
+      ],
+      "utilityUsage": {
+        "count": 4,
+        "sites": [
+          "packages/ui/src/components/list-item.tsx",
+          "packages/ui/src/components/matrix-block.tsx",
+          "packages/ui/src/components/pill.tsx",
+          "packages/ui/test/pill.test.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--amber",
+            "background": "--panel",
+            "ratio": 9.49,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--amber",
+            "background": "--panel",
+            "ratio": 5.02,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-success",
+      "source": "--green",
+      "value": "#4cc38a",
+      "declaredAt": "packages/ui/src/styles/tokens.css:11",
+      "role": "done/success status text",
+      "themes": {
+        "dark": "#4cc38a",
+        "light": "#15803d"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:22"
+      ],
+      "utilityUsage": {
+        "count": 3,
+        "sites": [
+          "packages/ui/src/components/matrix-block.tsx",
+          "packages/ui/src/components/pill.tsx",
+          "packages/ui/test/pill.test.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--green",
+            "background": "--panel",
+            "ratio": 7.78,
+            "wcag": "AA normal text"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--green",
+            "background": "--panel",
+            "ratio": 5.02,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-border",
+      "source": "--border",
+      "value": "#2a2f3a",
+      "declaredAt": "packages/ui/src/styles/tokens.css:12",
+      "role": "hairline borders on fields, cards, tabs, menus; unchecked switch track",
+      "themes": {
+        "dark": "#2a2f3a",
+        "light": "#dfe3ea"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:23"
+      ],
+      "utilityUsage": {
+        "count": 23,
+        "sites": [
+          "packages/ui/src/components/button.tsx",
+          "packages/ui/src/components/card.tsx",
+          "packages/ui/src/components/dialog.tsx",
+          "packages/ui/src/components/fab-menu.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--border",
+            "background": "--panel",
+            "ratio": 1.29,
+            "wcag": "below AA"
+          },
+          {
+            "foreground": "--border",
+            "background": "--bg",
+            "ratio": 1.41,
+            "wcag": "below AA"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--border",
+            "background": "--panel",
+            "ratio": 1.29,
+            "wcag": "below AA"
+          },
+          {
+            "foreground": "--border",
+            "background": "--bg",
+            "ratio": 1.18,
+            "wcag": "below AA"
+          }
+        ]
+      },
+      "status": "matched"
+    },
+    {
+      "family": "color",
+      "target": "--ds-color-on-accent",
+      "source": "--on-accent",
+      "value": "white",
+      "declaredAt": "packages/ui/src/styles/tokens.css:13",
+      "role": "text/glyph on an accent fill (theme-invariant white)",
+      "themes": {
+        "dark": "white",
+        "light": "white"
+      },
+      "usageSites": [
+        "packages/ui/src/styles/theme.css:24"
+      ],
+      "utilityUsage": {
+        "count": 13,
+        "sites": [
+          "packages/ui/src/components/button.tsx",
+          "packages/ui/src/components/command.tsx",
+          "packages/ui/src/components/fab-link.tsx",
+          "packages/ui/src/components/fab-menu.tsx"
+        ]
+      },
+      "contrast": {
+        "dark": [
+          {
+            "foreground": "--on-accent",
+            "background": "--accent",
+            "ratio": 3.16,
+            "wcag": "AA large text only"
+          }
+        ],
+        "light": [
+          {
+            "foreground": "--on-accent",
+            "background": "--accent",
+            "ratio": 4.5,
+            "wcag": "AA normal text"
+          }
+        ]
+      },
+      "status": "matched"
+    }
+  ]
+}
