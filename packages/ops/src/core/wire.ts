@@ -21,7 +21,12 @@
 import type { OpSpec, ResourceRegistry, WireRequest } from './types';
 import { findOp } from './registry';
 
-const ADDRESSING_FIELD = 'id';
+/**
+ * The field every single-row op addresses its row by, and the one a bare batch item
+ * hides behind (SPEC-bulk-ops §2.3, §2.9). Declared here alone: the wire owns the
+ * addressing convention, and schema, parser, and bulk vocabulary read this constant.
+ */
+export const ADDRESSING_FIELD = 'id';
 
 export function wireFor(
   registry: ResourceRegistry,
@@ -51,7 +56,17 @@ function methodFor(operation: OpSpec): WireRequest['method'] {
       return 'DELETE';
     case 'restore':
       return 'POST';
+    case 'getMany':
+    case 'createMany':
+    case 'updateMany':
+    case 'deleteMany':
+      throw noSingleWireRequest(operation.kind);
   }
+}
+
+/** A bulk kind fans out over its single-row sibling, so no one request exists to build (§2.6). */
+function noSingleWireRequest(kind: OpSpec['kind']): Error {
+  return new Error(`bulk kind ${kind} has no single wire request; fan out instead`);
 }
 
 function pathFor(

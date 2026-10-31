@@ -11,7 +11,9 @@
  * Output parity with the MCP adapter is a string comparison on `renderOpsResult`
  * and `renderFailure`, so both adapters render through `./render`.
  */
-import type { ResourceRegistry } from '../core/types';
+import type { BulkEnvelope } from '../core/bulk';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk';
+import type { OpSpec, ResourceRegistry } from '../core/types';
 import { toolName } from '../core/schema';
 import { createExecutor, resolveDeadlineMs } from '../transport/executor';
 import { currentAccessToken } from '../auth/token-provider';
@@ -99,9 +101,24 @@ async function runCall(options: MainOptions): Promise<number> {
     baseUrl: apiBaseFor({ service, registry, env: options.env }),
     readToken: currentAccessToken,
     deadlineMs: resolveDeadlineMs(options.env),
+    bulkLimit: resolveBulkLimit(options.env),
   });
-  options.stdout(renderOpsResult(await executor.run(command.operation.kind, command.input)));
-  return SUCCESS_EXIT;
+  const result = await executor.run(command.operation.kind, command.input);
+  options.stdout(renderOpsResult(result));
+  return exitCodeFor(command.operation.kind, result.body);
+}
+
+/**
+ * A batch where no item succeeded is the one failing call; a partial failure still
+ * exits 0. Only a bulk kind reports item counts, so only a bulk call reads them —
+ * the MCP adapter gates its own failure signal the same way (§2.7).
+ */
+function exitCodeFor(kind: OpSpec['kind'], body: unknown): number {
+  return failedEveryItem(kind, body) ? FAILURE_EXIT : SUCCESS_EXIT;
+}
+
+function failedEveryItem(kind: OpSpec['kind'], body: unknown): boolean {
+  return isBulkKind(kind) && (body as Partial<BulkEnvelope> | undefined)?.succeeded === 0;
 }
 
 /** The resources a loaded module registers, in declaration order. */

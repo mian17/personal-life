@@ -10,7 +10,29 @@
  * `validateInput` here, `deriveInputSchema` in schema.ts — so a malformed
  * declaration fails before any tool schema or request exists to carry it.
  */
+import type { BulkKind } from './bulk';
+import { bulkItemInput, isBulkKind, resolveBulkLimit } from './bulk';
 import type { FieldSpec, OpSpec, ValidationIssue } from './types';
+
+/**
+ * The one field every bulk op takes: one submitted item per entry (§2.3). The
+ * registry refuses an opt-in whose source op already declares this name.
+ */
+export const BULK_WRAPPER_FIELD = 'items';
+
+/** One submitted batch, with the kind and cap needed to judge it (§2.4, §2.5). */
+interface SubmittedBatch {
+  kind: BulkKind;
+  supplied: Record<string, unknown>;
+  bulkLimit: number;
+}
+
+/** One item of a batch, at the index its dotted path starts from. */
+interface JudgedItem {
+  kind: BulkKind;
+  index: number;
+  item: unknown;
+}
 
 /** A descriptor table together with the dotted path it sits at (`items.0`). */
 interface FieldTable {
@@ -27,11 +49,67 @@ interface LocatedField {
 /**
  * Every supplied value matches its descriptor and every required field exists.
  * Nested types are checked by the same walk a top-level field reaches, so a
- * failure reads as its full path (`items.0.nutrients.sodium`).
+ * failure reads as its full path (`items.0.nutrients.sodium`). A bulk op is
+ * judged as one batch: its envelope first, then each item at its own path.
  */
-export function validateInput(operation: OpSpec, supplied: Record<string, unknown>): ValidationIssue[] {
+export function validateInput(
+  operation: OpSpec,
+  supplied: Record<string, unknown>,
+  bulkLimit: number = resolveBulkLimit(process.env),
+): ValidationIssue[] {
   rejectMalformedDeclaration(operation);
-  return judgedInput({ fieldPath: '', fields: operation.fields }, supplied);
+  if (!isBulkKind(operation.kind)) {
+    return judgedInput({ fieldPath: '', fields: operation.fields }, supplied);
+  }
+  return bulkBatchIssues(operation, { kind: operation.kind, supplied, bulkLimit });
+}
+
+/**
+ * The batch-level refusals, or the items — a call-level failure reaches no request
+ * (§2.5). The envelope is judged with the same unknown-key rule every other op
+ * takes (`additionalProperties: false`), so a key the schema never advertises is
+ * refused here rather than riding along unread.
+ */
+function bulkBatchIssues(operation: OpSpec, batch: SubmittedBatch): ValidationIssue[] {
+  const items = batch.supplied[BULK_WRAPPER_FIELD];
+  if (!Array.isArray(items)) {
+    return [{ field: BULK_WRAPPER_FIELD, reason: batchEnvelopeReason(items) }];
+  }
+  const envelopeIssues = unknownEnvelopeFields(
+    Object.keys(batch.supplied).filter((fieldName) => fieldName !== BULK_WRAPPER_FIELD),
+  );
+  if (envelopeIssues.length > 0) return envelopeIssues;
+  const sizeReason = batchSizeReason(items.length, batch.bulkLimit);
+  if (sizeReason !== undefined) return [{ field: BULK_WRAPPER_FIELD, reason: sizeReason }];
+  return items.flatMap((item, index) =>
+    bulkItemIssues(operation, { kind: batch.kind, index, item }),
+  );
+}
+
+/** A bulk call takes `items` and nothing else, so every other supplied key is unknown (§2.3). */
+function unknownEnvelopeFields(fieldNames: string[]): ValidationIssue[] {
+  return fieldNames.map((fieldName) => ({ field: fieldName, reason: 'unknown field' }));
+}
+
+/** A batch nobody sent is missing; a batch that is not a list is the wrong type. */
+function batchEnvelopeReason(items: unknown): string {
+  return items === undefined ? 'required' : 'expected array';
+}
+
+/** At least one item, and never more than the resolved cap — which the message names (§2.4). */
+function batchSizeReason(itemCount: number, bulkLimit: number): string | undefined {
+  if (itemCount === 0) return 'at least one item required';
+  if (itemCount > bulkLimit) return `exceeds LIFE_OPS_BULK_LIMIT (${bulkLimit})`;
+  return undefined;
+}
+
+/** One item judged against the sibling's table, read from `items.<index>` downward (§2.5). */
+function bulkItemIssues(operation: OpSpec, judged: JudgedItem): ValidationIssue[] {
+  const context: FieldTable = {
+    fieldPath: `${BULK_WRAPPER_FIELD}.${judged.index}`,
+    fields: operation.fields,
+  };
+  return elementIssues(context, bulkItemInput(judged.kind, judged.item));
 }
 
 /**

@@ -11,6 +11,7 @@
     "packages/db",
     "packages/nutrition",
     "packages/ops",
+    "packages/mcp-gateway",
     "apps/pomodoro",
     "packages/service-kit",
     "apps/note-service",

@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "notes": {
+      "command": "{{node}}",
+      "args": ["{{stubScript}}", "{{stubFixtures}}/notes.json"],
+      "env": { "STUB_UPSTREAM_HANDSHAKE_FILE": "{{handshakeLog}}" }
+    },
+    "todos": {
+      "command": "{{node}}",
+      "args": ["{{stubScript}}", "{{stubFixtures}}/todos.json"],
+      "env": { "STUB_UPSTREAM_HANDSHAKE_FILE": "{{handshakeLog}}" }
+    }
+  },
+  "unregisteredApps": {
+    "calendar": {
+      "command": "{{node}}",
+      "args": ["{{stubScript}}", "{{stubFixtures}}/calendar.json"],
+      "env": { "STUB_UPSTREAM_HANDSHAKE_FILE": "{{handshakeLog}}" }
+    }
+  }
+}
