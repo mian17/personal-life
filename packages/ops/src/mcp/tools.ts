@@ -8,6 +8,8 @@
  * (SPEC-ops-all-services §1.1.2). This file owns nothing but that projection — a
  * tool that restated a schema or a wire shape would be a bug.
  */
+import type { BulkKind } from '../core/bulk';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk';
 import type { JsonSchema } from '../core/schema';
 import { deriveInputSchema, toolName } from '../core/schema';
 import type { OpSpec, ResourceRegistry } from '../core/types';
@@ -38,10 +40,17 @@ export interface ToolLocation {
   operation: OpSpec;
 }
 
-/** Every served registry's ops as MCP tools, in load order then registry order. */
-export function listTools(registrySet: RegistryUnion): McpTool[] {
+/**
+ * Every served registry's ops as MCP tools, in load order then registry order. `bulkLimit`
+ * is the cap this environment resolves, so a bulk tool advertises the cap the validator
+ * enforces; it defaults to the one `process.env` names.
+ */
+export function listTools(
+  registrySet: RegistryUnion,
+  bulkLimit: number = resolveBulkLimit(process.env),
+): McpTool[] {
   return everyRegistry(registrySet).flatMap((registry) =>
-    registry.ops.map((operation) => toolFor(registry, operation)),
+    registry.ops.map((operation) => toolFor(registry, operation, bulkLimit)),
   );
 }
 
@@ -63,24 +72,36 @@ function operationNamed(registry: ResourceRegistry, name: string): OpSpec | unde
   return registry.ops.find((operation) => toolName(registry, operation) === name);
 }
 
-function toolFor(registry: ResourceRegistry, operation: OpSpec): McpTool {
+function toolFor(registry: ResourceRegistry, operation: OpSpec, bulkLimit: number): McpTool {
   return {
     name: toolName(registry, operation),
     title: titleFor(registry, operation),
     description: describe(registry, operation),
-    inputSchema: deriveInputSchema(registry, operation.kind),
+    inputSchema: deriveInputSchema(registry, operation.kind, bulkLimit),
     annotations: annotationsFor(operation),
   };
 }
 
-/** How a client labels the tool in a prompt: `Get sample`, `Delete sample`. */
+/** How a client labels the tool in a prompt: `Get sample`, `Get many sample`. */
 function titleFor(registry: ResourceRegistry, operation: OpSpec): string {
-  return `${capitalize(operation.kind)} ${registry.name}`;
+  return `${kindWords(operation.kind)} ${registry.name}`;
+}
+
+function kindWords(kind: OpSpec['kind']): string {
+  return isBulkKind(kind) ? BULK_WORDS[kind] : capitalize(kind);
 }
 
 function capitalize(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
+
+/** How each bulk kind reads at the start of its title and description (§2.8). */
+const BULK_WORDS: Readonly<Record<BulkKind, string>> = {
+  getMany: 'Get many',
+  createMany: 'Create many',
+  updateMany: 'Update many',
+  deleteMany: 'Delete many',
+};
 
 /**
  * The kind's hints, then the op's frozen flag where the author overrode it
@@ -123,8 +144,39 @@ const HINTS_BY_KIND: Readonly<Record<OpSpec['kind'], ToolAnnotations>> = {
     idempotentHint: true,
     openWorldHint: false,
   },
+  getMany: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+  createMany: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+  updateMany: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+  deleteMany: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
 };
 
+/** One line that lets an agent choose the tool: the batch names its fan-out, a row op its kind. */
 function describe(registry: ResourceRegistry, operation: OpSpec): string {
+  if (isBulkKind(operation.kind)) return describeBatch(registry, operation.kind);
   return `${operation.kind} a ${registry.name} record through ${registry.basePath}`;
+}
+
+/** `Get many notes through /api/notes, one result per item` (§2.8). */
+function describeBatch(registry: ResourceRegistry, kind: BulkKind): string {
+  return `${BULK_WORDS[kind]} ${registry.name} through ${registry.basePath}, one result per item`;
 }

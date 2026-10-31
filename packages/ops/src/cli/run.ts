@@ -11,6 +11,8 @@
  * Output parity with the MCP adapter is a string comparison on `renderOpsResult`
  * and `renderFailure`, so both adapters render through `./render`.
  */
+import type { BulkEnvelope } from '../core/bulk';
+import { resolveBulkLimit } from '../core/bulk';
 import type { ResourceRegistry } from '../core/types';
 import { toolName } from '../core/schema';
 import { createExecutor, resolveDeadlineMs } from '../transport/executor';
@@ -99,9 +101,21 @@ async function runCall(options: MainOptions): Promise<number> {
     baseUrl: apiBaseFor({ service, registry, env: options.env }),
     readToken: currentAccessToken,
     deadlineMs: resolveDeadlineMs(options.env),
+    bulkLimit: resolveBulkLimit(options.env),
   });
-  options.stdout(renderOpsResult(await executor.run(command.operation.kind, command.input)));
-  return SUCCESS_EXIT;
+  const result = await executor.run(command.operation.kind, command.input);
+  options.stdout(renderOpsResult(result));
+  return exitCodeFor(result.body);
+}
+
+/** A batch where no item succeeded is the one failing call; a partial failure still exits 0. */
+function exitCodeFor(body: unknown): number {
+  return failedEveryItem(body) ? FAILURE_EXIT : SUCCESS_EXIT;
+}
+
+/** The batch envelope is the only body that counts its successes, and nothing succeeding fails the call. */
+function failedEveryItem(body: unknown): boolean {
+  return (body as Partial<BulkEnvelope> | undefined)?.succeeded === 0;
 }
 
 /** The resources a loaded module registers, in declaration order. */

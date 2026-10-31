@@ -48,6 +48,7 @@ const TEMPLATE_KEYS = [...GENERATED_KEYS, ...COMPUTED_KEYS];
 
 /** Variables with an in-code default or a platform meaning; deliberately absent from the generator. */
 const DEFAULTED_KEYS = [
+  'LIFE_OPS_BULK_LIMIT',
   'LIFE_OPS_CREDENTIALS_PATH',
   'LIFE_OPS_DEADLINE_MS',
   'LIFE_OPS_REFRESH_SKEW_MS',
