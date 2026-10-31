@@ -46,7 +46,10 @@ export function writeToolSlices(
   location: ToolCacheLocation,
   slices: readonly UpstreamSlice[],
 ): void {
-  saveCacheFile(location, slices.reduce(insertedOrReplaced, readToolSlices(location)));
+  saveCacheFile(
+    location,
+    slices.reduce((held, slice) => insertedOrReplaced(held, slice), readToolSlices(location)),
+  );
 }
 
 /** Forget one upstream's slice, leaving the other slices and their order untouched. */

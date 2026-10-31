@@ -157,8 +157,17 @@ function normalizedEntry(entry: UpstreamEntry): unknown {
 
 function sortedByKey(env: Record<string, string>): Record<string, string> {
   const sorted: Record<string, string> = {};
-  for (const key of Object.keys(env).sort()) sorted[key] = env[key];
+  for (const key of Object.keys(env).sort(byCodeUnit)) sorted[key] = env[key];
   return sorted;
+}
+
+/**
+ * Code-unit order — what a bare `sort()` gave before it demanded a comparator, so the hash of an
+ * existing config's `env` does not move (`localeCompare` would order by collation instead).
+ */
+function byCodeUnit(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

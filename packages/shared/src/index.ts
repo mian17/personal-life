@@ -2,6 +2,22 @@ export { likeMatch } from './like-match';
 export { resolveDbPath } from './db-path';
 
 /**
+ * The JSON-RPC stdio seam the MCP servers share (`SPEC-mcp-gateway`,
+ * `SPEC-ops-agent-contract` §3.1): one line reader, one message reader, one
+ * reply shape. Each server injects its own failure rendering.
+ */
+export {
+  answerUntilStdinCloses,
+  errorAnswer,
+  idOf,
+  isRecord,
+  parseLine,
+  readMessage,
+  readRequest,
+} from './mcp-json-rpc';
+export type { MessageRead, RpcFailure, RpcRequest, StdioLoop } from './mcp-json-rpc';
+
+/**
  * `TagRef` — the ecosystem tag vocabulary reference (`SPEC-service-kernel`).
  * note-service no longer owns tag names; it stores exactly the integer ids a
  * write carries (association-only `note_tag` rows). Names live solely in

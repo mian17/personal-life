@@ -194,10 +194,7 @@ async function askUpstream(upstream: UpstreamProcess, request: UpstreamRequest):
   return reply.result;
 }
 
-function startUpstream(
-  entry: UpstreamEntry,
-  notices: UpstreamNotices = { toolTableChanged: false },
-): UpstreamProcess {
+function startUpstream(entry: UpstreamEntry, notices?: UpstreamNotices): UpstreamProcess {
   const child: UpstreamChild = spawn(entry.command, entry.args, {
     cwd: entry.cwd,
     env: { ...process.env, ...entry.env },
@@ -205,7 +202,11 @@ function startUpstream(
   });
   swallowStdinFailures(child);
 
-  const readable: ReadableUpstream = { entry, child, notices };
+  const readable: ReadableUpstream = {
+    entry,
+    child,
+    notices: notices ?? { toolTableChanged: false },
+  };
   return { ...readable, nextReply: repliesFrom(readable) };
 }
 
@@ -257,7 +258,16 @@ function toolsOf(result: unknown, entry: UpstreamEntry): unknown[] {
 /** The JSON-RPC error as one clause: `error -32601: method not found`. */
 function describedError(error: unknown): string {
   if (!isRecord(error)) return `error ${JSON.stringify(error)}`;
-  return `error ${String(error.code ?? 'without code')}: ${String(error.message ?? 'without message')}`;
+  return `error ${fieldText(error.code, 'without code')}: ${fieldText(error.message, 'without message')}`;
+}
+
+/**
+ * A field as it reads only when it is text of its own; anything else would stringify to
+ * `[object Object]`, which says less than the fallback does.
+ */
+function fieldText(value: unknown, fallback: string): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return fallback;
 }
 
 /**

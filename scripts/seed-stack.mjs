@@ -552,27 +552,49 @@ async function seedStep(step, ids, credentialsDir) {
   return { label: step.label, created, skipped };
 }
 
-/** Wait until one URL answers at all; a redirect is an answer (the app gates `/health`). */
-async function waitForHttp(url) {
-  let lastError = 'no probe ran';
-  for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt += 1) {
-    try {
-      await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-      return;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      await new Promise((done) => setTimeout(done, PROBE_INTERVAL_MS));
+/** Runs thunks one after another, never two at once. */
+async function inTurn(thunks) {
+  await thunks.reduce((turn, run) => turn.then(() => run()), Promise.resolve());
+}
+
+/**
+ * Wait until one URL answers at all; a redirect is an answer (the app gates `/health`).
+ * One probe at a time: a failed probe waits out the interval and probes again, and the last
+ * failure is the one reported.
+ */
+async function waitForHttp(url, attempt = 1) {
+  try {
+    await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    return;
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    await new Promise((done) => setTimeout(done, PROBE_INTERVAL_MS));
+    if (attempt === PROBE_ATTEMPTS) {
+      throw new Error(`${url} never answered ${PROBE_ATTEMPTS} probes, ${PROBE_INTERVAL_MS}ms apart: ${failure}`);
     }
+    await waitForHttp(url, attempt + 1);
   }
-  throw new Error(`${url} never answered ${PROBE_ATTEMPTS} probes, ${PROBE_INTERVAL_MS}ms apart: ${lastError}`);
 }
 
 /** Refuse to seed a stack that is not up: half a stack is how a seed reports a false success. */
 async function probeStack() {
-  for (const [name, port] of PORTS) {
-    await waitForHttp(`http://127.0.0.1:${port}/health`);
-    console.log(`${name} on ${port}: up`);
-  }
+  await inTurn([...PORTS].map(([name, port]) => async () => probeOne(name, port)));
+}
+
+/** One service's probe, announced the moment it answers. */
+async function probeOne(name, port) {
+  await waitForHttp(`http://127.0.0.1:${port}/health`);
+  console.log(`${name} on ${port}: up`);
+}
+
+/** Every step in declaration order, each counted as it reports and feeding the ids below it. */
+async function seedEveryStep(steps, ids, credentialsDir) {
+  const counts = [];
+  const stepsInTurn = steps.map(
+    (step) => async () => counts.push(await seedStep(step, ids, credentialsDir)),
+  );
+  await inTurn(stepsInTurn);
+  return counts;
 }
 
 /** One line per resource as it is seeded, then the same numbers as a table. */
@@ -600,8 +622,7 @@ async function main() {
   try {
     writeCredentials(credentialsDir);
     const ids = new Map();
-    const counts = [];
-    for (const step of STEPS) counts.push(await seedStep(step, ids, credentialsDir));
+    const counts = await seedEveryStep(STEPS, ids, credentialsDir);
     printTable(counts);
   } finally {
     rmSync(credentialsDir, { recursive: true, force: true });
@@ -610,8 +631,10 @@ async function main() {
 
 // Importable for `scripts/seed-stack.test.mjs`; only the CLI invocation seeds.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(`seed:stack failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
-  });
+  }
 }

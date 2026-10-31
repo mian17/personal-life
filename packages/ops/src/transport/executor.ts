@@ -160,13 +160,23 @@ async function runInterleaved(batch: BulkBatch): Promise<BulkItemResult[]> {
   return await Promise.all(batch.items.map((item, index) => runItem({ batch, index, item })));
 }
 
-/** Item *i+1* is not sent until item *i* settles, so a partial write stays readable (§2.6). */
+/**
+ * Item *i+1* is not sent until item *i* settles, so a partial write stays readable (§2.6).
+ * The items await in a chain rather than a loop: each turn starts when the one before it
+ * settles, and a rejection ends the chain exactly where the loop would have stopped.
+ */
 async function runInSubmitOrder(batch: BulkBatch): Promise<BulkItemResult[]> {
   const results: BulkItemResult[] = [];
-  for (const [index, item] of batch.items.entries()) {
-    results.push(await runItem({ batch, index, item }));
-  }
+  await batch.items.reduce<Promise<void>>(
+    (turn, item, index) => turn.then(() => appendItem(results, { batch, index, item })),
+    Promise.resolve(),
+  );
   return results;
+}
+
+/** One item's turn, appended in the order the turns came up. */
+async function appendItem(results: BulkItemResult[], submitted: SubmittedItem): Promise<void> {
+  results.push(await runItem(submitted));
 }
 
 /** One item's request, its own deadline, and its own outcome either way (§2.6, §2.7). */
