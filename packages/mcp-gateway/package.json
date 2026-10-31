@@ -13,6 +13,7 @@
     "test:unit": "jest"
   },
   "devDependencies": {
+    "@life/shared": "*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.9",
@@ -35,6 +36,12 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@life/shared$": "<rootDir>/../shared/src/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@life/shared": "*"
   }
 }

@@ -31,7 +31,7 @@ const BULK_SOURCES: Readonly<Record<BulkKind, BulkSource>> = {
 export const BULK_KINDS: readonly BulkKind[] = Object.keys(BULK_SOURCES) as BulkKind[];
 
 export function isBulkKind(kind: OpSpec['kind']): kind is BulkKind {
-  return BULK_KINDS.some((bulkKind) => bulkKind === kind);
+  return BULK_KINDS.includes(kind as BulkKind);
 }
 
 /** The single-row kind this bulk kind fans out over, or `undefined` for the six existing kinds. */

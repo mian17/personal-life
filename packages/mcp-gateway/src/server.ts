@@ -30,6 +30,14 @@
  * The composition is `config → upstream → merge → cache`, the order the modules document: this
  * file knows JSON-RPC and nothing about how an upstream is reached.
  */
+import {
+  answerUntilStdinCloses,
+  errorAnswer,
+  idOf,
+  isRecord,
+  readMessage,
+} from '@life/shared';
+import type { RpcRequest } from '@life/shared';
 import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from './cache';
 import type { ToolCacheLocation } from './cache';
 import { loadGatewayConfig } from './config';
@@ -104,32 +112,14 @@ interface ServerLoop {
   readonly options: McpServerOptions;
 }
 
+/** This server's line loop: the shared reader, told how this server renders an escaped failure. */
 function answerLinesUntilStdinCloses(loop: ServerLoop): Promise<number> {
-  return new Promise((finish) => {
-    let buffered = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: string) => {
-      buffered += chunk;
-      for (;;) {
-        const lineEnd = buffered.indexOf('\n');
-        if (lineEnd === -1) return;
-        const line = buffered.slice(0, lineEnd);
-        buffered = buffered.slice(lineEnd + 1);
-        void respondToLine(loop, line);
-      }
-    });
-    process.stdin.on('end', () => finish(0));
+  return answerUntilStdinCloses({
+    server: loop.server,
+    stdout: loop.options.stdout,
+    stderr: loop.options.stderr,
+    renderFailure: reasonFor,
   });
-}
-
-/** A line's answer goes to stdout; a failure that escaped the loop goes to stderr, never stdout. */
-async function respondToLine(loop: ServerLoop, line: string): Promise<void> {
-  try {
-    const response = await loop.server.handle(line);
-    if (response !== null) loop.options.stdout(JSON.stringify(response));
-  } catch (error) {
-    loop.options.stderr(reasonFor(error));
-  }
 }
 
 async function answer(message: unknown, session: GatewaySession): Promise<unknown> {
@@ -390,10 +380,9 @@ function upstreamForTool(
   entries: readonly UpstreamEntry[],
 ): UpstreamEntry | undefined {
   const declared = entries.filter((entry) => name.startsWith(prefixedName(entry.configKey)));
-  const longestFirst = declared.sort(
-    (left, right) => right.configKey.length - left.configKey.length,
-  );
-  return longestFirst[0];
+  // `declared` is this call's own array, so sorting it in place stays invisible to the caller.
+  declared.sort((left, right) => right.configKey.length - left.configKey.length);
+  return declared[0];
 }
 
 function prefixedName(configKey: string): string {
@@ -441,63 +430,6 @@ function resultAnswer(request: RpcRequest, result: unknown): unknown {
   return { jsonrpc: '2.0', id: idOf(request), result };
 }
 
-function errorAnswer(failure: RpcFailure): unknown {
-  return { jsonrpc: '2.0', id: failure.id, error: { code: failure.code, message: failure.message } };
-}
-
-/** `id === undefined` is the notification shape; every other field arrives verbatim. */
-interface RpcRequest {
-  id: string | number | undefined;
-  method: string;
-  params: unknown;
-}
-
-/** A JSON-RPC error reply's varying part; a `null` id is what the protocol asks for a bad line. */
-interface RpcFailure {
-  id: string | number | null;
-  code: number;
-  message: string;
-}
-
-/** What one delivered message turned out to be. */
-type MessageRead =
-  | { kind: 'request'; request: RpcRequest }
-  | { kind: 'notARequest' }
-  | { kind: 'unparseable' };
-
-function readMessage(message: unknown): MessageRead {
-  if (typeof message !== 'string') return readRequest(message);
-  const parsed = parseLine(message);
-  return parsed.kind === 'unparseable' ? parsed : readRequest(parsed.value);
-}
-
-function parseLine(line: string): { kind: 'parsed'; value: unknown } | { kind: 'unparseable' } {
-  try {
-    return { kind: 'parsed', value: JSON.parse(line) as unknown };
-  } catch {
-    return { kind: 'unparseable' };
-  }
-}
-
-function readRequest(parsed: unknown): MessageRead {
-  if (!isRecord(parsed)) return { kind: 'notARequest' };
-  if (typeof parsed.method !== 'string') return { kind: 'notARequest' };
-  return {
-    kind: 'request',
-    request: { id: requestId(parsed), method: parsed.method, params: parsed.params },
-  };
-}
-
-function requestId(record: Record<string, unknown>): string | number | undefined {
-  const id = record.id;
-  if (typeof id === 'string' || typeof id === 'number') return id;
-  return undefined;
-}
-
-function idOf(request: RpcRequest): string | number | null {
-  return request.id ?? null;
-}
-
 function requestedVersion(request: RpcRequest): string | undefined {
   const version = paramsOf(request)?.protocolVersion;
   return typeof version === 'string' ? version : undefined;
@@ -506,10 +438,6 @@ function requestedVersion(request: RpcRequest): string | undefined {
 /** The `params` object of a request; anything else reads as absent. */
 function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
   return isRecord(request.params) ? request.params : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function reasonFor(error: unknown): string {

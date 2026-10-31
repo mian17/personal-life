@@ -8,6 +8,8 @@
  * one shared executor and the one canonical render the CLI uses, so adapter
  * parity is a string comparison, not a convention.
  */
+import { answerUntilStdinCloses, errorAnswer, idOf, readMessage } from '@life/shared';
+import type { RpcRequest } from '@life/shared';
 import type { OpSpec, ResourceRegistry } from '../core/types';
 import type { BulkEnvelope } from '../core/bulk';
 import { isBulkKind, resolveBulkLimit } from '../core/bulk';
@@ -81,31 +83,14 @@ async function serveFromEnvironment(): Promise<void> {
   }
 }
 
+/** This server's line loop: the shared reader, told how an escaped failure is rendered here. */
 function answerRequestsUntilStdinCloses(loop: ServerLoop): Promise<number> {
-  return new Promise((finish) => {
-    let buffered = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: string) => {
-      buffered += chunk;
-      for (;;) {
-        const lineEnd = buffered.indexOf('\n');
-        if (lineEnd === -1) return;
-        const line = buffered.slice(0, lineEnd);
-        buffered = buffered.slice(lineEnd + 1);
-        void respondToLine(loop, line);
-      }
-    });
-    process.stdin.on('end', () => finish(0));
+  return answerUntilStdinCloses({
+    server: loop.server,
+    stdout: loop.options.stdout,
+    stderr: loop.options.stderr,
+    renderFailure,
   });
-}
-
-async function respondToLine(loop: ServerLoop, line: string): Promise<void> {
-  try {
-    const response = await loop.server.handle(line);
-    if (response !== null) loop.options.stdout(JSON.stringify(response));
-  } catch (error) {
-    loop.options.stderr(renderFailure(error));
-  }
 }
 
 async function answer(message: unknown, session: Session): Promise<unknown> {
@@ -278,10 +263,6 @@ function methodNotSupportedAnswer(request: RpcRequest): unknown {
   });
 }
 
-function errorAnswer(failure: RpcFailure): unknown {
-  return { jsonrpc: '2.0', id: failure.id, error: { code: failure.code, message: failure.message } };
-}
-
 interface Session {
   options: McpServerOptions;
   /** The service the CLI's base precedence reads, built once from the served resources. */
@@ -302,59 +283,6 @@ interface ToolOutcome {
   failed: boolean;
   /** A batch ran and every item failed; the envelope is still the payload. */
   nothingSucceeded: boolean;
-}
-
-/** `id === undefined` is the notification shape; every other field arrives verbatim. */
-interface RpcRequest {
-  id: string | number | undefined;
-  method: string;
-  params: unknown;
-}
-
-/** A JSON-RPC error reply's varying part; `null` id is what the protocol asks for a bad line. */
-interface RpcFailure {
-  id: string | number | null;
-  code: number;
-  message: string;
-}
-
-/** What one delivered message turned out to be. */
-type MessageRead =
-  | { kind: 'request'; request: RpcRequest }
-  | { kind: 'notARequest' }
-  | { kind: 'unparseable' };
-
-function readMessage(message: unknown): MessageRead {
-  if (typeof message !== 'string') return readRequest(message);
-  const parsed = parseLine(message);
-  return parsed.kind === 'unparseable' ? parsed : readRequest(parsed.value);
-}
-
-function parseLine(line: string): { kind: 'parsed'; value: unknown } | { kind: 'unparseable' } {
-  try {
-    return { kind: 'parsed', value: JSON.parse(line) as unknown };
-  } catch {
-    return { kind: 'unparseable' };
-  }
-}
-
-function readRequest(parsed: unknown): MessageRead {
-  if (typeof parsed !== 'object' || parsed === null) return { kind: 'notARequest' };
-  const record = parsed as Record<string, unknown>;
-  if (typeof record['method'] !== 'string') return { kind: 'notARequest' };
-  return {
-    kind: 'request',
-    request: { id: requestId(record), method: record['method'], params: record['params'] },
-  };
-}
-
-function requestId(record: Record<string, unknown>): string | number | undefined {
-  if (typeof record['id'] === 'string' || typeof record['id'] === 'number') return record['id'];
-  return undefined;
-}
-
-function idOf(request: RpcRequest): string | number | null {
-  return request.id ?? null;
 }
 
 /** The `arguments` object of the call; an absent one behaves as an empty input. */

@@ -97,6 +97,24 @@ describe('listUpstreamTools', () => {
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(HANDSHAKE_TIMEOUT_MS);
     expect(processIsGone(upstream.pidFile)).toBe(true);
   });
+
+  it('reads a string error code and message into the failure', async () => {
+    const entry = errorReplyingUpstream({ code: -32601, message: 'method not found' });
+
+    const failure = await failureOf(listUpstreamTools(entry));
+
+    expect(failure.message).toContain('answered tools/list with error -32601: method not found');
+  });
+
+  it('falls back to the literal text when an error field is not a string', async () => {
+    const entry = errorReplyingUpstream({ code: { nested: true }, message: { nested: true } });
+
+    const failure = await failureOf(listUpstreamTools(entry));
+
+    expect(failure.message).toContain(
+      'answered tools/list with error without code: without message',
+    );
+  });
 });
 
 describe('callUpstreamTool', () => {
@@ -143,6 +161,42 @@ function stubUpstream(fixture: StubFixture): StubUpstream {
 }
 
 let compiledStub: string | undefined;
+
+/**
+ * An upstream that handshakes normally and then rejects `tools/list` with `error` as given, so
+ * the gateway's rendering of a JSON-RPC error reply is what the assertion reads.
+ */
+function errorReplyingUpstream(error: Record<string, unknown>): UpstreamEntry {
+  const directory = mkdtempSync(join(tmpdir(), 'mcp-gateway-error-'));
+  const scriptPath = join(directory, 'error-upstream.js');
+  writeFileSync(scriptPath, ERROR_REPLYING_UPSTREAM_SOURCE);
+
+  const errorPath = join(directory, 'error.json');
+  writeFileSync(errorPath, JSON.stringify(error));
+
+  return { configKey: 'alpha', command: process.execPath, args: [scriptPath, errorPath], env: {} };
+}
+
+const ERROR_REPLYING_UPSTREAM_SOURCE = `
+const { readFileSync } = require('node:fs');
+const { createInterface } = require('node:readline');
+
+const error = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+
+createInterface({ input: process.stdin, crlfDelay: Infinity }).on('line', (line) => {
+  const request = JSON.parse(line);
+  if (request.method === 'initialize') {
+    return write({ jsonrpc: '2.0', id: request.id, result: {} });
+  }
+  if (request.method === 'tools/list') {
+    return write({ jsonrpc: '2.0', id: request.id, error });
+  }
+});
+
+function write(message) {
+  process.stdout.write(JSON.stringify(message) + '\\n');
+}
+`;
 
 /** Node cannot load the `.ts` stub, so its source is compiled once and the JavaScript spawned. */
 function stubScript(): string {
