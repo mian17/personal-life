@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { resolveDbPath } from '@life/shared';
+import { resolveDbPath } from '@life/shared/node';
 
 export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal' | 'focus';
 

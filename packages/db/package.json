@@ -41,6 +41,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@life/shared/node$": "<rootDir>/../shared/src/node.ts"
+    }
   }
 }

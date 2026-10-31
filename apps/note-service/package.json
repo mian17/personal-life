@@ -68,6 +68,7 @@
       "^@life/db$": "<rootDir>/../../packages/db/src/index.ts",
       "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
       "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^@life/shared/node$": "<rootDir>/../../packages/shared/src/node.ts",
       "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts"
     },
     "transform": {

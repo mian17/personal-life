@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { resolveDbPath as resolveSharedDbPath } from '@life/shared';
+import { resolveDbPath as resolveSharedDbPath } from '@life/shared/node';
 
 /**
  * Single source of truth for the note-service DB path, shared by the
