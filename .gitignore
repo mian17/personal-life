@@ -19,6 +19,7 @@ docs/intent/
 docs/specs/
 docs/reports/
 tasks/
+docs/design-systems/personal-life/screens/*.png
 # security scan artifacts (generated)
 vbsec-reports/
 __pycache__/
