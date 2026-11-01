@@ -1,0 +1,1831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Every primitive in the revised personal-life design system, in both schemes and against each app accent.">
+<title>Personal Life — revised component specimens</title>
+<script>
+/* Apply the stored theme before first paint so the page never flashes. */
+(function () {
+  try {
+    var c = localStorage.getItem('calm-theme');
+    if (c === 'light' || c === 'dark') document.documentElement.setAttribute('data-theme', c);
+  } catch (e) {}
+})();
+</script>
+<style>
+/* ---------- the app stylesheet, verbatim: specimens are the real components ---------- */
+/* ============================================================
+   Colour theme — one accent per app, the same calm vocabulary in both
+   schemes. Text on the accent clears AA: 5.90:1 light, 8.3–9.0:1 dark.
+   No pure-black fill, no pure-white text, no neon, no colour-only state.
+
+   Measured contrast (WCAG 2.1 relative luminance)
+   pair                              light    dark
+   --ink      on --surface          17.17    13.20
+   --ink-2    on --surface           7.06     6.77
+   --ink-3    on --surface           5.96     5.37
+   --on-max   on --max             5.90    9.00
+   --line-strong on --surface        3.45     3.83  (non-text boundary)
+   --line     on --surface           1.19     1.17  (hairline, decorative only)
+   --ok / --warn / --danger on their soft fills clear 5.4:1 in both.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+
+  /* ground + surfaces */
+  --page: #F4F4F1;
+  --surface: #FFFFFF;
+  --surface-sunken: #F7F7F4;
+  --press: #ECECE9;
+
+  /* ink */
+  --ink: #1B1B1F;
+  --ink-2: #58585E;
+  --ink-3: #63636A;
+
+  /* lines */
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: #8A8A8A;
+  --focus: #2A5D8F;
+
+  /* this app's accent: primary fill, selection, progress */
+  --max: #4F6B52;
+  --max-press: #405743;
+  --on-max: #FFFFFF;
+
+  /* semantic, muted, never neon */
+  --ok: #335B3F;     --ok-soft: #EAF1EA;
+  --warn: #6E5A16;   --warn-soft: #F5F0E0;
+  --danger: #8A3B3B; --danger-soft: #F6E9E9;
+  --chart-muted: #C9C9C6;
+
+  /* geometry, grid, motion — one vocabulary */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+  --frame-max: 414px;
+  --tap: 48px;
+  --fab-size: 56px;
+  --focus-ring: 2px;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --d-fast: 200ms;
+  --d-base: 260ms;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #16171A;
+  --surface: #1E2024;
+  --surface-sunken: #24262B;
+  --press: #2C2F35;
+
+  --ink: #E9E7E2;
+  --ink-2: #A9A79F;
+  --ink-3: #96948D;
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: #767B84;
+  --focus: #8FBCE8;
+
+  --max: #9FC0A3;
+  --max-press: #B0CDB3;
+  --on-max: #16171A;
+
+  --ok: #9FC0A3;     --ok-soft: #202A21;
+  --warn: #D9C68A;   --warn-soft: #2A2418;
+  --danger: #D98C86; --danger-soft: #2C1F1F;
+  --chart-muted: #3A3D43;
+}
+
+/* Follow the OS until the visitor picks a theme in Settings. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #16171A;
+    --surface: #1E2024;
+    --surface-sunken: #24262B;
+    --press: #2C2F35;
+    --ink: #E9E7E2;
+    --ink-2: #A9A79F;
+    --ink-3: #96948D;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: #767B84;
+    --focus: #8FBCE8;
+    --max: #9FC0A3;
+    --max-press: #B0CDB3;
+    --on-max: #16171A;
+    --ok: #9FC0A3;     --ok-soft: #202A21;
+    --warn: #D9C68A;   --warn-soft: #2A2418;
+    --danger: #D98C86; --danger-soft: #2C1F1F;
+    --chart-muted: #3A3D43;
+  }
+}
+
+
+/* ---------- the prototype's base: tokens, type, rows, cards, sheets ---------- */
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { -webkit-appearance: none; }
+svg { display: block; }
+
+:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* spacing utilities — every value an 8pt step */
+.mt0 { margin-top: 0; }
+.mt2 { margin-top: var(--s2); }
+.mt3 { margin-top: var(--s3); }
+.mt4 { margin-top: var(--s4); }
+.ml-auto { margin-left: auto; }
+
+/* ---------- frame ---------- */
+.frame {
+  position: relative;
+  max-width: var(--frame-max);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--s6));
+  background: var(--surface);
+  border-inline: 1px solid var(--line);
+}
+
+.main { display: block; }
+
+.panel { padding: var(--s2) var(--s4) var(--s6); }
+.panel[hidden] { display: none; }
+
+.grow { flex: 1; }
+.no-grow { flex: 0 0 auto; }
+/* a row whose whole body opens a detail view */
+.row__main--btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* inert row: no press, no pointer */
+.row[data-static] { cursor: default; }
+.row[data-static]:active { background: transparent; }
+
+/* ---------- page header ---------- */
+.phead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding-top: var(--s2);
+}
+
+.h1 {
+  font-size: 28px;
+  line-height: 1.14;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+}
+
+.phead__sub {
+  margin-top: var(--s1);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+/* ---------- section label ---------- */
+.slabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: var(--s6) 0 var(--s2);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.slabel__count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-3);
+}
+
+/* ---------- grouped list + rows ---------- */
+.group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.list__item + .list__item { border-top: 1px solid var(--line); }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s3) var(--s4);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.row:active { background: var(--press); }
+
+.row__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+  flex: 1;
+}
+
+.row__title {
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+
+.row__meta {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.row__trail {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--ink-3);
+}
+
+.row--done .row__title {
+  color: var(--ink-2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.row--done .row__meta { color: var(--ink-3); }
+
+/* checkbox: 24px mark inside a 48px target */
+.check {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin: calc(var(--s2) * -1) 0 calc(var(--s2) * -1) calc(var(--s3) * -1);
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.check:active { background: var(--press); }
+
+.check__box {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: transparent;
+}
+
+.check[aria-checked="true"] .check__box {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+.check__glyph { width: 16px; height: 16px; }
+
+/* ---------- pills ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--s6);
+  padding: 0 var(--s2);
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+.pill--neutral { background: var(--surface-sunken); color: var(--ink-2); }
+.pill--warn    { background: var(--warn-soft);   color: var(--warn); }
+.pill--danger  { background: var(--danger-soft); color: var(--danger); }
+.pill--ok      { background: var(--ok-soft);     color: var(--ok); }
+
+/* ---------- controls ---------- */
+.iconbtn {
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.iconbtn:active { background: var(--press); }
+
+.icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.icon--sm { width: 18px; height: 18px; }
+
+.btn {
+  width: 100%;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: 0 var(--s5);
+  border: 1px solid var(--max);
+  border-radius: var(--r-md);
+  background: var(--max);
+  color: var(--on-max);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+}
+
+.btn:active { background: var(--max-press); border-color: var(--max-press); }
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--ghost:active { background: var(--press); }
+
+.btn--danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--danger);
+}
+
+.btn--danger:active { background: var(--danger-soft); }
+
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+
+/* ---------- fields ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--tap);
+  padding: 0 var(--s3);
+  margin-top: var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.search:focus-within { outline: var(--focus-ring) solid var(--focus); outline-offset: var(--focus-ring); }
+
+.search input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.search input::placeholder { color: var(--ink-3); }
+.search input:focus { outline: none; }
+
+.input {
+  width: 100%;
+  height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 16px;
+}
+
+.input:focus, .textarea:focus, .select:focus {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+}
+
+.field { display: block; margin-top: var(--s4); }
+
+.field__label {
+  display: block;
+  margin-bottom: var(--s2);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 17px;
+  line-height: 1.55;
+  resize: none;
+}
+
+.select {
+  height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.textarea--sm { min-height: 112px; }
+.body-copy { font-size: 16px; }
+.chart-box { padding: var(--s3) var(--s3) var(--s2); }
+
+/* ---------- chips + segmented ---------- */
+.filters {
+  display: flex;
+  gap: var(--s2);
+  margin: var(--s3) calc(var(--s4) * -1) 0;
+  padding: 0 var(--s4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar { display: none; }
+.filters--inset { margin-inline: 0; padding-inline: 0; }
+
+.chip {
+  flex: none;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:active { background: var(--press); }
+
+.chip[aria-pressed="true"] {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+.chip[aria-pressed="true"]:active { background: var(--max-press); }
+
+.seg {
+  display: inline-flex;
+  gap: var(--s1);
+  padding: var(--s1);
+  margin-top: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+}
+
+.seg__btn {
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seg__btn:active { background: var(--press); }
+
+.seg__btn[aria-pressed="true"] {
+  background: var(--max);
+  color: var(--on-max);
+}
+
+.seg__btn[aria-pressed="true"]:active { background: var(--max-press); }
+
+/* ---------- card ---------- */
+.card {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.card--flush { padding: 0; overflow: hidden; }
+.card + .card { margin-top: var(--s3); }
+
+/* ---------- meals: headline + macros ---------- */
+.kpi {
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi__unit { font-size: 15px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
+
+.kpi__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin-top: var(--s1);
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.track__fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--max);
+}
+
+.macro {
+  display: grid;
+  grid-template-columns: 64px 1fr 88px;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s3);
+}
+
+.macro__label { font-size: 14px; font-weight: 600; }
+
+.macro__value {
+  font-size: 14px;
+  color: var(--ink-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- pomodoro ---------- */
+.timer__phase {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.timer__time {
+  margin-top: var(--s2);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer__hint { margin-top: var(--s3); font-size: 14px; color: var(--ink-2); min-height: 20px; }
+
+.dots { display: flex; gap: var(--s2); margin-top: var(--s4); }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--line-strong);
+}
+
+.dot--on { background: var(--max); border-color: var(--max); }
+
+/* ---------- chart ---------- */
+.chart { width: 100%; height: auto; }
+.chart__bar { fill: var(--max); }
+.chart__bar--muted { fill: var(--chart-muted); }
+.chart__grid { stroke: var(--line); stroke-width: 1; }
+.chart__target { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 4 4; }
+.chart__label { fill: var(--ink-2); font-size: 11px; font-weight: 600; font-family: inherit; }
+.chart__value { fill: var(--ink); font-size: 11px; font-weight: 600; font-family: inherit; }
+
+/* ---------- facts table ---------- */
+.facts { display: grid; }
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.fact:last-child { border-bottom: 0; }
+.fact__v { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- empty state ---------- */
+.empty {
+  padding: var(--s8) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.empty__title { font-size: 16px; font-weight: 600; color: var(--ink); }
+.empty__body { margin-top: var(--s1); font-size: 15px; }
+
+/* ---------- sub-view ---------- */
+.subnav {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding-top: var(--s2);
+}
+
+.backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  margin-left: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.backlink:active { background: var(--press); }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+}
+
+.status[data-state="idle"] .status__dot { background: var(--ink-3); }
+
+.subfoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- matrix ---------- */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+.quad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 132px;
+  padding: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-sunken);
+}
+
+.quad__label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.quad__list { display: flex; flex-direction: column; gap: var(--s2); }
+
+.quad__item {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.quad__item:active { background: var(--press); }
+.quad__empty { font-size: 13px; color: var(--ink-2); }
+
+/* ---------- motion: only when the OS allows it ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { transition: transform var(--d-base) var(--ease); }
+  .scrim { transition: opacity var(--d-fast) var(--ease); }
+  .track__fill { transition: width var(--d-base) linear; }
+  .chip, .seg__btn, .row, .iconbtn, .btn, .check { transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease); }
+
+  /* one-shot entrance, never a loop */
+  .panel:not([hidden]) { animation: view-in var(--d-fast) var(--ease) both; }
+
+  @keyframes view-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+
+/* Reduced motion: no transforms, no fades that travel, state is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- single-app additions ---------- */
+
+/* ---------- header actions ---------- */
+.phead__actions { display: flex; align-items: center; gap: var(--s1); }
+
+/* ---------- appearance switch, full width, three equal parts ---------- */
+.seg--theme { display: flex; width: 100%; }
+.seg--theme .seg__btn { flex: 1; }
+.group > .seg--theme { margin: 0; padding: var(--s2); border: 0; border-radius: 0; background: transparent; }
+
+/* ---------- a switch inside a settings row ---------- */
+.row__switch {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.row__switch[aria-pressed="true"] {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+/* ---------- save read-out under a toolbar ---------- */
+.editor-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 20px;
+  margin-top: var(--s2);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.editor-status:empty { display: none; }
+.editor-status__dot { width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--ok); }
+.editor-status[data-state="idle"] .editor-status__dot { background: var(--ink-3); }
+
+/* ---------- the note editor is one tall surface ---------- */
+.note-body { min-height: 56dvh; }
+
+/* ---------- fab, one per app, no tab bar to clear ---------- */
+.fab {
+  position: fixed;
+  z-index: 30;
+  right: max(var(--s4), calc((100vw - var(--frame-max)) / 2 + var(--s4)));
+  bottom: calc(env(safe-area-inset-bottom) + var(--s4));
+  width: var(--fab-size);
+  height: var(--fab-size);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--max);
+  border-radius: var(--r-pill);
+  background: var(--max);
+  color: var(--on-max);
+  cursor: pointer;
+}
+.fab:active { background: var(--max-press); }
+.fab[hidden] { display: none; }
+.fab .icon { width: 24px; height: 24px; stroke-width: 2; }
+
+/* ---------- scrim + sheet, used only by the feedback form ---------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+}
+.scrim.is-open { opacity: 1; }
+.scrim[hidden] { display: none; }
+
+.sheet {
+  position: fixed; z-index: 50;
+  left: 50%; bottom: 0;
+  width: 100%; max-width: var(--frame-max);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: var(--s2) var(--s4) calc(var(--s6) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface);
+  transform: translate(-50%, 100%);
+}
+.sheet.is-open { transform: translate(-50%, 0); }
+.sheet[hidden] { display: none; }
+
+.sheet__grab {
+  width: 36px; height: 4px;
+  margin: var(--s2) auto 0;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+}
+
+.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2); margin-top: var(--s2); }
+.sheet__title { font-size: 20px; line-height: 1.25; font-weight: 700; letter-spacing: -0.015em; }
+.sheet__sub { margin-top: var(--s1); font-size: 14px; color: var(--ink-2); }
+
+.sheet__form { margin-top: var(--s4); }
+.sheet__foot { margin-top: var(--s6); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { transition: transform var(--d-base) var(--ease); }
+  .scrim { transition: opacity var(--d-fast) var(--ease); }
+}
+
+
+/* ---------- documentation layer, after the product layer so its resets win ---------- */
+
+/* ============================================================
+   Revised design-system documentation.
+   Same tokens, same vocabulary, same 8pt grid as the five app files.
+   This page styles documentation, not product UI.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --page: #F4F4F1; --surface: #FFFFFF; --surface-sunken: #F7F7F4; --press: #ECECE9;
+  --ink: #1B1B1F; --ink-2: #58585E; --ink-3: #63636A;
+  --line: rgba(0, 0, 0, 0.08); --line-strong: #8A8A8A; --focus: #2A5D8F;
+  --max: #1B1B1F; --max-press: #2B2B30; --on-max: #FFFFFF;
+  --ok: #335B3F; --ok-soft: #EAF1EA;
+  --warn: #6E5A16; --warn-soft: #F5F0E0;
+  --danger: #8A3B3B; --danger-soft: #F6E9E9;
+  --chart-muted: #C9C9C6;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px;
+  --tap: 48px; --focus-ring: 2px;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1); --d-fast: 200ms; --d-base: 260ms;
+  --doc-max: 1120px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #16171A; --surface: #1E2024; --surface-sunken: #24262B; --press: #2C2F35;
+  --ink: #E9E7E2; --ink-2: #A9A79F; --ink-3: #96948D;
+  --line: rgba(255, 255, 255, 0.07); --line-strong: #767B84; --focus: #8FBCE8;
+  --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A;
+  --ok: #9FC0A3; --ok-soft: #202A21;
+  --warn: #D9C68A; --warn-soft: #2A2418;
+  --danger: #D98C86; --danger-soft: #2C1F1F;
+  --chart-muted: #3A3D43;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #16171A; --surface: #1E2024; --surface-sunken: #24262B; --press: #2C2F35;
+    --ink: #E9E7E2; --ink-2: #A9A79F; --ink-3: #96948D;
+    --line: rgba(255, 255, 255, 0.07); --line-strong: #767B84; --focus: #8FBCE8;
+    --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A;
+    --ok: #9FC0A3; --ok-soft: #202A21;
+    --warn: #D9C68A; --warn-soft: #2A2418;
+    --danger: #D98C86; --danger-soft: #2C1F1F;
+    --chart-muted: #3A3D43;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+  }
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  /* Warm off-white ground, the same one a screen paints. Cards and groups sit on
+     --surface above it. */
+  background: var(--page);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, p { margin: 0; }
+ul, ol { margin: 0; padding: 0; }
+code, kbd, samp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* ---------- shell ---------- */
+.wrap {
+  max-width: var(--doc-max);
+  margin-inline: auto;
+  padding: var(--s8) var(--s6) calc(var(--s8) * 2);
+}
+
+.masthead { border-bottom: 1px solid var(--line); padding-bottom: var(--s6); }
+.masthead__kicker {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.masthead h1 {
+  margin-top: var(--s2);
+  font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.025em;
+}
+.masthead p {
+  max-width: 62ch; margin-top: var(--s3);
+  font-size: 17px; line-height: 1.6; color: var(--ink-2);
+}
+.masthead__meta {
+  display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4);
+  margin-top: var(--s4); font-size: 13.5px; color: var(--ink-3);
+}
+
+/* ---------- theme + accent controls ---------- */
+.controls {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4);
+  margin: 0 calc(var(--s6) * -1); padding: var(--s3) var(--s6);
+  background: color-mix(in srgb, var(--page) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.controls__group { display: flex; align-items: center; gap: var(--s2); }
+.controls__label {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+/* ---------- sections ---------- */
+.section { margin-top: calc(var(--s8) * 1.5); scroll-margin-top: 72px; }
+.section > h2 {
+  font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.018em;
+  padding-top: var(--s4); border-top: 1px solid var(--line);
+}
+.section > h2 + p { max-width: 68ch; margin-top: var(--s2); color: var(--ink-2); }
+.section h3 {
+  margin-top: var(--s6);
+  font-size: 15px; font-weight: 650; letter-spacing: 0.01em;
+}
+.section h3 + p { max-width: 68ch; margin-top: var(--s1); font-size: 14.5px; color: var(--ink-2); }
+
+/* ---------- specimen surface ---------- */
+/* A specimen is a screen region: it paints the same off-white ground the apps do,
+   so every group, card and button inside it resolves against the real ground. */
+.specimen {
+  margin-top: var(--s4);
+  padding: var(--s6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--page);
+}
+.specimen__row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3);
+}
+.specimen__row + .specimen__row { margin-top: var(--s4); }
+.specimen__caption {
+  margin-top: var(--s3); font-size: 13px; color: var(--ink-3);
+}
+
+/* ---------- tables ---------- */
+.table { width: 100%; margin-top: var(--s3); border-collapse: collapse; font-size: 14px; }
+.table caption {
+  caption-side: top; text-align: left;
+  padding-bottom: var(--s2); font-size: 13px; color: var(--ink-3);
+}
+.table th, .table td {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.table th {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+.table td:first-child { white-space: nowrap; font-weight: 600; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- swatches ---------- */
+.swatches {
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+.swatch { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.swatch__chip {
+  height: 64px;
+  border-bottom: 1px solid var(--line);
+  /* a white chip needs its own visible edge, so this is a boundary (3.45:1),
+     not a hairline */
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+}
+.swatch__body { padding: var(--s2) var(--s3); }
+.swatch__name { font-size: 13px; font-weight: 650; }
+.swatch__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-2);
+}
+.swatch__role { margin-top: var(--s1); font-size: 12px; color: var(--ink-3); line-height: 1.35; }
+
+/* ---------- scale specimens ---------- */
+.type-row { display: flex; align-items: baseline; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--line); }
+.type-row:last-child { border-bottom: 0; }
+.type-row__meta {
+  flex: none; width: 190px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-3);
+}
+.type-row__sample { flex: 1; min-width: 0; }
+
+.space-row { display: flex; align-items: center; gap: var(--s4); padding: var(--s2) 0; }
+.space-row__bar { flex: none; height: 16px; background: var(--max); border-radius: 2px; }
+.space-row__label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; color: var(--ink-2);
+}
+.radius-row { display: flex; flex-wrap: wrap; gap: var(--s4); }
+.radius-demo {
+  width: 104px; height: 72px;
+  display: grid; place-items: center;
+  background: var(--surface-sunken); border: 1px solid var(--line-strong);
+  font-size: 12px; color: var(--ink-2);
+}
+
+/* ---------- notes, lists, callouts ---------- */
+.rule-list { margin-top: var(--s3); padding-left: var(--s5); list-style: disc; }
+.rule-list li { margin-top: var(--s2); max-width: 70ch; }
+.rule-list li::marker { color: var(--ink-3); }
+
+.callout {
+  margin-top: var(--s4); padding: var(--s4);
+  border: 1px solid var(--line); border-left: 3px solid var(--max);
+  border-radius: var(--r-md); background: var(--surface-sunken);
+}
+.callout__title { font-size: 14px; font-weight: 650; }
+.callout p { margin-top: var(--s1); font-size: 14px; color: var(--ink-2); }
+
+.tag-list { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.tag {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  height: 26px; padding: 0 var(--s2);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface-sunken);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-2);
+}
+
+/* ---------- two-up ---------- */
+.duo { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: var(--s4); }
+.pane {
+  padding: var(--s4);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  /* each pane carries its own scheme and paints the screen ground, so the
+     components inside resolve the tokens of the theme being demonstrated */
+  background: var(--page);
+}
+.pane__label {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  opacity: 0.62;
+}
+
+/* ---------- footer ---------- */
+.foot {
+  margin-top: calc(var(--s8) * 1.5); padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--ink-3);
+}
+
+@media (max-width: 720px) {
+  .wrap { padding: var(--s6) var(--s4) var(--s10); }
+  .masthead h1 { font-size: 30px; }
+  .type-row { flex-direction: column; gap: var(--s1); }
+  .type-row__meta { width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ---------- one accent per app, the same values the app files hard-code ---------- */
+/* The app stylesheet sets a default accent on :root, so the documented default is
+   restated here: ink as a fill until the toolbar picks an app. */
+:root, [data-theme="light"] { --max: #1B1B1F; --max-press: #2B2B30; --on-max: #FFFFFF; }
+[data-theme="dark"] { --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A; }
+[data-accent="notes"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="notes"], [data-accent="notes"] [data-theme="light"] { --max: #4F6B52; --max-press: #405743; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="notes"], [data-theme="dark"] [data-accent="notes"], [data-accent="notes"] [data-theme="dark"] { --max: #9FC0A3; --max-press: #B0CDB3; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="notes"]:not([data-theme="light"]) { --max: #9FC0A3; --max-press: #B0CDB3; --on-max: #16171A; } }
+[data-accent="todos"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="todos"], [data-accent="todos"] [data-theme="light"] { --max: #2F5F61; --max-press: #254B4D; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="todos"], [data-theme="dark"] [data-accent="todos"], [data-accent="todos"] [data-theme="dark"] { --max: #82B5B6; --max-press: #97C5C6; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="todos"]:not([data-theme="light"]) { --max: #82B5B6; --max-press: #97C5C6; --on-max: #16171A; } }
+[data-accent="meals"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="meals"], [data-accent="meals"] [data-theme="light"] { --max: #8B5A45; --max-press: #744A38; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="meals"], [data-theme="dark"] [data-accent="meals"], [data-accent="meals"] [data-theme="dark"] { --max: #DCA489; --max-press: #E4B39C; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="meals"]:not([data-theme="light"]) { --max: #DCA489; --max-press: #E4B39C; --on-max: #16171A; } }
+[data-accent="pomodoro"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="pomodoro"], [data-accent="pomodoro"] [data-theme="light"] { --max: #5A5285; --max-press: #4A4470; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="pomodoro"], [data-theme="dark"] [data-accent="pomodoro"], [data-accent="pomodoro"] [data-theme="dark"] { --max: #B6AEDC; --max-press: #C7C1E6; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="pomodoro"]:not([data-theme="light"]) { --max: #B6AEDC; --max-press: #C7C1E6; --on-max: #16171A; } }
+[data-accent="feedback"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="feedback"], [data-accent="feedback"] [data-theme="light"] { --max: #6F5570; --max-press: #5B455C; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="feedback"], [data-theme="dark"] [data-accent="feedback"], [data-accent="feedback"] [data-theme="dark"] { --max: #C4A9C6; --max-press: #D0BACF; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="feedback"]:not([data-theme="light"]) { --max: #C4A9C6; --max-press: #D0BACF; --on-max: #16171A; } }
+
+/* ---------- specimen framing ---------- */
+.specimen .frame { border: 0; min-height: 0; padding-bottom: 0; max-width: none; }
+.specimen .panel { padding: 0; }
+.doc-note { font-size: 13px; color: var(--ink-3); margin-top: var(--s2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" focusable="false" class="sprite">
+  <defs>
+    <symbol id="i-notes" viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-todos" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></symbol>
+    <symbol id="i-meals" viewBox="0 0 24 24"><path d="M4 11h16"/><path d="M5.5 11a6.5 6.5 0 0013 0"/><path d="M12 17.5V20"/><path d="M9 20h6"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2"/><path d="M9.5 3h5"/></symbol>
+    <symbol id="i-feedback" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v7a2.5 2.5 0 01-2.5 2.5H9l-5 4z"/><path d="M8.5 9h7M8.5 12h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5l-7 7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9.5 5l7 7-7 7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" stroke-width="2.75"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l4.5 4.5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5l10 6.5-10 6.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5.5v13M15 5.5v13"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"/><path d="M4.5 5v4.5H9"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 20v-6M12.5 20V9M17 20v-4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9 7V5h6v2"/><path d="M6.5 7l1 12h9l1-12"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="14" rx="2.5"/><path d="M4 10.5h16M8.5 4v4M15.5 4v4"/></symbol>
+  </defs>
+</svg>
+<div class="wrap">
+  <header class="masthead">
+    <p class="masthead__kicker">Personal Life · revised</p>
+    <h1>Revised component specimens</h1>
+    <p>
+      Every primitive from the five revised apps, rendered with the same stylesheet the apps ship. Switch the theme or
+      the accent above and the whole page follows — nothing here is a screenshot.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="controls__group">
+      <span class="controls__label">Theme</span>
+      <div class="seg" role="group" aria-label="Theme">
+        <button class="seg__btn" type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button class="seg__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+        <button class="seg__btn" type="button" data-theme-set="system" aria-pressed="true">System</button>
+      </div>
+    </div>
+    <div class="controls__group">
+      <span class="controls__label">Accent</span>
+      <div class="seg" role="group" aria-label="Accent">
+        <button class="seg__btn" type="button" data-accent-set="neutral" aria-pressed="true">Neutral</button>
+        <button class="seg__btn" type="button" data-accent-set="notes" aria-pressed="false">Notes</button>
+        <button class="seg__btn" type="button" data-accent-set="todos" aria-pressed="false">Tasks</button>
+        <button class="seg__btn" type="button" data-accent-set="meals" aria-pressed="false">Meals</button>
+        <button class="seg__btn" type="button" data-accent-set="pomodoro" aria-pressed="false">Focus</button>
+        <button class="seg__btn" type="button" data-accent-set="feedback" aria-pressed="false">Feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="buttons">
+    <h2>Buttons</h2>
+    <p>One primary action per screen. Ghost for the second, danger tint for destructive, never both filled.</p>
+    <div class="specimen">
+      <div class="specimen__row">
+        <button class="btn" type="button" style="width:auto">Start focus</button>
+        <button class="btn btn--ghost" type="button" style="width:auto">Reset</button>
+        <button class="btn btn--danger" type="button" style="width:auto">Delete note</button>
+        <button class="btn" type="button" style="width:auto" disabled>Save</button>
+      </div>
+      <div class="specimen__row">
+        <button class="btn" type="button" style="width:auto"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-play"></use></svg> Start focus</button>
+        <button class="btn btn--ghost" type="button" style="width:auto">Save as reusable meal</button>
+      </div>
+      <div class="specimen__row" style="max-width:414px">
+        <button class="btn" type="button">Save meal</button>
+      </div>
+      <p class="specimen__caption">Primary fill is the app accent. Disabled drops to 50% opacity and stops receiving pointer events.</p>
+    </div>
+  </section>
+
+  <section class="section" id="icon-buttons">
+    <h2>Icon buttons and the floating action</h2>
+    <p>A 22px glyph inside a 48px target. The FAB is the list screens' only create affordance.</p>
+    <div class="specimen">
+      <div class="specimen__row">
+        <button class="iconbtn" type="button" aria-label="Settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg></button>
+        <button class="iconbtn" type="button" aria-label="Stats"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+        <button class="iconbtn" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button>
+        <button class="iconbtn" type="button" aria-label="Save"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>
+        <button class="iconbtn" type="button" aria-label="Back"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-back"></use></svg></button>
+        <span class="fab" style="position:static;transform:none;display:grid" aria-hidden="true"><svg class="icon"><use href="#i-plus"></use></svg></span>
+      </div>
+      <p class="specimen__caption">The FAB is shown in place here; in the apps it floats above the safe area, bottom-right.</p>
+    </div>
+  </section>
+
+  <section class="section" id="rows">
+    <h2>Rows and grouped lists</h2>
+    <p>A row is one title, one meta line, and an optional trail. Groups get a 1px hairline between rows, never a divider of their own.</p>
+    <div class="specimen" style="max-width:414px">
+      <p class="slabel">Recent<span class="slabel__count">4 notes</span></p>
+      <div class="group">
+        <div class="list__item">
+          <div class="row">
+            <span class="row__main"><span class="row__title">Quiet mornings, three rules</span><span class="row__meta">Today, 08:14 · home</span></span>
+          <span class="row__trail"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-chev"></use></svg></span>
+          </div>
+        </div>
+        <div class="list__item">
+          <div class="row">
+            <span class="row__main"><span class="row__title">Questions before Thursday&rsquo;s call</span><span class="row__meta">Yesterday, 19:02 · health</span></span>
+          <span class="row__trail"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-chev"></use></svg></span>
+          </div>
+        </div>
+        <div class="list__item">
+          <div class="row row--done">
+            <span class="row__main"><span class="row__title">Water the plants</span><span class="row__meta">Done 09:12</span></span>
+          </div>
+        </div>
+        <div class="list__item">
+          <div class="row" data-static="true">
+            <span class="row__main"><span class="row__title">Daily goal</span></span>
+            <span class="row__trail"><span class="pill pill--neutral">100 min</span></span>
+          </div>
+        </div>
+      </div>
+      <p class="specimen__caption">Rows 1–2 navigate, row 3 is done, row 4 is inert (<code>data-static</code>) and carries a value instead of a chevron.</p>
+    </div>
+
+    <h3>Row with a checkbox</h3>
+    <div class="specimen" style="max-width:414px">
+      <div class="group">
+        <div class="list__item">
+          <div class="row">
+            <button class="check" type="button" role="checkbox" aria-checked="false" aria-label="Complete: Send meter reading">
+              <span class="check__box" aria-hidden="true"><svg class="icon check__glyph"><use href="#i-check"></use></svg></span>
+            </button>
+            <button class="row__main row__main--btn" type="button">
+              <span class="row__title">Send meter reading</span>
+              <span class="row__meta">Due yesterday</span>
+            </button>
+            <span class="row__trail"><span class="pill pill--danger">Overdue</span></span>
+          </div>
+        </div>
+        <div class="list__item">
+          <div class="row row--done">
+            <button class="check" type="button" role="checkbox" aria-checked="true" aria-label="Mark not done: Take out recycling">
+              <span class="check__box" aria-hidden="true"><svg class="icon check__glyph"><use href="#i-check"></use></svg></span>
+            </button>
+            <span class="row__main">
+              <span class="row__title">Take out recycling</span>
+              <span class="row__meta">Done 08:03</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p class="specimen__caption">The checkbox and the text are two sibling buttons, never one inside the other.</p>
+    </div>
+  </section>
+
+  <section class="section" id="pills">
+    <h2>Pills and section labels</h2>
+    <p>A pill is a word with a tint. Never a tint alone, never a coloured dot without its label.</p>
+    <div class="specimen">
+      <div class="specimen__row">
+        <span class="pill pill--neutral">Open</span>
+        <span class="pill pill--warn">In progress</span>
+        <span class="pill pill--ok">Done</span>
+        <span class="pill pill--danger">Overdue</span>
+        <span class="pill pill--neutral">360 kcal</span>
+        <span class="pill pill--ok">50 min</span>
+      </div>
+      <div class="specimen__row" style="max-width:414px;display:block">
+        <p class="slabel">Breakfast<span class="slabel__count">360 kcal</span></p>
+        <p class="slabel" style="margin-top:0">Done<span class="slabel__count">2 tasks</span></p>
+      </div>
+      <div class="specimen__row">
+        <span class="status"><span class="status__dot"></span>Saved</span>
+        <span class="status" data-state="idle"><span class="status__dot"></span>No change yet</span>
+        <span class="editor-status" data-state="saved"><span class="editor-status__dot"></span>Saved</span>
+        <span class="editor-status" data-state="idle"><span class="editor-status__dot"></span>Saving&hellip;</span>
+      </div>
+      <p class="specimen__caption">Two read-outs: the older <code>.status</code> and the editor's <code>.editor-status</code>. Both announce through <code>role="status"</code>.</p>
+    </div>
+  </section>
+
+  <section class="section" id="chips">
+    <h2>Chips and segmented controls</h2>
+    <p>Chips filter a list. A segmented control swaps a whole view. Both are real buttons with <code>aria-pressed</code>.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="filters" role="group" aria-label="Filter by tag" style="margin-inline:0;padding-inline:0">
+        <button class="chip" type="button" aria-pressed="true">All</button>
+        <button class="chip" type="button" aria-pressed="false">home</button>
+        <button class="chip" type="button" aria-pressed="false">work</button>
+        <button class="chip" type="button" aria-pressed="false">health</button>
+      </div>
+      <div class="seg" role="group" aria-label="Task view" style="margin-top:16px">
+        <button class="seg__btn" type="button" aria-pressed="true">Today</button>
+        <button class="seg__btn" type="button" aria-pressed="false">Matrix</button>
+      </div>
+      <div class="seg" role="group" aria-label="Focus length" style="margin-top:16px">
+        <button class="seg__btn" type="button" aria-pressed="false">15 min</button>
+        <button class="seg__btn" type="button" aria-pressed="true">25 min</button>
+        <button class="seg__btn" type="button" aria-pressed="false">50 min</button>
+      </div>
+      <div class="seg seg--theme" role="group" aria-label="Appearance" style="margin-top:16px">
+        <button class="seg__btn" type="button" aria-pressed="false">Light</button>
+        <button class="seg__btn" type="button" aria-pressed="false">Dark</button>
+        <button class="seg__btn" type="button" aria-pressed="true">System</button>
+      </div>
+      <p class="specimen__caption">The Appearance control is the first section of every app's Settings.</p>
+    </div>
+  </section>
+
+  <section class="section" id="fields">
+    <h2>Fields</h2>
+    <p>Every field is 48px tall with a 1px boundary, and shows a 2px focus ring on <code>:focus-visible</code>.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="search">
+        <svg class="icon icon--sm" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="visually-hidden" for="doc-q">Search notes</label>
+        <input id="doc-q" type="search" placeholder="Search notes" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field__label" for="doc-title">Title</label>
+        <input class="input" id="doc-title" type="text" value="Portion picker skips 5 g steps">
+      </div>
+      <div class="field">
+        <label class="field__label" for="doc-body">What happened</label>
+        <textarea class="textarea textarea--sm" id="doc-body">Stepping down from 100 g lands on 90 then 80. I want 95.</textarea>
+      </div>
+      <div class="field">
+        <label class="field__label" for="doc-status">Status</label>
+        <select class="select" id="doc-status" style="width:100%">
+          <option>Open</option>
+          <option>In progress</option>
+          <option>Done</option>
+          <option>Won&rsquo;t do</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="visually-hidden" for="doc-note">Note body</label>
+        <textarea class="textarea note-body" id="doc-note" style="min-height:180px">Three rules that keep the morning quiet:
+
+1. No screens before the kettle boils.
+2. One task on the counter, not a list.
+3. If the plan changes, the plan was wrong, not me.</textarea>
+      </div>
+      <p class="specimen__caption">The last one is the note editor: one surface, no title field, first line is the title.</p>
+    </div>
+  </section>
+
+  <section class="section" id="switches">
+    <h2>Switches inside rows</h2>
+    <p>A setting that is on or off is a button with <code>aria-pressed</code> and its state written out.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="group">
+        <div class="row" data-static="true">
+          <span class="row__main"><span class="row__title">Matrix lens</span><span class="row__meta">Adds a second view of the same tasks.</span></span>
+          <button class="row__switch" type="button" aria-pressed="true">On</button>
+        </div>
+        <div class="row" data-static="true">
+          <span class="row__main"><span class="row__title">Matrix lens</span><span class="row__meta">Hidden while off.</span></span>
+          <button class="row__switch" type="button" aria-pressed="false">Off</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="cards">
+    <h2>Cards, KPI and progress</h2>
+    <p>A card is a hairline plus a faint ambient shadow. Progress is a filled track; the value is always written beside it.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="card">
+        <p class="row__meta">Logged so far</p>
+        <div class="kpi__row"><span class="kpi">1,180</span><span class="kpi__unit">of 2,050 kcal</span></div>
+        <div class="track mt3" role="img" aria-label="58 percent of the daily energy target"><div class="track__fill" style="width:58%"></div></div>
+        <div class="macro">
+          <span class="macro__label">Protein</span>
+          <div class="track" role="img" aria-label="62 grams of protein toward 120"><div class="track__fill" style="width:52%"></div></div>
+          <span class="macro__value">62 / 120 g</span>
+        </div>
+        <div class="macro">
+          <span class="macro__label">Carbs</span>
+          <div class="track" role="img" aria-label="131 grams of carbohydrate toward 220"><div class="track__fill" style="width:60%"></div></div>
+          <span class="macro__value">131 / 220 g</span>
+        </div>
+        <div class="macro">
+          <span class="macro__label">Fat</span>
+          <div class="track" role="img" aria-label="39 grams of fat toward 68"><div class="track__fill" style="width:57%"></div></div>
+          <span class="macro__value">39 / 68 g</span>
+        </div>
+      </div>
+      <p class="specimen__caption">Each track carries an <code>aria-label</code> with its own numbers, so the bar is not the only carrier.</p>
+    </div>
+
+    <h3>Facts table</h3>
+    <div class="specimen" style="max-width:414px">
+      <div class="card">
+        <div class="facts">
+          <div class="fact"><span>Due</span><span class="fact__v">Today, 17:00</span></div>
+          <div class="fact"><span>List</span><span class="fact__v">Errands</span></div>
+          <div class="fact"><span>Tags</span><span class="fact__v">health</span></div>
+          <div class="fact"><span>Repeat</span><span class="fact__v">Monthly, day 30</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="focus">
+    <h2>Focus timer</h2>
+    <p>A countdown, a progress bar, four session dots, one primary button whose label names the next phase.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="card">
+        <p class="timer__phase">Focus</p>
+        <p class="timer__time" role="timer">25:00</p>
+        <p class="timer__hint" role="status">Ready when you are.</p>
+        <div class="track mt3" role="img" aria-label="0 percent of this focus block complete"><div class="track__fill" style="width:0%"></div></div>
+        <div class="filters filters--inset" role="group" aria-label="Focus length" style="margin-inline:0;padding-inline:0">
+          <button class="chip" type="button" aria-pressed="false">15 min</button>
+          <button class="chip" type="button" aria-pressed="true">25 min</button>
+          <button class="chip" type="button" aria-pressed="false">50 min</button>
+        </div>
+        <div class="dots" role="img" aria-label="One of four focus blocks finished">
+          <span class="dot dot--on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <div class="btn-row">
+          <button class="btn grow" type="button" aria-pressed="false">
+            <svg class="icon icon--sm" aria-hidden="true"><use href="#i-play"></use></svg> Start
+          </button>
+          <button class="btn btn--ghost no-grow" type="button" aria-label="Reset session">
+            <svg class="icon icon--sm" aria-hidden="true"><use href="#i-reset"></use></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <h3>Chart</h3>
+    <div class="specimen" style="max-width:414px">
+      <div class="card card--flush chart-box">
+        <svg class="chart" viewBox="0 0 340 168" role="img" aria-label="Focus minutes per day for the last seven days. Total 155 minutes.">
+          <line class="chart__grid" x1="28" y1="130" x2="336" y2="130"></line>
+          <line class="chart__grid" x1="28" y1="80" x2="336" y2="80"></line>
+          <line class="chart__grid" x1="28" y1="30" x2="336" y2="30"></line>
+          <line class="chart__target" x1="28" y1="62" x2="336" y2="62"></line>
+          <rect class="chart__bar" x="34" y="92" width="20" height="38" rx="3"></rect>
+          <rect class="chart__bar" x="82" y="55" width="20" height="75" rx="3"></rect>
+          <rect class="chart__bar chart__bar--muted" x="130" y="130" width="20" height="0" rx="3"></rect>
+          <rect class="chart__bar" x="178" y="92" width="20" height="38" rx="3"></rect>
+          <rect class="chart__bar" x="226" y="42" width="20" height="88" rx="3"></rect>
+          <rect class="chart__bar" x="274" y="92" width="20" height="38" rx="3"></rect>
+          <rect class="chart__bar" x="322" y="55" width="14" height="75" rx="3"></rect>
+          <text class="chart__label" x="44" y="146" text-anchor="middle">T</text>
+          <text class="chart__label" x="92" y="146" text-anchor="middle">F</text>
+          <text class="chart__label" x="140" y="146" text-anchor="middle">S</text>
+          <text class="chart__label" x="188" y="146" text-anchor="middle">S</text>
+          <text class="chart__label" x="236" y="146" text-anchor="middle">M</text>
+          <text class="chart__label" x="284" y="146" text-anchor="middle">T</text>
+          <text class="chart__label" x="329" y="146" text-anchor="middle">W</text>
+        </svg>
+      </div>
+      <p class="specimen__caption">Drawn inline with SVG. The dashed line is the daily goal; a zero day is a muted stub, not a gap.</p>
+    </div>
+  </section>
+
+  <section class="section" id="matrix">
+    <h2>Matrix</h2>
+    <p>Four quadrants the same width. An empty quadrant says so instead of collapsing.</p>
+    <div class="specimen" style="max-width:414px">
+      <div class="matrix">
+        <div class="quad">
+          <p class="quad__label">Do now</p>
+          <div class="quad__list"><button class="quad__item" type="button">Send meter reading</button></div>
+        </div>
+        <div class="quad">
+          <p class="quad__label">Plan</p>
+          <div class="quad__list"><button class="quad__item" type="button">Write two lines of the report</button></div>
+        </div>
+        <div class="quad">
+          <p class="quad__label">Quick</p>
+          <div class="quad__list"><button class="quad__item" type="button">Refill prescription</button></div>
+        </div>
+        <div class="quad">
+          <p class="quad__label">Drop</p>
+          <p class="quad__empty">Nothing here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="empty">
+    <h2>Empty states</h2>
+    <p>A heading stays, and one sentence says what happens next.</p>
+    <div class="specimen" style="max-width:414px">
+      <p class="slabel" style="margin-top:0">Dinner<span class="slabel__count">Not logged</span></p>
+      <div class="empty">
+        <p class="empty__title">Nothing yet.</p>
+        <p class="empty__body">870 kcal left for the day.</p>
+      </div>
+      <div class="empty" style="margin-top:16px">
+        <p class="empty__title">Nothing matches.</p>
+        <p class="empty__body">Clear the search or pick All.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="sheet">
+    <h2>Bottom sheet</h2>
+    <p>The feedback form is the only sheet in the system. Grab handle, title, close, backdrop, Escape.</p>
+    <div class="specimen">
+      <div class="sheet" style="position:static;transform:none;max-width:none;max-height:none;border-radius:16px;border:1px solid var(--line);overflow:visible">
+        <div class="sheet__grab"></div>
+        <div class="sheet__head">
+          <div>
+            <h2 class="sheet__title">Send feedback</h2>
+            <p class="sheet__sub">One thing. It goes to the inbox, not to a ticket queue.</p>
+          </div>
+          <button class="iconbtn" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button>
+        </div>
+        <div class="sheet__form">
+          <div class="seg seg--theme" role="group" aria-label="Kind of feedback">
+            <button class="seg__btn" type="button" aria-pressed="true">Problem</button>
+            <button class="seg__btn" type="button" aria-pressed="false">Idea</button>
+            <button class="seg__btn" type="button" aria-pressed="false">Praise</button>
+          </div>
+          <div class="field">
+            <label class="field__label" for="doc-sheet-title">Title</label>
+            <input class="input" id="doc-sheet-title" type="text" value="Portion picker skips 5 g steps">
+          </div>
+          <div class="field">
+            <label class="field__label" for="doc-sheet-body">What happened</label>
+            <textarea class="textarea textarea--sm" id="doc-sheet-body">Stepping down from 100 g lands on 90 then 80.</textarea>
+          </div>
+          <div class="sheet__foot">
+            <button class="btn" type="button">Send</button>
+          </div>
+        </div>
+      </div>
+      <p class="specimen__caption">Shown in place. In the app it travels up from the bottom edge over a dimmed backdrop.</p>
+    </div>
+  </section>
+
+  <section class="section" id="screens">
+    <h2>Screen compositions</h2>
+    <p>The primitives above, arranged the way the apps arrange them. These are full 414px screens, not diagrams.</p>
+
+    <h3>Settings — the one screen shape all five apps share</h3>
+    <div class="specimen specimen--phone" style="max-width:414px">
+      <div class="panel">
+        <div class="subnav">
+          <button class="backlink" type="button"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-back"></use></svg> Notes</button>
+        </div>
+        <h1 class="h1 mt2">Settings</h1>
+
+        <p class="slabel">Appearance</p>
+        <div class="group">
+          <div class="seg seg--theme" role="group" aria-label="Appearance">
+            <button class="seg__btn" type="button" aria-pressed="false">Light</button>
+            <button class="seg__btn" type="button" aria-pressed="false">Dark</button>
+            <button class="seg__btn" type="button" aria-pressed="true">System</button>
+          </div>
+        </div>
+
+        <p class="slabel">Comfort</p>
+        <div class="group">
+          <div class="row" data-static="true">
+            <span class="row__main"><span class="row__title">Reduce motion</span><span class="row__meta">Follows the system setting.</span></span>
+            <span class="row__trail"><span class="pill pill--neutral">System</span></span>
+          </div>
+          <div class="row" data-static="true">
+            <span class="row__main"><span class="row__title">Larger text</span><span class="row__meta">Follows Dynamic Type.</span></span>
+            <span class="row__trail"><span class="pill pill--neutral">System</span></span>
+          </div>
+        </div>
+
+        <p class="slabel">Support</p>
+        <div class="group">
+          <button class="row" type="button">
+            <span class="row__main"><span class="row__title">Send feedback</span><span class="row__meta">Tell us what got in the way.</span></span>
+            <span class="row__trail"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-chev"></use></svg></span>
+          </button>
+        </div>
+
+        <p class="row__meta mt4">Personal Life · prototype</p>
+      </div>
+    </div>
+
+    <h3>Editor header — cancel, title, commit</h3>
+    <div class="specimen specimen--phone" style="max-width:414px">
+      <div class="panel">
+        <div class="subnav">
+          <button class="iconbtn" type="button" aria-label="Cancel"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button>
+          <span class="h1" style="font-size:17px;font-weight:600;margin-left:12px">New Note</span>
+          <span class="ml-auto"></span>
+          <button class="iconbtn" type="button" aria-label="Save"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>
+        </div>
+        <p class="editor-status" data-state="saved"><span class="editor-status__dot"></span>Saved</p>
+        <p class="row__meta">Today, 08:14 · home</p>
+        <div class="field">
+          <label class="visually-hidden" for="doc-editor">Note body</label>
+          <textarea class="textarea note-body" id="doc-editor" style="min-height:220px">Three rules that keep the morning quiet:</textarea>
+        </div>
+        <div class="subfoot">
+          <button class="btn btn--ghost" type="button">Delete note</button>
+        </div>
+      </div>
+      <p class="specimen__caption">No Save row at the foot. The checkmark commits, the X leaves, the status line reports.</p>
+    </div>
+
+    <h3>Detail header — back link names its parent</h3>
+    <div class="specimen specimen--phone" style="max-width:414px">
+      <div class="panel">
+        <div class="subnav">
+          <button class="backlink" type="button"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-back"></use></svg> Meals</button>
+          <span class="status ml-auto">Review meal</span>
+        </div>
+        <h1 class="h1 mt2">Lunch</h1>
+        <p class="row__meta mt2">Thursday, 30 October · 12:40</p>
+        <div class="card mt4">
+          <div class="kpi__row mt0"><span class="kpi">820</span><span class="kpi__unit">kcal</span></div>
+          <div class="facts mt3">
+            <div class="fact"><span>Protein</span><span class="fact__v">41 g</span></div>
+            <div class="fact"><span>Carbs</span><span class="fact__v">96 g</span></div>
+            <div class="fact"><span>Fat</span><span class="fact__v">27 g</span></div>
+          </div>
+        </div>
+        <div class="subfoot">
+          <button class="btn" type="button">Save meal</button>
+          <button class="btn btn--ghost" type="button">Save as reusable meal</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">
+    Personal Life · revised component specimens · the stylesheet under these specimens is the one the app files ship.
+    See <a href="revised-design-system.html">the revised design system</a> for tokens, type, spacing and the accessibility contract.
+  </p>
+</div>
+<script>
+
+(function () {
+  'use strict';
+  var root = document.documentElement;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* ---------------- theme ---------------- */
+  function setTheme(choice) {
+    if (choice === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', choice);
+    try { localStorage.setItem('calm-theme', choice); } catch (e) {}
+    $$('[data-theme-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.themeSet === choice ? 'true' : 'false');
+    });
+  }
+  var saved = 'system';
+  try { saved = localStorage.getItem('calm-theme') || 'system'; } catch (e) {}
+  setTheme(saved);
+  $$('[data-theme-set]').forEach(function (b) {
+    b.addEventListener('click', function () { setTheme(b.dataset.themeSet); });
+  });
+
+  /* ---------------- accent ---------------- */
+  function setAccent(name) {
+    if (name === 'neutral') root.removeAttribute('data-accent');
+    else root.setAttribute('data-accent', name);
+    try { localStorage.setItem('calm-accent', name); } catch (e) {}
+    $$('[data-accent-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.accentSet === name ? 'true' : 'false');
+    });
+  }
+  var savedAccent = 'neutral';
+  try { savedAccent = localStorage.getItem('calm-accent') || 'neutral'; } catch (e) {}
+  setAccent(savedAccent);
+  $$('[data-accent-set]').forEach(function (b) {
+    b.addEventListener('click', function () { setAccent(b.dataset.accentSet); });
+  });
+})();
+
+</script>
+</body>
+</html>
