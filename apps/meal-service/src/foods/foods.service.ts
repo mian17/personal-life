@@ -1,17 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import {
   completeVector,
   foodNameAad,
@@ -25,7 +27,7 @@ import { Food, type FoodUnit } from './food.entity';
 import { Serving } from './serving.entity';
 import type { CreateFoodDto, ServingInputDto } from './dto/create-food.dto';
 import type { UpdateFoodDto } from './dto/update-food.dto';
-import { FoodsCache, toCachedFoodRow, toCachedServing, type CachedFoodRow } from './foods-cache';
+import { FoodsCache, toCachedFoodRow, type CachedFoodRow } from './foods-cache';
 
 /** The wire shape of a serving: label, amount (in the food's unit), and its complete per-serving vector. */
 export interface ServingDto {
@@ -107,7 +109,40 @@ export class FoodsService {
     @InjectRepository(Serving) private readonly servings: Repository<Serving>,
     private readonly cache: FoodsCache,
     private readonly keys: KeysService,
+    // Optional only so the unit suites that build this service positionally keep
+    // compiling; `FoodsModule` always provides the token, so a batch always has
+    // the service's one cache adapter to bump.
+    @Inject(MEAL_CACHE) private readonly mealCache?: MealCache,
   ) {}
+
+  /**
+   * The service's one cache adapter, as the batch kernel types it. The resource
+   * cache helper composes the adapter rather than extending it, so a batch hands
+   * the kernel the adapter itself — one bump then invalidates this owner's whole
+   * read set (`SPEC-meal-service.md` §6).
+   *
+   * The module always provides the token, so this never throws under Nest; the
+   * typed throw only guards a hand-built service in a unit suite.
+   */
+  private requireMealCache(): MealCache {
+    if (!this.mealCache) {
+      throw new Error('MEAL_CACHE is unavailable: the batch cache adapter is not wired');
+    }
+    return this.mealCache;
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * go to, taken from the injected repository instead of a fifth constructor
+   * argument so the existing suites that build this service positionally keep
+   * compiling.
+   *
+   * ponytail: upgrade path is `@InjectDataSource()` once those suites are
+   * converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.foods.manager.connection;
+  }
 
   /**
    * Decrypt-or-passthrough (`SPEC-meal-service` Code Style, mirroring
@@ -237,13 +272,44 @@ export class FoodsService {
     return this.toDto(row, sub, dek);
   }
 
+  /** `POST /api/foods` — 201 with the sealed catalog row. */
   async create(sub: string, dto: CreateFoodDto): Promise<FoodDto> {
+    const food = await this.insertOne(this.foods.manager, sub, dto);
+    // Bump AFTER the mutation: pre-write reads were born under the old
+    // generation and die here; a thrown save never bumps.
+    await this.cache.bump(sub);
+    return food;
+  }
+
+  /** The `foods` batch create: one transaction, submission order, one bump (§5). */
+  async createMany(sub: string, items: CreateFoodDto[]): Promise<FoodDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+  }
+
+  /**
+   * One food's insert plus its serving rows, through the manager the caller
+   * supplies, and with no bump. Every write here — the food row and each
+   * serving — goes through `manager`, so a batch's nested servings roll back
+   * with their food.
+   */
+  private async insertOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    dto: CreateFoodDto,
+  ): Promise<FoodDto> {
+    const foods = this.foodsFor(manager);
     // Service-generated id: the AAD binds it, so it exists before the ciphertext.
     const id = randomUUID();
     const dek = await this.keys.getOrCreateDek(sub);
     const base = dto.nutrients === undefined ? null : this.requireVector(dto.nutrients);
 
-    const food = this.foods.create({
+    const food = foods.create({
       id,
       ownerSub: sub,
       name: encryptField(dek, dto.name, foodNameAad(sub, id)),
@@ -253,31 +319,57 @@ export class FoodsService {
       version: 0,
       deletedAt: null,
     });
-    const saved = await this.foods.save(food);
+    const saved = await foods.save(food);
     const servings = await this.replaceServings(
+      manager,
       sub,
       saved,
       base ?? zeroVector(),
       normalizePortions(dto.portions),
       dek,
     );
-
-    // Bump AFTER the mutation: pre-write reads were born under the old
-    // generation and die here; a thrown save never bumps.
-    await this.cache.bump(sub);
-    return this.toDto(
-      { ...toCachedFoodRow(saved), servings: servings.map((s) => toCachedServing(s)) },
-      sub,
-      dek,
-    );
+    return this.toDto(toCachedFoodRow({ ...saved, servings }), sub, dek);
   }
 
+  /** `PATCH /api/foods/:id` — a stale `expectedVersion` is a 409. */
   async update(sub: string, id: string, dto: UpdateFoodDto): Promise<FoodDto> {
-    const food = await this.foods.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    const food = await this.updateOne(this.foods.manager, sub, id, dto);
+    await this.cache.bump(sub);
+    return food;
+  }
+
+  /**
+   * The `foods` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` or one invalid nutrient vector rolls the whole batch
+   * back.
+   */
+  async updateMany(
+    sub: string,
+    items: (UpdateFoodDto & { id: string })[]
+  ): Promise<FoodDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+  }
+
+  /**
+   * One food's patch plus its serving set, through the manager the caller
+   * supplies, and with no bump.
+   */
+  private async updateOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+    dto: UpdateFoodDto,
+  ): Promise<FoodDto> {
+    const foods = this.foodsFor(manager);
+    const food = await foods.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!food) throw new NotFoundException('Food not found');
-    if (dto.expectedVersion !== undefined && food.version !== dto.expectedVersion) {
-      throw new ConflictException('Food was modified');
-    }
+    this.rejectStaleVersion(food, dto.expectedVersion);
 
     const dek = await this.keys.getOrCreateDek(sub);
     const base = dto.nutrients === undefined ? null : this.requireVector(dto.nutrients);
@@ -293,41 +385,116 @@ export class FoodsService {
     }
 
     food.version += 1;
-    const saved = await this.foods.save(food);
+    const saved = await foods.save(food);
+    const servings = await this.reconcileServings(manager, sub, saved, base, baseChanged, dto, dek);
+    return this.toDto(toCachedFoodRow({ ...saved, servings }), sub, dek);
+  }
 
-    // The serving set is replaced when the client sends one, re-derived when the
-    // vector or serving weight moved, and otherwise left untouched — so a
-    // serving can never disagree with the food it belongs to. Re-deriving a
-    // changed base needs the vector, so a PATCH that moves `servingGrams`
-    // without `nutrients` reuses the food's stored base (decrypted once here).
-    let servings: Serving[];
+  /**
+   * The serving set a patch leaves behind: replaced when the client sends one,
+   * re-derived when the vector or serving weight moved, otherwise untouched — so
+   * a serving can never disagree with the food it belongs to.
+   */
+  private async reconcileServings(
+    manager: EntityManager | undefined,
+    sub: string,
+    food: Food,
+    base: NutrientVector | null,
+    baseChanged: boolean,
+    dto: UpdateFoodDto,
+    dek: Buffer,
+  ): Promise<Serving[]> {
     if (dto.portions !== undefined) {
       if (base === null) {
         throw new BadRequestException('nutrients are required to replace portions');
       }
-      servings = await this.replaceServings(sub, saved, base, normalizePortions(dto.portions), dek);
-    } else if (baseChanged || dto.servingGrams !== undefined) {
-      const effectiveBase = base ?? this.storedBaseVector(sub, saved, dek);
-      servings = await this.deriveServings(sub, saved, effectiveBase, dek);
-    } else {
-      servings = await this.servings.find({ where: { foodId: saved.id, ownerSub: sub } });
-      servings.sort((a, b) => a.id.localeCompare(b.id));
+      return this.replaceServings(manager, sub, food, base, normalizePortions(dto.portions), dek);
     }
-
-    await this.cache.bump(sub);
-    return this.toDto(
-      { ...toCachedFoodRow(saved), servings: servings.map((s) => toCachedServing(s)) },
-      sub,
-      dek,
-    );
+    if (baseChanged || dto.servingGrams !== undefined) {
+      // Re-deriving a changed base needs the vector, so a PATCH that moves
+      // `servingGrams` without `nutrients` reuses the food's stored base.
+      const effectiveBase = base ?? this.storedBaseVector(sub, food, dek);
+      return this.deriveServings(manager, sub, food, effectiveBase, dek);
+    }
+    return this.readServings(manager, sub, food);
   }
 
+  /** `DELETE /api/foods/:id` — soft delete; the row stays readable by id only. */
   async remove(sub: string, id: string): Promise<void> {
-    const food = await this.foods.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    await this.softDeleteOne(this.foods.manager, sub, id);
+    await this.cache.bump(sub);
+  }
+
+  /**
+   * The `foods` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning. A foreign id is a 404 and rolls
+   * the whole batch back.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
+    });
+    return { deleted };
+  }
+
+  /**
+   * One food's move out of the active list, through the manager the caller
+   * supplies, and with no bump. Soft by definition, mirroring the singular
+   * delete: the row keeps naming past entries and saved-meal items.
+   */
+  private async softDeleteOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+  ): Promise<void> {
+    const foods = this.foodsFor(manager);
+    const food = await foods.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!food) throw new NotFoundException('Food not found');
     food.deletedAt = new Date();
-    await this.foods.save(food);
-    await this.cache.bump(sub);
+    await foods.save(food);
+  }
+
+  /**
+   * The food repository a write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it. No
+   * manager means the service's own repository — the singular path, and the only
+   * shape a unit suite's repository double can supply.
+   */
+  private foodsFor(manager: EntityManager | undefined): Repository<Food> {
+    if (!manager) return this.foods;
+    return manager.getRepository(Food);
+  }
+
+  /** The serving repository a write runs against, under the same rule as `foodsFor`. */
+  private servingsFor(manager: EntityManager | undefined): Repository<Serving> {
+    if (!manager) return this.servings;
+    return manager.getRepository(Serving);
+  }
+
+  /** Optimistic concurrency: an explicit version that no longer matches is a 409. */
+  private rejectStaleVersion(food: Food, expectedVersion: number | undefined): void {
+    if (expectedVersion === undefined || food.version === expectedVersion) return;
+    throw new ConflictException('Food was modified');
+  }
+
+  /** The rows a patch leaves alone, read through the caller's manager. */
+  private async readServings(
+    manager: EntityManager | undefined,
+    sub: string,
+    food: Food,
+  ): Promise<Serving[]> {
+    const servings = await this.servingsFor(manager).find({
+      where: { foodId: food.id, ownerSub: sub },
+    });
+    servings.sort((a, b) => a.id.localeCompare(b.id));
+    return servings;
   }
 
   /**
@@ -355,18 +522,20 @@ export class FoodsService {
    * instead of an insert/update/delete matrix.
    */
   private async replaceServings(
+    manager: EntityManager | undefined,
     sub: string,
     food: Food,
     base: NutrientVector,
     portions: ServingInputDto[],
     dek: Buffer,
   ): Promise<Serving[]> {
-    const existing = await this.servings.find({ where: { foodId: food.id, ownerSub: sub } });
-    if (existing.length > 0) await this.servings.delete({ foodId: food.id, ownerSub: sub });
+    const servings = this.servingsFor(manager);
+    const existing = await servings.find({ where: { foodId: food.id, ownerSub: sub } });
+    if (existing.length > 0) await servings.delete({ foodId: food.id, ownerSub: sub });
 
     const rows = portions.map((portion) => {
       const servingId = randomUUID();
-      return this.servings.create({
+      return servings.create({
         id: servingId,
         ownerSub: sub,
         foodId: food.id,
@@ -386,7 +555,7 @@ export class FoodsService {
     // between in-memory rows (~40% of multi-portion writes); the DB stays
     // correct but the returned DTO is built from the crossed copies. `save()`
     // keeps each row's id with its ciphertext. Small batch, fine per write.
-    if (rows.length > 0) await this.servings.save(rows);
+    if (rows.length > 0) await servings.save(rows);
     rows.sort((a, b) => a.id.localeCompare(b.id));
     return rows;
   }
@@ -409,12 +578,14 @@ export class FoodsService {
    * `portions` set, so a serving can never serve a stale number.
    */
   private async deriveServings(
+    manager: EntityManager | undefined,
     sub: string,
     food: Food,
     base: NutrientVector,
     dek: Buffer,
   ): Promise<Serving[]> {
-    const existing = await this.servings.find({ where: { foodId: food.id, ownerSub: sub } });
+    const servings = this.servingsFor(manager);
+    const existing = await servings.find({ where: { foodId: food.id, ownerSub: sub } });
     for (const serving of existing) {
       serving.nutrients = this.sealVector(
         dek,
@@ -422,7 +593,7 @@ export class FoodsService {
         servingNutrientsAad(sub, serving.id),
       );
     }
-    if (existing.length > 0) await this.servings.save(existing);
+    if (existing.length > 0) await servings.save(existing);
     existing.sort((a, b) => a.id.localeCompare(b.id));
     return existing;
   }

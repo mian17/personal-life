@@ -1,16 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import { completeVector, readStoredVector } from '../foods/content';
 import { Entry } from './entry.entity';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto';
@@ -74,7 +76,40 @@ export class EntriesService {
     @InjectRepository(Entry) private readonly entries: Repository<Entry>,
     private readonly cache: EntriesCache,
     private readonly keys: KeysService,
+    // Optional only so the unit suites that build this service positionally keep
+    // compiling; `EntriesModule` always provides the token, so a batch always
+    // has the service's one cache adapter to bump.
+    @Inject(MEAL_CACHE) private readonly mealCache?: MealCache,
   ) {}
+
+  /**
+   * The service's one cache adapter, as the batch kernel types it. The resource
+   * cache helper composes the adapter rather than extending it, so a batch hands
+   * the kernel the adapter itself — one bump then invalidates this owner's whole
+   * read set (`SPEC-meal-service.md` §6).
+   *
+   * The module always provides the token, so this never throws under Nest; the
+   * typed throw only guards a hand-built service in a unit suite.
+   */
+  private requireMealCache(): MealCache {
+    if (!this.mealCache) {
+      throw new Error('MEAL_CACHE is unavailable: the batch cache adapter is not wired');
+    }
+    return this.mealCache;
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * go to, taken from the injected repository instead of a fifth constructor
+   * argument so the existing suites that build this service positionally keep
+   * compiling.
+   *
+   * ponytail: upgrade path is `@InjectDataSource()` once those suites are
+   * converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.entries.manager.connection;
+  }
 
   /**
    * Decrypt-or-passthrough (`SPEC-meal-service` Code Style, mirroring
@@ -174,13 +209,44 @@ export class EntriesService {
     return found.map(toCachedEntryRow);
   }
 
+  /** `POST /api/entries` — 201 with the sealed confirmed snapshot. */
   async create(sub: string, dto: CreateEntryDto): Promise<EntryDto> {
+    const entry = await this.insertOne(this.entries.manager, sub, dto);
+    // Bump AFTER the mutation: pre-write reads were born under the old
+    // generation and die here; a thrown save never bumps.
+    await this.cache.bump(sub);
+    return entry;
+  }
+
+  /** The `entries` batch create: one transaction, submission order, one bump (§5). */
+  async createMany(sub: string, items: CreateEntryDto[]): Promise<EntryDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+  }
+
+  /**
+   * One entry's insert, through the manager the caller supplies, and with no
+   * bump. The singular route passes the repository's manager and keeps its own
+   * bump; a batch passes the transaction's manager, so the kernel owns one bump
+   * for the whole request.
+   */
+  private async insertOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    dto: CreateEntryDto,
+  ): Promise<EntryDto> {
+    const entries = this.entriesFor(manager);
     // Service-generated id: the AAD binds it, so it exists before the ciphertext.
     const id = randomUUID();
     const dek = await this.keys.getOrCreateDek(sub);
     const vector = this.requireVector(dto.nutrients);
 
-    const entry = this.entries.create({
+    const entry = entries.create({
       id,
       ownerSub: sub,
       date: dto.date,
@@ -191,26 +257,51 @@ export class EntriesService {
       version: 0,
       deletedAt: null,
     });
-    const saved = await this.entries.save(entry);
-
-    // Bump AFTER the mutation: pre-write reads were born under the old
-    // generation and die here; a thrown save never bumps.
-    await this.cache.bump(sub);
+    const saved = await entries.save(entry);
     return this.toDto(toCachedEntryRow(saved), sub, dek);
   }
 
+  /** `PATCH /api/entries/:id` — a stale `expectedVersion` is a 409. */
   async update(sub: string, id: string, dto: UpdateEntryDto): Promise<EntryDto> {
-    const entry = await this.entries.findOne({
-      where: { id, ownerSub: sub, deletedAt: IsNull() },
-    });
-    if (!entry) throw new NotFoundException('Entry not found');
-    if (dto.expectedVersion !== undefined && entry.version !== dto.expectedVersion) {
-      throw new ConflictException('Entry was modified');
-    }
+    const entry = await this.updateOne(this.entries.manager, sub, id, dto);
+    await this.cache.bump(sub);
+    return entry;
+  }
 
-    // The snapshot changes only when the client sends corrected numbers; the
-    // stored row is never re-derived from a live food. A quantity change
-    // without a corrected vector is rejected so the pair can never disagree.
+  /**
+   * The `entries` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` on any item is a 409 and rolls the whole batch back.
+   */
+  async updateMany(
+    sub: string,
+    items: (UpdateEntryDto & { id: string })[]
+  ): Promise<EntryDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+  }
+
+  /**
+   * One entry's patch, through the manager the caller supplies, and with no
+   * bump. The snapshot changes only when the client sends corrected numbers; the
+   * stored row is never re-derived from a live food.
+   */
+  private async updateOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+    dto: UpdateEntryDto,
+  ): Promise<EntryDto> {
+    const entries = this.entriesFor(manager);
+    const entry = await entries.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!entry) throw new NotFoundException('Entry not found');
+    this.rejectStaleVersion(entry, dto.expectedVersion);
+    // A quantity change without a corrected vector is rejected so the pair can
+    // never disagree.
     if (dto.quantity !== undefined && dto.nutrients === undefined) {
       throw new BadRequestException('nutrients are required to change quantity');
     }
@@ -228,20 +319,66 @@ export class EntriesService {
     }
 
     entry.version += 1;
-    const saved = await this.entries.save(entry);
-
-    await this.cache.bump(sub);
+    const saved = await entries.save(entry);
     return this.toDto(toCachedEntryRow(saved), sub, dek);
   }
 
+  /** `DELETE /api/entries/:id` — soft delete; the row leaves every read. */
   async remove(sub: string, id: string): Promise<void> {
-    const entry = await this.entries.findOne({
-      where: { id, ownerSub: sub, deletedAt: IsNull() },
+    await this.softDeleteOne(this.entries.manager, sub, id);
+    await this.cache.bump(sub);
+  }
+
+  /**
+   * The `entries` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning. A foreign id is a 404 and rolls
+   * the whole batch back, leaving every row live.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
     });
+    return { deleted };
+  }
+
+  /**
+   * One entry's move out of the reads, through the manager the caller supplies,
+   * and with no bump. Soft by definition, mirroring the singular delete.
+   */
+  private async softDeleteOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+  ): Promise<void> {
+    const entries = this.entriesFor(manager);
+    const entry = await entries.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!entry) throw new NotFoundException('Entry not found');
     entry.deletedAt = new Date();
-    await this.entries.save(entry);
-    await this.cache.bump(sub);
+    await entries.save(entry);
+  }
+
+  /**
+   * The entry repository a write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it. No
+   * manager means the service's own repository — the singular path, and the only
+   * shape a unit suite's repository double can supply.
+   */
+  private entriesFor(manager: EntityManager | undefined): Repository<Entry> {
+    if (!manager) return this.entries;
+    return manager.getRepository(Entry);
+  }
+
+  /** Optimistic concurrency: an explicit version that no longer matches is a 409. */
+  private rejectStaleVersion(entry: Entry, expectedVersion: number | undefined): void {
+    if (expectedVersion === undefined || entry.version === expectedVersion) return;
+    throw new ConflictException('Entry was modified');
   }
 
   /**

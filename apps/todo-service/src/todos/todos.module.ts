@@ -4,6 +4,7 @@ import { KeysModule } from '@life/service-kit';
 import { MASTER_KEY_ENV } from '../service-config';
 import { TodoCacheModule } from '../cache/todo-cache.module';
 import { ListsModule } from '../lists/lists.module';
+import { TodoBatchController } from '../batch/todo-batch.controller';
 import { Todo } from './todo.entity';
 import { TodoTag } from './todo-tag.entity';
 import { TodoCompletion } from './todo-completion.entity';
@@ -22,7 +23,10 @@ import { TodosService } from './todos.service';
     TodoCacheModule,
     ListsModule,
   ],
-  controllers: [TodosController],
+  // The batch controller is listed first on purpose: its routes are literal
+  // (`/api/todos:batchCreate`), and registration order is what keeps a parameter
+  // route from claiming a path that only looks parameterised.
+  controllers: [TodoBatchController, TodosController],
   providers: [TodosService],
   // Exported so the reminders sweep can inject the `markReminded` clear seam.
   exports: [TodosService],

@@ -1,10 +1,19 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
 import { Tag } from './tag.entity';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
+import type { CreateTagDto } from './dto/create-tag.dto';
+import type { BatchUpdateTagItem } from './dto/batch-tags.dto';
+
+/** A create-or-get that either wrote a row or reused one. */
+interface CreatedOrReused {
+  tag: TagDto;
+  created: boolean;
+}
 
 /** The registry DTO (`SPEC-tags-service` API): the `version` is the OCC counter. */
 export interface TagDto {
@@ -116,8 +125,35 @@ export class TagsService {
    * to invalidate. The cache is read-only plumbing for `list`/`resolve` — the
    * same split as note-service's `resolveTags` vs `listTags`.
    */
-  private ownerRows(sub: string): Promise<Tag[]> {
-    return this.tags.find({ where: { ownerSub: sub }, order: { id: 'ASC' } });
+  private ownerRows(manager: EntityManager | undefined, sub: string): Promise<Tag[]> {
+    return this.tagsRepository(manager).find({
+      where: { ownerSub: sub },
+      order: { id: 'ASC' },
+    });
+  }
+
+  /**
+   * The repository one write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it — an item
+   * of a batch has to see the items submitted before it. No manager means the
+   * service's own repository: the singular path.
+   */
+  private tagsRepository(manager: EntityManager | undefined): Repository<Tag> {
+    if (!manager) return this.tags;
+    return manager.getRepository(Tag);
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * use.
+   *
+   * ponytail: taken from the injected repository rather than a fourth
+   * constructor argument, so the cache suite that builds this service
+   * positionally keeps compiling. Upgrade path: `@InjectDataSource()` once that
+   * suite is converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.tags.manager.connection;
   }
 
   /**
@@ -152,17 +188,47 @@ export class TagsService {
   }
 
   /**
-   * `POST /api/tags {name}` — create-or-get, case-insensitive per owner. Any
-   * matching row (of the caller) is reused with its original spelling; only a
-   * brand-new name writes and bumps the generation.
+   * `POST /api/tags {name}` — create-or-get, case-insensitive per owner. Only a
+   * brand-new name writes, so only a brand-new name bumps the generation.
    */
-  async create(sub: string, name: string): Promise<{ tag: TagDto; created: boolean }> {
+  async create(sub: string, name: string): Promise<CreatedOrReused> {
+    const result = await this.createOrGetOne(this.tags.manager, sub, name);
+    if (result.created) {
+      await this.cache.bumpGeneration(sub);
+    }
+    return result;
+  }
+
+  /**
+   * The `tags` batch create: one transaction, submission order, and one bump —
+   * only if some item actually wrote (`SPEC-tags-service.md` §6). A batch of
+   * already-existing names is all create-or-get hits, so it commits no write and
+   * leaves the owner's counter alone.
+   */
+  async createMany(sub: string, items: CreateTagDto[]): Promise<TagDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.createOrGetOne(manager, sub, item.name),
+      invalidate: (rows) => rows.some((row) => row.created),
+    });
+    return results.map((result) => result.tag);
+  }
+
+  /**
+   * One name's create-or-get, through the caller's manager, and with no bump.
+   * Any matching row of the caller is reused with its original spelling; only a
+   * brand-new name writes.
+   */
+  private async createOrGetOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    name: string,
+  ): Promise<CreatedOrReused> {
     const dek = await this.keys.getOrCreateDek(sub);
-    const rows = await this.ownerRows(sub);
-    const wanted = name.toLowerCase();
-    const existing = rows.find(
-      (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
-    );
+    const existing = await this.findByName(manager, sub, dek, name);
     if (existing) {
       return {
         tag: {
@@ -175,23 +241,35 @@ export class TagsService {
       };
     }
 
-    const saved = await this.tags.save(
-      this.tags.create({
+    const tags = this.tagsRepository(manager);
+    const saved = await tags.save(
+      tags.create({
         name: encryptField(dek, name, tagNameAad(sub)),
         ownerSub: sub,
         version: 0,
         createdAt: new Date(),
       }),
     );
-    // Bump AFTER the mutation: pre-write entries die here, a thrown save never bumps.
-    await this.cache.bumpGeneration(sub);
     return { tag: { ...toCachedRow(saved), name }, created: true };
   }
 
+  /** The caller's row whose decrypted name matches `name`, case-insensitively. */
+  private async findByName(
+    manager: EntityManager | undefined,
+    sub: string,
+    dek: Buffer,
+    name: string,
+  ): Promise<Tag | undefined> {
+    const wanted = name.toLowerCase();
+    const rows = await this.ownerRows(manager, sub);
+    return rows.find(
+      (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
+    );
+  }
+
   /**
-   * `PATCH /api/tags/:id {name, expectedVersion?}` — rename. A foreign or missing
-   * id is a byte-identical 404 (never 403). A case-insensitive collision with a
-   * *different* tag of the same owner is 409; a stale `expectedVersion` is 409.
+   * `PATCH /api/tags/:id {name, expectedVersion?}` — rename. Every path here
+   * mutates, so the singular route bumps unconditionally after it returns.
    */
   async rename(
     sub: string,
@@ -199,7 +277,40 @@ export class TagsService {
     name: string,
     expectedVersion?: number,
   ): Promise<TagDto> {
-    const tag = await this.tags.findOne({ where: { id, ownerSub: sub } });
+    const tag = await this.renameOne(this.tags.manager, sub, id, name, expectedVersion);
+    // Bump AFTER the mutation — see bumpGeneration(); a thrown rename never bumps.
+    await this.cache.bumpGeneration(sub);
+    return tag;
+  }
+
+  /** The `tags` batch rename: one transaction, submission order, one bump. */
+  async renameMany(sub: string, items: BatchUpdateTagItem[]): Promise<TagDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) =>
+        this.renameOne(manager, sub, item.id, item.name, item.expectedVersion),
+    });
+  }
+
+  /**
+   * One tag's rename, through the caller's manager, and with no bump. A foreign
+   * or missing id is a byte-identical 404 (never 403). A case-insensitive
+   * collision with a *different* tag of the same owner is 409; a stale
+   * `expectedVersion` is 409. Any of those throws, which for a batch rolls the
+   * whole request back.
+   */
+  private async renameOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: number,
+    name: string,
+    expectedVersion?: number,
+  ): Promise<TagDto> {
+    const tags = this.tagsRepository(manager);
+    const tag = await tags.findOne({ where: { id, ownerSub: sub } });
     if (!tag) throw new NotFoundException('Tag not found');
     if (expectedVersion !== undefined && tag.version !== expectedVersion) {
       throw new ConflictException('Tag was modified');
@@ -207,7 +318,7 @@ export class TagsService {
 
     const dek = await this.keys.getOrCreateDek(sub);
     const wanted = name.toLowerCase();
-    const siblings = await this.ownerRows(sub);
+    const siblings = await this.ownerRows(manager, sub);
     const collision = siblings.some(
       (row) =>
         row.id !== id && this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
@@ -216,8 +327,7 @@ export class TagsService {
 
     tag.name = encryptField(dek, name, tagNameAad(sub));
     tag.version += 1;
-    const saved = await this.tags.save(tag);
-    await this.cache.bumpGeneration(sub);
+    const saved = await tags.save(tag);
     return { ...toCachedRow(saved), name };
   }
 
