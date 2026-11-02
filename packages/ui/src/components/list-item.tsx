@@ -40,10 +40,13 @@ export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'
  * The row surface: the panel fill, the row radius clipping the action slots, and the
  * collapse animation. The floor is one two-line row (title + sub) so an empty
  * `meta`/`snippet` cannot collapse it — a dense row is exactly its content height instead.
+ * The collapse travels on `--d-base`: the `motion-safe:transition-[height,opacity]` utility
+ * compiles inside `base.css`'s motion gate, which supplies that §7 duration, and the
+ * `reduce` block there is the backstop that collapses it.
  */
 const rowSurfaceStyles = cx(
   'flex bg-panel rounded-[var(--radius-lg)] overflow-hidden',
-  'transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+  'motion-safe:transition-[height,opacity]',
   '[interpolate-size:allow-keywords]',
 );
 

@@ -24,7 +24,9 @@ export interface SnackbarProps {
  * fab's `z-10`. Every length rides a token, so no colour or measure enters the palette here.
  *
  * The entry rides the transition instead of a keyframe: `starting:` is the first-frame style, so
- * the toast slides up on mount and the stylesheet owns no animation for it.
+ * the toast slides up on mount and the stylesheet owns no animation for it. It travels on the
+ * fast duration without restating it — `base.css` holds both motion defaults inside the
+ * `prefers-reduced-motion: no-preference` gate, which is what makes reduced motion instant.
  */
 const toastStyles = cx(
   'fixed z-20',
@@ -35,7 +37,7 @@ const toastStyles = cx(
   'p-[var(--space-0-6)_var(--space-0-75)]',
   'bg-panel text-text border border-border',
   'rounded-[var(--radius-md)] shadow-[var(--shadow-fab)]',
-  'transition-[translate,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+  'motion-safe:transition-[translate,opacity]',
   'starting:translate-y-[var(--space-1)] starting:opacity-0',
 );
 

@@ -230,14 +230,15 @@ try {
       colorScheme: theme,
     });
     // Both theme levers, set per page. The app's inline script in `layout.tsx` copies
-    // `localStorage.theme` into `data-theme`, and `tokens.css` also keys its light
+    // `localStorage['calm-theme']` into `data-theme`, and `tokens.css` also keys its light
     // values off `prefers-color-scheme` for a root with no `data-theme`. Setting only
     // one would leave the other in charge of part of the palette: the init script
     // claims `localStorage` before any page script runs, `colorScheme` claims the
-    // media query, so neither can leak the wrong theme into a screenshot.
+    // media query, so neither can leak the wrong theme into a screenshot. The key is
+    // the one `theme-toggle.tsx` writes, so a shot and a visitor's choice share it.
     await context.addInitScript((value) => {
       try {
-        localStorage.setItem('theme', value);
+        localStorage.setItem('calm-theme', value);
       } catch {
         // A blocked store leaves the media query above to decide; nothing to do.
       }

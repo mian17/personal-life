@@ -26,7 +26,7 @@ const fabLinkStyles = cx(
   'bottom-[calc(var(--space-1)+env(safe-area-inset-bottom))]',
   'inline-flex items-center justify-center size-[var(--fab-size)] rounded-full',
   'bg-accent text-on-accent no-underline shadow-[var(--shadow-fab)]',
-  'outline-none transition-colors',
+  'outline-none motion-safe:transition-colors',
   // `outline-none` zeroes the style variable an outline width draws with, so the ring
   // needs its style back; width and offset both ride the `--focus-ring` token.
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',

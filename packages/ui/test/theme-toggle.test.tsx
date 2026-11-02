@@ -31,26 +31,26 @@ describe('ThemeToggle', () => {
     expect(button.getAttribute('aria-label')).toBe('Theme: Light. Activate for Dark.');
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(currentIcon(button)).toBe('lucide-sun');
-    expect(window.localStorage.getItem('theme')).toBe('light');
+    expect(window.localStorage.getItem('calm-theme')).toBe('light');
     expect(document.documentElement.dataset.theme).toBe('light');
 
     fireEvent.click(button);
     expect(button.getAttribute('aria-label')).toBe('Theme: Dark. Activate for System.');
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(currentIcon(button)).toBe('lucide-moon');
-    expect(window.localStorage.getItem('theme')).toBe('dark');
+    expect(window.localStorage.getItem('calm-theme')).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
 
     fireEvent.click(button);
     expect(button.getAttribute('aria-label')).toBe('Theme: System. Activate for Light.');
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(currentIcon(button)).toBe('lucide-monitor');
-    expect(window.localStorage.getItem('theme')).toBe('system');
+    expect(window.localStorage.getItem('calm-theme')).toBe('system');
     expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
   it('reads a stored theme on mount without applying it to the document', () => {
-    window.localStorage.setItem('theme', 'dark');
+    window.localStorage.setItem('calm-theme', 'dark');
     render(<ThemeToggle />);
     const button = screen.getByRole('button');
     expect(button.getAttribute('aria-label')).toBe('Theme: Dark. Activate for System.');
@@ -60,7 +60,7 @@ describe('ThemeToggle', () => {
   });
 
   it('ignores an unrecognized stored value', () => {
-    window.localStorage.setItem('theme', 'sepia');
+    window.localStorage.setItem('calm-theme', 'sepia');
     render(<ThemeToggle />);
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe(
       'Theme: System. Activate for Light.',

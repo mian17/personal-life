@@ -31,7 +31,7 @@ const switchTrack = cx(
   'w-[calc(var(--space-1)+var(--space-0-4)+var(--space-1-25))]',
   'p-[var(--space-0-2)] rounded-full border-0',
   'bg-border data-[state=checked]:bg-accent',
-  'cursor-pointer transition-colors outline-hidden',
+  'cursor-pointer motion-safe:transition-colors outline-hidden',
   // `outline-hidden` zeroes `--tw-outline-style`, and `outline-<width>` draws with that
   // variable — so the ring needs `outline-solid` to exist. Without it Chromium computes
   // `outline-style: none` and the focus ring is invisible.
@@ -42,7 +42,7 @@ const switchTrack = cx(
 
 const switchThumb = cx(
   'pointer-events-none block size-[var(--space-1)] rounded-full bg-muted',
-  'transition-transform data-[state=checked]:translate-x-[var(--space-1-25)]',
+  'motion-safe:transition-transform data-[state=checked]:translate-x-[var(--space-1-25)]',
   'data-[state=checked]:bg-on-accent',
 );
 

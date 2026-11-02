@@ -8,6 +8,7 @@ import { IconButton } from './icon-button';
 
 type Theme = 'system' | 'light' | 'dark';
 
+const THEME_STORAGE_KEY = 'calm-theme';
 const THEME_ORDER: Theme[] = ['system', 'light', 'dark'];
 const THEME_LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 const THEME_ICONS: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
@@ -16,7 +17,7 @@ function readStoredTheme(): Theme {
   if (typeof window === 'undefined') {
     return 'system';
   }
-  const storedTheme = window.localStorage.getItem('theme');
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
   return storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'system';
 }
 
@@ -49,7 +50,7 @@ export function ThemeToggle({ className, ...rest }: Readonly<ThemeToggleProps>) 
 
   function cycleTheme() {
     setTheme(nextTheme);
-    window.localStorage.setItem('theme', nextTheme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     applyTheme(nextTheme);
   }
 

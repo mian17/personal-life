@@ -24,7 +24,7 @@ const checkboxRoot = cx(
   'peer inline-flex shrink-0 items-center justify-center',
   'size-[var(--checkbox-size,var(--space-0-75))] p-[var(--space-0-15)]',
   'rounded-[var(--space-0-2)] border border-current',
-  'cursor-pointer transition-colors outline-none',
+  'cursor-pointer motion-safe:transition-colors outline-none',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
   'disabled:cursor-not-allowed disabled:opacity-50',
   'data-[state=checked]:bg-current',

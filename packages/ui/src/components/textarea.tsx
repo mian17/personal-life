@@ -16,7 +16,7 @@ export interface TextareaProps extends ComponentPropsWithRef<'textarea'> {
  */
 const textareaVariants = cva(
   cx(
-    'block w-full min-w-0 [font:inherit] outline-none transition-colors',
+    'block w-full min-w-0 [font:inherit] outline-none motion-safe:transition-colors',
     'placeholder:text-muted disabled:cursor-not-allowed disabled:text-muted',
   ),
   {

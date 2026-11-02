@@ -46,7 +46,7 @@ const listStyles = cx(
 const tabStyles = cx(
   'inline-flex items-center justify-center whitespace-nowrap',
   'px-[var(--space-0-75)] py-[var(--space-0-5)] rounded-[var(--radius-md)]',
-  'text-muted no-underline cursor-pointer transition-colors',
+  'text-muted no-underline cursor-pointer motion-safe:transition-colors',
   'data-[state=active]:bg-accent data-[state=active]:text-on-accent',
   'outline-hidden focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
   'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',

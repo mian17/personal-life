@@ -49,58 +49,140 @@ function unitValues(css: string, unit: 'px' | 'rem'): string[] {
   return Array.from(new Set(found));
 }
 
-/** Frozen colors — byte-identical to apps/app/app/globals.css. */
-const DARK_COLORS = {
-  '--bg': '#0f1115',
-  '--panel': '#181b22',
-  '--text': '#e8eaf0',
-  '--muted': '#8b93a7',
-  '--accent': '#5b8cff',
-  '--danger': '#ff6b6b',
-  '--danger-soft': '#ff9e9e',
-  '--amber': '#f2b64c',
-  '--green': '#4cc38a',
-  '--border': '#2a2f3a',
-  '--on-accent': 'white',
-} as const;
-
+/** §2 light palette plus §3's on-accent word, as declared on `:root`. */
 const LIGHT_COLORS = {
-  '--bg': '#f4f5f7',
-  '--panel': '#ffffff',
-  '--text': '#1a1d24',
-  '--muted': '#5c6577',
-  '--accent': '#2f6bff',
-  '--danger': '#d64545',
-  '--danger-soft': '#d97070',
-  '--amber': '#b45309',
-  '--green': '#15803d',
-  '--border': '#dfe3ea',
+  '--page': '#f4f4f1',
+  '--surface': '#ffffff',
+  '--surface-sunken': '#f7f7f4',
+  '--press': '#ecece9',
+  '--ink': '#1b1b1f',
+  '--ink-2': '#58585e',
+  '--ink-3': '#63636a',
+  '--line': 'rgba(0, 0, 0, 0.08)',
+  '--line-strong': '#8a8a8a',
+  '--focus': '#2a5d8f',
+  '--ok': '#335b3f',
+  '--ok-soft': '#eaf1ea',
+  '--warn': '#6e5a16',
+  '--warn-soft': '#f5f0e0',
+  '--danger': '#8a3b3b',
+  '--danger-soft': '#f6e9e9',
+  '--chart-muted': '#c9c9c6',
+  '--on-max': '#ffffff',
 } as const;
 
-/** Literals promoted to named tokens — values unchanged. */
-const NAMED_TOKENS = {
-  '--radius-md': '10px',
-  '--radius-lg': '12px',
-  '--radius-pill': '999px',
-  '--tap-height': '48px',
-  '--content-width': '640px',
-  '--border-width': '1px',
-  '--focus-ring': '2px',
-  '--icon-btn-size': '40px',
+/** §2 dark palette plus §3's on-accent word. */
+const DARK_COLORS = {
+  '--page': '#16171a',
+  '--surface': '#1e2024',
+  '--surface-sunken': '#24262b',
+  '--press': '#2c2f35',
+  '--ink': '#e9e7e2',
+  '--ink-2': '#a9a79f',
+  '--ink-3': '#96948d',
+  '--line': 'rgba(255, 255, 255, 0.07)',
+  '--line-strong': '#767b84',
+  '--focus': '#8fbce8',
+  '--ok': '#9fc0a3',
+  '--ok-soft': '#202a21',
+  '--warn': '#d9c68a',
+  '--warn-soft': '#2a2418',
+  '--danger': '#d98c86',
+  '--danger-soft': '#2c1f1f',
+  '--chart-muted': '#3a3d43',
+  '--on-max': '#16171a',
+} as const;
+
+/** §3 one accent per app: `[fill, pressed fill]` per scheme. */
+const ACCENTS = {
+  notes: { light: ['#4f6b52', '#405743'], dark: ['#9fc0a3', '#b0cdb3'] },
+  todos: { light: ['#2f5f61', '#254b4d'], dark: ['#82b5b6', '#97c5c6'] },
+  meals: { light: ['#8b5a45', '#744a38'], dark: ['#dca489', '#e4b39c'] },
+  pomodoro: { light: ['#5a5285', '#4a4470'], dark: ['#b6aedc', '#c7c1e6'] },
+  feedback: { light: ['#6f5570', '#5b455c'], dark: ['#c4a9c6', '#d0bacf'] },
+} as const;
+
+/** §4 one stack, eleven declared steps, two read-outs. */
+const TYPE_TOKENS = {
+  '--font-stack': "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif",
+  '--fs-title': '28px',
+  '--fs-sheet-title': '20px',
+  '--fs-body': '17px',
+  '--fs-row-title': '16px',
+  '--fs-button': '16px',
+  '--fs-chip': '15px',
+  '--fs-label': '14px',
+  '--fs-meta': '13.5px',
+  '--fs-section-label': '13px',
+  '--fs-pill': '12.5px',
+  '--fs-count': '12px',
+  '--fs-axis': '11px',
+  '--fs-kpi': '40px',
+  '--fs-timer': '64px',
+  '--lh-title': '1.14',
+  '--lh-sheet-title': '1.25',
+  '--lh-body': '1.47',
+  '--lh-body-longform': '1.55',
+  '--lh-row-title': '1.35',
+  '--lh-control': '1',
+  '--lh-meta': '1.4',
+  '--lh-kpi': '1.05',
+  '--fw-body': '400',
+  '--fw-semibold': '600',
+  '--fw-section-label': '650',
+  '--fw-bold': '700',
+  '--tracking-title': '-0.021em',
+  '--tracking-sheet-title': '-0.015em',
+  '--tracking-row-title': '-0.008em',
+  '--tracking-button': '-0.005em',
+  '--tracking-section-label': '0.06em',
+  '--tracking-pill': '0.005em',
+  '--tracking-count': '0.02em',
+  '--tracking-kpi': '-0.03em',
+  '--tracking-timer': '-0.04em',
+  '--tracking-none': '0',
+} as const;
+
+/** §5 seven 4px steps, the frame, and the touch minimum. */
+const SPACE_TOKENS = {
+  '--s1': '4px',
+  '--s2': '8px',
+  '--s3': '12px',
+  '--s4': '16px',
+  '--s5': '20px',
+  '--s6': '24px',
+  '--s8': '32px',
+  '--frame-max': '414px',
+  '--tap': '48px',
+  '--row-min-height': '56px',
+  '--checkbox-size': '24px',
   '--fab-size': '56px',
-  '--font-size': '16px',
-  '--leading': '1.5',
-  '--fs-editor': '1.05rem',
-  '--shadow-fab': '0 4px 12px rgba(0, 0, 0, 0.25)',
-  '--font-stack': 'system-ui, -apple-system, sans-serif',
 } as const;
 
-/** Motion — new literals promoted to tokens (user-approved). */
-const MOTION_TOKENS = {
-  '--duration-fast': '120ms',
-  '--duration-base': '200ms',
-  '--ease-standard': 'ease-out',
+/** §6 four radii, two border widths, the focus ring — and no product shadow. */
+const SHAPE_TOKENS = {
+  '--r-sm': '8px',
+  '--r-md': '12px',
+  '--r-lg': '16px',
+  '--r-pill': '999px',
+  '--border-width': '1px',
+  '--border-width-strong': '1.5px',
+  '--focus-ring': '2px',
 } as const;
+
+/** §7 two durations on one curve. */
+const MOTION_TOKENS = {
+  '--d-fast': '200ms',
+  '--d-base': '260ms',
+  '--ease': 'cubic-bezier(0.25, 1, 0.5, 1)',
+} as const;
+
+/** Every distinct px literal the whole refactor is allowed to know about. */
+const FROZEN_PX = [
+  '1px', '1.5px', '2px', '4px', '8px', '11px', '12px', '12.5px', '13px', '13.5px',
+  '14px', '15px', '16px', '17px', '20px', '24px', '28px', '32px', '40px', '48px',
+  '56px', '64px', '414px', '999px',
+];
 
 /**
  * The app-wide breakpoint scale (Tailwind's published values). This map is the
@@ -117,133 +199,138 @@ const BREAKPOINTS = {
   '2xl': '1536px',
 } as const;
 
-/**
- * New status colors stay off the frozen color surface: only `--accent` /
- * `--amber` / `--green` / `--muted` appear here, and a distinct `wont_do`
- * hue needs explicit user approval (SPEC-feedback-status.md open question 1).
- */
-const STATUS_TOKENS = {
-  open: '--accent',
-  in_progress: '--amber',
-  done: '--green',
-  wont_do: '--muted',
+/** `feedback-status.ts` still names the shipped hues; the revision renames each one. */
+const STATUS_RENAMES = {
+  '--accent': '--ink-2',
+  '--amber': '--warn',
+  '--green': '--ok',
+  '--muted': '--ink-3',
 } as const;
 
-/** Spacing scale — exactly the 20 distinct rem literals in globals.css. */
-const SPACING_REM = {
-  '--space-0-15': '0.15rem',
-  '--space-0-2': '0.2rem',
-  '--space-0-25': '0.25rem',
-  '--space-0-3': '0.3rem',
-  '--space-0-35': '0.35rem',
-  '--space-0-4': '0.4rem',
-  '--space-0-5': '0.5rem',
-  '--space-0-6': '0.6rem',
-  '--space-0-7': '0.7rem',
-  '--space-0-75': '0.75rem',
-  '--space-0-8': '0.8rem',
-  '--space-0-85': '0.85rem',
-  '--space-0-9': '0.9rem',
-  '--space-0-95': '0.95rem',
-  '--space-1': '1rem',
-  '--space-1-25': '1.25rem',
-  '--space-2': '2rem',
-  '--space-3': '3rem',
-  '--space-5': '5rem',
-} as const;
-
-const FROZEN_REM = [
-  '0.15rem', '0.2rem', '0.25rem', '0.3rem', '0.35rem', '0.4rem', '0.5rem', '0.6rem',
-  '0.7rem', '0.75rem', '0.8rem', '0.85rem', '0.9rem', '0.95rem', '1rem', '1.05rem',
-  '1.25rem', '2rem', '3rem', '5rem',
-];
-
-const FROZEN_PX = ['1px', '2px', '4px', '10px', '12px', '16px', '40px', '48px', '56px', '640px', '999px'];
-
-describe('tokens.css — frozen token contract', () => {
+describe('tokens.css — palette and schemes', () => {
   const tokens = read('src/styles/tokens.css');
 
-  it('pins the dark defaults on :root, byte-identical to globals.css', () => {
+  it('paints the light scheme on :root, so it is light by definition', () => {
     const decls = declarations(tokens, ':root');
-    expect(decls).toMatchObject(DARK_COLORS);
-    expect(decls['color-scheme']).toBe('light dark');
-  });
-
-  it("pins the dark theme block on :root[data-theme='dark']", () => {
-    const decls = declarations(tokens, ":root[data-theme='dark']");
-    expect(decls['color-scheme']).toBe('dark');
-  });
-
-  it("pins the light theme block on :root[data-theme='light']", () => {
-    const decls = declarations(tokens, ":root[data-theme='light']");
     expect(decls).toMatchObject(LIGHT_COLORS);
     expect(decls['color-scheme']).toBe('light');
   });
 
-  it('defines every promoted named token at the exact literal value', () => {
-    const decls = declarations(tokens, ':root');
-    expect(decls).toMatchObject(NAMED_TOKENS);
+  it("paints the dark scheme on :root[data-theme='dark']", () => {
+    const decls = declarations(tokens, ":root[data-theme='dark']");
+    expect(decls).toMatchObject(DARK_COLORS);
+    expect(decls['color-scheme']).toBe('dark');
   });
 
-  it('defines the spacing scale at exactly the frozen rem values', () => {
-    const decls = declarations(tokens, ':root');
-    expect(decls).toMatchObject(SPACING_REM);
+  it('restates the dark scheme for System under prefers-color-scheme: dark', () => {
+    const system = tokens.slice(tokens.indexOf('@media (prefers-color-scheme: dark)'));
+    expect(system).not.toBe('');
+    const decls = declarations(system, ':root:not([data-theme])');
+    expect(decls).toMatchObject(DARK_COLORS);
+    expect(decls['color-scheme']).toBe('dark');
+  });
+});
+
+describe('tokens.css — one accent per app', () => {
+  const tokens = read('src/styles/tokens.css');
+  const system = tokens.slice(tokens.indexOf('@media (prefers-color-scheme: dark)'));
+
+  it.each(Object.entries(ACCENTS))('paints %s in light', (app, accent) => {
+    expect(declarations(tokens, `[data-app='${app}']`)).toMatchObject({
+      '--max': accent.light[0],
+      '--max-press': accent.light[1],
+    });
   });
 
-  it('defines the motion tokens at their approved values', () => {
-    const decls = declarations(tokens, ':root');
-    expect(decls).toMatchObject(MOTION_TOKENS);
+  it.each(Object.entries(ACCENTS))('repaints %s for an explicit dark choice', (app, accent) => {
+    expect(declarations(tokens, `[data-theme='dark'] [data-app='${app}']`)).toMatchObject({
+      '--max': accent.dark[0],
+      '--max-press': accent.dark[1],
+    });
+  });
+
+  it.each(Object.entries(ACCENTS))('repaints %s when the system is dark', (app, accent) => {
+    expect(declarations(system, `:root:not([data-theme]) [data-app='${app}']`)).toMatchObject({
+      '--max': accent.dark[0],
+      '--max-press': accent.dark[1],
+    });
+  });
+});
+
+describe('tokens.css — type, rhythm, shape and motion', () => {
+  const tokens = read('src/styles/tokens.css');
+
+  it('declares the type scale at the revised values', () => {
+    expect(declarations(tokens, ':root')).toMatchObject(TYPE_TOKENS);
+  });
+
+  it('declares the spacing rhythm and the layout measures', () => {
+    expect(declarations(tokens, ':root')).toMatchObject(SPACE_TOKENS);
+  });
+
+  it('declares the radii, the border widths and the focus ring', () => {
+    expect(declarations(tokens, ':root')).toMatchObject(SHAPE_TOKENS);
+  });
+
+  it('declares both durations on the one curve', () => {
+    expect(declarations(tokens, ':root')).toMatchObject(MOTION_TOKENS);
+  });
+});
+
+describe('tokens.css — vocabulary the revision forbids', () => {
+  const tokens = read('src/styles/tokens.css');
+
+  it('carries no gradient', () => {
+    expect(tokens).not.toMatch(/gradient/i);
+  });
+
+  it('carries no shadow token at all, let alone an elevation ladder', () => {
+    expect(tokens).not.toMatch(/box-shadow|--shadow/);
+  });
+
+  it('carries exactly the four ladder radii, no invented step', () => {
+    expect(tokens.match(/--r-[a-z]+:/g)).toEqual(['--r-sm:', '--r-md:', '--r-lg:', '--r-pill:']);
+  });
+
+  it('carries one on-accent word per scheme and no second value', () => {
+    const declared = tokens.match(/--on-max:/g) ?? [];
+    expect(declared).toHaveLength(3);
+    expect(new Set([LIGHT_COLORS['--on-max'], DARK_COLORS['--on-max']]).size).toBe(2);
   });
 
   it('keeps the app-wide breakpoint scale out of the token declarations', () => {
-    // The scale is pinned by BREAKPOINTS, never duplicated into `tokens.css`:
-    // a `--sm`-style declaration would put a second owner on the values and
-    // re-introduce raw px literals into the frozen inventory.
     for (const name of Object.keys(BREAKPOINTS)) {
       expect(tokens).not.toMatch(new RegExp(`--${name}\\s*:`));
     }
   });
 
-  it('keeps the four theme selectors with the light/dark/media shape', () => {
-    expect(tokens).toContain(":root[data-theme='dark']");
-    expect(tokens).toContain(":root[data-theme='light']");
-    expect(tokens).toContain('@media (prefers-color-scheme: light)');
-    expect(tokens).toContain(':root:not([data-theme])');
-  });
-
-  it('applies the light palette inside the prefers-color-scheme media query', () => {
-    const mediaAt = tokens.indexOf('@media (prefers-color-scheme: light)');
-    const notRootAt = tokens.indexOf(':root:not([data-theme])');
-    expect(mediaAt).toBeGreaterThanOrEqual(0);
-    expect(notRootAt).toBeGreaterThan(mediaAt);
-    const decls = declarations(tokens.slice(notRootAt), ':root:not([data-theme])');
-    expect(decls).toMatchObject(LIGHT_COLORS);
-  });
-
-  it('uses exactly the frozen rem inventory, no invented values', () => {
-    expect(unitValues(tokens, 'rem').sort()).toEqual([...FROZEN_REM].sort());
-  });
-
-  it('uses exactly the frozen px inventory, no invented values', () => {
+  it('uses exactly the frozen px inventory, no invented value', () => {
     expect(unitValues(tokens, 'px').sort()).toEqual([...FROZEN_PX].sort());
+  });
+
+  it('uses the em scale for tracking and no rem literal at all', () => {
+    expect(unitValues(tokens, 'rem')).toEqual([]);
   });
 });
 
-describe('status → token mapping', () => {
+describe('feedback status → revised token', () => {
   const tokensCss = read('src/styles/tokens.css');
 
-  it('pins every status to the frozen token table', () => {
-    const rendered = Object.fromEntries(
-      FEEDBACK_STATUSES.map(({ value, token }) => [value, token]),
-    );
-    expect(rendered).toEqual(STATUS_TOKENS);
+  it('pins every status to its renamed hue', () => {
+    const renamed = FEEDBACK_STATUSES.map(({ value, token }) => [value, STATUS_RENAMES[token]]);
+    expect(renamed).toEqual([
+      ['open', '--ink-2'],
+      ['in_progress', '--warn'],
+      ['done', '--ok'],
+      ['wont_do', '--ink-3'],
+    ]);
   });
 
   it('reads four distinct tokens declared in tokens.css', () => {
     const decls = declarations(tokensCss, ':root');
-    const mappedTokens = Object.values(STATUS_TOKENS);
-    for (const token of mappedTokens) expect(decls[token]).toBeDefined();
-    expect(new Set(mappedTokens).size).toBe(4);
+    const hues = Object.values(STATUS_RENAMES);
+    for (const hue of hues) expect(decls[hue]).toBeDefined();
+    expect(new Set(hues).size).toBe(4);
   });
 });
 
@@ -255,13 +342,16 @@ describe('base.css — base element layer', () => {
     expect(decls['box-sizing']).toBe('border-box');
   });
 
-  it('owns the html, body reset with values from tokens only', () => {
+  it('owns the html, body reset: the ground, the ink and the §4 type baseline, all from tokens', () => {
     const decls = declarations(base, 'html,\nbody');
     expect(decls['margin']).toBe('0');
     expect(decls['padding']).toBe('0');
-    expect(decls['background']).toBe('var(--bg)');
-    expect(decls['color']).toBe('var(--text)');
-    expect(decls['font']).toBe('var(--font-size)/var(--leading) var(--font-stack)');
+    expect(decls['background']).toBe('var(--page)');
+    expect(decls['color']).toBe('var(--ink)');
+    expect(decls['font-family']).toBe('var(--font-stack)');
+    expect(decls['font-size']).toBe('var(--fs-body)');
+    expect(decls['font-weight']).toBe('var(--fw-body)');
+    expect(decls['line-height']).toBe('var(--lh-body)');
   });
 });
 

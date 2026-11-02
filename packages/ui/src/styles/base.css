@@ -12,11 +12,60 @@
   }
 }
 
-html,
+/* §1 the ground paints edge to edge and every raised surface floats on it; §4 body is
+   17px / 1.47 in the one system stack, at weight 400.
+
+   The type baseline lands on `body` alone, exactly as the revised reset does (`html` keeps
+   only the text-size-adjust), because the root font-size is the unit Tailwind's scale is
+   written in: `--spacing` is 0.25rem, so `h-12` is 48px only while the root stays at the
+   UA's 16px. Moving 17px onto `html` would rescale every rem-based utility by 6.25% and
+   quietly break the 48px tap target. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: var(--font-size)/var(--leading) var(--font-stack);
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-stack);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-body);
+  line-height: var(--lh-body);
+  /* §4 every number that changes keeps its width, so digits do not jump. Declared once here
+     rather than restated by each read-out; the rule is a no-op for text without digits.
+     ponytail: narrow it to a `.ui-tabular-nums` class when Task 4 restyles the read-outs and
+     the per-primitive opt-in becomes cheaper than one inherited declaration. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* §7 motion is opt-in, and this gate is what supplies its durations. Every `transition-*`
+   utility in `packages/ui` carries the `motion-safe:` variant, so its compiled declaration
+   sits inside a `no-preference` query and reads its length and curve from Tailwind's two
+   transition defaults below — no primitive restates a duration. */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    --default-transition-duration: var(--d-fast);
+    --default-transition-timing-function: var(--ease);
+  }
+
+  /* The list row's collapse is the slow one: it travels `--d-base` while every other
+     transition keeps the fast default. */
+  .ui-list-item {
+    transition-duration: var(--d-base);
+  }
+}
+
+/* The backstop under the gate: `reduce` collapses every duration the gate let through.
+   0.001ms rather than 0s, so a component that waits on `transitionend` still hears it; every
+   looping animation is capped at one iteration for the same reason: no ticker exists here. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

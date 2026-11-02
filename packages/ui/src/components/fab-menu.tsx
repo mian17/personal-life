@@ -38,7 +38,7 @@ const cornerStyles = cx(
 const triggerStyles = cx(
   'inline-flex items-center justify-center size-[var(--fab-size)] rounded-full cursor-pointer',
   'border-0 bg-accent text-on-accent shadow-[var(--shadow-fab)]',
-  'outline-none transition-colors',
+  'outline-none motion-safe:transition-colors',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
   'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
 );

@@ -596,16 +596,15 @@ describe('ListItem', () => {
     expect(classes).toContain('overflow-hidden');
   });
 
-  it('transitions the base row through the motion tokens', () => {
+  it('transitions the base row on the collapse properties and names no duration itself', () => {
     render(
       <ul>
         <ListItem title="Groceries" />
       </ul>,
     );
     const classes = classesOf(screen.getByRole('listitem'));
-    expect(classes).toContain('transition-[height,opacity]');
-    expect(classes).toContain('duration-[var(--duration-base)]');
-    expect(classes).toContain('ease-[var(--ease-standard)]');
+    expect(classes).toContain('motion-safe:transition-[height,opacity]');
+    expect(classes).not.toContain('duration-[var(--d-base)]');
   });
 
   it('linkStylesFor: pins the link body class string for row, dense and column shapes', () => {
@@ -771,7 +770,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] has-[>.ui-checkbox]:ps-[var(--space-0-9)] items-center min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]',
+      'ui-list-item flex bg-panel rounded-[var(--radius-lg)] overflow-hidden motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] has-[>.ui-checkbox]:ps-[var(--space-0-9)] items-center min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]',
     );
     unmount();
 
@@ -790,7 +789,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] [--checkbox-size:var(--space-0-75)] items-center min-h-0 [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--space-0-5)] [&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))] [&>form>.ui-btn--danger]:rounded-[var(--radius-lg)] [&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex bg-panel rounded-[var(--radius-lg)] overflow-hidden motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] [--checkbox-size:var(--space-0-75)] items-center min-h-0 [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--space-0-5)] [&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))] [&>form>.ui-btn--danger]:rounded-[var(--radius-lg)] [&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

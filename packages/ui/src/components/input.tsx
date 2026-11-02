@@ -15,7 +15,7 @@ export type InputProps = ComponentPropsWithRef<'input'>;
 const inputStyles = cx(
   'block w-full min-w-0 h-12 rounded-md border border-border bg-panel px-3 py-2',
   'text-base text-text placeholder:text-muted',
-  '[font:inherit] outline-none transition-colors',
+  '[font:inherit] outline-none motion-safe:transition-colors',
   'file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-text',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
   'disabled:cursor-not-allowed disabled:text-muted',
