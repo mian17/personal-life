@@ -7,7 +7,7 @@
 | `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
 | `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
 | `max-test-runs` | 2 |
-| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts` is the value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
+| `frozen-surfaces` | PWA constants (`public/manifest-*.json`, `viewport.themeColor`) — always frozen; e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`) and token values (`packages/ui/test/tokens.test.ts` is the value table) — frozen by default, released per-run by an explicit intent that names them and moves the tests in the same commit |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
 | `lessons` | `docs/lessons/` |
 | `base-branch` | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main` |
