@@ -18,9 +18,9 @@ describe('TagFilterNav', () => {
     render(<TagFilterNav items={[]} />);
     const nav = screen.getByRole('navigation');
     expect(nav.classList.contains('flex')).toBe(true);
-    expect(nav.classList.contains('flex-wrap')).toBe(true);
-    expect(nav.classList.contains('items-baseline')).toBe(true);
-    expect(nav.classList.contains('gap-[var(--space-0-5)]')).toBe(true);
+    expect(nav.classList.contains('overflow-x-auto')).toBe(true);
+    expect(nav.classList.contains('gap-[var(--s2)]')).toBe(true);
+    expect(nav.classList.contains('-mx-[var(--s4)]')).toBe(true);
   });
 
   it('renders one filter Pill anchor per item with the name verbatim as its accessible name', () => {

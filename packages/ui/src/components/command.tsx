@@ -6,9 +6,9 @@ import type { ComponentProps } from 'react';
 import { cx } from '../lib/cx';
 
 /**
- * The registry `command` parts, theme-mapped: `bg-popover` is `--panel`, `text-popover-foreground`
- * is `--text`, `bg-accent`/`text-accent-foreground` are `--accent`/`--on-accent`, `border` is
- * `--border` and `text-muted-foreground` is `--muted`. Geometry rides the token spacing scale.
+ * The registry `command` parts, §8 flat: the panel fill, line and radius belong to the popover
+ * content that holds this list, and the selected row is the app's accent pair. Geometry rides the
+ * token spacing scale.
  *
  * `cmdk` owns the listbox, the selected row `aria-activedescendant` names, the keyboard walk and
  * the auto-highlight of the first row; a caller that filters its own rows passes
@@ -17,7 +17,7 @@ import { cx } from '../lib/cx';
  *
  * Deviation from the registry root: its panel fill, rounding and clipping are dropped. In the
  * combobox recipe the root wraps the *field* as well as the list, and the panel around the list
- * is the popover content, which already carries fill, border and shadow.
+ * is the popover content, which already carries fill, border and radius.
  *
  * Subset of the registry item: `CommandDialog`, `CommandGroup`, `CommandSeparator`,
  * `CommandShortcut` and `CommandInput` have no consumer here, so they are not vendored.
@@ -26,21 +26,25 @@ const commandStyles = 'flex w-full flex-col';
 
 /**
  * Registry `max-h-[300px]`: the list is as tall as the caller's `--autosuggest-rows` — one tap
- * target and the gap under it each, less the trailing gap, plus the list's own padding — then it
- * scrolls.
+ * target and the gap under it each — then it scrolls.
  */
 const listStyles = cx(
-  'overflow-x-hidden overflow-y-auto scroll-py-[var(--space-0-25)]',
-  'p-[var(--space-0-4)]',
-  'max-h-[calc(var(--autosuggest-rows,8)*(var(--tap-height)+var(--space-0-25)))]',
+  'overflow-x-hidden overflow-y-auto scroll-py-[var(--s1)]',
+  'p-[var(--s1)]',
+  'max-h-[calc(var(--autosuggest-rows,8)*(var(--tap)+var(--s1)))]',
 );
 
-const emptyStyles = 'py-[var(--space-1)] text-center text-muted';
+/** The no-match line sits at the list's own inset, in the second ink tier. */
+const emptyStyles = cx(
+  'py-[var(--s4)] text-center text-ink-2 text-[length:var(--fs-label)]',
+);
 
+/** One row: a tap target tall, accent fill while `cmdk` marks it selected. */
 const itemStyles = cx(
-  'relative flex cursor-default select-none items-center gap-[var(--space-0-5)]',
-  'px-[var(--space-0-5)] py-[var(--space-0-3)] text-text outline-none',
-  'data-[selected=true]:bg-accent data-[selected=true]:text-on-accent',
+  'relative flex min-h-[var(--tap)] cursor-default select-none items-center',
+  'gap-[var(--s2)] px-[var(--s3)] py-[var(--s2)]',
+  'rounded-[var(--r-sm)] text-ink outline-none',
+  'data-[selected=true]:bg-max data-[selected=true]:text-on-max',
   'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
 );
 

@@ -31,23 +31,21 @@ export interface FeedbackFormProps {
   submitLabel?: string;
 }
 
-/** Label above its control, the layout the retired `.ui-field` rule gave. */
-const fieldStyles = 'ui-field flex flex-col gap-[var(--space-0-4)]';
+/** §8's `.field`: a block, one `--s4` step below the field before it, label over control. */
+const fieldStyles = 'ui-field flex flex-col gap-[var(--s2)] mt-[var(--s4)]';
 
 /**
- * A stacked field caption reads as text, not as the quiet chip-row caption: it takes
- * the colour and weight the retired `.ui-field-label--strong` rule gave. Both class
- * hooks stay on the label, so the caption is still reachable by name.
+ * §8's `.field__label`: 13px, 650, `0.06em`, upper case, second ink tier. Both class hooks stay
+ * on the label, so the caption is still reachable by name.
  */
 const labelStyles = cx(
   'ui-field-label ui-field-label--strong',
-  'shrink-0 text-text font-semibold text-[length:var(--space-0-85)]',
+  'shrink-0 uppercase text-ink-2',
+  'text-[length:var(--fs-section-label)] font-[var(--fw-section-label)]',
+  'tracking-[var(--tracking-section-label)]',
 );
 
-const requiredMarkerStyles = cx(
-  'ui-field-label__required',
-  'ml-[var(--space-0-3)] text-danger',
-);
+const requiredMarkerStyles = cx('ui-field-label__required', 'ml-[var(--s1)] text-danger');
 
 const TITLE_REQUIRED = 'Title is required.';
 const DESCRIPTION_REQUIRED = 'Description is required.';
@@ -137,6 +135,7 @@ export function FeedbackForm({
       open={open}
       onOpenChange={onOpenChange}
       title={dialogTitle}
+      size="sheet"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

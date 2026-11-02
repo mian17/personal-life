@@ -15,16 +15,17 @@ export interface EditorStackProps extends ComponentPropsWithRef<'div'> {
 const bodyStyles = 'flex min-h-0 flex-1 flex-col';
 
 /**
- * Breathing room between the toolbar and the first field. The toolbar's own
- * bottom margin is small (the notes editor shares it), so the editor body owns
- * the larger separation.
+ * Breathing room between the toolbar and the first field. The toolbar's own bottom
+ * margin is small (the notes editor shares it), so the editor body owns the larger
+ * separation.
  */
-const toolbarGapStyles = 'mt-[var(--space-1)]';
+const toolbarGapStyles = 'mt-[var(--s2)]';
 
+/** The field rhythm is `Stack`'s, so an editor and a screen space their children alike. */
 const gapStyles: Record<StackGap, string> = {
-  sm: 'gap-[var(--space-0-5)]',
-  md: 'gap-[var(--space-1)]',
-  lg: 'gap-[var(--space-2)]',
+  sm: 'gap-[var(--s1)]',
+  md: 'gap-[var(--s2)]',
+  lg: 'gap-[var(--s4)]',
 };
 
 /**

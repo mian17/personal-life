@@ -50,9 +50,13 @@ body {
     --default-transition-timing-function: var(--ease);
   }
 
-  /* The list row's collapse is the slow one: it travels `--d-base` while every other
-     transition keeps the fast default. */
+  /* Two slow transitions, both named by class: the list row's collapse, and the bottom
+     sheet travelling its own height. Every other transition keeps the fast default. */
   .ui-list-item {
+    transition-duration: var(--d-base);
+  }
+
+  .ui-dialog--sheet {
     transition-duration: var(--d-base);
   }
 }

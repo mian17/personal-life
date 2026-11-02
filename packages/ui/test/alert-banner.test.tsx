@@ -19,9 +19,9 @@ describe('AlertBanner', () => {
   it('paints the warning tone from token utilities', () => {
     render(<AlertBanner>Changed.</AlertBanner>);
     const banner = document.querySelector('.ui-alert-banner')!;
-    expect(banner.classList.contains('border-danger')).toBe(true);
-    expect(banner.classList.contains('bg-panel')).toBe(true);
-    expect(banner.classList.contains('rounded-[var(--radius-md)]')).toBe(true);
+    expect(banner.classList.contains('border-warn')).toBe(true);
+    expect(banner.classList.contains('bg-warn-soft')).toBe(true);
+    expect(banner.classList.contains('rounded-[var(--r-lg)]')).toBe(true);
   });
 
   it('forwards role="alert" verbatim (the editor conflict banner contract)', () => {

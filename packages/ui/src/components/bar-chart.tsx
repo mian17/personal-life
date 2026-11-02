@@ -4,6 +4,7 @@ import type { ScaleFunction } from 'recharts';
 import {
   Bar,
   BarChart as RechartsBarChart,
+  Cell,
   ReferenceLine,
   ResponsiveContainer,
   XAxis,
@@ -68,6 +69,9 @@ const EMPTY_BAR_HEIGHT = 2;
  * The wrapper around recharts — its only home in the repository. Bars carry the
  * measured minutes, one stepped `ReferenceLine` carries the per-bucket targets, and
  * every colour arrives as a `var(--…)` token so a theme change moves the chart.
+ *
+ * §8 draws the bars square-cornered, and a bucket with nothing in it in the muted chart tone
+ * rather than the accent — that is what tells an empty day apart from a missing one.
  */
 export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarChartProps>) {
   const rows = data.map((bucket, index) => ({
@@ -85,25 +89,34 @@ export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarC
             <YAxis
               width={Y_AXIS_WIDTH}
               domain={[0, tallestAmount(rows)]}
-              tick={{ fill: 'var(--muted)' }}
-              stroke="var(--border)"
+              tick={{ fill: 'var(--ink-2)' }}
+              stroke="var(--line)"
             />
             {hasTargets(rows) && (
               <ReferenceLine
                 y={0}
                 ifOverflow="hidden"
-                stroke="var(--amber)"
+                stroke="var(--warn)"
                 strokeDasharray="4 4"
                 shape={<TargetSteps rows={rows} />}
               />
             )}
             <Bar
               dataKey="value"
-              fill="var(--accent)"
-              radius={[4, 4, 0, 0]}
               minPointSize={EMPTY_BAR_HEIGHT}
               isAnimationActive={false}
-            />
+            >
+              {rows.map((row) => (
+                <Cell
+                  key={row.index}
+                  // An SVG `fill` cannot name a Tailwind colour utility, and `--max` is
+                  // declared in the app's scope rather than on `:root`, so the fill reads the
+                  // documented bridge that aliases it — `--accent` resolves per app, in both
+                  // schemes, exactly as `bg-max` does in the markup around it.
+                  fill={row.value === 0 ? 'var(--chart-muted)' : 'var(--accent)'}
+                />
+              ))}
+            </Bar>
           </RechartsBarChart>
         </ResponsiveContainer>
       </div>
@@ -128,8 +141,8 @@ function BucketAxis({ buckets, count }: Readonly<{ buckets: BarChartBucket[]; co
       dataKey="index"
       interval={0}
       tickFormatter={tickLabel(buckets, labelledIndexes)}
-      tick={{ fill: 'var(--muted)' }}
-      stroke="var(--border)"
+      tick={{ fill: 'var(--ink-2)' }}
+      stroke="var(--line)"
     />
   );
 }
@@ -208,7 +221,7 @@ function TargetSteps({ rows }: Readonly<{ rows: ChartRow[] }>) {
     <polyline
       className="ui-bar-chart__target"
       fill="none"
-      stroke="var(--amber)"
+      stroke="var(--warn)"
       strokeDasharray="4 4"
       points={runs.join(' ')}
     />

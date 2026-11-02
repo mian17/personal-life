@@ -6,7 +6,7 @@ import { Dialog } from '../src/components/dialog';
  * A controlled surface with a real opener, so closing can be observed from the opener's side:
  * Radix returns focus to whatever held it when the panel opened.
  */
-function Opener({ size }: Readonly<{ size?: 'default' | 'full' }>) {
+function Opener({ size }: Readonly<{ size?: 'default' | 'full' | 'sheet' }>) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -105,5 +105,18 @@ describe('Dialog', () => {
     const panel = dialog();
     expect(panel.classList.contains('ui-dialog')).toBe(true);
     expect(panel.classList.contains('ui-dialog--full')).toBe(true);
+  });
+
+  it('emits ui-dialog--sheet and a grab handle for size="sheet" — the bottom sheet', () => {
+    setup({ open: true, size: 'sheet' });
+    const panel = dialog();
+    expect(panel.classList.contains('ui-dialog--sheet')).toBe(true);
+    expect(panel.classList.contains('ui-dialog--full')).toBe(false);
+    expect(document.querySelector('.ui-dialog__grab')).not.toBeNull();
+  });
+
+  it('leaves the sheet grab handle off the centred panel', () => {
+    setup({ open: true });
+    expect(document.querySelector('.ui-dialog__grab')).toBeNull();
   });
 });

@@ -23,25 +23,29 @@ export interface TagPickerProps extends Omit<ComponentPropsWithRef<'fieldset'>, 
 
 /**
  * A picker reads as one labelled row: the `fieldset` groups the chips natively, so its
- * browser-drawn border, padding and minimum width are all reset and the label rides
- * the chips' baseline instead of sitting above them as an orphan caption.
+ * browser-drawn border, padding and minimum width are all reset and the label rides the
+ * chips' baseline instead of sitting above them as an orphan caption.
  */
 const pickerStyles = cx(
-  'flex flex-wrap items-baseline gap-[var(--space-0-5)]',
+  'flex flex-wrap items-baseline gap-[var(--s2)]',
   'min-w-0 m-0 p-0 border-0',
 );
 
 /**
- * The `legend`'s browser box would break the row, so only its text is kept. A quiet
- * caption: the same size and colour every labelled pill row uses.
+ * The `legend`'s browser box would break the row, so only its text is kept. §8's field caption:
+ * 13px, 650, `0.06em`, upper case, second ink tier — the same caption every labelled row uses.
  */
-const labelStyles = 'inline p-0 shrink-0 text-muted text-[length:var(--space-0-85)]';
+const labelStyles = cx(
+  'inline p-0 shrink-0 uppercase text-ink-2',
+  'text-[length:var(--fs-section-label)] font-[var(--fw-section-label)]',
+  'tracking-[var(--tracking-section-label)]',
+);
 
-/** The chips wrap on their own line, centred against each other. */
-const tagsStyles = 'flex flex-wrap items-center gap-[var(--space-0-4)]';
+/** The chips wrap on their own line, centred against each other, one `--s2` apart. */
+const tagsStyles = 'flex flex-wrap items-center gap-[var(--s2)]';
 
 /** The create row sits under the chips, pushed down by the block's own gap. */
-const createStyles = 'flex items-center gap-[var(--space-0-5)] mt-[var(--space-0-5)]';
+const createStyles = 'flex items-center gap-[var(--s2)] mt-[var(--s3)]';
 
 export function TagPicker({
   tags,

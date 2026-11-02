@@ -24,21 +24,22 @@ export interface MenuProps {
 }
 
 /** The row: summary and its `⋯` trigger, always in flow beside the entity name. */
-const rowStyles = 'relative flex flex-col gap-[var(--space-0-4)]';
+const rowStyles = 'relative flex flex-col gap-[var(--s2)]';
 
-const summaryStyles = 'flex items-center gap-[var(--space-0-5)]';
+const summaryStyles = 'flex items-center gap-[var(--s2)]';
 
 const labelStyles = 'min-w-0 flex-1 truncate';
 
 /**
- * Registry panel, theme-mapped: fill and border ride the existing tokens, so the open menu
- * introduces no colour of its own. Radix portals it into the top layer, where the managers'
- * `overflow: hidden` card cannot clip it, and owns the focus trap, Escape and outside dismiss.
+ * The panel is one raised surface: surface fill, one line, `--r-lg`, `--s2` inset, no shadow.
+ * Radix portals it into the top layer, where the managers' `overflow: hidden` card cannot clip
+ * it, and owns the focus trap, Escape and outside dismiss. It fades in over `--d-fast`.
  */
 const panelStyles = cx(
-  'z-50 flex flex-col gap-[var(--space-0-4)]',
-  'p-[var(--space-0-5)] border rounded-[var(--radius-md)]',
-  'bg-panel text-text shadow-[var(--shadow-fab)]',
+  'z-50 flex flex-col gap-[var(--s1)]',
+  'p-[var(--s2)] border border-line rounded-[var(--r-lg)]',
+  'bg-surface text-ink',
+  'motion-safe:transition-opacity starting:opacity-0',
 );
 
 export function Menu({

@@ -32,7 +32,7 @@ describe('EditorToolbar', () => {
     expect(toolbar.classList.contains('flex')).toBe(true);
     expect(toolbar.classList.contains('items-center')).toBe(true);
     expect(toolbar.classList.contains('justify-between')).toBe(true);
-    expect(toolbar.classList.contains('mb-[var(--space-0-5)]')).toBe(true);
+    expect(toolbar.classList.contains('mb-[var(--s2)]')).toBe(true);
 
     const title = render(
       <EditorToolbar back={{ label: 'Back', onBack: () => {} }} title="New" />,

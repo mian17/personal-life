@@ -11,29 +11,29 @@ export interface AlertBannerProps extends ComponentPropsWithRef<'div'> {
 }
 
 /**
- * Registry `alert` surface, theme-mapped: the border draws `--danger`, the fill is
- * the panel, and every length rides a token, so no new colour enters the palette.
- * The banner is one wrapping row — the message, then its actions beside it.
+ * §8's tone pair on a card surface: the tint behind, the tone word on top, one line of the same
+ * tone — a status never paints a saturated block. The banner is one wrapping row — the message,
+ * then its actions beside it — and its radius is the card's, not a control's.
  */
 const alertVariants = cva(
   [
     'flex flex-wrap items-center justify-between',
-    'gap-[var(--space-0-5)] mb-[var(--space-0-5)]',
-    'px-[var(--space-0-75)] py-[var(--space-0-6)]',
-    'border rounded-[var(--radius-md)]',
+    'gap-[var(--s2)] mb-[var(--s3)]',
+    'px-[var(--s4)] py-[var(--s3)]',
+    'border rounded-[var(--r-lg)]',
   ].join(' '),
   {
     variants: {
       tone: {
-        warning: 'border-danger bg-panel text-text',
+        warning: 'border-warn bg-warn-soft text-warn',
       },
     },
     defaultVariants: { tone: 'warning' },
   },
 );
 
-const textStyles = 'm-0 text-[length:var(--space-0-9)]';
-const actionStyles = 'flex flex-wrap gap-[var(--space-0-5)]';
+const textStyles = 'm-0 text-[length:var(--fs-label)]';
+const actionStyles = 'flex flex-wrap gap-[var(--s2)]';
 
 export function AlertBanner({
   tone = 'warning',

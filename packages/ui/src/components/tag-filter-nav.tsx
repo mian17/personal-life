@@ -17,12 +17,22 @@ export interface TagFilterNavProps {
   'aria-label'?: string;
 }
 
-/** The nav's own geometry: pills wrap on one baseline, with a row's breathing room. */
-const navStyles =
-  'flex flex-wrap items-baseline gap-[var(--space-0-5)] my-[var(--space-1-25)]';
+/**
+ * §8's `.filters`: one row of chips that scrolls sideways rather than wrapping, run out to the
+ * panel's edges and pulled back in by its own `--s4` inset, with the scrollbar hidden. The step
+ * above the row is the section label's, so the nav draws no margin of its own below.
+ */
+const navStyles = cx(
+  'flex gap-[var(--s2)] overflow-x-auto [scrollbar-width:none]',
+  'mt-[var(--s3)] -mx-[var(--s4)] px-[var(--s4)]',
+);
 
-/** A quiet row caption: same size and colour the retired `.ui-field-label` rule gave. */
-const labelStyles = 'shrink-0 text-muted text-[length:var(--space-0-85)]';
+/** §8's field caption: 13px, 650, `0.06em`, upper case, second ink tier. */
+const labelStyles = cx(
+  'shrink-0 text-ink-2 uppercase',
+  'text-[length:var(--fs-section-label)] font-[var(--fw-section-label)]',
+  'tracking-[var(--tracking-section-label)]',
+);
 
 export function TagFilterNav({ items, label, className, ...rest }: Readonly<TagFilterNavProps>) {
   return (

@@ -5,12 +5,13 @@ export type EditorScreenProps = ComponentPropsWithRef<'div'>;
 
 /**
  * Full-height column: the screen owns the page height, so the editor body below the
- * toolbar scrolls inside it. The padding clears the notch and the home indicator.
+ * toolbar scrolls inside it. The padding is the frame's `--s4` inset, and it clears the
+ * notch and the home indicator.
  */
 const screenStyles = [
   'flex flex-col min-h-[100dvh]',
-  'pt-[max(var(--space-0-75),env(safe-area-inset-top))] pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]',
-  'px-[var(--space-1)]',
+  'pt-[max(var(--s3),env(safe-area-inset-top))] pb-[calc(var(--s4)+env(safe-area-inset-bottom))]',
+  'px-[var(--s4)]',
 ].join(' ');
 
 export function EditorScreen({ className, children, ...rest }: EditorScreenProps) {

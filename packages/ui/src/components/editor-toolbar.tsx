@@ -18,12 +18,22 @@ export interface EditorToolbarProps {
   className?: string;
 }
 
-/** One row: back control, then the middle slot, then the actions, pushed to the far edge. */
-const toolbarStyles =
-  'flex items-center justify-between gap-[var(--space-0-5)] mb-[var(--space-0-5)]';
+/**
+ * One row: back control, then the middle slot, then the actions, pushed to the far edge. It is a
+ * tap target tall, so the row keeps the frame's rhythm whether the middle slot holds a heading or
+ * a status read-out.
+ */
+const toolbarStyles = cx(
+  'flex items-center justify-between gap-[var(--s2)]',
+  'min-h-[var(--tap)] mb-[var(--s2)]',
+);
 
 /** Sized below the list `PageTitle` (an editor is a sub-screen), centred between the two controls. */
-const titleStyles = 'flex-1 min-w-0 m-0 text-center text-[length:var(--space-0-95)] font-semibold';
+const titleStyles = cx(
+  'flex-1 min-w-0 m-0 text-center',
+  'text-[length:var(--fs-row-title)] leading-[var(--lh-row-title)]',
+  'tracking-[var(--tracking-row-title)] font-semibold',
+);
 
 export function EditorToolbar({ back, title, status, actions, className }: Readonly<EditorToolbarProps>) {
   return (

@@ -259,7 +259,6 @@ function ComboboxField({
       {open && (
         <PopoverContent
           align="start"
-          sideOffset={4}
           className="w-[var(--radix-popover-trigger-width)] p-0"
           // The field owns focus and the outside press; the panel takes neither.
           onOpenAutoFocus={(event) => event.preventDefault()}
@@ -270,13 +269,13 @@ function ComboboxField({
               <CommandItem
                 key={option.id}
                 value={option.id}
-                className="min-h-[var(--tap-height)]"
+                className="min-h-[var(--tap)]"
                 onSelect={selectValue}
                 // Without this the row press blurs the field and the click is lost.
                 onPointerDown={(event) => event.preventDefault()}
               >
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                {option.meta != null && <span className="shrink-0 text-muted">{option.meta}</span>}
+                {option.meta != null && <span className="shrink-0 text-ink-2">{option.meta}</span>}
               </CommandItem>
             ))}
             <CommandEmpty>{emptyLabel}</CommandEmpty>

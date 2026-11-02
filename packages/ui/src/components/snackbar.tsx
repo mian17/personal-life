@@ -20,8 +20,9 @@ export interface SnackbarProps {
 }
 
 /**
- * Registry toast root, theme-mapped: the page's own panel lifted into the fab corner, above the
- * fab's `z-10`. Every length rides a token, so no colour or measure enters the palette here.
+ * The toast is the page's own raised surface lifted into the fab corner: one line, `--r-lg`, `--s4`
+ * inset, no shadow. It sits above the fab (`z-30`) and below the scrim (`z-40`), so a sheet's
+ * scrim dims it like everything else the page holds.
  *
  * The entry rides the transition instead of a keyframe: `starting:` is the first-frame style, so
  * the toast slides up on mount and the stylesheet owns no animation for it. It travels on the
@@ -29,22 +30,22 @@ export interface SnackbarProps {
  * `prefers-reduced-motion: no-preference` gate, which is what makes reduced motion instant.
  */
 const toastStyles = cx(
-  'fixed z-20',
-  'left-[calc(var(--space-1)+env(safe-area-inset-left))]',
-  'bottom-[calc(var(--space-1)+env(safe-area-inset-bottom))]',
-  'flex items-center gap-[var(--space-0-75)] m-0 list-none',
-  'max-w-[calc(100vw-var(--space-1)*2)]',
-  'p-[var(--space-0-6)_var(--space-0-75)]',
-  'bg-panel text-text border border-border',
-  'rounded-[var(--radius-md)] shadow-[var(--shadow-fab)]',
+  'fixed z-[35]',
+  'left-[calc(var(--s4)+env(safe-area-inset-left))]',
+  'bottom-[calc(var(--s4)+env(safe-area-inset-bottom))]',
+  'flex items-center gap-[var(--s3)] m-0 list-none',
+  'max-w-[calc(100vw-var(--s4)*2)]',
+  'p-[var(--s3)_var(--s4)]',
+  'bg-surface text-ink border border-line',
+  'rounded-[var(--r-lg)]',
   'motion-safe:transition-[translate,opacity]',
-  'starting:translate-y-[var(--space-1)] starting:opacity-0',
+  'starting:translate-y-[var(--s4)] starting:opacity-0',
 );
 
 /** The mirror of the entry: one step down and faded out, over the same transition. */
-const leavingStyles = 'translate-y-[var(--space-1)] opacity-0';
+const leavingStyles = 'translate-y-[var(--s4)] opacity-0';
 
-const textStyles = 'text-[length:var(--space-0-9)]';
+const textStyles = 'text-[length:var(--fs-label)]';
 const actionStyles = 'shrink-0';
 
 export function Snackbar({

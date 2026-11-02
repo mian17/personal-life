@@ -28,28 +28,31 @@ export interface TabBarProps {
 }
 
 /**
- * Registry list, theme-mapped: one bordered rail holding the triggers, so the selected tab reads
- * as the accent surface and the rest stay muted. Radix owns `role="tablist"` and the roving focus.
+ * §8's `.seg`: one trough holding the triggers, one `--s1` apart on the sunken fill, so the
+ * selected tab reads as the accent fill and the rest stay in the second ink tier. Radix owns
+ * `role="tablist"` and the roving focus.
  */
 const listStyles = cx(
-  'inline-flex items-center gap-[var(--space-0-4)]',
-  'p-[var(--space-0-4)] mb-[var(--space-1)]',
-  'rounded-[var(--radius-md)] border border-border bg-panel',
+  'inline-flex items-center gap-[var(--s1)]',
+  'p-[var(--s1)] mt-[var(--s4)]',
+  'rounded-[var(--r-md)] border border-line bg-surface-sunken',
 );
 
 /**
- * Registry trigger, theme-mapped. Each trigger is a route link, so activation stays a real
- * navigation; arrow-key focus comes from the list, and Enter follows the `href` the browser and
+ * §8's `.seg__btn`: a route link on the trough, a tap target tall, pressed-accent when it is the
+ * current tab. Arrow-key focus comes from the list, and Enter follows the `href` the browser and
  * `next/link` already handle. `outline-hidden` zeroes `--tw-outline-style` and `outline-<width>`
  * draws with that variable, so the focus ring needs `outline-solid` to exist at all.
  */
 const tabStyles = cx(
   'inline-flex items-center justify-center whitespace-nowrap',
-  'px-[var(--space-0-75)] py-[var(--space-0-5)] rounded-[var(--radius-md)]',
-  'text-muted no-underline cursor-pointer motion-safe:transition-colors',
-  'data-[state=active]:bg-accent data-[state=active]:text-on-accent',
+  'min-h-[var(--tap)] px-[var(--s4)] rounded-[var(--r-sm)]',
+  'text-[length:var(--fs-chip)] font-semibold tracking-[var(--tracking-button)]',
+  'text-ink-2 no-underline cursor-pointer motion-safe:transition-colors',
+  'data-[state=active]:bg-max data-[state=active]:text-on-max',
+  'active:bg-max-press',
   'outline-hidden focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
-  'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
+  'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-max',
 );
 
 export function Tab({ href, active = false, children, className }: Readonly<TabProps>) {
@@ -68,7 +71,7 @@ export function Tab({ href, active = false, children, className }: Readonly<TabP
           tabStyles,
           // The surface follows the prop the app already passes, so it cannot depend on
           // Radix forwarding `data-state` onto the `asChild` anchor.
-          active && 'bg-accent text-on-accent',
+          active && 'bg-max text-on-max',
           className,
         )}
       >

@@ -40,12 +40,12 @@ describe('Tab', () => {
     );
     // The surface rides the prop-conditioned classes the anchor receives itself.
     const active = classesOf(screen.getByRole('tab', { name: 'List' }));
-    expect(active).toContain('bg-accent');
-    expect(active).toContain('text-on-accent');
+    expect(active).toContain('bg-max');
+    expect(active).toContain('text-on-max');
 
     const inactive = classesOf(screen.getByRole('tab', { name: 'Matrix' }));
-    expect(inactive).not.toContain('bg-accent');
-    expect(inactive).not.toContain('text-on-accent');
+    expect(inactive).not.toContain('bg-max');
+    expect(inactive).not.toContain('text-on-max');
 
     // `asChild` does forward `data-state`, so the `data-[state=active]` fallback is live.
     expect(screen.getByRole('tab', { name: 'List' }).getAttribute('data-state')).toBe('active');

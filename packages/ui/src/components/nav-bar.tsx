@@ -7,11 +7,14 @@ export interface NavBarProps {
   className?: string;
 }
 
-/** The page's top row: the leading slot, then the trailing controls pushed to the far edge. */
-const navBarStyles = 'flex items-center gap-[var(--space-0-5)] m-[0_0_var(--space-0-25)]';
+/**
+ * §8's `.phead`: the leading slot at the top of the panel, the trailing controls on the far edge.
+ * The bar draws no outer margin — the step below it belongs to whatever the screen renders next.
+ */
+const navBarStyles = 'flex items-start gap-[var(--s2)] pt-[var(--s2)]';
 
-/** The trailing group keeps the bar's own rhythm, so its controls line up whatever they are. */
-const actionsStyles = 'flex items-center gap-[var(--space-0-5)] ml-auto';
+/** §8's `.phead__actions`: the trailing controls sit one `--s1` apart, aligned on one line. */
+const actionsStyles = 'flex items-center gap-[var(--s1)] ml-auto';
 
 export function NavBar({ leading, trailing, className }: Readonly<NavBarProps>) {
   return (

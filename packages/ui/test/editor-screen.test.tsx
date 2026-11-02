@@ -22,12 +22,12 @@ describe('EditorScreen', () => {
     expect(screenEl.classList.contains('flex-col')).toBe(true);
     expect(screenEl.classList.contains('min-h-[100dvh]')).toBe(true);
     expect(
-      screenEl.classList.contains('pt-[max(var(--space-0-75),env(safe-area-inset-top))]'),
+      screenEl.classList.contains('pt-[max(var(--s3),env(safe-area-inset-top))]'),
     ).toBe(true);
     expect(
-      screenEl.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]'),
+      screenEl.classList.contains('pb-[calc(var(--s4)+env(safe-area-inset-bottom))]'),
     ).toBe(true);
-    expect(screenEl.classList.contains('px-[var(--space-1)]')).toBe(true);
+    expect(screenEl.classList.contains('px-[var(--s4)]')).toBe(true);
   });
 
   it('renders its children inside the container', () => {
