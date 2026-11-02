@@ -36,35 +36,40 @@ export interface MatrixBlockProps {
  * `minmax(auto, 1fr)`, which would grow).
  */
 const gridStyles =
-  'grid grid-cols-[repeat(2,minmax(0,1fr))] auto-rows-[minmax(0,1fr)] gap-[var(--space-0-5)]';
+  'grid grid-cols-[repeat(2,minmax(0,1fr))] auto-rows-[minmax(0,1fr)] gap-[var(--s2)]';
 
-/** A muted panel, separated from its siblings by the grid gap alone — no outer frame. */
+/**
+ * §8's `.quad`: a sunken panel with its own hairline, separated from its siblings by the grid
+ * gap alone — no outer frame. `--s8 * 4 + --s1` is the reference's 132px floor, kept in tokens.
+ */
 const quadrantStyles =
-  'flex flex-col gap-[var(--space-0-5)] p-[var(--space-1)] min-h-[var(--space-5)] max-h-full overflow-hidden bg-panel rounded-[var(--radius-lg)]';
+  'flex flex-col gap-[var(--s2)] p-[var(--s3)] min-h-[calc(var(--s8)*4+var(--s1))] max-h-full overflow-hidden bg-surface-sunken border border-line rounded-[var(--r-lg)]';
 
-/** The heading keeps one line: a long label ellipsizes rather than widening the panel. */
-const labelStyles = 'm-0 truncate text-[length:var(--space-0-7)] font-bold';
+/** §8's `.quad__label`: one line of small caps; a long label ellipsizes rather than widening the panel. */
+const labelStyles =
+  'm-0 truncate text-[length:var(--fs-count)] [font-weight:var(--fw-section-label)] tracking-[0.04em] uppercase text-ink-2';
 
 /** Heading tint per quadrant tone (off by default). */
 const labelToneStyles: Record<MatrixTone, string> = {
   danger: 'text-danger',
-  amber: 'text-amber',
-  accent: 'text-accent',
-  green: 'text-green',
+  amber: 'text-warn',
+  accent: 'text-max',
+  green: 'text-ok',
 };
 
 /**
  * Overflowing content scrolls inside the box; the heading stays put. The box's bottom edge
- * fades into the panel, so a row cut by that edge reads as "more below" instead of as a
+ * fades into the sunken panel, so a row cut by that edge reads as "more below" instead of as a
  * rendering fault — a touch browser paints no scrollbar to say the box scrolls. `content-start`
  * keeps the fade over empty box space when the box has room to spare.
  */
 const itemsStyles =
-  'grid content-start gap-[var(--space-0-25)] flex-1 min-h-0 overflow-y-auto ' +
-  '[mask-image:linear-gradient(to_bottom,var(--panel)_calc(100%_-_var(--space-1)),transparent)]';
+  'grid content-start gap-[var(--s1)] flex-1 min-h-0 overflow-y-auto ' +
+  '[mask-image:linear-gradient(to_bottom,var(--surface-sunken)_calc(100%_-_var(--s3)),transparent)]';
 
 /** Empty quadrant: muted and centred in the remaining box height. */
-const emptyStyles = 'flex-1 grid place-content-center m-0 text-muted text-center text-[length:var(--space-0-85)]';
+const emptyStyles =
+  'flex-1 grid place-content-center m-0 text-ink-2 text-center text-[length:var(--fs-meta)]';
 
 function quadrantClassName(quadrant: MatrixQuadrant): string {
   return cx(

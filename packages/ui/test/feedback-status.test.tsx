@@ -1,12 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { FEEDBACK_STATUS_VALUES } from '@life/shared';
 import {
   FEEDBACK_STATUSES,
   feedbackStatusOption,
 } from '../src/components/feedback-status';
-
-const tokensCss = readFileSync(join(__dirname, '..', 'src', 'styles', 'tokens.css'), 'utf8');
 
 const EXPECTED = [
   { value: 'open', label: 'Open', token: '--accent' },
@@ -33,11 +29,8 @@ describe('feedback status vocabulary', () => {
     expect(new Set(tokens).size).toBe(4);
   });
 
-  it('pins each mapped token to a token declared in tokens.css', () => {
-    for (const { token } of FEEDBACK_STATUSES) {
-      expect(tokensCss).toContain(`${token}:`);
-    }
-  });
+  // Each status hue's declaration is pinned once, by `tokens.test.ts`'s
+  // "feedback status → revised token" block, which owns the legacy-to-revised rename.
 
   it('answers the option for a status and rejects an unknown one', () => {
     expect(feedbackStatusOption('done')).toEqual(EXPECTED[2]);

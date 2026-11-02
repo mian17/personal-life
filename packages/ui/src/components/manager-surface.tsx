@@ -38,19 +38,19 @@ export interface ManagerSurfaceProps<T extends ManagerItem>
 }
 
 /** The create field sits on one line: the input takes the width, the button follows. */
-const createStyles = 'flex items-center gap-[var(--space-0-5)]';
+const createStyles = 'flex items-center gap-[var(--s2)]';
 
 /** Rows stack below the create field, clear of the browser's list box and markers. */
-const listStyles = 'list-none m-[var(--space-0-5)_0_0] p-0 grid gap-[var(--space-0-4)]';
+const listStyles = 'list-none m-[var(--s2)_0_0] p-0 grid gap-[var(--s1)]';
 
 /** One row is one line: the menu takes the width, so the actions stay at the far end. */
-const rowStyles = 'flex items-center gap-[var(--space-0-5)]';
+const rowStyles = 'flex items-center gap-[var(--s2)]';
 
 /** The row menu is the row's only width-taking child. */
 const menuStyles = 'flex-1 min-w-0';
 
 /** The inline rename editor stands in for the row, so it takes the row's width. */
-const editStyles = 'flex items-center gap-[var(--space-0-5)] flex-1';
+const editStyles = 'flex items-center gap-[var(--s2)] flex-1';
 
 /** The name fills the summary line and ellipsizes rather than pushing the trigger out. */
 const nameStyles = 'flex-1 min-w-0';

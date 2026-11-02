@@ -25,7 +25,7 @@ describe('SettingsBlock', () => {
     expect(document.querySelector('.ui-section__heading-row')).toBeNull();
   });
 
-  it('renders children in order inside the composed card surface', () => {
+  it('renders children in order on the flush card, one per divided row', () => {
     render(
       <SettingsBlock title="Todos">
         <span data-testid="a">a</span>
@@ -34,10 +34,15 @@ describe('SettingsBlock', () => {
       </SettingsBlock>,
     );
     const card = document.querySelector('.ui-card')!;
-    const stack = card.querySelector('.ui-stack')!;
-    expect(stack.querySelectorAll('[data-testid]')).toHaveLength(3);
+    // The group owns the row geometry: the card is flush and one rows box inside it
+    // carries the inset and the hairline between neighbours.
+    expect(card.classList.contains('ui-card--flush')).toBe(true);
+    const rows = card.querySelector('.ui-settings-block__rows')!;
+    expect(rows.querySelectorAll('[data-testid]')).toHaveLength(3);
     expect(card.textContent).toBe('abc');
     expect(document.querySelector('.ui-section')!.querySelector('.ui-card')).toBe(card);
+    expect(rows.classList.contains('divide-y')).toBe(true);
+    expect(rows.classList.contains('[&>*]:px-[var(--s4)]')).toBe(true);
   });
 
   it('merges className onto the composed section', () => {

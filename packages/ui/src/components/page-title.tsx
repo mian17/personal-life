@@ -7,9 +7,11 @@ import { cx } from '../lib/cx';
  */
 export type PageTitleProps = ComponentPropsWithRef<'h1'>;
 
-/** The page's single heading: display size off the frozen type scale, set tight, clear of the content below. */
-const headingStyles =
-  'm-[0_0_var(--space-1)] text-[length:var(--space-2)] font-bold tracking-[-0.02em]';
+/** §8's `.h1`: the display size set tight, clear of the content below. */
+const headingStyles = cx(
+  'm-[var(--s2)_0_var(--s4)]',
+  'text-[length:var(--fs-title)] leading-[var(--lh-title)] font-bold tracking-[var(--tracking-title)]',
+);
 
 export function PageTitle({ className, children, ...rest }: PageTitleProps) {
   return (

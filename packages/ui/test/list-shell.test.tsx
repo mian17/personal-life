@@ -154,7 +154,7 @@ describe('ListShell', () => {
     const { container } = render(<ListShell title="Pomodoro" body={<span />} fill />);
 
     const page = container.querySelector('.ui-page')!;
-    expect(page.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!')).toBe(
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
       true,
     );
   });
@@ -172,10 +172,12 @@ describe('ListShell', () => {
     );
 
     const page = container.querySelector('.ui-page')!;
-    expect(page.classList.contains('pb-[calc(var(--space-5)+env(safe-area-inset-bottom))]')).toBe(
-      true,
-    );
-    expect(page.classList.contains('pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!')).toBe(
+    expect(
+      page.classList.contains(
+        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]',
+      ),
+    ).toBe(true);
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
       false,
     );
   });

@@ -19,11 +19,11 @@ export interface StackProps extends ComponentPropsWithRef<'div'> {
  */
 const stackStyles = 'grid';
 
-/** The token gap scale: one step per gap, `md` matching the base line height. */
+/** The spacing steps: one per gap, `md` matching the base line height. */
 const gapStyles: Record<StackGap, string> = {
-  sm: 'gap-[var(--space-0-5)]',
-  md: 'gap-[var(--space-1)]',
-  lg: 'gap-[var(--space-2)]',
+  sm: 'gap-[var(--s1)]',
+  md: 'gap-[var(--s2)]',
+  lg: 'gap-[var(--s4)]',
 };
 
 /**

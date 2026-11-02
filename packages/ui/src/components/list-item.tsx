@@ -37,111 +37,99 @@ export interface ListItemProps extends Omit<ComponentPropsWithRef<'li'>, 'title'
 }
 
 /**
- * The row surface: the panel fill, the row radius clipping the action slots, and the
- * collapse animation. The floor is one two-line row (title + sub) so an empty
- * `meta`/`snippet` cannot collapse it — a dense row is exactly its content height instead.
- * The collapse travels on `--d-base`: the `motion-safe:transition-[height,opacity]` utility
- * compiles inside `base.css`'s motion gate, which supplies that §7 duration, and the
- * `reduce` block there is the backstop that collapses it.
+ * The row surface: one line of slots and body, the press wash, and the collapse animation.
+ * The row is transparent inside its group — the group paints the surface and the dividers —
+ * so a row only owns its own geometry. The collapse travels on `--d-base`: the
+ * `motion-safe:transition-[height,opacity]` utility compiles inside `base.css`'s motion gate,
+ * which supplies that §7 duration, and the `reduce` block there is the backstop that
+ * collapses it.
  */
 const rowSurfaceStyles = cx(
-  'flex bg-panel rounded-[var(--radius-lg)] overflow-hidden',
+  'flex gap-[var(--s3)] overflow-hidden active:bg-press',
   'motion-safe:transition-[height,opacity]',
   '[interpolate-size:allow-keywords]',
 );
 
-const rowFloorStyles =
-  'min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]';
+/**
+ * §8's `.row` box: the row's own insets and its 56px floor, which is what keeps a row without
+ * a meta line from collapsing to its title.
+ */
+const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)]';
 
-/** A collapsing row animates to nothing while the consumer hides it. */
-const collapsingRowStyles = 'h-0 min-h-0 opacity-0 overflow-hidden';
+/**
+ * A dense row is exactly the tap target tall, on the tighter inset, and narrows the checkbox
+ * mark it hosts so the mark never fills the row it sits in.
+ */
+const denseRowStyles = 'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s5)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
- * square for a compact inset so the glyph does not sit flush to the row edge.
+ * square for a compact inset. The row's own end inset has already placed the slot, so the
+ * glyph needs no negative margin to land on the text edge.
  */
 const rowSlotStyles = cx(
   '[&>form]:flex',
   '[&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0',
   '[&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0',
-  '[&>form>.ui-btn--danger]:p-[var(--space-0-5)]',
-  // Glyph's right inset lands on the row's own text inset (`--space-0-9`), the same
-  // padding the row body carries, so a trailing control does not read tighter than the text.
-  '[&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))]',
-  '[&>form>.ui-btn--danger]:rounded-[var(--radius-lg)]',
+  '[&>form>.ui-btn--danger]:p-[var(--s2)]',
+  '[&>form>.ui-btn--danger]:rounded-[var(--r-md)]',
 );
 
 /**
- * Leading checkbox inset: a todo row starts its leading checkbox box on `--space-0-9`, the
- * same inset the trailing delete glyph's outer edge resolves to, so the two ends of the row
- * sit on one edge. Selector-matched to the direct `.ui-checkbox` child, so a row without one
- * is untouched. A dense row opts out (`!isDense`): its quadrant lens keeps the checkbox flush
- * to the clipped row edge.
- */
-const todoCheckboxInsetStyles = 'has-[>.ui-checkbox]:ps-[var(--space-0-9)]';
-
-/**
  * The whole row is the target: the body stretches to the row height and takes its width.
- * Each shape below spells out its own alignment, gap and padding, so nothing is applied
- * twice and no later class has to outrank an earlier one.
+ * Each shape below spells out its own alignment and gap, so nothing is applied twice and no
+ * later class has to outrank an earlier one. Padding lives on the row box, not here, so the
+ * slots and the body share one inset.
  */
 const linkSharedStyles =
   'flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent]';
 
 /** One line: meta and snippet share it, the whole line centred against the row. */
-const linkRowStyles = cx(
-  linkSharedStyles,
-  'items-center gap-[var(--space-0-75)] p-[var(--space-0-9)]',
-);
+const linkRowStyles = cx(linkSharedStyles, 'items-center gap-[var(--s2)]');
 
 /** Nested and feedback rows stack: the title line above the child body. */
-const linkColumnStyles = cx(
-  linkSharedStyles,
-  'flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
-);
+const linkColumnStyles = cx(linkSharedStyles, 'flex-col items-stretch gap-[var(--s2)]');
 
-/**
- * Dense todo rows are compact rows, exactly as tall as their content, centred on it.
- * Start padding is the row's text inset (`--space-0-9`), the token the trailing delete
- * glyph's right inset resolves to, so a leading checkbox and that glyph sit on one edge.
- * End padding stays compact: the row body runs to the trailing slot, not the row edge.
- */
-const linkDenseStyles = cx(
-  linkSharedStyles,
-  'items-center gap-[var(--space-0-5)] py-[var(--space-0-6)] ps-[var(--space-0-9)] pe-[var(--space-0-4)]',
-);
+/** A dense row packs its line tighter than a full row. */
+const linkDenseStyles = cx(linkSharedStyles, 'items-center gap-[var(--s1)]');
 
-/** Title above, meta line below, at the tight token gap. */
-const textStyles = 'flex flex-col gap-[var(--space-0-15)] flex-1 min-w-0';
+/** Title above, meta line below, one spacing step apart. */
+const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';
 
-const titleBaseStyles = 'font-semibold';
+/** §8's `.row__title`: 16px at 1.35, semibold, set slightly tight. */
+const titleBaseStyles =
+  'font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)]';
+
+const titleSizeStyles = 'text-[length:var(--fs-row-title)]';
+
+/** A dense row's title drops to the meta size, so a quadrant row reads as one compact block. */
+const denseTitleSizeStyles = 'text-[length:var(--fs-meta)]';
 
 /** The title is one ellipsized line — except a todo row, which reads up to two. */
 const titleLineStyles = 'truncate';
 const titleClampedStyles = 'line-clamp-2 whitespace-normal';
 
-const denseTextStyles = 'text-[length:var(--space-0-7)]';
-
+/** §8's `.row__meta`: the second ink tier, one step below the title. */
 const subStyles = cx(
-  'flex items-baseline gap-[var(--space-0-4)] min-w-0',
-  'text-muted text-[length:var(--space-0-85)]',
+  'flex items-baseline gap-[var(--s1)] min-w-0',
+  'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]',
   '[&>time]:shrink-0 [&>time]:whitespace-nowrap',
 );
 
-const separatorStyles = 'shrink-0 text-border';
+const separatorStyles = 'shrink-0 text-ink-3';
 const snippetStyles = 'min-w-0 truncate';
-const nestedBodyStyles = 'grid gap-[var(--space-0-5)]';
+const nestedBodyStyles = 'grid gap-[var(--s2)]';
 
 /**
- * A nested body spans its column, but a title line carrying an action gives that action
- * `--icon-btn-size` plus the action-line gap, so the body reserves the same column and a
- * child field shares the title field's edges.
+ * A nested body spans its column, but a title line carrying an action gives that action a
+ * full tap target plus the action-line gap, so the body reserves the same column and a child
+ * field shares the title field's edges.
  */
-const nestedBodyActionInsetStyles = 'pr-[calc(var(--icon-btn-size)+var(--space-0-5))]';
+const nestedBodyActionInsetStyles = 'pr-[calc(var(--tap)+var(--s2))]';
 
 /** The title line carrying its action: the action sits against the title, not the child body. */
 const actionLineStyles = cx(
-  'flex items-stretch gap-[var(--space-0-5)]',
+  'flex items-stretch gap-[var(--s2)]',
   '[&>:first-child]:flex-1 [&>:first-child]:min-w-0',
 );
 
@@ -149,9 +137,9 @@ const actionLineStyles = cx(
 const actionStyles = 'flex items-center shrink-0';
 
 /** A done row is struck and muted; so is the due date that would otherwise read red. */
-const doneTitleStyles = 'text-muted line-through';
+const doneTitleStyles = 'text-ink-2 line-through';
 const doneRowStyles =
-  '[&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted';
+  '[&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3';
 
 /**
  * A tone tints the leading control of an open coloured-lens row: the checkbox inherits the
@@ -159,13 +147,9 @@ const doneRowStyles =
  */
 const toneStyles: Record<ListItemTone, string> = {
   danger: '[&_.ui-checkbox]:text-danger [&_.ui-icon-btn]:text-danger',
-  amber: '[&_.ui-checkbox]:text-amber [&_.ui-icon-btn]:text-amber',
-  accent: '[&_.ui-checkbox]:text-accent [&_.ui-icon-btn]:text-accent',
+  amber: '[&_.ui-checkbox]:text-warn [&_.ui-icon-btn]:text-warn',
+  accent: '[&_.ui-checkbox]:text-max [&_.ui-icon-btn]:text-max',
 };
-
-/** The leading checkbox is bigger in a todo row and compact in its dense scale. */
-const todoCheckboxSize = '[--checkbox-size:var(--space-1-25)]';
-const denseCheckboxSize = '[--checkbox-size:var(--space-0-75)]';
 
 /** The row's computed shape, resolved once so every class and node builder reads one source. */
 interface RowFlags {
@@ -186,6 +170,10 @@ function linkStylesFor({ isColumn, isDense }: Readonly<RowFlags>): string {
   return linkRowStyles;
 }
 
+function titleSizeStylesFor(isDense: boolean): string {
+  return isDense ? denseTitleSizeStyles : titleSizeStyles;
+}
+
 function titleNodeFor(
   { variant, isDense, done, carriesAction }: Readonly<RowFlags>,
   title: ReactNode,
@@ -197,8 +185,8 @@ function titleNodeFor(
         'ui-list-item__title',
         carriesAction && 'ui-list-item__title--with-action',
         titleBaseStyles,
+        titleSizeStylesFor(isDense),
         variant === 'todo' ? titleClampedStyles : titleLineStyles,
-        isDense && denseTextStyles,
         done && doneTitleStyles,
         carriesAction && actionLineStyles,
       )}
@@ -212,7 +200,7 @@ function titleNodeFor(
 }
 
 function subNodeFor(
-  { variant, isDense }: Readonly<RowFlags>,
+  { variant }: Readonly<RowFlags>,
   meta: ReactNode,
   snippet: ReactNode,
 ): ReactNode {
@@ -229,7 +217,7 @@ function subNodeFor(
       <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
     </>
   ) : (
-    <span className={cx('ui-list-item__sub', subStyles, isDense && denseTextStyles)}>
+    <span className={cx('ui-list-item__sub', subStyles)}>
       {meta}
       {snippetNode && (
         <>
@@ -261,9 +249,11 @@ function rowHookClassesFor({
   );
 }
 
-/** The row's utility classes: surface, control insets, alignment, and state treatment. */
+/** A collapsing row animates to nothing while the consumer hides it. */
+const collapsingRowStyles = 'h-0 min-h-0 opacity-0 overflow-hidden';
+
+/** The row's utility classes: surface, box, alignment, slots, and state treatment. */
 function rowStyleClassesFor({
-  variant,
   isDense,
   isColumn,
   hasSlot,
@@ -273,11 +263,8 @@ function rowStyleClassesFor({
 }: Readonly<RowFlags>): string {
   return cx(
     rowSurfaceStyles,
-    isDense ? denseCheckboxSize : variant === 'todo' && todoCheckboxSize,
-    !isDense && todoCheckboxInsetStyles,
+    isDense ? denseRowStyles : rowBoxStyles,
     isColumn ? 'items-start' : 'items-center',
-    isDense ? 'min-h-0' : rowFloorStyles,
-    variant === 'nested' && '[&>.ui-icon-btn]:mt-[var(--space-0-9)] [&>form]:mt-[var(--space-0-9)]',
     hasSlot && rowSlotStyles,
     done && doneRowStyles,
     tone && !done && toneStyles[tone],

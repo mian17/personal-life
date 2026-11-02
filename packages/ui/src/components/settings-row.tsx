@@ -19,16 +19,17 @@ export interface SettingsRowProps {
  */
 const rowStyles = cx(
   'flex flex-wrap items-center justify-between',
-  'gap-[var(--space-0-5)] max-sm:flex-col max-sm:items-stretch',
+  'gap-[var(--s2)] max-sm:flex-col max-sm:items-stretch',
 );
 
 /** The label column takes the row's leftover width, so a long label never pushes the control out. */
-const textStyles = 'flex flex-1 flex-col gap-[var(--space-0-15)] min-w-0';
+const textStyles = 'flex flex-1 flex-col gap-[var(--s1)] min-w-0';
 
 /** A label may ellipsize only if its own box is allowed to shrink. */
-const labelStyles = 'min-w-0';
+const labelStyles = 'min-w-0 text-[length:var(--fs-row-title)]';
 
-const descriptionStyles = 'text-muted text-[length:var(--space-0-85)]';
+/** §8's `.row__meta` treatment for the optional second line. */
+const descriptionStyles = 'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
 
 /** The control keeps its intrinsic width and centres against the label line. */
 const controlStyles = 'flex items-center shrink-0';

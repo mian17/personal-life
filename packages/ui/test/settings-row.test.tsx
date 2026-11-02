@@ -30,7 +30,7 @@ describe('SettingsRow', () => {
     );
     const desc = document.querySelector('.ui-settings-row__desc')!;
     expect(desc.textContent).toBe('System, light, or dark.');
-    expect(desc.classList.contains('text-muted')).toBe(true);
+    expect(desc.classList.contains('text-ink-2')).toBe(true);
   });
 
   it('omits the description when undefined', () => {

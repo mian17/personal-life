@@ -48,12 +48,12 @@ const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
 const fillBodyStyles = 'flex-1 min-h-0 grid [grid-template-rows:minmax(0,1fr)]';
 
 /**
- * A page with no `FabLink` has no fab to clear, so its bottom padding is the screen edge
- * alone — `PageShell`'s `--space-5` band would otherwise float the content above the safe
- * area. Important because both paddings are utilities of one layer, where the later one in
- * the generated sheet wins regardless of attribute order.
+ * A page with no `FabLink` has no fab to clear, so its bottom padding is the frame's own
+ * `--s6` band alone — `PageShell`'s fab band would otherwise float the content above the
+ * safe area. Important because both paddings are utilities of one layer, where the later
+ * one in the generated sheet wins regardless of attribute order.
  */
-const fablessPageStyles = 'pb-[calc(var(--space-1)+env(safe-area-inset-bottom))]!';
+const fablessPageStyles = 'pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!';
 
 export function ListShell({
   title,

@@ -7,9 +7,10 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-const SECTION_UTILITY = 'mt-[var(--space-2)]';
+const SECTION_UTILITY = 'mt-[var(--s6)]';
 const AUTO_HIDE_UTILITY = '[&:has(.ui-list):not(:has(.ui-list-item))]:hidden';
-const HEADING_MARGIN_UTILITY = '[&>:is(h2,h3)]:m-[0_0_var(--space-0-5)]';
+const HEADING_MARGIN_UTILITY = '[&>:is(h2,h3)]:m-0';
+const LABEL_GAP_UTILITY = 'mb-[var(--s2)]';
 
 describe('Section', () => {
   it('renders a <section> landmark carrying the body', () => {
@@ -79,9 +80,9 @@ describe('Section', () => {
   });
 
   it.each<[StackGap, string]>([
-    ['sm', '--space-0-5'],
-    ['md', '--space-1'],
-    ['lg', '--space-2'],
+    ['sm', '--s1'],
+    ['md', '--s2'],
+    ['lg', '--s4'],
   ])('composes a Stack body mapped through gap="%s" (%s)', (gap, token) => {
     render(<Section gap={gap}>x</Section>);
     const stack = document.querySelector('.ui-stack')!;
@@ -98,12 +99,20 @@ describe('Section', () => {
     expect(stack.classList.contains('ui-stack--lg')).toBe(false);
   });
 
-  it('owns the outer --space-2 rhythm while the heading owns its --space-0-5 gap', () => {
+  it('owns the outer --s6 rhythm while the label owns its own --s2 gap', () => {
     render(<Section label="Today">x</Section>);
     expect(classesOf(document.querySelector('.ui-section')!)).toContain(SECTION_UTILITY);
-    expect(
-      classesOf(document.querySelector('.ui-section__heading-row')!),
-    ).toContain(HEADING_MARGIN_UTILITY);
+
+    // §8's `.slabel`: the small-caps treatment rides the heading row's children, so the
+    // heading keeps its own hook alone and no type utility is pinned on it directly.
+    const rowClasses = classesOf(document.querySelector('.ui-section__heading-row')!);
+    expect(rowClasses).toContain(HEADING_MARGIN_UTILITY);
+    expect(rowClasses).toContain(LABEL_GAP_UTILITY);
+    expect(rowClasses).toContain('[&>:is(h2,h3)]:uppercase');
+    expect(rowClasses).toContain('[&>:is(h2,h3)]:text-[length:var(--fs-section-label)]');
+
+    // A section without a label carries no label gap: the utility only exists on the row.
+    expect(classesOf(document.querySelector('.ui-section')!)).not.toContain(LABEL_GAP_UTILITY);
   });
 
   it('collapses a group section whose every row was removed', () => {

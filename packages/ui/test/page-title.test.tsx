@@ -5,8 +5,8 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-const DISPLAY_SIZE_UTILITY = 'text-[length:var(--space-2)]';
-const HEADING_MARGIN_UTILITY = 'm-[0_0_var(--space-1)]';
+const DISPLAY_SIZE_UTILITY = 'text-[length:var(--fs-title)]';
+const HEADING_MARGIN_UTILITY = 'm-[var(--s2)_0_var(--s4)]';
 
 describe('PageTitle', () => {
   it('renders an <h1> heading with the ui-page-title hook', () => {

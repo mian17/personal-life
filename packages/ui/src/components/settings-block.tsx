@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
+import { cx } from '../lib/cx';
 import { Card } from './card';
 import { Section } from './section';
-import { Stack } from './stack';
 
 export interface SettingsBlockProps {
   /** Group heading; omitted renders no heading row. */
@@ -12,11 +12,18 @@ export interface SettingsBlockProps {
   className?: string;
 }
 
+/**
+ * The group owns the row geometry: a flush card draws the surface and the outer hairline, and
+ * each child takes the row inset with a hairline between neighbours. A `SettingsRow` therefore
+ * carries no padding of its own, so it reads the same standalone in a nested field body.
+ */
+const rowsStyles = 'divide-y divide-line [&>*]:px-[var(--s4)] [&>*]:py-[var(--s3)]';
+
 export function SettingsBlock({ title, children, className }: Readonly<SettingsBlockProps>) {
   return (
-    <Section label={title} gap="sm" className={className}>
-      <Card>
-        <Stack gap="sm">{children}</Stack>
+    <Section label={title} className={className}>
+      <Card flush>
+        <div className={cx('ui-settings-block__rows', rowsStyles)}>{children}</div>
       </Card>
     </Section>
   );
