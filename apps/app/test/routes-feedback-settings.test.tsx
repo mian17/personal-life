@@ -56,6 +56,14 @@ describe('/feedback/settings page wiring', () => {
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
   });
 
+  it('lays the appearance segment into the settings row: full width, no trough chrome', () => {
+    const html = renderToStaticMarkup(FeedbackSettingsPage());
+    const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
+
+    expect(segment).toContain('w-full');
+    expect(segment).not.toContain('bg-surface-sunken');
+  });
+
   it('renders the frozen copy and a back affordance targeting /feedback', () => {
     const html = renderToStaticMarkup(FeedbackSettingsPage());
 

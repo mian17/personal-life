@@ -10,7 +10,7 @@ export default async function TodosSettingsPage() {
   return (
     <ManagerBlock title="Settings" backHref="/todos">
       <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle />} />
+        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle inGroup />} />
       </SettingsBlock>
       <SettingsBlock title="Todos">
         <SettingsRow

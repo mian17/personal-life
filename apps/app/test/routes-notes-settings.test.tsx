@@ -20,6 +20,14 @@ describe('/notes/settings appearance control', () => {
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
   });
 
+  it('lays the appearance segment into the settings row: full width, no trough chrome', () => {
+    const html = renderToStaticMarkup(NotesSettingsPage());
+    const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
+
+    expect(segment).toContain('w-full');
+    expect(segment).not.toContain('bg-surface-sunken');
+  });
+
   it('keeps the row label and description the settings idiom already reads', () => {
     const html = renderToStaticMarkup(NotesSettingsPage());
 

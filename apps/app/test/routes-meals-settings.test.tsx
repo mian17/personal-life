@@ -44,6 +44,14 @@ describe('/meals/settings page wiring', () => {
     expect(row.props.control.type).toBe(ThemeToggle);
   });
 
+  it('lays the appearance segment into the settings row: full width, no trough chrome', () => {
+    const html = renderToStaticMarkup(MealsSettingsPage());
+    const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
+
+    expect(segment).toContain('w-full');
+    expect(segment).not.toContain('bg-surface-sunken');
+  });
+
   it('renders the frozen copy and a back affordance targeting /meals', () => {
     const html = renderToStaticMarkup(MealsSettingsPage());
 

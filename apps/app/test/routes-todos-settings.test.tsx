@@ -31,6 +31,14 @@ describe('/todos/settings appearance control', () => {
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
   });
 
+  it('lays the appearance segment into the settings row: full width, no trough chrome', async () => {
+    const html = renderToStaticMarkup(await TodosSettingsPage());
+    const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
+
+    expect(segment).toContain('w-full');
+    expect(segment).not.toContain('bg-surface-sunken');
+  });
+
   it('leaves the todos matrix switch untouched beside it', async () => {
     const html = renderToStaticMarkup(await TodosSettingsPage());
 

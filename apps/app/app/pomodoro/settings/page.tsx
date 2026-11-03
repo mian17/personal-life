@@ -45,7 +45,7 @@ export default async function PomodoroSettingsRoute() {
   return (
     <ManagerBlock title="Settings" backHref="/pomodoro">
       <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle />} />
+        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle inGroup />} />
       </SettingsBlock>
 
       <SettingsBlock title="Comfort">

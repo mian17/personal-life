@@ -85,6 +85,14 @@ describe('/pomodoro/settings page wiring', () => {
     expect(settingsRow(block, 'Theme').props.control.type).toBe(ThemeToggle);
   });
 
+  it('lays the appearance segment into the settings row: full width, no trough chrome', async () => {
+    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
+
+    expect(segment).toContain('w-full');
+    expect(segment).not.toContain('bg-surface-sunken');
+  });
+
   it('renders the Comfort block as the reference draws it: a static row reading System', async () => {
     const page = await PomodoroSettingsPage();
     const block = settingsBlock(page, 'Comfort');
