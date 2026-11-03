@@ -25,7 +25,6 @@ export function NoteList({ notes }: Readonly<{ notes: Note[] }>) {
                   type="submit"
                   variant="danger"
                   size="icon"
-                  className="note-delete"
                   aria-label={`Delete ${title}`}
                 >
                   <Trash2 size={18} aria-hidden />
