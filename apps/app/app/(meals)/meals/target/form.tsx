@@ -142,7 +142,11 @@ export function TargetProfileForm({
           <>
             <Card>
               <Stack gap="sm">
-                <Kpi value={KCAL.format(Math.round(initial.calories))} unit="kcal" />
+                <Kpi
+                  label="Derived energy"
+                  value={KCAL.format(Math.round(initial.calories))}
+                  unit="kcal"
+                />
                 <Facts>
                   <FactsRow label="Protein" value={format('protein', initial.proteinG)} />
                   <FactsRow label="Carbs" value={format('carbohydrates', initial.carbG)} />

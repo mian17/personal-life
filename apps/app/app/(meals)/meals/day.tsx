@@ -46,10 +46,16 @@ const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
 ];
 
 /** The reference's three macro tracks, in its order; the goal grams live on the target row. */
-const MACRO_TRACKS: readonly { key: Nutrient; label: string; goal: (target: MealTarget) => number }[] = [
-  { key: 'protein', label: 'Protein', goal: (target) => target.proteinG },
-  { key: 'carbohydrates', label: 'Carbs', goal: (target) => target.carbG },
-  { key: 'fat', label: 'Fat', goal: (target) => target.fatG },
+const MACRO_TRACKS: readonly {
+  key: Nutrient;
+  label: string;
+  /** The nutrient as the reference's track aria-label names it (`62 grams of carbohydrate toward 220`). */
+  noun: string;
+  goal: (target: MealTarget) => number;
+}[] = [
+  { key: 'protein', label: 'Protein', noun: 'protein', goal: (target) => target.proteinG },
+  { key: 'carbohydrates', label: 'Carbs', noun: 'carbohydrate', goal: (target) => target.carbG },
+  { key: 'fat', label: 'Fat', noun: 'fat', goal: (target) => target.fatG },
 ];
 
 /** Whole kcal with the reference's thousands separator (`1,180`); the formatter does not group. */
@@ -62,9 +68,8 @@ function grouped(kcal: number): string {
 /**
  * The day's headline as `Kpi`'s two slots: the eaten figure on its own (whole
  * kcal, grouped the way the reference draws it), then what it is measured
- * against. A missing profile (target 404) is "no target set", never an error
- * page. `kcal` is named once, right after the figure, so the read-out the day
- * card exposes leads with the day's own number.
+ * against — `of 2,050 kcal`, the unit word last as the reference writes it. A
+ * missing profile (target 404) is "no target set", never an error page.
  */
 function dayReadout(
   totalCalories: number,
@@ -73,7 +78,7 @@ function dayReadout(
   const eaten =
     Number.isFinite(totalCalories) && totalCalories >= 0 ? grouped(totalCalories) : UNKNOWN;
   if (target == null) return { eaten, unit: 'kcal — No target set' };
-  return { eaten, unit: `kcal of ${grouped(target.calories)}` };
+  return { eaten, unit: `of ${grouped(target.calories)} kcal` };
 }
 
 /** A figure as a share of its goal; a zero or unknown goal draws an empty bar, never a divide-by-zero. */
@@ -123,7 +128,7 @@ export async function mealDay(day: string, emptyBody: string) {
       <PageTitle>Meals — {formatDate(day)}</PageTitle>
       <Card aria-live="polite" role="status">
         <Stack gap="sm">
-          <Kpi value={readout.eaten} unit={readout.unit} />
+          <Kpi label="Logged so far" value={readout.eaten} unit={readout.unit} />
           {target != null && (
             <>
               <ProgressBar
@@ -137,8 +142,9 @@ export async function mealDay(day: string, emptyBody: string) {
                   <ProgressBar
                     key={track.key}
                     value={percentOf(have, goal)}
-                    label={`${format(track.key, have)} of ${format(track.key, goal)} toward the daily ${track.label.toLowerCase()} target`}
-                    caption={`${track.label} · ${Math.round(have)} / ${format(track.key, goal)}`}
+                    label={`${Math.round(have)} grams of ${track.noun} toward ${Math.round(goal)}`}
+                    caption={track.label}
+                    readout={`${Math.round(have)} / ${format(track.key, goal)}`}
                   />
                 );
               })}

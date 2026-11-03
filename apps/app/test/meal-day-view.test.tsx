@@ -109,7 +109,9 @@ describe('meals day view', () => {
     // number, the unit slot the rest of the day summary. The value is grouped
     // the way the reference draws it (`1,180`), which the formatter does not do.
     expect(html).toMatch(/ui-kpi__value[^>]*>600</);
-    expect(html).toContain('kcal of 2,000');
+    // The reference writes the unit last: `of 2,000 kcal`.
+    expect(html).toContain('of 2,000 kcal');
+    expect(html).not.toContain('kcal of 2,000');
     expect(html).not.toContain('No meals logged today.');
   });
 
@@ -126,13 +128,31 @@ describe('meals day view', () => {
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
-    // One energy track against the target calories, then one per macro, each
-    // naming its own grams in the visible caption above its bar.
+    // One energy track against the target calories, then one per macro, each a
+    // reference `.macro` row: its label, its track, and its grams read-out.
     expect(html).toContain('aria-label="30 percent of the daily energy target"');
-    expect(html).toContain('Protein · 62 / 120 g');
-    expect(html).toContain('Carbs · 131 / 220 g');
-    expect(html).toContain('Fat · 39 / 68 g');
-    expect(html).toContain('aria-label="62 g of 120 g toward the daily protein target"');
+    for (const [label, have, goal] of [
+      ['Protein', 62, 120],
+      ['Carbs', 131, 220],
+      ['Fat', 39, 68],
+    ] as const) {
+      expect(html).toMatch(
+        new RegExp(
+          `ui-progress--row[^>]*><span class="ui-progress__caption[^"]*">${label}</span>`,
+        ),
+      );
+      expect(html).toContain(`${have} / ${goal} g`);
+    }
+    expect(html).toContain('aria-label="62 grams of protein toward 120"');
+    expect(html).toContain('Logged so far');
+  });
+
+  it('names the day card read-out the way the reference does: "Logged so far"', async () => {
+    mockedGetMealTarget.mockResolvedValue(target({ calories: 2000 }));
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toMatch(/ui-kpi__label[^>]*>Logged so far</);
   });
 
   it('says "No target set" when the owner has no profile yet (target 404 is not an error)', async () => {
