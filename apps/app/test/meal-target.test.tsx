@@ -324,8 +324,17 @@ describe('target page', () => {
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-03');
     // The page is the form itself: no app shell (PageShell/Card/NavBar) wraps it.
     expect(el.type).toBe(TargetProfileForm);
-    expect(html).toContain(format('calories', 2400));
+    // The derived-energy card is the headline: `Kpi`'s value slot carries the
+    // grouped figure (the shared formatter does not group) and the unit the word,
+    // then the three macro totals as `Facts` rows.
+    expect(html).toMatch(/ui-kpi__value[^>]*>2,400</);
+    expect(html).toContain('>kcal<');
     expect(html).toContain(format('protein', 112));
+    expect(html).toContain(format('carbohydrates', 345));
+    // The stored profile reads back as pill rows above the fields.
+    expect(html).toContain('30 years');
+    expect(html).toContain('Moderate');
+    expect(html).toContain('Maintain');
     expect(html).not.toContain('No target set yet');
     // The stored profile opens the form as an edit, not as an empty onboarding form.
     expect(html).toContain('aria-label="Age"');

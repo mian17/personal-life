@@ -1,4 +1,4 @@
-import { format, sum, UNKNOWN } from '@life/nutrition';
+import { format, sum, UNKNOWN, type Nutrient, type NutrientVector } from '@life/nutrition';
 import {
   ButtonLink,
   Card,
@@ -10,9 +10,10 @@ import {
   NavBar,
   PageShell,
   PageTitle,
+  Pill,
+  ProgressBar,
   Section,
   Stack,
-  StatusText,
 } from '@life/ui';
 import { MealDoors } from './meal-doors';
 import { MealsNav } from '../../meals-nav';
@@ -23,6 +24,7 @@ import {
   listMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
+  type MealTarget,
 } from '@/lib/meal-api';
 
 /**
@@ -43,24 +45,41 @@ const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
   { key: 'snack', label: 'Snacks' },
 ];
 
+/** The reference's three macro tracks, in its order; the goal grams live on the target row. */
+const MACRO_TRACKS: readonly { key: Nutrient; label: string; goal: (target: MealTarget) => number }[] = [
+  { key: 'protein', label: 'Protein', goal: (target) => target.proteinG },
+  { key: 'carbohydrates', label: 'Carbs', goal: (target) => target.carbG },
+  { key: 'fat', label: 'Fat', goal: (target) => target.fatG },
+];
+
+/** Whole kcal with the reference's thousands separator (`1,180`); the formatter does not group. */
+const KCAL = new Intl.NumberFormat('en-US');
+
+function grouped(kcal: number): string {
+  return KCAL.format(Math.round(kcal));
+}
+
 /**
  * The day's headline as `Kpi`'s two slots: the eaten figure on its own (whole
- * kcal, the same rule the shared formatter applies), then the unit and what it
- * is measured against. A missing profile (target 404) is "no target set", never
- * an error page; an over-target day reads "X over" so the formatter's negative
- * guard never leaks an em dash into the remaining figure.
+ * kcal, grouped the way the reference draws it), then what it is measured
+ * against. A missing profile (target 404) is "no target set", never an error
+ * page. `kcal` is named once, right after the figure, so the read-out the day
+ * card exposes leads with the day's own number.
  */
 function dayReadout(
   totalCalories: number,
   target: { calories: number } | null,
-): { eaten: number | string; unit: string } {
+): { eaten: string; unit: string } {
   const eaten =
-    Number.isFinite(totalCalories) && totalCalories >= 0 ? Math.round(totalCalories) : UNKNOWN;
+    Number.isFinite(totalCalories) && totalCalories >= 0 ? grouped(totalCalories) : UNKNOWN;
   if (target == null) return { eaten, unit: 'kcal — No target set' };
-  const rest = target.calories - totalCalories;
-  const tail =
-    rest >= 0 ? `${format('calories', rest)} left` : `${format('calories', -rest)} over`;
-  return { eaten, unit: `kcal / ${format('calories', target.calories)}, ${tail}` };
+  return { eaten, unit: `kcal of ${grouped(target.calories)}` };
+}
+
+/** A figure as a share of its goal; a zero or unknown goal draws an empty bar, never a divide-by-zero. */
+function percentOf(have: number, goal: number): number {
+  if (!Number.isFinite(have) || !Number.isFinite(goal) || goal <= 0) return 0;
+  return (have / goal) * 100;
 }
 
 /** The target row, or `null` when the owner has no profile yet (404). */
@@ -81,6 +100,12 @@ async function loadTarget(date: string) {
  * Nutrient strings come from the shared `@life/nutrition` formatter and totals
  * from its `sum()` (no app-local unit table); the upload atom itself lives on
  * the entry editor — the photo door opens it, it is not composed here.
+ *
+ * The headline card is the reference's progress card: the day's `Kpi`, one
+ * energy track against the target calories, then the three macro tracks. The
+ * card IS the read-out, so it carries the one `role="status"` the day view
+ * exposes — a `Kpi` is block content and cannot nest inside a phrasing
+ * `StatusText`.
  */
 export async function mealDay(day: string, emptyBody: string) {
   const [entries, target, catalog] = await Promise.all([
@@ -88,20 +113,37 @@ export async function mealDay(day: string, emptyBody: string) {
     loadTarget(day),
     listMealFoodsIncludingDeleted(),
   ]);
-  const totalCalories = sum(entries.map((entry) => entry.nutrients)).calories;
-  const readout = dayReadout(totalCalories, target);
+  const totals: NutrientVector = sum(entries.map((entry) => entry.nutrients));
+  const readout = dayReadout(totals.calories, target);
+  const energyPercent = target == null ? 0 : percentOf(totals.calories, target.calories);
 
   return (
     <PageShell>
       <NavBar trailing={<MealsNav />} />
       <PageTitle>Meals — {formatDate(day)}</PageTitle>
-      <Card>
+      <Card aria-live="polite" role="status">
         <Stack gap="sm">
-          {/* The Kpi wears the day's figure; the `StatusText` shell keeps the one
-              `role="status"` read-out the day view has always exposed. */}
-          <StatusText>
-            <Kpi value={readout.eaten} unit={readout.unit} />
-          </StatusText>
+          <Kpi value={readout.eaten} unit={readout.unit} />
+          {target != null && (
+            <>
+              <ProgressBar
+                value={energyPercent}
+                label={`${Math.round(energyPercent)} percent of the daily energy target`}
+              />
+              {MACRO_TRACKS.map((track) => {
+                const goal = track.goal(target);
+                const have = totals[track.key];
+                return (
+                  <ProgressBar
+                    key={track.key}
+                    value={percentOf(have, goal)}
+                    label={`${format(track.key, have)} of ${format(track.key, goal)} toward the daily ${track.label.toLowerCase()} target`}
+                    caption={`${track.label} · ${Math.round(have)} / ${format(track.key, goal)}`}
+                  />
+                );
+              })}
+            </>
+          )}
           <ButtonLink href="/meals/target" variant="ghost">
             {target ? 'Edit target' : 'Set target'}
           </ButtonLink>
@@ -134,7 +176,8 @@ export async function mealDay(day: string, emptyBody: string) {
                     <ListItem
                       key={entry.id}
                       title={label || calories}
-                      meta={label ? `${calories} × ${entry.quantity}` : `× ${entry.quantity}`}
+                      meta={`× ${entry.quantity}`}
+                      trailing={label ? <Pill>{calories}</Pill> : undefined}
                     />
                   );
                 })}

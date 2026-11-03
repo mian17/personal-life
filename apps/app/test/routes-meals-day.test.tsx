@@ -1,4 +1,4 @@
-import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
+import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { formatDate, PageShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -95,7 +95,11 @@ describe('/meals day route wiring', () => {
     const el = await MealsPage();
     const html = renderToStaticMarkup(el);
 
-    expect(html).toContain(format('calories', 600));
+    // `Kpi` splits the read-out into two slots, so the figure is asserted in the
+    // value slot rather than as one `format('calories', …)` literal; the no-target
+    // path (this route mocks a 404 target) is the `"kcal — No target set"` unit.
+    expect(html).toMatch(/ui-kpi__value[^>]*>600</);
+    expect(html).toContain('kcal — No target set');
     expect(html).not.toContain('No meals logged today.');
   });
 });

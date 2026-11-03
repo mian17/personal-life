@@ -40,6 +40,14 @@ describe('ProgressBar', () => {
     expect(bar.getAttribute('aria-valuenow')).toBe('20');
   });
 
+  it('draws its caption above the bar, without adding a second read-out role', () => {
+    render(<ProgressBar value={52} label="62 g of protein toward 120 g" caption="Protein · 62 / 120 g" />);
+
+    expect(screen.getByText('Protein · 62 / 120 g')).toBeDefined();
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+    expect(drawnPercent(screen.getByRole('progressbar'))).toBe(52);
+  });
+
   it('styles itself from tokens, importing no chart library', () => {
     const source = readFileSync(join(__dirname, '../src/components/progress-bar.tsx'), 'utf8');
 
