@@ -132,6 +132,14 @@ describe('TagManager', () => {
     ).toBe(true);
   });
 
+  it('separates tag rows with the group hairline', () => {
+    setup();
+
+    const manager = document.querySelector('.ui-tag-manager')!;
+    expect(manager.classList.contains('[&>ul>*+*]:border-t')).toBe(true);
+    expect(manager.classList.contains('[&>ul>*+*]:border-line')).toBe(true);
+  });
+
   it('merges className instead of replacing it', () => {
     render(
       <TagManager

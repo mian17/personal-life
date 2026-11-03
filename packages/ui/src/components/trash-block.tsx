@@ -12,6 +12,13 @@ import { PageActions } from './page-actions';
 import { PageShell } from './page-shell';
 import { PageTitle } from './page-title';
 
+/**
+ * §8's `.empty` sits on the page ground: a centred block, no surface fill and no card
+ * outline. `EmptyState` inherits `Card`'s raised box, so the trash screen clears both
+ * back to the page; the copy, padding and radius stay the empty state's own.
+ */
+const emptyStateStyles = 'border-0! bg-transparent!';
+
 export interface TrashBlockItem {
   /** Stable React key + the id passed to the bound action mappers. */
   id: string;
@@ -80,7 +87,7 @@ export function TrashBlock({
       <PageTitle>{title}</PageTitle>
 
       {items.length === 0 ? (
-        <EmptyState body={emptyMessage} />
+        <EmptyState body={emptyMessage} className={emptyStateStyles} />
       ) : (
         <>
           <List>
