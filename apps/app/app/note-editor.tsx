@@ -478,20 +478,10 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
             role="alert"
             actions={
               <>
-                <Button
-                  variant="primary"
-                  size="bare"
-                  className="editor-conflict-load"
-                  onClick={loadLatest}
-                >
+                <Button variant="primary" size="bare" onClick={loadLatest}>
                   Load latest
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="bare"
-                  className="editor-conflict-overwrite"
-                  onClick={keepMine}
-                >
+                <Button variant="ghost" size="bare" onClick={keepMine}>
                   Keep mine (overwrite)
                 </Button>
               </>
