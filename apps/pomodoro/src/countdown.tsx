@@ -7,10 +7,22 @@ export interface CountdownProps {
   remainingMs: number;
 }
 
-/** The digits are read, never announced: the status line beside them carries the live text. */
+/**
+ * §8's `.timer__time`: the digits' own line box and figure treatment. The size is the
+ * `display` tier's; weight, tight tracking and tabular figures are the read-out's.
+ */
+const timeStyles =
+  'tabular-nums leading-[var(--lh-control)] font-semibold tracking-[var(--tracking-timer)]';
+
+/**
+ * The digits are read, never announced: the status line beside them carries the live
+ * text. `role="timer"` is the reference's own role for the read-out — a timer region
+ * is a live region that is polite by default, so the explicit `off` still holds it to
+ * "read on arrival, never interrupt".
+ */
 export function Countdown({ remainingMs }: Readonly<CountdownProps>) {
   return (
-    <StatusText size="display" aria-live="off">
+    <StatusText size="display" role="timer" aria-live="off" className={timeStyles}>
       {formatCountdown(remainingMs)}
     </StatusText>
   );
