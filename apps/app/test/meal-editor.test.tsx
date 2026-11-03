@@ -229,8 +229,8 @@ function findAll(node: unknown, type: unknown): ReactElement<Record<string, unkn
 }
 
 /**
- * The run total's `Kpi` read-out as its two slots joined (`250 kcal`) — located
- * by its atom, so the `Items` hint (`StatusText`, under `Items` before the
+ * by its atom, so the `Items` hint (`StatusText`, in the `Items` section that
+ * follows it) is never mistaken for it.
  * total) is never mistaken for it.
  */
 function runTotal(tree: EditorTree): string {
@@ -1150,20 +1150,20 @@ describe('restored entry display name', () => {
     };
   }
 
-  /** One item's facts read-out as `[label, value]` pairs — the reference's macro table. */
-  function itemFacts(tree: EditorTree): string[][] {
+  /** The meal card's macro totals as `[label, value]` pairs — the reference's one table. */
+  function mealFacts(tree: EditorTree): string[][] {
     const facts = findAll(tree, Facts)[0];
     return findAll(facts, FactsRow).map((row) => [text(row.props.label), text(row.props.value)]);
   }
 
-  it('reads a restored item’s macros back in the facts table', () => {
+  it('reads a restored meal’s macro totals in the meal card', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree(
         entry({ nutrients: vector({ calories: 300, protein: 12, carbohydrates: 40, fat: 9 }) }),
       );
 
-      expect(itemFacts(tree)).toEqual([
+      expect(mealFacts(tree)).toEqual([
         ['Protein', '12 g'],
         ['Carbs', '40 g'],
         ['Fat', '9 g'],
@@ -1173,12 +1173,36 @@ describe('restored entry display name', () => {
     }
   });
 
-  it('reads a manual item’s unconfirmed macros as the unknown em dash', () => {
+  it('reads a meal’s unconfirmed macro totals as the unknown em dash', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
 
-      expect(itemFacts(tree).map(([, value]) => value)).toEqual([UNKNOWN, UNKNOWN, UNKNOWN]);
+      expect(mealFacts(tree).map(([, value]) => value)).toEqual([UNKNOWN, UNKNOWN, UNKNOWN]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('sums a macro across items and keeps a key any item lacks an em dash', () => {
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Protein for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: '10' },
+      });
+      const oneConfirmed = harness.renderTree();
+      (button(oneConfirmed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
+      const twoRows = harness.renderTree();
+      (field(twoRows, 'Protein for item 2').props.onChange as (e: unknown) => void)({
+        target: { value: '5' },
+      });
+
+      expect(mealFacts(harness.renderTree())).toEqual([
+        ['Protein', '15 g'],
+        ['Carbs', UNKNOWN],
+        ['Fat', UNKNOWN],
+      ]);
     } finally {
       harness.restore();
     }

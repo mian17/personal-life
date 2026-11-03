@@ -153,8 +153,8 @@ function totalDisplay(
 }
 
 /**
- * The macro facts the reference draws per item, in its order. Keys absent from
- * the headline field list are skipped, so this never invents a row.
+ * The macro facts the reference draws once for the meal, in its order. Keys
+ * absent from the headline field list are skipped, so this never invents a row.
  */
 const FACT_KEYS: readonly Nutrient[] = ['protein', 'carbohydrates', 'fat'];
 
@@ -506,17 +506,19 @@ export function MealEditor({
   }
 
   /**
-   * One item's macro read-out: the reference's `Protein / Carbs / Fat` facts
-   * table, the item's own values with the same `known` gate as the fields above
-   * (an unconfirmed value is the em dash, never a fabricated `0`).
+   * The meal card's macro totals: the reference draws one `Protein / Carbs / Fat`
+   * table for the whole meal, not per item. A key reads as a number only when
+   * every item confirmed it — the same rule `caloriesKnown` uses, because a
+   * partial sum would present itself as the meal's real macro. Any unconfirmed
+   * key keeps the em dash, never a fabricated `0`.
    */
-  function macroFacts(item: EditorItem) {
+  function mealFacts(items: readonly EditorItem[]) {
     return FACT_KEYS.flatMap((key) => {
       const fact = nutrition.fields.find((field) => field.key === key);
       if (!fact) return [];
-      const value = item.known.includes(key)
-        ? `${round2(item.nutrients[key])} ${fact.unit}`
-        : nutrition.unknown;
+      const known = items.length > 0 && items.every((item) => item.known.includes(key));
+      const sum = items.reduce((acc, item) => acc + item.nutrients[key], 0);
+      const value = known ? `${round2(sum)} ${fact.unit}` : nutrition.unknown;
       return [
         <FactsRow key={key} label={inlineLabel(fact.label)} value={value} />,
       ];
@@ -581,7 +583,6 @@ export function MealEditor({
             }
           />
         ))}
-        <Facts>{macroFacts(item)}</Facts>
         <Button variant="ghost" onClick={() => setOpenNutrients(index)}>
           {triggerLabel}
         </Button>
@@ -643,6 +644,11 @@ export function MealEditor({
 
       {manual && <FoodSearch foods={foods} onPick={confirmFood} />}
 
+      <Section label="Total">
+        <Kpi value={total.value} unit={total.unit} />
+        <Facts>{mealFacts(items)}</Facts>
+      </Section>
+
       <Section
         label="Items"
         count={items.length}
@@ -660,10 +666,6 @@ export function MealEditor({
         ) : (
           <List>{items.map((item, index) => itemForm(item, index))}</List>
         )}
-      </Section>
-
-      <Section label="Total">
-        <Kpi value={total.value} unit={total.unit} />
       </Section>
 
       <Section label="Save as meal">
