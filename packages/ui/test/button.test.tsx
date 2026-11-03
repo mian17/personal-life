@@ -70,6 +70,18 @@ describe('Button', () => {
     expect(classes).toContain('text-danger');
   });
 
+  it('fills the primary variant with the scoped accent and draws the word on it', () => {
+    render(<Button>Save</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('bg-max');
+    expect(classes).toContain('text-on-max');
+    expect(classes).toContain('border-max');
+    expect(classes).toContain('active:bg-max-press');
+    // The retired vocabulary: a fill that resolves against a root alias instead of the app scope.
+    expect(classes).not.toContain('bg-accent');
+    expect(classes).not.toContain('text-on-accent');
+  });
+
   it('carries the disabled treatment on the rendered element', () => {
     render(<Button disabled>x</Button>);
     const button = screen.getByRole('button') as HTMLButtonElement;

@@ -76,6 +76,23 @@ describe('per-route PWA manifests', () => {
     expect(grounds).toEqual(manifests.map(() => ['#16171a', '#16171a']));
   });
 
+  /**
+   * The browser chrome carries one ground per scheme, and it has to be the same §2 page colour
+   * the route itself paints; a literal that drifts here leaves a strip of the retired ground
+   * above every screen.
+   */
+  it('paints the browser chrome on the §2 ground in both schemes', () => {
+    const layout = fs.readFileSync(path.join(__dirname, '..', 'app', 'layout.tsx'), 'utf8');
+    const themeColors = [...layout.matchAll(/\(prefers-color-scheme: (\w+)\)', color: '(#[\da-f]{6})'/g)].map(
+      ([, scheme, colour]) => [scheme, colour],
+    );
+
+    expect(themeColors).toEqual([
+      ['light', '#f4f4f1'],
+      ['dark', '#16171a'],
+    ]);
+  });
+
   it('ships every icon the per-route manifests declare', () => {
     const manifests = [
       'manifest-notes.json',

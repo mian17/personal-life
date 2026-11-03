@@ -170,6 +170,20 @@ describe('theme.css', () => {
     expect(tailwindColourRoles()).toEqual(expectedTailwindRoles());
   });
 
+  /**
+   * The `@theme` map below is published on `:root`, but `--max` and `--max-press` are declared
+   * on the app's own scope, and a custom property substitutes where it is declared — so the
+   * root alias would resolve against an undefined `--max` and every accent fill would paint
+   * nothing. Re-declaring the pair inside the scope that defines it is the mechanism by which
+   * an accent reaches a utility; without it `bg-max` is dead in every app.
+   */
+  it('re-declares the accent pair inside the scope that defines it, so a utility can reach it', () => {
+    expect(declarationsOf(THEME_CSS, '[data-app]')).toEqual({
+      '--color-max': 'var(--max)',
+      '--color-max-press': 'var(--max-press)',
+    });
+  });
+
   it('fails rather than defaults when asked for a role it does not map', () => {
     expect(() => tailwindColourRole('--unmapped')).toThrow(/theme.css does not map --unmapped/);
   });
