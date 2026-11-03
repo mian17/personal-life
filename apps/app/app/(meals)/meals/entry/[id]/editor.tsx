@@ -583,7 +583,7 @@ export function MealEditor({
       }
     >
       {door !== 'food' && (
-        <Section label="Add from photo — optional steering hint, never a correction">
+        <Section label="Photo">
           <FilePicker label="Choose a photo" accept="image/*" onFiles={onPhoto}>
             <Camera size={20} aria-hidden />
           </FilePicker>
@@ -634,7 +634,7 @@ export function MealEditor({
           value={mealName}
           onChange={(event) => setMealName(event.target.value)}
         />
-        <Button onClick={saveAsMeal} disabled={!canSave || savingMeal}>
+        <Button variant="ghost" onClick={saveAsMeal} disabled={!canSave || savingMeal}>
           Save as meal
         </Button>
       </Section>
