@@ -47,12 +47,30 @@ describe('SessionPills', () => {
     },
   );
 
+  it('draws each dot as the reference circle, not as a chip', () => {
+    renderPills('short', 2, 'running');
+
+    // §8's `.dot` is a square 8px box on the pill radius; the chip's own height,
+    // inset and neutral fill are what the row overrides, and every one is token-scaled.
+    const dots = Array.from(document.querySelectorAll('.ui-pill'));
+    expect(dots).toHaveLength(SESSIONS_PER_CYCLE);
+    for (const dot of dots) {
+      expect(dot.className).toContain('size-[var(--s2)]!');
+      expect(dot.className).toContain('p-0!');
+      expect(dot.className).toContain('border-[length:var(--border-width-strong)]!');
+    }
+    // An empty session's dot is the ring alone, never the pill's grey fill.
+    const empty = dots.filter((dot) => !dot.classList.contains('ui-pill--active'));
+    expect(empty.length).toBeGreaterThan(0);
+    for (const dot of empty) expect(dot.className).toContain('bg-transparent!');
+  });
+
   it('names the session once, on the row, for assistive tech', () => {
     renderPills('short', 2, 'running');
 
-    const row = screen.getByRole('group');
-    expect(row.getAttribute('aria-label')).toBe(`Session 2 of ${SESSIONS_PER_CYCLE}`);
     // The dots are a picture, not a read-out: the count lives in the label.
+    const row = screen.getByRole('img');
+    expect(row.getAttribute('aria-label')).toBe(`Session 2 of ${SESSIONS_PER_CYCLE}`);
     expect(row.textContent).toBe('');
   });
 });
