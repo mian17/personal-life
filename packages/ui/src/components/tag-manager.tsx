@@ -1,6 +1,7 @@
 'use client';
 
 import type { ComponentPropsWithRef } from 'react';
+import { cx } from '../lib/cx';
 import { ManagerSurface } from './manager-surface';
 import type { TagOption } from './tag-picker';
 
@@ -14,6 +15,13 @@ export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
   placeholder?: string;
   createLabel?: string;
 }
+
+/**
+ * §8's `.group` separates neighbouring rows with a `--line` hairline; the shared
+ * `ManagerSurface` spaces its rows instead, so the tag manager restores the divider
+ * on the list it owns.
+ */
+const rowHairlines = '[&>ul>*+*]:border-t [&>ul>*+*]:border-line';
 
 /** Tag registry manager: `ManagerSurface` with the tag noun and numeric ids. */
 export function TagManager({
@@ -40,7 +48,7 @@ export function TagManager({
       onCreate={onCreate}
       onRename={onRename}
       onDelete={onDelete}
-      className={className}
+      className={cx(rowHairlines, className)}
       {...rest}
     />
   );
