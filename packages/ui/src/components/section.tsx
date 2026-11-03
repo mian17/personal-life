@@ -6,6 +6,8 @@ export type SectionHeadingLevel = 'h2' | 'h3';
 
 export interface SectionProps extends ComponentPropsWithRef<'section'> {
   label?: ReactNode;
+  /** §8's `.slabel__count`: how many rows the group holds, read at the heading row's far end. */
+  count?: ReactNode;
   headingLevel?: SectionHeadingLevel;
   actions?: ReactNode;
   gap?: StackGap;
@@ -38,8 +40,25 @@ const labelledStyles = 'mb-[var(--s2)]';
 /** The action slot takes the row's leftover width, so it sits at the far end. */
 const actionsStyles = 'ml-auto';
 
+/**
+ * §8's `.slabel__count`: one step below the label, un-uppercased, and quiet. `normal-case` is
+ * stated rather than inherited — the row's uppercase treatment is scoped to the heading, and the
+ * count must stay un-uppercased if that ever widens.
+ */
+const countStyles = cx(
+  'text-[length:var(--fs-count)]',
+  '[font-weight:var(--fw-semibold)]',
+  'tracking-[var(--tracking-count)]',
+  'normal-case',
+  'text-ink-3',
+);
+
+/** `.slabel` is space-between: the count holds the far end only while no action does. */
+const countFarEndStyles = 'ml-auto';
+
 export function Section({
   label,
+  count,
   headingLevel = 'h2',
   actions,
   gap = 'md',
@@ -53,6 +72,17 @@ export function Section({
       {label != null && (
         <div className={cx('ui-section__heading-row', headingRowStyles, labelledStyles)}>
           <Heading className="ui-section__heading">{label}</Heading>
+          {count != null && (
+            <span
+              className={cx(
+                'ui-section__count',
+                countStyles,
+                actions == null && countFarEndStyles,
+              )}
+            >
+              {count}
+            </span>
+          )}
           {actions != null && (
             <div className={cx('ui-section__actions', actionsStyles)}>{actions}</div>
           )}

@@ -13,6 +13,9 @@ export interface EditorToolbarProps {
   /** A centred screen title. Rendered as a real `<h1>`, so every editor screen
    *  has a heading (create/edit screens are otherwise headed-less). */
   title?: ReactNode;
+  /** §6's `.row__meta` tier beneath the title — the record's meta line (e.g. "Thursday, 30
+   *  October · 12:40"). */
+  sub?: ReactNode;
   status?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -35,16 +38,42 @@ const titleStyles = cx(
   'tracking-[var(--tracking-row-title)] font-semibold',
 );
 
-export function EditorToolbar({ back, title, status, actions, className }: Readonly<EditorToolbarProps>) {
+/** The middle slot stacks the heading over its sub-line, so both stay centred as one block. */
+const middleColumnStyles = 'flex flex-col items-center flex-1 min-w-0';
+
+/** §6's `.row__meta`: the quiet second line, one `--s2` under the title. */
+const subStyles = cx(
+  'm-0 mt-[var(--s2)]',
+  'text-[length:var(--fs-meta)] leading-[var(--lh-meta)] text-ink-2',
+);
+
+export function EditorToolbar({
+  back,
+  title,
+  sub,
+  status,
+  actions,
+  className,
+}: Readonly<EditorToolbarProps>) {
+  const middle =
+    title != null ? (
+      <h1 className={cx('ui-editor-toolbar__title', titleStyles)}>{title}</h1>
+    ) : (
+      status
+    );
+
   return (
     <div className={cx('ui-editor-toolbar', toolbarStyles, className)}>
       <IconButton label={back.label} onClick={back.onBack}>
         <ChevronLeft size={20} aria-hidden />
       </IconButton>
-      {title != null ? (
-        <h1 className={cx('ui-editor-toolbar__title', titleStyles)}>{title}</h1>
+      {sub != null ? (
+        <div className={cx('ui-editor-toolbar__main', middleColumnStyles)}>
+          {middle}
+          <div className={cx('ui-editor-toolbar__sub', subStyles)}>{sub}</div>
+        </div>
       ) : (
-        status
+        middle
       )}
       {actions}
     </div>

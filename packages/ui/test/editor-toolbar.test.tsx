@@ -80,6 +80,58 @@ describe('EditorToolbar', () => {
     expect(toolbar.children).toHaveLength(1);
   });
 
+  it('renders the sub-line beneath the title on §6 `.row__meta` tokens', () => {
+    render(
+      <EditorToolbar
+        back={{ label: 'Back', onBack: () => {} }}
+        title="Lunch"
+        sub="Thursday, 30 October · 12:40"
+      />,
+    );
+    const heading = screen.getByRole('heading', { level: 1, name: 'Lunch' });
+    const middle = document.querySelector('.ui-editor-toolbar__main')!;
+    const sub = document.querySelector('.ui-editor-toolbar__sub')!;
+
+    expect(middle.contains(heading)).toBe(true);
+    expect(Array.from(middle.children)).toEqual([heading, sub]);
+    expect(sub.textContent).toBe('Thursday, 30 October · 12:40');
+    expect(classesOf(sub)).toEqual(
+      expect.arrayContaining([
+        'text-[length:var(--fs-meta)]',
+        'leading-[var(--lh-meta)]',
+        'text-ink-2',
+        'mt-[var(--s2)]',
+      ]),
+    );
+  });
+
+  it('renders no sub-line and no wrapper when sub is absent', () => {
+    render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} title="New" />);
+    expect(document.querySelector('.ui-editor-toolbar__sub')).toBeNull();
+    expect(document.querySelector('.ui-editor-toolbar__main')).toBeNull();
+    const toolbar = document.querySelector('.ui-editor-toolbar')!;
+    expect(toolbar.children).toHaveLength(2);
+    expect(toolbar.children[1]).toBe(screen.getByRole('heading', { level: 1 }));
+  });
+
+  it('keeps the sub-line ordering with status and actions present', () => {
+    render(
+      <EditorToolbar
+        back={{ label: 'Back', onBack: () => {} }}
+        title="Lunch"
+        sub="12:40"
+        actions={<button type="button">Save</button>}
+      />,
+    );
+    const toolbar = document.querySelector('.ui-editor-toolbar')!;
+    expect(Array.from(toolbar.children)).toEqual([
+      screen.getByRole('button', { name: 'Back' }),
+      document.querySelector('.ui-editor-toolbar__main'),
+      screen.getByRole('button', { name: 'Save' }),
+    ]);
+    expect(document.querySelector('.ui-editor-toolbar__sub')!.textContent).toBe('12:40');
+  });
+
   it('merges className instead of replacing it', () => {
     render(<EditorToolbar className="legacy-hook" back={{ label: 'Back', onBack: () => {} }} />);
     expect(classesOf(document.querySelector('.ui-editor-toolbar')!)).toEqual(
