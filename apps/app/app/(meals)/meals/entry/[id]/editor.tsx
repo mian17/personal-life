@@ -7,6 +7,7 @@ import type { Nutrient, NutrientVector } from '@life/nutrition';
 import {
   AlertBanner,
   Button,
+  Card,
   Dialog,
   EditorChrome,
   EmptyState,
@@ -644,10 +645,10 @@ export function MealEditor({
 
       {manual && <FoodSearch foods={foods} onPick={confirmFood} />}
 
-      <Section label="Total">
+      <Card>
         <Kpi value={total.value} unit={total.unit} />
         <Facts>{mealFacts(items)}</Facts>
-      </Section>
+      </Card>
 
       <Section
         label="Items"

@@ -229,9 +229,9 @@ function findAll(node: unknown, type: unknown): ReactElement<Record<string, unkn
 }
 
 /**
- * by its atom, so the `Items` hint (`StatusText`, in the `Items` section that
- * follows it) is never mistaken for it.
- * total) is never mistaken for it.
+ * The meal's run total, read off the one `Kpi` the total card draws: the eaten
+ * figure and its unit as two slots. It is found by its atom, so the `Items` hint
+ * (`StatusText`, in the section that follows it) is never mistaken for it.
  */
 function runTotal(tree: EditorTree): string {
   const found = find(tree, Kpi);

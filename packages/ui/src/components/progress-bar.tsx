@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 
 export interface ProgressBarProps {
@@ -5,6 +6,12 @@ export interface ProgressBarProps {
   value: number;
   /** Accessible name for the bar, e.g. `"Today: 20 of 30 minutes"`. */
   label: string;
+  /**
+   * Visible read-out drawn on the line above the bar (`"Protein · 62 / 120 g"`),
+   * so a bar can say what it measures without borrowing a section label. Absent,
+   * the atom renders the bare `<progress>` it always did.
+   */
+  caption?: ReactNode;
   className?: string;
 }
 
@@ -15,22 +22,39 @@ const MAX_PERCENT = 100;
 const trackStyles =
   'ui-progress-track block h-[var(--s2)] w-full appearance-none overflow-hidden rounded-[var(--r-pill)] bg-press [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
 
+/** §8's `.row__meta` treatment for the caption line. */
+const captionStyles = 'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
+
+/** One spacing step between the caption and the bar it names. */
+const captionedStyles = 'grid gap-[var(--s1)]';
+
 /**
  * Today's fill as a native `<progress>`: the element already carries the progressbar
  * role and its own value/max pair, so a one-value bar needs no ARIA scaffold and no
  * chart library. The track-and-fill look comes from token-styled pseudo-elements.
+ *
+ * A `caption` adds one line above the bar; the wrapper owns the caller's `className`
+ * in that shape, so the bar itself keeps its full width either way.
  */
-export function ProgressBar({ value, label, className }: Readonly<ProgressBarProps>) {
+export function ProgressBar({ value, label, caption, className }: Readonly<ProgressBarProps>) {
   const percent = clampedPercent(value);
-
-  return (
+  const bar = (
     <progress
       aria-label={label}
       aria-valuenow={Math.round(percent)}
-      className={cx(trackStyles, className)}
+      className={cx(trackStyles, caption == null && className)}
       max={MAX_PERCENT}
       value={percent}
     />
+  );
+
+  if (caption == null) return bar;
+
+  return (
+    <div className={cx('ui-progress', captionedStyles, className)}>
+      <span className={cx('ui-progress__caption', captionStyles)}>{caption}</span>
+      {bar}
+    </div>
   );
 }
 

@@ -106,12 +106,33 @@ describe('meals day view', () => {
 
     // The headline is now `Kpi`'s two slots, so the figure and what it is
     // measured against cannot share one literal: the value slot holds the eaten
-    // number, the unit slot the rest of the day summary.
+    // number, the unit slot the rest of the day summary. The value is grouped
+    // the way the reference draws it (`1,180`), which the formatter does not do.
     expect(html).toMatch(/ui-kpi__value[^>]*>600</);
-    expect(html).toContain(
-      `kcal / ${format('calories', 2000)}, ${format('calories', 1400)} left`,
-    );
+    expect(html).toContain('kcal of 2,000');
     expect(html).not.toContain('No meals logged today.');
+  });
+
+  it('draws the reference progress card: the energy track, then the three macro tracks', async () => {
+    mockedListDayEntries.mockResolvedValue([
+      entry({
+        id: 'a',
+        nutrients: vector({ calories: 600, protein: 62, carbohydrates: 131, fat: 39 }),
+      }),
+    ]);
+    mockedGetMealTarget.mockResolvedValue(
+      target({ calories: 2000, proteinG: 120, carbG: 220, fatG: 68 }),
+    );
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    // One energy track against the target calories, then one per macro, each
+    // naming its own grams in the visible caption above its bar.
+    expect(html).toContain('aria-label="30 percent of the daily energy target"');
+    expect(html).toContain('Protein · 62 / 120 g');
+    expect(html).toContain('Carbs · 131 / 220 g');
+    expect(html).toContain('Fat · 39 / 68 g');
+    expect(html).toContain('aria-label="62 g of 120 g toward the daily protein target"');
   });
 
   it('says "No target set" when the owner has no profile yet (target 404 is not an error)', async () => {
@@ -180,7 +201,7 @@ describe('meals day view', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('titles a pre-feature entry (no catalog match) with its stored value, and keeps calories + quantity in meta', async () => {
+  it('keeps the portion in meta and draws the calories as a trailing pill', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: 'Toast', quantity: 2, nutrients: vector({ calories: 123 }) }),
     ]);
@@ -188,9 +209,9 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('Toast');
-    expect(html).toMatch(
-      /ui-list-item__title[^"]*">Toast<\/span><span class="ui-list-item__sub[^"]*">123 kcal × 2</,
-    );
+    expect(html).toMatch(/ui-list-item__sub[^"]*">× 2</);
+    // The kcal is the reference's `.row__trail` neutral pill, read once.
+    expect(html).toMatch(/ui-pill[^>]*>123 kcal</);
   });
 
   it('titles a catalog entry with the resolved food name, never the raw id', async () => {
@@ -203,8 +224,9 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toMatch(
-      /ui-list-item__title[^"]*">Chicken<\/span><span class="ui-list-item__sub[^"]*">123 kcal × 2</,
+      /ui-list-item__title[^"]*">Chicken<\/span><span class="ui-list-item__sub[^"]*">× 2</,
     );
+    expect(html).toMatch(/ui-pill[^>]*>123 kcal</);
     expect(html).not.toContain(uuid);
   });
 
@@ -239,6 +261,9 @@ describe('meals day view', () => {
     expect(html).toMatch(
       /ui-list-item__title[^"]*">123 kcal<\/span><span class="ui-list-item__sub[^"]*">× 1</,
     );
+    // The pill is skipped when the title already IS the figure, so the row never
+    // reads the same kcal twice.
+    expect(html).not.toMatch(/ui-pill[^>]*>123 kcal</);
   });
 
   it('renders the [date] route through the same view for the route day', async () => {

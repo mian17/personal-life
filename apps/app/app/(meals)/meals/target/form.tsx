@@ -2,8 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { format } from '@life/nutrition';
 import { Check } from 'lucide-react';
-import { EditorChrome, IconButton, Input, Section, Select, SettingsRow, StatusText } from '@life/ui';
+import {
+  Card,
+  EditorChrome,
+  Facts,
+  FactsRow,
+  IconButton,
+  Input,
+  Kpi,
+  Pill,
+  Section,
+  Select,
+  SettingsRow,
+  Stack,
+  StatusText,
+} from '@life/ui';
 import type { MealTarget } from '@/lib/meal-api';
 import { saveProfileAction } from './actions';
 
@@ -16,7 +31,9 @@ import { saveProfileAction } from './actions';
  * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `EditorChrome`
  * (back leading, save in `actions`, mirroring the meal entry editor), each field
  * is a `SettingsRow` (visible label left, control right) hosting an
- * `Input`/`Select`, feedback is `StatusText`. The `<form>` is glue (submit
+ * `Input`/`Select`, feedback is `StatusText`. The derived-energy card and the
+ * `Profile` read-out rows are the reference's read-only half; the form below
+ * them is the only place a value changes. The `<form>` is glue (submit
  * semantics + native numeric validation), no className, no raw control, no app
  * CSS. Sex/activity/goal are `Select`s over the service enums, so a level the
  * service does not have cannot be offered here.
@@ -44,12 +61,22 @@ const GOAL_OPTIONS = [
   { value: 'gain', label: 'Gain weight' },
 ];
 
+/** Whole kcal with the reference's thousands separator (`2,050`); the formatter does not group. */
+const KCAL = new Intl.NumberFormat('en-US');
+
+/** The stored enum value as its own option list spells it (the service owns the vocabulary). */
+function optionLabel(options: { value: string; label: string }[], value: string): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
 /**
  * The profile form. `initial` is the current target row's stored profile, so an
  * existing profile opens as an edit rather than an empty onboarding form; with no
  * target the fields start on the defaults a first-run user changes at most a few.
  * `summary` is the day's derived-calorie headline the server page computed — it
- * renders read-only above the fields and never travels back down the save path.
+ * is non-null exactly when a target exists, which is the same condition that
+ * draws the derived-energy card, so the card replaces the sentence and the
+ * figures are never printed twice.
  */
 export function TargetProfileForm({
   initial,
@@ -111,8 +138,30 @@ export function TargetProfileForm({
           return save();
         }}
       >
-        {summary != null ? (
-          <StatusText>{summary}</StatusText>
+        {initial != null && summary != null ? (
+          <>
+            <Card>
+              <Stack gap="sm">
+                <Kpi value={KCAL.format(Math.round(initial.calories))} unit="kcal" />
+                <Facts>
+                  <FactsRow label="Protein" value={format('protein', initial.proteinG)} />
+                  <FactsRow label="Carbs" value={format('carbohydrates', initial.carbG)} />
+                  <FactsRow label="Fat" value={format('fat', initial.fatG)} />
+                </Facts>
+              </Stack>
+            </Card>
+            <Section label="Profile">
+              <SettingsRow label="Age" control={<Pill>{`${initial.age} years`}</Pill>} />
+              <SettingsRow label="Height" control={<Pill>{`${initial.heightCm} cm`}</Pill>} />
+              <SettingsRow label="Weight" control={<Pill>{`${initial.weightKg} kg`}</Pill>} />
+              <SettingsRow label="Sex" control={<Pill>{optionLabel(SEX_OPTIONS, initial.sex)}</Pill>} />
+              <SettingsRow
+                label="Activity"
+                control={<Pill>{optionLabel(ACTIVITY_OPTIONS, initial.activity)}</Pill>}
+              />
+              <SettingsRow label="Goal" control={<Pill>{optionLabel(GOAL_OPTIONS, initial.goal)}</Pill>} />
+            </Section>
+          </>
         ) : (
           <StatusText>No target set yet — add your profile below.</StatusText>
         )}

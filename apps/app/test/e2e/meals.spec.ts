@@ -52,22 +52,23 @@ async function openDoor(page: Page, door: string): Promise<void> {
 }
 
 /**
- * The day's own total: the only `role="status"` on the day view (`<Card><StatusText>`).
- * The status text is the day summary (`"1220 kcal — No target set"`), so the
- * leading calorie figure is read off, not the whole string parsed.
+ * The day's own total: the one `role="status"` on the day view (the progress
+ * `Card` itself). Its text is the day summary — the `Kpi` figure, `kcal`, and
+ * what it is measured against — so the leading calorie figure is read off, not
+ * the whole string parsed. The figure is grouped (`1,180`), hence the comma.
  */
 async function dayTotal(page: Page): Promise<number> {
   const text = await page.getByRole('status').innerText();
-  const match = /([\d.]+)\s*kcal/.exec(text);
+  const match = /([\d,]+(?:\.\d+)?)\s*kcal/.exec(text);
   if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(text)}`);
-  return Number(match[1]);
+  return Number(match[1].replaceAll(',', ''));
 }
 
 /**
  * The confirmed entries the day view actually lists: every row carrying the
- * `N kcal × <portions>` read-out, each read back from its own calorie figure.
- * A row without a `×` is an unconfirmed entry and is skipped; a row that has a
- * `×` but no readable figure before it is spec drift and throws. Reading the
+ * `× <portions>` meta plus a calorie figure in its trailing pill, each read back
+ * that way. A row without a `×` is an unconfirmed entry and is skipped; a row
+ * that has a `×` but no readable figure is spec drift and throws. Reading the
  * day's sum off the page is the only honest check — a pre-known total would
  * have to be re-derived here, which is the drift this replaces.
  */
@@ -76,11 +77,19 @@ async function listedEntryCalories(page: Page): Promise<number[]> {
   const figures: number[] = [];
   for (const row of rows) {
     if (!row.includes('×')) continue;
-    const match = /(?:^|\s)([\d.]+)\s*kcal\s*×/.exec(row.replace(/\n/g, ' '));
+    const match = /([\d,]+(?:\.\d+)?)\s*kcal/.exec(row.replace(/\n/g, ' '));
     if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(row)}`);
-    figures.push(Number(match[1]));
+    figures.push(Number(match[1].replaceAll(',', '')));
   }
   return figures;
+}
+
+/** A day row as the view draws it: the portion in its meta, the kcal in its trailing pill. */
+function dayRow(page: Page, kcal: string, portions: string) {
+  return page
+    .getByRole('listitem')
+    .filter({ hasText: `${kcal} kcal` })
+    .filter({ hasText: `× ${portions}` });
 }
 
 /** A catalog food per run, so a rerun can never collide with the last one. */
@@ -272,9 +281,7 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals$/, { timeout: 15_000 });
 
     // The day view lists the logged quantity and totals the snapshot.
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
     const loggedFigures = await listedEntryCalories(page);
     const loggedTotal = await dayTotal(page);
     expect(loggedFigures).toContain(130);
@@ -289,9 +296,7 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
 
     await page.goto('/meals');
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
 
@@ -306,13 +311,11 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
 
     await page.goto('/meals');
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
+    // The row still renders the deleted food's dish name, not the raw id.
+    await expect(page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal' })).toBeVisible({
       timeout: 15_000,
     });
-    // The row still renders the deleted food's dish name, not the raw id.
-    await expect(
-      page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal × 2.5' }),
-    ).toBeVisible({ timeout: 15_000 });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
   });
