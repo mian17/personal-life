@@ -57,6 +57,7 @@ export function FoodSearch({ foods, onPick }: Readonly<{ foods: PickerFood[]; on
   return (
     <Section label="Log food">
       <Autosuggest
+        field="search"
         label="Search foods"
         placeholder="Search your foods"
         options={options}

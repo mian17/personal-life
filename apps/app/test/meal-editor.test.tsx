@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Autosuggest, Button, Dialog, EmptyState, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
+import { Autosuggest, Button, Dialog, EmptyState, Facts, FactsRow, FilePicker, IconButton, Input, Kpi, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -229,14 +229,14 @@ function findAll(node: unknown, type: unknown): ReactElement<Record<string, unkn
 }
 
 /**
- * The run total's `StatusText` — located by its `<number> kcal` content, not by
- * tree position, so the `Items` hint (also a `StatusText`, under `Items` before
- * the total) never gets mistaken for it.
+ * The run total's `Kpi` read-out as its two slots joined (`250 kcal`) — located
+ * by its atom, so the `Items` hint (`StatusText`, under `Items` before the
+ * total) is never mistaken for it.
  */
-function runTotal(tree: EditorTree): ReactElement<Record<string, unknown>> {
-  const found = find(tree, StatusText, (el) => /kcal$/.test(text(el)));
+function runTotal(tree: EditorTree): string {
+  const found = find(tree, Kpi);
   if (!found) throw new Error('no run total rendered');
-  return found;
+  return `${text(found.props.value)} ${text(found.props.unit)}`;
 }
 
 /** Concatenate every string in a rendered node subtree. */
@@ -289,7 +289,7 @@ describe('MealEditor photo door', () => {
       expect(field(seeded, 'Food for item 1').props.value).toBe('Omelette');
       expect(field(seeded, 'Calories for Omelette').props.value).toBe('250');
       const total = runTotal(seeded);
-      expect(text(total)).toBe(format('calories', 250));
+      expect(total).toBe(format('calories', 250));
     } finally {
       harness.restore();
     }
@@ -553,7 +553,7 @@ describe('MealEditor manual door — search-first multi-add', () => {
       expect(field(two, 'Food for item 1').props.value).toBe('Oatmeal');
       expect(field(two, 'Food for item 2').props.value).toBe('Chicken');
       // The run total sums both confirmed picks.
-      expect(text(runTotal(two))).toBe(format('calories', 554));
+      expect(runTotal(two)).toBe(format('calories', 554));
     } finally {
       harness.restore();
     }
@@ -579,7 +579,7 @@ describe('MealEditor unknown affordance', () => {
       // Nothing is confirmed, so nothing was invented: the per-item field is
       // empty (em dash) and the run total is a true zero — the same figure the
       // day view renders for an entry set with no confirmed calories.
-      expect(text(runTotal(tree))).toBe(format('calories', 0));
+      expect(runTotal(tree)).toBe(format('calories', 0));
 
       const html = renderToStaticMarkup(tree);
       expect(html).toContain(`placeholder="${UNKNOWN}"`);
@@ -930,7 +930,7 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       const dialogs = findAll(tree, Dialog);
       expect(dialogs).toHaveLength(1);
       expect(dialogs[0].props.title).toBe('All nutrients');
-      expect(dialogs[0].props.size).toBe('full');
+      expect(dialogs[0].props.size).toBe('sheet');
       expect(dialogs[0].props.open).toBe(false);
       // A closed dialog portals nothing, so its sheet class is asserted by
       // `packages/ui/test/dialog.test.tsx`, where the panel is actually mounted.
@@ -1149,6 +1149,40 @@ describe('restored entry display name', () => {
       ...overrides,
     };
   }
+
+  /** One item's facts read-out as `[label, value]` pairs — the reference's macro table. */
+  function itemFacts(tree: EditorTree): string[][] {
+    const facts = findAll(tree, Facts)[0];
+    return findAll(facts, FactsRow).map((row) => [text(row.props.label), text(row.props.value)]);
+  }
+
+  it('reads a restored item’s macros back in the facts table', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(
+        entry({ nutrients: vector({ calories: 300, protein: 12, carbohydrates: 40, fat: 9 }) }),
+      );
+
+      expect(itemFacts(tree)).toEqual([
+        ['Protein', '12 g'],
+        ['Carbs', '40 g'],
+        ['Fat', '9 g'],
+      ]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('reads a manual item’s unconfirmed macros as the unknown em dash', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      expect(itemFacts(tree).map(([, value]) => value)).toEqual([UNKNOWN, UNKNOWN, UNKNOWN]);
+    } finally {
+      harness.restore();
+    }
+  });
 
   it('renders the catalog food name for a restored entry whose foodId is a catalog id', () => {
     const harness = stateHarness();
