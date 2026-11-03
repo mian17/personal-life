@@ -49,6 +49,34 @@ describe('Kpi', () => {
     expect(classesOf(row)).toEqual(expect.arrayContaining(['legacy-hook', 'ui-kpi']));
   });
 
+  it('draws the reference meta line above the row when labelled', () => {
+    const { container } = render(
+      <Kpi label="Logged so far" value="1,180" unit="of 2,050 kcal" />,
+    );
+    const block = container.firstElementChild as HTMLElement;
+    expect(classesOf(block)).toContain('ui-kpi-block');
+
+    const [label, row] = Array.from(block.children) as HTMLElement[];
+    expect(label.textContent).toBe('Logged so far');
+    // §8's `.row__meta`: the meta tier, second ink tier.
+    expect(classesOf(label)).toEqual(
+      expect.arrayContaining([
+        'text-[length:var(--fs-meta)]',
+        'leading-[var(--lh-meta)]',
+        'text-ink-2',
+      ]),
+    );
+    expect(classesOf(row)).toContain('ui-kpi');
+    expect(row.textContent).toBe('1,180of 2,050 kcal');
+  });
+
+  it('keeps the unlabelled shape: the row itself is the root, className and all', () => {
+    const { container } = render(<Kpi value="820" unit="kcal" />);
+    const row = container.firstElementChild as HTMLElement;
+    expect(classesOf(row)).toContain('ui-kpi');
+    expect(row.children).toHaveLength(2);
+  });
+
   it('accepts a node for the value and the unit', () => {
     render(
       <Kpi

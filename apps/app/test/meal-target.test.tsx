@@ -329,6 +329,8 @@ describe('target page', () => {
     // then the three macro totals as `Facts` rows.
     expect(html).toMatch(/ui-kpi__value[^>]*>2,400</);
     expect(html).toContain('>kcal<');
+    // §8's `.row__meta` names the read-out: the reference's `Derived energy` line.
+    expect(html).toMatch(/ui-kpi__label[^>]*>Derived energy</);
     expect(html).toContain(format('protein', 112));
     expect(html).toContain(format('carbohydrates', 345));
     // The stored profile reads back as pill rows above the fields.
