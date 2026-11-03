@@ -22,6 +22,8 @@ export interface EditorChromeProps {
   back: { label: string; onBack: () => void };
   /** Centred `<h1>` title for create/edit screens; wins over `status` in the toolbar. */
   title?: ReactNode;
+  /** Meta line under that title, passed straight to `EditorToolbar`'s `sub`. */
+  sub?: ReactNode;
   /** Status read-out rendered when there is no `title` (e.g. `<StatusText>Saved</StatusText>`). */
   status?: ReactNode;
   /** Toolbar right-side actions (e.g. the Save/Add `IconButton`). */
@@ -45,6 +47,7 @@ export interface EditorChromeProps {
 export function EditorChrome({
   back,
   title,
+  sub,
   status,
   actions,
   banner,
@@ -54,7 +57,7 @@ export function EditorChrome({
 }: Readonly<EditorChromeProps>): JSX.Element {
   return (
     <EditorScreen>
-      <EditorToolbar back={back} title={title} status={status} actions={actions} />
+      <EditorToolbar back={back} title={title} sub={sub} status={status} actions={actions} />
       {banner}
       <EditorStack gap={gap}>
         {children}
