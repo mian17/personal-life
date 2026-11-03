@@ -17,11 +17,12 @@ export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
 }
 
 /**
- * §8's `.group` separates neighbouring rows with a `--line` hairline; the shared
- * `ManagerSurface` spaces its rows instead, so the tag manager restores the divider
- * on the list it owns.
+ * §8's `.group` meets its rows flush and draws one `--line` hairline between them. The
+ * shared `ManagerSurface` spaces its rows with a `--s1` gap, which would leave that rule
+ * floating inside the gap, so the tag manager closes the gap on the list it owns and lets
+ * the rows meet at the hairline the way the reference does.
  */
-const rowHairlines = '[&>ul>*+*]:border-t [&>ul>*+*]:border-line';
+const groupRows = '[&>ul]:gap-0 [&>ul>*+*]:border-t [&>ul>*+*]:border-line';
 
 /** Tag registry manager: `ManagerSurface` with the tag noun and numeric ids. */
 export function TagManager({
@@ -48,7 +49,7 @@ export function TagManager({
       onCreate={onCreate}
       onRename={onRename}
       onDelete={onDelete}
-      className={cx(rowHairlines, className)}
+      className={cx(groupRows, className)}
       {...rest}
     />
   );

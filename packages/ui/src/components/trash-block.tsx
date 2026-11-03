@@ -13,11 +13,11 @@ import { PageShell } from './page-shell';
 import { PageTitle } from './page-title';
 
 /**
- * §8's `.empty` sits on the page ground: a centred block, no surface fill and no card
- * outline. `EmptyState` inherits `Card`'s raised box, so the trash screen clears both
- * back to the page; the copy, padding and radius stay the empty state's own.
+ * §8's `.empty` sits on the page ground but keeps its `--line` hairline. `EmptyState`
+ * inherits `Card`'s raised surface fill, so the trash screen clears only that; the
+ * hairline, copy, padding and radius stay the empty state's own.
  */
-const emptyStateStyles = 'border-0! bg-transparent!';
+const emptyStateStyles = 'bg-transparent!';
 
 export interface TrashBlockItem {
   /** Stable React key + the id passed to the bound action mappers. */

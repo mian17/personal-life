@@ -51,12 +51,14 @@ describe('TrashBlock', () => {
     expect(document.querySelector('.ui-list')).toBeNull();
   });
 
-  it('draws the empty state on the page ground, not as a raised card', () => {
+  it('draws the empty state on the page ground, keeping the reference hairline', () => {
     render(<TrashBlock {...makeProps({ items: [] })} />);
 
     const empty = document.querySelector('.ui-empty')!;
     expect(empty.classList.contains('bg-transparent!')).toBe(true);
-    expect(empty.classList.contains('border-0!')).toBe(true);
+    expect(empty.classList.contains('border-0!')).toBe(false);
+    expect(empty.classList.contains('border')).toBe(true);
+    expect(empty.classList.contains('border-line')).toBe(true);
   });
 
   it('omits meta and snippet from the DOM when undefined', () => {

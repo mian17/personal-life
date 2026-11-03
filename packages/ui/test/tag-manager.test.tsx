@@ -132,10 +132,11 @@ describe('TagManager', () => {
     ).toBe(true);
   });
 
-  it('separates tag rows with the group hairline', () => {
+  it('separates tag rows with one flush hairline, closing the shared list gap', () => {
     setup();
 
     const manager = document.querySelector('.ui-tag-manager')!;
+    expect(manager.classList.contains('[&>ul]:gap-0')).toBe(true);
     expect(manager.classList.contains('[&>ul>*+*]:border-t')).toBe(true);
     expect(manager.classList.contains('[&>ul>*+*]:border-line')).toBe(true);
   });
