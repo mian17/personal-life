@@ -1,4 +1,4 @@
-import { ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle, Input } from '@life/ui';
+import { ManagerBlock, Pill, SettingsBlock, SettingsRow, ThemeToggle, Input } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 /**
@@ -85,6 +85,17 @@ describe('/pomodoro/settings page wiring', () => {
     expect(settingsRow(block, 'Theme').props.control.type).toBe(ThemeToggle);
   });
 
+  it('renders the Comfort block as the reference draws it: a static row reading System', async () => {
+    const page = await PomodoroSettingsPage();
+    const block = settingsBlock(page, 'Comfort');
+
+    expect(block).toBeDefined();
+
+    const row = settingsRow(block, 'Reduce motion');
+    expect(row.props.control.type).toBe(Pill);
+    expect(row.props.control.props.children).toBe('System');
+  });
+
   it('renders the three duration fields bound to their own preference', async () => {
     const page = await PomodoroSettingsPage();
     const form = blockForm(page, 'Durations');
@@ -122,7 +133,7 @@ describe('/pomodoro/settings page wiring', () => {
     expect(settingsRow(block, 'Long break').props.control.props.defaultValue).toBe(20);
   });
 
-  it('renders the frozen copy and a back affordance targeting /pomodoro', async () => {
+  it('renders the frozen copy, the footer meta line and a back affordance targeting /pomodoro', async () => {
     const html = renderToStaticMarkup(await PomodoroSettingsPage());
 
     expect(html).toContain('Settings');
@@ -130,6 +141,14 @@ describe('/pomodoro/settings page wiring', () => {
     expect(html).toContain('System, light, or dark.');
     expect(html).toContain('Save durations');
     expect(html).toContain('href="/pomodoro"');
+    expect(html).toContain('Reduce motion');
+    expect(html).toContain('Personal Life · prototype');
+  });
+
+  it("drops the reference's Send feedback row: this screen has no feedback entry point", async () => {
+    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+
+    expect(html).not.toContain('Send feedback');
   });
 });
 
@@ -138,7 +157,7 @@ describe('/pomodoro/settings daily goal row', () => {
     mockedListGoals.mockResolvedValue([goal('2026-10-01', 30), goal(TODAY, 40)]);
 
     const page = await PomodoroSettingsPage();
-    const control = settingsRow(settingsBlock(blockForm(page, 'Focus stats'), 'Focus stats'), 'Daily goal')
+    const control = settingsRow(settingsBlock(blockForm(page, 'Focus'), 'Focus'), 'Daily goal')
       .props.control;
 
     expect(control.type).toBe(Input);
@@ -155,7 +174,7 @@ describe('/pomodoro/settings daily goal row', () => {
 
     const page = await PomodoroSettingsPage();
     const control = settingsRow(
-      settingsBlock(blockForm(page, 'Focus stats'), 'Focus stats'),
+      settingsBlock(blockForm(page, 'Focus'), 'Focus'),
       'Daily goal',
     ).props.control;
 
@@ -164,7 +183,7 @@ describe('/pomodoro/settings daily goal row', () => {
 
   it('submits through a server action that writes today with the clamped minutes', async () => {
     const page = await PomodoroSettingsPage();
-    const form = blockForm(page, 'Focus stats');
+    const form = blockForm(page, 'Focus');
 
     expect(form.props.action).toBe(setPomodoroGoal);
 
