@@ -2,11 +2,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent } from 'react';
 import { useCommandState } from 'cmdk';
 import { Command, CommandEmpty, CommandItem, CommandList } from './command';
 import { Input } from './input';
 import { Popover, PopoverAnchor, PopoverContent } from './popover';
+import { SearchField } from './search-field';
 
 /**
  * A value no row carries. `cmdk` selects the first row whenever its value is empty, so a list
@@ -47,7 +48,20 @@ export interface AutosuggestProps {
   debounceMs?: number;
   /** Options visible in the popup at once; the rest scroll. */
   maxVisible?: number;
+  /**
+   * The shell the field wears: `'input'` (default) keeps today's field, `'search'` the `.search`
+   * shell. Cosmetic only — the gate, the debounced report, the popup and the keyboard walk are
+   * the same in both.
+   */
+  field?: 'input' | 'search';
 }
+
+/**
+ * `SearchField` always reports its own debounced text. In the search shell the field belongs to
+ * this component (`inputProps` carries the value and the keys), so that report has nothing of
+ * its own to say — and never fires, because the shell's own text never moves.
+ */
+function noQueryReport() {}
 
 /**
  * A combobox from the registry recipe: an `Input` inside a `Popover`, over a `Command` root whose
@@ -89,6 +103,7 @@ function ComboboxField({
   minChars = 3,
   debounceMs = 0,
   maxVisible = 8,
+  field = 'input',
   highlightedValue,
   moveHighlightTo,
 }: Readonly<AutosuggestProps & Highlight>) {
@@ -233,29 +248,47 @@ function ComboboxField({
     }
   }
 
+  // One prop object feeds whichever shell is worn, so the two cannot drift apart.
+  const fieldProps: ComponentPropsWithRef<'input'> = {
+    ref: fieldRef,
+    // Both shells take a plain text field: a `type="search"` one adds the platform's clear
+    // control, an interaction this combobox does not have (it clears on Escape or a pick).
+    type: 'text',
+    placeholder,
+    'aria-label': label,
+    role: 'combobox',
+    autoComplete: 'off',
+    'aria-autocomplete': 'list',
+    'aria-expanded': open,
+    'aria-controls': open ? listboxId : undefined,
+    'aria-activedescendant': open ? highlightedRowId : undefined,
+    value: text,
+    onChange: (event) => change(event.target.value),
+    onKeyDown: handleKeyDown,
+    // A dismissed list comes back when the field is entered again: a press for a field that
+    // kept focus (Escape), a focus for one that did not.
+    onPointerDown: () => setDismissed(false),
+    onFocus: () => setDismissed(false),
+  };
+
   return (
     <Popover open={open} onOpenChange={(next) => setDismissed(!next)}>
-      <PopoverAnchor asChild>
-        <Input
-          ref={fieldRef}
-          type="text"
-          placeholder={placeholder}
-          aria-label={label}
-          role="combobox"
-          autoComplete="off"
-          aria-autocomplete="list"
-          aria-expanded={open}
-          aria-controls={open ? listboxId : undefined}
-          aria-activedescendant={open ? highlightedRowId : undefined}
-          value={text}
-          onChange={(event) => change(event.target.value)}
-          onKeyDown={handleKeyDown}
-          // A dismissed list comes back when the field is entered again: a press for a field that
-          // kept focus (Escape), a focus for one that did not.
-          onPointerDown={() => setDismissed(false)}
-          onFocus={() => setDismissed(false)}
-        />
-      </PopoverAnchor>
+      {field === 'search' ? (
+        // The shell is `SearchField`'s; the field inside it is this component's, so the value,
+        // the keys and the ARIA travel through `inputProps`.
+        <PopoverAnchor>
+          <SearchField
+            label={label}
+            placeholder={placeholder ?? ''}
+            onQueryChange={noQueryReport}
+            inputProps={fieldProps}
+          />
+        </PopoverAnchor>
+      ) : (
+        <PopoverAnchor asChild>
+          <Input {...fieldProps} />
+        </PopoverAnchor>
+      )}
       {open && (
         <PopoverContent
           align="start"

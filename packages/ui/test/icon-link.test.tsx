@@ -30,12 +30,38 @@ describe('IconLink', () => {
     );
   });
 
-  it('carries the ui-icon-link hook alongside the registry square', () => {
+  it('carries the ui-icon-link hook alongside the icon control square', () => {
     render(<IconLink href="/" label="Back">{<span />}</IconLink>);
     const link = screen.getByRole('link');
     expect(link.classList.contains('ui-icon-link')).toBe(true);
-    expect(link.classList.contains('size-10')).toBe(true);
-    expect(link.classList.contains('bg-panel')).toBe(true);
+    expect(link.classList.contains('size-[var(--tap)]')).toBe(true);
+    expect(link.classList.contains('rounded-[var(--r-md)]')).toBe(true);
+    expect(link.classList.contains('bg-surface')).toBe(true);
+  });
+
+  it('paints through the current vocabulary and never a retired alias', () => {
+    render(<IconLink href="/" label="Back">{<span />}</IconLink>);
+    const classes = classesOf(screen.getByRole('link'));
+
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'border-line',
+        'bg-surface',
+        'text-ink',
+        'active:bg-press',
+        'focus-visible:outline-focus',
+      ]),
+    );
+    for (const retired of [
+      'border-border',
+      'bg-panel',
+      'text-text',
+      'outline-accent',
+      'size-10',
+      'rounded-md',
+    ]) {
+      expect(classes).not.toContain(retired);
+    }
   });
 
   it('merges className instead of replacing it', () => {

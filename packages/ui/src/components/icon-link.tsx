@@ -10,15 +10,14 @@ export interface IconLinkProps extends Omit<ComponentPropsWithRef<'a'>, 'href' |
 }
 
 /**
- * The registry button's `asChild` shape at this atom's 40px square: one fixed
- * look, so a class string — no cva.
+ * The registry button's `asChild` shape at the icon control's tap target: a 48px square on
+ * `IconButton`'s radius, drawn as the framed variant of that control — `--line` hairline,
+ * `--surface` fill, `--ink` glyph, washing to `--press` under the finger.
  *
- * ponytail: the string repeats IconButton's `default` variant, which is not
- * exported; lift it into a shared `iconControlVariants` if a third consumer
- * appears.
+ * One fixed look, so a class string — no cva.
  */
 const iconLinkStyles =
-  'inline-flex size-10 items-center justify-center rounded-md border border-border bg-panel text-text no-underline outline-none motion-safe:transition-colors focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent [-webkit-tap-highlight-color:transparent]';
+  'inline-flex size-[var(--tap)] items-center justify-center rounded-[var(--r-md)] border border-line bg-surface text-ink no-underline outline-none motion-safe:transition-colors active:bg-press focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus [-webkit-tap-highlight-color:transparent]';
 
 export function IconLink({ href, label, className, children, ...rest }: Readonly<IconLinkProps>) {
   return (

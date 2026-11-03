@@ -2,6 +2,7 @@
 
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
 
@@ -13,6 +14,13 @@ export interface SearchFieldProps {
   value?: string;
   onQueryChange: (q: string) => void;
   className?: string;
+  /**
+   * Props merged last onto the shell's field, for a caller that owns the text and the keys
+   * (`Autosuggest`): `ref`, `onKeyDown`, `role`, `aria-*` and a `value`/`onChange` pair all
+   * reach the real `<input>`. Omitted, the shell's own field and its debounced report are
+   * the only value path.
+   */
+  inputProps?: ComponentPropsWithRef<'input'>;
 }
 
 /**
@@ -32,6 +40,7 @@ export function SearchField({
   value,
   onQueryChange,
   className,
+  inputProps,
 }: Readonly<SearchFieldProps>) {
   const [inner, setInner] = useState(value ?? '');
   const lastValue = useRef(value ?? '');
@@ -70,6 +79,7 @@ export function SearchField({
         aria-label={label}
         value={inner}
         onChange={(event) => setInner(event.target.value)}
+        {...inputProps}
       />
     </div>
   );
