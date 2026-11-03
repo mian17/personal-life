@@ -79,4 +79,19 @@ describe('ThemeToggle', () => {
       true,
     );
   });
+
+  it('drops the trough chrome and fills the row when laid into a settings group', () => {
+    const { rerender } = render(<ThemeToggle />);
+    const trough = screen.getByRole('group', { name: 'Appearance' });
+    expect(trough.classList.contains('border')).toBe(true);
+    expect(trough.classList.contains('bg-surface-sunken')).toBe(true);
+    expect(trough.classList.contains('w-full')).toBe(false);
+
+    rerender(<ThemeToggle inGroup />);
+    expect(trough.classList.contains('border')).toBe(false);
+    expect(trough.classList.contains('bg-surface-sunken')).toBe(false);
+    expect(trough.classList.contains('bg-transparent')).toBe(true);
+    expect(trough.classList.contains('w-full')).toBe(true);
+    expect(trough.classList.contains('rounded-none')).toBe(true);
+  });
 });

@@ -1,4 +1,5 @@
-// Composed registry `button` (icon control), snapshot `ui-registry-2026-10-26` (2026-10-26) — see vendor/shadcn/SNAPSHOT.md
+// Three-state appearance segment (Light / Dark / System) sharing `tab-bar.tsx`'s `.seg` classes,
+// persisting the choice under `calm-theme` in `localStorage`.
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -40,9 +41,19 @@ function applyTheme(theme: Theme) {
 export type ThemeToggleProps = Omit<
   ComponentPropsWithRef<'div'>,
   'role' | 'aria-label' | 'children'
->;
+> & {
+  /**
+   * Laid into a settings group, which owns the frame: full width, no trough chrome
+   * (`revised-feedback.html:843-845`). Omitted renders the bordered trough for use on its own.
+   */
+  inGroup?: boolean;
+};
 
-export function ThemeToggle({ className, ...rest }: Readonly<ThemeToggleProps>) {
+/** §8's `.group > .seg--theme`: the group frames it, so the segment drops padding chrome and fills. */
+const groupTroughStyles =
+  'flex w-full items-center gap-[var(--s1)] p-[var(--s2)] rounded-none border-0 bg-transparent';
+
+export function ThemeToggle({ className, inGroup = false, ...rest }: Readonly<ThemeToggleProps>) {
   const [theme, setTheme] = useState<Theme>('system');
 
   useEffect(() => {
@@ -59,7 +70,13 @@ export function ThemeToggle({ className, ...rest }: Readonly<ThemeToggleProps>) 
     <div
       role="group"
       aria-label="Appearance"
-      className={cx('ui-seg', 'ui-seg--theme', '[&>*]:flex-1', segTroughBaseStyles, className)}
+      className={cx(
+        'ui-seg',
+        'ui-seg--theme',
+        '[&>*]:flex-1',
+        inGroup ? groupTroughStyles : segTroughBaseStyles,
+        className,
+      )}
       {...rest}
     >
       {THEME_ORDER.map((value) => {
