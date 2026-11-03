@@ -29,6 +29,12 @@ export type { PillButtonType, PillProps, PillSize, PillTag } from './components/
 export { Card } from './components/card';
 export type { CardProps } from './components/card';
 
+export { Facts, FactsRow } from './components/facts';
+export type { FactsProps, FactsRowProps } from './components/facts';
+
+export { Kpi } from './components/kpi';
+export type { KpiProps } from './components/kpi';
+
 export { StatusText } from './components/status-text';
 export type { StatusTextProps } from './components/status-text';
 
