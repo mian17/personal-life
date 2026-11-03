@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { Tab, TabBar } from '../src/components/tab-bar';
+import { Segmented, Tab, TabBar } from '../src/components/tab-bar';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
@@ -101,5 +101,53 @@ describe('TabBar', () => {
     const classes = classesOf(screen.getByRole('tablist'));
     expect(classes).toContain('legacy-hook');
     expect(classes).toContain('ui-tab-bar');
+  });
+});
+
+describe('Segmented', () => {
+  const items = [
+    { href: '/pomodoro/stats?period=week', label: 'Week', active: true },
+    { href: '/pomodoro/stats?period=month', label: 'Month' },
+  ];
+
+  it('renders one route link per item in a named group, in order', () => {
+    render(<Segmented aria-label="Chart window" items={items} />);
+
+    const group = screen.getByRole('group', { name: 'Chart window' });
+    expect(group.getAttribute('data-slot')).toBe('segmented');
+    expect(group.classList.contains('ui-seg')).toBe(true);
+
+    const links = screen.getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['Week', 'Month']);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(items.map((item) => item.href));
+    expect(links[0].getAttribute('data-next-link')).toBe('');
+    expect(links[0].getAttribute('data-slot')).toBe('segmented-item');
+  });
+
+  it('names the current segment with aria-current rather than a pressed state', () => {
+    render(<Segmented aria-label="Chart window" items={items} />);
+    const [week, month] = screen.getAllByRole('link');
+
+    expect(week.getAttribute('aria-current')).toBe('page');
+    expect(month.getAttribute('aria-current')).toBeNull();
+    expect(week.getAttribute('aria-pressed')).toBeNull();
+  });
+
+  it('paints the active segment from the accent fill and leaves the other plain', () => {
+    render(<Segmented aria-label="Chart window" items={items} />);
+    const [week, month] = screen.getAllByRole('link');
+
+    expect(classesOf(week)).toContain('bg-max');
+    expect(classesOf(week)).toContain('ui-seg__btn--active');
+    expect(classesOf(month)).not.toContain('bg-max');
+    expect(classesOf(month)).not.toContain('ui-seg__btn--active');
+  });
+
+  it('merges className instead of replacing it', () => {
+    render(<Segmented aria-label="Chart window" items={items} className="legacy-hook" />);
+
+    const classes = classesOf(screen.getByRole('group', { name: 'Chart window' }));
+    expect(classes).toContain('legacy-hook');
+    expect(classes).toContain('ui-seg');
   });
 });

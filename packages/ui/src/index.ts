@@ -103,8 +103,8 @@ export type { AutosuggestOption, AutosuggestProps } from './components/autosugge
 export { PillGroup } from './components/pill-group';
 export type { PillGroupProps } from './components/pill-group';
 
-export { Tab, TabBar } from './components/tab-bar';
-export type { TabProps, TabBarProps } from './components/tab-bar';
+export { Segmented, Tab, TabBar } from './components/tab-bar';
+export type { Segment, SegmentedProps, TabProps, TabBarProps } from './components/tab-bar';
 
 export { PageActions } from './components/page-actions';
 export type { PageActionsProps } from './components/page-actions';

@@ -27,12 +27,29 @@ export interface TabBarProps {
   className?: string;
 }
 
+export interface Segment {
+  /** Destination route, app-supplied (e.g. one filter value of the current view). */
+  href: string;
+  /** Control label (frozen visible text, app-supplied). */
+  label: string;
+  /** Marks the segment the current URL already shows. */
+  active?: boolean;
+}
+
+export interface SegmentedProps {
+  /** Group name (`aria-label`); frozen text, app-supplied. */
+  'aria-label': string;
+  /** Segments in render order. */
+  items: Segment[];
+  /** Class passthrough. */
+  className?: string;
+}
+
 /**
- * §8's `.seg`: one trough holding the triggers, one `--s1` apart on the sunken fill, so the
- * selected tab reads as the accent fill and the rest stay in the second ink tier. Radix owns
- * `role="tablist"` and the roving focus.
+ * §8's `.seg`: one trough holding the controls, one `--s1` apart on the sunken fill, so the
+ * selected one reads as the accent fill and the rest stay in the second ink tier.
  */
-const listStyles = cx(
+const segTroughStyles = cx(
   'inline-flex items-center gap-[var(--s1)]',
   'p-[var(--s1)] mt-[var(--s4)]',
   'rounded-[var(--r-md)] border border-line bg-surface-sunken',
@@ -40,20 +57,25 @@ const listStyles = cx(
 
 /**
  * §8's `.seg__btn`: a route link on the trough, a tap target tall, pressed-accent when it is the
- * current tab. Arrow-key focus comes from the list, and Enter follows the `href` the browser and
- * `next/link` already handle. `outline-hidden` zeroes `--tw-outline-style` and `outline-<width>`
- * draws with that variable, so the focus ring needs `outline-solid` to exist at all.
+ * current one. Enter follows the `href` the browser and `next/link` already handle.
+ * `outline-hidden` zeroes `--tw-outline-style` and `outline-<width>` draws with that variable, so
+ * the focus ring needs `outline-solid` to exist at all.
  */
-const tabStyles = cx(
+const segControlStyles = cx(
   'inline-flex items-center justify-center whitespace-nowrap',
   'min-h-[var(--tap)] px-[var(--s4)] rounded-[var(--r-sm)]',
   'text-[length:var(--fs-chip)] font-semibold tracking-[var(--tracking-button)]',
   'text-ink-2 no-underline cursor-pointer motion-safe:transition-colors',
-  'data-[state=active]:bg-max data-[state=active]:text-on-max',
   'active:bg-max-press',
   'outline-hidden focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
   'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-max',
 );
+
+/** The one selected control wears the accent fill, whichever control family draws it. */
+const segActiveStyles = 'bg-max text-on-max';
+
+/** A tab additionally follows Radix's forwarded `data-state`, which `asChild` does emit. */
+const tabStyles = cx(segControlStyles, 'data-[state=active]:bg-max data-[state=active]:text-on-max');
 
 export function Tab({ href, active = false, children, className }: Readonly<TabProps>) {
   return (
@@ -71,7 +93,7 @@ export function Tab({ href, active = false, children, className }: Readonly<TabP
           tabStyles,
           // The surface follows the prop the app already passes, so it cannot depend on
           // Radix forwarding `data-state` onto the `asChild` anchor.
-          active && 'bg-max text-on-max',
+          active && segActiveStyles,
           className,
         )}
       >
@@ -91,11 +113,49 @@ export function TabBar({
       <TabsPrimitive.List
         aria-label={ariaLabel}
         data-slot="tabs-list"
-        className={cx('ui-tab-bar', listStyles, className)}
+        className={cx('ui-tab-bar', segTroughStyles, className)}
       >
         {children}
       </TabsPrimitive.List>
     </TabsPrimitive.Root>
+  );
+}
+
+/**
+ * §8's `.seg` as a filter: the same trough and control as `TabBar`, drawn as plain route links in a
+ * `group`. Tabs own a tablist and roving focus because they swap panels; a filter only navigates,
+ * so its controls stay links and the current one is named `aria-current` — `aria-pressed` is not
+ * supported on the link role.
+ */
+export function Segmented({
+  ['aria-label']: ariaLabel,
+  items,
+  className,
+}: Readonly<SegmentedProps>) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      data-slot="segmented"
+      className={cx('ui-seg', segTroughStyles, className)}
+    >
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          data-slot="segmented-item"
+          aria-current={item.active === true ? 'page' : undefined}
+          className={cx(
+            'ui-seg__btn',
+            item.active && 'ui-seg__btn--active',
+            segControlStyles,
+            item.active && segActiveStyles,
+          )}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </div>
   );
 }
 
