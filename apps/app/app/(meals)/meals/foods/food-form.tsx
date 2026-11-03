@@ -11,6 +11,7 @@ import {
   EditorChrome,
   IconButton,
   Input,
+  Pill,
   Row,
   Section,
   Select,
@@ -116,10 +117,11 @@ function initialMeasures(food: MealFood | null): MeasureDraft[] {
  * and a blank box is the stored "no value" `0`, never the unknown affordance.
  *
  * Composition is `@life/ui` only (Contract 1): `EditorChrome` is the frame,
- * `SettingsRow` hosts each `Input`/`Select`/`StatusText`, measures are `Row`s of
- * `Input` + `IconButton` remove, the delete is a `ConfirmButton`. The save is
- * imperative (the toolbar `IconButton`, the entry editor's pattern), so the
- * delete control can never submit the save path by accident.
+ * `SettingsRow` hosts each `Input`/`Select`, a value the owner cannot change is a
+ * `Pill` in the control slot, measures are `Row`s of `Input` + `IconButton`
+ * remove, the delete is a `ConfirmButton`. The save is imperative (the toolbar
+ * `IconButton`, the entry editor's pattern), so the delete control can never
+ * submit the save path by accident.
  */
 export function FoodForm({
   food,
@@ -254,8 +256,8 @@ export function FoodForm({
             />
           ) : (
             /* `UpdateFoodDto` carries no `unit`: it is fixed at creation, so the edit
-               page states it beside the label and leaves the control column empty. */
-            <SettingsRow label={<>{'Unit '}<StatusText>{unit}</StatusText></>} control={null} />
+               page states it as a read-out pill rather than an editable field. */
+            <SettingsRow label="Unit" control={<Pill>{unit}</Pill>} />
           )}
           <StatusText>Facts below are per 100 {unit} — a blank value is 0.</StatusText>
         </Section>
