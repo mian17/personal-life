@@ -1,9 +1,10 @@
-import { format, sum } from '@life/nutrition';
+import { format, sum, UNKNOWN } from '@life/nutrition';
 import {
   ButtonLink,
   Card,
   EmptyState,
   formatDate,
+  Kpi,
   List,
   ListItem,
   NavBar,
@@ -43,18 +44,23 @@ const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
 ];
 
 /**
- * The day's headline: total eaten against the target and what remains. A missing
- * profile (target 404) is "no target set", never an error page; an over-target
- * day reads "X over" so the shared formatter's negative guard never leaks an
- * em dash into the remaining figure.
+ * The day's headline as `Kpi`'s two slots: the eaten figure on its own (whole
+ * kcal, the same rule the shared formatter applies), then the unit and what it
+ * is measured against. A missing profile (target 404) is "no target set", never
+ * an error page; an over-target day reads "X over" so the formatter's negative
+ * guard never leaks an em dash into the remaining figure.
  */
-function daySummary(totalCalories: number, target: { calories: number } | null): string {
-  const eaten = format('calories', totalCalories);
-  if (target == null) return `${eaten} — No target set`;
+function dayReadout(
+  totalCalories: number,
+  target: { calories: number } | null,
+): { eaten: number | string; unit: string } {
+  const eaten =
+    Number.isFinite(totalCalories) && totalCalories >= 0 ? Math.round(totalCalories) : UNKNOWN;
+  if (target == null) return { eaten, unit: 'kcal — No target set' };
   const rest = target.calories - totalCalories;
   const tail =
     rest >= 0 ? `${format('calories', rest)} left` : `${format('calories', -rest)} over`;
-  return `${eaten} / ${format('calories', target.calories)}, ${tail}`;
+  return { eaten, unit: `kcal / ${format('calories', target.calories)}, ${tail}` };
 }
 
 /** The target row, or `null` when the owner has no profile yet (404). */
@@ -83,6 +89,7 @@ export async function mealDay(day: string, emptyBody: string) {
     listMealFoodsIncludingDeleted(),
   ]);
   const totalCalories = sum(entries.map((entry) => entry.nutrients)).calories;
+  const readout = dayReadout(totalCalories, target);
 
   return (
     <PageShell>
@@ -90,7 +97,11 @@ export async function mealDay(day: string, emptyBody: string) {
       <PageTitle>Meals — {formatDate(day)}</PageTitle>
       <Card>
         <Stack gap="sm">
-          <StatusText>{daySummary(totalCalories, target)}</StatusText>
+          {/* The Kpi wears the day's figure; the `StatusText` shell keeps the one
+              `role="status"` read-out the day view has always exposed. */}
+          <StatusText>
+            <Kpi value={readout.eaten} unit={readout.unit} />
+          </StatusText>
           <ButtonLink href="/meals/target" variant="ghost">
             {target ? 'Edit target' : 'Set target'}
           </ButtonLink>
@@ -107,7 +118,7 @@ export async function mealDay(day: string, emptyBody: string) {
             sum(items.map((entry) => entry.nutrients)).calories,
           );
           return (
-            <Section key={group.key} label={`${group.label} — ${subtotal}`}>
+            <Section key={group.key} label={group.label} count={subtotal}>
               <List>
                 {items.map((entry) => {
                   // The catalog resolves the stored id to a name; an id matching

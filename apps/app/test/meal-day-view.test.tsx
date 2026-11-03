@@ -104,8 +104,12 @@ describe('meals day view', () => {
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
+    // The headline is now `Kpi`'s two slots, so the figure and what it is
+    // measured against cannot share one literal: the value slot holds the eaten
+    // number, the unit slot the rest of the day summary.
+    expect(html).toMatch(/ui-kpi__value[^>]*>600</);
     expect(html).toContain(
-      `${format('calories', 600)} / ${format('calories', 2000)}, ${format('calories', 1400)} left`,
+      `kcal / ${format('calories', 2000)}, ${format('calories', 1400)} left`,
     );
     expect(html).not.toContain('No meals logged today.');
   });
@@ -113,7 +117,8 @@ describe('meals day view', () => {
   it('says "No target set" when the owner has no profile yet (target 404 is not an error)', async () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
-    expect(html).toContain(`${format('calories', 0)} — No target set`);
+    expect(html).toMatch(/ui-kpi__value[^>]*>0</);
+    expect(html).toContain('kcal — No target set');
   });
 
   it('links to the target page with "Set target" when no target is set', async () => {
@@ -165,7 +170,10 @@ describe('meals day view', () => {
       ['Lunch', 500],
       ['Snacks', 100],
     ] as const) {
-      expect(html).toContain(`${label} — ${format('calories', kcal)}`);
+      // The heading keeps the label; the subtotal moved into the section's
+      // count slot, so the two no longer share one `Label — n kcal` literal.
+      expect(html).toContain(`>${label}</h2>`);
+      expect(html).toMatch(new RegExp(`ui-section__count[^>]*>${format('calories', kcal)}<`));
     }
     expect(html).not.toContain('Dinner');
     const order = ['Breakfast', 'Lunch', 'Snacks'].map((label) => html.indexOf(label));
