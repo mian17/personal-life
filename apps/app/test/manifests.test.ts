@@ -56,6 +56,26 @@ describe('per-route PWA manifests', () => {
     expect(pomodoro.icons[0].src).toBe('/icon-pomodoro.png');
   });
 
+  /**
+   * A manifest carries one ground for both schemes, so each keeps the dark value. Pinning it
+   * here is what stops the two constants drifting apart after they leave the token file.
+   */
+  it('paints every route on the revised §2 ground', () => {
+    const manifests = [
+      'manifest-notes.json',
+      'manifest-todos.json',
+      'manifest-meals.json',
+      'manifest-feedback.json',
+      'manifest-pomodoro.json',
+    ];
+    const grounds = manifests.map((file) => {
+      const manifest = readManifest(file);
+      return [manifest.theme_color, manifest.background_color];
+    });
+
+    expect(grounds).toEqual(manifests.map(() => ['#16171a', '#16171a']));
+  });
+
   it('ships every icon the per-route manifests declare', () => {
     const manifests = [
       'manifest-notes.json',

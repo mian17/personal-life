@@ -5,8 +5,8 @@
   "start_url": "/meals",
   "scope": "/meals",
   "display": "standalone",
-  "background_color": "#0f1115",
-  "theme_color": "#0f1115",
+  "background_color": "#16171a",
+  "theme_color": "#16171a",
   "icons": [
     {
       "src": "/icon-meals.png",

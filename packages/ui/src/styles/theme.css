@@ -3,8 +3,6 @@
    Tailwind's reset under it would re-order every app's box model in one step.
    Each `--color-*` below is a Tailwind utility name (`bg-page`, `text-ink-2`, `border-line`)
    for one revised role; the vocabulary is tokens.css's, never a second one invented here.
-   The retired vocabulary follows in two blocks — the colour utilities here, the names CSS
-   reads through `var()` at the end of the file — and both carry one deletion list.
    ponytail: no `--spacing-*` mapping — Tailwind's 0.25rem scale covers every revised step. */
 @layer theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
@@ -50,77 +48,4 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-chart-muted: var(--chart-muted);
-
-  /* The shipped names, still spoken by every primitive and screen until Tasks 3–10 restyle
-     them. Each one is an alias onto a revised role, never a fourth colour, so the retired
-     utilities keep emitting CSS while the migration runs. ponytail: delete this block when
-     the last consumer is restyled; nothing new may name a role below this line. */
-  --color-bg: var(--page);
-  --color-panel: var(--surface);
-  --color-text: var(--ink);
-  --color-muted: var(--ink-2);
-  --color-border: var(--line);
-  --color-accent: var(--max);
-  --color-on-accent: var(--on-max);
-  --color-amber: var(--warn);
-  --color-green: var(--ok);
-}
-
-/* The same bridge for the names no utility class can carry: an SVG `fill`, a `calc()` inside
-   an arbitrary value, a mask gradient. A primitive or a screen still speaks each of these,
-   and every one is an alias onto a revised value, never a fourth colour or a fifth length.
-   One deletion list covers all of it — this block and the `--color-*` block above leave
-   `theme.css` together, with the matching tables in `theme-parity.test.ts`, the day the last
-   consumer is restyled. Nothing new may name a value below this line.
-
-   The spacing steps need a word. The revised grid is seven 4px steps; the shipped scale was
-   rem-based in sixteenths, so its sub-4px steps and its eighth-steps have no revised
-   counterpart. Each is written as the fraction of a revised step it stood for, which keeps
-   the geometry the primitives were laid out against — deleting this block is what snaps
-   every inset to the 4px grid, and that is the restyle tasks' job, not a side effect of the
-   token rename. Dropping it early renders every row edge-to-edge (no padding, no gap, no
-   radius, a clipped sub line), which is exactly what the missing names did. */
-:root {
-  /* roles read through `var()` rather than through a utility */
-  --panel: var(--surface);
-  --muted: var(--ink-2);
-  --accent: var(--max);
-  --amber: var(--warn);
-  --border: var(--line);
-
-  /* §5 spacing, expressed on the revised grid */
-  --space-0-15: calc(var(--s1) * 0.6);
-  --space-0-2: calc(var(--s1) * 0.8);
-  --space-0-25: var(--s1);
-  --space-0-3: calc(var(--s1) * 1.2);
-  --space-0-35: calc(var(--s1) * 1.4);
-  --space-0-4: calc(var(--s1) * 1.6);
-  --space-0-5: var(--s2);
-  --space-0-6: calc(var(--s2) * 1.2);
-  --space-0-7: calc(var(--s1) * 2.8);
-  --space-0-75: var(--s3);
-  --space-0-8: calc(var(--s1) * 3.2);
-  --space-0-85: calc(var(--s1) * 3.4);
-  --space-0-9: calc(var(--s1) * 3.6);
-  --space-0-95: calc(var(--s1) * 3.8);
-  --space-1: var(--s4);
-  --space-1-25: var(--s5);
-  --space-2: var(--s8);
-  --space-3: var(--tap);
-  --space-5: calc(var(--s8) * 2.5);
-
-  /* §5–§6 the frame, the touch minimum, the radii, the editor's type size */
-  --tap-height: var(--tap);
-  --content-width: var(--frame-max);
-  --icon-btn-size: var(--tap);
-  --radius-md: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --radius-pill: var(--r-pill);
-  --leading: var(--lh-row-title);
-  --fs-editor: var(--fs-body);
-
-  /* §6 retired the product shadow, so the raised layers are flat and read off the ground
-     alone; the restyle tasks put the border that replaces it on each one. A zero shadow keeps
-     the `box-shadow` chain Tailwind compiles valid while it paints nothing. */
-  --shadow-fab: 0 0 0 0 transparent;
 }

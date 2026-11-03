@@ -109,11 +109,11 @@ export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarC
               {rows.map((row) => (
                 <Cell
                   key={row.index}
-                  // An SVG `fill` cannot name a Tailwind colour utility, and `--max` is
-                  // declared in the app's scope rather than on `:root`, so the fill reads the
-                  // documented bridge that aliases it — `--accent` resolves per app, in both
-                  // schemes, exactly as `bg-max` does in the markup around it.
-                  fill={row.value === 0 ? 'var(--chart-muted)' : 'var(--accent)'}
+                  // An SVG `fill` cannot name a Tailwind colour utility, so it reads the token
+                  // directly: `--max` is declared in the app's scope, which this chart sits
+                  // inside, so the bar takes the app's accent in both schemes the way `bg-max`
+                  // does in the markup around it. A zero bucket keeps the muted chart tone.
+                  fill={row.value === 0 ? 'var(--chart-muted)' : 'var(--max)'}
                 />
               ))}
             </Bar>

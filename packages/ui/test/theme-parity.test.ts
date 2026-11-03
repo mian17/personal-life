@@ -76,49 +76,6 @@ const DARK_SCHEME: Declarations = {
   '--on-max': '#16171a',
 };
 
-/**
- * The half of the same bridge that no utility class can carry: `var()` reads from an SVG
- * attribute, a `calc()` in an arbitrary value, a mask gradient. A primitive that still speaks
- * one of these renders with zero padding, zero gap and zero radius once the name goes
- * undefined, so this table is a rendering criterion, not a tidiness rule. Same deletion list
- * as `RETIRED_ROLE_BRIDGES`: an entry leaves here with the last consumer's restyle.
- */
-const RETIRED_VALUE_BRIDGES: Declarations = {
-  '--panel': 'var(--surface)',
-  '--muted': 'var(--ink-2)',
-  '--accent': 'var(--max)',
-  '--amber': 'var(--warn)',
-  '--border': 'var(--line)',
-  '--space-0-15': 'calc(var(--s1) * 0.6)',
-  '--space-0-2': 'calc(var(--s1) * 0.8)',
-  '--space-0-25': 'var(--s1)',
-  '--space-0-3': 'calc(var(--s1) * 1.2)',
-  '--space-0-35': 'calc(var(--s1) * 1.4)',
-  '--space-0-4': 'calc(var(--s1) * 1.6)',
-  '--space-0-5': 'var(--s2)',
-  '--space-0-6': 'calc(var(--s2) * 1.2)',
-  '--space-0-7': 'calc(var(--s1) * 2.8)',
-  '--space-0-75': 'var(--s3)',
-  '--space-0-8': 'calc(var(--s1) * 3.2)',
-  '--space-0-85': 'calc(var(--s1) * 3.4)',
-  '--space-0-9': 'calc(var(--s1) * 3.6)',
-  '--space-0-95': 'calc(var(--s1) * 3.8)',
-  '--space-1': 'var(--s4)',
-  '--space-1-25': 'var(--s5)',
-  '--space-2': 'var(--s8)',
-  '--space-3': 'var(--tap)',
-  '--space-5': 'calc(var(--s8) * 2.5)',
-  '--tap-height': 'var(--tap)',
-  '--content-width': 'var(--frame-max)',
-  '--icon-btn-size': 'var(--tap)',
-  '--radius-md': 'var(--r-md)',
-  '--radius-lg': 'var(--r-lg)',
-  '--radius-pill': 'var(--r-pill)',
-  '--leading': 'var(--lh-row-title)',
-  '--fs-editor': 'var(--fs-body)',
-  '--shadow-fab': '0 0 0 0 transparent',
-};
-
 /** §3 one accent per app, for fill, selection and progress only. */
 const ACCENT_ROLES = ['--max', '--max-press'];
 
@@ -128,24 +85,6 @@ const ACCENT_ROLES = ['--max', '--max-press'];
  * They are runtime inputs, so a missing declaration is correct for them and only for them.
  */
 const RUNTIME_SUPPLIED_VALUES = ['--autosuggest-rows', '--radix-popover-trigger-width'];
-
-/**
- * The shipped role names a primitive or a screen still speaks, each bridged in `theme.css`
- * onto the revised role that replaces it. This table is the deletion list for that bridge
- * block: an entry leaves here the day its last consumer is restyled, and the test then
- * demands the bridge leave `theme.css` too.
- */
-const RETIRED_ROLE_BRIDGES: Declarations = {
-  '--color-bg': 'var(--page)',
-  '--color-panel': 'var(--surface)',
-  '--color-text': 'var(--ink)',
-  '--color-muted': 'var(--ink-2)',
-  '--color-border': 'var(--line)',
-  '--color-accent': 'var(--max)',
-  '--color-on-accent': 'var(--on-max)',
-  '--color-amber': 'var(--warn)',
-  '--color-green': 'var(--ok)',
-};
 
 const APP_ACCENTS: Record<string, { light: Declarations; dark: Declarations }> = {
   notes: {
@@ -227,17 +166,8 @@ describe.each(Object.keys(APP_ACCENTS))('the %s accent', (app) => {
 });
 
 describe('theme.css', () => {
-  it('maps every revised colour role to a var() over tokens.css', () => {
-    expect(tailwindColourRoles()).toEqual({ ...expectedTailwindRoles(), ...RETIRED_ROLE_BRIDGES });
-  });
-
-  it('bridges every retired role onto a role tokens.css actually declares', () => {
-    const declaredRoles = new Set([...Object.keys(LIGHT_SCHEME), ...ACCENT_ROLES]);
-    const unknownTargets = Object.values(RETIRED_ROLE_BRIDGES)
-      .map(bridgedRole)
-      .filter((role) => !declaredRoles.has(role));
-
-    expect(unknownTargets).toEqual([]);
+  it('maps every revised colour role to a var() over tokens.css, and nothing else', () => {
+    expect(tailwindColourRoles()).toEqual(expectedTailwindRoles());
   });
 
   it('fails rather than defaults when asked for a role it does not map', () => {
@@ -245,15 +175,15 @@ describe('theme.css', () => {
   });
 });
 
-describe('the retired value bridge', () => {
-  it('declares every retired geometry and directly-read role on :root as a revised alias', () => {
-    expect(declarationsOf(THEME_CSS, ':root')).toMatchObject(RETIRED_VALUE_BRIDGES);
-  });
-
+describe('the values a component reads', () => {
+  /**
+   * A component sits inside one of the app's accent scopes, so `--max` and `--max-press` reach
+   * it from there rather than from `:root`. Every other name it reads has to be a root token.
+   */
   it('leaves no name undefined that a component reads through var()', () => {
     const declared = new Set([
       ...Object.keys(declarationsOf(TOKENS_CSS, ':root')),
-      ...Object.keys(declarationsOf(THEME_CSS, ':root')),
+      ...ACCENT_ROLES,
     ]);
     const undefinedNames = referencedValues(componentSources())
       .filter((name) => !declared.has(name) && !RUNTIME_SUPPLIED_VALUES.includes(name))
@@ -352,12 +282,6 @@ function relativeLuminance(colour: string): number {
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function bridgedRole(bridge: string): string {
-  const matched = bridge.match(/^var\((--[\w-]+)\)$/);
-  if (matched === null) throw new Error(`theme.css bridges onto ${bridge}, which is not a bare var()`);
-  return matched[1];
 }
 
 function motionSection(preference: 'no-preference' | 'reduce'): string {

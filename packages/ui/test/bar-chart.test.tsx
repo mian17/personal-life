@@ -79,7 +79,7 @@ describe('BarChart', () => {
       bar.getAttribute('fill'),
     );
     expect(emptyMonday).toBe('var(--chart-muted)');
-    expect(measuredTuesday).toBe('var(--accent)');
+    expect(measuredTuesday).toBe('var(--max)');
   });
 
   it('draws one flat target run per targeted bucket, and none for a bare bucket', () => {
