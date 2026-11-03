@@ -1,10 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeToggle } from '../src/components/theme-toggle';
 
-function currentIcon(button: HTMLElement): string | null {
-  const svg = button.querySelector('svg');
-  if (!svg) return null;
-  return Array.from(svg.classList).find((cls) => cls.startsWith('lucide-') && cls !== 'lucide') ?? null;
+/** The pressed option's visible label — the group's whole contract in one read. */
+function pressedOption(): string | undefined {
+  return screen
+    .getAllByRole('button')
+    .find((button) => button.getAttribute('aria-pressed') === 'true')?.textContent ?? undefined;
+}
+
+function option(label: string): HTMLElement {
+  return screen.getByRole('button', { name: label });
 }
 
 describe('ThemeToggle', () => {
@@ -13,38 +18,41 @@ describe('ThemeToggle', () => {
     delete document.documentElement.dataset.theme;
   });
 
-  it('starts on system and renders an IconButton with the frozen label', () => {
+  it('renders the three appearance choices as one pressed group', () => {
     render(<ThemeToggle />);
-    const button = screen.getByRole('button');
-    expect(button.tagName).toBe('BUTTON');
-    expect(button.classList.contains('ui-icon-btn')).toBe(true);
-    expect(button.getAttribute('aria-label')).toBe('Theme: System. Activate for Light.');
-    expect(button.getAttribute('aria-pressed')).toBe('false');
-    expect(currentIcon(button)).toBe('lucide-monitor');
+
+    expect(screen.getByRole('group', { name: 'Appearance' })).toBeTruthy();
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Light',
+      'Dark',
+      'System',
+    ]);
+    expect(pressedOption()).toBe('System');
+    expect(option('System').classList.contains('ui-seg__btn--active')).toBe(true);
+    expect(option('Light').classList.contains('ui-seg__btn--active')).toBe(false);
   });
 
-  it('cycles system → light → dark and back to system', () => {
+  it('applies the picked scheme to the document and moves the pressed state with it', () => {
     render(<ThemeToggle />);
-    const button = screen.getByRole('button');
 
-    fireEvent.click(button);
-    expect(button.getAttribute('aria-label')).toBe('Theme: Light. Activate for Dark.');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(currentIcon(button)).toBe('lucide-sun');
-    expect(window.localStorage.getItem('calm-theme')).toBe('light');
-    expect(document.documentElement.dataset.theme).toBe('light');
-
-    fireEvent.click(button);
-    expect(button.getAttribute('aria-label')).toBe('Theme: Dark. Activate for System.');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(currentIcon(button)).toBe('lucide-moon');
+    fireEvent.click(option('Dark'));
+    expect(pressedOption()).toBe('Dark');
     expect(window.localStorage.getItem('calm-theme')).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
 
-    fireEvent.click(button);
-    expect(button.getAttribute('aria-label')).toBe('Theme: System. Activate for Light.');
-    expect(button.getAttribute('aria-pressed')).toBe('false');
-    expect(currentIcon(button)).toBe('lucide-monitor');
+    fireEvent.click(option('Light'));
+    expect(pressedOption()).toBe('Light');
+    expect(window.localStorage.getItem('calm-theme')).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  it('clears the document choice under System, leaving the System preference stored', () => {
+    window.localStorage.setItem('calm-theme', 'dark');
+    render(<ThemeToggle />);
+    expect(pressedOption()).toBe('Dark');
+
+    fireEvent.click(option('System'));
+    expect(pressedOption()).toBe('System');
     expect(window.localStorage.getItem('calm-theme')).toBe('system');
     expect(document.documentElement.dataset.theme).toBeUndefined();
   });
@@ -52,23 +60,23 @@ describe('ThemeToggle', () => {
   it('reads a stored theme on mount without applying it to the document', () => {
     window.localStorage.setItem('calm-theme', 'dark');
     render(<ThemeToggle />);
-    const button = screen.getByRole('button');
-    expect(button.getAttribute('aria-label')).toBe('Theme: Dark. Activate for System.');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(currentIcon(button)).toBe('lucide-moon');
+
+    expect(pressedOption()).toBe('Dark');
     expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
   it('ignores an unrecognized stored value', () => {
     window.localStorage.setItem('calm-theme', 'sepia');
     render(<ThemeToggle />);
-    expect(screen.getByRole('button').getAttribute('aria-label')).toBe(
-      'Theme: System. Activate for Light.',
-    );
+
+    expect(pressedOption()).toBe('System');
   });
 
-  it('merges a passthrough className', () => {
+  it('merges a passthrough className onto the group', () => {
     render(<ThemeToggle className="legacy-hook" />);
-    expect(screen.getByRole('button').classList.contains('legacy-hook')).toBe(true);
+
+    expect(screen.getByRole('group', { name: 'Appearance' }).classList.contains('legacy-hook')).toBe(
+      true,
+    );
   });
 });

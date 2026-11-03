@@ -117,6 +117,16 @@ const ENTRIES: FeedbackDto[] = [
 ];
 
 describe('FeedbackInbox grouping', () => {
+  it("reads the inbox sub-line and each app group's entry count", () => {
+    const plural = render(ENTRIES);
+    expect(plural).toContain('Across all five modules');
+    // Three apps, two entries each: §8's `.slabel__count` is plural on every group.
+    expect(plural.match(/>2 entries</g)).toHaveLength(3);
+
+    const singular = render([ENTRIES[0]]);
+    expect(singular).toContain('>1 entry<');
+  });
+
   it('nests app then type, in canonical order, preserving newest-first inside groups', () => {
     const html = render(ENTRIES);
 

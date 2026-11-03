@@ -38,6 +38,29 @@ describe('ListShell', () => {
     ]);
   });
 
+  it('renders the sub-line between the title and the tabs', () => {
+    const { container } = render(
+      <ListShell
+        title="Feedback"
+        subtitle="Across all five modules"
+        tabs={<span data-testid="tabs" />}
+        body={<span data-testid="body" />}
+      />,
+    );
+
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'h1', 'p', 'tabs', 'body']);
+    expect(container.querySelector('.ui-list-shell__sub')!.textContent).toBe(
+      'Across all five modules',
+    );
+  });
+
+  it('renders no sub-line when the slot is omitted', () => {
+    const { container } = render(<ListShell title="Feedback" body={<span data-testid="body" />} />);
+
+    expect(container.querySelector('.ui-list-shell__sub')).toBeNull();
+    expect(container.querySelector('.ui-page p')).toBeNull();
+  });
+
   it('renders nothing for omitted optional slots (no empty wrapper)', () => {
     const { container } = render(
       <ListShell

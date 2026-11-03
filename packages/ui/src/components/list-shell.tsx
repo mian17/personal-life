@@ -9,7 +9,9 @@ import { PageTitle } from './page-title';
 export interface ListShellProps {
   /** Page title rendered as `<h1>` (`PageTitle`). Frozen text supplied by the app. */
   title: string;
-  /** Trailing nav actions: icon links + `ThemeToggle`, in render order. */
+  /** §8's `.phead__sub`: the one quiet line under the title (e.g. "Across all five modules"). */
+  subtitle?: string;
+  /** Trailing nav actions: icon links, in render order. */
   navTrailing?: ReactNode;
   /** Tab navigation (`TabBar`); rendered directly under the page title. */
   tabs?: ReactNode;
@@ -47,6 +49,12 @@ const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
  */
 const fillBodyStyles = 'flex-1 min-h-0 grid [grid-template-rows:minmax(0,1fr)]';
 
+/** §8's `.phead__sub`: one step under the meta tier, in the second ink tier, right under the title. */
+const subtitleStyles = cx(
+  'ui-list-shell__sub',
+  'mt-[var(--s1)] text-[length:var(--fs-meta)] leading-[var(--lh-meta)] text-ink-2',
+);
+
 /**
  * A page with no `FabLink` has no fab to clear, so its bottom padding is the frame's own
  * `--s6` band alone — `PageShell`'s fab band would otherwise float the content above the
@@ -57,6 +65,7 @@ const fablessPageStyles = 'pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!';
 
 export function ListShell({
   title,
+  subtitle,
   navTrailing,
   tabs,
   search,
@@ -76,6 +85,7 @@ export function ListShell({
     >
       <NavBar trailing={navTrailing} />
       <PageTitle>{title}</PageTitle>
+      {subtitle != null && <p className={subtitleStyles}>{subtitle}</p>}
       {tabs}
       {search}
       {filters}

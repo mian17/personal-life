@@ -5,7 +5,7 @@ export const metadata = routeLayoutMetadata('/manifest-meals.json', 'Meals', '/i
 
 export default function MealsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <RouteLayout>
+    <RouteLayout app="meals">
       <SnackbarProvider>{children}</SnackbarProvider>
     </RouteLayout>
   );

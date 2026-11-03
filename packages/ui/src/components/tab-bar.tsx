@@ -47,13 +47,17 @@ export interface SegmentedProps {
 
 /**
  * §8's `.seg`: one trough holding the controls, one `--s1` apart on the sunken fill, so the
- * selected one reads as the accent fill and the rest stay in the second ink tier.
+ * selected one reads as the accent fill and the rest stay in the second ink tier. The trough
+ * without its page-top margin is what a control that already sits in a row (the appearance
+ * segment) composes, so the one `.seg` look has a single declaration.
  */
-const segTroughStyles = cx(
+export const segTroughBaseStyles = cx(
   'inline-flex items-center gap-[var(--s1)]',
-  'p-[var(--s1)] mt-[var(--s4)]',
+  'p-[var(--s1)]',
   'rounded-[var(--r-md)] border border-line bg-surface-sunken',
 );
+
+const segTroughStyles = cx(segTroughBaseStyles, 'mt-[var(--s4)]');
 
 /**
  * §8's `.seg__btn`: a route link on the trough, a tap target tall, pressed-accent when it is the
@@ -61,7 +65,7 @@ const segTroughStyles = cx(
  * `outline-hidden` zeroes `--tw-outline-style` and `outline-<width>` draws with that variable, so
  * the focus ring needs `outline-solid` to exist at all.
  */
-const segControlStyles = cx(
+export const segControlStyles = cx(
   'inline-flex items-center justify-center whitespace-nowrap',
   'min-h-[var(--tap)] px-[var(--s4)] rounded-[var(--r-sm)]',
   'text-[length:var(--fs-chip)] font-semibold tracking-[var(--tracking-button)]',
@@ -72,7 +76,7 @@ const segControlStyles = cx(
 );
 
 /** The one selected control wears the accent fill, whichever control family draws it. */
-const segActiveStyles = 'bg-max text-on-max';
+export const segActiveStyles = 'bg-max text-on-max';
 
 /** A tab additionally follows Radix's forwarded `data-state`, which `asChild` does emit. */
 const tabStyles = cx(segControlStyles, 'data-[state=active]:bg-max data-[state=active]:text-on-max');

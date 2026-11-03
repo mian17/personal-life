@@ -44,6 +44,18 @@ describe('/feedback/settings page wiring', () => {
     expect(row.props.control.type).toBe(ThemeToggle);
   });
 
+  it('renders the three-state Light/Dark/System appearance control', () => {
+    const html = renderToStaticMarkup(FeedbackSettingsPage());
+
+    expect(html).toContain('role="group"');
+    expect(html).toContain('aria-label="Appearance"');
+    for (const label of ['Light', 'Dark', 'System']) {
+      expect(html).toContain(`>${label}</button>`);
+    }
+    // Server render is the System choice, and the mount read moves it once stored.
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+  });
+
   it('renders the frozen copy and a back affordance targeting /feedback', () => {
     const html = renderToStaticMarkup(FeedbackSettingsPage());
 

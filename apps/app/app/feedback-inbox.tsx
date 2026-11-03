@@ -26,6 +26,8 @@ const TYPE_LABELS: Record<string, string> = Object.fromEntries(
 
 const EMPTY_HEADING = 'No feedback yet.';
 const EMPTY_BODY = 'Use the feedback button in the toolbar to send the first one.';
+/** §8's `.phead__sub`: the one line under the title saying what the inbox spans. */
+const INBOX_SUBTITLE = 'Across all five modules';
 
 /**
  * A filter that hides every entry is not an empty inbox (`SPEC-feedback-status`
@@ -35,6 +37,11 @@ const EMPTY_BODY = 'Use the feedback button in the toolbar to send the first one
 function matchesNothingState(status: FeedbackStatus): { heading: string; body: string } {
   const { label } = feedbackStatusOption(status);
   return { heading: `No ${label} feedback.`, body: `Try another status or switch back to All.` };
+}
+
+/** §8's `.slabel__count`: the row count read at the far end of an app's group label. */
+function entryCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'entry' : 'entries'}`;
 }
 
 /** Canonical ids first, unknown ids last (alphabetical). */
@@ -135,7 +142,7 @@ export function FeedbackInbox({
         else byType.set(entry.type, [entry]);
       }
       return (
-        <Section key={app} label={APP_LABELS[app] ?? app}>
+        <Section key={app} label={APP_LABELS[app] ?? app} count={entryCountLabel(appEntries.length)}>
           {orderedKeys([...byType.keys()], TYPE_ORDER).map((type) => {
             const typeEntries = byType.get(type) ?? [];
             return (
@@ -160,6 +167,7 @@ export function FeedbackInbox({
   return (
     <ListShell
       title="Feedback"
+      subtitle={INBOX_SUBTITLE}
       navTrailing={
         <>
           <FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />

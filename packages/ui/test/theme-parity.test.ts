@@ -19,8 +19,15 @@ const COMPONENTS_DIRECTORY = join(__dirname, '../src/components');
 const TOKENS_CSS = readFileSync(join(STYLES_DIRECTORY, 'tokens.css'), 'utf8');
 const THEME_CSS = readFileSync(join(STYLES_DIRECTORY, 'theme.css'), 'utf8');
 const BASE_CSS = readFileSync(join(STYLES_DIRECTORY, 'base.css'), 'utf8');
-/** The app's pre-paint script: the other half of the storage key and of every accent scope. */
+/** The app's pre-paint script: the other half of the storage key. */
 const APP_LAYOUT = readFileSync(join(__dirname, '../../../apps/app/app/layout.tsx'), 'utf8');
+/**
+ * Every area layout, concatenated: the accent scope moved off the root script and onto each
+ * segment's own layout, so the scopes the app paints are declared here (one `app="…"` per area).
+ */
+const AREA_LAYOUTS = ['notes', 'todos', '(meals)/meals', 'pomodoro', 'feedback']
+  .map((directory) => readFileSync(join(__dirname, '../../../apps/app/app', directory, 'layout.tsx'), 'utf8'))
+  .join('\n');
 
 const DARK_SCHEME_MEDIA = '@media (prefers-color-scheme: dark)';
 const SYSTEM_ROOT_SELECTOR = ':root:not([data-theme])';
@@ -313,8 +320,8 @@ describe('the app appearance script', () => {
     expect(APP_LAYOUT).toContain("localStorage.getItem('calm-theme')");
   });
 
-  it('scopes every accent it lists, and lists exactly the scopes tokens.css declares', () => {
-    expect(accentScopesIn(APP_LAYOUT)).toEqual(accentScopesIn(TOKENS_CSS));
+  it('scopes every accent the area layouts declare, and declares exactly the scopes tokens.css names', () => {
+    expect(accentScopesIn(AREA_LAYOUTS)).toEqual(accentScopesIn(TOKENS_CSS));
   });
 });
 
@@ -323,12 +330,10 @@ function referencedValues(source: string): string[] {
   return [...new Set([...source.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name))];
 }
 
-/** The `data-app` scopes a stylesheet or a route list names, sorted so only membership counts. */
+/** The `data-app` scopes a stylesheet names, or the `app` each area layout renders it with. */
 function accentScopesIn(source: string): string[] {
   const scopes = [...source.matchAll(/\[data-app='([\w-]+)'\]/g)].map(([, app]) => app);
-  const declaredInLayout = [...source.matchAll(/ACCENT_SCOPED_ROUTES = \[([^\]]*)\]/g)].flatMap(([, routes]) =>
-    [...routes.matchAll(/'([\w-]+)'/g)].map(([, route]) => route),
-  );
+  const declaredInLayout = [...source.matchAll(/<RouteLayout app="([\w-]+)"/g)].map(([, app]) => app);
   return [...new Set([...scopes, ...declaredInLayout])].sort();
 }
 
