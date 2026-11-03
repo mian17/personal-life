@@ -64,9 +64,9 @@ describe('Button', () => {
     const classes = classesOf(screen.getByRole('button'));
     // Borderless: the panel behind the button is the surface.
     expect(classes).not.toContain('border');
-    expect(classes).not.toContain('border-border');
-    expect(classes).not.toContain('bg-panel');
-    expect(classes).toContain('size-12');
+    expect(classes).not.toContain('border-line-strong');
+    expect(classes).not.toContain('bg-surface');
+    expect(classes).toContain('size-[var(--tap)]');
     expect(classes).toContain('text-danger');
   });
 

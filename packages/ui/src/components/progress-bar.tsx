@@ -11,8 +11,9 @@ export interface ProgressBarProps {
 const MIN_PERCENT = 0;
 const MAX_PERCENT = 100;
 
+/** The trough is the pressed wash, the fill the app accent, both on the pill radius (§6). */
 const trackStyles =
-  'ui-progress-track block h-[var(--space-0-5)] w-full appearance-none overflow-hidden rounded-[var(--radius-pill)] bg-border [&::-moz-progress-bar]:rounded-[var(--radius-pill)] [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--radius-pill)] [&::-webkit-progress-value]:bg-accent';
+  'ui-progress-track block h-[var(--s2)] w-full appearance-none overflow-hidden rounded-[var(--r-pill)] bg-press [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
 
 /**
  * Today's fill as a native `<progress>`: the element already carries the progressbar

@@ -43,10 +43,12 @@ describe('Pill', () => {
         <Pill tone="wont_do">w</Pill>
       </>,
     );
-    expect(screen.getByText('o').classList.contains('text-accent')).toBe(true);
-    expect(screen.getByText('p').classList.contains('text-amber')).toBe(true);
-    expect(screen.getByText('d').classList.contains('text-green')).toBe(true);
-    expect(screen.getByText('w').classList.contains('text-muted')).toBe(true);
+    expect(screen.getByText('o').classList.contains('bg-surface-sunken')).toBe(true);
+    expect(screen.getByText('p').classList.contains('bg-warn-soft')).toBe(true);
+    expect(screen.getByText('p').classList.contains('text-warn')).toBe(true);
+    expect(screen.getByText('d').classList.contains('bg-ok-soft')).toBe(true);
+    expect(screen.getByText('d').classList.contains('text-ok')).toBe(true);
+    expect(screen.getByText('w').classList.contains('text-ink-2')).toBe(true);
   });
 
   it('renders an anchor when as="a", preserving href', () => {

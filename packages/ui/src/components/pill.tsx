@@ -27,28 +27,29 @@ export interface PillProps extends ComponentPropsWithRef<'span'> {
 }
 
 /**
- * Tone → text colour, one row per feedback status (`FEEDBACK_STATUSES` owns the
- * vocabulary and the token each value maps to). A colour name is its token name
- * minus `--`, resolved by the `@theme` block in `theme.css`.
+ * Tone → the tint behind the word and the word itself (`REVISED-DESIGN` §8's four pill tones).
+ * `FEEDBACK_STATUSES` owns the vocabulary; a status with no signal reads as the neutral pill.
  */
 export const pillToneStyles: Record<string, string> = {
-  open: 'text-accent',
-  in_progress: 'text-amber',
-  done: 'text-green',
-  wont_do: 'text-muted',
+  open: 'bg-surface-sunken text-ink-2',
+  in_progress: 'bg-warn-soft text-warn',
+  done: 'bg-ok-soft text-ok',
+  wont_do: 'bg-surface-sunken text-ink-2',
 };
 
 /**
- * The registry `badge` shell, theme-mapped: `chip` is the bordered status chip,
- * `filter` the borderless navigation pill. Geometry rides the spacing tokens so
- * both sizes keep the padding and type they carried as hand-written CSS.
+ * The two pills the revision draws: `chip` is §8's status pill — 24px tall, 12.5px / 600,
+ * riding its tone's tint — and `filter` is §8's `.chip`: the 48px filter control on the
+ * strong hairline, filling with the app accent while pressed.
+ *
+ * Both carry the border width so a colour is never declared twice; the colour arrives from
+ * `pillColours`, one pair at a time.
  */
-const pillVariants = cva('inline-flex items-center rounded-full', {
+const pillVariants = cva('inline-flex items-center whitespace-nowrap font-semibold rounded-[var(--r-pill)]', {
   variants: {
     size: {
-      chip: 'gap-[var(--space-0-3)] border border-border px-[var(--space-0-5)] py-[var(--space-0-2)] text-[length:var(--space-0-8)]',
-      filter:
-        'border-0 px-[var(--space-0-7)] py-[var(--space-0-35)] text-[length:var(--space-0-85)] no-underline',
+      chip: 'h-[var(--s6)] gap-[var(--s1)] border px-[var(--s2)] text-[length:var(--fs-pill)] tracking-[var(--tracking-pill)]',
+      filter: 'min-h-[var(--tap)] border px-[var(--s4)] text-[length:var(--fs-chip)]',
     },
   },
   defaultVariants: { size: 'chip' },
@@ -56,10 +57,17 @@ const pillVariants = cva('inline-flex items-center rounded-full', {
 
 /** Shed only the UA button chrome, so a button pill matches its span/anchor twin. */
 const toggleStyles =
-  'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent';
+  'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus';
 
 const removeStyles =
-  'min-h-0 cursor-pointer rounded-full border-0 bg-transparent px-[var(--space-0-35)] py-0 text-[length:var(--space-0-95)] font-semibold leading-none text-muted hover:text-danger [font-family:inherit]';
+  'ui-pill__remove min-h-0 cursor-pointer rounded-[var(--r-pill)] border-0 bg-transparent px-[var(--s1)] py-0 text-[length:var(--fs-meta)] font-semibold leading-none text-ink-2 hover:text-danger [font-family:inherit]';
+
+/** The one colour pair a pill wears: pressed filter, plain filter, or the tone's tint. */
+function pillColours(size: PillSize, tone: string | undefined, active: boolean): string {
+  if (active) return 'border-max bg-max text-on-max active:bg-max-press';
+  if (size === 'filter') return 'border-line-strong bg-surface text-ink active:bg-press';
+  return (tone != null && pillToneStyles[tone]) || 'border-transparent bg-surface-sunken text-ink-2';
+}
 
 export function Pill({
   size = 'chip',
@@ -80,11 +88,6 @@ export function Pill({
   // and patching that with `role`/`tabIndex`/a hand-written Space handler only
   // reimplements what <button> already does.
   const toggles = as === 'button' || (as === 'a' && href == null);
-  // One colour pair per pill, never two competing utilities: an active pill is the
-  // accent fill, otherwise the panel surface with the tone's text colour.
-  const colours = active
-    ? 'bg-accent text-on-accent'
-    : cx('bg-panel', (tone != null && pillToneStyles[tone]) || 'text-muted');
   const classes = cx(
     'ui-pill',
     `ui-pill--${size}`,
@@ -92,7 +95,7 @@ export function Pill({
     toggles && 'ui-pill--button',
     active && 'ui-pill--active',
     pillVariants({ size }),
-    colours,
+    pillColours(size, tone, active),
     toggles && toggleStyles,
     className,
   );
@@ -121,7 +124,7 @@ export function Pill({
       {onRemove && (
         <button
           type="button"
-          className={cx('ui-pill__remove', removeStyles)}
+          className={removeStyles}
           aria-label={removeLabel}
           onClick={onRemove}
         >

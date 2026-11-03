@@ -1,5 +1,6 @@
 'use client';
 
+import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { Input } from './input';
@@ -13,6 +14,17 @@ export interface SearchFieldProps {
   onQueryChange: (q: string) => void;
   className?: string;
 }
+
+/**
+ * The revised `.search` (REVISED-DESIGN §8): the shell owns the height, the strong hairline
+ * and the focus ring, the inner input owns nothing but its text, and the leading glyph and
+ * placeholders sit a tier quieter than what the reader types.
+ */
+const shellStyles = cx(
+  'flex items-center gap-[var(--s2)] h-[var(--tap)] px-[var(--s3)] mt-[var(--s4)]',
+  'rounded-[var(--r-md)] border border-line-strong bg-surface text-ink-3',
+  'focus-within:outline-solid focus-within:outline-[length:var(--focus-ring)] focus-within:outline-offset-[var(--focus-ring)] focus-within:outline-focus',
+);
 
 export function SearchField({
   label,
@@ -46,13 +58,14 @@ export function SearchField({
     return () => clearTimeout(timer);
   }, [inner]);
 
-  // `mb-4` is the block gap `.ui-search-box` used to carry. The hook stays so callers
-  // can still reach the wrapper; the leading glyph and the clear control are the
-  // browser's own for `type="search"`, so no markup here re-draws them.
+  // The shell is where the ring belongs, so the input inside it runs `bare`; the clear
+  // control stays the browser's own for `type="search"`, so no markup here re-draws it.
   return (
-    <div className={cx('ui-search-box mb-4', className)}>
+    <div className={cx('ui-search-box', shellStyles, className)}>
+      <Search size={18} aria-hidden className="shrink-0" />
       <Input
         type="search"
+        variant="bare"
         placeholder={placeholder}
         aria-label={label}
         value={inner}

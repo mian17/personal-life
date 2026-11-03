@@ -64,7 +64,7 @@ const labelToneStyles: Record<MatrixTone, string> = {
  * keeps the fade over empty box space when the box has room to spare.
  */
 const itemsStyles =
-  'grid content-start gap-[var(--s1)] flex-1 min-h-0 overflow-y-auto ' +
+  'grid content-start gap-[var(--s2)] flex-1 min-h-0 overflow-y-auto ' +
   '[mask-image:linear-gradient(to_bottom,var(--surface-sunken)_calc(100%_-_var(--s3)),transparent)]';
 
 /** Empty quadrant: muted and centred in the remaining box height. */

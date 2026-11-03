@@ -102,6 +102,10 @@
   --d-fast: 200ms;
   --d-base: 260ms;
   --ease: cubic-bezier(0.25, 1, 0.5, 1);
+
+  /* §8 the scrim dims the page toward black, not toward the ground, so it holds
+     one value in both schemes and is never restated for dark */
+  --scrim: rgba(0, 0, 0, 0.32);
 }
 
 :root[data-theme='dark'] {

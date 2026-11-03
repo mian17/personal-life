@@ -13,6 +13,15 @@
 @source '../';
 @source '../../../../apps';
 
+/* Tailwind publishes `--color-max` on `:root`, but §3 puts `--max` on the app's own scope, and
+   a custom property substitutes where it is declared — so the alias above resolves against an
+   undefined `--max` and every `bg-max` paints nothing. Re-declaring the accent pair inside the
+   scope that defines it is what makes the accent reach a utility. */
+[data-app] {
+  --color-max: var(--max);
+  --color-max-press: var(--max-press);
+}
+
 @theme {
   /* §2 ground and the raised layers that sit on it */
   --color-page: var(--page);

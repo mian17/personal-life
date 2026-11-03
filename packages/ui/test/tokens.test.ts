@@ -177,6 +177,11 @@ const MOTION_TOKENS = {
   '--ease': 'cubic-bezier(0.25, 1, 0.5, 1)',
 } as const;
 
+/** §8 the scrim's dim: one value in both schemes, because it dims toward black. */
+const SCRIM_TOKENS = {
+  '--scrim': 'rgba(0, 0, 0, 0.32)',
+} as const;
+
 /** Every distinct px literal the whole refactor is allowed to know about. */
 const FROZEN_PX = [
   '1px', '1.5px', '2px', '4px', '8px', '11px', '12px', '12.5px', '13px', '13.5px',
@@ -199,13 +204,8 @@ const BREAKPOINTS = {
   '2xl': '1536px',
 } as const;
 
-/** `feedback-status.ts` still names the shipped hues; the revision renames each one. */
-const STATUS_RENAMES = {
-  '--accent': '--ink-2',
-  '--amber': '--warn',
-  '--green': '--ok',
-  '--muted': '--ink-3',
-} as const;
+/** The revised palette's status hues, in the order `feedback-status.ts` maps them. */
+const REVISED_STATUS_HUES = ['--ink-2', '--warn', '--ok', '--ink-3'] as const;
 
 describe('tokens.css — palette and schemes', () => {
   const tokens = read('src/styles/tokens.css');
@@ -275,6 +275,10 @@ describe('tokens.css — type, rhythm, shape and motion', () => {
   it('declares both durations on the one curve', () => {
     expect(declarations(tokens, ':root')).toMatchObject(MOTION_TOKENS);
   });
+
+  it('declares one scrim dim, shared by both schemes', () => {
+    expect(declarations(tokens, ':root')).toMatchObject(SCRIM_TOKENS);
+  });
 });
 
 describe('tokens.css — vocabulary the revision forbids', () => {
@@ -316,21 +320,15 @@ describe('tokens.css — vocabulary the revision forbids', () => {
 describe('feedback status → revised token', () => {
   const tokensCss = read('src/styles/tokens.css');
 
-  it('pins every status to its renamed hue', () => {
-    const renamed = FEEDBACK_STATUSES.map(({ value, token }) => [value, STATUS_RENAMES[token]]);
-    expect(renamed).toEqual([
-      ['open', '--ink-2'],
-      ['in_progress', '--warn'],
-      ['done', '--ok'],
-      ['wont_do', '--ink-3'],
-    ]);
+  it('pins every status to its revised hue', () => {
+    const hues = FEEDBACK_STATUSES.map(({ token }) => token);
+    expect(hues).toEqual([...REVISED_STATUS_HUES]);
   });
 
   it('reads four distinct tokens declared in tokens.css', () => {
     const decls = declarations(tokensCss, ':root');
-    const hues = Object.values(STATUS_RENAMES);
-    for (const hue of hues) expect(decls[hue]).toBeDefined();
-    expect(new Set(hues).size).toBe(4);
+    for (const hue of REVISED_STATUS_HUES) expect(decls[hue]).toBeDefined();
+    expect(new Set(REVISED_STATUS_HUES).size).toBe(4);
   });
 });
 
@@ -342,8 +340,8 @@ describe('base.css — base element layer', () => {
     expect(decls['box-sizing']).toBe('border-box');
   });
 
-  it('owns the html, body reset: the ground, the ink and the §4 type baseline, all from tokens', () => {
-    const decls = declarations(base, 'html,\nbody');
+  it('owns the body reset: the ground, the ink and the §4 type baseline, all from tokens', () => {
+    const decls = declarations(base, 'body');
     expect(decls['margin']).toBe('0');
     expect(decls['padding']).toBe('0');
     expect(decls['background']).toBe('var(--page)');
@@ -352,6 +350,12 @@ describe('base.css — base element layer', () => {
     expect(decls['font-size']).toBe('var(--fs-body)');
     expect(decls['font-weight']).toBe('var(--fw-body)');
     expect(decls['line-height']).toBe('var(--lh-body)');
+  });
+
+  it('leaves the root font-size to the UA, so every rem-based utility keeps its px', () => {
+    const decls = declarations(base, 'html');
+    expect(decls['-webkit-text-size-adjust']).toBe('100%');
+    expect(decls['font-size']).toBeUndefined();
   });
 });
 

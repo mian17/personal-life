@@ -24,12 +24,12 @@ export interface DialogProps {
  * shape. Radix portals the panel into the top layer, where an ancestor's `overflow: hidden` cannot
  * clip it, and owns the focus trap and Escape handling.
  *
- * The scrim dims the page at half strength through the page token, and fades in over `--d-fast`;
- * the sheet below it travels up over `--d-base`. Both are `motion-safe:`, so `reduce` collapses
- * them and the surface simply appears.
+ * The scrim dims the page through `--scrim`, and fades in over `--d-fast`; the sheet below it
+ * travels up over `--d-base`. Both are `motion-safe:`, so `reduce` collapses them and the surface
+ * simply appears.
  */
 const dialogOverlay = cx(
-  'fixed inset-0 z-40 bg-page/50',
+  'fixed inset-0 z-40 bg-[var(--scrim)]',
   'motion-safe:transition-opacity starting:opacity-0',
 );
 

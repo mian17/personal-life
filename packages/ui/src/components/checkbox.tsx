@@ -15,19 +15,33 @@ export interface CheckboxProps
 }
 
 /**
- * The registry root, indicator and check, theme-mapped onto this repo's tokens: `bg-primary`
- * becomes `bg-current`, so the square fills with the row's colour and a `ListItem` tone tints it,
- * and the check is drawn in `--panel` so it reads against the fill. Geometry keeps the
- * `--checkbox-size` hook the todo and dense rows set on their leading control.
+ * The revised `.check` (REVISED-DESIGN §8, §11): a 24px mark painted inside a 48px target.
+ * The root is the target — full `--tap`, `--r-md`, pressing to `--press` — so the tap surface
+ * never shrinks to the size of the mark a reader is aiming at.
+ * §8's negative offsets travel with it: the target bleeds `--s2` over the row's block padding
+ * and `--s3` over its start padding, so a 48px target adds no height to a dense row and the
+ * mark lands on the row's own text inset. Row-side insets stay with the row primitives that
+ * own row geometry (`list-item`'s `has-[>.ui-checkbox]` padding, and a dense row's zero start
+ * padding, which clips the target's start half against the row edge).
  */
-const checkboxRoot = cx(
-  'peer inline-flex shrink-0 items-center justify-center',
-  'size-[var(--checkbox-size,var(--space-0-75))] p-[var(--space-0-15)]',
-  'rounded-[var(--space-0-2)] border border-current',
-  'cursor-pointer motion-safe:transition-colors outline-none',
-  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
+const checkboxTarget = cx(
+  'ui-checkbox peer group grid shrink-0 place-items-center',
+  'size-[var(--tap)] rounded-[var(--r-md)] border-0 bg-transparent',
+  '-my-[var(--s2)] -ms-[var(--s3)]',
+  'cursor-pointer motion-safe:transition-colors active:bg-press outline-none',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
   'disabled:cursor-not-allowed disabled:opacity-50',
-  'data-[state=checked]:bg-current',
+);
+
+/**
+ * The revised `.check__box`: the mark's frame. `--checkbox-size` (24px) is the hook a dense row
+ * narrows, and the box carries no padding.
+ */
+const checkboxBox = cx(
+  'ui-checkbox__box grid size-[var(--checkbox-size)] place-items-center',
+  'rounded-[var(--r-sm)] border-[length:var(--border-width-strong)] border-line-strong',
+  'bg-surface text-transparent',
+  'group-data-[state=checked]:border-max group-data-[state=checked]:bg-max group-data-[state=checked]:text-on-max',
 );
 
 export function Checkbox({ checked = false, label, className, ...rest }: Readonly<CheckboxProps>) {
@@ -36,15 +50,17 @@ export function Checkbox({ checked = false, label, className, ...rest }: Readonl
       data-slot="checkbox"
       checked={checked}
       aria-label={label}
-      className={cx('ui-checkbox', checked && 'ui-checkbox--checked', checkboxRoot, className)}
+      className={cx('ui-checkbox', checked && 'ui-checkbox--checked', checkboxTarget, className)}
       {...rest}
     >
-      <CheckboxPrimitive.Indicator
-        data-slot="checkbox-indicator"
-        className="ui-checkbox__glyph grid place-content-center text-panel"
-      >
-        <Check className="size-full" strokeWidth={3} />
-      </CheckboxPrimitive.Indicator>
+      <span data-slot="checkbox-box" className={checkboxBox}>
+        <CheckboxPrimitive.Indicator
+          data-slot="checkbox-indicator"
+          className="ui-checkbox__glyph grid size-full place-content-center"
+        >
+          <Check className="size-[min(var(--s4),100%)]" strokeWidth={3} />
+        </CheckboxPrimitive.Indicator>
+      </span>
     </CheckboxPrimitive.Root>
   );
 }

@@ -120,7 +120,7 @@ describe('MatrixBlock', () => {
 
     const items = document.querySelector('.ui-matrix__items')!;
     expect(items.classList.contains('grid')).toBe(true);
-    expect(items.classList.contains('gap-[var(--s1)]')).toBe(true);
+    expect(items.classList.contains('gap-[var(--s2)]')).toBe(true);
     expect(items.classList.contains('flex-1')).toBe(true);
     expect(items.classList.contains('min-h-0')).toBe(true);
     expect(items.classList.contains('overflow-y-auto')).toBe(true);
