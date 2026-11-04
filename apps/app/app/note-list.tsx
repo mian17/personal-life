@@ -12,12 +12,23 @@ function firstTagName(note: Note, tagNames: Record<number, string>): string | un
   return note.tagIds.map((tagId) => tagNames[tagId]).find((name) => name != null);
 }
 
+/**
+ * An empty list carries two different meanings, so it has two different empty states: a healthy
+ * account that has not written anything yet, and a narrowed account whose filters matched nothing.
+ */
+const emptyCopy = {
+  account: { heading: 'No notes yet.', body: 'Tap + to write your first note.' },
+  filtered: { heading: 'Nothing matches.', body: 'Clear the search or pick All.' },
+} as const;
+
 export function NoteList({
   notes,
   tagNames,
-}: Readonly<{ notes: Note[]; tagNames: Record<number, string> }>) {
+  isFiltered = false,
+}: Readonly<{ notes: Note[]; tagNames: Record<number, string>; isFiltered?: boolean }>) {
   if (notes.length === 0) {
-    return <EmptyState heading="No notes yet." body="Tap + to write your first note." />;
+    const { heading, body } = emptyCopy[isFiltered ? 'filtered' : 'account'];
+    return <EmptyState heading={heading} body={body} />;
   }
   return (
     <List>

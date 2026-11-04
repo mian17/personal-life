@@ -23,6 +23,8 @@ export default async function NotesPage({
   );
 
   const current = { tag, q };
+  // Whether the page is narrowed at all decides which empty state an empty result gets.
+  const narrowed = Boolean(q?.trim()) || tagId !== undefined;
   // The `All` chip is always the row's first option and is active whenever no tag filter is
   // applied, so the row always shows the unfiltered state it can return to.
   const allFilter = {
@@ -55,7 +57,7 @@ export default async function NotesPage({
       }
       body={
         <Section label="Recent" count={notes.length === 1 ? '1 note' : `${notes.length} notes`}>
-          <NoteList notes={notes} tagNames={tagNames} />
+          <NoteList notes={notes} tagNames={tagNames} isFiltered={narrowed} />
         </Section>
       }
       fabHref="/notes/new"

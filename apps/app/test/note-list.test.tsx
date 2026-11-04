@@ -18,8 +18,8 @@ function note(overrides: Partial<Note> = {}): Note {
   };
 }
 
-const render = (notes: Note[], tagNames: Record<number, string> = {}) =>
-  renderToStaticMarkup(<NoteList notes={notes} tagNames={tagNames} />);
+const render = (notes: Note[], tagNames: Record<number, string> = {}, isFiltered = false) =>
+  renderToStaticMarkup(<NoteList notes={notes} tagNames={tagNames} isFiltered={isFiltered} />);
 
 /**
  * The recent-notes rows: the painted meta line (time plus the one tag the registry
@@ -47,9 +47,17 @@ describe('NoteList', () => {
     expect(html).not.toContain('Delete');
   });
 
-  it('renders the empty state instead of a list when there are no notes', () => {
+  it('renders the unfiltered empty state for an account with no notes', () => {
     const html = render([]);
     expect(html).toContain('No notes yet.');
+    expect(html).toContain('Tap + to write your first note.');
     expect(html).not.toContain('ui-list');
+  });
+
+  it('renders the filtered empty state when a narrowed page matches nothing', () => {
+    const html = render([], {}, true);
+    expect(html).toContain('Nothing matches.');
+    expect(html).toContain('Clear the search or pick All.');
+    expect(html).not.toContain('No notes yet.');
   });
 });
