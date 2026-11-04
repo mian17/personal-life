@@ -62,9 +62,15 @@ const labelToneStyles: Record<MatrixTone, string> = {
  * fades into the sunken panel, so a row cut by that edge reads as "more below" instead of as a
  * rendering fault — a touch browser paints no scrollbar to say the box scrolls. `content-start`
  * keeps the fade over empty box space when the box has room to spare.
+ *
+ * `items-start` is what makes this box the scroller. The app's group (`List`) clips its rows at
+ * its own rounded edge with `overflow-hidden`, which makes it a scroll container and so gives it
+ * a zero automatic minimum size; at the default `stretch` it would collapse to this box's height
+ * and swallow its own rows, leaving the box nothing to scroll. Aligned to the top, the group
+ * keeps its content height and the overflow arrives here.
  */
 const itemsStyles =
-  'grid content-start gap-[var(--s2)] flex-1 min-h-0 overflow-y-auto ' +
+  'grid content-start items-start gap-[var(--s2)] flex-1 min-h-0 overflow-y-auto ' +
   '[mask-image:linear-gradient(to_bottom,var(--surface-sunken)_calc(100%_-_var(--s3)),transparent)]';
 
 /** Empty quadrant: muted and centred in the remaining box height. */

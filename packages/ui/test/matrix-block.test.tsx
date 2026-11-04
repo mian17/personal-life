@@ -156,6 +156,15 @@ describe('MatrixBlock', () => {
     expect(pinsHeight(quadrant)).toBe(false);
     expect(pinsHeight(items)).toBe(false);
 
+    // The overflow has to arrive at this box, not die in the app's group: `List` clips at its
+    // rounded edge (`overflow-hidden`), which gives a grid item a zero automatic minimum size, so
+    // at the default `stretch` the group would collapse to the box's height and swallow its rows —
+    // the box would then have nothing to scroll. jsdom computes no layout, so the alignment is
+    // pinned as the utility it compiles from; measured in a browser at 390×700, this box is 155px
+    // tall whether or not the group is aligned, and its scroll height is 462px only when it is.
+    expect(items.classList.contains('items-start')).toBe(true);
+    expect(items.classList.contains('items-stretch')).toBe(false);
+
     const mask = items.className
       .split(/\s+/)
       .filter(Boolean)
