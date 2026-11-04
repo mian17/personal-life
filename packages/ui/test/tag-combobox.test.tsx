@@ -180,6 +180,44 @@ describe('TagCombobox', () => {
     expect(document.activeElement).toBe(outside);
   });
 
+  it('lays the trigger over the whole field instead of giving it a line of its own', () => {
+    setup();
+
+    expect(shell().classList.contains('relative')).toBe(true);
+    expect(trigger().classList.contains('absolute')).toBe(true);
+    expect(trigger().classList.contains('inset-0')).toBe(true);
+    // A flow item would wrap onto its own line once the chips fill one, reserving a tap-height band.
+    expect(trigger().classList.contains('flex-1')).toBe(false);
+    expect(trigger().classList.contains('self-stretch')).toBe(false);
+  });
+
+  it('keeps the chips above the trigger and clear of the chevron column', () => {
+    setup({ selectedIds: [1, 2, 3] });
+
+    const chipRow = document.querySelector('.ui-tag-combobox__chips')!;
+    expect(chipRow.classList.contains('z-10')).toBe(true);
+    expect(chipRow.classList.contains('relative')).toBe(true);
+    expect(chipRow.classList.contains('pr-[var(--s6)]')).toBe(true);
+  });
+
+  it('keeps every chip and its remove control when the row wraps', () => {
+    setup({ selectedIds: [1, 2, 3] });
+
+    expect(chips()).toHaveLength(3);
+    expect(removeButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Remove errand',
+      'Remove home',
+      'Remove Home repair',
+    ]);
+  });
+
+  it('keeps one chevron and the placeholder on an empty field', () => {
+    setup();
+
+    expect(trigger().textContent).toContain('Select tags…');
+    expect(trigger().querySelectorAll('svg')).toHaveLength(1);
+  });
+
   it('offers no field at all when the caller has no tags', () => {
     setup({ tags: [] });
 

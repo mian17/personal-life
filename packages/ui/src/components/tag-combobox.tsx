@@ -61,31 +61,49 @@ const labelStyles = cx(
  * The `Input` field shell, so a control that opens a panel and a text field read as one thing: the
  * strong hairline, the field radius and the field rhythm. It is a `div` rather than the control
  * itself because the attached chips carry their own remove buttons, and a button may not nest in a
- * button — the shell holds the chips, the trigger sits beside them.
+ * button — the shell holds the chips, the trigger covers them.
+ *
+ * `relative` is the trigger's containing block: the trigger is taken out of the flow so a wrapped
+ * chip row never pushes it onto a line of its own and leaves a blank band under the chips.
  */
 const fieldStyles = cx(
-  'ui-tag-combobox__field flex w-full min-w-0 flex-wrap items-center gap-[var(--s2)] text-left',
+  'ui-tag-combobox__field relative flex w-full min-w-0 flex-wrap items-center gap-[var(--s2)]',
+  'text-left',
   'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)]',
   'rounded-[var(--r-md)] border border-line-strong bg-surface',
   'text-[length:var(--fs-button)] text-ink',
 );
 
 /**
- * The field's control: whatever width the chips leave, showing the placeholder or nothing but the
- * chevron. It owns the keyboard states — the focus ring and the disabled tier — because it is the
- * only part of the shell a keyboard lands on.
+ * The field's control: it covers the whole shell, so a press anywhere in the field opens the panel
+ * and the chevron stays on the field's right edge, centred on the whole field rather than on the
+ * last chip row. It owns the keyboard states — the focus ring and the disabled tier — because it is
+ * the only part of the shell a keyboard lands on.
+ *
+ * Its `inset-0` box plus the shell's own padding and radius put its content box exactly on the
+ * shell's content box, so the placeholder lines up with the first chip and the focus ring lands on
+ * the field's border, not inside it.
  */
 const triggerStyles = cx(
-  'flex min-w-0 flex-1 items-center gap-[var(--s2)] self-stretch',
+  'absolute inset-0 flex items-center justify-between gap-[var(--s2)]',
+  'rounded-[var(--r-md)] px-[var(--s3)] py-[var(--s2)]',
   'cursor-pointer appearance-none bg-transparent [font-family:inherit] [line-height:inherit]',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
   'disabled:cursor-not-allowed disabled:text-ink-3 disabled:opacity-50',
 );
 
-/** The attached chips wrap onto further rows inside the field, one `--s2` apart. */
-const chipsStyles = 'ui-tag-combobox__chips flex flex-wrap items-center gap-[var(--s2)]';
+/**
+ * The attached chips wrap onto further rows inside the field, one `--s2` apart. They sit above the
+ * covering trigger so their own controls stay pressable, and stop short of the chevron's column.
+ */
+const chipsStyles =
+  'ui-tag-combobox__chips relative z-10 flex flex-wrap items-center gap-[var(--s2)] pr-[var(--s6)]';
 
-/** The chevron trails whatever the field holds, in the icon tier. */
+/**
+ * The chevron trails whatever the field holds, in the icon tier. `ml-auto` rather than the
+ * trigger's `justify-between` alone pins it right once chips are attached and the placeholder is
+ * gone, leaving the chevron as the trigger's only child.
+ */
 const chevronStyles = 'ml-auto shrink-0 text-ink-3';
 
 /** The search strip at the panel's top: the field sits at the popup's own `--s2` block inset. */
