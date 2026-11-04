@@ -19,37 +19,46 @@ export interface SettingsRowProps {
 }
 
 /**
- * One setting: label on the left, the caller's control on the right. Below `sm`
- * the row becomes a labelled field — the control takes the full width under its
- * label instead of being clipped by the two-column line.
+ * One setting on a single line at every width: label column left, the caller's
+ * control column right. The reference `.row` has no media query, so neither does
+ * this one — a narrow screen ellipsizes the label instead of restacking it.
  *
  * With `href` the label is the link target and the row's far end carries the
  * chevron (plus the caller's control, when one is given). The row itself stays a
- * `div`: wrapping the label in a link keeps the markup valid when the control is
- * itself interactive (a pill button, a toggle).
+ * `div`: the label's anchor is stretched over the whole row instead of wrapping
+ * it, which keeps the markup valid when the control is itself interactive (a pill
+ * button, a toggle) — that control column is raised above the overlay so it keeps
+ * its own clicks.
  */
-const rowStyles = cx(
-  'flex flex-wrap items-center justify-between',
-  'gap-[var(--s2)] max-sm:flex-col max-sm:items-stretch',
-);
+const rowStyles = 'relative flex items-center gap-[var(--s3)]';
+
+/** Only a row with a destination or an action reads as pressable — a bare label row does not. */
+const interactiveRowStyles = 'cursor-pointer active:bg-press';
 
 /** The label column takes the row's leftover width, so a long label never pushes the control out. */
 const textStyles = 'flex flex-1 flex-col gap-[var(--s1)] min-w-0';
 
 /** A label may ellipsize only if its own box is allowed to shrink. */
-const labelStyles = 'min-w-0 text-[length:var(--fs-row-title)]';
+const labelStyles = 'min-w-0 truncate text-[length:var(--fs-row-title)]';
 
-/** §8's `.row__meta` treatment for the optional second line. */
-const descriptionStyles = 'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
+/** §8's `.row__meta` treatment for the optional second line, clamped so it never grows the row. */
+const descriptionStyles = cx(
+  'line-clamp-2',
+  'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]',
+);
 
-/** The control keeps its intrinsic width and centres against the label line. */
-const controlStyles = 'flex items-center gap-[var(--s2)] shrink-0';
+/** The control keeps its intrinsic width, centres against the label line, and stays above the overlay. */
+const controlStyles = 'relative flex items-center gap-[var(--s2)] shrink-0';
 
-/** The row label as a link: same type and ink, no underline, the focus ring in place. */
+/** The label's hit area is the whole row, so no empty space on the row is dead. */
+const stretchStyles = "after:absolute after:inset-0 after:content-['']";
+
+/** The row label as a link: the row's own ink (so `:visited` cannot repaint it), no underline. */
 const linkLabelStyles = cx(
-  'no-underline',
+  'text-ink no-underline',
   'outline-none focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)]',
   'focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
+  stretchStyles,
 );
 
 /** The label as a button: only the UA chrome is shed, so it is the link's twin. */
@@ -67,6 +76,8 @@ export function SettingsRow({
   onClick,
   className,
 }: Readonly<SettingsRowProps>) {
+  const isInteractive = href != null || onClick != null;
+
   const labelNode =
     href != null ? (
       <Link href={href} className={cx('ui-settings-row__label', labelStyles, linkLabelStyles)}>
@@ -84,12 +95,17 @@ export function SettingsRow({
       <span className={cx('ui-settings-row__label', labelStyles)}>{label}</span>
     );
 
-  const chevron = (href != null || onClick != null) && (
-    <ChevronRight size={18} aria-hidden className="text-ink-3" />
-  );
+  const chevron = isInteractive && <ChevronRight size={18} aria-hidden className="text-ink-3" />;
 
   return (
-    <div className={cx('ui-settings-row', rowStyles, className)}>
+    <div
+      className={cx(
+        'ui-settings-row',
+        rowStyles,
+        isInteractive && interactiveRowStyles,
+        className,
+      )}
+    >
       <div className={cx('ui-settings-row__text', textStyles)}>
         {labelNode}
         {description != null && (
