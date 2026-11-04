@@ -9,6 +9,12 @@
  *
  *   npm run screens -w apps/app             # from the repo root
  *   SCREENS_BASE_URL=http://localhost:3100   # default
+ *   SCREENS_OUT_DIR=docs/design-systems/personal-life/screens-applied/8b32307
+ *                                           # default: .../personal-life/screens
+ *
+ * `SCREENS_OUT_DIR` is where the PNGs and `manifest.json` of this run go, so a
+ * per-commit capture writes its own folder instead of overwriting the reference
+ * set. Relative paths resolve from the repo root (see below), never the cwd.
  *
  * The app's identity gate answers `/auth/login` without a session cookie, so a
  * run needs a logged-in state: save one from a real browser and point
@@ -28,7 +34,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
@@ -37,7 +43,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 // -w apps/app` runs with the cwd set to `apps/app`, where a cwd-relative
 // `docs/` path would land inside the workspace.
 const repoRoot = join(here, '..', '..', '..', '..');
-const screensDir = join(repoRoot, 'docs', 'design-systems', 'personal-life', 'screens');
+const defaultScreensDir = join(repoRoot, 'docs', 'design-systems', 'personal-life', 'screens');
+// An override is resolved the same way, for the same reason: a relative
+// `SCREENS_OUT_DIR` must mean the same folder from any cwd.
+const screensDirOverride = process.env.SCREENS_OUT_DIR?.trim();
+const screensDir = screensDirOverride ? resolve(repoRoot, screensDirOverride) : defaultScreensDir;
 const manifestPath = join(screensDir, 'manifest.json');
 
 const baseUrl = (process.env.SCREENS_BASE_URL?.trim() || 'http://localhost:3100').replace(/\/+$/, '');

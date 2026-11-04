@@ -5,20 +5,32 @@
  * PNGs sitting next to it.
  *
  *   node test/screens/gallery.mjs
+ *   SCREENS_OUT_DIR=docs/design-systems/personal-life/screens-applied/8b32307 node test/screens/gallery.mjs
  *
  * Runs before any capture: with no manifest it writes the same page in its
  * zero-capture state, so an operator always finds the command they need.
+ *
+ * The page lands beside the capture folder, named `<folder>-gallery.html`, and
+ * links `<folder>/<file>` — so a per-commit folder gets its own gallery whose
+ * images still resolve, and the default set keeps `screens-gallery.html`.
+ * `SCREENS_OUT_DIR` means one thing to both scripts: where this run's PNGs and
+ * `manifest.json` go. Relative paths resolve from the repo root (see below).
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..', '..');
-const screensDir = join(repoRoot, 'docs', 'design-systems', 'personal-life', 'screens');
+const defaultScreensDir = join(repoRoot, 'docs', 'design-systems', 'personal-life', 'screens');
+// Resolved against the repo root for the same reason `capture.mjs` does: the cwd
+// of `npm run screens -w apps/app` is `apps/app`.
+const screensDirOverride = process.env.SCREENS_OUT_DIR?.trim();
+const screensDir = screensDirOverride ? resolve(repoRoot, screensDirOverride) : defaultScreensDir;
 const manifestPath = join(screensDir, 'manifest.json');
-const galleryPath = join(repoRoot, 'docs', 'design-systems', 'personal-life', 'screens-gallery.html');
+const screensName = basename(screensDir);
+const galleryPath = join(dirname(screensDir), `${screensName}-gallery.html`);
 
 const MODULES = [
   ['notes', 'Notes'],
@@ -69,8 +81,8 @@ function themeRow(screen, manifest) {
   }
   return `<div class="row">
     ${label}
-    <a class="shot" href="screens/${escape(screen.file)}" title="Open ${escape(screen.file)} full size">
-      <img src="screens/${escape(screen.file)}" width="${manifest.viewport.width}" height="${manifest.viewport.height}" loading="lazy"
+    <a class="shot" href="${escape(screensName)}/${escape(screen.file)}" title="Open ${escape(screen.file)} full size">
+      <img src="${escape(screensName)}/${escape(screen.file)}" width="${manifest.viewport.width}" height="${manifest.viewport.height}" loading="lazy"
         alt="${escape(screen.title)} screen at ${escape(screen.route)}, ${escape(screen.theme ?? 'default')} theme">
     </a>
     ${meta(screen, manifest)}
@@ -139,7 +151,7 @@ const body = screens.length
       <h2>No captures yet</h2>
       <p>Start the app on port 3100 (<code>npm run dev</code>), then run:</p>
       <pre><code>npm run screens -w apps/app</code></pre>
-      <p class="note">This page is regenerated from <code>screens/manifest.json</code>; reload it after the capture run.</p>
+      <p class="note">This page is regenerated from <code>${escape(screensName)}/manifest.json</code>; reload it after the capture run.</p>
     </div>`;
 
 const html = `<!doctype html>
@@ -284,6 +296,7 @@ ${body}
 </html>
 `;
 
+mkdirSync(dirname(galleryPath), { recursive: true });
 writeFileSync(galleryPath, html);
 console.log(
   screens.length
