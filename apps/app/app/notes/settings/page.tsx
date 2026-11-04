@@ -19,7 +19,7 @@ export default async function NotesSettingsPage() {
       <SettingsBlock title="Comfort">
         <SettingsRow
           label="Reduce motion"
-          description="Follows the system setting."
+          description="Follows the system setting. Turn it on in iOS Settings › Accessibility."
           control={<Pill>System</Pill>}
         />
         <SettingsRow

@@ -91,7 +91,9 @@ export function ThemeToggle({ className, inGroup = false, ...rest }: Readonly<Th
               'ui-seg__btn',
               pressed && 'ui-seg__btn--active',
               segControlStyles,
-              pressed && segActiveStyles,
+              // A `<button>` carries a UA face; the links `Tab`/`Segmented` render do not, so only
+              // the unpressed branch here needs transparency, and it never sits beside the accent.
+              pressed ? segActiveStyles : 'bg-transparent',
             )}
           >
             {THEME_LABELS[value]}

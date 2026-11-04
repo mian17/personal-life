@@ -42,6 +42,25 @@ const panelStyles = cx(
   'motion-safe:transition-opacity starting:opacity-0',
 );
 
+/** One entry of the panel: whatever draws the row, plus the panel's own hook class. */
+export interface MenuItemProps {
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * One entry of the panel. Radix's `Item` is what makes it a menu item — `role="menuitem"` and
+ * Arrow-key movement between entries — which a plain button dropped into the panel never gets.
+ * `asChild` keeps the primitive's own look; only the role and the keys are added.
+ */
+export function MenuItem({ children, className }: Readonly<MenuItemProps>) {
+  return (
+    <DropdownMenuPrimitive.Item asChild className={cx('ui-menu__item', className)}>
+      {children}
+    </DropdownMenuPrimitive.Item>
+  );
+}
+
 export function Menu({
   label,
   summary,

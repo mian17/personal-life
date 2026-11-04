@@ -68,7 +68,6 @@ const segTroughStyles = cx(segTroughBaseStyles, 'mt-[var(--s4)]');
 export const segControlStyles = cx(
   'inline-flex items-center justify-center whitespace-nowrap',
   'min-h-[var(--tap)] px-[var(--s4)] rounded-[var(--r-sm)]',
-  'bg-transparent',
   'text-[length:var(--fs-chip)] font-semibold tracking-[var(--tracking-button)]',
   'text-ink-2 no-underline cursor-pointer motion-safe:transition-colors',
   'active:bg-max-press',

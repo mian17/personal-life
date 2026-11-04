@@ -72,6 +72,15 @@ describe('ThemeToggle', () => {
     expect(pressedOption()).toBe('System');
   });
 
+  it('fills the pressed option with the accent and leaves the others transparent', () => {
+    render(<ThemeToggle />);
+
+    expect(option('System').classList.contains('bg-max')).toBe(true);
+    expect(option('System').classList.contains('bg-transparent')).toBe(false);
+    expect(option('Light').classList.contains('bg-transparent')).toBe(true);
+    expect(option('Light').classList.contains('bg-max')).toBe(false);
+  });
+
   it('merges a passthrough className onto the group', () => {
     render(<ThemeToggle className="legacy-hook" />);
 

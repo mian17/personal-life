@@ -144,15 +144,16 @@ describe('Segmented', () => {
   });
 
 
-  it('leaves the unselected control transparent, so no default button face paints', () => {
+  it('leaves the unselected control unfilled, so no default button face paints', () => {
     render(<Segmented aria-label="Chart window" items={items} />);
     const [week, month] = screen.getAllByRole('link');
 
-    expect(classesOf(month)).toContain('bg-transparent');
+    expect(classesOf(month)).not.toContain('bg-max');
     expect(classesOf(month)).not.toContain('bg-surface-sunken');
-    // The selected one still wears the accent fill, which wins over the transparent base.
     expect(classesOf(week)).toContain('bg-max');
-    expect(classesOf(week)).toContain('bg-transparent');
+    // Nothing may cancel it: `bg-transparent` is the same plain-utility layer, and Tailwind emits
+    // it after `.bg-max`, so carrying both would leave the selected control with no fill.
+    expect(classesOf(week)).not.toContain('bg-transparent');
   });
 
   it('merges className instead of replacing it', () => {

@@ -2,7 +2,7 @@ import { listNoteTagUsage, listNotes } from '@/lib/api';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
-import { formatLongDate, IconLink, ListShell, Section, TagFilterNav } from '@life/ui';
+import { formatLongDate, IconLink, ListShell, Section, TagFilterNav, todayIso } from '@life/ui';
 import { Plus, SlidersHorizontal } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,9 @@ export default async function NotesPage({
   // Usage ids resolve to names through the registry; ids the registry no longer
   // returns are detached and never rendered (kernel detach semantics).
   const namedTags = await resolveTagUsage(usage);
+  const tagNames: Record<number, string> = Object.fromEntries(
+    namedTags.map((tag) => [tag.tagId, tag.name]),
+  );
 
   const current = { tag, q };
   const filterItems = [
@@ -40,7 +43,7 @@ export default async function NotesPage({
   return (
     <ListShell
       title="Notes"
-      subtitle={formatLongDate(new Date().toISOString())}
+      subtitle={formatLongDate(todayIso())}
       navTrailing={
         <IconLink href={settingsHref('/notes')} label="Settings" variant="bare">
           <SlidersHorizontal size={20} aria-hidden />
@@ -53,8 +56,8 @@ export default async function NotesPage({
         ) : undefined
       }
       body={
-        <Section label="Recent" count={`${notes.length} notes`}>
-          <NoteList notes={notes} />
+        <Section label="Recent" count={notes.length === 1 ? '1 note' : `${notes.length} notes`}>
+          <NoteList notes={notes} tagNames={tagNames} />
         </Section>
       }
       fabHref="/notes/new"

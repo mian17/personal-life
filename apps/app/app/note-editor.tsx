@@ -8,6 +8,7 @@ import {
   Button,
   EditorChrome,
   Menu,
+  MenuItem,
   StatusText,
   Textarea,
   type TagOption,
@@ -486,9 +487,11 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
       actions={
         note != null && (
           <Menu label="Note actions" open={menuOpen} onOpenChange={setMenuOpen}>
-            <Button variant="danger" size="bare" onClick={() => void removeNote()}>
-              Delete note
-            </Button>
+            <MenuItem>
+              <Button variant="danger" size="bare" onClick={() => void removeNote()}>
+                Delete note
+              </Button>
+            </MenuItem>
           </Menu>
         )
       }
