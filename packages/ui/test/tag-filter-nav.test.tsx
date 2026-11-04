@@ -41,7 +41,7 @@ describe('TagFilterNav', () => {
     expect(scroll.classList.contains('flex-1')).toBe(true);
     expect(
       scroll.classList.contains(
-        '[mask-image:linear-gradient(to_right,var(--surface)_calc(100%_-_var(--s6)),transparent)]',
+        '[mask-image:linear-gradient(to_right,var(--page)_calc(100%_-_var(--s6)),transparent)]',
       ),
     ).toBe(true);
     expect(screen.getByRole('navigation').classList.contains('overflow-x-auto')).toBe(false);

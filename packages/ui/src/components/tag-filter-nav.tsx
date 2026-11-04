@@ -38,11 +38,17 @@ const navStyles = cx(
  * used to carry. Its trailing edge fades (`matrix-block.tsx`'s technique) because a touch
  * browser paints no scrollbar to say the strip scrolls; the fade sits here, never on the nav,
  * so the pinned chip's own edges stay crisp.
+ *
+ * The fade colour must be the surface the row is actually painted on, never a neutral guess:
+ * the row sits on the page (`base.css` paints `body` with `--page`), so fading to `--page` is
+ * invisible while fading to the raised `--surface` smears a white patch across the page.
+ * `matrix-block.tsx` follows the same rule one level down, fading to `--surface-sunken` because
+ * its box sits on that sunken panel.
  */
 const scrollStyles = cx(
   'ui-tag-filter-nav__scroll',
   'flex items-center gap-[var(--s2)] overflow-x-auto [scrollbar-width:none] min-w-0 flex-1',
-  '[mask-image:linear-gradient(to_right,var(--surface)_calc(100%_-_var(--s6)),transparent)]',
+  '[mask-image:linear-gradient(to_right,var(--page)_calc(100%_-_var(--s6)),transparent)]',
 );
 
 /** §8's field caption: 13px, 650, `0.06em`, upper case, second ink tier. */
