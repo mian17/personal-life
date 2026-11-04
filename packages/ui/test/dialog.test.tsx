@@ -133,4 +133,21 @@ describe('Dialog', () => {
     setup({ open: true });
     expect(document.querySelector('.ui-dialog__grab')).toBeNull();
   });
+
+  /**
+   * The sheet's entrance is a transition from a `@starting-style` value. jsdom computes no
+   * transitions, so the runnable check is the class list the stylesheet compiles: the starting
+   * style must repeat `[data-state=open]` or it loses to the open state's own reset on specificity
+   * and the panel is already at its final position on the first frame. The visual proof is the
+   * playwright probe in the task report.
+   */
+  it('starts the sheet off screen at a specificity that outranks its open state', () => {
+    setup({ open: true, size: 'sheet' });
+    const classes = dialog().classList;
+
+    expect(classes.contains('starting:data-[state=open]:translate-y-full')).toBe(true);
+    expect(classes.contains('starting:translate-y-full')).toBe(false);
+    expect(classes.contains('data-[state=open]:translate-y-0')).toBe(true);
+    expect(classes.contains('motion-safe:transition-transform')).toBe(true);
+  });
 });

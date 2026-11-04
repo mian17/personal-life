@@ -51,6 +51,11 @@ const fullPanel = 'inset-0 h-[100dvh] w-full rounded-none p-[var(--s4)]';
  * §8's `.sheet`: pinned to the frame's bottom edge, one card radius on its top corners, as tall as
  * the viewport allows less one `--s8`+`--s2` rail, and clear of the home indicator. It arrives by
  * travelling its own height, which is the one transition in the system that runs `--d-base`.
+ *
+ * The starting style repeats the open state's attribute so it outranks the `data-[state=open]`
+ * reset: a bare `starting:translate-y-full` compiles to one class (0,1,0) and loses to
+ * `.data-[state=open]:translate-y-0[data-state="open"]` (0,2,0), which leaves the panel already
+ * at its final position on the first frame — no travel, no transition.
  */
 const sheetPanel = cx(
   'ui-dialog--sheet',
@@ -58,7 +63,7 @@ const sheetPanel = cx(
   'w-full max-w-[var(--frame-max)] max-h-[calc(100dvh-(var(--s8)+var(--s2)))] overflow-y-auto',
   'rounded-t-[var(--r-lg)] border-t',
   'p-[var(--s2)_var(--s4)_calc(var(--s6)+env(safe-area-inset-bottom))]',
-  'motion-safe:transition-transform starting:translate-y-full',
+  'motion-safe:transition-transform starting:data-[state=open]:translate-y-full',
 );
 
 /** §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. */
