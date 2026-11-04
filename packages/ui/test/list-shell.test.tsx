@@ -11,7 +11,7 @@ function order(root: Element): string[] {
 }
 
 describe('ListShell', () => {
-  it('renders the fixed slot order: nav → title → tabs → search → filters → body → fab', () => {
+  it('renders the fixed slot order: header → tabs → search → filters → body → fab', () => {
     render(
       <ListShell
         title="Notes"
@@ -29,7 +29,6 @@ describe('ListShell', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Notes' })).toBeTruthy();
     expect(order(document.querySelector('.ui-page')!)).toEqual([
       'nav',
-      'h1',
       'tabs',
       'search',
       'filters',
@@ -38,7 +37,23 @@ describe('ListShell', () => {
     ]);
   });
 
-  it('renders the sub-line between the title and the tabs', () => {
+  it('renders the title block as the header\'s leading slot, one row with the trailing controls', () => {
+    const { container } = render(
+      <ListShell
+        title="Notes"
+        subtitle="Thursday, 30 October"
+        navTrailing={<span data-testid="nav-trailing" />}
+        body={<span data-testid="body" />}
+      />,
+    );
+
+    const nav = container.querySelector('.ui-nav-bar')!;
+    const leading = nav.firstElementChild!;
+    expect(leading.contains(screen.getByRole('heading', { level: 1, name: 'Notes' }))).toBe(true);
+    expect(nav.contains(screen.getByTestId('nav-trailing'))).toBe(true);
+  });
+
+  it('renders the sub-line inside the nav bar, under the title', () => {
     const { container } = render(
       <ListShell
         title="Feedback"
@@ -48,10 +63,10 @@ describe('ListShell', () => {
       />,
     );
 
-    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'h1', 'p', 'tabs', 'body']);
-    expect(container.querySelector('.ui-list-shell__sub')!.textContent).toBe(
-      'Across all five modules',
-    );
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'tabs', 'body']);
+    const subtitle = container.querySelector('.ui-nav-bar .ui-list-shell__sub')!;
+    expect(subtitle.textContent).toBe('Across all five modules');
+    expect(subtitle.previousElementSibling!.tagName).toBe('H1');
   });
 
   it('renders no sub-line when the slot is omitted', () => {
@@ -77,12 +92,7 @@ describe('ListShell', () => {
     expect(screen.queryByTestId('search')).toBeNull();
     expect(screen.queryByTestId('filters')).toBeNull();
     expect(container.querySelector('.ui-nav-bar__actions')).toBeNull();
-    expect(order(container.querySelector('.ui-page')!)).toEqual([
-      'nav',
-      'h1',
-      'body',
-      'a',
-    ]);
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'body', 'a']);
   });
 
   it('renders the title as the page h1', () => {
@@ -105,7 +115,7 @@ describe('ListShell', () => {
 
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.querySelector('.ui-fab-link')).toBeNull();
-    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'h1', 'body']);
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'body']);
   });
 
   it('passes fabLabel/fabHref to the FabLink aria-label and href', () => {

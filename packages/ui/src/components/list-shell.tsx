@@ -56,6 +56,25 @@ const subtitleStyles = cx(
 );
 
 /**
+ * §8's `.phead` puts the title block and the trailing controls on one flex line; `NavBar`'s own
+ * `pt-[var(--s2)]` is that line's top inset, so the title drops its own top margin (`mt-0`).
+ */
+const titleBlockStyles = 'mt-0';
+
+/**
+ * The header's leading slot: the title block — `<h1>` plus the optional sub-line — level with
+ * the trailing controls, matching `.phead`'s `<div>` wrapper.
+ */
+function TitleBlock({ title, subtitle }: Pick<ListShellProps, 'title' | 'subtitle'>) {
+  return (
+    <div className="ui-list-shell__title-block">
+      <PageTitle className={titleBlockStyles}>{title}</PageTitle>
+      {subtitle != null && <p className={subtitleStyles}>{subtitle}</p>}
+    </div>
+  );
+}
+
+/**
  * A page with no `FabLink` has no fab to clear, so its bottom padding is the frame's own
  * `--s6` band alone — `PageShell`'s fab band would otherwise float the content above the
  * safe area. Important because both paddings are utilities of one layer, where the later
@@ -83,9 +102,7 @@ export function ListShell({
         fabHref == null && fablessPageStyles,
       )}
     >
-      <NavBar trailing={navTrailing} />
-      <PageTitle>{title}</PageTitle>
-      {subtitle != null && <p className={subtitleStyles}>{subtitle}</p>}
+      <NavBar leading={<TitleBlock title={title} subtitle={subtitle} />} trailing={navTrailing} />
       {tabs}
       {search}
       {filters}
