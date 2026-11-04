@@ -1,5 +1,5 @@
 import type { List, Todo, TodoCompletion } from '@life/shared';
-import { dueDateLabel, FeedbackNavItem, ListShell, SettingsLink, Tab, TabBar, todayIso } from '@life/ui';
+import { dueDateLabel, ListShell, SettingsLink, Tab, TabBar, todayIso } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
@@ -150,30 +150,18 @@ describe('/todos list page wiring', () => {
     expect(el.props.filters).toBeUndefined();
   });
 
-  it('keeps the frozen nav link labels the e2e suite depends on', async () => {
+  it('keeps the nav to the single settings control: the tags/lists/trash icons are gone', async () => {
     const el = await TodosPage();
 
     expect(el.props.navTrailing.type).toBe(TodosNav);
+    const nav = TodosNav() as unknown as { type: unknown; props: { href: string } };
+    expect(nav.type).toBe(SettingsLink);
+    expect(nav.props.href).toBe('/todos/settings');
+
     const html = renderToStaticMarkup(<TodosNav />);
     expect(html).not.toMatch(/Theme:/);
     const labels = [...html.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(
-      expect.arrayContaining(['Manage tags', 'Manage lists', 'Trash', 'Settings']),
-    );
-  });
-
-  it('places the feedback item for this app before the Settings link', () => {
-    const kids = asArray(TodosNav() as unknown as { props: { children: unknown } });
-
-    const feedback = kids.filter((k) => k.type === FeedbackNavItem);
-    expect(feedback).toHaveLength(1);
-    expect(feedback[0].props.app).toBe('todos');
-
-    // SettingsLink stays the trailing nav item, feedback immediately before it.
-    const last = kids[kids.length - 1];
-    expect(last.type).toBe(SettingsLink);
-    expect(last.props.href).toBe('/todos/settings');
-    expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
+    expect(labels).toEqual(['Settings']);
   });
 
   it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {
