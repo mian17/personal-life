@@ -257,10 +257,11 @@ describe('ListItem', () => {
     );
     expect(classesOf(document.querySelector('.ui-list-item__sub')!)).toContain(DENSE_TYPE_UTILITY);
 
-    // A dense row is exactly the tap target tall, at the compact control scale.
+    // A dense row is exactly the tap target tall, at the compact control scale: the matrix
+    // mark is `--s3` (12px), the value the pre-redesign row gave this variant (`0.75rem`).
     const row = classesOf(screen.getByRole('listitem'));
     expect(row).toContain('min-h-[var(--tap)]');
-    expect(row).toContain('[--checkbox-size:var(--s5)]');
+    expect(row).toContain('[--checkbox-size:var(--s3)]');
   });
 
   it('clamps the todo title to two lines, and leaves a base row one line', () => {
@@ -796,7 +797,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s5)] items-center [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s3)] items-center [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

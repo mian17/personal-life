@@ -58,9 +58,12 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
 
 /**
  * A dense row is exactly the tap target tall, on the tighter inset, and narrows the checkbox
- * mark it hosts so the mark never fills the row it sits in.
+ * mark it hosts so the mark never fills the row it sits in. `--s3` (12px) is the dense scale the
+ * matrix lens has always drawn: the pre-redesign row set `--checkbox-size` to `0.75rem` here, and
+ * `--s3` is that value at the frozen 16px root. The default todo row keeps the control's own
+ * mark.
  */
-const denseRowStyles = 'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s5)]';
+const denseRowStyles = 'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s3)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
