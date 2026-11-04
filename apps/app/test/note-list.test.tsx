@@ -57,7 +57,7 @@ describe('NoteList', () => {
   it('renders the filtered empty state when a narrowed page matches nothing', () => {
     const html = render([], {}, true);
     expect(html).toContain('Nothing matches.');
-    expect(html).toContain('Clear the search or pick All.');
+    expect(html).toContain('Clear the search or try something else.');
     expect(html).not.toContain('No notes yet.');
   });
 });

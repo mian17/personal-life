@@ -18,7 +18,7 @@ function firstTagName(note: Note, tagNames: Record<number, string>): string | un
  */
 const emptyCopy = {
   account: { heading: 'No notes yet.', body: 'Tap + to write your first note.' },
-  filtered: { heading: 'Nothing matches.', body: 'Clear the search or pick All.' },
+  filtered: { heading: 'Nothing matches.', body: 'Clear the search or try something else.' },
 } as const;
 
 export function NoteList({
