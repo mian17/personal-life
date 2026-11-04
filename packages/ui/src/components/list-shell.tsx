@@ -45,9 +45,10 @@ const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
 /**
  * The growing slot between the page title block and the fab. `minmax(0, 1fr)`, not a bare `1fr`:
  * `1fr` is `minmax(auto, 1fr)`, so a tall child would grow this track instead of scrolling inside
- * it. A definite `100dvh` page is what bounds it.
+ * it. A definite `100dvh` page is what bounds it. Its top inset is the section step (`--s6`), the
+ * same gap a labelled `Section` opens with, so a filled body starts below the tabs like the list.
  */
-const fillBodyStyles = 'flex-1 min-h-0 grid [grid-template-rows:minmax(0,1fr)]';
+const fillBodyStyles = 'flex-1 min-h-0 grid pt-[var(--s6)] [grid-template-rows:minmax(0,1fr)]';
 
 /** §8's `.phead__sub`: one step under the meta tier, in the second ink tier, right under the title. */
 const subtitleStyles = cx(

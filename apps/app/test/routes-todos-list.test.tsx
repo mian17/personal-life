@@ -205,6 +205,19 @@ describe('/todos list page wiring', () => {
     expect(el.props.body.props.hideDone).toBeUndefined();
   });
 
+  it('opens a zero-row body one section step down, wrapping the empty state in a section', async () => {
+    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null });
+    const el = await TodosPage();
+    const html = renderToStaticMarkup(el.props.body);
+
+    // The empty state is not left flush under the tabs: it rides the section primitive,
+    // whose own `--s6` top step is the page's rhythm. `autoHideStyles` cannot hide it —
+    // the section holds an empty state, never a `.ui-list`.
+    expect(html).toMatch(/<section[^>]*class="[^"]*ui-section/);
+    expect(html).toContain('ui-empty');
+    expect(html).toContain('No todos');
+  });
+
   it('renders a done todo as a struck row with no trash control', async () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],

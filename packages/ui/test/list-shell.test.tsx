@@ -2,7 +2,14 @@ import { render, screen } from '@testing-library/react';
 import { ListShell } from '../src/components/list-shell';
 
 const FILL_PAGE_UTILITIES = ['flex', 'flex-col', 'h-[100dvh]', 'overflow-hidden'];
-const FILL_BODY_UTILITIES = ['flex-1', 'min-h-0', 'grid', '[grid-template-rows:minmax(0,1fr)]'];
+const FILL_BODY_UTILITIES = [
+  'flex-1',
+  'min-h-0',
+  'grid',
+  // The section step (`--s6`): a filled body opens below the tabs like a labelled section.
+  'pt-[var(--s6)]',
+  '[grid-template-rows:minmax(0,1fr)]',
+];
 
 function order(root: Element): string[] {
   return Array.from(root.children).map((child) =>
