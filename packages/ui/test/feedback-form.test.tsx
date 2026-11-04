@@ -250,6 +250,33 @@ describe('FeedbackForm', () => {
     expect(onSubmit.mock.calls[1][0].id).not.toBe(onSubmit.mock.calls[0][0].id);
   });
 
+  it('shares the settings Appearance trough and splits it into three equal controls', () => {
+    renderForm();
+
+    const trough = typeGroup();
+    // The shared `.seg` chrome from `segTroughBaseStyles` — the same trough ThemeToggle draws.
+    const sharedTroughClasses = [
+      'inline-flex',
+      'border-line',
+      'bg-surface-sunken',
+      'rounded-[var(--r-md)]',
+    ];
+    for (const sharedClass of sharedTroughClasses) {
+      expect(trough.className).toContain(sharedClass);
+    }
+    expect(trough.className).toContain('w-full');
+    // Equal thirds: the trough hands every control an equal share through its child selector.
+    expect(trough.className).toContain('[&>*]:flex-1');
+    // The dead hooks that used to stand in for the trough are gone, not merely unused.
+    expect(trough.className).not.toContain('ui-seg--kind');
+
+    // The `--s2` side padding keeps the longest label ("Enhancement") inside a third, where
+    // `segControlStyles`' `--s4` floor would overflow it.
+    for (const segment of within(trough).getAllByRole('button')) {
+      expect(segment.className).toContain('px-[var(--s2)]');
+    }
+  });
+
   it('separates its blocks with the dialog body gap alone, keeping --s2 inside a field', () => {
     renderForm();
 

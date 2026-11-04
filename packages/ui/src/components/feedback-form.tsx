@@ -52,12 +52,19 @@ const labelStyles = cx(
 );
 
 /**
- * §8's `.seg`: the trough spreads its three controls edge to edge, each holding an equal share.
- * The trough keeps `segTroughBaseStyles`'s inline-flex; `w-full` alone fills the sheet's width.
- * The buttons carry `whitespace-nowrap` and `--s4` side padding, so their min-content width is
- * label plus 32px — the sheet renders `shortLabel` to keep that floor under the third of 343px.
+ * §8's `.seg--theme` in the sheet: the shared trough from `segTroughBaseStyles` (borders, sunken
+ * surface, `--s1` padding and gaps) stretched to the sheet's width, each control taking an equal
+ * share of it.
  */
-const typeTroughStyles = cx('ui-seg', 'ui-seg--kind', 'w-full', '[&>*]:flex-1');
+const typeTroughStyles = cx(segTroughBaseStyles, 'w-full', '[&>*]:flex-1');
+
+/**
+ * The picker's controls give up `segControlStyles`' `--s4` side padding for `--s2`: inside the
+ * sheet a control's equal third is 109px at 375px, and "Enhancement" needs ~91px of text plus
+ * two of these 8px paddings to fit, where `--s4` would floor it at ~123px and break the thirds.
+ * `!` for the same reason `failureStyles` carries one — the `--s4` base is unconditional.
+ */
+const typeControlStyles = 'px-[var(--s2)]!';
 
 /**
  * The one status line under the fields. A failure takes the danger ink, a validation hint keeps
@@ -175,6 +182,7 @@ export function FeedbackForm({
                 'ui-seg__btn',
                 pressed && 'ui-seg__btn--active',
                 segControlStyles,
+                typeControlStyles,
                 // A `<button>` carries a UA face; the links `Tab`/`Segmented` render do not, so only
                 // the unpressed branch here needs transparency, and it never sits beside the accent.
                 pressed ? segActiveStyles : 'bg-transparent',
