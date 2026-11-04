@@ -3,17 +3,17 @@ import type { JSX, ReactNode } from 'react';
 import { EditorScreen } from './editor-screen';
 import { EditorToolbar, type EditorToolbarBack } from './editor-toolbar';
 import { EditorStack } from './editor-stack';
-import { TagPicker, type TagOption } from './tag-picker';
+import { TagCombobox, type TagOption } from './tag-combobox';
 import type { StackGap } from './stack';
 
 export interface EditorChromeTagPicker {
-  /** Available tags (id + display name) — `TagPicker`'s data shape. */
+  /** Available tags (id + display name) — `TagCombobox`'s data shape. */
   tags: readonly TagOption[];
   /** Currently attached ids. */
   selectedIds: readonly number[];
   /** Attach/detach callback; the app owns the state. */
   onToggle: (id: number) => void;
-  /** Picker label, e.g. "Attached tags" / "Tags". */
+  /** Picker label, e.g. "Attached tags" / "Tags" — the combobox's caption and its accessible name. */
   label?: string;
 }
 
@@ -62,9 +62,9 @@ export function EditorChrome({
       <EditorStack gap={gap}>
         {children}
         {tagPicker && (
-          <TagPicker
-            tags={[...tagPicker.tags]}
-            selectedIds={[...tagPicker.selectedIds]}
+          <TagCombobox
+            tags={tagPicker.tags}
+            selectedIds={tagPicker.selectedIds}
             onToggle={tagPicker.onToggle}
             label={tagPicker.label}
           />

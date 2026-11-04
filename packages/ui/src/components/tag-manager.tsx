@@ -3,7 +3,7 @@
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 import { ManagerSurface } from './manager-surface';
-import type { TagOption } from './tag-picker';
+import type { TagOption } from './tag-combobox';
 
 export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
   tags: TagOption[];

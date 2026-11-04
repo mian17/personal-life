@@ -125,8 +125,8 @@ export type { SettingsRowProps } from './components/settings-row';
 export { SettingsBlock } from './components/settings-block';
 export type { SettingsBlockProps } from './components/settings-block';
 
-export { TagPicker } from './components/tag-picker';
-export type { TagOption, TagPickerProps } from './components/tag-picker';
+export { TagCombobox } from './components/tag-combobox';
+export type { TagComboboxProps, TagOption } from './components/tag-combobox';
 
 export { TagManager } from './components/tag-manager';
 export type { TagManagerProps } from './components/tag-manager';

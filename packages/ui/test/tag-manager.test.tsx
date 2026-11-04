@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { TagManager } from '../src/components/tag-manager';
-import type { TagOption } from '../src/components/tag-picker';
+import type { TagOption } from '../src/components/tag-combobox';
 
 const TAGS: TagOption[] = [
   { id: 1, name: 'errand' },
