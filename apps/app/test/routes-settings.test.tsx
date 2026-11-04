@@ -22,6 +22,17 @@ jest.mock('@/app/feedback-actions', () => ({
   submitFeedbackAction: jest.fn(),
 }));
 
+// The counted settings rows read the tag and list registries through the server-only
+// barrels; mocking them keeps `next/headers`/fetch out of the node test env.
+jest.mock('@/lib/todo-api', () => ({
+  listTodoTagUsage: jest.fn(),
+  listLists: jest.fn(),
+}));
+jest.mock('@/lib/tags-compose', () => ({ resolveTagUsage: jest.fn() }));
+
+import { listLists, listTodoTagUsage } from '@/lib/todo-api';
+import { resolveTagUsage } from '@/lib/tags-compose';
+
 import { SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
 import { readPref } from '@/lib/preferences';
 import { setPref } from '@life/app-kit/preference-action';
@@ -31,6 +42,9 @@ import { TOGGLE_DEBOUNCE_MS } from '@/lib/use-debounced-callback';
 import TodosSettingsPage from '@/app/todos/settings/page';
 
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
+const mockedListTodoTagUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUsage>;
+const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
+const mockedResolveTagUsage = resolveTagUsage as jest.MockedFunction<typeof resolveTagUsage>;
 
 // `MatrixSwitch` reads its hooks off the raw `react` module exports at call time,
 // so spying there intercepts a direct call (outside React, `testEnvironment: node`).
@@ -101,6 +115,9 @@ describe('/todos/settings page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedReadPref.mockResolvedValue(true);
+    mockedListTodoTagUsage.mockResolvedValue([]);
+    mockedListLists.mockResolvedValue([]);
+    mockedResolveTagUsage.mockResolvedValue([]);
   });
 
   it('composes one SettingsShell titled Settings, backed to /todos, wired to todo feedback', async () => {
