@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Life — screen gallery</title>
+<style>
+  /* Every value below is a token from docs/design-systems/personal-life/DESIGN.md
+     (dark palette); keep the gallery and the app on one set of numbers. */
+  :root {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --panel: #181b22;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #5b8cff;
+    --border: #2a2f3a;
+    --danger: #ff6b6b;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --font: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --phone-w: 414;
+    --phone-h: 896;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    max-width: 72rem;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 var(--font);
+  }
+
+  h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.25rem; line-height: 1.25; margin: 2rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1rem; line-height: 1.25; margin: 0 0 0.25rem; }
+
+  a { color: var(--accent); }
+  a:hover { text-decoration: underline; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  p { margin: 0.25rem 0; }
+  .note { color: var(--muted); font-size: 0.9375rem; }
+  .mono { font-family: var(--mono); font-size: 0.875rem; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05em 0.3em;
+  }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem 1rem; overflow-x: auto; }
+  pre code { background: none; border: 0; padding: 0; }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin: 1rem 0; padding: 0.75rem 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .facts div { margin: 0; }
+  .facts dt { color: var(--muted); font-size: 0.8125rem; }
+  .facts dd { margin: 0; font-weight: 600; }
+
+  .count { color: var(--muted); font-weight: 400; font-size: 0.9375rem; }
+
+  .filter { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
+  .filter input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.4rem 0.625rem; min-width: 18rem; }
+  /* Full-opacity muted, not the browser's faded default: #8b93a7 on #181b22 is 5.60:1. */
+  .filter input::placeholder { color: var(--muted); opacity: 1; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1.25rem; }
+
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; }
+  .tile[hidden] { display: none; }
+
+  /* Each theme is its own labelled row; the label is what makes a light shot
+     next to a dark one readable without opening the file name. */
+  .row { margin-bottom: 0.75rem; }
+  .row:last-child { margin-bottom: 0; }
+  .theme { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
+
+  /* Natural flow at the PNG's own ratio: the full screen stays visible however
+     narrow the column gets, never cropped to a different aspect. */
+  .shot { display: block; margin-bottom: 0.5rem; }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--phone-w) / var(--phone-h);
+    object-fit: contain;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .meta { color: var(--muted); font-size: 0.8125rem; font-family: var(--mono); overflow-wrap: anywhere; }
+  .route { color: var(--text); }
+
+  .row.failed { border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 0.5rem 0.75rem; }
+  .failure { color: var(--danger); font-size: 0.9375rem; overflow-wrap: anywhere; }
+
+  .empty { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-top: 1.5rem; }
+  .empty h2 { border: 0; margin-top: 0; padding-top: 0; }
+
+  @media print {
+    :root { color-scheme: light; --bg: #ffffff; --panel: #ffffff; --text: #000000; --muted: #333333; --accent: #000000; --border: #999999; --danger: #000000; }
+    body { max-width: none; padding: 0; background: #ffffff; color: #000000; }
+    .filter { display: none; }
+    .tiles { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .tile, .shot, .shot img { break-inside: avoid; page-break-inside: avoid; }
+    .shot img { border-color: #999999; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Personal Life — screen gallery</h1>
+  <dl class="facts">
+      <div><dt>Total</dt><dd>58</dd></div>
+      <div><dt>Captured</dt><dd>58</dd></div>
+      <div><dt>Failed</dt><dd>0</dd></div>
+      <div><dt>Screens</dt><dd>29</dd></div>
+      <div><dt>Themes</dt><dd>light, dark</dd></div>
+      <div><dt>Viewport</dt><dd>414×896 CSS px @2x</dd></div>
+      <div><dt>Git SHA</dt><dd class="mono">4f1b14e14226c27ac3f0c27bc9b3aaaa3498b426</dd></div>
+      <div><dt>Captured at</dt><dd>2026-11-04 04:58 UTC</dd></div>
+    </dl>
+</header>
+<p class="note">Capture at 414×896 CSS px, device pixel ratio
+      2. Regenerate after UI changes with
+      <code>npm run screens -w apps/app</code> against a dev server on port 3100.</p>
+    <label class="filter">Filter <input type="search" id="filter" placeholder="route, title or slug" autocomplete="off"></label>
+    <section aria-labelledby="module-notes">
+    <h2 id="module-notes">Notes <span class="count">6</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Notes</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-index-light.png" title="Open notes-index-light.png full size">
+      <img src="4f1b14e/notes-index-light.png" width="414" height="896" loading="lazy"
+        alt="Notes screen at /notes, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes</span> · notes-index-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-index-dark.png" title="Open notes-index-dark.png full size">
+      <img src="4f1b14e/notes-index-dark.png" width="414" height="896" loading="lazy"
+        alt="Notes screen at /notes, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes</span> · notes-index-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>New note</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-new-light.png" title="Open notes-new-light.png full size">
+      <img src="4f1b14e/notes-new-light.png" width="414" height="896" loading="lazy"
+        alt="New note screen at /notes/new, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes/new</span> · notes-new-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-new-dark.png" title="Open notes-new-dark.png full size">
+      <img src="4f1b14e/notes-new-dark.png" width="414" height="896" loading="lazy"
+        alt="New note screen at /notes/new, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes/new</span> · notes-new-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Note editor</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-detail-light.png" title="Open notes-detail-light.png full size">
+      <img src="4f1b14e/notes-detail-light.png" width="414" height="896" loading="lazy"
+        alt="Note editor screen at /notes/cb9c1439-6971-41d0-a965-d953c5df1088, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes/cb9c1439-6971-41d0-a965-d953c5df1088</span> · notes-detail-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-detail-dark.png" title="Open notes-detail-dark.png full size">
+      <img src="4f1b14e/notes-detail-dark.png" width="414" height="896" loading="lazy"
+        alt="Note editor screen at /notes/cb9c1439-6971-41d0-a965-d953c5df1088, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes/cb9c1439-6971-41d0-a965-d953c5df1088</span> · notes-detail-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Notes settings</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-settings-light.png" title="Open notes-settings-light.png full size">
+      <img src="4f1b14e/notes-settings-light.png" width="414" height="896" loading="lazy"
+        alt="Notes settings screen at /notes/settings, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes/settings</span> · notes-settings-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-settings-dark.png" title="Open notes-settings-dark.png full size">
+      <img src="4f1b14e/notes-settings-dark.png" width="414" height="896" loading="lazy"
+        alt="Notes settings screen at /notes/settings, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes/settings</span> · notes-settings-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Tag manager</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-tags-light.png" title="Open notes-tags-light.png full size">
+      <img src="4f1b14e/notes-tags-light.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /notes/tags, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes/tags</span> · notes-tags-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-tags-dark.png" title="Open notes-tags-dark.png full size">
+      <img src="4f1b14e/notes-tags-dark.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /notes/tags, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes/tags</span> · notes-tags-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Trash</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/notes-trash-light.png" title="Open notes-trash-light.png full size">
+      <img src="4f1b14e/notes-trash-light.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /notes/trash, light theme">
+    </a>
+    <p class="meta"><span class="route">/notes/trash</span> · notes-trash-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/notes-trash-dark.png" title="Open notes-trash-dark.png full size">
+      <img src="4f1b14e/notes-trash-dark.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /notes/trash, dark theme">
+    </a>
+    <p class="meta"><span class="route">/notes/trash</span> · notes-trash-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article></div>
+  </section>
+<section aria-labelledby="module-todos">
+    <h2 id="module-todos">Todos <span class="count">8</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Today</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-today-light.png" title="Open todos-today-light.png full size">
+      <img src="4f1b14e/todos-today-light.png" width="414" height="896" loading="lazy"
+        alt="Today screen at /todos, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos</span> · todos-today-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-today-dark.png" title="Open todos-today-dark.png full size">
+      <img src="4f1b14e/todos-today-dark.png" width="414" height="896" loading="lazy"
+        alt="Today screen at /todos, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos</span> · todos-today-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>New todo</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-new-light.png" title="Open todos-new-light.png full size">
+      <img src="4f1b14e/todos-new-light.png" width="414" height="896" loading="lazy"
+        alt="New todo screen at /todos/new, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/new</span> · todos-new-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-new-dark.png" title="Open todos-new-dark.png full size">
+      <img src="4f1b14e/todos-new-dark.png" width="414" height="896" loading="lazy"
+        alt="New todo screen at /todos/new, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/new</span> · todos-new-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Matrix</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-matrix-light.png" title="Open todos-matrix-light.png full size">
+      <img src="4f1b14e/todos-matrix-light.png" width="414" height="896" loading="lazy"
+        alt="Matrix screen at /todos/matrix, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/matrix</span> · todos-matrix-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-matrix-dark.png" title="Open todos-matrix-dark.png full size">
+      <img src="4f1b14e/todos-matrix-dark.png" width="414" height="896" loading="lazy"
+        alt="Matrix screen at /todos/matrix, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/matrix</span> · todos-matrix-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Edit todo</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-edit-light.png" title="Open todos-edit-light.png full size">
+      <img src="4f1b14e/todos-edit-light.png" width="414" height="896" loading="lazy"
+        alt="Edit todo screen at /todos/46b9b1a4-796b-47d0-8ce2-de013d5c68d2/edit, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/46b9b1a4-796b-47d0-8ce2-de013d5c68d2/edit</span> · todos-edit-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-edit-dark.png" title="Open todos-edit-dark.png full size">
+      <img src="4f1b14e/todos-edit-dark.png" width="414" height="896" loading="lazy"
+        alt="Edit todo screen at /todos/46b9b1a4-796b-47d0-8ce2-de013d5c68d2/edit, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/46b9b1a4-796b-47d0-8ce2-de013d5c68d2/edit</span> · todos-edit-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Todos settings</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-settings-light.png" title="Open todos-settings-light.png full size">
+      <img src="4f1b14e/todos-settings-light.png" width="414" height="896" loading="lazy"
+        alt="Todos settings screen at /todos/settings, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/settings</span> · todos-settings-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-settings-dark.png" title="Open todos-settings-dark.png full size">
+      <img src="4f1b14e/todos-settings-dark.png" width="414" height="896" loading="lazy"
+        alt="Todos settings screen at /todos/settings, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/settings</span> · todos-settings-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Tag manager</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-tags-light.png" title="Open todos-tags-light.png full size">
+      <img src="4f1b14e/todos-tags-light.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /todos/tags, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/tags</span> · todos-tags-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-tags-dark.png" title="Open todos-tags-dark.png full size">
+      <img src="4f1b14e/todos-tags-dark.png" width="414" height="896" loading="lazy"
+        alt="Tag manager screen at /todos/tags, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/tags</span> · todos-tags-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>List manager</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-lists-light.png" title="Open todos-lists-light.png full size">
+      <img src="4f1b14e/todos-lists-light.png" width="414" height="896" loading="lazy"
+        alt="List manager screen at /todos/lists, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/lists</span> · todos-lists-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-lists-dark.png" title="Open todos-lists-dark.png full size">
+      <img src="4f1b14e/todos-lists-dark.png" width="414" height="896" loading="lazy"
+        alt="List manager screen at /todos/lists, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/lists</span> · todos-lists-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Trash</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/todos-trash-light.png" title="Open todos-trash-light.png full size">
+      <img src="4f1b14e/todos-trash-light.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /todos/trash, light theme">
+    </a>
+    <p class="meta"><span class="route">/todos/trash</span> · todos-trash-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/todos-trash-dark.png" title="Open todos-trash-dark.png full size">
+      <img src="4f1b14e/todos-trash-dark.png" width="414" height="896" loading="lazy"
+        alt="Trash screen at /todos/trash, dark theme">
+    </a>
+    <p class="meta"><span class="route">/todos/trash</span> · todos-trash-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article></div>
+  </section>
+<section aria-labelledby="module-meals">
+    <h2 id="module-meals">Meals <span class="count">10</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Meals today</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-today-light.png" title="Open meals-today-light.png full size">
+      <img src="4f1b14e/meals-today-light.png" width="414" height="896" loading="lazy"
+        alt="Meals today screen at /meals, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals</span> · meals-today-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-today-dark.png" title="Open meals-today-dark.png full size">
+      <img src="4f1b14e/meals-today-dark.png" width="414" height="896" loading="lazy"
+        alt="Meals today screen at /meals, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals</span> · meals-today-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Meals day</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-day-light.png" title="Open meals-day-light.png full size">
+      <img src="4f1b14e/meals-day-light.png" width="414" height="896" loading="lazy"
+        alt="Meals day screen at /meals/2026-11-04, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/2026-11-04</span> · meals-day-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-day-dark.png" title="Open meals-day-dark.png full size">
+      <img src="4f1b14e/meals-day-dark.png" width="414" height="896" loading="lazy"
+        alt="Meals day screen at /meals/2026-11-04, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/2026-11-04</span> · meals-day-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Meal entry</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-entry-light.png" title="Open meals-entry-light.png full size">
+      <img src="4f1b14e/meals-entry-light.png" width="414" height="896" loading="lazy"
+        alt="Meal entry screen at /meals/entry/591867d7-3a59-4ae4-94ea-0f9761e8ff7c, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/entry/591867d7-3a59-4ae4-94ea-0f9761e8ff7c</span> · meals-entry-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-entry-dark.png" title="Open meals-entry-dark.png full size">
+      <img src="4f1b14e/meals-entry-dark.png" width="414" height="896" loading="lazy"
+        alt="Meal entry screen at /meals/entry/591867d7-3a59-4ae4-94ea-0f9761e8ff7c, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/entry/591867d7-3a59-4ae4-94ea-0f9761e8ff7c</span> · meals-entry-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Food catalog</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-foods-light.png" title="Open meals-foods-light.png full size">
+      <img src="4f1b14e/meals-foods-light.png" width="414" height="896" loading="lazy"
+        alt="Food catalog screen at /meals/foods, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods</span> · meals-foods-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-foods-dark.png" title="Open meals-foods-dark.png full size">
+      <img src="4f1b14e/meals-foods-dark.png" width="414" height="896" loading="lazy"
+        alt="Food catalog screen at /meals/foods, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods</span> · meals-foods-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>New food</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-food-new-light.png" title="Open meals-food-new-light.png full size">
+      <img src="4f1b14e/meals-food-new-light.png" width="414" height="896" loading="lazy"
+        alt="New food screen at /meals/foods/new, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/new</span> · meals-food-new-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-food-new-dark.png" title="Open meals-food-new-dark.png full size">
+      <img src="4f1b14e/meals-food-new-dark.png" width="414" height="896" loading="lazy"
+        alt="New food screen at /meals/foods/new, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/new</span> · meals-food-new-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Edit food</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-food-detail-light.png" title="Open meals-food-detail-light.png full size">
+      <img src="4f1b14e/meals-food-detail-light.png" width="414" height="896" loading="lazy"
+        alt="Edit food screen at /meals/foods/4d602c19-01b7-4748-85dc-715f2145fb6b, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/4d602c19-01b7-4748-85dc-715f2145fb6b</span> · meals-food-detail-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-food-detail-dark.png" title="Open meals-food-detail-dark.png full size">
+      <img src="4f1b14e/meals-food-detail-dark.png" width="414" height="896" loading="lazy"
+        alt="Edit food screen at /meals/foods/4d602c19-01b7-4748-85dc-715f2145fb6b, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/foods/4d602c19-01b7-4748-85dc-715f2145fb6b</span> · meals-food-detail-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Saved meals</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-saved-light.png" title="Open meals-saved-light.png full size">
+      <img src="4f1b14e/meals-saved-light.png" width="414" height="896" loading="lazy"
+        alt="Saved meals screen at /meals/saved, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/saved</span> · meals-saved-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-saved-dark.png" title="Open meals-saved-dark.png full size">
+      <img src="4f1b14e/meals-saved-dark.png" width="414" height="896" loading="lazy"
+        alt="Saved meals screen at /meals/saved, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/saved</span> · meals-saved-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Saved meal</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-saved-detail-light.png" title="Open meals-saved-detail-light.png full size">
+      <img src="4f1b14e/meals-saved-detail-light.png" width="414" height="896" loading="lazy"
+        alt="Saved meal screen at /meals/saved/e534297c-901f-4829-b994-99f71341041e, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/saved/e534297c-901f-4829-b994-99f71341041e</span> · meals-saved-detail-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-saved-detail-dark.png" title="Open meals-saved-detail-dark.png full size">
+      <img src="4f1b14e/meals-saved-detail-dark.png" width="414" height="896" loading="lazy"
+        alt="Saved meal screen at /meals/saved/e534297c-901f-4829-b994-99f71341041e, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/saved/e534297c-901f-4829-b994-99f71341041e</span> · meals-saved-detail-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Meals settings</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-settings-light.png" title="Open meals-settings-light.png full size">
+      <img src="4f1b14e/meals-settings-light.png" width="414" height="896" loading="lazy"
+        alt="Meals settings screen at /meals/settings, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/settings</span> · meals-settings-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-settings-dark.png" title="Open meals-settings-dark.png full size">
+      <img src="4f1b14e/meals-settings-dark.png" width="414" height="896" loading="lazy"
+        alt="Meals settings screen at /meals/settings, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/settings</span> · meals-settings-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Nutrition target</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/meals-target-light.png" title="Open meals-target-light.png full size">
+      <img src="4f1b14e/meals-target-light.png" width="414" height="896" loading="lazy"
+        alt="Nutrition target screen at /meals/target, light theme">
+    </a>
+    <p class="meta"><span class="route">/meals/target</span> · meals-target-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/meals-target-dark.png" title="Open meals-target-dark.png full size">
+      <img src="4f1b14e/meals-target-dark.png" width="414" height="896" loading="lazy"
+        alt="Nutrition target screen at /meals/target, dark theme">
+    </a>
+    <p class="meta"><span class="route">/meals/target</span> · meals-target-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article></div>
+  </section>
+<section aria-labelledby="module-pomodoro">
+    <h2 id="module-pomodoro">Pomodoro <span class="count">3</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Timer</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/pomodoro-timer-light.png" title="Open pomodoro-timer-light.png full size">
+      <img src="4f1b14e/pomodoro-timer-light.png" width="414" height="896" loading="lazy"
+        alt="Timer screen at /pomodoro, light theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro</span> · pomodoro-timer-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/pomodoro-timer-dark.png" title="Open pomodoro-timer-dark.png full size">
+      <img src="4f1b14e/pomodoro-timer-dark.png" width="414" height="896" loading="lazy"
+        alt="Timer screen at /pomodoro, dark theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro</span> · pomodoro-timer-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Stats</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/pomodoro-stats-light.png" title="Open pomodoro-stats-light.png full size">
+      <img src="4f1b14e/pomodoro-stats-light.png" width="414" height="896" loading="lazy"
+        alt="Stats screen at /pomodoro/stats, light theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/stats</span> · pomodoro-stats-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/pomodoro-stats-dark.png" title="Open pomodoro-stats-dark.png full size">
+      <img src="4f1b14e/pomodoro-stats-dark.png" width="414" height="896" loading="lazy"
+        alt="Stats screen at /pomodoro/stats, dark theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/stats</span> · pomodoro-stats-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Pomodoro settings</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/pomodoro-settings-light.png" title="Open pomodoro-settings-light.png full size">
+      <img src="4f1b14e/pomodoro-settings-light.png" width="414" height="896" loading="lazy"
+        alt="Pomodoro settings screen at /pomodoro/settings, light theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/settings</span> · pomodoro-settings-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/pomodoro-settings-dark.png" title="Open pomodoro-settings-dark.png full size">
+      <img src="4f1b14e/pomodoro-settings-dark.png" width="414" height="896" loading="lazy"
+        alt="Pomodoro settings screen at /pomodoro/settings, dark theme">
+    </a>
+    <p class="meta"><span class="route">/pomodoro/settings</span> · pomodoro-settings-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article></div>
+  </section>
+<section aria-labelledby="module-shared">
+    <h2 id="module-shared">Shared <span class="count">2</span></h2>
+    <div class="tiles"><article class="tile">
+    <h3>Feedback inbox</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/feedback-inbox-light.png" title="Open feedback-inbox-light.png full size">
+      <img src="4f1b14e/feedback-inbox-light.png" width="414" height="896" loading="lazy"
+        alt="Feedback inbox screen at /feedback, light theme">
+    </a>
+    <p class="meta"><span class="route">/feedback</span> · feedback-inbox-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/feedback-inbox-dark.png" title="Open feedback-inbox-dark.png full size">
+      <img src="4f1b14e/feedback-inbox-dark.png" width="414" height="896" loading="lazy"
+        alt="Feedback inbox screen at /feedback, dark theme">
+    </a>
+    <p class="meta"><span class="route">/feedback</span> · feedback-inbox-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article>
+<article class="tile">
+    <h3>Feedback settings</h3>
+    <div class="row">
+    <p class="theme">light</p>
+    <a class="shot" href="4f1b14e/feedback-settings-light.png" title="Open feedback-settings-light.png full size">
+      <img src="4f1b14e/feedback-settings-light.png" width="414" height="896" loading="lazy"
+        alt="Feedback settings screen at /feedback/settings, light theme">
+    </a>
+    <p class="meta"><span class="route">/feedback/settings</span> · feedback-settings-light.png · 2026-11-04 04:58 UTC</p>
+  </div>
+<div class="row">
+    <p class="theme">dark</p>
+    <a class="shot" href="4f1b14e/feedback-settings-dark.png" title="Open feedback-settings-dark.png full size">
+      <img src="4f1b14e/feedback-settings-dark.png" width="414" height="896" loading="lazy"
+        alt="Feedback settings screen at /feedback/settings, dark theme">
+    </a>
+    <p class="meta"><span class="route">/feedback/settings</span> · feedback-settings-dark.png · 2026-11-04 04:58 UTC</p>
+  </div>
+  </article></div>
+  </section>
+<script>
+  // Progressive: without this script every tile stays visible, because hiding is
+  // done with the HTML "hidden" attribute, never by the markup itself.
+  (function () {
+    var input = document.getElementById('filter');
+    if (!input) return;
+    var tiles = Array.prototype.slice.call(document.querySelectorAll('.tile'));
+    input.addEventListener('input', function () {
+      var query = input.value.trim().toLowerCase();
+      tiles.forEach(function (tile) {
+        tile.hidden = query !== '' && tile.textContent.toLowerCase().indexOf(query) === -1;
+      });
+    });
+  })();
+</script>
+</body>
+</html>
