@@ -105,7 +105,7 @@ describe('SettingsRow', () => {
       expect(row.classList.contains('max-sm:items-stretch')).toBe(false);
     });
 
-    it('lets the label column shrink and ellipsize while the control keeps its width', () => {
+    it('lets the label column shrink and ellipsize, and the control keep its width', () => {
       render(
         <SettingsRow
           label="Reduce motion"
@@ -119,10 +119,44 @@ describe('SettingsRow', () => {
       const control = document.querySelector('.ui-settings-row__control')!;
 
       expect(text.classList.contains('min-w-0')).toBe(true);
-      expect(text.classList.contains('flex-1')).toBe(true);
+      expect(text.classList.contains('flex-auto')).toBe(true);
       expect(label.classList.contains('truncate')).toBe(true);
       expect(desc.classList.contains('line-clamp-2')).toBe(true);
-      expect(control.classList.contains('shrink-0')).toBe(true);
+      // A compact control holds its size through the flex floor, not a frozen column.
+      expect(control.classList.contains('shrink-0')).toBe(false);
+      expect(control.classList.contains('min-w-0')).toBe(false);
+    });
+  });
+
+  // A control can be prose (a status line where a switch cannot render yet). Prose has
+  // to wrap inside the row: a frozen control column holds the whole sentence on one
+  // line and pushes it past the card's clipped edge, leaving the label with no width.
+  describe('prose control wrapping', () => {
+    const COPY = 'Add this app to your Home Screen to turn on push reminders.';
+
+    it('leaves the control column shrinkable so the copy wraps inside the row', () => {
+      render(<SettingsRow label="Push reminders" control={<span>{COPY}</span>} />);
+      const control = document.querySelector('.ui-settings-row__control')!;
+
+      expect(control.classList.contains('shrink-0')).toBe(false);
+      // The column stops at its longest word, which is what makes the copy wrap.
+      expect(control.classList.contains('min-w-0')).toBe(false);
+      expect(control.textContent).toBe(COPY);
+    });
+
+    it('gives the label column its own text as a basis, so it is not squeezed to nothing', () => {
+      render(<SettingsRow label="Push reminders" control={<span>{COPY}</span>} />);
+      const text = document.querySelector('.ui-settings-row__text')!;
+
+      expect(text.classList.contains('flex-auto')).toBe(true);
+      expect(text.classList.contains('flex-1')).toBe(false);
+    });
+
+    it('pins the chevron against the squashed column beside it', () => {
+      render(<SettingsRow label="Tags" href="/notes/tags" control={<span>{COPY}</span>} />);
+      const chevron = document.querySelector('.ui-settings-row__control svg')!;
+
+      expect(chevron.classList.contains('shrink-0')).toBe(true);
     });
   });
 

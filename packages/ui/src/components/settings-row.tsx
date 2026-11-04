@@ -29,14 +29,21 @@ export interface SettingsRowProps {
  * it, which keeps the markup valid when the control is itself interactive (a pill
  * button, a toggle) — that control column is raised above the overlay so it keeps
  * its own clicks.
+ *
+ * A control may be prose (`StatusText` under a switch that cannot render yet), and
+ * prose has to wrap inside the row rather than run past the card's clipped edge.
+ * So the control column may shrink — its `min-width: auto` floor is its longest word,
+ * so prose wraps while a pill or a toggle keeps its size — and the label column
+ * carries its text as a flex basis (`flex-auto`) instead of a zero one, so the two
+ * share a narrow row instead of the label vanishing to nothing.
  */
 const rowStyles = 'relative flex items-center gap-[var(--s3)]';
 
 /** Only a row with a destination or an action reads as pressable — a bare label row does not. */
 const interactiveRowStyles = 'cursor-pointer active:bg-press';
 
-/** The label column takes the row's leftover width, so a long label never pushes the control out. */
-const textStyles = 'flex flex-1 flex-col gap-[var(--s1)] min-w-0';
+/** The label column asks for its own text width, so a shrinking control leaves it some room. */
+const textStyles = 'flex flex-auto flex-col gap-[var(--s1)] min-w-0';
 
 /** A label may ellipsize only if its own box is allowed to shrink. */
 const labelStyles = 'min-w-0 truncate text-[length:var(--fs-row-title)]';
@@ -47,8 +54,8 @@ const descriptionStyles = cx(
   'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]',
 );
 
-/** The control keeps its intrinsic width, centres against the label line, and stays above the overlay. */
-const controlStyles = 'relative flex items-center gap-[var(--s2)] shrink-0';
+/** The control keeps its natural width but may shrink under it, so a text control wraps. */
+const controlStyles = 'relative flex items-center gap-[var(--s2)]';
 
 /** The label's hit area is the whole row, so no empty space on the row is dead. */
 const stretchStyles = "after:absolute after:inset-0 after:content-['']";
@@ -95,7 +102,9 @@ export function SettingsRow({
       <span className={cx('ui-settings-row__label', labelStyles)}>{label}</span>
     );
 
-  const chevron = isInteractive && <ChevronRight size={18} aria-hidden className="text-ink-3" />;
+  const chevron = isInteractive && (
+    <ChevronRight size={18} aria-hidden className="shrink-0 text-ink-3" />
+  );
 
   return (
     <div
