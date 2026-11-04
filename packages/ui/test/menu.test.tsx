@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { Menu } from '../src/components/menu';
+import { Button } from '../src/components/button';
+import { Menu, MenuItem } from '../src/components/menu';
 
 /**
  * The registry trigger opens on a primary press, so a click alone would never reach it. jsdom
@@ -33,6 +34,19 @@ function Harness({ disabled = false }: { disabled?: boolean }) {
       </Menu>
       <button type="button">Outside</button>
     </div>
+  );
+}
+
+function ItemHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Menu label="Actions for Groceries" summary="Groceries" open={open} onOpenChange={setOpen}>
+      <MenuItem>
+        <Button variant="danger" size="bare">
+          Delete note
+        </Button>
+      </MenuItem>
+    </Menu>
   );
 }
 
@@ -88,6 +102,14 @@ describe('Menu', () => {
     press(trigger());
     press(screen.getByRole('menu'));
     expect(screen.getByRole('menu')).toBeTruthy();
+  });
+
+  it('gives a MenuItem-wrapped Button the menu item role and its text as the name', () => {
+    // A plain button dropped into the panel is only a button: no `menuitem` role, so no Arrow
+    // movement between entries. Radix's `Item` supplies both, and `asChild` keeps the button.
+    render(<ItemHarness />);
+    press(trigger());
+    expect(screen.getByRole('menuitem', { name: 'Delete note' })).toBeTruthy();
   });
 
   it('disables the trigger', () => {
