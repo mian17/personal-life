@@ -462,8 +462,7 @@ One settings shape, shared by all five, in this order:
 3. `.slabel` **Comfort** — a `.group` of inert `data-static` rows. Every app carries
    "Reduce motion" (meta "Follows the system setting.", with a `pill--neutral` read-out
    that says `System`, `Reduced` or `Standard`, painted from
-   `matchMedia('(prefers-reduced-motion: reduce)')`); Notes adds a second row, "Larger
-   text" (meta "Follows Dynamic Type.", pill "System").
+   `matchMedia('(prefers-reduced-motion: reduce)')`).
 4. `.slabel` naming the app, with one row: Notes "Tags" — inert, meta "home · work ·
    health", pill "3"; Tasks "Matrix lens" — inert, meta "Adds a second view of the same
    tasks.", a `.row__switch` reading "On"; Meals "Daily target" — a button to the
