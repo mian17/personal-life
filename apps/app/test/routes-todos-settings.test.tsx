@@ -6,14 +6,14 @@ jest.mock('@/lib/preferences', () => ({
   setPref: jest.fn(),
 }));
 jest.mock('@life/app-kit/preference-action', () => ({ setPref: jest.fn() }));
+jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
 
 import TodosSettingsPage from '@/app/todos/settings/page';
 
 /**
- * The appearance control on `/todos/settings`. The page's block wiring (including
- * the matrix switch) is pinned in `routes-settings.test.tsx`; this file pins what
- * the Theme row's control renders, since it is the screen the three-state swap
- * changed.
+ * The appearance control on `/todos/settings`. The page's shell wiring (including the matrix
+ * switch) is pinned in `routes-settings.test.tsx`; this file pins what the shell's Appearance
+ * group renders, since it is the screen the three-state swap changed.
  */
 describe('/todos/settings appearance control', () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('/todos/settings appearance control', () => {
     const html = renderToStaticMarkup(await TodosSettingsPage());
 
     expect(html).toContain('aria-label="Eisenhower matrix"');
-    expect(html).toContain('System, light, or dark.');
+    expect(html).not.toContain('System, light, or dark.');
     expect(html).toContain('href="/todos"');
   });
 });
