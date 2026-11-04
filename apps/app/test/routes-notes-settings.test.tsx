@@ -15,6 +15,7 @@ jest.mock('@/app/feedback-actions', () => ({
 
 import { listNoteTagUsage } from '@/lib/api';
 import { resolveTagUsage } from '@/lib/tags-compose';
+import { ManagerBlock } from '@life/ui';
 import NotesSettingsPage from '@/app/notes/settings/page';
 
 const mockedListNoteTagUsage = listNoteTagUsage as jest.MockedFunction<typeof listNoteTagUsage>;
@@ -36,6 +37,20 @@ describe('/notes/settings', () => {
       { tagId: 1, count: 3, name: 'home' },
       { tagId: 2, count: 1, name: 'work' },
     ]);
+  });
+
+  it('composes ManagerBlock titled Settings backed to /notes', async () => {
+    const page = (await NotesSettingsPage()) as any;
+
+    expect(page.type).toBe(ManagerBlock);
+    expect(page.props.title).toBe('Settings');
+    expect(page.props.backHref).toBe('/notes');
+  });
+
+  it('renders no Eisenhower matrix row', async () => {
+    const html = renderToStaticMarkup(await NotesSettingsPage());
+
+    expect(html).not.toContain('Eisenhower matrix');
   });
 
   it('renders the four groups in reference order, backed to /notes', async () => {

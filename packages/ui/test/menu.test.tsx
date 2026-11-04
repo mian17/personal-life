@@ -36,7 +36,23 @@ function Harness({ disabled = false }: { disabled?: boolean }) {
   );
 }
 
+function SoloHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Menu label="Note actions" open={open} onOpenChange={setOpen}>
+      <button type="button">Delete note</button>
+    </Menu>
+  );
+}
+
 describe('Menu', () => {
+  it('renders the trigger alone when no summary is given', () => {
+    render(<SoloHarness />);
+    const button = screen.getByRole('button', { name: 'Note actions' });
+    expect(button.closest('.ui-menu__summary')).toBeNull();
+    expect(button.closest('.ui-menu__label')).toBeNull();
+  });
+
   it('renders the summary and a closed trigger', () => {
     render(<Harness />);
     expect(screen.getByText('Groceries')).toBeTruthy();

@@ -10,8 +10,8 @@ import { IconButton } from './icon-button';
 export interface MenuProps {
   /** Trigger accessible name. */
   label: string;
-  /** The always-visible row content (the entity name). */
-  summary: ReactNode;
+  /** The always-visible row content (the entity name). Omitted renders the trigger alone. */
+  summary?: ReactNode;
   /** Panel content, revealed when open. */
   children: ReactNode;
   /** Controlled open state. */
@@ -51,19 +51,27 @@ export function Menu({
   disabled,
   className,
 }: Readonly<MenuProps>) {
+  const trigger = (
+    <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
+      <IconButton label={label}>
+        <MoreVertical size={16} aria-hidden />
+      </IconButton>
+    </DropdownMenuPrimitive.Trigger>
+  );
+
   return (
     // Non-modal: the per-row disclosure leaves the page behind it interactive, as the
     // hand-rolled panel it replaces did, while Radix keeps the dismiss behaviour.
     <DropdownMenuPrimitive.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <div className={cx('ui-menu', rowStyles, className)}>
-        <div className={cx('ui-menu__summary', summaryStyles)}>
-          <span className={cx('ui-menu__label', labelStyles)}>{summary}</span>
-          <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
-            <IconButton label={label}>
-              <MoreVertical size={16} aria-hidden />
-            </IconButton>
-          </DropdownMenuPrimitive.Trigger>
-        </div>
+        {summary == null ? (
+          trigger
+        ) : (
+          <div className={cx('ui-menu__summary', summaryStyles)}>
+            <span className={cx('ui-menu__label', labelStyles)}>{summary}</span>
+            {trigger}
+          </div>
+        )}
         <DropdownMenuPrimitive.Portal>
           <DropdownMenuPrimitive.Content className={cx('ui-menu__panel', panelStyles)}>
             {children}

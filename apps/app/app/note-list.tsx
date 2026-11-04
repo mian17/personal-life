@@ -1,7 +1,6 @@
-import { Trash2 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { Note } from '@life/shared';
-import { Button, EmptyState, List, ListItem, LocalTime } from '@life/ui';
-import { deleteNoteAction } from './actions';
+import { EmptyState, formatNoteMeta, List, ListItem } from '@life/ui';
 import { splitBody } from './note-title';
 
 export function NoteList({ notes }: Readonly<{ notes: Note[] }>) {
@@ -17,20 +16,9 @@ export function NoteList({ notes }: Readonly<{ notes: Note[] }>) {
             key={note.id}
             href={`/notes/${note.id}`}
             title={title}
-            meta={<LocalTime dateTime={note.createdAt} />}
+            meta={formatNoteMeta(note.createdAt)}
             snippet={snippet || undefined}
-            deleteAction={
-              <form action={deleteNoteAction.bind(null, note.id)}>
-                <Button
-                  type="submit"
-                  variant="danger"
-                  size="icon"
-                  aria-label={`Delete ${title}`}
-                >
-                  <Trash2 size={18} aria-hidden />
-                </Button>
-              </form>
-            }
+            trailing={<ChevronRight size={18} aria-hidden className="text-ink-3" />}
           />
         );
       })}
