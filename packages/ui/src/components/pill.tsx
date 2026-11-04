@@ -138,7 +138,7 @@ export function Pill({
     // The no-href case was handled above as a button, so this branch always navigates.
     const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
     return (
-      <Link href={href} data-slot="badge" className={classes} {...linkProps}>
+      <Link href={href} data-slot="badge" className={cx(classes, 'no-underline')} {...linkProps}>
         {content}
       </Link>
     );

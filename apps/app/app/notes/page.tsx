@@ -1,10 +1,9 @@
 import { listNoteTagUsage, listNotes } from '@/lib/api';
-import { submitFeedbackAction } from '../feedback-actions';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink, ListShell, TagFilterNav } from '@life/ui';
-import { Plus, Settings, Tags, Trash2 } from 'lucide-react';
+import { formatLongDate, IconLink, ListShell, Section, TagFilterNav } from '@life/ui';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,23 +40,23 @@ export default async function NotesPage({
   return (
     <ListShell
       title="Notes"
+      subtitle={formatLongDate(new Date().toISOString())}
       navTrailing={
-        <>
-          <IconLink href="/notes/tags" label="Manage tags">
-            <Tags size={20} aria-hidden />
-          </IconLink>
-          <IconLink href="/notes/trash" label="Trash">
-            <Trash2 size={20} aria-hidden />
-          </IconLink>
-          <FeedbackNavItem app="notes" onSubmit={submitFeedbackAction} />
-          <IconLink href={settingsHref('/notes')} label="Settings">
-            <Settings size={20} aria-hidden />
-          </IconLink>
-        </>
+        <IconLink href={settingsHref('/notes')} label="Settings" variant="bare">
+          <SlidersHorizontal size={20} aria-hidden />
+        </IconLink>
       }
       search={<PreservingSearchBox path="/notes" q={q} params={{ tag }} label="Search notes" />}
-      filters={namedTags.length > 0 ? <TagFilterNav label="Tags" items={filterItems} /> : undefined}
-      body={<NoteList notes={notes} />}
+      filters={
+        namedTags.length > 0 ? (
+          <TagFilterNav aria-label="Tags" items={filterItems} />
+        ) : undefined
+      }
+      body={
+        <Section label="Recent" count={`${notes.length} notes`}>
+          <NoteList notes={notes} />
+        </Section>
+      }
       fabHref="/notes/new"
       fabLabel="New note"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}

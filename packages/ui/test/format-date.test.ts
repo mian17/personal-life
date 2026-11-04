@@ -1,6 +1,13 @@
 import { todayIso } from '../src/components/due-date-pill';
 import { WEEKDAY_SHORT, dueDay, isoWeekday, localTimePart, weekdayShort } from '../src/lib/date-parts';
-import { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from '../src/lib/format-date';
+import {
+  dueDateLabel,
+  formatDate,
+  formatDayMonth,
+  formatLongDate,
+  formatNoteMeta,
+  formatWeekday,
+} from '../src/lib/format-date';
 
 describe('formatDate', () => {
   it('renders dd/mm/yyyy with the full year', () => {
@@ -176,5 +183,53 @@ describe('isoWeekday / weekdayShort', () => {
 
   it('exposes WEEKDAY_SHORT indexed by ISO weekday − 1', () => {
     expect(WEEKDAY_SHORT).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  });
+});
+
+describe('formatLongDate', () => {
+  it('renders the long weekday, a comma, then day and full month', () => {
+    expect(formatLongDate('2026-10-30')).toBe('Friday, 30 October');
+    expect(formatLongDate('2026-03-01')).toBe('Sunday, 1 March');
+  });
+
+  it('takes the written date part of an ISO datetime', () => {
+    expect(formatLongDate('2026-10-29T23:30:00.000Z')).toBe('Thursday, 29 October');
+  });
+
+  it('renders empty or malformed input as an empty string', () => {
+    expect(formatLongDate('')).toBe('');
+    expect(formatLongDate('nope')).toBe('');
+    expect(formatLongDate('2026-02-31')).toBe('');
+  });
+});
+
+describe('formatNoteMeta', () => {
+  const timedToday = () => {
+    const [year, month, day] = todayIso().split('-').map(Number);
+    return new Date(year, month - 1, day, 8, 14).toISOString();
+  };
+
+  it('reads Today with the local time', () => {
+    expect(formatNoteMeta(timedToday())).toBe('Today, 08:14');
+  });
+
+  it('reads Yesterday for the day before today', () => {
+    const [year, month, day] = todayIso().split('-').map(Number);
+    const yesterday = new Date(Date.UTC(year, month - 1, day - 1, 12, 0));
+    expect(formatNoteMeta(yesterday.toISOString()).startsWith('Yesterday, ')).toBe(true);
+  });
+
+  it('falls back to the day-month form for older notes', () => {
+    expect(formatNoteMeta('2026-01-05T08:14:00.000Z')).toContain('5 Jan, ');
+  });
+
+  it('appends the tag name after a middot when one is given', () => {
+    expect(formatNoteMeta(timedToday(), 'garden')).toBe('Today, 08:14 · garden');
+    expect(formatNoteMeta(timedToday(), '')).toBe('Today, 08:14');
+  });
+
+  it('renders empty or malformed input as an empty string', () => {
+    expect(formatNoteMeta('')).toBe('');
+    expect(formatNoteMeta('nope')).toBe('');
   });
 });

@@ -80,6 +80,34 @@ describe('IconLink', () => {
     expect(screen.getByRole('link').getAttribute('aria-label')).toBe('Go home');
   });
 
+
+  describe('variant', () => {
+    it('defaults to the framed control: hairline and surface fill', () => {
+      render(<IconLink href="/" label="Back">{<span />}</IconLink>);
+      const classes = classesOf(screen.getByRole('link'));
+
+      expect(classes).toContain('border-line');
+      expect(classes).toContain('bg-surface');
+      expect(classes).toContain('ui-icon-link--framed');
+    });
+
+    it('renders the bare control with no frame and no fill, keeping the tap target', () => {
+      render(<IconLink href="/" label="Back" variant="bare">{<span />}</IconLink>);
+      const link = screen.getByRole('link');
+      const classes = classesOf(link);
+
+      expect(classes).toContain('ui-icon-link--bare');
+      expect(classes).not.toContain('bg-surface');
+      expect(classes).not.toContain('border-line');
+      expect(classes).toContain('size-[var(--tap)]');
+      expect(classes).toContain('rounded-[var(--r-md)]');
+      expect(classes).toContain('text-ink');
+      expect(classes).toContain('no-underline');
+      expect(classes).toContain('active:bg-press');
+      expect(classes).toContain('focus-visible:outline-focus');
+    });
+  });
+
   /**
    * Regression: Tailwind v4's `outline-none` zeroes `--tw-outline-style`, so
    * `focus-visible:outline-2` alone computes `outline-style: none` and the ring never draws.

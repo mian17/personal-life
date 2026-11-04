@@ -143,6 +143,18 @@ describe('Segmented', () => {
     expect(classesOf(month)).not.toContain('ui-seg__btn--active');
   });
 
+
+  it('leaves the unselected control transparent, so no default button face paints', () => {
+    render(<Segmented aria-label="Chart window" items={items} />);
+    const [week, month] = screen.getAllByRole('link');
+
+    expect(classesOf(month)).toContain('bg-transparent');
+    expect(classesOf(month)).not.toContain('bg-surface-sunken');
+    // The selected one still wears the accent fill, which wins over the transparent base.
+    expect(classesOf(week)).toContain('bg-max');
+    expect(classesOf(week)).toContain('bg-transparent');
+  });
+
   it('merges className instead of replacing it', () => {
     render(<Segmented aria-label="Chart window" items={items} className="legacy-hook" />);
 

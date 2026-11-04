@@ -74,6 +74,20 @@ describe('Pill', () => {
     expect(link.hasAttribute('data-next-link')).toBe(true);
   });
 
+
+  it('drops the underline on the navigating branch only', () => {
+    render(
+      <Pill as="a" href="/?tag=errand" size="filter">
+        errand
+      </Pill>,
+    );
+    expect(screen.getByRole('link').classList.contains('no-underline')).toBe(true);
+
+    render(<Pill>errand</Pill>);
+    const chips = screen.getAllByText('errand');
+    expect(chips[chips.length - 1].classList.contains('no-underline')).toBe(false);
+  });
+
   it('adds the active modifier only when active', () => {
     const { rerender } = render(
       <Pill as="a" href="/x" size="filter">

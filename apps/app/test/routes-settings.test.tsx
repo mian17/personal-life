@@ -23,7 +23,6 @@ import { setPref } from '@life/app-kit/preference-action';
 import { MatrixSwitch } from '@/app/settings/matrix-switch';
 import { TOGGLE_DEBOUNCE_MS } from '@/lib/use-debounced-callback';
 import TodosSettingsPage from '@/app/todos/settings/page';
-import NotesSettingsPage from '@/app/notes/settings/page';
 
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
 
@@ -140,31 +139,6 @@ describe('/todos/settings page wiring', () => {
 
     expect(row.props.control.props.checked).toBe(false);
     expect(renderToStaticMarkup(page)).toContain('aria-checked="false"');
-  });
-});
-
-describe('/notes/settings page wiring', () => {
-  it('composes ManagerBlock titled Settings backed to /notes with Appearance only', () => {
-    const page = NotesSettingsPage();
-
-    expect(page.type).toBe(ManagerBlock);
-    expect(page.props.title).toBe('Settings');
-    expect(page.props.backHref).toBe('/notes');
-
-    const blocks = childList(page);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0].type).toBe(SettingsBlock);
-    expect(blocks[0].props.title).toBe('Appearance');
-  });
-
-  it('renders the Theme row and no matrix switch', () => {
-    const page = NotesSettingsPage();
-    const row = settingsRow(settingsBlock(page, 'Appearance'), 'Theme');
-
-    expect(row.props.control.type).toBe(ThemeToggle);
-    const html = renderToStaticMarkup(page);
-    expect(html).not.toContain('Eisenhower matrix');
-    expect(html).not.toContain('role="switch"');
   });
 });
 

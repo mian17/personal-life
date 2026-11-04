@@ -51,7 +51,7 @@ export { Switch } from './components/switch';
 export type { SwitchProps } from './components/switch';
 
 export { IconLink } from './components/icon-link';
-export type { IconLinkProps } from './components/icon-link';
+export type { IconLinkProps, IconLinkVariant } from './components/icon-link';
 
 export { PageShell } from './components/page-shell';
 export type { PageShellProps } from './components/page-shell';
@@ -174,7 +174,7 @@ export type { FeedbackFormProps } from './components/feedback-form';
 export { FEEDBACK_TYPES } from './components/feedback-types';
 
 export { FeedbackNavItem } from './components/feedback-nav-item';
-export type { FeedbackNavItemProps } from './components/feedback-nav-item';
+export type { FeedbackNavItemProps, FeedbackNavItemVariant } from './components/feedback-nav-item';
 
 export { FEEDBACK_STATUSES, feedbackStatusOption } from './components/feedback-status';
 export type { FeedbackStatusOption, FeedbackStatusToken } from './components/feedback-status';
@@ -187,4 +187,11 @@ export type { ProgressBarProps } from './components/progress-bar';
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 
-export { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from './lib/format-date';
+export {
+  dueDateLabel,
+  formatDate,
+  formatDayMonth,
+  formatLongDate,
+  formatNoteMeta,
+  formatWeekday,
+} from './lib/format-date';
