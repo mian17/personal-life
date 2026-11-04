@@ -23,22 +23,19 @@ export default async function NotesPage({
   );
 
   const current = { tag, q };
-  const filterItems = [
-    ...(tagId !== undefined
-      ? [
-          {
-            name: 'All',
-            href: filterHref({ path: '/notes', current, overrides: { tag: undefined } }),
-            active: false,
-          },
-        ]
-      : []),
-    ...namedTags.map((t) => ({
-      name: t.name,
-      href: filterHref({ path: '/notes', current, overrides: { tag: String(t.tagId) } }),
-      active: tagId === t.tagId,
-    })),
-  ];
+  // The `All` chip is always the row's first option and is active whenever no tag filter is
+  // applied, so the row always shows the unfiltered state it can return to.
+  const allFilter = {
+    name: 'All',
+    href: filterHref({ path: '/notes', current, overrides: { tag: undefined } }),
+    active: tagId === undefined,
+  };
+  const tagFilters = namedTags.map((t) => ({
+    name: t.name,
+    href: filterHref({ path: '/notes', current, overrides: { tag: String(t.tagId) } }),
+    active: tagId === t.tagId,
+  }));
+  const filterItems = [allFilter, ...tagFilters];
 
   return (
     <ListShell
