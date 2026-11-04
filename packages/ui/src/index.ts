@@ -153,6 +153,9 @@ export type { TrashBlockItem, TrashBlockProps, TrashFormAction } from './compone
 export { ManagerBlock } from './components/manager-block';
 export type { ManagerBlockProps } from './components/manager-block';
 
+export { SettingsShell } from './components/settings-shell';
+export type { SettingsShellProps } from './components/settings-shell';
+
 export { ListShell } from './components/list-shell';
 export type { ListShellProps } from './components/list-shell';
 

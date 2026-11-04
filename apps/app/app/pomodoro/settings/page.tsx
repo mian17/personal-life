@@ -1,18 +1,11 @@
 import { readPrefNumber } from '@life/app-kit';
-import {
-  Button,
-  Input,
-  ManagerBlock,
-  Pill,
-  SettingsBlock,
-  SettingsRow,
-  ThemeToggle,
-} from '@life/ui';
+import { Button, Input, SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
 import { DEFAULT_DURATIONS, MINUTES_RANGE, type Durations } from '@life/pomodoro';
 import { listGoals } from '@/lib/focus-api';
 import { resolveGoal } from '@/lib/stats-buckets';
 import { getToday } from '@/lib/today';
 import { setPomodoroDurations, setPomodoroGoal } from '../actions';
+import { submitFeedbackAction } from '../../feedback-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,38 +17,22 @@ const DURATION_FIELDS = [
 ] as const;
 
 /**
- * §8's `.row__meta` as a standalone line: no primitive renders static body copy
- * (a `StatusText` is a live region and a `SettingsRow` needs a control), so the
- * footer line is a structural `<p>` carrying the meta tier's token classes only.
- */
-const footerStyles = 'mt-[var(--s6)] text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
-
-/**
  * Thin mount: the inputs open on the stored minutes, the server action owns the write.
  *
- * The groups follow the reference's settings screen order (Appearance, Comfort,
- * Focus, Support). The theme control is the one the screen already had; the
- * reference's "Send feedback" row is deliberately absent — this screen has no
- * feedback entry point of its own (the timer's toolbar owns it), so drawing it
- * would add behaviour the restyle must not add.
+ * The shell draws the shared Appearance, Comfort, Support and closing line; this page adds the
+ * timer's two groups between Comfort and Support. The timer's toolbar keeps its own feedback
+ * icon entry, so the Support row is the same double entry the other apps already have.
  */
 export default async function PomodoroSettingsRoute() {
   const [durations, dailyGoal] = await Promise.all([readDurations(), readDailyGoal()]);
 
   return (
-    <ManagerBlock title="Settings" backHref="/pomodoro">
-      <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle inGroup />} />
-      </SettingsBlock>
-
-      <SettingsBlock title="Comfort">
-        <SettingsRow
-          label="Reduce motion"
-          description="Follows system setting."
-          control={<Pill>System</Pill>}
-        />
-      </SettingsBlock>
-
+    <SettingsShell
+      title="Settings"
+      backHref="/pomodoro"
+      app="pomodoro"
+      onSubmit={submitFeedbackAction}
+    >
       <form action={setPomodoroGoal}>
         <SettingsBlock title="Focus">
           <SettingsRow
@@ -98,9 +75,7 @@ export default async function PomodoroSettingsRoute() {
           <Button type="submit">Save durations</Button>
         </SettingsBlock>
       </form>
-
-      <p className={footerStyles}>Personal Life · prototype</p>
-    </ManagerBlock>
+    </SettingsShell>
   );
 }
 

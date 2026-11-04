@@ -15,16 +15,37 @@ jest.mock('@/app/feedback-actions', () => ({
 
 import { listNoteTagUsage } from '@/lib/api';
 import { resolveTagUsage } from '@/lib/tags-compose';
-import { ManagerBlock } from '@life/ui';
+import { submitFeedbackAction } from '@/app/feedback-actions';
+import { SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
 import NotesSettingsPage from '@/app/notes/settings/page';
 
 const mockedListNoteTagUsage = listNoteTagUsage as jest.MockedFunction<typeof listNoteTagUsage>;
 const mockedResolveTagUsage = resolveTagUsage as jest.MockedFunction<typeof resolveTagUsage>;
 
+/** The page returns one shell element; its `children` are the Notes group the page owns. */
+function shellChildren(page: any): any[] {
+  const kids = page?.props?.children;
+  if (kids == null) return [];
+  return (Array.isArray(kids) ? kids : [kids]).flat();
+}
+
+function notesGroup(page: any): any {
+  return shellChildren(page).find(
+    (child) => child?.type === SettingsBlock && child.props.title === 'Notes',
+  );
+}
+
+function notesRow(page: any, label: string): any {
+  const kids = notesGroup(page)?.props?.children;
+  return (Array.isArray(kids) ? kids : [kids]).find(
+    (child: any) => child?.type === SettingsRow && child.props.label === label,
+  );
+}
+
 /**
- * The `/notes/settings` screen: the four groups the reference draws, in order,
- * with the Appearance segment alone in its group (no Theme row label), the Tags
- * row fed by the registry, and the feedback row as the dialog's trigger.
+ * The `/notes/settings` screen: one `SettingsShell` carrying the shared Appearance,
+ * Comfort and Support groups plus the closing line, with the Notes group (registry-fed
+ * Tags row, Trash row) as its only app-specific child.
  */
 describe('/notes/settings', () => {
   beforeEach(() => {
@@ -39,12 +60,21 @@ describe('/notes/settings', () => {
     ]);
   });
 
-  it('composes ManagerBlock titled Settings backed to /notes', async () => {
+  it('composes one SettingsShell titled Settings, backed to /notes, wired to notes feedback', async () => {
     const page = (await NotesSettingsPage()) as any;
 
-    expect(page.type).toBe(ManagerBlock);
+    expect(page.type).toBe(SettingsShell);
     expect(page.props.title).toBe('Settings');
     expect(page.props.backHref).toBe('/notes');
+    expect(page.props.app).toBe('notes');
+    expect(page.props.onSubmit).toBe(submitFeedbackAction);
+  });
+
+  it('passes the Notes group as the shell\'s only child', async () => {
+    const page = await NotesSettingsPage();
+
+    expect(shellChildren(page)).toHaveLength(1);
+    expect(notesGroup(page)).toBeDefined();
   });
 
   it('renders no Eisenhower matrix row', async () => {
@@ -62,6 +92,7 @@ describe('/notes/settings', () => {
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain('href="/notes"');
+    expect(html).toContain('Personal Life · prototype');
   });
 
   it('lays the appearance segment as one pressed group, with no row label', async () => {
@@ -85,12 +116,14 @@ describe('/notes/settings', () => {
   });
 
   it('links the Tags and Trash rows, dot-joining the registry names into the count pill', async () => {
-    const html = renderToStaticMarkup(await NotesSettingsPage());
+    const page = await NotesSettingsPage();
+    const html = renderToStaticMarkup(page);
 
-    expect(html).toContain('href="/notes/tags"');
+    expect(notesRow(page, 'Tags').props.href).toBe('/notes/tags');
+    expect(notesRow(page, 'Tags').props.description).toBe('home · work');
+    expect(notesRow(page, 'Trash').props.href).toBe('/notes/trash');
     expect(html).toContain('home · work');
     expect(html).toContain('>2</span>');
-    expect(html).toContain('href="/notes/trash"');
     expect(html).toContain('Notes you deleted.');
     expect(mockedResolveTagUsage).toHaveBeenCalledWith(await mockedListNoteTagUsage.mock.results[0].value);
   });

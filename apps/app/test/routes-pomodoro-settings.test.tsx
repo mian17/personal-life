@@ -1,4 +1,4 @@
-import { ManagerBlock, Pill, SettingsBlock, SettingsRow, ThemeToggle, Input } from '@life/ui';
+import { SettingsBlock, SettingsRow, SettingsShell, Input } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 /**
@@ -14,6 +14,7 @@ jest.mock('@life/app-kit', () => ({
 /** The goal row reads the owner's goal rows and the request day through these two seams. */
 jest.mock('@/lib/focus-api', () => ({ listGoals: jest.fn(), setGoal: jest.fn() }));
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
+jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
 
 import { readPrefNumber } from '@life/app-kit';
 import { DEFAULT_DURATIONS, MINUTES_RANGE } from '@life/pomodoro';
@@ -21,6 +22,7 @@ import { listGoals, setGoal, type GoalRow } from '@/lib/focus-api';
 import { getToday } from '@/lib/today';
 import PomodoroSettingsPage from '@/app/pomodoro/settings/page';
 import { setPomodoroGoal } from '@/app/pomodoro/actions';
+import { submitFeedbackAction } from '@/app/feedback-actions';
 
 const mockedReadPrefNumber = readPrefNumber as jest.MockedFunction<typeof readPrefNumber>;
 const mockedListGoals = listGoals as jest.MockedFunction<typeof listGoals>;
@@ -36,9 +38,17 @@ function childList(node: any): any[] {
   return (Array.isArray(kids) ? kids : [kids]).flat();
 }
 
-/** The page's tree expanded one level, so a block is found inside the form that wraps it. */
-function settingsBlock(page: any, title: string): any {
-  return childList(page).find(
+/**
+ * The page returns one `SettingsShell`; the timer's own groups are its `children`, so both
+ * helpers re-root at that child slot (`SPEC-ui-settings-shell` Design 3).
+ */
+function shellChildren(page: any): any[] {
+  return childList(page);
+}
+
+/** The block inside a node whose children are blocks — a `<form>` wrapper, or the shell itself. */
+function settingsBlock(node: any, title: string): any {
+  return childList(node).find(
     (child) => child?.type === SettingsBlock && child.props.title === title,
   );
 }
@@ -51,7 +61,7 @@ function settingsRow(block: any, label: string): any {
 
 /** The `<form>` the page wraps a titled block in; its `action` is that block's write. */
 function blockForm(page: any, title: string): any {
-  return childList(page).find(
+  return shellChildren(page).find(
     (child) => child?.type === 'form' && settingsBlock(child, title) !== undefined,
   );
 }
@@ -69,20 +79,21 @@ beforeEach(() => {
 });
 
 describe('/pomodoro/settings page wiring', () => {
-  it('composes ManagerBlock titled Settings backed to /pomodoro', async () => {
+  it('composes one SettingsShell titled Settings, backed to /pomodoro, wired to pomodoro feedback', async () => {
     const page = await PomodoroSettingsPage();
 
-    expect(page.type).toBe(ManagerBlock);
+    expect(page.type).toBe(SettingsShell);
     expect(page.props.title).toBe('Settings');
     expect(page.props.backHref).toBe('/pomodoro');
+    expect(page.props.app).toBe('pomodoro');
+    expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('renders the Appearance block with a ThemeToggle control', async () => {
-    const page = await PomodoroSettingsPage();
-    const block = settingsBlock(page, 'Appearance');
+  it('renders the Appearance group with no Theme row: the shell draws the segment alone', async () => {
+    const html = renderToStaticMarkup(await PomodoroSettingsPage());
 
-    expect(block).toBeDefined();
-    expect(settingsRow(block, 'Theme').props.control.type).toBe(ThemeToggle);
+    expect(html).toContain('role="group" aria-label="Appearance"');
+    expect(html).not.toContain('System, light, or dark.');
   });
 
   it('lays the appearance segment into the settings row: full width, no trough chrome', async () => {
@@ -93,15 +104,13 @@ describe('/pomodoro/settings page wiring', () => {
     expect(segment).not.toContain('bg-surface-sunken');
   });
 
-  it('renders the Comfort block as the reference draws it: a static row reading System', async () => {
-    const page = await PomodoroSettingsPage();
-    const block = settingsBlock(page, 'Comfort');
+  it('renders the Comfort group with the standard Reduce motion copy', async () => {
+    const html = renderToStaticMarkup(await PomodoroSettingsPage());
 
-    expect(block).toBeDefined();
-
-    const row = settingsRow(block, 'Reduce motion');
-    expect(row.props.control.type).toBe(Pill);
-    expect(row.props.control.props.children).toBe('System');
+    expect(html).toContain('Reduce motion');
+    expect(html).toContain(
+      'Follows the system setting. Turn it on in iOS Settings › Accessibility.',
+    );
   });
 
   it('renders the three duration fields bound to their own preference', async () => {
@@ -145,18 +154,18 @@ describe('/pomodoro/settings page wiring', () => {
     const html = renderToStaticMarkup(await PomodoroSettingsPage());
 
     expect(html).toContain('Settings');
-    expect(html).toContain('Theme');
-    expect(html).toContain('System, light, or dark.');
+    expect(html).not.toContain('System, light, or dark.');
     expect(html).toContain('Save durations');
     expect(html).toContain('href="/pomodoro"');
     expect(html).toContain('Reduce motion');
     expect(html).toContain('Personal Life · prototype');
   });
 
-  it("drops the reference's Send feedback row: this screen has no feedback entry point", async () => {
+  it('renders the shared Support row as the dialog trigger', async () => {
     const html = renderToStaticMarkup(await PomodoroSettingsPage());
 
-    expect(html).not.toContain('Send feedback');
+    expect(html).toContain('Send feedback');
+    expect(html).toContain('Tell us what got in the way.');
   });
 });
 
