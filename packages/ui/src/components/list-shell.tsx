@@ -57,9 +57,11 @@ const subtitleStyles = cx(
 
 /**
  * §8's `.phead` puts the title block and the trailing controls on one flex line; `NavBar`'s own
- * `pt-[var(--s2)]` is that line's top inset, so the title drops its own top margin (`mt-0`).
+ * `pt-[var(--s2)]` is that line's top inset, so the title drops its own top margin (`mt-0`). The
+ * heading's own bottom step is dropped too (`mb-0`), leaving `subtitleStyles`' `--s1` as the whole
+ * title → sub-line gap — `.phead__sub`'s `margin-top: var(--s1)`, not the two steps compounded.
  */
-const titleBlockStyles = 'mt-0';
+const titleBlockStyles = 'mt-0 mb-0';
 
 /**
  * The header's leading slot: the title block — `<h1>` plus the optional sub-line — level with

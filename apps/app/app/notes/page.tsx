@@ -35,7 +35,8 @@ export default async function NotesPage({
     href: filterHref({ path: '/notes', current, overrides: { tag: String(t.tagId) } }),
     active: tagId === t.tagId,
   }));
-  const filterItems = [allFilter, ...tagFilters];
+  // The `All` chip is pinned outside the scrolling strip so it stays reachable however far the
+  // tag chips scroll; only the tags themselves scroll under it.
 
   return (
     <ListShell
@@ -49,7 +50,7 @@ export default async function NotesPage({
       search={<PreservingSearchBox path="/notes" q={q} params={{ tag }} label="Search notes" />}
       filters={
         namedTags.length > 0 ? (
-          <TagFilterNav aria-label="Tags" items={filterItems} />
+          <TagFilterNav aria-label="Tags" pinned={allFilter} items={tagFilters} />
         ) : undefined
       }
       body={
