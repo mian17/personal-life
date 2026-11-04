@@ -58,14 +58,26 @@ const labelStyles = cx(
 );
 
 /**
- * The `Input` field shell worn by a button, so a trigger that opens a panel and a text field read
- * as one control: the strong hairline, the field radius, the field rhythm and the focus ring.
+ * The `Input` field shell, so a control that opens a panel and a text field read as one thing: the
+ * strong hairline, the field radius and the field rhythm. It is a `div` rather than the control
+ * itself because the attached chips carry their own remove buttons, and a button may not nest in a
+ * button — the shell holds the chips, the trigger sits beside them.
  */
 const fieldStyles = cx(
   'ui-tag-combobox__field flex w-full min-w-0 flex-wrap items-center gap-[var(--s2)] text-left',
   'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)]',
   'rounded-[var(--r-md)] border border-line-strong bg-surface',
   'text-[length:var(--fs-button)] text-ink',
+);
+
+/**
+ * The field's control: whatever width the chips leave, showing the placeholder or nothing but the
+ * chevron. It owns the keyboard states — the focus ring and the disabled tier — because it is the
+ * only part of the shell a keyboard lands on.
+ */
+const triggerStyles = cx(
+  'flex min-w-0 flex-1 items-center gap-[var(--s2)] self-stretch',
+  'cursor-pointer appearance-none bg-transparent [font-family:inherit] [line-height:inherit]',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
   'disabled:cursor-not-allowed disabled:text-ink-3 disabled:opacity-50',
 );
@@ -155,6 +167,8 @@ function TagComboboxControl({
   const [query, setQuery] = useState('');
   const [listboxId, setListboxId] = useState('');
   const captionId = useId();
+  // The shell is the popover anchor, so a press anywhere in it is a press on the field itself.
+  const fieldRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   // Whether the next close hands focus back to the field: a Tab has already moved it onward.
   const returnFocusOnClose = useRef(true);
@@ -206,6 +220,17 @@ function TagComboboxControl({
     changeOpen(true);
   }
 
+  /**
+   * A chip's remove button unmounts with the chip it detaches, which would drop the keyboard onto
+   * `document.body`. When the field held the focus, the trigger takes it back; a removal that never
+   * held focus — a pointer press somewhere else — moves nothing.
+   */
+  function removeTag(id: number) {
+    const fieldHeldFocus = fieldRef.current?.contains(document.activeElement) ?? false;
+    onToggle(id);
+    if (fieldHeldFocus) triggerRef.current?.focus();
+  }
+
   function filter(next: string) {
     setQuery(next);
     // New rows mean the walked row may be gone: the list starts unchosen again.
@@ -219,45 +244,54 @@ function TagComboboxControl({
       </span>
       <Popover open={open} onOpenChange={changeOpen}>
         <PopoverAnchor asChild>
-          <button
-            ref={triggerRef}
-            type="button"
-            className={fieldStyles}
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            aria-controls={open ? listboxId : undefined}
-            aria-labelledby={captionId}
-            disabled={inert}
-            onClick={() => changeOpen(!open)}
-            onKeyDown={handleTriggerKeyDown}
-          >
-            {attached.length > 0 ? (
+          <div ref={fieldRef} className={fieldStyles}>
+            {attached.length > 0 && (
               <span className={chipsStyles}>
                 {attached.map((tag) => (
-                  <Pill key={tag.id} as="span" size="chip">
+                  <Pill
+                    key={tag.id}
+                    as="span"
+                    size="chip"
+                    onRemove={() => removeTag(tag.id)}
+                    removeLabel={`Remove ${tag.name}`}
+                  >
                     {tag.name}
                   </Pill>
                 ))}
               </span>
-            ) : (
-              <span className="text-ink-3">{hasTags ? placeholder : NO_TAGS}</span>
             )}
-            <ChevronDown size={16} aria-hidden className={chevronStyles} />
-          </button>
+            <button
+              ref={triggerRef}
+              type="button"
+              className={triggerStyles}
+              aria-haspopup="listbox"
+              aria-expanded={open}
+              aria-controls={open ? listboxId : undefined}
+              aria-labelledby={captionId}
+              disabled={inert}
+              onClick={() => changeOpen(!open)}
+              onKeyDown={handleTriggerKeyDown}
+            >
+              {attached.length === 0 && (
+                <span className="text-ink-3">{hasTags ? placeholder : NO_TAGS}</span>
+              )}
+              <ChevronDown size={16} aria-hidden className={chevronStyles} />
+            </button>
+          </div>
         </PopoverAnchor>
         {open && (
           <PopoverContent
             align="start"
             className="w-[var(--radix-popover-trigger-width)] p-0"
-            // The field is the anchor, so Radix cannot recognise a press on it as its own: without
-            // this the trigger would close the panel and the click would reopen it in one gesture.
+            // The shell is the anchor, so Radix cannot recognise a press on it — the trigger or a
+            // chip's remove button — as its own: without this the press would dismiss the panel.
             onInteractOutside={(event) => {
-              if (event.target instanceof Node && triggerRef.current?.contains(event.target)) {
+              if (event.target instanceof Node && fieldRef.current?.contains(event.target)) {
                 event.preventDefault();
               }
             }}
-            // Radix would restore focus to a trigger it never registered; the field is the anchor,
-            // so the close hands focus back here — except after a Tab, which moves it onward.
+            // Radix would restore focus to a trigger it never registered; the shell is the anchor,
+            // so the close hands focus back to the trigger — except after a Tab, which moves it on.
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               if (returnFocusOnClose.current) triggerRef.current?.focus();

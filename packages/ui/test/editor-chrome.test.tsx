@@ -112,7 +112,7 @@ describe('EditorChrome', () => {
     const control = container.querySelector('.ui-tag-combobox')!;
     expect(control.contains(trigger)).toBe(true);
     expect(container.querySelector('.ui-editor-stack')!.contains(control)).toBe(true);
-    expect(trigger.textContent).toContain('errand');
+    expect(container.querySelector('.ui-tag-combobox__chips')!.textContent).toContain('errand');
 
     fireEvent.click(trigger);
     const rows = screen.getAllByRole('option');

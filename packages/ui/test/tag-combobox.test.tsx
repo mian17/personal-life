@@ -46,6 +46,7 @@ function setup(overrides: Partial<TagComboboxProps> = {}) {
 }
 
 const trigger = (name = 'Tags') => screen.getByRole('button', { name });
+const shell = () => document.querySelector('.ui-tag-combobox__field') as HTMLElement;
 const field = () => screen.getByRole('combobox', { name: 'Search tags' }) as HTMLInputElement;
 const rows = () => screen.queryAllByRole('option');
 const activeRow = () => {
@@ -53,6 +54,7 @@ const activeRow = () => {
   return id == null ? null : document.getElementById(id);
 };
 const chips = () => document.querySelectorAll('.ui-tag-combobox__chips .ui-pill');
+const removeButtons = () => screen.queryAllByRole('button', { name: /^Remove / });
 
 function open(overrides: Partial<TagComboboxProps> = {}) {
   const context = setup(overrides);
@@ -86,7 +88,6 @@ describe('TagCombobox', () => {
     setup({ selectedIds: [2], label: 'Attached tags' });
 
     const control = screen.getByRole('button', { name: 'Attached tags' });
-    expect(control.textContent).toContain('home');
     expect(control.getAttribute('aria-labelledby')).toBe(
       document.querySelector('.ui-tag-combobox__label')!.id,
     );
@@ -96,9 +97,87 @@ describe('TagCombobox', () => {
     setup({ selectedIds: [1, 2, 3] });
 
     expect(chips()).toHaveLength(3);
-    expect(trigger().textContent).toContain('errand');
-    expect(trigger().textContent).toContain('home');
-    expect(trigger().textContent).toContain('Home repair');
+    expect([...chips()].map((chip) => chip.textContent)).toEqual([
+      'errand',
+      'home',
+      'Home repair',
+    ]);
+  });
+
+  it('keeps the chips inside the field shell but outside the trigger button', () => {
+    setup({ selectedIds: [1, 2] });
+
+    const chipRow = document.querySelector('.ui-tag-combobox__chips')!;
+    expect(shell().contains(chipRow)).toBe(true);
+    expect(trigger().contains(chipRow)).toBe(false);
+    // A button may not nest a button: the chips' own controls stay out of the trigger.
+    expect(trigger().textContent).not.toContain('home');
+    expect(trigger().getAttribute('aria-labelledby')).toBe(
+      document.querySelector('.ui-tag-combobox__label')!.id,
+    );
+  });
+
+  it('gives every attached chip its own remove control', () => {
+    setup({ selectedIds: [1, 2] });
+
+    expect(removeButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Remove errand',
+      'Remove home',
+    ]);
+    expect(shell().contains(removeButtons()[0])).toBe(true);
+  });
+
+  it('detaches a tag from its chip control without reopening the panel', () => {
+    const { onToggle } = setup({ selectedIds: [2] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove home' }));
+
+    expect(onToggle).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('detaches the chip the caller controls', () => {
+    render(<Controlled initialSelected={[2]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove home' }));
+
+    expect(chips()).toHaveLength(0);
+    expect(trigger().textContent).toContain('Select tags…');
+  });
+
+  it('keeps the panel open when a chip is removed while it is open', async () => {
+    render(<Controlled initialSelected={[2]} />);
+    fireEvent.click(trigger());
+    await settle();
+
+    const remove = screen.getByRole('button', { name: 'Remove home' });
+    fireEvent.pointerDown(remove);
+    fireEvent.click(remove);
+    await settle();
+
+    expect(chips()).toHaveLength(0);
+    expect(screen.getByRole('listbox')).toBeTruthy();
+  });
+
+  it('hands focus back to the trigger when a removal takes the focus with it', () => {
+    render(<Controlled initialSelected={[2]} />);
+    const remove = screen.getByRole('button', { name: 'Remove home' });
+    remove.focus();
+
+    fireEvent.click(remove);
+
+    expect(screen.queryByRole('button', { name: 'Remove home' })).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('leaves focus where it was when the removal did not hold it', () => {
+    setup({ selectedIds: [2] });
+    const outside = screen.getByRole('button', { name: 'Outside' });
+    outside.focus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove home' }));
+
+    expect(document.activeElement).toBe(outside);
   });
 
   it('offers no field at all when the caller has no tags', () => {
@@ -274,7 +353,7 @@ describe('TagCombobox', () => {
     fireEvent.click(rows()[1]);
     expect(rows()[1].getAttribute('aria-checked')).toBe('true');
     expect(chips()).toHaveLength(1);
-    expect(trigger().textContent).toContain('home');
+    expect(chips()[0].textContent).toContain('home');
 
     fireEvent.click(rows()[1]);
     expect(rows()[1].getAttribute('aria-checked')).toBe('false');
