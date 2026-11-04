@@ -204,6 +204,21 @@ function watchForRedirectLoop(page) {
   return { tripped, stop: () => page.off('request', onDocumentRequest) };
 }
 
+/**
+ * The origin the browser ended up on, when it is not the app's own — `undefined` when
+ * the screen stayed put.
+ *
+ * Judged by origin, not by path: a dead session does not bounce to `/auth/login` on
+ * this app. The identity gate hands the browser to the IdP at `/interaction/<uid>` on
+ * the IdP's own port, so the document leaves the app's origin entirely and no path
+ * allowlist can enumerate the hops it makes on the way.
+ */
+function strayOrigin(page) {
+  const landed = new URL(page.url()).origin;
+  const expected = new URL(baseUrl).origin;
+  return landed === expected ? undefined : landed;
+}
+
 /** Navigates, refusing to wait forever when the app is bouncing the browser in a circle. */
 async function loadScreen(page, url) {
   const loop = watchForRedirectLoop(page);
@@ -265,9 +280,9 @@ try {
         const response = await withScreenBudget(
           (async () => {
             const landed = await loadScreen(page, baseUrl + route);
-            const path = new URL(page.url()).pathname;
-            if (path.startsWith('/auth/')) {
-              throw new Error(`redirected to ${path}: no session cookie (set SCREENS_STORAGE_STATE)`);
+            const elsewhere = strayOrigin(page);
+            if (elsewhere) {
+              throw new Error(`landed on ${elsewhere} instead of ${new URL(baseUrl).origin}: no session cookie (set SCREENS_STORAGE_STATE)`);
             }
             const status = landed?.status() ?? 0;
             if (status >= 400) throw new Error(`HTTP ${status} for ${route}`);
