@@ -29,7 +29,7 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await dialog.getByLabel('Title').fill(title);
   await dialog.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(dialog.getByText('Description is required.')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await dialog.getByRole('button', { name: 'Close' }).click();
 
   // Emptiness is not asserted here: chapter 2 seeds a row into the same
   // persistent database, so this page is only empty on a fresh stack. The frozen

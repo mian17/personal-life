@@ -45,6 +45,20 @@ describe('Dialog', () => {
     expect(dialog().getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
   });
 
+  it('renders the description under the title inside the header', () => {
+    setup({ open: true, description: 'One thing.' });
+    const sub = screen.getByText('One thing.');
+    expect(sub.tagName).toBe('P');
+    expect(sub.classList.contains('ui-dialog__sub')).toBe(true);
+    expect(sub.closest('.ui-dialog__head')).not.toBeNull();
+    expect(sub.closest('.ui-dialog__title-block')).not.toBeNull();
+  });
+
+  it('renders no description line when none is given', () => {
+    setup({ open: true });
+    expect(document.querySelector('.ui-dialog__sub')).toBeNull();
+  });
+
   it('fires onOpenChange(false) from the Close icon button', () => {
     const { onOpenChange } = setup({ open: true });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));

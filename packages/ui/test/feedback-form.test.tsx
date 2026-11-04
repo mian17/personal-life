@@ -38,8 +38,9 @@ function Harness({ onSubmit }: { onSubmit: FeedbackFormProps['onSubmit'] }) {
 const titleInput = () =>
   screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement;
 const textarea = () => screen.getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
-const typeGroup = () => screen.getByRole('group', { name: 'Feedback type' });
+const typeGroup = () => screen.getByRole('group', { name: 'Kind of feedback' });
 const send = () => screen.getByRole('button', { name: 'Send' });
+const statusLine = () => screen.getByRole('status');
 
 async function submitForm() {
   await act(async () => {
@@ -48,17 +49,19 @@ async function submitForm() {
 }
 
 describe('FeedbackForm', () => {
-  it('opens with the frozen title and closes through onOpenChange', () => {
+  it('opens with the frozen title and subtitle and closes through the one Close control', () => {
     const { onOpenChange } = renderForm();
 
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Send feedback');
+    expect(screen.getByText('One thing. It goes to the inbox, not to a ticket queue.')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-
+    // One dismissal affordance: the sheet's own close control (Escape is Radix's).
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    // No message yet, so no status line at all.
+    expect(screen.queryByRole('status')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onOpenChange).toHaveBeenCalledTimes(2);
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -67,23 +70,23 @@ describe('FeedbackForm', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('renders the three type pills with aria-pressed, first selected', () => {
+  it('renders the three type segments with aria-pressed, first selected', () => {
     renderForm();
 
-    const pills = within(typeGroup()).getAllByRole('button');
-    expect(pills.map((pill) => pill.textContent)).toEqual([
+    const segments = within(typeGroup()).getAllByRole('button');
+    expect(segments.map((segment) => segment.textContent)).toEqual([
       'Feature request',
       'Enhancement',
       'Bug report',
     ]);
-    expect(pills.map((pill) => pill.getAttribute('aria-pressed'))).toEqual([
+    expect(segments.map((segment) => segment.getAttribute('aria-pressed'))).toEqual([
       'true',
       'false',
       'false',
     ]);
 
-    fireEvent.click(pills[2]);
-    expect(pills.map((pill) => pill.getAttribute('aria-pressed'))).toEqual([
+    fireEvent.click(segments[2]);
+    expect(segments.map((segment) => segment.getAttribute('aria-pressed'))).toEqual([
       'false',
       'false',
       'true',
@@ -99,7 +102,10 @@ describe('FeedbackForm', () => {
     await submitForm();
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toBe('Title is required.');
+    expect(statusLine().textContent).toBe('Title is required.');
+    expect(statusLine().getAttribute('aria-live')).toBe('polite');
+    // A validation hint keeps the meta ink; only a failed send takes the danger ink.
+    expect(statusLine().className).not.toContain('text-danger');
     expect(titleInput().getAttribute('aria-invalid')).toBe('true');
     expect(textarea().getAttribute('aria-invalid')).toBeNull();
     expect(document.activeElement).toBe(titleInput());
@@ -114,7 +120,7 @@ describe('FeedbackForm', () => {
     await submitForm();
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toBe('Description is required.');
+    expect(statusLine().textContent).toBe('Description is required.');
     expect(textarea().getAttribute('aria-invalid')).toBe('true');
     expect(titleInput().getAttribute('aria-invalid')).toBeNull();
     expect(document.activeElement).toBe(textarea());
@@ -125,7 +131,7 @@ describe('FeedbackForm', () => {
     const { onSubmit } = renderForm();
 
     await submitForm();
-    expect(screen.getByRole('alert').textContent).toBe('Title is required.');
+    expect(statusLine().textContent).toBe('Title is required.');
     expect(titleInput().getAttribute('aria-invalid')).toBe('true');
 
     fireEvent.change(titleInput(), { target: { value: 'a title' } });
@@ -168,7 +174,8 @@ describe('FeedbackForm', () => {
 
     await submitForm();
 
-    expect(screen.getByRole('alert').textContent).toBe("Couldn't send feedback. Try again.");
+    expect(statusLine().textContent).toBe("Couldn't send feedback. Try again.");
+    expect(statusLine().className).toContain('text-danger!');
     expect(onOpenChange).not.toHaveBeenCalled();
 
     await submitForm();
@@ -177,7 +184,7 @@ describe('FeedbackForm', () => {
     expect(onSubmit.mock.calls[1][0].id).toBe(onSubmit.mock.calls[0][0].id);
   });
 
-  it('surfaces a rejected submit in the same banner and stays open', async () => {
+  it('surfaces a rejected submit in the same status line and stays open', async () => {
     const onSubmit = jest.fn(async (): Promise<FeedbackSubmitResult> => {
       throw new Error('Network down.');
     });
@@ -187,7 +194,7 @@ describe('FeedbackForm', () => {
 
     await submitForm();
 
-    expect(screen.getByRole('alert').textContent).toBe('Network down.');
+    expect(statusLine().textContent).toBe('Network down.');
     expect((send() as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -244,12 +251,13 @@ describe('FeedbackForm', () => {
   });
 
   it('accepts overridden copy without changing the frozen defaults', () => {
-    renderForm({ title: 'Custom', submitLabel: 'Send it' });
+    renderForm({ title: 'Custom', description: 'Custom subtitle', submitLabel: 'Send it' });
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Custom');
+    expect(screen.getByText('Custom subtitle')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send it' })).toBeTruthy();
   });
 
-  it('renders visible labels bound to their controls with placeholders and required markers', () => {
+  it('renders visible labels bound to their controls, with no placeholder or required marker', () => {
     renderForm();
 
     const titleLabel = titleInput().labels?.[0] as HTMLLabelElement;
@@ -265,8 +273,9 @@ describe('FeedbackForm', () => {
     expect(titleLabel.textContent).toContain('Title');
     expect(descriptionLabel.textContent).toContain('Description');
 
-    expect(titleInput().placeholder).toBe('Short summary of your feedback');
-    expect(textarea().placeholder).toBe('What happened, and what did you expect?');
+    // The reference's clean field: the label is the only prompt, no placeholder copy.
+    expect(titleInput().getAttribute('placeholder')).toBeNull();
+    expect(textarea().getAttribute('placeholder')).toBeNull();
 
     // The hooks lead the class list; the utilities that now carry the retired
     // `.ui-field-label--strong` colour and weight follow them.
@@ -279,9 +288,10 @@ describe('FeedbackForm', () => {
       'ui-field-label--strong',
     ]);
 
-    const markers = document.querySelectorAll('.ui-field-label__required');
-    expect(markers).toHaveLength(2);
-    markers.forEach((marker) => expect(marker.getAttribute('aria-hidden')).toBe('true'));
+    // The caption carries no `*`: `aria-required` still states the rule to a screen reader.
+    expect(document.querySelectorAll('.ui-field-label__required')).toHaveLength(0);
+    expect(titleInput().getAttribute('aria-required')).toBe('true');
+    expect(textarea().getAttribute('aria-required')).toBe('true');
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toBe(titleInput());
     expect(screen.getByRole('textbox', { name: 'Description' })).toBe(textarea());

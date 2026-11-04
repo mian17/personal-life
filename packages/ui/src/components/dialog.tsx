@@ -12,6 +12,8 @@ export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
+  /** Second line under the title, inside the header's left block. Omitted renders no line. */
+  description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   /** `full` is an edge-to-edge screen; `sheet` is the bottom sheet, its top edge a card radius. */
@@ -77,6 +79,14 @@ const dialogTitle = cx(
   'tracking-[var(--tracking-sheet-title)] font-bold',
 );
 
+const dialogTitleBlock = cx('ui-dialog__title-block', 'flex flex-col');
+
+/** §8's `.sheet__sub`: one `--s1` under the title, `14px` (`--fs-label`), the second ink tier. */
+const dialogDescription = cx(
+  'ui-dialog__sub',
+  'm-0 mt-[var(--s1)] text-[length:var(--fs-label)] text-ink-2',
+);
+
 const dialogBody = cx('ui-dialog__body', 'flex flex-col gap-[var(--s4)] mt-[var(--s4)]');
 
 const dialogFooter = cx(
@@ -100,6 +110,7 @@ export function Dialog({
   open,
   onOpenChange,
   title,
+  description,
   children,
   footer,
   size = 'default',
@@ -133,7 +144,10 @@ export function Dialog({
         >
           {size === 'sheet' && <div aria-hidden className={grabStyles} />}
           <div className={dialogHeader}>
-            <DialogPrimitive.Title className={dialogTitle}>{title}</DialogPrimitive.Title>
+            <div className={dialogTitleBlock}>
+              <DialogPrimitive.Title className={dialogTitle}>{title}</DialogPrimitive.Title>
+              {description != null && <p className={dialogDescription}>{description}</p>}
+            </div>
             <DialogPrimitive.Close asChild>
               <IconButton label="Close">
                 <X size={20} aria-hidden />
