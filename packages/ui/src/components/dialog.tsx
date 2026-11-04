@@ -35,6 +35,12 @@ const dialogOverlay = cx(
   'motion-safe:transition-opacity starting:opacity-0',
 );
 
+/**
+ * Every dialog size shares the overlay, so only the sheet's carries the scrim's exit — the same
+ * fade, backwards, styled in `base.css` under the motion gate.
+ */
+const sheetScrimExit = 'ui-dialog__scrim--sheet';
+
 const dialogPanel = cx('fixed z-50 flex flex-col text-ink', 'border border-line bg-surface');
 
 /** The centred panel: a card, `--s4` inset, `--r-lg`, narrower than the frame it floats on. */
@@ -56,6 +62,9 @@ const fullPanel = 'inset-0 h-[100dvh] w-full rounded-none p-[var(--s4)]';
  * reset: a bare `starting:translate-y-full` compiles to one class (0,1,0) and loses to
  * `.data-[state=open]:translate-y-0[data-state="open"]` (0,2,0), which leaves the panel already
  * at its final position on the first frame — no travel, no transition.
+ *
+ * The entrance is a transition; the exit cannot be, and lives in `base.css` as a keyframe — see
+ * the comment there.
  */
 const sheetPanel = cx(
   'ui-dialog--sheet',
@@ -132,7 +141,10 @@ export function Dialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay data-slot="dialog-overlay" className={dialogOverlay} />
+        <DialogPrimitive.Overlay
+          data-slot="dialog-overlay"
+          className={cx(dialogOverlay, size === 'sheet' && sheetScrimExit)}
+        />
         <DialogPrimitive.Content
           data-slot="dialog-content"
           aria-describedby={undefined}

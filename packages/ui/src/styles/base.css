@@ -59,6 +59,43 @@ body {
   .ui-dialog--sheet {
     transition-duration: var(--d-base);
   }
+
+  /* The sheet's exit is a keyframe, not a transition. Radix's Presence holds the closed element
+     mounted only while `animation-name` resolves to something it can wait on — it listens for
+     `animationend`/`animationcancel` and never for `transitionend` — so the entrance may stay a
+     `@starting-style` transition while the exit must animate. Keyed on the closed state, because
+     that is the frame the presence is leaving on. */
+  .ui-dialog--sheet[data-state='closed'] {
+    animation: ui-sheet-out var(--d-base) var(--ease);
+  }
+
+  /* The scrim is shared by every dialog size, so only the sheet's overlay carries this class. */
+  .ui-dialog__scrim--sheet[data-state='closed'] {
+    animation: ui-scrim-out var(--d-fast) var(--ease);
+  }
+
+  /* Down its own height, ending where the panel's base `translate-y-full` already rests, so there
+     is no jump when the animation hands the property back. The x comes from the `-translate-x-1/2`
+     utility, not a hardcoded `-50%`, so a different x utility still travels straight down. */
+  @keyframes ui-sheet-out {
+    from {
+      translate: var(--tw-translate-x, 0px) 0;
+    }
+
+    to {
+      translate: var(--tw-translate-x, 0px) 100%;
+    }
+  }
+
+  @keyframes ui-scrim-out {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
 }
 
 /* The backstop under the gate: `reduce` collapses every duration the gate let through.

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Dialog } from '../src/components/dialog';
 
 /**
@@ -149,5 +149,24 @@ describe('Dialog', () => {
     expect(classes.contains('starting:translate-y-full')).toBe(false);
     expect(classes.contains('data-[state=open]:translate-y-0')).toBe(true);
     expect(classes.contains('motion-safe:transition-transform')).toBe(true);
+  });
+
+  /**
+   * The sheet's exit is a keyframe in `base.css` keyed on `[data-state="closed"]`, because
+   * Radix's Presence waits for `animationend` and never for `transitionend`. jsdom applies no
+   * stylesheet, so the runnable check is the class that opts the shared overlay into that rule;
+   * the playwright probe in the task report is the visual proof of the travel itself.
+   */
+  it('carries the scrim exit hook on the sheet overlay only', () => {
+    setup({ open: true, size: 'sheet' });
+    expect(overlay().classList.contains('ui-dialog__scrim--sheet')).toBe(true);
+
+    cleanup();
+    setup({ open: true });
+    expect(overlay().classList.contains('ui-dialog__scrim--sheet')).toBe(false);
+
+    cleanup();
+    setup({ open: true, size: 'full' });
+    expect(overlay().classList.contains('ui-dialog__scrim--sheet')).toBe(false);
   });
 });
