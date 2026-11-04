@@ -51,6 +51,16 @@ describe('EditorToolbar', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 
+  it('passes the back control\'s variant through, and defaults to the borderless face', () => {
+    render(<EditorToolbar back={{ label: 'Back', onBack: () => {}, variant: 'framed' }} />);
+    expect(screen.getByRole('button', { name: 'Back' }).classList.contains('ui-icon-btn--framed')).toBe(true);
+
+    const plain = render(<EditorToolbar back={{ label: 'Back', onBack: () => {} }} />);
+    const back = plain.container.querySelector('.ui-icon-btn')!;
+    expect(back.classList.contains('ui-icon-btn--framed')).toBe(false);
+    expect(back.classList.contains('border-0')).toBe(true);
+  });
+
   it('invokes onBack when the back button is clicked', () => {
     const onBack = jest.fn();
     render(<EditorToolbar back={{ label: 'Back', onBack }} />);

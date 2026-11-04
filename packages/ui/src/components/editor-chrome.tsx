@@ -1,7 +1,7 @@
 // React 19 types dropped the global `JSX` namespace; it is exported by `react`.
 import type { JSX, ReactNode } from 'react';
 import { EditorScreen } from './editor-screen';
-import { EditorToolbar } from './editor-toolbar';
+import { EditorToolbar, type EditorToolbarBack } from './editor-toolbar';
 import { EditorStack } from './editor-stack';
 import { TagPicker, type TagOption } from './tag-picker';
 import type { StackGap } from './stack';
@@ -19,7 +19,7 @@ export interface EditorChromeTagPicker {
 
 export interface EditorChromeProps {
   /** Back control: a BUTTON, never an href (frozen — calling it flushes/leaves). */
-  back: { label: string; onBack: () => void };
+  back: EditorToolbarBack;
   /** Centred `<h1>` title for create/edit screens; wins over `status` in the toolbar. */
   title?: ReactNode;
   /** Meta line under that title, passed straight to `EditorToolbar`'s `sub`. */

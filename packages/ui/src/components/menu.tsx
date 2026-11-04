@@ -5,7 +5,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import type { ReactNode } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { cx } from '../lib/cx';
-import { IconButton } from './icon-button';
+import { IconButton, type IconButtonVariant } from './icon-button';
 
 export interface MenuProps {
   /** Trigger accessible name. */
@@ -20,6 +20,12 @@ export interface MenuProps {
   onOpenChange: (open: boolean) => void;
   /** Disables the trigger. */
   disabled?: boolean;
+  /** The trigger's face; omitted, the trigger stays the borderless `.iconbtn`. */
+  triggerVariant?: IconButtonVariant;
+  /** The trigger's glyph; omitted, the vertical ellipsis every row uses. */
+  triggerIcon?: ReactNode;
+  /** The gap between the trigger and the panel. */
+  sideOffset?: number;
   className?: string;
 }
 
@@ -41,6 +47,14 @@ const panelStyles = cx(
   'bg-surface text-ink',
   'motion-safe:transition-opacity starting:opacity-0',
 );
+
+/**
+ * The gap between the trigger and the panel: the raised surface sits one step off its trigger
+ * rather than touching it, and `--s2` is that step. Radix's `sideOffset` is a popper offset in px,
+ * not a style, so it cannot take `var(--s2)` — the literal mirrors the token, as `popover.tsx`'s
+ * own default does for the same reason.
+ */
+const PANEL_SIDE_OFFSET_PX = 8;
 
 /** One entry of the panel: whatever draws the row, plus the panel's own hook class. */
 export interface MenuItemProps {
@@ -68,12 +82,15 @@ export function Menu({
   open,
   onOpenChange,
   disabled,
+  triggerVariant = 'default',
+  triggerIcon = <MoreVertical size={16} aria-hidden />,
+  sideOffset = PANEL_SIDE_OFFSET_PX,
   className,
 }: Readonly<MenuProps>) {
   const trigger = (
     <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
-      <IconButton label={label}>
-        <MoreVertical size={16} aria-hidden />
+      <IconButton label={label} variant={triggerVariant}>
+        {triggerIcon}
       </IconButton>
     </DropdownMenuPrimitive.Trigger>
   );
@@ -92,7 +109,10 @@ export function Menu({
           </div>
         )}
         <DropdownMenuPrimitive.Portal>
-          <DropdownMenuPrimitive.Content className={cx('ui-menu__panel', panelStyles)}>
+          <DropdownMenuPrimitive.Content
+            sideOffset={sideOffset}
+            className={cx('ui-menu__panel', panelStyles)}
+          >
             {children}
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>

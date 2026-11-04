@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import type { Note } from '@life/shared';
 import {
   AlertBanner,
@@ -482,11 +483,17 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
   // create-or-get, so the picker never needs a create affordance here.
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => void leave() }}
+      back={{ label: 'Back', onBack: () => void leave(), variant: 'framed' }}
       status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
       actions={
         note != null && (
-          <Menu label="Note actions" open={menuOpen} onOpenChange={setMenuOpen}>
+          <Menu
+            label="Note actions"
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            triggerVariant="framed"
+            triggerIcon={<MoreHorizontal size={16} aria-hidden />}
+          >
             <MenuItem>
               <Button variant="danger" size="bare" onClick={() => void removeNote()}>
                 Delete note

@@ -1,11 +1,13 @@
 import { ChevronLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
-import { IconButton } from './icon-button';
+import { IconButton, type IconButtonVariant } from './icon-button';
 
 export interface EditorToolbarBack {
   label: string;
   onBack: () => void;
+  /** The back control's face; omitted, the control stays the borderless `.iconbtn`. */
+  variant?: IconButtonVariant;
 }
 
 export interface EditorToolbarProps {
@@ -64,7 +66,7 @@ export function EditorToolbar({
 
   return (
     <div className={cx('ui-editor-toolbar', toolbarStyles, className)}>
-      <IconButton label={back.label} onClick={back.onBack}>
+      <IconButton label={back.label} variant={back.variant} onClick={back.onBack}>
         <ChevronLeft size={20} aria-hidden />
       </IconButton>
       {sub != null ? (
