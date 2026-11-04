@@ -53,6 +53,9 @@ export type { SwitchProps } from './components/switch';
 export { IconLink } from './components/icon-link';
 export type { IconLinkProps, IconLinkVariant } from './components/icon-link';
 
+export { SettingsLink } from './components/settings-link';
+export type { SettingsLinkProps } from './components/settings-link';
+
 export { PageShell } from './components/page-shell';
 export type { PageShellProps } from './components/page-shell';
 

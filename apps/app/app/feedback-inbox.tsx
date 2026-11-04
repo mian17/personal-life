@@ -6,15 +6,14 @@ import {
   FEEDBACK_STATUSES,
   FEEDBACK_TYPES,
   FeedbackNavItem,
-  IconLink,
   List,
   ListShell,
   Pill,
   PillGroup,
   Section,
+  SettingsLink,
 } from '@life/ui';
 import { filterHref, settingsHref } from '@life/app-kit';
-import { Settings } from 'lucide-react';
 import { FeedbackRow } from './feedback-row';
 
 const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', meals: 'Meals', feedback: 'Feedback' };
@@ -171,9 +170,7 @@ export function FeedbackInbox({
       navTrailing={
         <>
           <FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />
-          <IconLink href={settingsHref('/feedback')} label="Settings">
-            <Settings size={20} aria-hidden />
-          </IconLink>
+          <SettingsLink href={settingsHref('/feedback')} />
         </>
       }
       filters={<StatusFilter status={status} />}

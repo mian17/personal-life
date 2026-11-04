@@ -1,19 +1,17 @@
 import { settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink } from '@life/ui';
-import { ChartColumn, Settings } from 'lucide-react';
+import { FeedbackNavItem, IconLink, SettingsLink } from '@life/ui';
+import { ChartColumn } from 'lucide-react';
 import { submitFeedbackAction } from '../feedback-actions';
 
-/** The Pomodoro toolbar: stats first, then feedback, the gear last. */
+/** The Pomodoro toolbar: stats, feedback, then the bare settings control last. */
 export function PomodoroNav() {
   return (
     <>
-      <IconLink href="/pomodoro/stats" label="Stats">
+      <IconLink href="/pomodoro/stats" label="Stats" variant="bare">
         <ChartColumn size={20} aria-hidden />
       </IconLink>
       <FeedbackNavItem app="pomodoro" onSubmit={submitFeedbackAction} />
-      <IconLink href={settingsHref('/pomodoro')} label="Settings">
-        <Settings size={20} aria-hidden />
-      </IconLink>
+      <SettingsLink href={settingsHref('/pomodoro')} />
     </>
   );
 }

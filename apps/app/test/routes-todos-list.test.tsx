@@ -1,5 +1,5 @@
 import type { List, Todo, TodoCompletion } from '@life/shared';
-import { dueDateLabel, FeedbackNavItem, ListShell, Tab, TabBar, todayIso } from '@life/ui';
+import { dueDateLabel, FeedbackNavItem, ListShell, SettingsLink, Tab, TabBar, todayIso } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
@@ -105,6 +105,38 @@ describe('/todos list page wiring', () => {
     expect(el.props.fabHref).toBe('/todos/new');
   });
 
+  it('subtitles the header with the day\u2019s open and done rows, zero included', async () => {
+    // The default fixture's only todo is undated, so it lands in no shown group: the
+    // header still reads the literal, no-plural zero form.
+    const el = await TodosPage();
+
+    expect(el.props.subtitle).toBe('0 open \u00b7 0 done');
+  });
+
+  it('counts open as overdue + today and done as the done rows, including derived occurrences', async () => {
+    const TODAY = todayIso();
+    mockedListTodos.mockResolvedValue({
+      todos: [
+        todo({ id: 'o1', title: 'Send meter reading', dueDate: '2000-01-01' }),
+        todo({ id: 't1', title: 'Write the report', dueDate: TODAY }),
+        todo({ id: 'd1', title: 'Pay rent', done: true }),
+        todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: TODAY }),
+      ],
+      nextCursor: null,
+    });
+    // The repeating todo's ticked occurrence is a done row with no `Todo` row of its own.
+    mockedListTodoCompletions.mockResolvedValue({
+      completions: [completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' })],
+      nextCursor: null,
+    });
+
+    const el = await TodosPage();
+
+    // open: overdue (1) + today (1, the live repeating row); done: the done one-off
+    // plus the derived occurrence the completion log makes a done row.
+    expect(el.props.subtitle).toBe('3 open \u00b7 2 done');
+  });
+
   it('passes no filter or search axes through to listTodos', async () => {
     await TodosPage();
 
@@ -137,9 +169,10 @@ describe('/todos list page wiring', () => {
     expect(feedback).toHaveLength(1);
     expect(feedback[0].props.app).toBe('todos');
 
-    // Settings stays the trailing nav item, feedback immediately before it.
+    // SettingsLink stays the trailing nav item, feedback immediately before it.
     const last = kids[kids.length - 1];
-    expect(last.props.label).toBe('Settings');
+    expect(last.type).toBe(SettingsLink);
+    expect(last.props.href).toBe('/todos/settings');
     expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
   });
 

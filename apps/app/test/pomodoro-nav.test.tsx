@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { FeedbackNavItem } from '@life/ui';
+import { FeedbackNavItem, SettingsLink } from '@life/ui';
 
 import { PomodoroNav } from '@/app/pomodoro/pomodoro-nav';
 
@@ -33,9 +33,10 @@ describe('pomodoro toolbar nav', () => {
     expect(feedback).toHaveLength(1);
     expect(feedback[0].props.app).toBe('pomodoro');
 
-    // Stats leads, the gear trails, feedback sits between them.
+    // Stats leads, the bare settings control trails, feedback sits between them.
     expect(kids[0].props.label).toBe('Stats');
-    expect(kids[kids.length - 1].props.label).toBe('Settings');
+    expect(kids[kids.length - 1].type).toBe(SettingsLink);
+    expect(kids[kids.length - 1].props.href).toBe('/pomodoro/settings');
     expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
   });
 });

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { FeedbackNavItem } from '@life/ui';
+import { FeedbackNavItem, SettingsLink } from '@life/ui';
 
 import { MealsNav } from '@/app/meals-nav';
 
@@ -46,7 +46,8 @@ describe('meals toolbar nav', () => {
 
     // Settings stays the trailing nav item, feedback immediately before it.
     const last = kids[kids.length - 1];
-    expect(last.props.label).toBe('Settings');
+    expect(last.type).toBe(SettingsLink);
+    expect(last.props.href).toBe('/meals/settings');
     expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
   });
 });
