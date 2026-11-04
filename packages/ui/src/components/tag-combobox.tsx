@@ -94,10 +94,16 @@ const triggerStyles = cx(
 
 /**
  * The attached chips wrap onto further rows inside the field, one `--s2` apart. They sit above the
- * covering trigger so their own controls stay pressable, and stop short of the chevron's column.
+ * covering trigger so they paint over it, and stop short of the chevron's column.
+ *
+ * `pointer-events-none` takes the row out of hit-testing: painted above the trigger, a chip would
+ * otherwise swallow every press on its body and the field would read dead — no panel, no focus.
+ * Only the chips' own controls opt back in (`[&_button]:pointer-events-auto`), so a remove button
+ * still works and any other press in the field falls through to the real trigger underneath. The
+ * pair is one decision — drop either half and the chip body stops opening the panel again.
  */
 const chipsStyles =
-  'ui-tag-combobox__chips relative z-10 flex flex-wrap items-center gap-[var(--s2)] pr-[var(--s6)]';
+  'ui-tag-combobox__chips pointer-events-none relative z-10 flex flex-wrap items-center gap-[var(--s2)] pr-[var(--s6)] [&_button]:pointer-events-auto';
 
 /**
  * The chevron trails whatever the field holds, in the icon tier. `ml-auto` rather than the

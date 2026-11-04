@@ -200,6 +200,19 @@ describe('TagCombobox', () => {
     expect(chipRow.classList.contains('pr-[var(--s6)]')).toBe(true);
   });
 
+  it('lets a chip-body press through to the trigger and takes it back for the remove control', () => {
+    setup({ selectedIds: [1, 2] });
+
+    // jsdom computes no layout and no hit-testing, so the class pair is all a run can assert here;
+    // the browser does the rest — a press on a chip's body lands on the trigger underneath it.
+    const chipRow = document.querySelector('.ui-tag-combobox__chips')!;
+    expect(chipRow.classList.contains('pointer-events-none')).toBe(true);
+    expect(chipRow.classList.contains('[&_button]:pointer-events-auto')).toBe(true);
+
+    // The chips' own controls opt back in, so a removal still lands on the chip, not the panel.
+    expect(chipRow.contains(screen.getByRole('button', { name: 'Remove home' }))).toBe(true);
+  });
+
   it('keeps every chip and its remove control when the row wraps', () => {
     setup({ selectedIds: [1, 2, 3] });
 
