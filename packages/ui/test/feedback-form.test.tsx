@@ -75,9 +75,9 @@ describe('FeedbackForm', () => {
 
     const segments = within(typeGroup()).getAllByRole('button');
     expect(segments.map((segment) => segment.textContent)).toEqual([
-      'Feature request',
+      'Feature',
       'Enhancement',
-      'Bug report',
+      'Bug',
     ]);
     expect(segments.map((segment) => segment.getAttribute('aria-pressed'))).toEqual([
       'true',
@@ -145,7 +145,7 @@ describe('FeedbackForm', () => {
 
   it('submits the trimmed title and description with the exact app, type and idempotency key, then closes', async () => {
     const { onSubmit, onOpenChange } = renderForm({ app: 'todos' });
-    fireEvent.click(within(typeGroup()).getByRole('button', { name: 'Bug report' }));
+    fireEvent.click(within(typeGroup()).getByRole('button', { name: 'Bug' }));
     fireEvent.change(titleInput(), { target: { value: '  dark mode  ' } });
     fireEvent.change(textarea(), { target: { value: '  dark mode please  ' } });
 
@@ -248,6 +248,18 @@ describe('FeedbackForm', () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(2);
     expect(onSubmit.mock.calls[1][0].id).not.toBe(onSubmit.mock.calls[0][0].id);
+  });
+
+  it('separates its blocks with the dialog body gap alone, keeping --s2 inside a field', () => {
+    renderForm();
+
+    const fields = Array.from(document.querySelectorAll<HTMLElement>('.ui-field'));
+    expect(fields).toHaveLength(2);
+    for (const field of fields) {
+      // `Dialog`'s body already steps `--s4` between children; a field margin would double it.
+      expect(field.className).not.toMatch(/(^|\s)mt-/);
+      expect(field.className).toContain('gap-[var(--s2)]');
+    }
   });
 
   it('accepts overridden copy without changing the frozen defaults', () => {

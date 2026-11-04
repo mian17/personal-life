@@ -34,8 +34,11 @@ export interface FeedbackFormProps {
 
 const DEFAULT_DESCRIPTION = 'One thing. It goes to the inbox, not to a ticket queue.';
 
-/** §8's `.field`: a block, one `--s4` step below the field before it, label over control. */
-const fieldStyles = 'ui-field flex flex-col gap-[var(--s2)] mt-[var(--s4)]';
+/**
+ * §8's `.field`: label over control, one `--s2` apart. The `--s4` between blocks comes from
+ * `Dialog`'s body gap alone; a margin here would double it.
+ */
+const fieldStyles = 'ui-field flex flex-col gap-[var(--s2)]';
 
 /**
  * §8's `.field__label`: 13px, 650, `0.06em`, upper case, second ink tier. Both class hooks stay
@@ -51,6 +54,8 @@ const labelStyles = cx(
 /**
  * §8's `.seg`: the trough spreads its three controls edge to edge, each holding an equal share.
  * The trough keeps `segTroughBaseStyles`'s inline-flex; `w-full` alone fills the sheet's width.
+ * The buttons carry `whitespace-nowrap` and `--s4` side padding, so their min-content width is
+ * label plus 32px — the sheet renders `shortLabel` to keep that floor under the third of 343px.
  */
 const typeTroughStyles = cx('ui-seg', 'ui-seg--kind', 'w-full', '[&>*]:flex-1');
 
@@ -175,7 +180,7 @@ export function FeedbackForm({
                 pressed ? segActiveStyles : 'bg-transparent',
               )}
             >
-              {feedbackType.label}
+              {feedbackType.shortLabel}
             </button>
           );
         })}
