@@ -80,8 +80,7 @@ describe('/notes/settings', () => {
 
     expect(html).toContain('Reduce motion');
     expect(html).toContain('Follows the system setting.');
-    expect(html).toContain('Larger text');
-    expect(html).toContain('Follows Dynamic Type.');
+    expect(html).not.toContain('Larger text');
     expect(html).not.toContain('role="switch"');
   });
 

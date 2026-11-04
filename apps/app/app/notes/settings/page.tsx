@@ -22,11 +22,6 @@ export default async function NotesSettingsPage() {
           description="Follows the system setting. Turn it on in iOS Settings › Accessibility."
           control={<Pill>System</Pill>}
         />
-        <SettingsRow
-          label="Larger text"
-          description="Follows Dynamic Type."
-          control={<Pill>System</Pill>}
-        />
       </SettingsBlock>
 
       <SettingsBlock title="Notes">
