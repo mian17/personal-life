@@ -62,8 +62,15 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * matrix lens has always drawn: the pre-redesign row set `--checkbox-size` to `0.75rem` here, and
  * `--s3` is that value at the frozen 16px root. The default todo row keeps the control's own
  * mark.
+ *
+ * The end inset is one step tighter than the start (`pe-[var(--s2)]`): the pre-redesign dense row
+ * ran `0.4rem` at the end against `0.9rem` at the start, and the matrix row has no trailing
+ * control for that end inset to clear. The start inset stays `--s3`, the step that matches
+ * `0.9rem` within the token scale; the mark's own box lands a quarter of the 48px target past
+ * that inset, which is what keeps the target unclipped against the row's `overflow-hidden` edge.
  */
-const denseRowStyles = 'min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)] [--checkbox-size:var(--s3)]';
+const denseRowStyles =
+  'min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
@@ -93,8 +100,11 @@ const linkRowStyles = cx(linkSharedStyles, 'items-center gap-[var(--s2)]');
 /** Nested and feedback rows stack: the title line above the child body. */
 const linkColumnStyles = cx(linkSharedStyles, 'flex-col items-stretch gap-[var(--s2)]');
 
-/** A dense row packs its line tighter than a full row. */
-const linkDenseStyles = cx(linkSharedStyles, 'items-center gap-[var(--s1)]');
+/**
+ * A dense row packs its line tighter than a full row. The mark-to-title gap is the pre-redesign
+ * `0.5rem` (`--s2`), not the tighter `--s1` the redesigned row shrank it to.
+ */
+const linkDenseStyles = cx(linkSharedStyles, 'items-center gap-[var(--s2)]');
 
 /** Title above, meta line below, one spacing step apart. */
 const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';
@@ -255,7 +265,12 @@ function rowHookClassesFor({
 /** A collapsing row animates to nothing while the consumer hides it. */
 const collapsingRowStyles = 'h-0 min-h-0 opacity-0 overflow-hidden';
 
-/** The row's utility classes: surface, box, alignment, slots, and state treatment. */
+/**
+ * The row's utility classes: surface, box, alignment, slots, and state treatment. A dense row
+ * top-aligns its slots so its leading mark rides the title's first line: the 48px target centres
+ * its 12px mark on itself, and a centred target cannot lift that mark above the row's top edge
+ * without bleeding past the row's `overflow-hidden` clip, so the top edge is the mark's ceiling.
+ */
 function rowStyleClassesFor({
   isDense,
   isColumn,
@@ -267,7 +282,7 @@ function rowStyleClassesFor({
   return cx(
     rowSurfaceStyles,
     isDense ? denseRowStyles : rowBoxStyles,
-    isColumn ? 'items-start' : 'items-center',
+    isColumn || isDense ? 'items-start' : 'items-center',
     hasSlot && rowSlotStyles,
     done && doneRowStyles,
     tone && !done && toneStyles[tone],
