@@ -809,14 +809,11 @@ describe('TodoEditor custom repeat', () => {
 describe('TodoEditor screen shape', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('renders the due-date state strip with the editor', () => {
+  it('no longer renders a due-date strip above the fields', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree(todo({ dueDate: '2026-10-02' }));
-      const strip = findByType(tree.props.children, DueDatePill);
-      expect(strip).toBeDefined();
-      expect(strip!.props.dueDate).toBe('2026-10-02');
-      expect(strip!.props.emptyLabel).toBe('No date');
+      expect(findByType(tree.props.children, DueDatePill)).toBeUndefined();
     } finally {
       harness.restore();
     }

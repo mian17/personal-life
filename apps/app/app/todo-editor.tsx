@@ -12,7 +12,6 @@ import {
 } from '@life/shared';
 import {
   Button,
-  DueDatePill,
   EditorChrome,
   Field,
   IconButton,
@@ -202,8 +201,6 @@ export function TodoEditor({
         label: 'Tags',
       }}
     >
-      <DueDatePill dueDate={joinDue(dueDate, dueTime)} emptyLabel="No date" />
-
       <Field label="Title">
         <Input
           type="text"
