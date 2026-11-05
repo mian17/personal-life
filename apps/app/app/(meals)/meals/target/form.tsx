@@ -29,8 +29,8 @@ import { saveProfileAction } from './actions';
  * client send computed kcal" — `forbidNonWhitelisted` rejects such a body).
  *
  * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `PageShell`,
- * the header is the reference's sub-view row (`SubNav` back to settings, the
- * screen's name trailing) over `PageTitle` and its server-computed sub-line, each
+ * the header is the reference's sub-view row (`SubNav` back to settings) over
+ * `PageTitle` and its server-computed sub-line, each
  * field is a `SettingsRow` (visible label left, control right) hosting an
  * `Input`/`Select`, feedback is `StatusText`, and the one commit affordance is
  * the footer's primary submit `Button`. The derived-energy card and the `Profile`
@@ -125,7 +125,7 @@ export function TargetProfileForm({
 
   return (
     <PageShell>
-      <SubNav backHref="/meals/settings" backLabel="Meals" status="Daily target" />
+      <SubNav backHref="/meals/settings" backLabel="Meals" />
 
       <PageTitle sub="Computed on the server from these six values. Nothing here is guessed in the browser.">
         Daily target

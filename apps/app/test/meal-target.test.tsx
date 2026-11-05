@@ -164,7 +164,8 @@ describe('target profile form composition', () => {
       expect(back).toBeDefined();
       expect(back!.props.backHref).toBe('/meals/settings');
       expect(back!.props.backLabel).toBe('Meals');
-      expect(back!.props.status).toBe('Daily target');
+      // The row ends at the back link: the heading already says `Daily target`.
+      expect('status' in back!.props).toBe(false);
 
       // Exactly one commit affordance: the footer's submit button.
       const submits = find(tree, Button, (el) => el.props.type === 'submit');
@@ -180,6 +181,7 @@ describe('target profile form composition', () => {
 
       const html = renderToStaticMarkup(tree);
       expect(html).toContain('ui-sub-nav');
+      expect(html).not.toContain('ui-sub-nav__status');
       expect(html).toContain('>Daily target</h1>');
       expect(html).toContain('ui-page-title__sub');
     } finally {
