@@ -78,7 +78,11 @@ describe('Tags batch API (e2e)', () => {
     });
 
     it('does not answer on a slashed path, which would be the parameter route', async () => {
-      await postAs(token, '/api/tags/batchCreate', { items: [{ name: 'nope' }] }).expect(404);
+      const response = await postAs(token, '/api/tags/batchCreate', {
+        items: [{ name: 'nope' }],
+      }).expect(404);
+
+      expect(response.body).toEqual(routedNowhere('POST', '/api/tags/batchCreate'));
     });
 
     it('rejects eleven items with 400 and creates none of them', async () => {
@@ -182,7 +186,14 @@ describe('Tags batch API (e2e)', () => {
     });
 
     it('rejects a non-integer id with 400', async () => {
-      await post('/api/tags:batchUpdate', { items: [{ id: 'abc', name: 'text id' }] }).expect(400);
+      const response = await post('/api/tags:batchUpdate', {
+        items: [{ id: 'abc', name: 'text id' }],
+      }).expect(400);
+
+      // `BatchUpdateTagItem.id` is decorated `@IsInt`, so the batch rejects the id
+      // through the DTO at the index it sits at, even though the route itself is a
+      // POST with no `:id` parameter.
+      expect(response.body.message).toEqual(['items.0.id must be an integer number']);
     });
   });
 
@@ -196,7 +207,9 @@ describe('Tags batch API (e2e)', () => {
     });
 
     it('has no batchDelete route for tags', async () => {
-      await post('/api/tags:batchDelete', { items: [] }).expect(404);
+      const response = await post('/api/tags:batchDelete', { items: [] }).expect(404);
+
+      expect(response.body).toEqual(routedNowhere('POST', '/api/tags:batchDelete'));
     });
 
     it('still creates and renames a single tag', async () => {
@@ -221,6 +234,16 @@ describe('Tags batch API (e2e)', () => {
       expect(currentGeneration()).toBe(generationBefore);
     });
   });
+
+  /**
+   * What Nest answers for a request that matched no route at all. An absent path
+   * answers exactly this body, so a 404 carrying a domain message (a batch route
+   * that did resolve and then failed on its items) can never pass for an absent
+   * route.
+   */
+  function routedNowhere(verb: string, path: string) {
+    return { statusCode: 404, message: `Cannot ${verb} ${path}`, error: 'Not Found' };
+  }
 
   function post(path: string, body: unknown): request.Test {
     return postAs(token, path, body);

@@ -101,7 +101,11 @@ describe('Todos and lists batch API (e2e)', () => {
     });
 
     it('does not answer on a slashed path, which would be the parameter route', async () => {
-      await apiPost('/api/todos/batchCreate', { items: [{ title: 'nope' }] }).expect(404);
+      const response = await apiPost('/api/todos/batchCreate', {
+        items: [{ title: 'nope' }],
+      }).expect(404);
+
+      expect(response.body).toEqual(routedNowhere('POST', '/api/todos/batchCreate'));
     });
 
     it('rejects eleven items with 400 and leaves the list untouched', async () => {
@@ -264,7 +268,11 @@ describe('Todos and lists batch API (e2e)', () => {
     });
 
     it('has no :batchDelete route for lists', async () => {
-      await apiPost('/api/lists:batchDelete', { items: [{ id: MISSING_ID }] }).expect(404);
+      const response = await apiPost('/api/lists:batchDelete', {
+        items: [{ id: MISSING_ID }],
+      }).expect(404);
+
+      expect(response.body).toEqual(routedNowhere('POST', '/api/lists:batchDelete'));
     });
   });
 
@@ -279,9 +287,13 @@ describe('Todos and lists batch API (e2e)', () => {
     });
 
     it('leaves GET /api/todos/tags, /trash and /completions answerable', async () => {
-      await apiGet('/api/todos/tags').expect(200);
-      await apiGet('/api/todos/trash').expect(200);
-      await apiGet('/api/todos/completions').expect(200);
+      const tagUsage = await apiGet('/api/todos/tags').expect(200);
+      const trash = await apiGet('/api/todos/trash').expect(200);
+      const completions = await apiGet('/api/todos/completions').expect(200);
+
+      expect(tagUsage.body).toEqual(expect.any(Array));
+      expect(trash.body.todos).toEqual(expect.any(Array));
+      expect(completions.body.completions).toEqual(expect.any(Array));
     });
   });
 
@@ -326,6 +338,16 @@ describe('Todos and lists batch API (e2e)', () => {
       expect(redis.sets).toHaveLength(before);
     });
   });
+
+  /**
+   * What Nest answers for a request that matched no route at all. An absent path
+   * answers exactly this body, so a 404 carrying a domain message (a batch route
+   * that did resolve and then failed on its items) can never pass for an absent
+   * route.
+   */
+  function routedNowhere(verb: string, path: string) {
+    return { statusCode: 404, message: `Cannot ${verb} ${path}`, error: 'Not Found' };
+  }
 
   function apiGet(path: string): request.Test {
     return authGet(token, path);

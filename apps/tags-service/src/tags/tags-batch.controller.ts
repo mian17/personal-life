@@ -17,13 +17,13 @@ import { TagsService } from './tags.service';
 export class TagsBatchController {
   constructor(private readonly tags: TagsService) {}
 
-  @Post('api/tags\\:batchCreate')
+  @Post(String.raw`api/tags\:batchCreate`)
   @HttpCode(201)
   createMany(@Principal() principal: Principal, @Body() dto: BatchCreateTagsDto) {
     return this.tags.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/tags\\:batchUpdate')
+  @Post(String.raw`api/tags\:batchUpdate`)
   @HttpCode(200)
   updateMany(@Principal() principal: Principal, @Body() dto: BatchUpdateTagsDto) {
     return this.tags.renameMany(principal.sub, dto.items);

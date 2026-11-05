@@ -1,5 +1,5 @@
 /**
- * Submission order, as a sequential loop rather than `Promise.all`
+ * Submission order, one item at a time rather than `Promise.all`
  * (`SPEC-batch-receiver.md` §5.2).
  *
  * Sequential is the contract, not an implementation detail: a per-item
