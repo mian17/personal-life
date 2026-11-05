@@ -156,6 +156,8 @@ const SPACE_TOKENS = {
   '--tap': '48px',
   '--row-min-height': '56px',
   '--checkbox-size': '24px',
+  /* §6's corner for the mark, an alias of `--r-sm` so a row can narrow it with the size. */
+  '--checkbox-radius': 'var(--r-sm)',
   '--fab-size': '56px',
 } as const;
 

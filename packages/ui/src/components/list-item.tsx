@@ -107,7 +107,7 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  *
  * Because the target is pinned out of flow over the row's start, its press wash (`--press`, a
  * 48px square reaching 52px from the row edge) covers the first third of a title that starts at
- * 28px, and its `transition-colors`
+ * 28px, and its `motion-safe:transition-colors`
  * keeps that square painted for a moment past the release, while the row's own wash snaps back.
  * Read as one gesture, a square appears over the title and then fades off it. The row is already
  * the press target (`rowSurfaceStyles`) and covers the whole row, so the wash survives without
