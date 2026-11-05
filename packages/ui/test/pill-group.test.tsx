@@ -31,7 +31,7 @@ describe('PillGroup', () => {
     expect(group.classList.contains('flex-wrap')).toBe(true);
     expect(group.classList.contains('items-center')).toBe(true);
     expect(group.classList.contains('border-t')).toBe(true);
-    expect(group.classList.contains('border-border')).toBe(true);
+    expect(group.classList.contains('border-line')).toBe(true);
   });
 
   it('forwards role and aria-label verbatim (the saved-tags group contract)', () => {

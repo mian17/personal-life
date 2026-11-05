@@ -9,10 +9,10 @@ import {
 const tokensCss = readFileSync(join(__dirname, '..', 'src', 'styles', 'tokens.css'), 'utf8');
 
 const EXPECTED = [
-  { value: 'open', label: 'Open', token: '--accent' },
-  { value: 'in_progress', label: 'In Progress', token: '--amber' },
-  { value: 'done', label: 'Done', token: '--green' },
-  { value: 'wont_do', label: "Won't Do", token: '--muted' },
+  { value: 'open', label: 'Open', token: '--ink-2' },
+  { value: 'in_progress', label: 'In Progress', token: '--warn' },
+  { value: 'done', label: 'Done', token: '--ok' },
+  { value: 'wont_do', label: "Won't Do", token: '--ink-3' },
 ] as const;
 
 describe('feedback status vocabulary', () => {

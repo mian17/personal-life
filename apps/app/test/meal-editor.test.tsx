@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Autosuggest, Button, Dialog, EmptyState, FilePicker, IconButton, Input, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
+import { Autosuggest, Button, Dialog, EmptyState, Facts, FactsRow, FilePicker, IconButton, Input, Kpi, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -63,7 +63,12 @@ function entry(overrides: Partial<MealEntry> = {}): MealEntry {
 }
 
 interface EditorTree extends ReactElement {
-  props: { children: ReactNode; banner?: ReactNode; actions?: ReactNode };
+  props: {
+    children: ReactNode;
+    banner?: ReactNode;
+    actions?: ReactNode;
+    back: { label: string; variant?: string };
+  };
 }
 
 /**
@@ -229,14 +234,14 @@ function findAll(node: unknown, type: unknown): ReactElement<Record<string, unkn
 }
 
 /**
- * The run total's `StatusText` — located by its `<number> kcal` content, not by
- * tree position, so the `Items` hint (also a `StatusText`, under `Items` before
- * the total) never gets mistaken for it.
+ * The meal's run total, read off the one `Kpi` the total card draws: the eaten
+ * figure and its unit as two slots. It is found by its atom, so the `Items` hint
+ * (`StatusText`, in the section that follows it) is never mistaken for it.
  */
-function runTotal(tree: EditorTree): ReactElement<Record<string, unknown>> {
-  const found = find(tree, StatusText, (el) => /kcal$/.test(text(el)));
+function runTotal(tree: EditorTree): string {
+  const found = find(tree, Kpi);
   if (!found) throw new Error('no run total rendered');
-  return found;
+  return `${text(found.props.value)} ${text(found.props.unit)}`;
 }
 
 /** Concatenate every string in a rendered node subtree. */
@@ -289,7 +294,7 @@ describe('MealEditor photo door', () => {
       expect(field(seeded, 'Food for item 1').props.value).toBe('Omelette');
       expect(field(seeded, 'Calories for Omelette').props.value).toBe('250');
       const total = runTotal(seeded);
-      expect(text(total)).toBe(format('calories', 250));
+      expect(total).toBe(format('calories', 250));
     } finally {
       harness.restore();
     }
@@ -553,7 +558,7 @@ describe('MealEditor manual door — search-first multi-add', () => {
       expect(field(two, 'Food for item 1').props.value).toBe('Oatmeal');
       expect(field(two, 'Food for item 2').props.value).toBe('Chicken');
       // The run total sums both confirmed picks.
-      expect(text(runTotal(two))).toBe(format('calories', 554));
+      expect(runTotal(two)).toBe(format('calories', 554));
     } finally {
       harness.restore();
     }
@@ -579,7 +584,7 @@ describe('MealEditor unknown affordance', () => {
       // Nothing is confirmed, so nothing was invented: the per-item field is
       // empty (em dash) and the run total is a true zero — the same figure the
       // day view renders for an entry set with no confirmed calories.
-      expect(text(runTotal(tree))).toBe(format('calories', 0));
+      expect(runTotal(tree)).toBe(format('calories', 0));
 
       const html = renderToStaticMarkup(tree);
       expect(html).toContain(`placeholder="${UNKNOWN}"`);
@@ -588,6 +593,24 @@ describe('MealEditor unknown affordance', () => {
       expect(
         find(tree, Button, (el) => text(el.props.children).includes('Save as meal'))!.props.disabled,
       ).toBe(true);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('MealEditor toolbar', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('frames the toolbar as a set: the back control and the save share one face', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      expect(tree.props.back).toEqual({ label: 'Back', variant: 'framed', onBack: expect.any(Function) });
+
+      const save = button(tree, (el) => el.props.label === 'Save meal');
+      expect(save.props.variant).toBe('framed');
     } finally {
       harness.restore();
     }
@@ -930,7 +953,7 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       const dialogs = findAll(tree, Dialog);
       expect(dialogs).toHaveLength(1);
       expect(dialogs[0].props.title).toBe('All nutrients');
-      expect(dialogs[0].props.size).toBe('full');
+      expect(dialogs[0].props.size).toBe('sheet');
       expect(dialogs[0].props.open).toBe(false);
       // A closed dialog portals nothing, so its sheet class is asserted by
       // `packages/ui/test/dialog.test.tsx`, where the panel is actually mounted.
@@ -1149,6 +1172,64 @@ describe('restored entry display name', () => {
       ...overrides,
     };
   }
+
+  /** The meal card's macro totals as `[label, value]` pairs — the reference's one table. */
+  function mealFacts(tree: EditorTree): string[][] {
+    const facts = findAll(tree, Facts)[0];
+    return findAll(facts, FactsRow).map((row) => [text(row.props.label), text(row.props.value)]);
+  }
+
+  it('reads a restored meal’s macro totals in the meal card', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(
+        entry({ nutrients: vector({ calories: 300, protein: 12, carbohydrates: 40, fat: 9 }) }),
+      );
+
+      expect(mealFacts(tree)).toEqual([
+        ['Protein', '12 g'],
+        ['Carbs', '40 g'],
+        ['Fat', '9 g'],
+      ]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('reads a meal’s unconfirmed macro totals as the unknown em dash', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      expect(mealFacts(tree).map(([, value]) => value)).toEqual([UNKNOWN, UNKNOWN, UNKNOWN]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('sums a macro across items and keeps a key any item lacks an em dash', () => {
+    const harness = stateHarness();
+    try {
+      const first = harness.renderTree();
+      (field(first, 'Protein for item 1').props.onChange as (e: unknown) => void)({
+        target: { value: '10' },
+      });
+      const oneConfirmed = harness.renderTree();
+      (button(oneConfirmed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
+      const twoRows = harness.renderTree();
+      (field(twoRows, 'Protein for item 2').props.onChange as (e: unknown) => void)({
+        target: { value: '5' },
+      });
+
+      expect(mealFacts(harness.renderTree())).toEqual([
+        ['Protein', '15 g'],
+        ['Carbs', UNKNOWN],
+        ['Fat', UNKNOWN],
+      ]);
+    } finally {
+      harness.restore();
+    }
+  });
 
   it('renders the catalog food name for a restored entry whose foodId is a catalog id', () => {
     const harness = stateHarness();

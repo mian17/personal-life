@@ -1,5 +1,17 @@
 import { format, sum } from '@life/nutrition';
-import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
+import {
+  Button,
+  Card,
+  IconLink,
+  List,
+  ListItem,
+  NavBar,
+  PageActions,
+  PageShell,
+  PageTitle,
+  Pill,
+  Section,
+} from '@life/ui';
 import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
@@ -47,16 +59,17 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
               // stored; null means the item was saved without a catalog food,
               // so the meal name labels it.
               title={item.foodId ? restoredFoodName(item.foodId, catalog) : meal.name}
-              meta={`× ${item.quantity} · ${format('calories', item.nutrients.calories)}`}
+              meta={`× ${item.quantity}`}
+              trailing={<Pill>{format('calories', item.nutrients.calories)}</Pill>}
             />
           ))}
         </List>
       </Section>
-      <Section>
+      <PageActions>
         <form action={relogMealAction.bind(null, meal.id)}>
           <Button type="submit">Log this meal again</Button>
         </form>
-      </Section>
+      </PageActions>
     </PageShell>
   );
 }

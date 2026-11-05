@@ -38,6 +38,16 @@ export interface TodoGroup {
   todos: Todo[];
 }
 
+/**
+ * The `<N> open · <M> done` sub-line of §8's `.phead`, from the row sets a view owns: every
+ * rendered row counts as open, every completed row the view knows about counts as done.
+ * `/todos/matrix` passes its quadrant rows, so the line follows the grid rather than the grouped
+ * list and the two views cannot drift apart. Zero rows still read `0 open · 0 done`.
+ */
+export function describeTodoCounts(open: readonly Todo[], done: readonly Todo[]): string {
+  return `${open.length} open · ${done.length} done`;
+}
+
 export function groupTodos(
   todos: readonly Todo[],
   today: string,

@@ -1,13 +1,9 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from '@life/nutrition';
-import { EditorChrome, IconButton, Input, Select, SettingsRow, StatusText } from '@life/ui';
+import { Button, Input, ManagerBlock, Select, SettingsBlock, SettingsRow, StatusText } from '@life/ui';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
-
-// The form's editor chrome reads the router on render (Back via `router.back()`),
-// so the hook must resolve off the raw module the compiled client component reads.
-jest.mock('next/navigation', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 
@@ -65,7 +61,7 @@ function stateHarness() {
   const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
 
-  function renderTree(initial: MealTarget | null = null): Tree {
+  function renderTree(initial: MealTarget | null = null, summary: string | null = null): Tree {
     let index = 0;
     spy.mockImplementation(((value: unknown) => {
       const i = index++;
@@ -77,7 +73,7 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    return TargetProfileForm({ initial }) as unknown as Tree;
+    return TargetProfileForm({ initial, summary }) as unknown as Tree;
   }
 
   return { renderTree, restore: () => spy.mockRestore() };
@@ -152,32 +148,107 @@ describe('target profile form composition', () => {
       const html = renderToStaticMarkup(tree);
       expect(html).toContain('ui-input');
       expect(html).toContain('ui-select');
-      // The toolbar save is an IconButton now — no bare submit button remains.
-      expect(html).toContain('ui-icon-btn');
       expect(html).not.toContain('Set target');
     } finally {
       harness.restore();
     }
   });
 
-  it('frames the fields in the editor chrome: one back control and one save', () => {
+  it('opens with the shared manager header and closes with the one commit button', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
 
-      const chrome = find(tree, EditorChrome);
-      expect(chrome).toBeDefined();
-      // Back is the chrome's own control, not an in-body link.
-      expect((chrome!.props.back as { label: string }).label).toBe('Back');
+      // Back is the manager header's framed arrow to a literal route, not history, so a
+      // cold load still lands on settings. The label stays the shared `Back`.
+      const header = find(tree, ManagerBlock);
+      expect(header).toBeDefined();
+      expect(header!.props.title).toBe('Daily target');
+      expect(header!.props.backHref).toBe('/meals/settings');
+      expect('backLabel' in header!.props).toBe(false);
 
-      // Exactly one save trigger: the IconButton in `actions`, body provides none.
-      const save = find(chrome!.props.actions, IconButton);
-      expect(save).toBeDefined();
-      expect(save!.props.label).toBe('Save');
-      expect(find(tree, 'button', (el) => el.props.type === 'submit')).toBeUndefined();
+      // Exactly one commit affordance: the footer's submit button.
+      const submits = find(tree, Button, (el) => el.props.type === 'submit');
+      expect(submits).toBeDefined();
+      expect(text(submits)).toBe('Update profile');
+      expect(find(tree, Button, (el) => el.props.type !== 'submit')).toBeUndefined();
+      expect(find(tree, 'button', (el) => el.props.type === 'button')).toBeUndefined();
+
+      // The heading keeps its `<h1>` semantics and gains the server-computed sub-line.
+      expect(text(header!.props.sub)).toContain('Computed on the server');
 
       const html = renderToStaticMarkup(tree);
-      expect(html).toContain('Daily target');
+      expect(html).toContain('ui-icon-link--framed');
+      expect(html).toContain('aria-label="Back"');
+      expect(html).toContain('href="/meals/settings"');
+      expect(html).toContain('>Daily target</h1>');
+      expect(html).toContain('ui-page-title__sub');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('disables the commit button until the numbers parse', () => {
+    const harness = stateHarness();
+    try {
+      const empty = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(empty!.props.disabled).toBe(true);
+
+      const first = harness.renderTree();
+      type(first, 'Age', '30');
+      const second = harness.renderTree();
+      type(second, 'Height (cm)', '175');
+      const third = harness.renderTree();
+      type(third, 'Weight (kg)', '70');
+
+      // All three parsed: the button is live.
+      const ready = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(ready!.props.disabled).toBe(false);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('disables the commit button while a save is in flight and re-enables it on failure', async () => {
+    mockedGetToday.mockResolvedValue('2026-10-03');
+    // The PUT hangs until the test rejects it, so the in-flight state is observable.
+    let started = false;
+    let rejectSave: (error: Error) => void = () => {};
+    mockedPutMealProfile.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          started = true;
+          rejectSave = reject;
+        }),
+    );
+    const harness = stateHarness();
+    try {
+      for (const [label, value] of [
+        ['Age', '30'],
+        ['Height (cm)', '175'],
+        ['Weight (kg)', '70'],
+      ] as const) {
+        type(harness.renderTree(), label, value);
+      }
+
+      const form = find(harness.renderTree(), 'form');
+      if (!form) throw new Error('no form');
+      const pending = (form.props.onSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: jest.fn(),
+      });
+      while (!started) await Promise.resolve();
+
+      const inFlight = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(inFlight!.props.disabled).toBe(true);
+
+      rejectSave(new Error('boom'));
+      await pending;
+
+      const failed = harness.renderTree();
+      expect(find(failed, Button, (el) => el.props.type === 'submit')!.props.disabled).toBe(false);
+      expect(
+        text(find(failed, StatusText, (el) => text(el).includes('Could not save the profile'))),
+      ).toBe('Could not save the profile. Try again.');
     } finally {
       harness.restore();
     }
@@ -195,6 +266,48 @@ describe('target profile form composition', () => {
         expect(row).toBeDefined();
         expect(field(tree, label)).toBeDefined();
       }
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('sets both row groups on the shared surface card, with the feedback outside it', async () => {
+    const harness = stateHarness();
+    try {
+      // A blank numeric field fails before the service, so the error copy is reachable
+      // in the same tree as the rows.
+      const tree = harness.renderTree();
+      const form = find(tree, 'form');
+      if (!form) throw new Error('no form');
+      await (form.props.onSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: jest.fn(),
+      });
+
+      const failed = harness.renderTree();
+      const firstRun = find(failed, SettingsBlock, (el) => el.props.title === 'Set your target');
+      expect(firstRun).toBeDefined();
+      const firstRunHtml = renderToStaticMarkup(firstRun!);
+      // Six fields, one card: the surface, the hairline and the row insets belong to
+      // the block, and the heading keeps its `<h2>` group label.
+      expect(firstRunHtml).toContain('ui-settings-block__rows');
+      expect(firstRunHtml).toContain('ui-card--flush');
+      expect(firstRunHtml.match(/ui-settings-row(?![_-])/g)).toHaveLength(6);
+      expect(firstRunHtml).toContain('>Set your target</h2>');
+      // The feedback is not a row of the card: it renders after the block.
+      expect(firstRunHtml).not.toContain('Enter your age');
+      expect(renderToStaticMarkup(failed)).toContain('Enter your age');
+
+      const stored = harness.renderTree(target(), '2,400 kcal');
+      const edit = find(stored, SettingsBlock, (el) => el.props.title === 'Update your profile');
+      expect(edit).toBeDefined();
+      const editHtml = renderToStaticMarkup(edit!);
+      expect(editHtml).toContain('ui-card--flush');
+      expect(editHtml.match(/ui-settings-row(?![_-])/g)).toHaveLength(6);
+
+      // The read-only half sits on the same surface.
+      const profile = find(stored, SettingsBlock, (el) => el.props.title === 'Profile');
+      expect(profile).toBeDefined();
+      expect(renderToStaticMarkup(profile!)).toContain('ui-card--flush');
     } finally {
       harness.restore();
     }
@@ -324,8 +437,19 @@ describe('target page', () => {
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-03');
     // The page is the form itself: no app shell (PageShell/Card/NavBar) wraps it.
     expect(el.type).toBe(TargetProfileForm);
-    expect(html).toContain(format('calories', 2400));
+    // The derived-energy card is the headline: `Kpi`'s value slot carries the
+    // grouped figure (the shared formatter does not group) and the unit the word,
+    // then the three macro totals as `Facts` rows.
+    expect(html).toMatch(/ui-kpi__value[^>]*>2,400</);
+    expect(html).toContain('>kcal<');
+    // §8's `.row__meta` names the read-out: the reference's `Derived energy` line.
+    expect(html).toMatch(/ui-kpi__label[^>]*>Derived energy</);
     expect(html).toContain(format('protein', 112));
+    expect(html).toContain(format('carbohydrates', 345));
+    // The stored profile reads back as pill rows above the fields.
+    expect(html).toContain('30 years');
+    expect(html).toContain('Moderate');
+    expect(html).toContain('Maintain');
     expect(html).not.toContain('No target set yet');
     // The stored profile opens the form as an edit, not as an empty onboarding form.
     expect(html).toContain('aria-label="Age"');
@@ -339,13 +463,14 @@ describe('target page', () => {
     const el = await TargetPage();
     const html = renderToStaticMarkup(el);
 
-    // The page is an editor screen now (lesson 0014: the chrome is the shell) —
-    // assert the rendered markup, not the element tree: `el` is the form element
-    // and `find` only walks element props, not the function it points at.
-    expect(html).toContain('ui-editor-toolbar');
-    expect(html).toContain('aria-label="Back"');
+    // The page is the form itself (the shell lives inside it) — assert the rendered
+    // markup, not the element tree: `el` is the form element and `find` only walks
+    // element props, not the function it points at.
+    expect(html).toContain('ui-icon-link--framed');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('>Daily target</h1>');
-    expect(html).toContain('aria-label="Save"');
+    expect(html).toContain('>Update profile</button>');
+    expect(html).not.toContain('ui-editor-toolbar');
     expect(html).toContain('No target set yet');
     expect(html).toContain('Set your target');
   });

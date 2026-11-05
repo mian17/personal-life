@@ -1,17 +1,26 @@
-import { ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle } from '@life/ui';
+import { Pill, SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
+import { submitFeedbackAction } from '../../../feedback-actions';
 
 /**
- * Meals settings — the shared settings idiom, mirroring `/notes/settings`: a
- * `ManagerBlock` (back to the app root) with the single Appearance block that
- * owns the theme preference. Meals has no app-specific settings yet, so this
- * page stays minimal.
+ * Meals settings renders the shared settings shape — `SettingsShell` owns the Appearance,
+ * Comfort and Support groups plus the closing prototype line — and adds the one group the app
+ * owns: the destinations that used to ride the day view's toolbar as icons. The target row is
+ * the same route as the toolbar's Daily target control, which is the app's one target screen.
+ * Feedback is the shell's Support row, so it is not repeated here.
  */
 export default function MealsSettingsPage() {
   return (
-    <ManagerBlock title="Settings" backHref="/meals">
-      <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle />} />
+    <SettingsShell
+      title="Settings"
+      backHref="/meals"
+      app="meals"
+      onSubmit={submitFeedbackAction}
+    >
+      <SettingsBlock title="Meals">
+        <SettingsRow label="Daily target" href="/meals/target" control={<Pill>Edit</Pill>} />
+        <SettingsRow label="Saved meals" href="/meals/saved" />
+        <SettingsRow label="Foods" href="/meals/foods" />
       </SettingsBlock>
-    </ManagerBlock>
+    </SettingsShell>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FabMenu, Pill } from '@life/ui';
+import { ButtonLink, FabMenu } from '@life/ui';
 import { Plus } from 'lucide-react';
 
 /**
@@ -10,7 +10,8 @@ import { Plus } from 'lucide-react';
  * state, so the one bit of state lives in this client island — the day view
  * itself stays a server component. The plus icon is the "add a meal" affordance
  * (a camera read as "photo only"); the option names are the frozen e2e strings
- * (`PHOTO_DOOR` / `FOOD_DOOR`), so they stay verbatim.
+ * (`PHOTO_DOOR` / `FOOD_DOOR`), so they stay verbatim. Each option is the outlined
+ * secondary control, so it takes the button radius inside the panel's own `--r-lg`.
  */
 export function MealDoors() {
   const [open, setOpen] = useState(false);
@@ -22,12 +23,12 @@ export function MealDoors() {
       open={open}
       onOpenChange={setOpen}
     >
-      <Pill as="a" href="/meals/entry/new?door=photo" role="menuitem" size="filter">
+      <ButtonLink variant="ghost" href="/meals/entry/new?door=photo" role="menuitem">
         Log meal from photo
-      </Pill>
-      <Pill as="a" href="/meals/entry/new?door=food" role="menuitem" size="filter">
+      </ButtonLink>
+      <ButtonLink variant="ghost" href="/meals/entry/new?door=food" role="menuitem">
         Log food
-      </Pill>
+      </ButtonLink>
     </FabMenu>
   );
 }

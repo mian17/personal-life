@@ -1,27 +1,29 @@
 // React 19 types dropped the global `JSX` namespace; it is exported by `react`.
 import type { JSX, ReactNode } from 'react';
 import { EditorScreen } from './editor-screen';
-import { EditorToolbar } from './editor-toolbar';
+import { EditorToolbar, type EditorToolbarBack } from './editor-toolbar';
 import { EditorStack } from './editor-stack';
-import { TagPicker, type TagOption } from './tag-picker';
+import { TagCombobox, type TagOption } from './tag-combobox';
 import type { StackGap } from './stack';
 
 export interface EditorChromeTagPicker {
-  /** Available tags (id + display name) — `TagPicker`'s data shape. */
+  /** Available tags (id + display name) — `TagCombobox`'s data shape. */
   tags: readonly TagOption[];
   /** Currently attached ids. */
   selectedIds: readonly number[];
   /** Attach/detach callback; the app owns the state. */
   onToggle: (id: number) => void;
-  /** Picker label, e.g. "Attached tags" / "Tags". */
+  /** Picker label, e.g. "Attached tags" / "Tags" — the combobox's caption and its accessible name. */
   label?: string;
 }
 
 export interface EditorChromeProps {
   /** Back control: a BUTTON, never an href (frozen — calling it flushes/leaves). */
-  back: { label: string; onBack: () => void };
+  back: EditorToolbarBack;
   /** Centred `<h1>` title for create/edit screens; wins over `status` in the toolbar. */
   title?: ReactNode;
+  /** Meta line under that title, passed straight to `EditorToolbar`'s `sub`. */
+  sub?: ReactNode;
   /** Status read-out rendered when there is no `title` (e.g. `<StatusText>Saved</StatusText>`). */
   status?: ReactNode;
   /** Toolbar right-side actions (e.g. the Save/Add `IconButton`). */
@@ -45,6 +47,7 @@ export interface EditorChromeProps {
 export function EditorChrome({
   back,
   title,
+  sub,
   status,
   actions,
   banner,
@@ -54,14 +57,14 @@ export function EditorChrome({
 }: Readonly<EditorChromeProps>): JSX.Element {
   return (
     <EditorScreen>
-      <EditorToolbar back={back} title={title} status={status} actions={actions} />
+      <EditorToolbar back={back} title={title} sub={sub} status={status} actions={actions} />
       {banner}
       <EditorStack gap={gap}>
         {children}
         {tagPicker && (
-          <TagPicker
-            tags={[...tagPicker.tags]}
-            selectedIds={[...tagPicker.selectedIds]}
+          <TagCombobox
+            tags={tagPicker.tags}
+            selectedIds={tagPicker.selectedIds}
             onToggle={tagPicker.onToggle}
             label={tagPicker.label}
           />

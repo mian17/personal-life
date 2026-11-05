@@ -15,19 +15,21 @@ describe('EmptyState', () => {
     expect(screen.getByText('Tap + to write your first note.')).toBeTruthy();
   });
 
-  it('composes the card box but keeps it unfilled and quiet', () => {
+  it('keeps the card box and takes the taller block inset', () => {
     render(<EmptyState body="Trash is empty." />);
     const root = document.querySelector('.ui-empty')!;
     expect(root.classList.contains('ui-card')).toBe(true);
     expect(root.getAttribute('data-slot')).toBe('card');
-    // A panel surface would read as a filled box behind centred copy, so the
-    // layout cancels both the panel fill and its border.
-    expect(root.classList.contains('bg-transparent')).toBe(true);
-    expect(root.classList.contains('border-0')).toBe(true);
+    // §8's `.empty` is still a box on the page: the surface and the hairline stay.
+    expect(root.classList.contains('bg-surface')).toBe(true);
+    expect(root.classList.contains('border-line')).toBe(true);
     expect(root.classList.contains('text-center')).toBe(true);
+    // Padding is split into inline/block utilities so it replaces Card's `p-…`.
+    expect(root.classList.contains('px-[var(--s4)]')).toBe(true);
+    expect(root.classList.contains('py-[var(--s8)]')).toBe(true);
     // The quiet colour rides the copy, not the box: Card already sets a text
     // colour on the box and a second one there would race it.
-    expect(document.querySelector('.ui-empty p')!.classList.contains('text-muted')).toBe(true);
+    expect(document.querySelector('.ui-empty p')!.classList.contains('text-ink-2')).toBe(true);
   });
 
   it('renders both copies as paragraphs inside the block', () => {

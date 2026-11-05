@@ -197,6 +197,36 @@ describe('/todos/matrix page wiring', () => {
     expect(tabEls[1].props.active).toBe(true);
   });
 
+  it('subtitles the header with the matrix grid’s own open and done counts', async () => {
+    mockedListTodos.mockResolvedValue({
+      todos: [
+        todo({ id: 'ui-1', dueDate: TODAY, effectiveImportant: true }),
+        todo({ id: 'un-1', dueDate: TODAY, effectiveImportant: false }),
+        todo({ id: 'nn-1', dueDate: null, effectiveImportant: false }),
+        todo({ id: 'done-1', dueDate: TODAY, effectiveImportant: true, done: true }),
+        todo({ id: 'done-2', dueDate: null, effectiveImportant: false, done: true }),
+      ],
+      nextCursor: null,
+    });
+
+    const el = await TodosMatrixPage();
+
+    expect(el.props.subtitle).toBe('3 open \u00b7 2 done');
+    const quadrants = el.props.body.props.quadrants;
+    const renderedRows = quadrants.flatMap((q: any) =>
+      q.items ? asArray(q.items).map((row: any) => row.props.todo.id) : [],
+    );
+    expect(renderedRows).toHaveLength(3);
+  });
+
+  it('subtitles an empty matrix 0 open \u00b7 0 done', async () => {
+    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null });
+
+    const el = await TodosMatrixPage();
+
+    expect(el.props.subtitle).toBe('0 open \u00b7 0 done');
+  });
+
   it('keeps the fab and the todos toolbar, and omits search/filters', async () => {
     const el = await TodosMatrixPage();
 

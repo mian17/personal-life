@@ -64,10 +64,22 @@ describe('Button', () => {
     const classes = classesOf(screen.getByRole('button'));
     // Borderless: the panel behind the button is the surface.
     expect(classes).not.toContain('border');
-    expect(classes).not.toContain('border-border');
-    expect(classes).not.toContain('bg-panel');
-    expect(classes).toContain('size-12');
+    expect(classes).not.toContain('border-line-strong');
+    expect(classes).not.toContain('bg-surface');
+    expect(classes).toContain('size-[var(--tap)]');
     expect(classes).toContain('text-danger');
+  });
+
+  it('fills the primary variant with the scoped accent and draws the word on it', () => {
+    render(<Button>Save</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('bg-max');
+    expect(classes).toContain('text-on-max');
+    expect(classes).toContain('border-max');
+    expect(classes).toContain('active:bg-max-press');
+    // The retired vocabulary: a fill that resolves against a root alias instead of the app scope.
+    expect(classes).not.toContain('bg-accent');
+    expect(classes).not.toContain('text-on-accent');
   });
 
   it('carries the disabled treatment on the rendered element', () => {

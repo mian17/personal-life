@@ -43,10 +43,12 @@ describe('Pill', () => {
         <Pill tone="wont_do">w</Pill>
       </>,
     );
-    expect(screen.getByText('o').classList.contains('text-accent')).toBe(true);
-    expect(screen.getByText('p').classList.contains('text-amber')).toBe(true);
-    expect(screen.getByText('d').classList.contains('text-green')).toBe(true);
-    expect(screen.getByText('w').classList.contains('text-muted')).toBe(true);
+    expect(screen.getByText('o').classList.contains('bg-surface-sunken')).toBe(true);
+    expect(screen.getByText('p').classList.contains('bg-warn-soft')).toBe(true);
+    expect(screen.getByText('p').classList.contains('text-warn')).toBe(true);
+    expect(screen.getByText('d').classList.contains('bg-ok-soft')).toBe(true);
+    expect(screen.getByText('d').classList.contains('text-ok')).toBe(true);
+    expect(screen.getByText('w').classList.contains('text-ink-2')).toBe(true);
   });
 
   it('renders an anchor when as="a", preserving href', () => {
@@ -70,6 +72,20 @@ describe('Pill', () => {
     // The jest moduleNameMapper resolves `next/link` to the stub, which stamps
     // `data-next-link`; a raw <a> would carry no such marker.
     expect(link.hasAttribute('data-next-link')).toBe(true);
+  });
+
+
+  it('drops the underline on the navigating branch only', () => {
+    render(
+      <Pill as="a" href="/?tag=errand" size="filter">
+        errand
+      </Pill>,
+    );
+    expect(screen.getByRole('link').classList.contains('no-underline')).toBe(true);
+
+    render(<Pill>errand</Pill>);
+    const chips = screen.getAllByText('errand');
+    expect(chips[chips.length - 1].classList.contains('no-underline')).toBe(false);
   });
 
   it('adds the active modifier only when active', () => {

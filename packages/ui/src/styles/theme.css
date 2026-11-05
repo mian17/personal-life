@@ -1,8 +1,9 @@
 /* Colour names resolve through tokens.css variables, so no literal leaves that file.
    preflight is deliberately NOT imported: `base.css` owns the resets, and loading
    Tailwind's reset under it would re-order every app's box model in one step.
-   ponytail: colours only — geometry rides Tailwind's scale; add `--spacing-*` or `--radius-*`
-   mapping here once a primitive needs a token the scale cannot express. */
+   Each `--color-*` below is a Tailwind utility name (`bg-page`, `text-ink-2`, `border-line`)
+   for one revised role; the vocabulary is tokens.css's, never a second one invented here.
+   ponytail: no `--spacing-*` mapping — Tailwind's 0.25rem scale covers every revised step. */
 @layer theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
@@ -10,16 +11,41 @@
 @source '../';
 @source '../../../../apps';
 
+/* Tailwind publishes `--color-max` on `:root`, but §3 puts `--max` on the app's own scope, and
+   a custom property substitutes where it is declared — so the alias above resolves against an
+   undefined `--max` and every `bg-max` paints nothing. Re-declaring the accent pair inside the
+   scope that defines it is what makes the accent reach a utility. */
+[data-app] {
+  --color-max: var(--max);
+  --color-max-press: var(--max-press);
+}
+
 @theme {
-  --color-bg: var(--bg);
-  --color-panel: var(--panel);
-  --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-accent: var(--accent);
+  /* §2 ground and the raised layers that sit on it */
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-press: var(--press);
+
+  /* §2 the three ink tiers and the two line tiers */
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-focus: var(--focus);
+
+  /* §3 the one accent of the app in scope, and the word drawn on its fill */
+  --color-max: var(--max);
+  --color-max-press: var(--max-press);
+  --color-on-max: var(--on-max);
+
+  /* §2 the status words, each paired with the tint behind it */
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --color-amber: var(--amber);
-  --color-green: var(--green);
-  --color-border: var(--border);
-  --color-on-accent: var(--on-accent);
+  --color-chart-muted: var(--chart-muted);
 }

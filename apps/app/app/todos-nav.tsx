@@ -1,25 +1,11 @@
 import { settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink } from '@life/ui';
-import { List, Settings, Tags, Trash2 } from 'lucide-react';
-import { submitFeedbackAction } from './feedback-actions';
+import { SettingsLink } from '@life/ui';
 
-/** The Todos toolbar nav icons, shared by `/todos` and its lenses. */
+/**
+ * The Todos toolbar, shared by `/todos` and its lenses. Settings is its only control: the tags,
+ * lists and trash destinations moved to `/todos/settings` rows, and feedback is that screen's
+ * Support row.
+ */
 export function TodosNav() {
-  return (
-    <>
-      <IconLink href="/todos/tags" label="Manage tags">
-        <Tags size={20} aria-hidden />
-      </IconLink>
-      <IconLink href="/todos/lists" label="Manage lists">
-        <List size={20} aria-hidden />
-      </IconLink>
-      <IconLink href="/todos/trash" label="Trash">
-        <Trash2 size={20} aria-hidden />
-      </IconLink>
-      <FeedbackNavItem app="todos" onSubmit={submitFeedbackAction} />
-      <IconLink href={settingsHref('/todos')} label="Settings">
-        <Settings size={20} aria-hidden />
-      </IconLink>
-    </>
-  );
+  return <SettingsLink href={settingsHref('/todos')} />;
 }

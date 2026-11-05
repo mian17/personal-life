@@ -1,5 +1,7 @@
-import { routeLayoutMetadata } from '@life/app-kit';
+import { RouteLayout, routeLayoutMetadata } from '@life/app-kit';
 
 export const metadata = routeLayoutMetadata('/manifest-notes.json', 'Notes', '/icon-notes.png');
 
-export { RouteLayout as default } from '@life/app-kit';
+export default function NotesLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <RouteLayout app="notes">{children}</RouteLayout>;
+}

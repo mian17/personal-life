@@ -11,7 +11,7 @@ export default async function TrashPage() {
   return (
     <TrashBlock
       title="Trash"
-      backHref="/notes"
+      backHref="/notes/settings"
       items={notes.map((note) => {
         const { title, snippet } = splitBody(note.body);
         return {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { TagManager } from '../src/components/tag-manager';
-import type { TagOption } from '../src/components/tag-picker';
+import type { TagOption } from '../src/components/tag-combobox';
 
 const TAGS: TagOption[] = [
   { id: 1, name: 'errand' },
@@ -130,6 +130,15 @@ describe('TagManager', () => {
     expect(
       (screen.getByRole('button', { name: 'Actions for errand' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  it('separates tag rows with one flush hairline, closing the shared list gap', () => {
+    setup();
+
+    const manager = document.querySelector('.ui-tag-manager')!;
+    expect(manager.classList.contains('[&>ul]:gap-0')).toBe(true);
+    expect(manager.classList.contains('[&>ul>*+*]:border-t')).toBe(true);
+    expect(manager.classList.contains('[&>ul>*+*]:border-line')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {

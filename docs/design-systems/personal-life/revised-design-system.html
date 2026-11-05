@@ -1,0 +1,2020 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="The calm design system behind the five revised personal-life apps: tokens, type, spacing, motion, components, accessibility.">
+<title>Personal Life — revised design system</title>
+<script>
+/* Apply the stored theme before first paint so the page never flashes. */
+(function () {
+  try {
+    var c = localStorage.getItem('calm-theme');
+    if (c === 'light' || c === 'dark') document.documentElement.setAttribute('data-theme', c);
+  } catch (e) {}
+})();
+</script>
+<style>
+/* the app stylesheet, verbatim: the scheme comparison below uses the real components */
+/* ============================================================
+   Colour theme — one accent per app, the same calm vocabulary in both
+   schemes. Text on the accent clears AA: 5.90:1 light, 8.3–9.0:1 dark.
+   No pure-black fill, no pure-white text, no neon, no colour-only state.
+
+   Measured contrast (WCAG 2.1 relative luminance)
+   pair                              light    dark
+   --ink      on --surface          17.17    13.20
+   --ink-2    on --surface           7.06     6.77
+   --ink-3    on --surface           5.96     5.37
+   --on-max   on --max             5.90    9.00
+   --line-strong on --surface        3.45     3.83  (non-text boundary)
+   --line     on --surface           1.19     1.17  (hairline, decorative only)
+   --ok / --warn / --danger on their soft fills clear 5.4:1 in both.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+
+  /* ground + surfaces */
+  --page: #F4F4F1;
+  --surface: #FFFFFF;
+  --surface-sunken: #F7F7F4;
+  --press: #ECECE9;
+
+  /* ink */
+  --ink: #1B1B1F;
+  --ink-2: #58585E;
+  --ink-3: #63636A;
+
+  /* lines */
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: #8A8A8A;
+  --focus: #2A5D8F;
+
+  /* this app's accent: primary fill, selection, progress */
+  --max: #4F6B52;
+  --max-press: #405743;
+  --on-max: #FFFFFF;
+
+  /* semantic, muted, never neon */
+  --ok: #335B3F;     --ok-soft: #EAF1EA;
+  --warn: #6E5A16;   --warn-soft: #F5F0E0;
+  --danger: #8A3B3B; --danger-soft: #F6E9E9;
+  --chart-muted: #C9C9C6;
+
+  /* geometry, grid, motion — one vocabulary */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+  --frame-max: 414px;
+  --tap: 48px;
+  --fab-size: 56px;
+  --focus-ring: 2px;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --d-fast: 200ms;
+  --d-base: 260ms;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #16171A;
+  --surface: #1E2024;
+  --surface-sunken: #24262B;
+  --press: #2C2F35;
+
+  --ink: #E9E7E2;
+  --ink-2: #A9A79F;
+  --ink-3: #96948D;
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: #767B84;
+  --focus: #8FBCE8;
+
+  --max: #9FC0A3;
+  --max-press: #B0CDB3;
+  --on-max: #16171A;
+
+  --ok: #9FC0A3;     --ok-soft: #202A21;
+  --warn: #D9C68A;   --warn-soft: #2A2418;
+  --danger: #D98C86; --danger-soft: #2C1F1F;
+  --chart-muted: #3A3D43;
+}
+
+/* Follow the OS until the visitor picks a theme in Settings. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #16171A;
+    --surface: #1E2024;
+    --surface-sunken: #24262B;
+    --press: #2C2F35;
+    --ink: #E9E7E2;
+    --ink-2: #A9A79F;
+    --ink-3: #96948D;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: #767B84;
+    --focus: #8FBCE8;
+    --max: #9FC0A3;
+    --max-press: #B0CDB3;
+    --on-max: #16171A;
+    --ok: #9FC0A3;     --ok-soft: #202A21;
+    --warn: #D9C68A;   --warn-soft: #2A2418;
+    --danger: #D98C86; --danger-soft: #2C1F1F;
+    --chart-muted: #3A3D43;
+  }
+}
+
+
+/* ---------- the prototype's base: tokens, type, rows, cards, sheets ---------- */
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { -webkit-appearance: none; }
+svg { display: block; }
+
+:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* spacing utilities — every value an 8pt step */
+.mt0 { margin-top: 0; }
+.mt2 { margin-top: var(--s2); }
+.mt3 { margin-top: var(--s3); }
+.mt4 { margin-top: var(--s4); }
+.ml-auto { margin-left: auto; }
+
+/* ---------- frame ---------- */
+.frame {
+  position: relative;
+  max-width: var(--frame-max);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--s6));
+  background: var(--surface);
+  border-inline: 1px solid var(--line);
+}
+
+.main { display: block; }
+
+.panel { padding: var(--s2) var(--s4) var(--s6); }
+.panel[hidden] { display: none; }
+
+.grow { flex: 1; }
+.no-grow { flex: 0 0 auto; }
+/* a row whose whole body opens a detail view */
+.row__main--btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* inert row: no press, no pointer */
+.row[data-static] { cursor: default; }
+.row[data-static]:active { background: transparent; }
+
+/* ---------- page header ---------- */
+.phead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding-top: var(--s2);
+}
+
+.h1 {
+  font-size: 28px;
+  line-height: 1.14;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+}
+
+.phead__sub {
+  margin-top: var(--s1);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+/* ---------- section label ---------- */
+.slabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: var(--s6) 0 var(--s2);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.slabel__count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-3);
+}
+
+/* ---------- grouped list + rows ---------- */
+.group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.list__item + .list__item { border-top: 1px solid var(--line); }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s3) var(--s4);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.row:active { background: var(--press); }
+
+.row__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+  flex: 1;
+}
+
+.row__title {
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+
+.row__meta {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.row__trail {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--ink-3);
+}
+
+.row--done .row__title {
+  color: var(--ink-2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.row--done .row__meta { color: var(--ink-3); }
+
+/* checkbox: 24px mark inside a 48px target */
+.check {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin: calc(var(--s2) * -1) 0 calc(var(--s2) * -1) calc(var(--s3) * -1);
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.check:active { background: var(--press); }
+
+.check__box {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: transparent;
+}
+
+.check[aria-checked="true"] .check__box {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+.check__glyph { width: 16px; height: 16px; }
+
+/* ---------- pills ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--s6);
+  padding: 0 var(--s2);
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+.pill--neutral { background: var(--surface-sunken); color: var(--ink-2); }
+.pill--warn    { background: var(--warn-soft);   color: var(--warn); }
+.pill--danger  { background: var(--danger-soft); color: var(--danger); }
+.pill--ok      { background: var(--ok-soft);     color: var(--ok); }
+
+/* ---------- controls ---------- */
+.iconbtn {
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.iconbtn:active { background: var(--press); }
+
+.icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.icon--sm { width: 18px; height: 18px; }
+
+.btn {
+  width: 100%;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: 0 var(--s5);
+  border: 1px solid var(--max);
+  border-radius: var(--r-md);
+  background: var(--max);
+  color: var(--on-max);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+}
+
+.btn:active { background: var(--max-press); border-color: var(--max-press); }
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--ghost:active { background: var(--press); }
+
+.btn--danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--danger);
+}
+
+.btn--danger:active { background: var(--danger-soft); }
+
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+
+/* ---------- fields ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--tap);
+  padding: 0 var(--s3);
+  margin-top: var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.search:focus-within { outline: var(--focus-ring) solid var(--focus); outline-offset: var(--focus-ring); }
+
+.search input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.search input::placeholder { color: var(--ink-3); }
+.search input:focus { outline: none; }
+
+.input {
+  width: 100%;
+  height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 16px;
+}
+
+.input:focus, .textarea:focus, .select:focus {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+}
+
+.field { display: block; margin-top: var(--s4); }
+
+.field__label {
+  display: block;
+  margin-bottom: var(--s2);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 17px;
+  line-height: 1.55;
+  resize: none;
+}
+
+.select {
+  height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.textarea--sm { min-height: 112px; }
+.body-copy { font-size: 16px; }
+.chart-box { padding: var(--s3) var(--s3) var(--s2); }
+
+/* ---------- chips + segmented ---------- */
+.filters {
+  display: flex;
+  gap: var(--s2);
+  margin: var(--s3) calc(var(--s4) * -1) 0;
+  padding: 0 var(--s4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar { display: none; }
+.filters--inset { margin-inline: 0; padding-inline: 0; }
+
+.chip {
+  flex: none;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:active { background: var(--press); }
+
+.chip[aria-pressed="true"] {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+.chip[aria-pressed="true"]:active { background: var(--max-press); }
+
+.seg {
+  display: inline-flex;
+  gap: var(--s1);
+  padding: var(--s1);
+  margin-top: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+}
+
+.seg__btn {
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seg__btn:active { background: var(--press); }
+
+.seg__btn[aria-pressed="true"] {
+  background: var(--max);
+  color: var(--on-max);
+}
+
+.seg__btn[aria-pressed="true"]:active { background: var(--max-press); }
+
+/* ---------- card ---------- */
+.card {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.card--flush { padding: 0; overflow: hidden; }
+.card + .card { margin-top: var(--s3); }
+
+/* ---------- meals: headline + macros ---------- */
+.kpi {
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi__unit { font-size: 15px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
+
+.kpi__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin-top: var(--s1);
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.track__fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--max);
+}
+
+.macro {
+  display: grid;
+  grid-template-columns: 64px 1fr 88px;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s3);
+}
+
+.macro__label { font-size: 14px; font-weight: 600; }
+
+.macro__value {
+  font-size: 14px;
+  color: var(--ink-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- pomodoro ---------- */
+.timer__phase {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.timer__time {
+  margin-top: var(--s2);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer__hint { margin-top: var(--s3); font-size: 14px; color: var(--ink-2); min-height: 20px; }
+
+.dots { display: flex; gap: var(--s2); margin-top: var(--s4); }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--line-strong);
+}
+
+.dot--on { background: var(--max); border-color: var(--max); }
+
+/* ---------- chart ---------- */
+.chart { width: 100%; height: auto; }
+.chart__bar { fill: var(--max); }
+.chart__bar--muted { fill: var(--chart-muted); }
+.chart__grid { stroke: var(--line); stroke-width: 1; }
+.chart__target { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 4 4; }
+.chart__label { fill: var(--ink-2); font-size: 11px; font-weight: 600; font-family: inherit; }
+.chart__value { fill: var(--ink); font-size: 11px; font-weight: 600; font-family: inherit; }
+
+/* ---------- facts table ---------- */
+.facts { display: grid; }
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.fact:last-child { border-bottom: 0; }
+.fact__v { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- empty state ---------- */
+.empty {
+  padding: var(--s8) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.empty__title { font-size: 16px; font-weight: 600; color: var(--ink); }
+.empty__body { margin-top: var(--s1); font-size: 15px; }
+
+/* ---------- sub-view ---------- */
+.subnav {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding-top: var(--s2);
+}
+
+.backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  margin-left: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.backlink:active { background: var(--press); }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+}
+
+.status[data-state="idle"] .status__dot { background: var(--ink-3); }
+
+.subfoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- matrix ---------- */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+.quad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 132px;
+  padding: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-sunken);
+}
+
+.quad__label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.quad__list { display: flex; flex-direction: column; gap: var(--s2); }
+
+.quad__item {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.quad__item:active { background: var(--press); }
+.quad__empty { font-size: 13px; color: var(--ink-2); }
+
+/* ---------- motion: only when the OS allows it ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { transition: transform var(--d-base) var(--ease); }
+  .scrim { transition: opacity var(--d-fast) var(--ease); }
+  .track__fill { transition: width var(--d-base) linear; }
+  .chip, .seg__btn, .row, .iconbtn, .btn, .check { transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease); }
+
+  /* one-shot entrance, never a loop */
+  .panel:not([hidden]) { animation: view-in var(--d-fast) var(--ease) both; }
+
+  @keyframes view-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+
+/* Reduced motion: no transforms, no fades that travel, state is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- single-app additions ---------- */
+
+/* ---------- header actions ---------- */
+.phead__actions { display: flex; align-items: center; gap: var(--s1); }
+
+/* ---------- appearance switch, full width, three equal parts ---------- */
+.seg--theme { display: flex; width: 100%; }
+.seg--theme .seg__btn { flex: 1; }
+.group > .seg--theme { margin: 0; padding: var(--s2); border: 0; border-radius: 0; background: transparent; }
+
+/* ---------- a switch inside a settings row ---------- */
+.row__switch {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.row__switch[aria-pressed="true"] {
+  background: var(--max);
+  border-color: var(--max);
+  color: var(--on-max);
+}
+
+/* ---------- save read-out under a toolbar ---------- */
+.editor-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 20px;
+  margin-top: var(--s2);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.editor-status:empty { display: none; }
+.editor-status__dot { width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--ok); }
+.editor-status[data-state="idle"] .editor-status__dot { background: var(--ink-3); }
+
+/* ---------- the note editor is one tall surface ---------- */
+.note-body { min-height: 56dvh; }
+
+/* ---------- fab, one per app, no tab bar to clear ---------- */
+.fab {
+  position: fixed;
+  z-index: 30;
+  right: max(var(--s4), calc((100vw - var(--frame-max)) / 2 + var(--s4)));
+  bottom: calc(env(safe-area-inset-bottom) + var(--s4));
+  width: var(--fab-size);
+  height: var(--fab-size);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--max);
+  border-radius: var(--r-pill);
+  background: var(--max);
+  color: var(--on-max);
+  cursor: pointer;
+}
+.fab:active { background: var(--max-press); }
+.fab[hidden] { display: none; }
+.fab .icon { width: 24px; height: 24px; stroke-width: 2; }
+
+/* ---------- scrim + sheet, used only by the feedback form ---------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+}
+.scrim.is-open { opacity: 1; }
+.scrim[hidden] { display: none; }
+
+.sheet {
+  position: fixed; z-index: 50;
+  left: 50%; bottom: 0;
+  width: 100%; max-width: var(--frame-max);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: var(--s2) var(--s4) calc(var(--s6) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface);
+  transform: translate(-50%, 100%);
+}
+.sheet.is-open { transform: translate(-50%, 0); }
+.sheet[hidden] { display: none; }
+
+.sheet__grab {
+  width: 36px; height: 4px;
+  margin: var(--s2) auto 0;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+}
+
+.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2); margin-top: var(--s2); }
+.sheet__title { font-size: 20px; line-height: 1.25; font-weight: 700; letter-spacing: -0.015em; }
+.sheet__sub { margin-top: var(--s1); font-size: 14px; color: var(--ink-2); }
+
+.sheet__form { margin-top: var(--s4); }
+.sheet__foot { margin-top: var(--s6); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { transition: transform var(--d-base) var(--ease); }
+  .scrim { transition: opacity var(--d-fast) var(--ease); }
+}
+
+
+/* documentation layer, after the product layer so its resets win */
+
+/* ============================================================
+   Revised design-system documentation.
+   Same tokens, same vocabulary, same 8pt grid as the five app files.
+   This page styles documentation, not product UI.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --page: #F4F4F1; --surface: #FFFFFF; --surface-sunken: #F7F7F4; --press: #ECECE9;
+  --ink: #1B1B1F; --ink-2: #58585E; --ink-3: #63636A;
+  --line: rgba(0, 0, 0, 0.08); --line-strong: #8A8A8A; --focus: #2A5D8F;
+  --max: #1B1B1F; --max-press: #2B2B30; --on-max: #FFFFFF;
+  --ok: #335B3F; --ok-soft: #EAF1EA;
+  --warn: #6E5A16; --warn-soft: #F5F0E0;
+  --danger: #8A3B3B; --danger-soft: #F6E9E9;
+  --chart-muted: #C9C9C6;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px;
+  --tap: 48px; --focus-ring: 2px;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1); --d-fast: 200ms; --d-base: 260ms;
+  --doc-max: 1120px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #16171A; --surface: #1E2024; --surface-sunken: #24262B; --press: #2C2F35;
+  --ink: #E9E7E2; --ink-2: #A9A79F; --ink-3: #96948D;
+  --line: rgba(255, 255, 255, 0.07); --line-strong: #767B84; --focus: #8FBCE8;
+  --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A;
+  --ok: #9FC0A3; --ok-soft: #202A21;
+  --warn: #D9C68A; --warn-soft: #2A2418;
+  --danger: #D98C86; --danger-soft: #2C1F1F;
+  --chart-muted: #3A3D43;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #16171A; --surface: #1E2024; --surface-sunken: #24262B; --press: #2C2F35;
+    --ink: #E9E7E2; --ink-2: #A9A79F; --ink-3: #96948D;
+    --line: rgba(255, 255, 255, 0.07); --line-strong: #767B84; --focus: #8FBCE8;
+    --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A;
+    --ok: #9FC0A3; --ok-soft: #202A21;
+    --warn: #D9C68A; --warn-soft: #2A2418;
+    --danger: #D98C86; --danger-soft: #2C1F1F;
+    --chart-muted: #3A3D43;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+  }
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  /* Warm off-white ground, the same one a screen paints. Cards and groups sit on
+     --surface above it. */
+  background: var(--page);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, p { margin: 0; }
+ul, ol { margin: 0; padding: 0; }
+code, kbd, samp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* ---------- shell ---------- */
+.wrap {
+  max-width: var(--doc-max);
+  margin-inline: auto;
+  padding: var(--s8) var(--s6) calc(var(--s8) * 2);
+}
+
+.masthead { border-bottom: 1px solid var(--line); padding-bottom: var(--s6); }
+.masthead__kicker {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.masthead h1 {
+  margin-top: var(--s2);
+  font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.025em;
+}
+.masthead p {
+  max-width: 62ch; margin-top: var(--s3);
+  font-size: 17px; line-height: 1.6; color: var(--ink-2);
+}
+.masthead__meta {
+  display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4);
+  margin-top: var(--s4); font-size: 13.5px; color: var(--ink-3);
+}
+
+/* ---------- theme + accent controls ---------- */
+.controls {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4);
+  margin: 0 calc(var(--s6) * -1); padding: var(--s3) var(--s6);
+  background: color-mix(in srgb, var(--page) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.controls__group { display: flex; align-items: center; gap: var(--s2); }
+.controls__label {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+/* ---------- sections ---------- */
+.section { margin-top: calc(var(--s8) * 1.5); scroll-margin-top: 72px; }
+.section > h2 {
+  font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.018em;
+  padding-top: var(--s4); border-top: 1px solid var(--line);
+}
+.section > h2 + p { max-width: 68ch; margin-top: var(--s2); color: var(--ink-2); }
+.section h3 {
+  margin-top: var(--s6);
+  font-size: 15px; font-weight: 650; letter-spacing: 0.01em;
+}
+.section h3 + p { max-width: 68ch; margin-top: var(--s1); font-size: 14.5px; color: var(--ink-2); }
+
+/* ---------- specimen surface ---------- */
+/* A specimen is a screen region: it paints the same off-white ground the apps do,
+   so every group, card and button inside it resolves against the real ground. */
+.specimen {
+  margin-top: var(--s4);
+  padding: var(--s6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--page);
+}
+.specimen__row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3);
+}
+.specimen__row + .specimen__row { margin-top: var(--s4); }
+.specimen__caption {
+  margin-top: var(--s3); font-size: 13px; color: var(--ink-3);
+}
+
+/* ---------- tables ---------- */
+.table { width: 100%; margin-top: var(--s3); border-collapse: collapse; font-size: 14px; }
+.table caption {
+  caption-side: top; text-align: left;
+  padding-bottom: var(--s2); font-size: 13px; color: var(--ink-3);
+}
+.table th, .table td {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.table th {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+.table td:first-child { white-space: nowrap; font-weight: 600; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- swatches ---------- */
+.swatches {
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+.swatch { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.swatch__chip {
+  height: 64px;
+  border-bottom: 1px solid var(--line);
+  /* a white chip needs its own visible edge, so this is a boundary (3.45:1),
+     not a hairline */
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+}
+.swatch__body { padding: var(--s2) var(--s3); }
+.swatch__name { font-size: 13px; font-weight: 650; }
+.swatch__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-2);
+}
+.swatch__role { margin-top: var(--s1); font-size: 12px; color: var(--ink-3); line-height: 1.35; }
+
+/* ---------- scale specimens ---------- */
+.type-row { display: flex; align-items: baseline; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--line); }
+.type-row:last-child { border-bottom: 0; }
+.type-row__meta {
+  flex: none; width: 190px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-3);
+}
+.type-row__sample { flex: 1; min-width: 0; }
+
+.space-row { display: flex; align-items: center; gap: var(--s4); padding: var(--s2) 0; }
+.space-row__bar { flex: none; height: 16px; background: var(--max); border-radius: 2px; }
+.space-row__label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; color: var(--ink-2);
+}
+.radius-row { display: flex; flex-wrap: wrap; gap: var(--s4); }
+.radius-demo {
+  width: 104px; height: 72px;
+  display: grid; place-items: center;
+  background: var(--surface-sunken); border: 1px solid var(--line-strong);
+  font-size: 12px; color: var(--ink-2);
+}
+
+/* ---------- notes, lists, callouts ---------- */
+.rule-list { margin-top: var(--s3); padding-left: var(--s5); list-style: disc; }
+.rule-list li { margin-top: var(--s2); max-width: 70ch; }
+.rule-list li::marker { color: var(--ink-3); }
+
+.callout {
+  margin-top: var(--s4); padding: var(--s4);
+  border: 1px solid var(--line); border-left: 3px solid var(--max);
+  border-radius: var(--r-md); background: var(--surface-sunken);
+}
+.callout__title { font-size: 14px; font-weight: 650; }
+.callout p { margin-top: var(--s1); font-size: 14px; color: var(--ink-2); }
+
+.tag-list { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.tag {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  height: 26px; padding: 0 var(--s2);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface-sunken);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--ink-2);
+}
+
+/* ---------- two-up ---------- */
+.duo { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: var(--s4); }
+.pane {
+  padding: var(--s4);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  /* each pane carries its own scheme and paints the screen ground, so the
+     components inside resolve the tokens of the theme being demonstrated */
+  background: var(--page);
+}
+.pane__label {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  opacity: 0.62;
+}
+
+/* ---------- footer ---------- */
+.foot {
+  margin-top: calc(var(--s8) * 1.5); padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--ink-3);
+}
+
+@media (max-width: 720px) {
+  .wrap { padding: var(--s6) var(--s4) var(--s10); }
+  .masthead h1 { font-size: 30px; }
+  .type-row { flex-direction: column; gap: var(--s1); }
+  .type-row__meta { width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ---------- one accent per app, the same values the app files hard-code ---------- */
+/* The app stylesheet sets a default accent on :root, so the documented default is
+   restated here: ink as a fill until the toolbar picks an app. */
+:root, [data-theme="light"] { --max: #1B1B1F; --max-press: #2B2B30; --on-max: #FFFFFF; }
+[data-theme="dark"] { --max: #E9E7E2; --max-press: #F2F0EC; --on-max: #16171A; }
+[data-accent="notes"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="notes"], [data-accent="notes"] [data-theme="light"] { --max: #4F6B52; --max-press: #405743; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="notes"], [data-theme="dark"] [data-accent="notes"], [data-accent="notes"] [data-theme="dark"] { --max: #9FC0A3; --max-press: #B0CDB3; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="notes"]:not([data-theme="light"]) { --max: #9FC0A3; --max-press: #B0CDB3; --on-max: #16171A; } }
+[data-accent="todos"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="todos"], [data-accent="todos"] [data-theme="light"] { --max: #2F5F61; --max-press: #254B4D; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="todos"], [data-theme="dark"] [data-accent="todos"], [data-accent="todos"] [data-theme="dark"] { --max: #82B5B6; --max-press: #97C5C6; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="todos"]:not([data-theme="light"]) { --max: #82B5B6; --max-press: #97C5C6; --on-max: #16171A; } }
+[data-accent="meals"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="meals"], [data-accent="meals"] [data-theme="light"] { --max: #8B5A45; --max-press: #744A38; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="meals"], [data-theme="dark"] [data-accent="meals"], [data-accent="meals"] [data-theme="dark"] { --max: #DCA489; --max-press: #E4B39C; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="meals"]:not([data-theme="light"]) { --max: #DCA489; --max-press: #E4B39C; --on-max: #16171A; } }
+[data-accent="pomodoro"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="pomodoro"], [data-accent="pomodoro"] [data-theme="light"] { --max: #5A5285; --max-press: #4A4470; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="pomodoro"], [data-theme="dark"] [data-accent="pomodoro"], [data-accent="pomodoro"] [data-theme="dark"] { --max: #B6AEDC; --max-press: #C7C1E6; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="pomodoro"]:not([data-theme="light"]) { --max: #B6AEDC; --max-press: #C7C1E6; --on-max: #16171A; } }
+[data-accent="feedback"]:not([data-theme="dark"]), [data-theme="light"] [data-accent="feedback"], [data-accent="feedback"] [data-theme="light"] { --max: #6F5570; --max-press: #5B455C; --on-max: #FFFFFF; }
+[data-theme="dark"][data-accent="feedback"], [data-theme="dark"] [data-accent="feedback"], [data-accent="feedback"] [data-theme="dark"] { --max: #C4A9C6; --max-press: #D0BACF; --on-max: #16171A; }
+@media (prefers-color-scheme: dark) { [data-accent="feedback"]:not([data-theme="light"]) { --max: #C4A9C6; --max-press: #D0BACF; --on-max: #16171A; } }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" focusable="false" class="sprite">
+  <defs>
+    <symbol id="i-notes" viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-todos" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></symbol>
+    <symbol id="i-meals" viewBox="0 0 24 24"><path d="M4 11h16"/><path d="M5.5 11a6.5 6.5 0 0013 0"/><path d="M12 17.5V20"/><path d="M9 20h6"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2"/><path d="M9.5 3h5"/></symbol>
+    <symbol id="i-feedback" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v7a2.5 2.5 0 01-2.5 2.5H9l-5 4z"/><path d="M8.5 9h7M8.5 12h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5l-7 7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9.5 5l7 7-7 7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" stroke-width="2.75"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l4.5 4.5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5l10 6.5-10 6.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5.5v13M15 5.5v13"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"/><path d="M4.5 5v4.5H9"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 20v-6M12.5 20V9M17 20v-4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9 7V5h6v2"/><path d="M6.5 7l1 12h9l1-12"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="14" rx="2.5"/><path d="M4 10.5h16M8.5 4v4M15.5 4v4"/></symbol>
+  </defs>
+</svg>
+<div class="wrap">
+  <header class="masthead">
+    <p class="masthead__kicker">Personal Life · revised</p>
+    <h1>Revised design system</h1>
+    <p>
+      The visual and behavioural contract behind the five revised app prototypes: Notes, Tasks, Meals, Focus and Feedback.
+      One calm palette, one accent per app, a light and a dark scheme that share a vocabulary, and an 8pt grid
+      throughout. Everything below is measured from the tokens the app files actually ship.
+    </p>
+    <div class="masthead__meta">
+      <span>Five standalone apps</span>
+      <span>Two schemes, one phrase</span>
+      <span>No dependency, no network, no font file</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="controls__group">
+      <span class="controls__label">Theme</span>
+      <div class="seg" role="group" aria-label="Theme">
+        <button class="seg__btn" type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button class="seg__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+        <button class="seg__btn" type="button" data-theme-set="system" aria-pressed="true">System</button>
+      </div>
+    </div>
+    <div class="controls__group">
+      <span class="controls__label">Accent</span>
+      <div class="seg" role="group" aria-label="Accent">
+        <button class="seg__btn" type="button" data-accent-set="neutral" aria-pressed="true">Neutral</button>
+        <button class="seg__btn" type="button" data-accent-set="notes" aria-pressed="false">Notes</button>
+        <button class="seg__btn" type="button" data-accent-set="todos" aria-pressed="false">Tasks</button>
+        <button class="seg__btn" type="button" data-accent-set="meals" aria-pressed="false">Meals</button>
+        <button class="seg__btn" type="button" data-accent-set="pomodoro" aria-pressed="false">Focus</button>
+        <button class="seg__btn" type="button" data-accent-set="feedback" aria-pressed="false">Feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="principles">
+    <h2>1 · Principles</h2>
+    <p>Five rules that decide every later question. When a component is ambiguous, one of these settles it.</p>
+    <ul class="rule-list">
+      <li><strong>One screen, one job.</strong> A screen shows one thing to do. Sub-screens replace the parent; they never stack on top of it.</li>
+      <li><strong>Words carry state.</strong> Colour supports a status, it never is the status. Every chip, pill and bar has its word beside it.</li>
+      <li><strong>Furniture stays quiet.</strong> Hairlines, not heavy dividers. One accent per app, used for selection and progress. No gradients, no glow.</li>
+      <li><strong>Nothing moves unless the OS allows it.</strong> Every transition sits inside prefers-reduced-motion: no-preference. No loop, no autoplay, no ticker.</li>
+      <li><strong>Fits a hand, at 414 wide.</strong> One column, 48px targets, safe-area padding. Nothing important lives within 20px of the bottom edge.</li>
+    </ul>
+  </section>
+
+  <section class="section" id="colour">
+    <h2>2 · Colour</h2>
+    <p>
+      Warm off-white <code>--page</code> in light, soft charcoal in dark — one ground per scheme, painted by the
+      screen itself. Groups and cards sit above it on <code>--surface</code>, so the ground shows through the gaps
+      between them. Neither scheme uses pure black or pure white for a large fill.
+    </p>
+    <p>
+      One accent per app carries selection, primary fill and progress; status colours stay muted and always pair with
+      a word.
+    </p>
+
+    <h3>Page, surface, ink, lines, semantic — light</h3>
+    <div class="swatches">
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#F4F4F1"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--page</div>
+          <div class="swatch__value">#F4F4F1</div>
+          <div class="swatch__role">the screen ground — everything sits on it</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#FFFFFF"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--surface</div>
+          <div class="swatch__value">#FFFFFF</div>
+          <div class="swatch__role">a group or card raised above the ground</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#F7F7F4"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--sunken</div>
+          <div class="swatch__value">#F7F7F4</div>
+          <div class="swatch__role">neutral pill, inset track, segment trough</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#ECECE9"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--press</div>
+          <div class="swatch__value">#ECECE9</div>
+          <div class="swatch__role">pressed wash, one frame</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#1B1B1F"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink</div>
+          <div class="swatch__value">#1B1B1F</div>
+          <div class="swatch__role">titles and body text</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#58585E"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink2</div>
+          <div class="swatch__value">#58585E</div>
+          <div class="swatch__role">meta lines, labels, inactive chips, chart axis</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#63636A"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink3</div>
+          <div class="swatch__value">#63636A</div>
+          <div class="swatch__role">quiet counts and decorative glyphs</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#8A8A8A"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--lineStrong</div>
+          <div class="swatch__value">#8A8A8A</div>
+          <div class="swatch__role">control boundary — 3.13:1, the non-text minimum</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#2A5D8F"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--focus</div>
+          <div class="swatch__value">#2A5D8F</div>
+          <div class="swatch__role">focus ring, 2px at 2px offset</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#335B3F"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ok</div>
+          <div class="swatch__value">#335B3F</div>
+          <div class="swatch__role">done, saved — always with a word in a pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#EAF1EA"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--okSoft</div>
+          <div class="swatch__value">#EAF1EA</div>
+          <div class="swatch__role">the tint behind a done pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#6E5A16"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--warn</div>
+          <div class="swatch__value">#6E5A16</div>
+          <div class="swatch__role">due soon, in progress</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#F5F0E0"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--warnSoft</div>
+          <div class="swatch__value">#F5F0E0</div>
+          <div class="swatch__role">the tint behind a due-soon pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#8A3B3B"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--danger</div>
+          <div class="swatch__value">#8A3B3B</div>
+          <div class="swatch__role">overdue, destructive</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#F6E9E9"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--dangerSoft</div>
+          <div class="swatch__value">#F6E9E9</div>
+          <div class="swatch__role">the tint behind an overdue pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#C9C9C6"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--chartMuted</div>
+          <div class="swatch__value">#C9C9C6</div>
+          <div class="swatch__role">a zero day in a chart — a stub, never a gap</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Page, surface, ink, lines, semantic — dark</h3>
+    <div class="swatches">
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#16171A"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--page</div>
+          <div class="swatch__value">#16171A</div>
+          <div class="swatch__role">the screen ground — everything sits on it</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#1E2024"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--surface</div>
+          <div class="swatch__value">#1E2024</div>
+          <div class="swatch__role">a group or card raised above the ground</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#24262B"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--sunken</div>
+          <div class="swatch__value">#24262B</div>
+          <div class="swatch__role">neutral pill, inset track, segment trough</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#2C2F35"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--press</div>
+          <div class="swatch__value">#2C2F35</div>
+          <div class="swatch__role">pressed wash, one frame</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#E9E7E2"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink</div>
+          <div class="swatch__value">#E9E7E2</div>
+          <div class="swatch__role">titles and body text</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#A9A79F"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink2</div>
+          <div class="swatch__value">#A9A79F</div>
+          <div class="swatch__role">meta lines, labels, inactive chips, chart axis</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#96948D"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ink3</div>
+          <div class="swatch__value">#96948D</div>
+          <div class="swatch__role">quiet counts and decorative glyphs</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#767B84"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--lineStrong</div>
+          <div class="swatch__value">#767B84</div>
+          <div class="swatch__role">control boundary — 4.21:1, the non-text minimum</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#8FBCE8"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--focus</div>
+          <div class="swatch__value">#8FBCE8</div>
+          <div class="swatch__role">focus ring, 2px at 2px offset</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#9FC0A3"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--ok</div>
+          <div class="swatch__value">#9FC0A3</div>
+          <div class="swatch__role">done, saved — always with a word in a pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#202A21"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--okSoft</div>
+          <div class="swatch__value">#202A21</div>
+          <div class="swatch__role">the tint behind a done pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#D9C68A"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--warn</div>
+          <div class="swatch__value">#D9C68A</div>
+          <div class="swatch__role">due soon, in progress</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#2A2418"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--warnSoft</div>
+          <div class="swatch__value">#2A2418</div>
+          <div class="swatch__role">the tint behind a due-soon pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#D98C86"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--danger</div>
+          <div class="swatch__value">#D98C86</div>
+          <div class="swatch__role">overdue, destructive</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#2C1F1F"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--dangerSoft</div>
+          <div class="swatch__value">#2C1F1F</div>
+          <div class="swatch__role">the tint behind an overdue pill</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__chip" style="background:#3A3D43"></div>
+        <div class="swatch__body">
+          <div class="swatch__name">--chartMuted</div>
+          <div class="swatch__value">#3A3D43</div>
+          <div class="swatch__role">a zero day in a chart — a stub, never a gap</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Accents</h3>
+    <p>The neutral solid is the documentation default; each app file hard-codes its own.</p>
+      <table class="table">
+        <caption>The five app accents. Text on the accent is white in light, #16171A in dark; every pair clears AA.</caption>
+        <thead><tr><th>App</th><th>Light fill / press</th><th>Dark fill / press</th></tr></thead>
+        <tbody>
+          <tr><td>notes</td><td><code>#4F6B52</code> / <code>#405743</code></td><td><code>#9FC0A3</code> / <code>#B0CDB3</code></td></tr>
+          <tr><td>todos</td><td><code>#2F5F61</code> / <code>#254B4D</code></td><td><code>#82B5B6</code> / <code>#97C5C6</code></td></tr>
+          <tr><td>meals</td><td><code>#8B5A45</code> / <code>#744A38</code></td><td><code>#DCA489</code> / <code>#E4B39C</code></td></tr>
+          <tr><td>pomodoro</td><td><code>#5A5285</code> / <code>#4A4470</code></td><td><code>#B6AEDC</code> / <code>#C7C1E6</code></td></tr>
+          <tr><td>feedback</td><td><code>#6F5570</code> / <code>#5B455C</code></td><td><code>#C4A9C6</code> / <code>#D0BACF</code></td></tr>
+        </tbody>
+      </table>
+
+    <h3>Contrast, measured</h3>
+    <p>Computed with the WCAG 2.1 relative-luminance formula from the values above, not copied from a design tool.</p>
+    <div class="duo">
+      <table class="table">
+        <caption>Light scheme. Body text needs 4.5:1, large text and control boundaries 3:1.</caption>
+        <thead><tr><th>Token</th><th>Role</th><th class="num">Ratio</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>--ink</td><td>body text on the page ground</td><td class="num">15.58</td><td>Pass</td></tr>
+          <tr><td>--ink</td><td>body text on a card</td><td class="num">17.17</td><td>Pass</td></tr>
+          <tr><td>--ink-2</td><td>meta lines, labels on the ground</td><td class="num">6.41</td><td>Pass</td></tr>
+          <tr><td>--ink-3</td><td>quiet counts on the ground</td><td class="num">5.41</td><td>Pass</td></tr>
+          <tr><td>--on-max</td><td>text on the accent fill (neutral default)</td><td class="num">17.17</td><td>Pass</td></tr>
+          <tr><td>--focus</td><td>focus ring on the ground</td><td class="num">6.23</td><td>Pass</td></tr>
+          <tr><td>--line-strong</td><td>control boundary (non-text)</td><td class="num">3.13</td><td>Pass</td></tr>
+          <tr><td>--ok</td><td>done, saved</td><td class="num">6.74</td><td>Pass</td></tr>
+          <tr><td>--warn</td><td>due soon</td><td class="num">5.87</td><td>Pass</td></tr>
+          <tr><td>--danger</td><td>overdue, destructive</td><td class="num">6.41</td><td>Pass</td></tr>
+        </tbody>
+      </table>
+      <table class="table">
+        <caption>Dark scheme. Body text needs 4.5:1, large text and control boundaries 3:1.</caption>
+        <thead><tr><th>Token</th><th>Role</th><th class="num">Ratio</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>--ink</td><td>body text on the page ground</td><td class="num">14.50</td><td>Pass</td></tr>
+          <tr><td>--ink</td><td>body text on a card</td><td class="num">13.20</td><td>Pass</td></tr>
+          <tr><td>--ink-2</td><td>meta lines, labels on the ground</td><td class="num">7.44</td><td>Pass</td></tr>
+          <tr><td>--ink-3</td><td>quiet counts on the ground</td><td class="num">5.90</td><td>Pass</td></tr>
+          <tr><td>--on-max</td><td>text on the accent fill (neutral default)</td><td class="num">14.50</td><td>Pass</td></tr>
+          <tr><td>--focus</td><td>focus ring on the ground</td><td class="num">8.98</td><td>Pass</td></tr>
+          <tr><td>--line-strong</td><td>control boundary (non-text)</td><td class="num">4.21</td><td>Pass</td></tr>
+          <tr><td>--ok</td><td>done, saved</td><td class="num">7.45</td><td>Pass</td></tr>
+          <tr><td>--warn</td><td>due soon</td><td class="num">9.09</td><td>Pass</td></tr>
+          <tr><td>--danger</td><td>overdue, destructive</td><td class="num">6.08</td><td>Pass</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <p class="callout__title">Colour is never the only signal</p>
+      <p>
+        Every status appears as a pill with its own word — Overdue, Due today, Done, Won't do. The pill's tint is
+        reinforcement. Remove all colour and the screen still reads correctly.
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="type">
+    <h2>3 · Type</h2>
+    <p>
+      One system stack at every size —
+      <code>-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif</code> — so the page matches the
+      phone it runs on and no font is ever downloaded. Numbers that change use tabular figures.
+    </p>
+    <div class="specimen">
+      <div class="type-row">
+        <div class="type-row__meta">28px · 700 · 1.14 · -0.021em</div>
+        <div class="type-row__sample" style="font-size:28px;line-height:1.14;font-weight:700;letter-spacing:-0.021em">Page title</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">20px · 700 · 1.25 · -0.015em</div>
+        <div class="type-row__sample" style="font-size:20px;line-height:1.25;font-weight:700;letter-spacing:-0.015em">Sheet title</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">17px · 400 · 1.47</div>
+        <div class="type-row__sample" style="font-size:17px;line-height:1.47;font-weight:400;letter-spacing:0">Body</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">16px · 600 · 1.35 · -0.008em</div>
+        <div class="type-row__sample" style="font-size:16px;line-height:1.35;font-weight:600;letter-spacing:-0.008em">Row title</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">16px · 600 · 1 · -0.005em</div>
+        <div class="type-row__sample" style="font-size:16px;line-height:1;font-weight:600;letter-spacing:-0.005em">Button</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">15px · 600 · 1</div>
+        <div class="type-row__sample" style="font-size:15px;line-height:1;font-weight:600;letter-spacing:0">Chip / segment</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">13.5px · 400 · 1.4</div>
+        <div class="type-row__sample" style="font-size:13.5px;line-height:1.4;font-weight:400;letter-spacing:0">Row meta</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">13px · 650 · 1 · 0.06em</div>
+        <div class="type-row__sample" style="font-size:13px;line-height:1;font-weight:650;letter-spacing:0.06em">Section label</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">12.5px · 600 · 1 · 0.005em</div>
+        <div class="type-row__sample" style="font-size:12.5px;line-height:1;font-weight:600;letter-spacing:0.005em">Pill</div>
+      </div>
+      <div class="type-row">
+        <div class="type-row__meta">12px · 600 · 1 · 0.02em</div>
+        <div class="type-row__sample" style="font-size:12px;line-height:1;font-weight:600;letter-spacing:0.02em">Count</div>
+      </div>
+    </div>
+    <p class="specimen__caption">Page title — one per screen · Sheet title — bottom sheet heading · Body — note body, prose · Row title — list and settings rows · Button — primary and ghost actions · Chip / segment — filter chips, segmented control · Row meta — second line of a row · Section label — uppercase group heading · Pill — status and counts · Count — right side of a section label</p>
+  </section>
+
+  <section class="section" id="space">
+    <h2>4 · Spacing</h2>
+    <p>Every margin, padding and gap is one of these six steps. Nothing uses a value that is not on the scale.</p>
+    <div class="specimen">
+      <div class="space-row">
+        <div class="space-row__bar" style="width:4px"></div>
+        <div class="space-row__label">--s1 · 4px — hairline gaps, pill padding</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:8px"></div>
+        <div class="space-row__label">--s2 · 8px — inside a row, chip gaps</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:12px"></div>
+        <div class="space-row__label">--s3 · 12px — row padding, card inner gaps</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:16px"></div>
+        <div class="space-row__label">--s4 · 16px — screen padding, card padding</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:20px"></div>
+        <div class="space-row__label">--s5 · 20px — button horizontal padding</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:24px"></div>
+        <div class="space-row__label">--s6 · 24px — section spacing, sheet bottom padding</div>
+      </div>
+      <div class="space-row">
+        <div class="space-row__bar" style="width:32px"></div>
+        <div class="space-row__label">--s8 · 32px — empty-state padding</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="shape">
+    <h2>5 · Radii, elevation, motion</h2>
+    <p>Soft corners, ambient shadow instead of a border, and short easing that never overshoots.</p>
+
+    <h3>Radii</h3>
+    <div class="specimen">
+      <div class="radius-row">
+        <div class="radius-demo" style="border-radius:8px" title="checkbox, inner fill">--r-sm<br><span class="swatch__value">8px</span></div>
+        <div class="radius-demo" style="border-radius:12px" title="fields, icon buttons, primary buttons">--r-md<br><span class="swatch__value">12px</span></div>
+        <div class="radius-demo" style="border-radius:16px" title="cards, grouped lists, sheet top corners">--r-lg<br><span class="swatch__value">16px</span></div>
+        <div class="radius-demo" style="border-radius:999px" title="chips, pills, tracks, FAB">--r-pill<br><span class="swatch__value">999px</span></div>
+      </div>
+      <p class="specimen__caption">--r-sm 8px — checkbox, inner fill · --r-md 12px — fields, icon buttons, primary buttons · --r-lg 16px — cards, grouped lists, sheet top corners · --r-pill 999px — chips, pills, tracks, FAB</p>
+    </div>
+
+    <h3>Motion</h3>
+    <div class="specimen">
+      <table class="table">
+        <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td>--d-fast</td><td><code>200ms</code></td><td>fades, chip and row press feedback</td></tr>
+          <tr><td>--d-base</td><td><code>260ms</code></td><td>sheet travel, progress width</td></tr>
+          <tr><td>--ease</td><td><code>cubic-bezier(0.25, 1, 0.5, 1)</code></td><td>every transition, no bounce, no overshoot</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <p class="callout__title">Motion is opt-in, per the OS</p>
+      <p>
+        Every transition lives inside <code>@media (prefers-reduced-motion: no-preference)</code>. There is no
+        animation that repeats, no auto-advancing carousel, no parallax, and nothing strobes. With reduced motion on,
+        the interface has no travel at all — state is simply there.
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="layout">
+    <h2>6 · Layout</h2>
+    <p>
+      A single centred column, 414 CSS px wide — the iPhone 11 width the prototypes are drawn at — with
+      <code>viewport-fit=cover</code> and safe-area padding so nothing hides under a notch or the home indicator. The
+      frame paints the off-white ground edge to edge.
+    </p>
+    <div class="specimen">
+      <table class="table">
+        <thead><tr><th>Rule</th><th>Value</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Column</td><td><code>max-width: 414px</code>, centred</td><td>the width every screen was drawn at; on a phone it is the full width</td></tr>
+          <tr><td>Ground</td><td><code>--page</code> on the frame</td><td>the screen ground; groups and cards sit above it on <code>--surface</code></td></tr>
+          <tr><td>Screen padding</td><td><code>16px</code> inline</td><td>thumb clearance without eating the column</td></tr>
+          <tr><td>Top</td><td><code>env(safe-area-inset-top)</code></td><td>clear the notch and the status bar</td></tr>
+          <tr><td>Bottom</td><td><code>env(safe-area-inset-bottom) + 24px</code></td><td>clear the home indicator, leave room for a thumb</td></tr>
+          <tr><td>Touch target</td><td><code>48px</code> minimum</td><td>a checkbox is 24px painted inside a 48px button</td></tr>
+          <tr><td>Row height</td><td><code>56px</code> minimum</td><td>one comfortable line plus its meta line</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" id="components">
+    <h2>7 · Components</h2>
+    <p>
+      Twenty-four primitives, listed with the app that uses them. The
+      <a href="revised-components.html">revised component specimens</a> page renders every one of them, in both
+      schemes and against each accent.
+    </p>
+    <div class="specimen">
+      <table class="table">
+        <caption>Primitive inventory. Every class here exists in the shipped stylesheet of at least one app file.</caption>
+        <thead><tr><th>Primitive</th><th>Class</th><th>Used by</th></tr></thead>
+        <tbody>
+          <tr><td>Button</td><td><code>.btn, .btn--ghost, .btn--danger</code></td><td>all five</td></tr>
+          <tr><td>Icon button</td><td><code>.iconbtn</code></td><td>all five</td></tr>
+          <tr><td>Floating action</td><td><code>.fab</code></td><td>Notes, Tasks, Meals, Feedback</td></tr>
+          <tr><td>Grouped list</td><td><code>.group, .list__item</code></td><td>all five</td></tr>
+          <tr><td>Row</td><td><code>.row, .row__main, .row__title, .row__meta, .row__trail</code></td><td>all five</td></tr>
+          <tr><td>Checkbox</td><td><code>.check, .check__box</code></td><td>Tasks</td></tr>
+          <tr><td>Pill</td><td><code>.pill--neutral, --ok, --warn, --danger</code></td><td>Tasks, Focus, Feedback</td></tr>
+          <tr><td>Chip filter</td><td><code>.filters, .chip</code></td><td>Notes, Focus, Feedback</td></tr>
+          <tr><td>Segmented control</td><td><code>.seg, .seg__btn</code></td><td>Tasks, Meals, Focus, Feedback, settings</td></tr>
+          <tr><td>Switch in a row</td><td><code>.row__switch</code></td><td>Tasks</td></tr>
+          <tr><td>Search field</td><td><code>.search</code></td><td>Notes</td></tr>
+          <tr><td>Input, textarea, select</td><td><code>.input, .textarea, .select</code></td><td>Notes, Meals, Feedback</td></tr>
+          <tr><td>Card</td><td><code>.card, .card--flush</code></td><td>Meals, Focus, Feedback</td></tr>
+          <tr><td>KPI headline</td><td><code>.kpi, .kpi__unit, .kpi__row</code></td><td>Meals</td></tr>
+          <tr><td>Progress track</td><td><code>.track, .track__fill</code></td><td>Meals, Focus</td></tr>
+          <tr><td>Macro bar</td><td><code>.macro, .macro__label, .macro__value</code></td><td>Meals</td></tr>
+          <tr><td>Facts table</td><td><code>.facts, .fact, .fact__v</code></td><td>Tasks, Meals</td></tr>
+          <tr><td>Countdown</td><td><code>.timer__phase, .timer__time, .timer__hint</code></td><td>Focus</td></tr>
+          <tr><td>Session dots</td><td><code>.dots, .dot, .dot--on</code></td><td>Focus</td></tr>
+          <tr><td>Chart</td><td><code>.chart, .chart__bar, .chart__grid, .chart__target</code></td><td>Focus</td></tr>
+          <tr><td>Empty state</td><td><code>.empty, .empty__title, .empty__body</code></td><td>all five</td></tr>
+          <tr><td>Bottom sheet</td><td><code>.sheet, .scrim, .sheet__grab</code></td><td>all five (feedback form)</td></tr>
+          <tr><td>Section label</td><td><code>.slabel, .slabel__count</code></td><td>all five</td></tr>
+          <tr><td>Editor read-out</td><td><code>.editor-status, .editor-status__dot</code></td><td>Notes, Feedback</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" id="patterns">
+    <h2>8 · Patterns</h2>
+    <p>Six arrangements cover every screen in the five apps. New screens should be one of these, not a new shape.</p>
+
+    <h3>List → detail, never a stack</h3>
+    <p>
+      Tapping a row replaces the screen. The back link sits top-left and names its parent ("Notes", "Meals"), so the
+      header answers "where am I" without a title bar. Escape closes a sub-screen exactly as the back link does.
+    </p>
+
+    <h3>Toolbar save, no bottom button row</h3>
+    <p>
+      A create or edit screen puts its commit action in the header — a checkmark on the right — and its cancel on the
+      left. The body is the form. There is no Save/Cancel pair at the foot of an editor.
+    </p>
+
+    <h3>Settings: Appearance first, feedback last</h3>
+    <p>
+      Every app's settings screen opens with the same three-state Appearance control (Light / Dark / System), then the
+      app's own sections, then a single "Send feedback" row as the last item. The order is identical in all five apps.
+    </p>
+
+    <h3>Sheet for a transient task</h3>
+    <p>
+      The feedback form is the only sheet. It has a grab handle, a title, a backdrop, a close button and Escape. Focus
+      stays inside it while it is open and returns to the trigger on close.
+    </p>
+
+    <h3>Empty states say what to do next</h3>
+    <p>
+      An empty group keeps its heading and shows a sentence, never a blank area: "Nothing yet. 870 kcal left for the
+      day." The heading stays so the layout does not jump when the first row arrives.
+    </p>
+
+    <h3>Counting reads as a sentence</h3>
+    <p>
+      Counts are words, not bare numbers: "3 open · 2 done", "4 notes", "1 task". A filtered list says so — "2 of 4
+      entries" — instead of pretending the list is smaller than it is.
+    </p>
+  </section>
+
+  <section class="section" id="access">
+    <h2>9 · Accessibility contract</h2>
+    <p>The five app files are checked against this list. It is the definition of done, not an aspiration.</p>
+    <div class="specimen">
+      <table class="table">
+        <thead><tr><th>Requirement</th><th>How it is met</th></tr></thead>
+        <tbody>
+          <tr><td>Body contrast</td><td>5.37:1 or better for every text pair, in both schemes</td></tr>
+          <tr><td>Boundary contrast</td><td>3.45:1 light, 3.83:1 dark for control outlines</td></tr>
+          <tr><td>Target size</td><td>48px minimum; a 24px checkbox sits inside a 48px button</td></tr>
+          <tr><td>Focus visible</td><td>2px ring at <code>--focus</code>, 2px offset, on every control</td></tr>
+          <tr><td>Keyboard</td><td>Segmented controls and chip groups are real buttons; Escape closes sheets and sub-screens</td></tr>
+          <tr><td>Focus management</td><td>A screen change moves focus to its heading; a sheet traps Tab and restores focus on close</td></tr>
+          <tr><td>Reduced motion</td><td>Every transition gated on <code>no-preference</code>; no looping animation anywhere</td></tr>
+          <tr><td>Live regions</td><td>Save read-outs and form errors use <code>role="status"</code> with <code>aria-live="polite"</code></td></tr>
+          <tr><td>Not colour alone</td><td>Every status is a word in a pill; charts carry an <code>aria-label</code> with the total</td></tr>
+          <tr><td>Zoom</td><td>No <code>user-scalable=no</code>; text sizes stay relative to the user's setting</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" id="theme">
+    <h2>10 · Theme contract</h2>
+    <p>
+      Three states, one source of truth. <code>System</code> removes the attribute entirely and lets the OS decide;
+      <code>Light</code> and <code>Dark</code> pin it. The choice is stored once and shared by all five apps.
+    </p>
+    <div class="specimen">
+      <table class="table">
+        <thead><tr><th>Piece</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Storage key</td><td><code>calm-theme</code> in <code>localStorage</code></td></tr>
+          <tr><td>Light</td><td><code>:root, [data-theme="light"]</code></td></tr>
+          <tr><td>Dark</td><td><code>[data-theme="dark"]</code></td></tr>
+          <tr><td>System</td><td><code>:root:not([data-theme])</code> plus <code>@media (prefers-color-scheme: dark)</code></td></tr>
+          <tr><td>First paint</td><td>a small inline script sets the attribute before the stylesheet is parsed</td></tr>
+          <tr><td>Controls</td><td><code>[data-theme-set="light|dark|system"]</code>, appearing only in each app's Settings</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The same component, both schemes</h3>
+    <div class="duo">
+      <div class="pane" data-theme="light">
+        <p class="pane__label">Light</p>
+        <div class="sample-on-pane">
+          <div class="group" style="margin-top:12px">
+            <div class="row">
+              <span class="row__main"><span class="row__title">Refill prescription</span><span class="row__meta">Due 17:00 · health</span></span>
+              <span class="row__trail"><span class="pill pill--warn">Due today</span></span>
+            </div>
+            <div class="row row--done">
+              <span class="row__main"><span class="row__title">Water the plants</span><span class="row__meta">Done 09:12</span></span>
+            </div>
+          </div>
+          <div class="specimen__row" style="margin-top:16px">
+            <button class="btn" type="button" style="width:auto">Start focus</button>
+            <button class="btn btn--ghost" type="button" style="width:auto">Reset</button>
+            <span class="chip" aria-pressed="true">All</span>
+          </div>
+        </div>
+      </div>
+      <div class="pane" data-theme="dark">
+        <p class="pane__label">Dark</p>
+        <div class="sample-on-pane">
+          <div class="group" style="margin-top:12px">
+            <div class="row">
+              <span class="row__main"><span class="row__title">Refill prescription</span><span class="row__meta">Due 17:00 · health</span></span>
+              <span class="row__trail"><span class="pill pill--warn">Due today</span></span>
+            </div>
+            <div class="row row--done">
+              <span class="row__main"><span class="row__title">Water the plants</span><span class="row__meta">Done 09:12</span></span>
+            </div>
+          </div>
+          <div class="specimen__row" style="margin-top:16px">
+            <button class="btn" type="button" style="width:auto">Start focus</button>
+            <button class="btn btn--ghost" type="button" style="width:auto">Reset</button>
+            <span class="chip" aria-pressed="true">All</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">
+    Personal Life · revised design system · every ratio on this page is computed from the token values at build time.
+    The five app files live beside this one and share these tokens exactly.
+  </p>
+</div>
+<script>
+
+(function () {
+  'use strict';
+  var root = document.documentElement;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* ---------------- theme ---------------- */
+  function setTheme(choice) {
+    if (choice === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', choice);
+    try { localStorage.setItem('calm-theme', choice); } catch (e) {}
+    $$('[data-theme-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.themeSet === choice ? 'true' : 'false');
+    });
+  }
+  var saved = 'system';
+  try { saved = localStorage.getItem('calm-theme') || 'system'; } catch (e) {}
+  setTheme(saved);
+  $$('[data-theme-set]').forEach(function (b) {
+    b.addEventListener('click', function () { setTheme(b.dataset.themeSet); });
+  });
+
+  /* ---------------- accent ---------------- */
+  function setAccent(name) {
+    if (name === 'neutral') root.removeAttribute('data-accent');
+    else root.setAttribute('data-accent', name);
+    try { localStorage.setItem('calm-accent', name); } catch (e) {}
+    $$('[data-accent-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.accentSet === name ? 'true' : 'false');
+    });
+  }
+  var savedAccent = 'neutral';
+  try { savedAccent = localStorage.getItem('calm-accent') || 'neutral'; } catch (e) {}
+  setAccent(savedAccent);
+  $$('[data-accent-set]').forEach(function (b) {
+    b.addEventListener('click', function () { setAccent(b.dataset.accentSet); });
+  });
+})();
+
+</script>
+</body>
+</html>

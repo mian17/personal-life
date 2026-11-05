@@ -104,8 +104,10 @@ export function journeyChecklist(options: JourneyOptions): JourneyTest[] {
       await trashNote(page, tagged);
       await expect(page.getByText(tagged, { exact: false })).toHaveCount(0);
 
-      // Restore it from the trash page.
-      await page.getByLabel('Trash').click();
+      // Restore it from the trash page, reached through the Settings screen's Trash row.
+      await page.getByLabel('Settings').click();
+      await page.waitForURL(/\/notes\/settings$/, { timeout: 15_000 });
+      await page.getByRole('link', { name: 'Trash' }).click();
       await page.waitForURL(/\/notes\/trash$/, { timeout: 15_000 });
       await expect(page.getByText(tagged, { exact: false })).toBeVisible();
       await restoreNote(page, tagged);
@@ -114,7 +116,9 @@ export function journeyChecklist(options: JourneyOptions): JourneyTest[] {
       await page.getByLabel('Back').click();
       await page.waitForURL(/\/notes$/, { timeout: 15_000 });
       await trashNote(page, tagged);
-      await page.getByLabel('Trash').click();
+      await page.getByLabel('Settings').click();
+      await page.waitForURL(/\/notes\/settings$/, { timeout: 15_000 });
+      await page.getByRole('link', { name: 'Trash' }).click();
       await page.waitForURL(/\/notes\/trash$/, { timeout: 15_000 });
       await deleteForever(page, tagged);
       await expect(page.getByText('Trash is empty.')).toBeVisible();

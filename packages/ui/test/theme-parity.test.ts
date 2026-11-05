@@ -1,172 +1,360 @@
 /**
- * Proves the colour parity the migration rests on: the utility class a rendered primitive
- * carries walks its `var(--…)` chain through `theme.css` and `tokens.css` to the frozen
- * literal, in both themes. jsdom does not resolve `var()`, so the chain is walked through
- * the injected sheets' CSSOM instead of `getComputedStyle`.
+ * Proves the §1 theme plumbing the whole revision rests on: every colour role declared in
+ * `tokens.css` resolves to its revised literal in light and in dark, the explicit `data-theme`
+ * choice and the no-attribute System path carry the same dark set, each app's accent stays
+ * inside its own scope, and `theme.css` exposes that vocabulary to Tailwind without naming a
+ * role `tokens.css` does not declare.
+ *
+ * The stylesheets are read as text rather than through the CSSOM: jsdom drops the
+ * `@media (prefers-color-scheme: dark)` block, which is exactly the System path under test.
+ * The same reading pins the §7 motion gate in `base.css`, and the last two groups read the
+ * app's own sources so the copies of the theme vocabulary that live outside this package
+ * cannot drift from the one `tokens.css` declares.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createElement } from 'react';
-import { render, screen } from '@testing-library/react';
-import { Button } from '../src/components/button';
-import { IconButton } from '../src/components/icon-button';
 
 const STYLES_DIRECTORY = join(__dirname, '../src/styles');
+const COMPONENTS_DIRECTORY = join(__dirname, '../src/components');
+const TOKENS_CSS = readFileSync(join(STYLES_DIRECTORY, 'tokens.css'), 'utf8');
+const THEME_CSS = readFileSync(join(STYLES_DIRECTORY, 'theme.css'), 'utf8');
+const BASE_CSS = readFileSync(join(STYLES_DIRECTORY, 'base.css'), 'utf8');
+/** The app's pre-paint script: the other half of the storage key. */
+const APP_LAYOUT = readFileSync(join(__dirname, '../../../apps/app/app/layout.tsx'), 'utf8');
+/**
+ * Every area layout, concatenated: the accent scope moved off the root script and onto each
+ * segment's own layout, so the scopes the app paints are declared here (one `app="…"` per area).
+ */
+const AREA_LAYOUTS = ['notes', 'todos', '(meals)/meals', 'pomodoro', 'feedback']
+  .map((directory) => readFileSync(join(__dirname, '../../../apps/app/app', directory, 'layout.tsx'), 'utf8'))
+  .join('\n');
 
-const THEMES = ['light', 'dark'] as const;
+const DARK_SCHEME_MEDIA = '@media (prefers-color-scheme: dark)';
+const SYSTEM_ROOT_SELECTOR = ':root:not([data-theme])';
 
-type Theme = (typeof THEMES)[number];
+type Declarations = Record<string, string>;
 
-/** The 11 frozen colours — the same values `tokens.test.ts` pins, read here as parity proof. */
-const FROZEN_COLOURS: Record<Theme, Record<string, string>> = {
-  light: {
-    '--bg': '#f4f5f7',
-    '--panel': '#ffffff',
-    '--text': '#1a1d24',
-    '--muted': '#5c6577',
-    '--accent': '#2f6bff',
-    '--danger': '#d64545',
-    '--danger-soft': '#d97070',
-    '--amber': '#b45309',
-    '--green': '#15803d',
-    '--border': '#dfe3ea',
-    '--on-accent': 'white',
+const LIGHT_SCHEME: Declarations = {
+  '--page': '#f4f4f1',
+  '--surface': '#ffffff',
+  '--surface-sunken': '#f7f7f4',
+  '--press': '#ecece9',
+  '--ink': '#1b1b1f',
+  '--ink-2': '#58585e',
+  '--ink-3': '#63636a',
+  '--line': 'rgba(0, 0, 0, 0.08)',
+  '--line-strong': '#8a8a8a',
+  '--focus': '#2a5d8f',
+  '--ok': '#335b3f',
+  '--ok-soft': '#eaf1ea',
+  '--warn': '#6e5a16',
+  '--warn-soft': '#f5f0e0',
+  '--danger': '#8a3b3b',
+  '--danger-soft': '#f6e9e9',
+  '--chart-muted': '#c9c9c6',
+  '--on-max': '#ffffff',
+};
+
+const DARK_SCHEME: Declarations = {
+  '--page': '#16171a',
+  '--surface': '#1e2024',
+  '--surface-sunken': '#24262b',
+  '--press': '#2c2f35',
+  '--ink': '#e9e7e2',
+  '--ink-2': '#a9a79f',
+  '--ink-3': '#96948d',
+  '--line': 'rgba(255, 255, 255, 0.07)',
+  '--line-strong': '#767b84',
+  '--focus': '#8fbce8',
+  '--ok': '#9fc0a3',
+  '--ok-soft': '#202a21',
+  '--warn': '#d9c68a',
+  '--warn-soft': '#2a2418',
+  '--danger': '#d98c86',
+  '--danger-soft': '#2c1f1f',
+  '--chart-muted': '#3a3d43',
+  '--on-max': '#16171a',
+};
+
+/** §3 one accent per app, for fill, selection and progress only. */
+const ACCENT_ROLES = ['--max', '--max-press'];
+
+/**
+ * Names a component reads but this package never declares: Radix writes the trigger width onto
+ * the element, and the autosuggest row count arrives as an inline style with its own fallback.
+ * They are runtime inputs, so a missing declaration is correct for them and only for them.
+ */
+const RUNTIME_SUPPLIED_VALUES = ['--autosuggest-rows', '--radix-popover-trigger-width'];
+
+const APP_ACCENTS: Record<string, { light: Declarations; dark: Declarations }> = {
+  notes: {
+    light: { '--max': '#4f6b52', '--max-press': '#405743' },
+    dark: { '--max': '#9fc0a3', '--max-press': '#b0cdb3' },
   },
-  dark: {
-    '--bg': '#0f1115',
-    '--panel': '#181b22',
-    '--text': '#e8eaf0',
-    '--muted': '#8b93a7',
-    '--accent': '#5b8cff',
-    '--danger': '#ff6b6b',
-    '--danger-soft': '#ff9e9e',
-    '--amber': '#f2b64c',
-    '--green': '#4cc38a',
-    '--border': '#2a2f3a',
-    '--on-accent': 'white',
+  todos: {
+    light: { '--max': '#2f5f61', '--max-press': '#254b4d' },
+    dark: { '--max': '#82b5b6', '--max-press': '#97c5c6' },
+  },
+  meals: {
+    light: { '--max': '#8b5a45', '--max-press': '#744a38' },
+    dark: { '--max': '#dca489', '--max-press': '#e4b39c' },
+  },
+  pomodoro: {
+    light: { '--max': '#5a5285', '--max-press': '#4a4470' },
+    dark: { '--max': '#b6aedc', '--max-press': '#c7c1e6' },
+  },
+  feedback: {
+    light: { '--max': '#6f5570', '--max-press': '#5b455c' },
+    dark: { '--max': '#c4a9c6', '--max-press': '#d0bacf' },
   },
 };
 
-injectStylesheets();
-
-describe.each(THEMES)('the %s theme', (theme) => {
-  beforeEach(() => {
-    document.documentElement.dataset.theme = theme;
+describe('the light scheme', () => {
+  it('declares every revised colour role on :root with its frozen literal', () => {
+    expect(declarationsOf(TOKENS_CSS, ':root')).toMatchObject(LIGHT_SCHEME);
   });
 
-  afterEach(() => {
-    delete document.documentElement.dataset.theme;
-  });
-
-  it('holds all eleven frozen colours', () => {
-    expect(Object.keys(FROZEN_COLOURS[theme])).toHaveLength(11);
-  });
-
-  it('resolves every frozen colour on a rendered element to its frozen literal', () => {
-    for (const token of Object.keys(FROZEN_COLOURS[theme])) {
-      const probe = renderColourProbe(token);
-      expectFrozenColour(probe, `bg-${token.slice('--'.length)}`);
-    }
-  });
-
-  it('paints the converted primary Button in the frozen accent and on-accent', () => {
-    render(createElement(Button, null, 'Save'));
-
-    const button = screen.getByRole('button', { name: 'Save' });
-    expectFrozenColour(button, 'bg-accent');
-    expectFrozenColour(button, 'text-on-accent');
-  });
-
-  it('paints the converted default IconButton in the frozen panel, text and border', () => {
-    render(createElement(IconButton, { label: 'Delete' }, '×'));
-
-    const iconButton = screen.getByRole('button', { name: 'Delete' });
-    expectFrozenColour(iconButton, 'bg-panel');
-    expectFrozenColour(iconButton, 'text-text');
-    expectFrozenColour(iconButton, 'border-border');
-  });
-
-  it('fails rather than defaults when theme.css does not map a token', () => {
-    expect(() => resolveColourToken('--unmapped')).toThrow(/theme.css does not map --unmapped/);
+  it('paints a raised surface above the ground it sits on', () => {
+    const light = declarationsOf(TOKENS_CSS, ':root');
+    expect(relativeLuminance(light['--surface'])).toBeGreaterThan(relativeLuminance(light['--page']));
   });
 });
 
-function renderColourProbe(token: string): HTMLElement {
-  const colourName = token.slice('--'.length);
-  render(createElement('span', { 'data-testid': `probe-${colourName}`, className: `bg-${colourName}` }));
-  return screen.getByTestId(`probe-${colourName}`);
+describe('the dark scheme', () => {
+  it('declares every revised colour role under data-theme="dark" with its frozen literal', () => {
+    expect(declarationsOf(TOKENS_CSS, ":root[data-theme='dark']")).toMatchObject(DARK_SCHEME);
+  });
+
+  it('differs from light in every role, so the two schemes cannot drift into one', () => {
+    const sharedRoles = Object.keys(LIGHT_SCHEME).filter((role) => LIGHT_SCHEME[role] === DARK_SCHEME[role]);
+    expect(sharedRoles).toEqual([]);
+  });
+
+  it('keeps the raised surface above the ground, so the layering survives the flip', () => {
+    const dark = declarationsOf(TOKENS_CSS, ":root[data-theme='dark']");
+    expect(relativeLuminance(dark['--surface'])).toBeGreaterThan(relativeLuminance(dark['--page']));
+  });
+});
+
+describe('the System choice', () => {
+  it('restates the whole dark set when no theme attribute is chosen', () => {
+    const system = systemScheme();
+    expect(system).toMatchObject(DARK_SCHEME);
+  });
+
+  it('is the only path that consults the OS, so an explicit choice always wins', () => {
+    expect(TOKENS_CSS).toContain(DARK_SCHEME_MEDIA);
+    expect(declarationsOf(TOKENS_CSS, ':root')).toMatchObject(LIGHT_SCHEME);
+  });
+});
+
+describe.each(Object.keys(APP_ACCENTS))('the %s accent', (app) => {
+  it('is declared inside its own scope in light, never on :root', () => {
+    expect(declarationsOf(TOKENS_CSS, `[data-app='${app}']`)).toEqual(APP_ACCENTS[app].light);
+    expect(declarationsOf(TOKENS_CSS, ':root')['--max']).toBeUndefined();
+  });
+
+  it('follows the chosen dark scheme under data-theme="dark"', () => {
+    expect(declarationsOf(TOKENS_CSS, `[data-theme='dark'] [data-app='${app}']`)).toEqual(APP_ACCENTS[app].dark);
+  });
+
+  it('follows the OS under System', () => {
+    expect(declarationsOf(systemStylesheet(), `${SYSTEM_ROOT_SELECTOR} [data-app='${app}']`)).toEqual(
+      APP_ACCENTS[app].dark,
+    );
+  });
+});
+
+describe('theme.css', () => {
+  it('maps every revised colour role to a var() over tokens.css, and nothing else', () => {
+    expect(tailwindColourRoles()).toEqual(expectedTailwindRoles());
+  });
+
+  /**
+   * The `@theme` map below is published on `:root`, but `--max` and `--max-press` are declared
+   * on the app's own scope, and a custom property substitutes where it is declared — so the
+   * root alias would resolve against an undefined `--max` and every accent fill would paint
+   * nothing. Re-declaring the pair inside the scope that defines it is the mechanism by which
+   * an accent reaches a utility; without it `bg-max` is dead in every app.
+   */
+  it('re-declares the accent pair inside the scope that defines it, so a utility can reach it', () => {
+    expect(declarationsOf(THEME_CSS, '[data-app]')).toEqual({
+      '--color-max': 'var(--max)',
+      '--color-max-press': 'var(--max-press)',
+    });
+  });
+
+  it('fails rather than defaults when asked for a role it does not map', () => {
+    expect(() => tailwindColourRole('--unmapped')).toThrow(/theme.css does not map --unmapped/);
+  });
+});
+
+describe('the values a component reads', () => {
+  /**
+   * A component sits inside one of the app's accent scopes, so `--max` and `--max-press` reach
+   * it from there rather than from `:root`. Every other name it reads has to be a root token.
+   */
+  it('leaves no name undefined that a component reads through var()', () => {
+    const declared = new Set([
+      ...Object.keys(declarationsOf(TOKENS_CSS, ':root')),
+      ...ACCENT_ROLES,
+    ]);
+    const undefinedNames = referencedValues(componentSources())
+      .filter((name) => !declared.has(name) && !RUNTIME_SUPPLIED_VALUES.includes(name))
+      .sort();
+
+    expect(undefinedNames).toEqual([]);
+  });
+});
+
+describe('the §4 type baseline', () => {
+  /**
+   * The baseline belongs to `body`, not to `html`: the root font-size is the unit the whole
+   * Tailwind scale is written in, so moving it to 17px would rescale every rem-based utility
+   * by 6.25% and shrink `h-12` from the 48px tap target to 51px. The revised reset splits the
+   * same way — `html` takes the text-size-adjust, `body` takes the type.
+   */
+  it('lands on body alone, so the root font-size stays at the UA default', () => {
+    expect(ruleBody(BASE_CSS, 'html')).toContain('-webkit-text-size-adjust: 100%');
+    expect(ruleBody(BASE_CSS, 'html')).not.toContain('font-size');
+    expect(ruleBody(BASE_CSS, 'body')).toContain('font-size: var(--fs-body)');
+    expect(ruleBody(BASE_CSS, 'body')).toContain('line-height: var(--lh-body)');
+  });
+
+  it('gives every number that changes a fixed-width digit', () => {
+    expect(ruleBody(BASE_CSS, 'body')).toContain('font-variant-numeric: tabular-nums');
+  });
+});
+
+describe('the motion policy', () => {
+  /**
+   * §7 motion is opt-in, and every `transition-*` utility in `packages/ui` carries the
+   * `motion-safe:` variant, so its compiled declaration sits inside a `no-preference` query.
+   * That gate is what supplies the two durations: `--d-fast` for the ordinary transitions
+   * through Tailwind's defaults, and `--d-base` for the one primitive that travels slower (the
+   * list row's collapse), named there by its class. The `reduce` block beneath the gate is the
+   * backstop that collapses every duration it let through.
+   */
+  it('declares every duration inside the gate the OS opens, and none outside it', () => {
+    const allowedMotion = motionSection('no-preference');
+    expect(allowedMotion).toContain('--default-transition-duration: var(--d-fast)');
+    expect(allowedMotion).toContain('--default-transition-timing-function: var(--ease)');
+    expect(allowedMotion).toMatch(/\.ui-list-item\s*\{\s*transition-duration: var\(--d-base\)/);
+    expect(componentSources()).not.toMatch(/duration-\[/);
+  });
+
+  it('puts every transition utility behind the motion-safe variant, so the gate covers it', () => {
+    expect(componentSources()).not.toMatch(/(?<!motion-safe:)\btransition-/);
+  });
+
+  it('collapses every duration when the OS asks for less', () => {
+    const reducedMotion = motionSection('reduce');
+    expect(reducedMotion).toContain('transition-duration: 0.001ms !important');
+    expect(reducedMotion).toContain('animation-duration: 0.001ms !important');
+    expect(reducedMotion).toContain('animation-iteration-count: 1 !important');
+  });
+
+  it('has no looping animation for the cap to truncate', () => {
+    expect(BASE_CSS).not.toContain('infinite');
+  });
+});
+
+describe('the app appearance script', () => {
+  it('reads the one storage key the toggle writes, so a stored choice reaches first paint', () => {
+    expect(APP_LAYOUT).toContain("localStorage.getItem('calm-theme')");
+  });
+
+  it('scopes every accent the area layouts declare, and declares exactly the scopes tokens.css names', () => {
+    expect(accentScopesIn(AREA_LAYOUTS)).toEqual(accentScopesIn(TOKENS_CSS));
+  });
+});
+
+/** Every custom property a source text reads through `var()`, deduplicated. */
+function referencedValues(source: string): string[] {
+  return [...new Set([...source.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name))];
 }
 
-function expectFrozenColour(element: Element, utilityClass: string): void {
-  const token = `--${utilityClass.slice(utilityClass.indexOf('-') + 1)}`;
-  expect(element.classList.contains(utilityClass)).toBe(true);
-  expect(resolveColourToken(token)).toBe(FROZEN_COLOURS[appliedTheme()][token]);
+/** The `data-app` scopes a stylesheet names, or the `app` each area layout renders it with. */
+function accentScopesIn(source: string): string[] {
+  const scopes = [...source.matchAll(/\[data-app='([\w-]+)'\]/g)].map(([, app]) => app);
+  const declaredInLayout = [...source.matchAll(/<RouteLayout app="([\w-]+)"/g)].map(([, app]) => app);
+  return [...new Set([...scopes, ...declaredInLayout])].sort();
 }
 
-function injectStylesheets(): void {
-  appendStylesheet('tokens.css');
-  appendStylesheet('theme.css');
+function componentSources(): string {
+  return readdirSync(COMPONENTS_DIRECTORY)
+    .map((file) => readFileSync(join(COMPONENTS_DIRECTORY, file), 'utf8'))
+    .join('\n');
 }
 
-function appendStylesheet(file: string): void {
-  const style = document.createElement('style');
-  style.textContent = readFileSync(join(STYLES_DIRECTORY, file), 'utf8');
-  document.head.append(style);
+/** WCAG relative luminance, so "lighter" is a measurement rather than an opinion. */
+function relativeLuminance(colour: string): number {
+  const channels = colour.replace('#', '').match(/../g) ?? [];
+  if (channels.length !== 3) throw new Error(`${colour} is not a six-digit hex colour`);
+  const [red, green, blue] = channels.map((channel) => {
+    const value = parseInt(channel, 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-function appliedTheme(): Theme {
-  const theme = document.documentElement.dataset.theme;
-  if (theme !== 'light' && theme !== 'dark') throw new Error(`No theme applied: ${theme}`);
-  return theme;
+function motionSection(preference: 'no-preference' | 'reduce'): string {
+  const query = `@media (prefers-reduced-motion: ${preference})`;
+  const queryStart = BASE_CSS.indexOf(query);
+  if (queryStart === -1) throw new Error(`base.css does not declare ${query}`);
+  return bracedBlockAt(BASE_CSS, BASE_CSS.indexOf('{', queryStart));
 }
 
-function palette(): Record<string, string> {
-  return {
-    ...declarationsIn(':root'),
-    ...declarationsIn(`:root[data-theme='${appliedTheme()}']`),
-  };
+function expectedTailwindRoles(): Declarations {
+  const roles = [...Object.keys(LIGHT_SCHEME), ...ACCENT_ROLES];
+  return Object.fromEntries(roles.map((role) => [`--color-${role.slice('--'.length)}`, `var(${role})`]));
 }
 
-function resolveColourToken(token: string): string {
-  const mapping = declarationsIn('@theme')[`--color-${token.slice('--'.length)}`];
-  if (mapping === undefined) throw new Error(`theme.css does not map ${token}`);
-  return resolveVariableChain(mapping);
+function tailwindColourRoles(): Declarations {
+  return Object.fromEntries(
+    Object.entries(declarationsOf(THEME_CSS, '@theme')).filter(([name]) => name.startsWith('--color-')),
+  );
 }
 
-function resolveVariableChain(value: string): string {
-  const declarations = palette();
-  let literal = value;
-  while (literal.startsWith('var(')) {
-    const referenced = literal.slice('var('.length, -1).trim();
-    const declared = declarations[referenced];
-    if (declared === undefined) throw new Error(`tokens.css does not declare ${referenced}`);
-    literal = declared;
+function tailwindColourRole(role: string): string {
+  const mapped = tailwindColourRoles()[`--color-${role.slice('--'.length)}`];
+  if (mapped === undefined) throw new Error(`theme.css does not map ${role}`);
+  return mapped;
+}
+
+/** The dark set carried by the OS path, spliced out of its media block for the text parser. */
+function systemScheme(): Declarations {
+  return declarationsOf(systemStylesheet(), SYSTEM_ROOT_SELECTOR);
+}
+
+function systemStylesheet(): string {
+  return bracedBlockAt(TOKENS_CSS, TOKENS_CSS.indexOf('{', TOKENS_CSS.indexOf(DARK_SCHEME_MEDIA)));
+}
+
+function declarationsOf(stylesheet: string, selector: string): Declarations {
+  return customPropertiesIn(ruleBody(stylesheet, selector));
+}
+
+function ruleBody(stylesheet: string, selector: string): string {
+  const selectorStart = stylesheet.indexOf(`${selector} {`);
+  if (selectorStart === -1) throw new Error(`Stylesheet does not declare ${selector}`);
+  return bracedBlockAt(stylesheet, stylesheet.indexOf('{', selectorStart));
+}
+
+function bracedBlockAt(stylesheet: string, openBrace: number): string {
+  let depth = 0;
+  for (let position = openBrace; position < stylesheet.length; position += 1) {
+    if (stylesheet[position] === '{') depth += 1;
+    if (stylesheet[position] === '}') depth -= 1;
+    if (depth === 0) return stylesheet.slice(openBrace + 1, position);
   }
-  return literal;
+  throw new Error(`Unbalanced braces at offset ${openBrace}`);
 }
 
-function declarationsIn(selector: string): Record<string, string> {
-  return customPropertiesOf(findStyleRule(selector).style);
-}
-
-function findStyleRule(selector: string): CSSStyleRule {
-  for (const sheet of Array.from(document.styleSheets)) {
-    for (const rule of Array.from(sheet.cssRules)) {
-      if (styleRuleSelector(rule) === selector) return rule as CSSStyleRule;
-    }
+function customPropertiesIn(block: string): Declarations {
+  const declarations: Declarations = {};
+  for (const [, name, value] of block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
+    declarations[name] = value.trim();
   }
-  throw new Error(`Stylesheet rule not found: ${selector}`);
-}
-
-function styleRuleSelector(rule: CSSRule): string | undefined {
-  const { selectorText } = rule as CSSStyleRule;
-  return typeof selectorText === 'string' ? selectorText : undefined;
-}
-
-function customPropertiesOf(style: CSSStyleDeclaration): Record<string, string> {
-  const properties: Record<string, string> = {};
-  for (const name of Array.from(style)) {
-    if (name.startsWith('--')) properties[name] = style.getPropertyValue(name).trim();
-  }
-  return properties;
+  return declarations;
 }

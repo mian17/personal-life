@@ -25,7 +25,7 @@ describe('SettingsBlock', () => {
     expect(document.querySelector('.ui-section__heading-row')).toBeNull();
   });
 
-  it('renders children in order inside the composed card surface', () => {
+  it('renders children in order on the flush card, one per divided row', () => {
     render(
       <SettingsBlock title="Todos">
         <span data-testid="a">a</span>
@@ -34,10 +34,44 @@ describe('SettingsBlock', () => {
       </SettingsBlock>,
     );
     const card = document.querySelector('.ui-card')!;
-    const stack = card.querySelector('.ui-stack')!;
-    expect(stack.querySelectorAll('[data-testid]')).toHaveLength(3);
+    // The group owns the row geometry: the card is flush and one rows box inside it
+    // carries the inset and the hairline between neighbours.
+    expect(card.classList.contains('ui-card--flush')).toBe(true);
+    const rows = card.querySelector('.ui-settings-block__rows')!;
+    expect(rows.querySelectorAll('[data-testid]')).toHaveLength(3);
     expect(card.textContent).toBe('abc');
     expect(document.querySelector('.ui-section')!.querySelector('.ui-card')).toBe(card);
+    expect(rows.classList.contains('divide-y')).toBe(true);
+    expect(rows.classList.contains('[&>*]:px-[var(--s4)]')).toBe(true);
+  });
+
+  it('draws the footer on the card under the rows, in its own inset', () => {
+    render(
+      <SettingsBlock title="Focus" footer={<button type="submit">Save goal</button>}>
+        <span data-testid="body" />
+      </SettingsBlock>,
+    );
+    const card = document.querySelector('.ui-card')!;
+    const rows = card.querySelector('.ui-settings-block__rows')!;
+    const footer = card.querySelector('.ui-settings-block__footer')!;
+    // The footer is the card's second child, outside the divided rows box, so the block's
+    // row inset never reaches the button that lands in it.
+    expect(footer.parentElement).toBe(card);
+    expect(rows.contains(footer)).toBe(false);
+    expect(rows.querySelectorAll('[data-testid]')).toHaveLength(1);
+    expect(screen.getByRole('button').closest('.ui-settings-block__footer')).toBe(footer);
+    expect(footer.classList.contains('px-[var(--s4)]')).toBe(true);
+    expect(footer.classList.contains('py-[var(--s3)]')).toBe(true);
+    expect(footer.classList.contains('border-t')).toBe(true);
+  });
+
+  it('draws no footer node when the block has no closing action', () => {
+    render(
+      <SettingsBlock title="Comfort">
+        <span />
+      </SettingsBlock>,
+    );
+    expect(document.querySelector('.ui-settings-block__footer')).toBeNull();
   });
 
   it('merges className onto the composed section', () => {

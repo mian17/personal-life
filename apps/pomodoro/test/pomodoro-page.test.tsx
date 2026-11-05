@@ -1,14 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PomodoroPage } from '../src/pomodoro-page';
-import { DEFAULT_DURATIONS, MINUTE_MS } from '../src/timer';
+import { DEFAULT_DURATIONS, MINUTE_MS, SESSIONS_PER_CYCLE } from '../src/timer';
 
-/**
- * The card centres its rows with `place-content`, so a row that unmounts makes
- * the card shorter and the whole read-out shifts by half of what was lost. Every
- * row therefore stays mounted and only loses its paint — this is the property,
- * not the class name: the row is still the same node, in the same position, and
- * the card still has the same number of children.
- */
 /** The mode the hook writes back on every settle, which is also what a reload restores. */
 function storeMode(mode: {
   phase: string;
@@ -47,7 +40,7 @@ describe('PomodoroPage', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
   }
 
-  /** The card's rows are the layout: a row that unmounts shrinks the centring. */
+  /** The card's rows are the layout: a row that unmounts shrinks the card's rhythm. */
   function actionRow(button: HTMLElement): HTMLElement {
     const row = button.parentElement;
     if (!row) throw new Error('action button has no parent row');
@@ -59,24 +52,26 @@ describe('PomodoroPage', () => {
 
     const start = screen.getByRole('button', { name: 'Start focus' });
     const row = actionRow(start);
-    const stack = row.parentElement;
-    const rows = stack?.children.length ?? 0;
+    const card = row.parentElement;
+    const slot = Array.from(card?.children ?? []).indexOf(row);
+    const rows = card?.children.length ?? 0;
     expect(row.classList.contains('ui-invisible')).toBe(false);
     expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 
     // Same node, same slot: the label changes, the box does not move or vanish.
-    expect(stack?.children[4]).toBe(row);
+    expect(slot).toBeGreaterThan(-1);
+    expect(card?.children[slot]).toBe(row);
     expect(start.isConnected).toBe(true);
     expect(start.textContent).toBe('Pause');
-    expect(stack?.children.length).toBe(rows);
+    expect(card?.children.length).toBe(rows);
     expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 
     expect(start.textContent).toBe('Resume');
-    expect(stack?.children[4]).toBe(row);
+    expect(card?.children[slot]).toBe(row);
   });
 
   it('cannot reset before the cycle has begun', () => {
@@ -182,4 +177,56 @@ describe('PomodoroPage', () => {
     expect(screen.getByText(/^Next: /u)).toBe(line);
     expect(line.classList.contains('ui-invisible')).toBe(true);
   });
+
+  it('draws the session progress track from the phase the card is counting', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    // Nothing spent before the first start: the track is drawn at rest, at zero.
+    expect(progress()).toBe('0');
+  });
+
+  it('marks the chip of the focus length the settings chose as the pressed one', () => {
+    render(<PomodoroPage durations={{ ...DEFAULT_DURATIONS, focus: 50 }} />);
+
+    const pressed = screen
+      .getAllByText(/^\d+ min$/u)
+      .filter((chip) => chip.closest('.ui-pill--active') != null);
+
+    expect(pressed.map((chip) => chip.textContent)).toEqual(['50 min']);
+  });
+
+  it('names the cycle position in the Today count', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByText(`0 of ${SESSIONS_PER_CYCLE}`)).toBeTruthy();
+  });
+
+  it('reads the day the page handed the card as two pill rows', () => {
+    render(
+      <PomodoroPage durations={DEFAULT_DURATIONS} todayMinutes={50} todayGoalMinutes={100} />,
+    );
+
+    expect(rowTrail('Blocks finished')).toBe('50 min');
+    expect(rowTrail('Daily goal')).toBe('50 of 100 min');
+  });
+
+  it('draws no day rows when the page handed the card nothing to read', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.queryByText('Blocks finished')).toBeNull();
+    expect(screen.queryByText('Daily goal')).toBeNull();
+  });
+
+  /** The track's own read-out: `<progress>` exposes its value as the element's `value`. */
+  function progress(): string {
+    return screen.getByRole('progressbar').getAttribute('aria-valuenow') ?? '';
+  }
+
+  /** The trailing pill of a read-out row, read by its label. */
+  function rowTrail(title: string): string | null {
+    const label = screen.getByText(title);
+    const row = label.closest('li');
+    if (!row) throw new Error(`no row for ${title}`);
+    return within(row).getByText(/min$/u).textContent;
+  }
 });

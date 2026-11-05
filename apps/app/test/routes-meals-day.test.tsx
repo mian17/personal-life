@@ -1,5 +1,5 @@
-import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
-import { formatDate, PageShell } from '@life/ui';
+import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
+import { formatLongDate, ListShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
@@ -75,13 +75,14 @@ describe('/meals day route wiring', () => {
     const el = await MealsPage();
 
     const html = renderToStaticMarkup(el);
-    expect(html).toContain(`Meals — ${formatDate('2026-10-03')}`);
+    expect(html).toContain('>Meals</h1>');
+    expect(html).toContain(formatLongDate('2026-10-03'));
   });
 
-  it('renders PageShell and the empty state when the day has no entries', async () => {
+  it('renders the shared ListShell and the empty state when the day has no entries', async () => {
     const el = await MealsPage();
 
-    expect(el.type).toBe(PageShell);
+    expect(el.type).toBe(ListShell);
     const html = renderToStaticMarkup(el);
     expect(html).toContain('No meals logged today.');
   });
@@ -95,7 +96,11 @@ describe('/meals day route wiring', () => {
     const el = await MealsPage();
     const html = renderToStaticMarkup(el);
 
-    expect(html).toContain(format('calories', 600));
+    // `Kpi` splits the read-out into two slots, so the figure is asserted in the
+    // value slot rather than as one `format('calories', …)` literal; the no-target
+    // path (this route mocks a 404 target) is the `"kcal — No target set"` unit.
+    expect(html).toMatch(/ui-kpi__value[^>]*>600</);
+    expect(html).toContain('kcal — No target set');
     expect(html).not.toContain('No meals logged today.');
   });
 });

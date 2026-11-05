@@ -7,9 +7,10 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-const SECTION_UTILITY = 'mt-[var(--space-2)]';
+const SECTION_UTILITY = 'mt-[var(--s6)]';
 const AUTO_HIDE_UTILITY = '[&:has(.ui-list):not(:has(.ui-list-item))]:hidden';
-const HEADING_MARGIN_UTILITY = '[&>:is(h2,h3)]:m-[0_0_var(--space-0-5)]';
+const HEADING_MARGIN_UTILITY = '[&>:is(h2,h3)]:m-0';
+const LABEL_GAP_UTILITY = 'mb-[var(--s2)]';
 
 describe('Section', () => {
   it('renders a <section> landmark carrying the body', () => {
@@ -78,10 +79,91 @@ describe('Section', () => {
     expect(row.firstElementChild).toBe(heading);
   });
 
+  it('renders the count at the heading row far end, styled per §8 `.slabel__count`', () => {
+    render(
+      <Section label="Items" count={3}>
+        x
+      </Section>,
+    );
+    const row = document.querySelector('.ui-section__heading-row')!;
+    const count = document.querySelector('.ui-section__count')!;
+    expect(row.contains(count)).toBe(true);
+    expect(count.tagName).toBe('SPAN');
+    expect(count.textContent).toBe('3');
+    expect(row.lastElementChild).toBe(count);
+
+    const classes = classesOf(count);
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'text-[length:var(--fs-count)]',
+        '[font-weight:var(--fw-semibold)]',
+        'tracking-[var(--tracking-count)]',
+        'normal-case',
+        'text-ink-3',
+        'ml-auto',
+      ]),
+    );
+    // The label's uppercase treatment is scoped to the heading; the count never takes it.
+    expect(classes).not.toContain('[&>:is(h2,h3)]:uppercase');
+  });
+
+  it('lets the count trail the label while the action keeps the far end', () => {
+    render(
+      <Section
+        label="Items"
+        count={3}
+        actions={
+          <button type="button" data-testid="action">
+            Add item
+          </button>
+        }
+      >
+        x
+      </Section>,
+    );
+    const row = document.querySelector('.ui-section__heading-row')!;
+    const heading = screen.getByRole('heading', { level: 2 });
+    const count = document.querySelector('.ui-section__count')!;
+    const actions = document.querySelector('.ui-section__actions')!;
+    expect(Array.from(row.children)).toEqual([heading, count, actions]);
+    expect(count.classList.contains('ml-auto')).toBe(false);
+    expect(actions.classList.contains('ml-auto')).toBe(true);
+  });
+
+  it('renders no count element when count is absent, leaving the row as before', () => {
+    render(
+      <Section label="Today" actions={<button type="button">Edit</button>}>
+        x
+      </Section>,
+    );
+    expect(document.querySelector('.ui-section__count')).toBeNull();
+    expect(Array.from(document.querySelector('.ui-section__heading-row')!.children)).toEqual([
+      screen.getByRole('heading', { level: 2 }),
+      document.querySelector('.ui-section__actions'),
+    ]);
+  });
+
+  it('renders no count element without a label', () => {
+    render(<Section count={3}>x</Section>);
+    expect(document.querySelector('.ui-section__count')).toBeNull();
+    expect(document.querySelector('.ui-section__heading-row')).toBeNull();
+  });
+
+  it('styles the count through tokens only and renders any node', () => {
+    render(
+      <Section label="Items" count={<strong>3</strong>}>
+        x
+      </Section>,
+    );
+    const count = document.querySelector('.ui-section__count')!;
+    expect(count.querySelector('strong')!.textContent).toBe('3');
+    expect(classesOf(count).join(' ')).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(|\d+px|\d+rem/);
+  });
+
   it.each<[StackGap, string]>([
-    ['sm', '--space-0-5'],
-    ['md', '--space-1'],
-    ['lg', '--space-2'],
+    ['sm', '--s1'],
+    ['md', '--s2'],
+    ['lg', '--s4'],
   ])('composes a Stack body mapped through gap="%s" (%s)', (gap, token) => {
     render(<Section gap={gap}>x</Section>);
     const stack = document.querySelector('.ui-stack')!;
@@ -98,12 +180,20 @@ describe('Section', () => {
     expect(stack.classList.contains('ui-stack--lg')).toBe(false);
   });
 
-  it('owns the outer --space-2 rhythm while the heading owns its --space-0-5 gap', () => {
+  it('owns the outer --s6 rhythm while the label owns its own --s2 gap', () => {
     render(<Section label="Today">x</Section>);
     expect(classesOf(document.querySelector('.ui-section')!)).toContain(SECTION_UTILITY);
-    expect(
-      classesOf(document.querySelector('.ui-section__heading-row')!),
-    ).toContain(HEADING_MARGIN_UTILITY);
+
+    // §8's `.slabel`: the small-caps treatment rides the heading row's children, so the
+    // heading keeps its own hook alone and no type utility is pinned on it directly.
+    const rowClasses = classesOf(document.querySelector('.ui-section__heading-row')!);
+    expect(rowClasses).toContain(HEADING_MARGIN_UTILITY);
+    expect(rowClasses).toContain(LABEL_GAP_UTILITY);
+    expect(rowClasses).toContain('[&>:is(h2,h3)]:uppercase');
+    expect(rowClasses).toContain('[&>:is(h2,h3)]:text-[length:var(--fs-section-label)]');
+
+    // A section without a label carries no label gap: the utility only exists on the row.
+    expect(classesOf(document.querySelector('.ui-section')!)).not.toContain(LABEL_GAP_UTILITY);
   });
 
   it('collapses a group section whose every row was removed', () => {

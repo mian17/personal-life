@@ -12,11 +12,101 @@
   }
 }
 
-html,
+/* §1 the ground paints edge to edge and every raised surface floats on it; §4 body is
+   17px / 1.47 in the one system stack, at weight 400.
+
+   The type baseline lands on `body` alone, exactly as the revised reset does (`html` keeps
+   only the text-size-adjust), because the root font-size is the unit Tailwind's scale is
+   written in: `--spacing` is 0.25rem, so `h-12` is 48px only while the root stays at the
+   UA's 16px. Moving 17px onto `html` would rescale every rem-based utility by 6.25% and
+   quietly break the 48px tap target. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: var(--font-size)/var(--leading) var(--font-stack);
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-stack);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-body);
+  line-height: var(--lh-body);
+  /* §4 every number that changes keeps its width, so digits do not jump. Declared once here
+     rather than restated by each read-out; the rule is a no-op for text without digits.
+     ponytail: narrow it to a `.ui-tabular-nums` class when Task 4 restyles the read-outs and
+     the per-primitive opt-in becomes cheaper than one inherited declaration. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* §7 motion is opt-in, and this gate is what supplies its durations. Every `transition-*`
+   utility in `packages/ui` carries the `motion-safe:` variant, so its compiled declaration
+   sits inside a `no-preference` query and reads its length and curve from Tailwind's two
+   transition defaults below — no primitive restates a duration. */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    --default-transition-duration: var(--d-fast);
+    --default-transition-timing-function: var(--ease);
+  }
+
+  /* Two slow transitions, both named by class: the list row's collapse, and the bottom
+     sheet travelling its own height. Every other transition keeps the fast default. */
+  .ui-list-item {
+    transition-duration: var(--d-base);
+  }
+
+  .ui-dialog--sheet {
+    transition-duration: var(--d-base);
+  }
+
+  /* The sheet's exit is a keyframe, not a transition. Radix's Presence holds the closed element
+     mounted only while `animation-name` resolves to something it can wait on — it listens for
+     `animationend`/`animationcancel` and never for `transitionend` — so the entrance may stay a
+     `@starting-style` transition while the exit must animate. Keyed on the closed state, because
+     that is the frame the presence is leaving on. */
+  .ui-dialog--sheet[data-state='closed'] {
+    animation: ui-sheet-out var(--d-base) var(--ease);
+  }
+
+  /* The scrim is shared by every dialog size, so only the sheet's overlay carries this class. */
+  .ui-dialog__scrim--sheet[data-state='closed'] {
+    animation: ui-scrim-out var(--d-fast) var(--ease);
+  }
+
+  /* Down its own height, ending where the panel's base `translate-y-full` already rests, so there
+     is no jump when the animation hands the property back. The x comes from the `-translate-x-1/2`
+     utility, not a hardcoded `-50%`, so a different x utility still travels straight down. */
+  @keyframes ui-sheet-out {
+    from {
+      translate: var(--tw-translate-x, 0px) 0;
+    }
+
+    to {
+      translate: var(--tw-translate-x, 0px) 100%;
+    }
+  }
+
+  @keyframes ui-scrim-out {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
+}
+
+/* The backstop under the gate: `reduce` collapses every duration the gate let through.
+   0.001ms rather than 0s, so a component that waits on `transitionend` still hears it; every
+   looping animation is capped at one iteration for the same reason: no ticker exists here. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

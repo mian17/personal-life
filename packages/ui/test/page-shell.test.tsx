@@ -18,11 +18,11 @@ describe('PageShell', () => {
   it('takes its width, centring and safe-area padding from utilities rather than a stylesheet rule', () => {
     render(<PageShell>content</PageShell>);
     const classes = classesOf(screen.getByRole('main'));
-    expect(classes).toContain('max-w-[var(--content-width)]');
+    expect(classes).toContain('max-w-[var(--frame-max)]');
     expect(classes).toContain('mx-auto');
-    expect(classes).toContain('px-[var(--space-1)]');
-    expect(classes).toContain('pt-[var(--space-1)]');
-    expect(classes).toContain('pb-[calc(var(--space-5)+env(safe-area-inset-bottom))]');
+    expect(classes).toContain('px-[var(--s4)]');
+    expect(classes).toContain('pt-[var(--s4)]');
+    expect(classes).toContain('pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]');
   });
 
   it('renders its children inside the landmark', () => {

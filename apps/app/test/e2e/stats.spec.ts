@@ -92,14 +92,14 @@ async function recordFocusBlock(page: Page): Promise<void> {
   await recorded;
 }
 
-/** Stats, feedback, then the gear — the one order the timer's toolbar was approved in. */
+/** Stats, then the gear — the timer's toolbar keeps those two controls; feedback is a Support row. */
 async function expectToolbarOrder(page: Page): Promise<void> {
   const labels = await page
     .getByRole('navigation')
     .locator('a, button')
     .evaluateAll((controls) => controls.map((control) => control.getAttribute('aria-label')));
 
-  expect(labels).toEqual(['Stats', 'Send feedback', 'Settings']);
+  expect(labels).toEqual(['Stats', 'Settings']);
 }
 
 /** Takes the toolbar's shape-only stats icon, the surface's only door, and lands on the surface. */

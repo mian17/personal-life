@@ -7,9 +7,9 @@ function classesOf(el: Element): string[] {
 }
 
 const GAP_UTILITY: Record<StackGap, string> = {
-  sm: 'gap-[var(--space-0-5)]',
-  md: 'gap-[var(--space-1)]',
-  lg: 'gap-[var(--space-2)]',
+  sm: 'gap-[var(--s1)]',
+  md: 'gap-[var(--s2)]',
+  lg: 'gap-[var(--s4)]',
 };
 
 const ALIGN_UTILITY: Record<Exclude<StackAlign, 'start'>, string> = {
@@ -33,9 +33,9 @@ describe('Stack', () => {
   });
 
   it.each<[StackGap, string]>([
-    ['sm', '--space-0-5'],
-    ['md', '--space-1'],
-    ['lg', '--space-2'],
+    ['sm', '--s1'],
+    ['md', '--s2'],
+    ['lg', '--s4'],
   ])('maps gap="%s" to the %s token utility', (gap, token) => {
     render(<Stack gap={gap}>x</Stack>);
     const stack = document.querySelector('.ui-stack')!;

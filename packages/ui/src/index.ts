@@ -29,6 +29,12 @@ export type { PillButtonType, PillProps, PillSize, PillTag } from './components/
 export { Card } from './components/card';
 export type { CardProps } from './components/card';
 
+export { Facts, FactsRow } from './components/facts';
+export type { FactsProps, FactsRowProps } from './components/facts';
+
+export { Kpi } from './components/kpi';
+export type { KpiProps } from './components/kpi';
+
 export { StatusText } from './components/status-text';
 export type { StatusTextProps } from './components/status-text';
 
@@ -45,7 +51,10 @@ export { Switch } from './components/switch';
 export type { SwitchProps } from './components/switch';
 
 export { IconLink } from './components/icon-link';
-export type { IconLinkProps } from './components/icon-link';
+export type { IconLinkProps, IconLinkVariant } from './components/icon-link';
+
+export { SettingsLink } from './components/settings-link';
+export type { SettingsLinkProps } from './components/settings-link';
 
 export { PageShell } from './components/page-shell';
 export type { PageShellProps } from './components/page-shell';
@@ -55,6 +64,9 @@ export type { NavBarProps } from './components/nav-bar';
 
 export { PageTitle } from './components/page-title';
 export type { PageTitleProps } from './components/page-title';
+
+export { SubNav } from './components/sub-nav';
+export type { SubNavProps } from './components/sub-nav';
 
 export { FabLink } from './components/fab-link';
 export type { FabLinkProps } from './components/fab-link';
@@ -97,8 +109,11 @@ export type { AutosuggestOption, AutosuggestProps } from './components/autosugge
 export { PillGroup } from './components/pill-group';
 export type { PillGroupProps } from './components/pill-group';
 
-export { Tab, TabBar } from './components/tab-bar';
-export type { TabProps, TabBarProps } from './components/tab-bar';
+export { Field } from './components/field';
+export type { FieldProps } from './components/field';
+
+export { Segmented, Tab, TabBar } from './components/tab-bar';
+export type { Segment, SegmentedProps, TabProps, TabBarProps } from './components/tab-bar';
 
 export { PageActions } from './components/page-actions';
 export type { PageActionsProps } from './components/page-actions';
@@ -119,8 +134,8 @@ export type { SettingsRowProps } from './components/settings-row';
 export { SettingsBlock } from './components/settings-block';
 export type { SettingsBlockProps } from './components/settings-block';
 
-export { TagPicker } from './components/tag-picker';
-export type { TagOption, TagPickerProps } from './components/tag-picker';
+export { TagCombobox } from './components/tag-combobox';
+export type { TagComboboxProps, TagOption } from './components/tag-combobox';
 
 export { TagManager } from './components/tag-manager';
 export type { TagManagerProps } from './components/tag-manager';
@@ -135,14 +150,17 @@ export type { DueDateProps, DueDateTone } from './components/due-date';
 export { ListManager } from './components/list-manager';
 export type { ListManagerProps, TodoListOption } from './components/list-manager';
 
-export { Menu } from './components/menu';
-export type { MenuProps } from './components/menu';
+export { Menu, MenuItem } from './components/menu';
+export type { MenuItemProps, MenuProps } from './components/menu';
 
 export { TrashBlock } from './components/trash-block';
 export type { TrashBlockItem, TrashBlockProps, TrashFormAction } from './components/trash-block';
 
 export { ManagerBlock } from './components/manager-block';
 export type { ManagerBlockProps } from './components/manager-block';
+
+export { SettingsShell } from './components/settings-shell';
+export type { SettingsShellProps } from './components/settings-shell';
 
 export { ListShell } from './components/list-shell';
 export type { ListShellProps } from './components/list-shell';
@@ -168,7 +186,7 @@ export type { FeedbackFormProps } from './components/feedback-form';
 export { FEEDBACK_TYPES } from './components/feedback-types';
 
 export { FeedbackNavItem } from './components/feedback-nav-item';
-export type { FeedbackNavItemProps } from './components/feedback-nav-item';
+export type { FeedbackNavItemProps, FeedbackNavItemVariant } from './components/feedback-nav-item';
 
 export { FEEDBACK_STATUSES, feedbackStatusOption } from './components/feedback-status';
 export type { FeedbackStatusOption, FeedbackStatusToken } from './components/feedback-status';
@@ -181,4 +199,11 @@ export type { ProgressBarProps } from './components/progress-bar';
 export { cx } from './lib/cx';
 export type { ClassValue } from './lib/cx';
 
-export { dueDateLabel, formatDate, formatDayMonth, formatWeekday } from './lib/format-date';
+export {
+  dueDateLabel,
+  formatDate,
+  formatDayMonth,
+  formatLongDate,
+  formatNoteMeta,
+  formatWeekday,
+} from './lib/format-date';

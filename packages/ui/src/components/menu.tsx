@@ -5,13 +5,13 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import type { ReactNode } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { cx } from '../lib/cx';
-import { IconButton } from './icon-button';
+import { IconButton, type IconButtonVariant } from './icon-button';
 
 export interface MenuProps {
   /** Trigger accessible name. */
   label: string;
-  /** The always-visible row content (the entity name). */
-  summary: ReactNode;
+  /** The always-visible row content (the entity name). Omitted renders the trigger alone. */
+  summary?: ReactNode;
   /** Panel content, revealed when open. */
   children: ReactNode;
   /** Controlled open state. */
@@ -20,26 +20,60 @@ export interface MenuProps {
   onOpenChange: (open: boolean) => void;
   /** Disables the trigger. */
   disabled?: boolean;
+  /** The trigger's face; omitted, the trigger stays the borderless `.iconbtn`. */
+  triggerVariant?: IconButtonVariant;
+  /** The trigger's glyph; omitted, the vertical ellipsis every row uses. */
+  triggerIcon?: ReactNode;
+  /** The gap between the trigger and the panel. */
+  sideOffset?: number;
   className?: string;
 }
 
 /** The row: summary and its `⋯` trigger, always in flow beside the entity name. */
-const rowStyles = 'relative flex flex-col gap-[var(--space-0-4)]';
+const rowStyles = 'relative flex flex-col gap-[var(--s2)]';
 
-const summaryStyles = 'flex items-center gap-[var(--space-0-5)]';
+const summaryStyles = 'flex items-center gap-[var(--s2)]';
 
 const labelStyles = 'min-w-0 flex-1 truncate';
 
 /**
- * Registry panel, theme-mapped: fill and border ride the existing tokens, so the open menu
- * introduces no colour of its own. Radix portals it into the top layer, where the managers'
- * `overflow: hidden` card cannot clip it, and owns the focus trap, Escape and outside dismiss.
+ * The panel is one raised surface: surface fill, one line, `--r-lg`, `--s2` inset, no shadow.
+ * Radix portals it into the top layer, where the managers' `overflow: hidden` card cannot clip
+ * it, and owns the focus trap, Escape and outside dismiss. It fades in over `--d-fast`.
  */
 const panelStyles = cx(
-  'z-50 flex flex-col gap-[var(--space-0-4)]',
-  'p-[var(--space-0-5)] border rounded-[var(--radius-md)]',
-  'bg-panel text-text shadow-[var(--shadow-fab)]',
+  'z-50 flex flex-col gap-[var(--s1)]',
+  'p-[var(--s2)] border border-line rounded-[var(--r-lg)]',
+  'bg-surface text-ink',
+  'motion-safe:transition-opacity starting:opacity-0',
 );
+
+/**
+ * The gap between the trigger and the panel: the raised surface sits one step off its trigger
+ * rather than touching it, and `--s2` is that step. Radix's `sideOffset` is a popper offset in px,
+ * not a style, so it cannot take `var(--s2)` — the literal mirrors the token, as `popover.tsx`'s
+ * own default does for the same reason.
+ */
+const PANEL_SIDE_OFFSET_PX = 8;
+
+/** One entry of the panel: whatever draws the row, plus the panel's own hook class. */
+export interface MenuItemProps {
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * One entry of the panel. Radix's `Item` is what makes it a menu item — `role="menuitem"` and
+ * Arrow-key movement between entries — which a plain button dropped into the panel never gets.
+ * `asChild` keeps the primitive's own look; only the role and the keys are added.
+ */
+export function MenuItem({ children, className }: Readonly<MenuItemProps>) {
+  return (
+    <DropdownMenuPrimitive.Item asChild className={cx('ui-menu__item', className)}>
+      {children}
+    </DropdownMenuPrimitive.Item>
+  );
+}
 
 export function Menu({
   label,
@@ -48,23 +82,37 @@ export function Menu({
   open,
   onOpenChange,
   disabled,
+  triggerVariant = 'default',
+  triggerIcon = <MoreVertical size={16} aria-hidden />,
+  sideOffset = PANEL_SIDE_OFFSET_PX,
   className,
 }: Readonly<MenuProps>) {
+  const trigger = (
+    <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
+      <IconButton label={label} variant={triggerVariant}>
+        {triggerIcon}
+      </IconButton>
+    </DropdownMenuPrimitive.Trigger>
+  );
+
   return (
     // Non-modal: the per-row disclosure leaves the page behind it interactive, as the
     // hand-rolled panel it replaces did, while Radix keeps the dismiss behaviour.
     <DropdownMenuPrimitive.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <div className={cx('ui-menu', rowStyles, className)}>
-        <div className={cx('ui-menu__summary', summaryStyles)}>
-          <span className={cx('ui-menu__label', labelStyles)}>{summary}</span>
-          <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
-            <IconButton label={label}>
-              <MoreVertical size={16} aria-hidden />
-            </IconButton>
-          </DropdownMenuPrimitive.Trigger>
-        </div>
+        {summary == null ? (
+          trigger
+        ) : (
+          <div className={cx('ui-menu__summary', summaryStyles)}>
+            <span className={cx('ui-menu__label', labelStyles)}>{summary}</span>
+            {trigger}
+          </div>
+        )}
         <DropdownMenuPrimitive.Portal>
-          <DropdownMenuPrimitive.Content className={cx('ui-menu__panel', panelStyles)}>
+          <DropdownMenuPrimitive.Content
+            sideOffset={sideOffset}
+            className={cx('ui-menu__panel', panelStyles)}
+          >
             {children}
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>

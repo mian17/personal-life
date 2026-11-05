@@ -48,8 +48,8 @@ describe('FabLink', () => {
     );
     const link = screen.getByRole('link');
     expect(classesOf(link)).toContain('ui-fab-link');
-    expect(link.classList.contains('bg-accent')).toBe(true);
-    expect(link.classList.contains('text-on-accent')).toBe(true);
+    expect(link.classList.contains('bg-max')).toBe(true);
+    expect(link.classList.contains('text-on-max')).toBe(true);
   });
 
   it('expresses the fab size through utilities rather than the --fab-size rule', () => {

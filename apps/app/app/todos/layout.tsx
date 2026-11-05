@@ -5,7 +5,7 @@ export const metadata = routeLayoutMetadata('/manifest-todos.json', 'Todos', '/i
 
 export default function TodosLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <RouteLayout>
+    <RouteLayout app="todos">
       <SnackbarProvider>{children}</SnackbarProvider>
     </RouteLayout>
   );

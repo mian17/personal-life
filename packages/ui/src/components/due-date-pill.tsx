@@ -28,6 +28,10 @@ export interface DueDatePillProps extends Omit<ComponentPropsWithRef<'span'>, 'c
   emptyLabel?: string;
 }
 
+/** §8's status pill, worn by the read-out: a 24px tint carrying the word. */
+const pillStyles =
+  'ui-due-pill inline-flex items-center h-[var(--s6)] px-[var(--s2)] rounded-[var(--r-pill)] text-[length:var(--fs-pill)] font-semibold tracking-[var(--tracking-pill)] whitespace-nowrap';
+
 export function DueDatePill({
   dueDate,
   today,
@@ -41,8 +45,8 @@ export function DueDatePill({
   return (
     <span
       className={cx(
-        'ui-due-pill text-[length:var(--space-0-85)]',
-        stateColour(state),
+        pillStyles,
+        stateColours(state),
         `ui-due-pill--${state}`,
         className,
       )}
@@ -55,11 +59,11 @@ export function DueDatePill({
 }
 
 /**
- * State → text colour: overdue is the only state that earns the danger colour,
- * today is accented, and an absent or later date stays muted.
+ * State → the tint pair: overdue is the danger word on its tint, today the warn word on its
+ * tint, an absent or later date the neutral pill.
  */
-function stateColour(state: DueDateState): string {
-  if (state === 'overdue') return 'text-danger';
-  if (state === 'today') return 'text-accent';
-  return 'text-muted';
+function stateColours(state: DueDateState): string {
+  if (state === 'overdue') return 'bg-danger-soft text-danger';
+  if (state === 'today') return 'bg-warn-soft text-warn';
+  return 'bg-surface-sunken text-ink-2';
 }

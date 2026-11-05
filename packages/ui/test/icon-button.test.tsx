@@ -34,6 +34,37 @@ describe('IconButton', () => {
     expect(button.classList.contains('ui-icon-btn--ghost')).toBe(true);
   });
 
+  it('dresses the framed variant in the IconLink framed face over the shared base', () => {
+    render(
+      <IconButton label="Back" variant="framed">
+        {<span />}
+      </IconButton>,
+    );
+    const button = screen.getByRole('button');
+    const classes = button.classList;
+    expect(classes.contains('ui-icon-btn')).toBe(true);
+    expect(classes.contains('ui-icon-btn--framed')).toBe(true);
+    expect(classes.contains('border-line')).toBe(true);
+    expect(classes.contains('bg-surface')).toBe(true);
+    expect(classes.contains('text-ink')).toBe(true);
+    expect(classes.contains('size-[var(--tap)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
+    // The borderless face's declaration must not ride along, or the two contest one property.
+    expect(classes.contains('border-0')).toBe(false);
+    expect(classes.contains('bg-transparent')).toBe(false);
+    expect(classes.contains('text-ink-2')).toBe(false);
+  });
+
+  it('stays a transparent square carrying the second ink tier and no border', () => {
+    render(<IconButton label="Back">{<span />}</IconButton>);
+    const classes = screen.getByRole('button').classList;
+    expect(classes.contains('bg-transparent')).toBe(true);
+    expect(classes.contains('text-ink-2')).toBe(true);
+    expect(classes.contains('border-0')).toBe(true);
+    expect(classes.contains('size-[var(--tap)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
+  });
+
   it('merges className instead of replacing it', () => {
     render(
       <IconButton label="Save" className="legacy-hook">

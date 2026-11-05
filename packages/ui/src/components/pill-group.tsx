@@ -7,12 +7,12 @@ export interface PillGroupProps extends ComponentPropsWithRef<'div'> {
 }
 
 /**
- * The row's own geometry as utilities: a wrapping flex row of pills behind a
- * hairline rule. The label and actions slots carry only their hooks — they read
- * as the row's own text, so no rule ever styled them.
+ * The row's own geometry: a wrapping flex row of pills behind a hairline rule. The label and
+ * actions slots carry only their hooks — they read as the row's own text, so no rule ever
+ * styled them.
  */
 const rowStyles =
-  'flex flex-wrap items-center gap-[var(--space-0-4)] mt-[var(--space-0-5)] pt-[var(--space-0-6)] border-t border-border';
+  'flex flex-wrap items-center gap-[var(--s2)] mt-[var(--s4)] pt-[var(--s3)] border-t border-line';
 
 export function PillGroup({ label, actions, className, children, ...rest }: Readonly<PillGroupProps>) {
   return (

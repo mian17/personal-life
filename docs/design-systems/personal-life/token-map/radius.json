@@ -1,0 +1,84 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "family": "radius",
+  "source": "packages/ui/src/styles/tokens.css",
+  "tokens": [
+    {
+      "family": "radius",
+      "target": "--ds-radius-md",
+      "source": "--radius-md",
+      "value": "10px",
+      "role": "field shells, buttons, icon buttons, tab rail and triggers, menu/popover panels, toast, alert banner",
+      "declaredAt": "packages/ui/src/styles/tokens.css:16",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:23",
+        "packages/ui/src/components/fab-menu.tsx:49",
+        "packages/ui/src/components/menu.tsx:40",
+        "packages/ui/src/components/popover.tsx:22",
+        "packages/ui/src/components/snackbar.tsx:37",
+        "packages/ui/src/components/tab-bar.tsx:37",
+        "packages/ui/src/components/tab-bar.tsx:48",
+        "packages/ui/test/alert-banner.test.tsx:24"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "radius",
+      "target": "--ds-radius-lg",
+      "source": "--radius-lg",
+      "value": "12px",
+      "role": "cards and list rows; the centred dialog panel",
+      "declaredAt": "packages/ui/src/styles/tokens.css:17",
+      "usageSites": [
+        "packages/ui/src/components/card.tsx:21",
+        "packages/ui/src/components/dialog.tsx:39",
+        "packages/ui/src/components/list-item.tsx:45",
+        "packages/ui/src/components/list-item.tsx:68",
+        "packages/ui/src/components/matrix-block.tsx:43",
+        "packages/ui/test/card.test.tsx:22",
+        "packages/ui/test/list-item.test.tsx:774",
+        "packages/ui/test/list-item.test.tsx:793"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "radius",
+      "target": "--ds-radius-pill",
+      "source": "--radius-pill",
+      "value": "999px",
+      "role": "pills and chips (rounded-full), plus switch track and thumb",
+      "declaredAt": "packages/ui/src/styles/tokens.css:18",
+      "usageSites": [],
+      "status": "matched"
+    },
+    {
+      "family": "radius",
+      "target": "--ds-radius-none",
+      "source": "rounded-none in the full-screen dialog sheet",
+      "value": "0",
+      "role": "edge-to-edge sheet variant of the dialog",
+      "declaredAt": "packages/ui/src/components/dialog.tsx (sheetPanel)",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx"
+      ],
+      "status": "code-literal",
+      "note": "no token exists; the value is written as the Tailwind `rounded-none` utility"
+    },
+    {
+      "family": "radius",
+      "target": "--ds-radius-xs",
+      "source": "rounded-[var(--space-0-2)]",
+      "value": "0.2rem",
+      "role": "checkbox corner radius",
+      "declaredAt": "packages/ui/src/styles/tokens.css:49",
+      "usageSites": [
+        "packages/ui/src/components/checkbox.tsx:26",
+        "packages/ui/src/components/pill.tsx:49",
+        "packages/ui/src/components/switch.tsx:32",
+        "packages/ui/test/checkbox.test.tsx:57"
+      ],
+      "status": "derived-name",
+      "note": "corner radius expressed through a spacing token, not a radius token"
+    }
+  ]
+}

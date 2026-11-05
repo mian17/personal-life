@@ -1,102 +1,242 @@
+/* The revised vocabulary, ported value for value from
+   docs/design-systems/personal-life/REVISED-DESIGN.md §1–§7. Every other stylesheet and
+   primitive consumes var(--token); no raw colour or length exists outside this file. */
+
 :root {
-  /* colors — byte-identical to apps/app/app/globals.css */
-  --bg: #0f1115;
-  --panel: #181b22;
-  --text: #e8eaf0;
-  --muted: #8b93a7;
-  --accent: #5b8cff;
-  --danger: #ff6b6b;
-  --danger-soft: #ff9e9e;
-  --amber: #f2b64c;
-  --green: #4cc38a;
-  --border: #2a2f3a;
-  --on-accent: white;
+  color-scheme: light;
 
-  /* radii — literals promoted to tokens, values unchanged */
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-pill: 999px;
+  /* §2 palette — ground, then the raised surface that sits on it */
+  --page: #f4f4f1;
+  --surface: #ffffff;
+  --surface-sunken: #f7f7f4;
+  --press: #ecece9;
 
-  /* layout — literals promoted to tokens, values unchanged */
-  --tap-height: 48px;
-  --content-width: 640px;
-  --border-width: 1px;
-  --focus-ring: 2px;
-  --icon-btn-size: 40px;
+  --ink: #1b1b1f;
+  --ink-2: #58585e;
+  --ink-3: #63636a;
+
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: #8a8a8a;
+  --focus: #2a5d8f;
+
+  --ok: #335b3f;
+  --ok-soft: #eaf1ea;
+  --warn: #6e5a16;
+  --warn-soft: #f5f0e0;
+  --danger: #8a3b3b;
+  --danger-soft: #f6e9e9;
+  --chart-muted: #c9c9c6;
+
+  /* §3 the word drawn on this app's accent fill */
+  --on-max: #ffffff;
+
+  /* §4 one stack, twelve steps, two read-outs — the axis step is the SVG
+     chart label, 11px / 600 in `font-family: inherit` */
+  --font-stack: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+
+  --fs-title: 28px;
+  --fs-sheet-title: 20px;
+  --fs-body: 17px;
+  --fs-row-title: 16px;
+  --fs-button: 16px;
+  --fs-chip: 15px;
+  --fs-label: 14px;
+  --fs-meta: 13.5px;
+  --fs-section-label: 13px;
+  --fs-pill: 12.5px;
+  --fs-count: 12px;
+  --fs-axis: 11px;
+  --fs-kpi: 40px;
+  --fs-timer: 64px;
+
+  --lh-title: 1.14;
+  --lh-sheet-title: 1.25;
+  --lh-body: 1.47;
+  --lh-body-longform: 1.55;
+  --lh-row-title: 1.35;
+  --lh-control: 1;
+  --lh-meta: 1.4;
+  --lh-kpi: 1.05;
+
+  --fw-body: 400;
+  --fw-semibold: 600;
+  --fw-section-label: 650;
+  --fw-bold: 700;
+
+  --tracking-title: -0.021em;
+  --tracking-sheet-title: -0.015em;
+  --tracking-row-title: -0.008em;
+  --tracking-button: -0.005em;
+  --tracking-section-label: 0.06em;
+  --tracking-pill: 0.005em;
+  --tracking-count: 0.02em;
+  --tracking-kpi: -0.03em;
+  --tracking-timer: -0.04em;
+  --tracking-none: 0;
+
+  /* §5 seven 4px steps, then the frame and the touch minimum */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+
+  --frame-max: 414px;
+  --tap: 48px;
+  --row-min-height: 56px;
+  --checkbox-size: 24px;
   --fab-size: 56px;
 
-  /* Breakpoints: app-wide scale documented in SPEC-ui-tokens.md, pinned by
-     BREAKPOINTS in test/tokens.test.ts. Media queries cannot read custom
-     properties, so no tokens live here — each media rule writes its literal
-     value with a comment naming its breakpoint (e.g. `/* sm — 640px *​/`). */
+  /* §6 four radii, two border widths, no product shadow */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  --border-width: 1px;
+  --border-width-strong: 1.5px;
+  --focus-ring: 2px;
 
-  /* type — literals promoted to tokens, values unchanged */
-  --font-size: 16px;
-  --leading: 1.5;
-  --font-stack: system-ui, -apple-system, sans-serif;
-  --fs-editor: 1.05rem; /* .editor-body font-size */
+  /* §7 two durations on one curve */
+  --d-fast: 200ms;
+  --d-base: 260ms;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1);
 
-  /* shadow — literal promoted to a token, value unchanged */
-  --shadow-fab: 0 4px 12px rgba(0, 0, 0, 0.25);
-
-  /* motion — new literals promoted to tokens (user-approved) */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-  --ease-standard: ease-out;
-
-  /* spacing — exactly the length literals present in globals.css */
-  --space-0-15: 0.15rem;
-  --space-0-2: 0.2rem;
-  --space-0-25: 0.25rem;
-  --space-0-3: 0.3rem;
-  --space-0-35: 0.35rem;
-  --space-0-4: 0.4rem;
-  --space-0-5: 0.5rem;
-  --space-0-6: 0.6rem;
-  --space-0-7: 0.7rem;
-  --space-0-75: 0.75rem;
-  --space-0-8: 0.8rem;
-  --space-0-85: 0.85rem;
-  --space-0-9: 0.9rem;
-  --space-0-95: 0.95rem;
-  --space-1: 1rem;
-  --space-1-25: 1.25rem;
-  --space-2: 2rem;
-  --space-3: 3rem;
-  --space-5: 5rem;
-
-  color-scheme: light dark;
+  /* §8 the scrim dims the page toward black, not toward the ground, so it holds
+     one value in both schemes and is never restated for dark */
+  --scrim: rgba(0, 0, 0, 0.32);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+
+  --page: #16171a;
+  --surface: #1e2024;
+  --surface-sunken: #24262b;
+  --press: #2c2f35;
+
+  --ink: #e9e7e2;
+  --ink-2: #a9a79f;
+  --ink-3: #96948d;
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: #767b84;
+  --focus: #8fbce8;
+
+  --ok: #9fc0a3;
+  --ok-soft: #202a21;
+  --warn: #d9c68a;
+  --warn-soft: #2a2418;
+  --danger: #d98c86;
+  --danger-soft: #2c1f1f;
+  --chart-muted: #3a3d43;
+
+  --on-max: #16171a;
 }
 
-:root[data-theme='light'] {
-  --bg: #f4f5f7;
-  --panel: #ffffff;
-  --text: #1a1d24;
-  --muted: #5c6577;
-  --accent: #2f6bff;
-  --danger: #d64545;
-  --danger-soft: #d97070;
-  --amber: #b45309;
-  --green: #15803d;
-  --border: #dfe3ea;
-  color-scheme: light;
+/* §3 one accent per app, for fill, selection and progress only */
+[data-app='notes'] {
+  --max: #4f6b52;
+  --max-press: #405743;
 }
 
-@media (prefers-color-scheme: light) {
+[data-app='todos'] {
+  --max: #2f5f61;
+  --max-press: #254b4d;
+}
+
+[data-app='meals'] {
+  --max: #8b5a45;
+  --max-press: #744a38;
+}
+
+[data-app='pomodoro'] {
+  --max: #5a5285;
+  --max-press: #4a4470;
+}
+
+[data-app='feedback'] {
+  --max: #6f5570;
+  --max-press: #5b455c;
+}
+
+[data-theme='dark'] [data-app='notes'] {
+  --max: #9fc0a3;
+  --max-press: #b0cdb3;
+}
+
+[data-theme='dark'] [data-app='todos'] {
+  --max: #82b5b6;
+  --max-press: #97c5c6;
+}
+
+[data-theme='dark'] [data-app='meals'] {
+  --max: #dca489;
+  --max-press: #e4b39c;
+}
+
+[data-theme='dark'] [data-app='pomodoro'] {
+  --max: #b6aedc;
+  --max-press: #c7c1e6;
+}
+
+[data-theme='dark'] [data-app='feedback'] {
+  --max: #c4a9c6;
+  --max-press: #d0bacf;
+}
+
+/* §1 System: no attribute chosen, so the OS decides */
+@media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #f4f5f7;
-    --panel: #ffffff;
-    --text: #1a1d24;
-    --muted: #5c6577;
-    --accent: #2f6bff;
-    --danger: #d64545;
-    --danger-soft: #d97070;
-    --amber: #b45309;
-    --green: #15803d;
-    --border: #dfe3ea;
+    color-scheme: dark;
+
+    --page: #16171a;
+    --surface: #1e2024;
+    --surface-sunken: #24262b;
+    --press: #2c2f35;
+
+    --ink: #e9e7e2;
+    --ink-2: #a9a79f;
+    --ink-3: #96948d;
+
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: #767b84;
+    --focus: #8fbce8;
+
+    --ok: #9fc0a3;
+    --ok-soft: #202a21;
+    --warn: #d9c68a;
+    --warn-soft: #2a2418;
+    --danger: #d98c86;
+    --danger-soft: #2c1f1f;
+    --chart-muted: #3a3d43;
+
+    --on-max: #16171a;
+  }
+
+  :root:not([data-theme]) [data-app='notes'] {
+    --max: #9fc0a3;
+    --max-press: #b0cdb3;
+  }
+
+  :root:not([data-theme]) [data-app='todos'] {
+    --max: #82b5b6;
+    --max-press: #97c5c6;
+  }
+
+  :root:not([data-theme]) [data-app='meals'] {
+    --max: #dca489;
+    --max-press: #e4b39c;
+  }
+
+  :root:not([data-theme]) [data-app='pomodoro'] {
+    --max: #b6aedc;
+    --max-press: #c7c1e6;
+  }
+
+  :root:not([data-theme]) [data-app='feedback'] {
+    --max: #c4a9c6;
+    --max-press: #d0bacf;
   }
 }

@@ -11,12 +11,13 @@ function classesWithPrefix(classes: string[], prefix: string): string[] {
 
 /** The row body carries its layout as utilities; the hook rides along for locators. */
 const ROW_UTILITY = 'flex';
-const ROW_TINT_UTILITY = 'bg-panel';
+const ROW_PRESS_UTILITY = 'active:bg-press';
+const ROW_INSET_UTILITY = 'px-[var(--s4)]';
 const LINK_LAYOUT_UTILITY = 'self-stretch';
 /** A todo row clamps its title to two lines; every other row ellipsizes one. */
 const TITLE_CLAMP_UTILITY = 'line-clamp-2';
 const ONE_LINE_TITLE_UTILITY = 'truncate';
-const DENSE_TYPE_UTILITY = 'text-[length:var(--space-0-7)]';
+const DENSE_TYPE_UTILITY = 'text-[length:var(--fs-meta)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -30,7 +31,7 @@ describe('ListItem', () => {
     expect(classesOf(li)).toContain('ui-list-item');
   });
 
-  it('takes the row surface from utilities rather than a stylesheet rule', () => {
+  it('takes its geometry from utilities and leaves the surface to its group', () => {
     render(
       <ul>
         <ListItem title="Groceries" />
@@ -38,7 +39,12 @@ describe('ListItem', () => {
     );
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain(ROW_UTILITY);
-    expect(classes).toContain(ROW_TINT_UTILITY);
+    expect(classes).toContain(ROW_INSET_UTILITY);
+    // §8's `.group`/`.row` split: the group paints the surface, so a row only carries its
+    // own press wash — a per-row panel fill would double the surface the group already has.
+    expect(classes).toContain(ROW_PRESS_UTILITY);
+    expect(classes).not.toContain('bg-surface');
+    expect(classes.some((cls) => cls.startsWith('rounded-'))).toBe(false);
   });
 
   it('renders href as a link carrying the ui-list-item__link hook', () => {
@@ -133,24 +139,23 @@ describe('ListItem', () => {
     expect(children[2]).toBe(screen.getByTestId('delete-action'));
   });
 
-  it('insets the trailing delete glyph to the row text inset', () => {
+  it('insets the row box, not each slot, so the delete glyph lands on the text edge', () => {
     render(
       <ul>
         <ListItem href="/meals/1" title="Oats" deleteAction={<button>x</button>} />
       </ul>,
     );
-    const row = document.querySelector('.ui-list-item')!;
-    const rowClasses = classesOf(row);
-    // The row's text inset and the glyph's right inset resolve to the same token, so the
-    // trailing control cannot sit tighter to the edge than the text opposite it.
-    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))]');
-    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:p-[var(--space-0-5)]');
-    expect(document.querySelector('.ui-list-item__link')!.className).toContain(
-      'p-[var(--space-0-9)]',
-    );
+    const rowClasses = classesOf(document.querySelector('.ui-list-item')!);
+    // §8 gives the inset to the row, so neither the body nor the trailing glyph needs a
+    // compensating inset or a negative margin to line up with the text opposite it.
+    expect(rowClasses).toContain(ROW_INSET_UTILITY);
+    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:p-[var(--s2)]');
+    expect(rowClasses.some((cls) => cls.includes('mr-[calc('))).toBe(false);
+    const linkClasses = classesOf(document.querySelector('.ui-list-item__link')!);
+    expect(linkClasses.some((cls) => cls.startsWith('p-') || cls.startsWith('px-'))).toBe(false);
   });
 
-  it('keeps the leading and trailing row insets on one token', () => {
+  it('takes one row inset for both edges instead of per-side adjustments', () => {
     render(
       <ul>
         <ListItem
@@ -161,17 +166,14 @@ describe('ListItem', () => {
         />
       </ul>,
     );
-    const token = (cls: string) => cls.match(/var\(--space-[\w-]+\)/)![0];
     const rowClasses = classesOf(screen.getByRole('listitem'));
-    const startInset = rowClasses.find((cls) => cls.startsWith('has-[>.ui-checkbox]:ps-'))!;
-    // The row's leading start inset and the trailing glyph's right inset resolve to the same
-    // token, so neither side can drift tighter than the other.
-    expect(token(startInset)).toBe('var(--space-0-9)');
-    const glyphInset = rowClasses.find((cls) => cls.includes('mr-[calc('))!;
-    expect(token(glyphInset)).toBe(token(startInset));
+    // `px-…` is one declaration for both edges, so the leading and trailing sides cannot
+    // drift apart the way two independent insets could.
+    expect(rowClasses).toContain('px-[var(--s4)]');
+    expect(rowClasses.some((cls) => cls.startsWith('ps-') || cls.startsWith('pe-'))).toBe(false);
   });
 
-  it('starts the leading checkbox on the row inset instead of a fixed icon-square slot', () => {
+  it('drops the fixed icon-square slot: the checkbox shrinks, the box inset does not move', () => {
     const { unmount } = render(
       <ul>
         <ListItem
@@ -182,9 +184,10 @@ describe('ListItem', () => {
       </ul>,
     );
     const rowClasses = classesOf(screen.getByRole('listitem'));
-    // The removed 40px `IconButton` wrapper centred its control, which parked the checkbox
-    // inside that square. The row starts the checkbox box on its own inset instead.
-    expect(rowClasses).toContain('has-[>.ui-checkbox]:ps-[var(--space-0-9)]');
+    // The old 40px `IconButton` wrapper parked the checkbox inside its square. The row now
+    // keeps its own inset for leading slots, and the checkbox's mark is internally offset so
+    // the glyph — not the control box — lands on that inset.
+    expect(rowClasses).toContain('px-[var(--s4)]');
     expect(rowClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
     unmount();
 
@@ -198,9 +201,11 @@ describe('ListItem', () => {
         />
       </ul>,
     );
-    // A dense row keeps the checkbox flush to its clipped quadrant edge: no start inset.
+    // A dense row keeps the same rule at the tighter dense inset: `--s3` at the start, one
+    // step tighter at the end, because a matrix row carries no trailing control.
     const denseClasses = classesOf(screen.getByRole('listitem'));
-    expect(denseClasses.some((cls) => cls.includes('ps-[var(--space-0-9)]'))).toBe(false);
+    expect(denseClasses).toContain('ps-[var(--s3)]');
+    expect(denseClasses).toContain('pe-[var(--s2)]');
     expect(denseClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
   });
 
@@ -254,10 +259,59 @@ describe('ListItem', () => {
     );
     expect(classesOf(document.querySelector('.ui-list-item__sub')!)).toContain(DENSE_TYPE_UTILITY);
 
-    // A dense row is exactly its content height, at the compact control scale.
+    // A dense row is exactly the tap target tall, at the compact control scale: the matrix
+    // mark is `--s3` (12px), the value the pre-redesign row gave this variant (`0.75rem`),
+    // and its slots top-align so the mark rides the title's first line.
     const row = classesOf(screen.getByRole('listitem'));
-    expect(row).toContain('min-h-0');
-    expect(row).toContain('[--checkbox-size:var(--space-0-75)]');
+    expect(row).toContain('min-h-[var(--tap)]');
+    expect(row).toContain('items-start');
+    expect(row).not.toContain('items-center');
+    expect(row).toContain('[--checkbox-size:var(--s3)]');
+    // The corner travels with the size it is a fraction of: `--s1` (4px) is a third of this
+    // 12px mark, the same third `--r-sm` (8px) is of the default 24px one. Left at `--r-sm`,
+    // the 8px corner clamps to half the box and the mark paints as a disc instead of a box.
+    expect(row).toContain('[--checkbox-radius:var(--s1)]');
+  });
+
+  it('takes the dense row checkbox target out of flow so it reserves no row width', () => {
+    render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" />
+      </ul>,
+    );
+    const row = classesOf(screen.getByRole('listitem'));
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    // The control's target is a 48px square. In flow it reserved 48px of row width and pushed
+    // the title 60px off the row edge; the row is the target's positioning context instead, so
+    // the target paints over the row and only the row's own insets place the title.
+    expect(row).toContain('relative');
+    expect(row).toContain('[&>.ui-checkbox]:absolute');
+    // The 48px target keeps the row's top corner: moving it up to reach the first line would
+    // push 6.89px of the painted square outside the row's `overflow-hidden` clip.
+    expect(row).toContain('[&>.ui-checkbox]:top-[var(--s2)]');
+    // The mark alone is lifted onto the title's first-line centre — the target's half-height
+    // (`--tap`/2 = 24px) less the row's top inset (`--s2`) less half a title line
+    // (`--fs-meta` at `--lh-row-title` = 9.11px) = 6.89px. A row whose mark rides the target's
+    // own centring paints that 6.89px low, and low by the same amount on a two-line title.
+    expect(row).toContain(
+      '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
+    );
+    // The mark rides the target's leading edge, so its inset is the target's start offset: the
+    // `--s4` corner lands it 10px inside the row, one step from the title and on the same scale
+    // as the row's own start inset. The title offset (`--s3` + `--s4` = 28px) does not move with it.
+    expect(row).toContain('[&>.ui-checkbox]:justify-items-start');
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+    // The 48px target now paints from x 4 to x 52 over a title that starts at 28px. Its press
+    // wash is the only paint that can cover that text: the row already washes on press, so the
+    // target's own square is redundant feedback and, on release, the only thing still fading over
+    // the title (0.7 → 0.118 → 0.008 → 0 alpha across 200ms, measure in Chromium).
+    expect(row).toContain('[&>.ui-checkbox:active]:bg-transparent');
+    // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 6px past the
+    // mark's trailing edge at `--s4` (10px at the old `--s3` — the 4px the nudge spends). The inset sits on
+    expect(link).toContain('ps-[var(--s4)]');
+    expect(row).not.toContain('[&>.ui-list-item__link]');
+    // The target no longer contributes height, so the row keeps the tap floor itself.
+    expect(row).toContain('min-h-[var(--tap)]');
   });
 
   it('clamps the todo title to two lines, and leaves a base row one line', () => {
@@ -281,7 +335,7 @@ describe('ListItem', () => {
     expect(baseTitle).toContain(ONE_LINE_TITLE_UTILITY);
   });
 
-  it('adds the todo variant alone: the large checkbox, centred against the row', () => {
+  it('adds the todo variant alone: the default checkbox mark, centred against the row', () => {
     render(
       <ul>
         <ListItem variant="todo" title="Groceries" />
@@ -289,10 +343,24 @@ describe('ListItem', () => {
     );
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain('ui-list-item--todo');
-    expect(classes).toContain('[--checkbox-size:var(--space-1-25)]');
-    // The default todo row centres its leading control; the dense scale does too.
+    // §8 gives the todo mark no size override, so the row leaves the control's own default
+    // alone; only the dense row narrows it.
+    expect(classes.some((cls) => cls.startsWith('[--checkbox-size:'))).toBe(false);
+    // The corner is a hook of the mark's own size, so a row that does not narrow the mark must
+    // not restate it either — the control's `.ui-checkbox__box` `--r-sm` stands.
+    expect(classes.some((cls) => cls.startsWith('[--checkbox-radius:'))).toBe(false);
+    // The default todo row centres its leading control; a dense row top-aligns it on the title's
+    // first line, and a `size="dense"` without the todo variant never reaches that branch.
     expect(classes).toContain('items-center');
     expect(classes).not.toContain('ui-list-item--dense');
+    // The default row keeps its control in flow: it has width to spare and the mark's own
+    // 48px target is what places it, so the out-of-flow dense treatment must not leak here.
+    expect(classes).not.toContain('[&>.ui-checkbox]:absolute');
+    // Nor may the dense first-line lift: at this scale the control's own centring against the
+    // row is the intended geometry, and a shifted mark would sit 11.43px off it.
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox>*]:-translate-y-'))).toBe(false);
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox]:top-'))).toBe(false);
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-list-item__link]:ps-'))).toBe(false);
   });
 
   it('treats size="dense" without the todo variant as a no-op', () => {
@@ -307,15 +375,15 @@ describe('ListItem', () => {
     expect(classes).toContain('items-center');
   });
 
-  it('centres the dense todo row on its leading control, and keeps a column row top-aligned', () => {
+  it('top-aligns the dense todo row on its first line, and keeps a column row top-aligned', () => {
     const { unmount } = render(
       <ul>
         <ListItem variant="todo" size="dense" title="Groceries" />
       </ul>,
     );
     const denseRow = classesOf(screen.getByRole('listitem'));
-    expect(denseRow).toContain('items-center');
-    expect(denseRow).not.toContain('items-start');
+    expect(denseRow).toContain('items-start');
+    expect(denseRow).not.toContain('items-center');
     unmount();
 
     render(
@@ -348,14 +416,16 @@ describe('ListItem', () => {
     // No extra indent: the nested body starts on the title's own column, so a child
     // field and the title field share a left edge.
     const bodyClasses = classesOf(body);
-    expect(bodyClasses).not.toContain('pl-[var(--space-1)]');
+    expect(bodyClasses).not.toContain('pl-[var(--s2)]');
     expect(bodyClasses.some((token) => token.startsWith('pl-'))).toBe(false);
     // Without a title-line action there is no action column to reserve.
     expect(bodyClasses.some((token) => token.startsWith('pr-'))).toBe(false);
     const row = classesOf(screen.getByRole('listitem'));
     expect(row).toContain('items-start');
-    expect(classesWithPrefix(row, '[&>.ui-icon-btn]:mt-')).toHaveLength(1);
-    expect(classesWithPrefix(row, '[&>form]:mt-')).toHaveLength(1);
+    // The title line and the child body both start at the row's own top inset, so no slot
+    // needs a top offset to align with the title.
+    expect(classesWithPrefix(row, '[&>.ui-icon-btn]:mt-')).toHaveLength(0);
+    expect(classesWithPrefix(row, '[&>form]:mt-')).toHaveLength(0);
   });
 
   it('renders the nested titleAction inside the title line, and marks the line for it', () => {
@@ -379,10 +449,10 @@ describe('ListItem', () => {
     // The action rides the title line, not the indented child body.
     expect(titleLine.contains(slot)).toBe(true);
     expect(document.querySelector('.ui-list-item__nested-body')!.contains(slot)).toBe(false);
-    // The nested body reserves the action's column (`--icon-btn-size` + the action-line
+    // The nested body reserves the action's column (a full tap target plus the action-line
     // gap), so its right edge matches the title field's rather than the row's.
     expect(classesOf(document.querySelector('.ui-list-item__nested-body')!)).toContain(
-      'pr-[calc(var(--icon-btn-size)+var(--space-0-5))]',
+      'pr-[calc(var(--tap)+var(--s2))]',
     );
     // ... and the title content stays the line's first child, so it grows.
     expect(titleLine.firstChild!.textContent).toBe('Omelette');
@@ -545,7 +615,7 @@ describe('ListItem', () => {
       </ul>,
     );
     const classes = classesOf(document.querySelector('.ui-list-item__title')!);
-    expect(classes).toContain('text-muted');
+    expect(classes).toContain('text-ink-2');
     expect(classes).toContain('line-through');
   });
 
@@ -559,8 +629,8 @@ describe('ListItem', () => {
     // The tone hook stays for locators, but no tone colour is applied to a done row.
     expect(row).toContain('ui-list-item--danger');
     expect(row).not.toContain('[&_.ui-icon-btn]:text-danger');
-    expect(row).toContain('[&_.ui-icon-btn]:text-muted');
-    expect(row).toContain('[&_.ui-due-date]:text-muted');
+    expect(row).toContain('[&_.ui-icon-btn]:text-ink-3');
+    expect(row).toContain('[&_.ui-due-date]:text-ink-3');
   });
 
   it('applies one done treatment at both todo sizes', () => {
@@ -580,8 +650,8 @@ describe('ListItem', () => {
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain('ui-list-item--done');
     expect(classes).toContain('ui-list-item--dense');
-    // The done rules key off `--done`, never a size, so the due date is muted at both.
-    expect(classes).toContain('[&_.ui-due-date]:text-muted');
+    // The done rules key off the done flag, never a size, so the due date is muted at both.
+    expect(classes).toContain('[&_.ui-due-date]:text-ink-3');
   });
 
   it('collapses the row to zero height while hiding', () => {
@@ -596,16 +666,15 @@ describe('ListItem', () => {
     expect(classes).toContain('overflow-hidden');
   });
 
-  it('transitions the base row through the motion tokens', () => {
+  it('transitions the base row on the collapse properties and names no duration itself', () => {
     render(
       <ul>
         <ListItem title="Groceries" />
       </ul>,
     );
     const classes = classesOf(screen.getByRole('listitem'));
-    expect(classes).toContain('transition-[height,opacity]');
-    expect(classes).toContain('duration-[var(--duration-base)]');
-    expect(classes).toContain('ease-[var(--ease-standard)]');
+    expect(classes).toContain('motion-safe:transition-[height,opacity]');
+    expect(classes).not.toContain('duration-[var(--d-base)]');
   });
 
   it('linkStylesFor: pins the link body class string for row, dense and column shapes', () => {
@@ -615,7 +684,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)]',
     );
     baseRow.unmount();
 
@@ -625,7 +694,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-5)] py-[var(--space-0-6)] ps-[var(--space-0-9)] pe-[var(--space-0-4)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)] ps-[var(--s4)]',
     );
     denseRow.unmount();
 
@@ -637,7 +706,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] flex-col items-stretch gap-[var(--s2)]',
     );
   });
 
@@ -648,7 +717,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold truncate',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] truncate',
     );
     baseTitle.unmount();
 
@@ -658,7 +727,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-muted line-through',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] line-clamp-2 whitespace-normal text-ink-2 line-through',
     );
     doneTodo.unmount();
 
@@ -668,7 +737,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-[length:var(--space-0-7)]',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-meta)] line-clamp-2 whitespace-normal',
     );
     denseTodo.unmount();
 
@@ -680,7 +749,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title ui-list-item__title--with-action font-semibold truncate flex items-stretch gap-[var(--space-0-5)] [&>:first-child]:flex-1 [&>:first-child]:min-w-0',
+      'ui-list-item__title ui-list-item__title--with-action font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] truncate flex items-stretch gap-[var(--s2)] [&>:first-child]:flex-1 [&>:first-child]:min-w-0',
     );
     expect(document.querySelector('.ui-list-item__title-action')!.className).toBe(
       'ui-list-item__title-action flex items-center shrink-0',
@@ -694,10 +763,10 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     expect(document.querySelector('.ui-list-item__sep')!.className).toBe(
-      'ui-list-item__sep shrink-0 text-border',
+      'ui-list-item__sep shrink-0 text-ink-3',
     );
     expect(document.querySelector('.ui-list-item__snippet')!.className).toBe(
       'ui-list-item__snippet min-w-0 truncate',
@@ -710,7 +779,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap text-[length:var(--space-0-7)]',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     denseRow.unmount();
 
@@ -722,10 +791,10 @@ describe('ListItem', () => {
     const subs = document.querySelectorAll('.ui-list-item__sub');
     expect(subs).toHaveLength(2);
     expect(subs[0].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     expect(subs[1].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
   });
@@ -771,7 +840,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] has-[>.ui-checkbox]:ps-[var(--space-0-9)] items-center min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]',
+      'ui-list-item flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)] items-center',
     );
     unmount();
 
@@ -790,7 +859,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] [--checkbox-size:var(--space-0-75)] items-center min-h-0 [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--space-0-5)] [&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))] [&>form>.ui-btn--danger]:rounded-[var(--radius-lg)] [&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

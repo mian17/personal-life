@@ -17,15 +17,34 @@ jest.mock('@life/app-kit/preference-action', () => ({
   setPref: jest.fn(),
 }));
 
-import { ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle } from '@life/ui';
+/** The shell's Support row is fed this app's feedback action; the seam is stubbed here. */
+jest.mock('@/app/feedback-actions', () => ({
+  submitFeedbackAction: jest.fn(),
+}));
+
+// The counted settings rows read the tag and list registries through the server-only
+// barrels; mocking them keeps `next/headers`/fetch out of the node test env.
+jest.mock('@/lib/todo-api', () => ({
+  listTodoTagUsage: jest.fn(),
+  listLists: jest.fn(),
+}));
+jest.mock('@/lib/tags-compose', () => ({ resolveTagUsage: jest.fn() }));
+
+import { listLists, listTodoTagUsage } from '@/lib/todo-api';
+import { resolveTagUsage } from '@/lib/tags-compose';
+
+import { SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
 import { readPref } from '@/lib/preferences';
 import { setPref } from '@life/app-kit/preference-action';
+import { submitFeedbackAction } from '@/app/feedback-actions';
 import { MatrixSwitch } from '@/app/settings/matrix-switch';
 import { TOGGLE_DEBOUNCE_MS } from '@/lib/use-debounced-callback';
 import TodosSettingsPage from '@/app/todos/settings/page';
-import NotesSettingsPage from '@/app/notes/settings/page';
 
 const mockedReadPref = readPref as jest.MockedFunction<typeof readPref>;
+const mockedListTodoTagUsage = listTodoTagUsage as jest.MockedFunction<typeof listTodoTagUsage>;
+const mockedListLists = listLists as jest.MockedFunction<typeof listLists>;
+const mockedResolveTagUsage = resolveTagUsage as jest.MockedFunction<typeof resolveTagUsage>;
 
 // `MatrixSwitch` reads its hooks off the raw `react` module exports at call time,
 // so spying there intercepts a direct call (outside React, `testEnvironment: node`).
@@ -76,6 +95,10 @@ function childList(node: any): any[] {
   return Array.isArray(kids) ? kids : [kids];
 }
 
+/**
+ * The page returns one `SettingsShell`; the app's own groups are its `children`, so the block
+ * helpers re-root at that child slot (`SPEC-ui-settings-shell` Design 3).
+ */
 function settingsBlock(page: any, title: string): any {
   return childList(page).find(
     (child) => child?.type === SettingsBlock && child.props.title === title,
@@ -92,24 +115,30 @@ describe('/todos/settings page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedReadPref.mockResolvedValue(true);
+    mockedListTodoTagUsage.mockResolvedValue([]);
+    mockedListLists.mockResolvedValue([]);
+    mockedResolveTagUsage.mockResolvedValue([]);
   });
 
-  it('composes ManagerBlock titled Settings backed to /todos', async () => {
+  it('composes one SettingsShell titled Settings, backed to /todos, wired to todo feedback', async () => {
     const page = await TodosSettingsPage();
 
-    expect(page.type).toBe(ManagerBlock);
+    expect(page.type).toBe(SettingsShell);
     expect(page.props.title).toBe('Settings');
     expect(page.props.backHref).toBe('/todos');
+    expect(page.props.app).toBe('todos');
+    expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('renders the Appearance Theme row with a ThemeToggle control', async () => {
-    const page = await TodosSettingsPage();
-    const appearance = settingsBlock(page, 'Appearance');
+  it('renders the Appearance group as one pressed segment, with no Theme row', async () => {
+    const html = renderToStaticMarkup(await TodosSettingsPage());
 
-    expect(appearance).toBeDefined();
-    const row = settingsRow(appearance, 'Theme');
-    expect(row).toBeDefined();
-    expect(row.props.control.type).toBe(ThemeToggle);
+    expect(html).toContain('role="group" aria-label="Appearance"');
+    expect(html).not.toContain('System, light, or dark.');
+    for (const label of ['Light', 'Dark', 'System']) {
+      expect(html).toContain(`>${label}</button>`);
+    }
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
   });
 
   it('renders the Todos matrix row seeding the Switch from readPref', async () => {
@@ -131,6 +160,8 @@ describe('/todos/settings page wiring', () => {
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-label="Eisenhower matrix"');
     expect(html).toContain('aria-checked="true"');
+    expect(html).toContain('Send feedback');
+    expect(html).toContain('Personal Life · prototype');
   });
 
   it('seeds the switch OFF when the preference is off', async () => {
@@ -140,31 +171,6 @@ describe('/todos/settings page wiring', () => {
 
     expect(row.props.control.props.checked).toBe(false);
     expect(renderToStaticMarkup(page)).toContain('aria-checked="false"');
-  });
-});
-
-describe('/notes/settings page wiring', () => {
-  it('composes ManagerBlock titled Settings backed to /notes with Appearance only', () => {
-    const page = NotesSettingsPage();
-
-    expect(page.type).toBe(ManagerBlock);
-    expect(page.props.title).toBe('Settings');
-    expect(page.props.backHref).toBe('/notes');
-
-    const blocks = childList(page);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0].type).toBe(SettingsBlock);
-    expect(blocks[0].props.title).toBe('Appearance');
-  });
-
-  it('renders the Theme row and no matrix switch', () => {
-    const page = NotesSettingsPage();
-    const row = settingsRow(settingsBlock(page, 'Appearance'), 'Theme');
-
-    expect(row.props.control.type).toBe(ThemeToggle);
-    const html = renderToStaticMarkup(page);
-    expect(html).not.toContain('Eisenhower matrix');
-    expect(html).not.toContain('role="switch"');
   });
 });
 

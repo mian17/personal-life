@@ -17,9 +17,19 @@ describe('Card', () => {
   it('paints the panel surface from token utilities', () => {
     render(<Card>content</Card>);
     const card = screen.getByText('content');
-    expect(card.classList.contains('bg-panel')).toBe(true);
-    expect(card.classList.contains('border-border')).toBe(true);
-    expect(card.classList.contains('rounded-[var(--radius-lg)]')).toBe(true);
+    expect(card.classList.contains('bg-surface')).toBe(true);
+    expect(card.classList.contains('border-line')).toBe(true);
+    expect(card.classList.contains('rounded-[var(--r-lg)]')).toBe(true);
+    expect(card.classList.contains('p-[var(--s4)]')).toBe(true);
+  });
+
+  it('flush drops the panel inset and clips the rows inside it', () => {
+    render(<Card flush>content</Card>);
+    const card = screen.getByText('content');
+    expect(card.classList.contains('ui-card--flush')).toBe(true);
+    expect(card.classList.contains('p-0')).toBe(true);
+    expect(card.classList.contains('p-[var(--s4)]')).toBe(false);
+    expect(card.classList.contains('overflow-hidden')).toBe(true);
   });
 
   it('merges className instead of replacing it', () => {

@@ -1,10 +1,23 @@
 import { readPrefNumber } from '@life/app-kit';
-import { Button, Input, ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle } from '@life/ui';
-import { DEFAULT_DURATIONS, MINUTES_RANGE, type Durations } from '@life/pomodoro';
+import {
+  Button,
+  Input,
+  SettingsBlock,
+  SettingsRow,
+  SettingsShell,
+  Stack,
+  StatusText,
+} from '@life/ui';
+import {
+  DEFAULT_DURATIONS,
+  MINUTES_RANGE,
+  type Durations,
+} from '@life/pomodoro';
 import { listGoals } from '@/lib/focus-api';
 import { resolveGoal } from '@/lib/stats-buckets';
 import { getToday } from '@/lib/today';
 import { setPomodoroDurations, setPomodoroGoal } from '../actions';
+import { submitFeedbackAction } from '../../feedback-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,18 +28,65 @@ const DURATION_FIELDS = [
   { field: 'long', label: 'Long break' },
 ] as const;
 
-/** Thin mount: the inputs open on the stored minutes, the server action owns the write. */
-export default async function PomodoroSettingsRoute() {
+/** The flag `setPomodoroGoal` sends back when it refuses a daily goal (`actions.ts`). */
+const GOAL_REJECTED_FLAG = 'rejected';
+
+/**
+ * Thin mount: the inputs open on the stored minutes, the server action owns the write.
+ *
+ * The shell draws the shared Appearance, Comfort, Support and closing line; this page adds the
+ * timer's two groups between Comfort and Support. The timer's toolbar keeps its own feedback
+ * icon entry, so the Support row is the same double entry the other apps already have.
+ */
+export default async function PomodoroSettingsRoute({
+  searchParams,
+}: {
+  searchParams: Promise<{ goal?: string }>;
+}) {
   const [durations, dailyGoal] = await Promise.all([readDurations(), readDailyGoal()]);
+  const goalRejected = (await searchParams).goal === GOAL_REJECTED_FLAG;
 
   return (
-    <ManagerBlock title="Settings" backHref="/pomodoro">
-      <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle />} />
-      </SettingsBlock>
+    <SettingsShell
+      title="Settings"
+      backHref="/pomodoro"
+      app="pomodoro"
+      onSubmit={submitFeedbackAction}
+    >
+      <form action={setPomodoroGoal}>
+        <SettingsBlock
+          title="Focus"
+          footer={
+            <Stack gap="md">
+              {goalRejected && (
+                <StatusText className="text-danger!">
+                  {`A daily goal is ${MINUTES_RANGE.min} to ${MINUTES_RANGE.max} whole minutes.`}
+                </StatusText>
+              )}
+              <Button type="submit">Save goal</Button>
+            </Stack>
+          }
+        >
+          <SettingsRow
+            label="Daily goal"
+            description="Total focus minutes for a whole day."
+            control={
+              <Input
+                type="number"
+                name="goal"
+                min={MINUTES_RANGE.min}
+                max={MINUTES_RANGE.max}
+                step={1}
+                aria-label="Daily goal"
+                defaultValue={dailyGoal ?? undefined}
+              />
+            }
+          />
+        </SettingsBlock>
+      </form>
 
       <form action={setPomodoroDurations}>
-        <SettingsBlock title="Durations">
+        <SettingsBlock title="Durations" footer={<Button type="submit">Save durations</Button>}>
           {DURATION_FIELDS.map(({ field, label }) => (
             <SettingsRow
               key={field}
@@ -44,30 +104,9 @@ export default async function PomodoroSettingsRoute() {
               }
             />
           ))}
-          <Button type="submit">Save durations</Button>
         </SettingsBlock>
       </form>
-
-      <form action={setPomodoroGoal}>
-        <SettingsBlock title="Focus stats">
-          <SettingsRow
-            label="Daily goal"
-            description="Minutes"
-            control={
-              <Input
-                type="number"
-                name="goal"
-                min={MINUTES_RANGE.min}
-                max={MINUTES_RANGE.max}
-                aria-label="Daily goal"
-                defaultValue={dailyGoal ?? undefined}
-              />
-            }
-          />
-          <Button type="submit">Save goal</Button>
-        </SettingsBlock>
-      </form>
-    </ManagerBlock>
+    </SettingsShell>
   );
 }
 

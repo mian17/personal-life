@@ -60,12 +60,12 @@ export async function logOut(page: Page, origin: string): Promise<void> {
   await page.waitForURL(/\/login$/, { timeout: 30_000 });
 }
 
-/** Creates a note via the UI (new-note editor → Save → home). */
+/** Creates a note via the UI (new-note editor → Back, which flushes → home). */
 export async function createNote(page: Page, body: string): Promise<void> {
   await page.getByLabel('New note').click();
   await page.waitForURL(/\/notes\/new$/, { timeout: 15_000 });
   await page.getByLabel('Note body').fill(body);
-  await page.getByLabel('Save').click();
+  await page.getByLabel('Back').click();
   await page.waitForURL(/\/notes$/, { timeout: 15_000 });
 }
 
@@ -75,7 +75,7 @@ export async function editNote(page: Page, title: string, body: string): Promise
   await page.waitForURL(/\/notes\/[^/]+$/, { timeout: 15_000 });
   const textarea = page.getByLabel('Note body');
   await textarea.fill(body);
-  await page.getByLabel('Save').click();
+  await page.getByLabel('Back').click();
   await page.waitForURL(/\/notes$/, { timeout: 15_000 });
 }
 
@@ -85,9 +85,13 @@ export async function search(page: Page, term: string): Promise<void> {
   await page.waitForURL((url) => url.searchParams.get('q') === term, { timeout: 15_000 });
 }
 
-/** Moves a note to trash from the home list. */
+/** Moves a note to trash from the note detail's actions menu. */
 export async function trashNote(page: Page, title: string): Promise<void> {
-  await page.getByLabel(`Delete ${title}`).click();
+  await page.getByRole('link', { name: new RegExp(escape(title)) }).first().click();
+  await page.waitForURL(/\/notes\/[^/]+$/, { timeout: 15_000 });
+  await page.getByLabel('Note actions').click();
+  await page.getByRole('button', { name: 'Delete note' }).click();
+  await page.waitForURL(/\/notes$/, { timeout: 15_000 });
   await expect(page.getByText(title, { exact: false })).toHaveCount(0, { timeout: 15_000 });
 }
 

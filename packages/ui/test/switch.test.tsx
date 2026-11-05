@@ -75,7 +75,7 @@ describe('Switch focus ring', () => {
     const track = screen.getByRole('switch');
     expect(track.classList.contains('focus-visible:outline-solid')).toBe(true);
     expect(track.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
-    expect(track.classList.contains('focus-visible:outline-accent')).toBe(true);
+    expect(track.classList.contains('focus-visible:outline-focus')).toBe(true);
     // The reset itself must not zero anything the ring needs back.
     expect(track.classList.contains('outline-none')).toBe(false);
   });

@@ -39,6 +39,21 @@ export const MINUTE_MS = 60_000;
 
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
 
+/**
+ * Whether `value` is a whole-minute daily goal the service would accept.
+ *
+ * Today the service bounds a goal by the same `MINUTES_RANGE` rule a recorded block is held
+ * to, so the app must not offer a value the service would reject.
+ */
+export function isDailyGoal(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= MINUTES_RANGE.min &&
+    value <= MINUTES_RANGE.max
+  );
+}
+
 export const DEFAULT_MINUTES = DEFAULT_DURATIONS.focus;
 
 export function initialState(durations: Durations): TimerState {

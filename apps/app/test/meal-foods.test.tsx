@@ -49,7 +49,6 @@ import {
 } from '@/lib/meal-api';
 import { revalidatePath } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { MealsNav } from '@/app/meals-nav';
 import FoodsPage from '@/app/(meals)/meals/foods/page';
 import NewFoodPage from '@/app/(meals)/meals/foods/new/page';
 import EditFoodPage from '@/app/(meals)/meals/foods/[id]/page';
@@ -101,15 +100,6 @@ const bounds: FoodFormBounds = {
   amountMax: AMOUNT_MAX,
 };
 
-describe('foods nav entry', () => {
-  it('adds one Foods icon linking to the catalog', () => {
-    const html = renderToStaticMarkup(<MealsNav />);
-
-    expect(html).toContain('href="/meals/foods"');
-    expect(html).toContain('aria-label="Foods"');
-  });
-});
-
 describe('foods catalog page', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -124,7 +114,7 @@ describe('foods catalog page', () => {
 
     expect(el.type).toBe(ManagerBlock);
     expect(html).toContain('Foods');
-    expect(html).toContain('href="/meals"');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('Milk, Brand X');
     expect(html).toContain(`per 100 ml · ${format('calories', 52)}`);
     expect(html).toContain('Oats');
@@ -159,6 +149,29 @@ describe('foods catalog page', () => {
 
     expect(html).toContain('No matches.');
     expect(html).not.toContain('No foods yet.');
+  });
+
+  it('opens the catalog body on the shared section rhythm, rows and empty states alike', async () => {
+    mockedListMealFoods.mockResolvedValue([food()]);
+    const listHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    mockedListMealFoods.mockResolvedValue([]);
+    const missHtml = renderToStaticMarkup(await loadFoodsPage('zzz'));
+    const emptyHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    // The whole body — a list of rows or either empty state — sits inside the one
+    // unlabelled `Section`, which is what supplies the gap below the search box.
+    for (const [html, body] of [
+      [listHtml, 'Milk, Brand X'],
+      [missHtml, 'No matches.'],
+      [emptyHtml, 'No foods yet.'],
+    ] as const) {
+      const open = html.indexOf('ui-section');
+      expect(open).toBeGreaterThan(-1);
+      expect(html.indexOf(body)).toBeGreaterThan(open);
+      expect(html.lastIndexOf('</section>')).toBeGreaterThan(html.indexOf(body));
+      expect(html.indexOf('aria-label="New food"')).toBeGreaterThan(html.indexOf(body));
+    }
   });
 
   it('reaches create and edit through the catalog (AC1 create affordance, AC4 edit rows)', async () => {

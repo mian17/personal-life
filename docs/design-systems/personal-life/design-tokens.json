@@ -1,0 +1,906 @@
+{
+  "schemaVersion": 1,
+  "format": "od-design-tokens/v1",
+  "contract": "TOKEN_SCHEMA",
+  "generatedAt": "2026-10-29T12:34:49.000Z",
+  "source": {
+    "worktree": "/home/night/WebstormProjects/personal-life/.pi/worktrees/ds-personal-life",
+    "branch": "pi/ds/personal-life-base",
+    "gitSha": "0ec5573181ea985c2bb16be014c74a236fd55bf7",
+    "readAt": [
+      "packages/ui/src/styles/tokens.css",
+      "packages/ui/src/styles/theme.css",
+      "packages/ui/src/styles/base.css",
+      "packages/ui/src/styles.css",
+      "packages/ui/src/components/*.tsx",
+      "docs/design-systems/personal-life/DESIGN.md",
+      "docs/design-systems/personal-life/token-map/*.json"
+    ],
+    "tokensCss": "tokens.css",
+    "tokenContractReport": "source/token-contract.report.json"
+  },
+  "summary": {
+    "totalTokens": 56,
+    "declaredTokens": 56,
+    "sourceBackedTokens": 37,
+    "sourceBackedA1": 18,
+    "requiredA1": 26,
+    "fallbackTokens": 0,
+    "aliasTokens": 19,
+    "unmatchedTokens": 0,
+    "score": 66,
+    "scoreRule": "score = sourceBackedTokens / totalTokens * 100, rounded; sourceBackedA1 = source-backed rows in A1-identity + A1-structure",
+    "grade": "source-backed",
+    "recommendRebuild": false
+  },
+  "layers": {
+    "A1-identity": {
+      "total": 8,
+      "sourceBacked": 7,
+      "fallback": 0,
+      "alias": 1
+    },
+    "A1-structure": {
+      "total": 18,
+      "sourceBacked": 11,
+      "fallback": 0,
+      "alias": 7
+    },
+    "A2": {
+      "total": 26,
+      "sourceBacked": 19,
+      "fallback": 0,
+      "alias": 7
+    },
+    "B-slot": {
+      "total": 4,
+      "sourceBacked": 0,
+      "fallback": 0,
+      "alias": 4
+    }
+  },
+  "tokens": [
+    {
+      "name": "--bg",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#0f1115",
+      "role": "page ground",
+      "evidence": "packages/ui/src/styles/tokens.css:3",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--bg",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "name": "--surface",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#181b22",
+      "role": "raised surface: cards, rows, dialogs, fields",
+      "evidence": "packages/ui/src/styles/tokens.css:4",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--panel",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "name": "--surface-warm",
+      "layer": "B-slot",
+      "type": "color",
+      "value": "var(--surface)",
+      "role": "warm tinted surface slot",
+      "evidence": "alias -> tokens.css:4",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo has exactly one surface fill; alias points at --surface",
+      "sources": []
+    },
+    {
+      "name": "--fg",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#e8eaf0",
+      "role": "primary text and default glyph colour",
+      "evidence": "packages/ui/src/styles/tokens.css:5",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--text",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "name": "--fg-2",
+      "layer": "B-slot",
+      "type": "color",
+      "value": "var(--muted)",
+      "role": "secondary foreground slot",
+      "evidence": "alias -> tokens.css:6",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo has two text tones; the second is --muted, so --fg-2 points there instead of inventing a middle step",
+      "sources": []
+    },
+    {
+      "name": "--muted",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#8b93a7",
+      "role": "meta lines, inactive tabs, placeholders, done rows",
+      "evidence": "packages/ui/src/styles/tokens.css:6",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--muted",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "name": "--meta",
+      "layer": "B-slot",
+      "type": "color",
+      "value": "var(--muted)",
+      "role": "meta/secondary label slot",
+      "evidence": "alias -> tokens.css:6",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo paints meta text with --muted (DESIGN.md:33); no separate meta colour",
+      "sources": []
+    },
+    {
+      "name": "--border",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#2a2f3a",
+      "role": "hairline borders, 1.29:1 on --surface",
+      "evidence": "packages/ui/src/styles/tokens.css:12",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--border",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "name": "--border-soft",
+      "layer": "B-slot",
+      "type": "color",
+      "value": "var(--border)",
+      "role": "softer hairline slot",
+      "evidence": "alias -> tokens.css:12",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "one border colour exists; token-map/unmatched.json records no subtle/strong variant",
+      "sources": []
+    },
+    {
+      "name": "--accent",
+      "layer": "A1-identity",
+      "type": "color",
+      "value": "#5b8cff",
+      "role": "primary action fill, active tab, focus ring colour",
+      "evidence": "packages/ui/src/styles/tokens.css:7",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--accent",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "name": "--accent-on",
+      "layer": "A2",
+      "type": "color",
+      "value": "white",
+      "role": "text and glyphs on an accent fill",
+      "evidence": "packages/ui/src/styles/tokens.css:13",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--on-accent",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "name": "--accent-hover",
+      "layer": "A2",
+      "type": "color",
+      "value": "color-mix(in oklab, var(--accent), white 8%)",
+      "role": "accent hover state",
+      "evidence": "derived -> tokens.css:7",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo declares no hover colour (colour changes ride Tailwind transition-colors); dark-first mix moves toward white, sanctioned derivation from the repo accent",
+      "sources": []
+    },
+    {
+      "name": "--accent-active",
+      "layer": "A2",
+      "type": "color",
+      "value": "color-mix(in oklab, var(--accent), white 14%)",
+      "role": "accent pressed state",
+      "evidence": "derived -> tokens.css:7",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "same derivation one step further; light theme flips the mix direction to black",
+      "sources": []
+    },
+    {
+      "name": "--success",
+      "layer": "A2",
+      "type": "color",
+      "value": "#4cc38a",
+      "role": "done/success status",
+      "evidence": "packages/ui/src/styles/tokens.css:11",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--green",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "name": "--warn",
+      "layer": "A2",
+      "type": "color",
+      "value": "#f2b64c",
+      "role": "in-progress status, due-soon rows",
+      "evidence": "packages/ui/src/styles/tokens.css:10",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--amber",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "name": "--danger",
+      "layer": "A2",
+      "type": "color",
+      "value": "#ff6b6b",
+      "role": "destructive glyphs, overdue date, alert border",
+      "evidence": "packages/ui/src/styles/tokens.css:8",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--danger",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "name": "--font-display",
+      "layer": "A1-identity",
+      "type": "fontFamily",
+      "value": "var(--font-body)",
+      "role": "display/heading family",
+      "evidence": "alias -> tokens.css:36",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "one family, no display face (DESIGN.md:87); alias keeps a heading from pulling an outside typeface",
+      "sources": []
+    },
+    {
+      "name": "--font-body",
+      "layer": "A1-identity",
+      "type": "fontFamily",
+      "value": "system-ui, -apple-system, sans-serif",
+      "role": "the only font stack; html/body shorthand in base.css:21",
+      "evidence": "packages/ui/src/styles/tokens.css:36",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--font-stack",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 36
+        }
+      ]
+    },
+    {
+      "name": "--font-mono",
+      "layer": "A2",
+      "type": "fontFamily",
+      "value": "var(--font-body)",
+      "role": "code/preformatted family",
+      "evidence": "alias -> tokens.css:36",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "no monospace stack anywhere in the tree; alias rather than invent a face",
+      "sources": []
+    },
+    {
+      "name": "--text-xs",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "0.7rem",
+      "role": "dense row text (11.2px)",
+      "evidence": "packages/ui/src/styles/tokens.css:56",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-0-7 used in font-size position (DESIGN.md:99)",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 56
+        }
+      ]
+    },
+    {
+      "name": "--text-sm",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "0.8rem",
+      "role": "status chip text (12.8px)",
+      "evidence": "packages/ui/src/styles/tokens.css:58",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-0-8 used in font-size position",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 58
+        }
+      ]
+    },
+    {
+      "name": "--text-base",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "1rem",
+      "role": "body and field text (16px)",
+      "evidence": "packages/ui/src/styles/tokens.css:34",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--font-size",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "name": "--text-lg",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "1.05rem",
+      "role": "note editor body (16.8px)",
+      "evidence": "packages/ui/src/styles/tokens.css:37",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--fs-editor",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 37
+        }
+      ]
+    },
+    {
+      "name": "--text-xl",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "1.25rem",
+      "role": "dialog title, section heading (20px)",
+      "evidence": "packages/ui/src/styles/tokens.css:63",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-1-25 used in font-size position",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 63
+        }
+      ]
+    },
+    {
+      "name": "--text-2xl",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "2rem",
+      "role": "oversized numeric read-out (32px)",
+      "evidence": "packages/ui/src/styles/tokens.css:64",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-2 used in font-size position",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 64
+        }
+      ]
+    },
+    {
+      "name": "--text-3xl",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "3rem",
+      "role": "oversized numeric read-out (48px), repo ceiling",
+      "evidence": "packages/ui/src/styles/tokens.css:65",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-3 used in font-size position",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 65
+        }
+      ]
+    },
+    {
+      "name": "--text-4xl",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--text-3xl)",
+      "role": "largest display slot",
+      "evidence": "alias -> DESIGN.md:114",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo stops at 3rem; alias to the ceiling rather than invent a fourth display step",
+      "sources": []
+    },
+    {
+      "name": "--leading-body",
+      "layer": "A1-structure",
+      "type": "number",
+      "value": "1.5",
+      "role": "body leading, set once on html/body",
+      "evidence": "packages/ui/src/styles/tokens.css:35",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--leading",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "name": "--leading-tight",
+      "layer": "A1-structure",
+      "type": "number",
+      "value": "1",
+      "role": "leading for pills and icon-only buttons",
+      "evidence": "packages/ui/src/components/pill.tsx:62",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "the only tightened leading in the tree is `leading-none` (also button.tsx:40); repo declares no 1.15 step",
+      "sources": []
+    },
+    {
+      "name": "--tracking-display",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "-0.02em",
+      "role": "heading tracking",
+      "evidence": "packages/ui/src/components/page-title.tsx:12",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "`tracking-[-0.02em]`, repeated in section.tsx:30",
+      "sources": []
+    },
+    {
+      "name": "--space-1",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "0.25rem",
+      "role": "hairline gap step (4px)",
+      "evidence": "packages/ui/src/styles/tokens.css:50",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-0-25; note the name collision with the repo token of the same name (1rem)",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "name": "--space-2",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "0.5rem",
+      "role": "default tight gap: list rows, menu panel, dialog footer (8px)",
+      "evidence": "packages/ui/src/styles/tokens.css:54",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-0-5",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 54
+        }
+      ]
+    },
+    {
+      "name": "--space-3",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "0.75rem",
+      "role": "row gap, tab trigger padding, chip padding (12px)",
+      "evidence": "packages/ui/src/styles/tokens.css:57",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-0-75",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 57
+        }
+      ]
+    },
+    {
+      "name": "--space-4",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "1rem",
+      "role": "page padding, dialog padding, fab inset (16px)",
+      "evidence": "packages/ui/src/styles/tokens.css:62",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-1",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 62
+        }
+      ]
+    },
+    {
+      "name": "--space-5",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "1.25rem",
+      "role": "switch thumb travel (20px)",
+      "evidence": "packages/ui/src/styles/tokens.css:63",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-1-25",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 63
+        }
+      ]
+    },
+    {
+      "name": "--space-6",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "var(--space-5)",
+      "role": "large gap slot (24px)",
+      "evidence": "alias -> tokens.css:63",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo has no 24px step; closest real step is 20px (--space-1-25), so the alias stops one step short rather than invent 1.5rem",
+      "sources": []
+    },
+    {
+      "name": "--space-8",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "2rem",
+      "role": "section top margin, Stack lg gap (32px)",
+      "evidence": "packages/ui/src/styles/tokens.css:64",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-2",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 64
+        }
+      ]
+    },
+    {
+      "name": "--space-12",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "3rem",
+      "role": "extra-large gap (48px)",
+      "evidence": "packages/ui/src/styles/tokens.css:65",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--space-3",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 65
+        }
+      ]
+    },
+    {
+      "name": "--section-y-desktop",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-8)",
+      "role": "vertical section rhythm, wide viewport",
+      "evidence": "alias -> tokens.css:64",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "repo keeps one 32px section rhythm at every width; no responsive ladder exists",
+      "sources": []
+    },
+    {
+      "name": "--section-y-tablet",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-8)",
+      "role": "vertical section rhythm, tablet",
+      "evidence": "alias -> tokens.css:64",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "same single rhythm",
+      "sources": []
+    },
+    {
+      "name": "--section-y-phone",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-8)",
+      "role": "vertical section rhythm, phone",
+      "evidence": "alias -> tokens.css:64",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "same single rhythm; the column adapts measure, not breakpoints (DESIGN.md:355)",
+      "sources": []
+    },
+    {
+      "name": "--radius-sm",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "var(--radius-md)",
+      "role": "small corner slot",
+      "evidence": "alias -> tokens.css:16",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "smallest declared radius is 10px; the 3.2px checkbox corner is a spacing token, not a radius tier (DESIGN.md:169)",
+      "sources": []
+    },
+    {
+      "name": "--radius-md",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "10px",
+      "role": "fields, buttons, icon buttons, tab rail, menu/popover, toast, alert banner",
+      "evidence": "packages/ui/src/styles/tokens.css:16",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--radius-md",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "name": "--radius-lg",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "12px",
+      "role": "cards, list rows, centred dialog panel",
+      "evidence": "packages/ui/src/styles/tokens.css:17",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--radius-lg",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "name": "--radius-pill",
+      "layer": "A2",
+      "type": "dimension",
+      "value": "999px",
+      "role": "pills and chips, fab, switch track and thumb",
+      "evidence": "packages/ui/src/styles/tokens.css:18",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--radius-pill",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "name": "--elev-flat",
+      "layer": "A2",
+      "type": "shadow",
+      "value": "none",
+      "role": "cards, rows, fields and tab rails sit flat",
+      "evidence": "implicit -> DESIGN.md:175",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "repo casts nothing on resting surfaces; no flat shadow is declared because none is needed",
+      "sources": []
+    },
+    {
+      "name": "--elev-ring",
+      "layer": "A2",
+      "type": "shadow",
+      "value": "0 0 0 1px var(--border)",
+      "role": "1px border ring",
+      "evidence": "packages/ui/src/styles/tokens.css:23",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "width from the declared --border-width token, colour from --border; no ring shadow is declared in the repo",
+      "sources": []
+    },
+    {
+      "name": "--elev-raised",
+      "layer": "A2",
+      "type": "shadow",
+      "value": "0 4px 12px rgba(0, 0, 0, 0.25)",
+      "role": "the only elevation: fab, toast, menu, popover, dialog",
+      "evidence": "packages/ui/src/styles/tokens.css:40",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--shadow-fab",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 40
+        }
+      ]
+    },
+    {
+      "name": "--focus-ring",
+      "layer": "A2",
+      "type": "shadow",
+      "value": "0 0 0 2px var(--accent)",
+      "role": "focus ring on every interactive primitive",
+      "evidence": "packages/ui/src/styles/tokens.css:24",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "width from the declared --focus-ring token (2px), colour --accent because focus is drawn with `outline-accent` (button.tsx:19); no focus shadow is declared",
+      "sources": []
+    },
+    {
+      "name": "--motion-fast",
+      "layer": "A2",
+      "type": "duration",
+      "value": "120ms",
+      "role": "short transition (declared, no consumer yet)",
+      "evidence": "packages/ui/src/styles/tokens.css:43",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--duration-fast",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 43
+        }
+      ]
+    },
+    {
+      "name": "--motion-base",
+      "layer": "A2",
+      "type": "duration",
+      "value": "200ms",
+      "role": "row collapse, toast enter and leave",
+      "evidence": "packages/ui/src/styles/tokens.css:44",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--duration-base",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 44
+        }
+      ]
+    },
+    {
+      "name": "--ease-standard",
+      "layer": "A2",
+      "type": "cubicBezier",
+      "value": "ease-out",
+      "role": "the only curve",
+      "evidence": "packages/ui/src/styles/tokens.css:45",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--ease-standard",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "name": "--container-max",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "640px",
+      "role": "centred document column cap",
+      "evidence": "packages/ui/src/styles/tokens.css:22",
+      "status": "source-backed",
+      "confidence": "high",
+      "reason": "--content-width",
+      "sources": [
+        {
+          "file": "packages/ui/src/styles/tokens.css",
+          "line": 22
+        }
+      ]
+    },
+    {
+      "name": "--container-gutter-desktop",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-4)",
+      "role": "side padding, wide viewport",
+      "evidence": "alias -> tokens.css:62",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "page padding is 16px at every width (`px-[var(--space-1)]`), no responsive gutter ladder",
+      "sources": []
+    },
+    {
+      "name": "--container-gutter-tablet",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-4)",
+      "role": "side padding, tablet",
+      "evidence": "alias -> tokens.css:62",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "same single gutter",
+      "sources": []
+    },
+    {
+      "name": "--container-gutter-phone",
+      "layer": "A1-structure",
+      "type": "dimension",
+      "value": "var(--space-4)",
+      "role": "side padding, phone",
+      "evidence": "alias -> tokens.css:62",
+      "status": "aliased",
+      "confidence": "medium",
+      "reason": "same single gutter",
+      "sources": []
+    }
+  ]
+}

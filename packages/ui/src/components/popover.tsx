@@ -6,10 +6,11 @@ import type { ComponentProps } from 'react';
 import { cx } from '../lib/cx';
 
 /**
- * The registry `popover` parts, theme-mapped: `bg-popover` is `--panel`, `text-popover-foreground`
- * is `--text`, `rounded-md` is `--radius-md`, `shadow-md` is `--shadow-fab` and `border` is
- * `--border`. Radix portals the panel into the top layer, where an ancestor's `overflow: hidden`
- * cannot clip it, and owns the outside-press and Escape dismissal.
+ * The registry `popover` parts, theme-mapped: `bg-popover` is the raised surface, `rounded-md` is
+ * `--r-lg` — a floating panel is a card-sized surface, so it takes the card's radius and line,
+ * not the control radius — and the registry's `shadow-md` is gone, because §6 retired the product
+ * shadow. Radix portals the panel into the top layer, where an ancestor's `overflow: hidden`
+ * cannot clip it, and owns the outside-press and Escape dismissal. It fades in over `--d-fast`.
  *
  * The registry's fixed `w-72` and `p-4` are left to the caller: a panel that hangs off a control
  * is as wide as that control, and a command panel brings its own row padding.
@@ -19,8 +20,8 @@ import { cx } from '../lib/cx';
  * vendored.
  */
 const contentStyles = cx(
-  'z-50 overflow-hidden rounded-[var(--radius-md)] border border-border bg-panel text-text',
-  'shadow-[var(--shadow-fab)] outline-none',
+  'z-50 overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface text-ink',
+  'outline-none motion-safe:transition-opacity starting:opacity-0',
 );
 
 export function Popover(props: Readonly<ComponentProps<typeof PopoverPrimitive.Root>>) {

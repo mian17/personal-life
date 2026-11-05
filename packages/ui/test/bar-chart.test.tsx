@@ -64,12 +64,22 @@ describe('BarChart', () => {
     expect(emptyWednesday).toBeGreaterThan(0);
   });
 
-  it('carries every bar in the accent token', () => {
-    const { container } = render(<BarChart data={buckets} label="Focus minutes per day" />);
+  it('carries every measured bar in the accent token, and an empty one in the muted chart tone', () => {
+    const { container } = render(
+      <BarChart
+        data={[
+          { label: 'Mon', value: 0 },
+          { label: 'Tue', value: 30 },
+        ]}
+        label="Focus minutes per day"
+      />,
+    );
 
-    for (const bar of plottedBuckets(container)) {
-      expect(bar.getAttribute('fill')).toBe('var(--accent)');
-    }
+    const [emptyMonday, measuredTuesday] = plottedBuckets(container).map((bar) =>
+      bar.getAttribute('fill'),
+    );
+    expect(emptyMonday).toBe('var(--chart-muted)');
+    expect(measuredTuesday).toBe('var(--max)');
   });
 
   it('draws one flat target run per targeted bucket, and none for a bare bucket', () => {
@@ -122,20 +132,20 @@ describe('BarChart', () => {
     const { container } = render(<BarChart data={buckets} label="Focus minutes per day" />);
 
     const targetLine = container.querySelector('polyline.ui-bar-chart__target');
-    expect(targetLine?.getAttribute('stroke')).toBe('var(--amber)');
+    expect(targetLine?.getAttribute('stroke')).toBe('var(--warn)');
 
     const tickTexts = Array.from(
       container.querySelectorAll('.recharts-cartesian-axis-tick-value'),
     );
     expect(tickTexts.length).toBeGreaterThan(0);
     for (const tick of tickTexts) {
-      expect(tick.getAttribute('fill')).toBe('var(--muted)');
+      expect(tick.getAttribute('fill')).toBe('var(--ink-2)');
     }
 
     const axisLines = Array.from(container.querySelectorAll('.recharts-cartesian-axis-line'));
     expect(axisLines.length).toBeGreaterThan(0);
     for (const axis of axisLines) {
-      expect(axis.getAttribute('stroke')).toBe('var(--border)');
+      expect(axis.getAttribute('stroke')).toBe('var(--line)');
     }
   });
 

@@ -1,5 +1,5 @@
 import type { List, Todo, TodoCompletion } from '@life/shared';
-import { dueDateLabel, FeedbackNavItem, ListShell, Tab, TabBar, todayIso } from '@life/ui';
+import { dueDateLabel, ListShell, SettingsLink, Tab, TabBar, todayIso } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/todo-api', () => ({
@@ -105,6 +105,38 @@ describe('/todos list page wiring', () => {
     expect(el.props.fabHref).toBe('/todos/new');
   });
 
+  it('subtitles the header with the day\u2019s open and done rows, zero included', async () => {
+    // The default fixture's only todo is undated, so it lands in no shown group: the
+    // header still reads the literal, no-plural zero form.
+    const el = await TodosPage();
+
+    expect(el.props.subtitle).toBe('0 open \u00b7 0 done');
+  });
+
+  it('counts open as overdue + today and done as the done rows, including derived occurrences', async () => {
+    const TODAY = todayIso();
+    mockedListTodos.mockResolvedValue({
+      todos: [
+        todo({ id: 'o1', title: 'Send meter reading', dueDate: '2000-01-01' }),
+        todo({ id: 't1', title: 'Write the report', dueDate: TODAY }),
+        todo({ id: 'd1', title: 'Pay rent', done: true }),
+        todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: TODAY }),
+      ],
+      nextCursor: null,
+    });
+    // The repeating todo's ticked occurrence is a done row with no `Todo` row of its own.
+    mockedListTodoCompletions.mockResolvedValue({
+      completions: [completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' })],
+      nextCursor: null,
+    });
+
+    const el = await TodosPage();
+
+    // open: overdue (1) + today (1, the live repeating row); done: the done one-off
+    // plus the derived occurrence the completion log makes a done row.
+    expect(el.props.subtitle).toBe('3 open \u00b7 2 done');
+  });
+
   it('passes no filter or search axes through to listTodos', async () => {
     await TodosPage();
 
@@ -118,29 +150,18 @@ describe('/todos list page wiring', () => {
     expect(el.props.filters).toBeUndefined();
   });
 
-  it('keeps the frozen nav link labels the e2e suite depends on', async () => {
+  it('keeps the nav to the single settings control: the tags/lists/trash icons are gone', async () => {
     const el = await TodosPage();
 
     expect(el.props.navTrailing.type).toBe(TodosNav);
+    const nav = TodosNav() as unknown as { type: unknown; props: { href: string } };
+    expect(nav.type).toBe(SettingsLink);
+    expect(nav.props.href).toBe('/todos/settings');
+
     const html = renderToStaticMarkup(<TodosNav />);
     expect(html).not.toMatch(/Theme:/);
     const labels = [...html.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(
-      expect.arrayContaining(['Manage tags', 'Manage lists', 'Trash', 'Settings']),
-    );
-  });
-
-  it('places the feedback item for this app before the Settings link', () => {
-    const kids = asArray(TodosNav() as unknown as { props: { children: unknown } });
-
-    const feedback = kids.filter((k) => k.type === FeedbackNavItem);
-    expect(feedback).toHaveLength(1);
-    expect(feedback[0].props.app).toBe('todos');
-
-    // Settings stays the trailing nav item, feedback immediately before it.
-    const last = kids[kids.length - 1];
-    expect(last.props.label).toBe('Settings');
-    expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
+    expect(labels).toEqual(['Settings']);
   });
 
   it('renders the view tabs and the Matrix tab when the opt-in is on', async () => {
@@ -172,7 +193,20 @@ describe('/todos list page wiring', () => {
     expect(el.props.body.props.hideDone).toBeUndefined();
   });
 
-  it('renders a done todo as a struck row with no trash control', async () => {
+  it('opens a zero-row body one section step down, wrapping the empty state in a section', async () => {
+    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null });
+    const el = await TodosPage();
+    const html = renderToStaticMarkup(el.props.body);
+
+    // The empty state is not left flush under the tabs: it rides the section primitive,
+    // whose own `--s6` top step is the page's rhythm. `autoHideStyles` cannot hide it —
+    // the section holds an empty state, never a `.ui-list`.
+    expect(html).toMatch(/<section[^>]*class="[^"]*ui-section/);
+    expect(html).toContain('ui-empty');
+    expect(html).toContain('No todos');
+  });
+
+  it('renders a done todo struck, with the delete slot reserved but not an affordance', async () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],
       nextCursor: null,
@@ -182,8 +216,12 @@ describe('/todos list page wiring', () => {
     const html = renderToStaticMarkup(el.props.body);
     expect(html).toContain('ui-list-item--done');
     expect(html).toContain('ui-checkbox--checked');
-    expect(html).not.toContain('ui-btn--danger');
-    expect(html).not.toContain('aria-label="Delete Pay rent"');
+    // The slot is always rendered so a row's width never depends on `done`; on a done row it is
+    // `invisible`, which keeps its box in flow and drops the button from the a11y tree. An
+    // untick therefore reflows nothing while the row still offers no delete affordance.
+    expect(html).toContain('<form');
+    expect(html).toMatch(/<form[^>]*class="invisible"/);
+    expect(html).toContain('aria-label="Delete Pay rent"');
   });
 
   it("renders a repeating todo's completed occurrence as a done TodoItem while the next occurrence stays open", async () => {

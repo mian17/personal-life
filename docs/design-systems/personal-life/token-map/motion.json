@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "family": "motion",
+  "source": "packages/ui/src/styles/tokens.css",
+  "tokens": [
+    {
+      "family": "motion",
+      "target": "--ds-motion-duration-fast",
+      "source": "--duration-fast",
+      "value": "120ms",
+      "role": "reserved short transition (declared, no consumer in the current tree)",
+      "declaredAt": "packages/ui/src/styles/tokens.css:43",
+      "usageSites": [],
+      "status": "declared-unused"
+    },
+    {
+      "family": "motion",
+      "target": "--ds-motion-duration-base",
+      "source": "--duration-base",
+      "value": "200ms",
+      "role": "list row collapse and height/opacity transitions, toast enter and leave",
+      "declaredAt": "packages/ui/src/styles/tokens.css:44",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:46",
+        "packages/ui/src/components/snackbar.tsx:38",
+        "packages/ui/test/list-item.test.tsx:607",
+        "packages/ui/test/list-item.test.tsx:774",
+        "packages/ui/test/list-item.test.tsx:793"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "motion",
+      "target": "--ds-motion-ease-standard",
+      "source": "--ease-standard",
+      "value": "ease-out",
+      "role": "the only easing curve: row collapse, toast transition",
+      "declaredAt": "packages/ui/src/styles/tokens.css:45",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:46",
+        "packages/ui/src/components/snackbar.tsx:38",
+        "packages/ui/test/list-item.test.tsx:608",
+        "packages/ui/test/list-item.test.tsx:774",
+        "packages/ui/test/list-item.test.tsx:793"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "motion",
+      "target": "--ds-motion-duration-exit",
+      "source": "EXIT_MS (snackbar.tsx)",
+      "value": "200ms",
+      "role": "toast leave window before unmount; equal to --duration-base",
+      "declaredAt": "packages/ui/src/components/snackbar.tsx:9",
+      "usageSites": [
+        "packages/ui/src/components/snackbar.tsx"
+      ],
+      "status": "code-literal",
+      "note": "a component constant, not a token"
+    }
+  ]
+}

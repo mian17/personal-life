@@ -3,11 +3,14 @@ import { logIn } from './journey';
 
 /**
  * The feedback chapter's one targeted e2e run (SPEC-feedback-ui Testing
- * Strategy): from `/notes`, a blank title teaches the rule and creates nothing;
- * a valid submit shows up on `/feedback` under the right app → type group, with
- * both the title and the description lines.
+ * Strategy): from the notes Settings screen's Support row, a blank title teaches
+ * the rule and creates nothing; a valid submit shows up on `/feedback` under the
+ * right app → type group, with both the title and the description lines.
  *
- * Only feedback-owned selectors — no frozen suite is touched.
+ * The notes entry is the settings row (the header control left with the index
+ * restyle), so this spec walks `/notes` → Settings → the row; the dialog's own
+ * selectors are unchanged. Only feedback-owned selectors — no frozen suite is
+ * touched.
  */
 test('submit feedback from the notes toolbar and read it back in the inbox', async ({ page }) => {
   const title = `e2e feedback title ${Date.now()}`;
@@ -16,7 +19,7 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await logIn(page);
 
   // Blank title: 'Title is required.', no row created.
-  await page.getByRole('button', { name: 'Send feedback' }).click();
+  await openNotesFeedback(page);
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Send feedback' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Send', exact: true }).click();
@@ -26,7 +29,7 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await dialog.getByLabel('Title').fill(title);
   await dialog.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(dialog.getByText('Description is required.')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await dialog.getByRole('button', { name: 'Close' }).click();
 
   // Emptiness is not asserted here: chapter 2 seeds a row into the same
   // persistent database, so this page is only empty on a fresh stack. The frozen
@@ -35,9 +38,8 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   await expect(page.getByRole('heading', { level: 1, name: 'Feedback' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'All', exact: true })).toBeVisible();
 
-  // Valid submit from the notes toolbar → the entry belongs to the Notes app.
-  await page.goto('/notes');
-  await page.getByRole('button', { name: 'Send feedback' }).click();
+  // Valid submit from the notes settings row → the entry belongs to the Notes app.
+  await openNotesFeedback(page);
   const form = page.getByRole('dialog');
   await form.getByRole('button', { name: 'Enhancement' }).click();
   await form.getByLabel('Title').fill(title);
@@ -87,6 +89,17 @@ test('flipping an entry to Done removes it from Open and returns it under Done',
   await page.getByRole('link', { name: 'Done', exact: true }).click();
   await expect(entryPill(row)).toHaveText('Done');
 });
+
+/**
+ * Opens the feedback dialog from the notes Settings screen's Support row: the
+ * header now carries only the Settings control, so the row is reached through it.
+ */
+async function openNotesFeedback(page: Page): Promise<void> {
+  await page.goto('/notes');
+  await page.getByLabel('Settings').click();
+  await page.waitForURL(/\/notes\/settings$/, { timeout: 15_000 });
+  await page.getByRole('button', { name: 'Send feedback' }).click();
+}
 
 /** Sends one entry from /feedback's own toolbar dialog as the picked type. */
 async function submitFeedback(

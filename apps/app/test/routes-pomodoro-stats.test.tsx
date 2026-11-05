@@ -1,6 +1,15 @@
 import type { ReactElement } from 'react';
 import * as ui from '@life/ui';
-import { BarChart, IconLink, ManagerBlock, Pill, PillGroup, ProgressBar, StatusText } from '@life/ui';
+import {
+  BarChart,
+  IconLink,
+  ManagerBlock,
+  ProgressBar,
+  Section,
+  Segmented,
+  StatusText,
+} from '@life/ui';
+import type { Segment } from '@life/ui';
 
 // The route is a thin server shell over three seams: the BFF rows, the caller's
 // `today`, and the pure window arithmetic (the `routes-matrix.test.tsx` pattern).
@@ -111,6 +120,16 @@ function shiftHref(tree: unknown): string {
   return withType<{ href: string }>(tree, IconLink).href;
 }
 
+/** The chart-window control's segments, in render order. */
+function segments(tree: unknown): Segment[] {
+  return withType<{ items: Segment[] }>(tree, Segmented).items;
+}
+
+/** The dashed-line note's text, or `undefined` when no goal resolves for today. */
+function goalNote(tree: unknown): string | undefined {
+  return findAllOfType(tree, 'p')[0]?.props.children as string | undefined;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockedGetToday.mockResolvedValue(TODAY);
@@ -127,10 +146,10 @@ describe('/pomodoro/stats page wiring', () => {
     expect(bar.label).toBe('Today: 20 of 30 minutes');
   });
 
-  it('reads an absent or unknown period as the week filter and a junk offset as today', async () => {
+  it('reads an absent or unknown period as the week segment and a junk offset as today', async () => {
     const tree = statsTree(await statsPage({ period: 'nonsense', offset: '-3' }));
 
-    expect(findByType(tree, Pill, (pill) => pill.props.active === true)?.props.children).toBe('Week');
+    expect(segments(tree).find((item) => item.active)?.label).toBe('Week');
     expect(shiftHref(tree)).toBe('/pomodoro/stats?period=week&offset=1');
   });
 });
@@ -148,6 +167,7 @@ describe('/pomodoro/stats today bar with no goal', () => {
 
     const { data } = withType<{ data: { target?: number }[] }>(tree, BarChart);
     expect(data.every((bucket) => bucket.target === undefined)).toBe(true);
+    expect(goalNote(tree)).toBeUndefined();
   });
 });
 
@@ -196,7 +216,8 @@ describe('/pomodoro/stats trend window', () => {
     expect(mockedListSessions).toHaveBeenCalledWith('2016-11-03', TODAY);
   });
 
-  it('names the chart by what one bar covers', async () => {    const week = statsTree(await statsPage({ period: 'week' }));
+  it('names the chart by what one bar covers', async () => {
+    const week = statsTree(await statsPage({ period: 'week' }));
     const year = statsTree(await statsPage({ period: 'year' }));
 
     expect(withType<{ label: string }>(week, BarChart).label).toBe('Focus minutes per day');
@@ -213,14 +234,27 @@ describe('/pomodoro/stats composition', () => {
     expect(block.backHref).toBe('/pomodoro');
   });
 
-  it('filters the period through one link per period, each resetting the window to today', async () => {
+  it('states the window total at the section heading and the goal the dashed line means', async () => {
+    const tree = statsTree(await statsPage({}));
+    const section = withType<{ label: string; count: string }>(tree, Section);
+
+    expect(section.label).toBe('Focus minutes');
+    // Today's 20 minutes inside a 7-day window whose other days hold nothing.
+    expect(section.count).toBe('20 min');
+    expect(goalNote(tree)).toBe('Dashed line is the 30 minute daily goal.');
+  });
+
+  it('filters the period through one segment per period, each resetting the window to today', async () => {
     const tree = statsTree(await statsPage({ period: 'month' }));
 
-    expect(withType<{ label: string }>(tree, PillGroup).label).toBe('Period');
-    expect(findAllOfType(tree, Pill).map((pill) => [pill.props.children, pill.props.href])).toEqual([
+    expect(withType<{ 'aria-label': string }>(tree, Segmented)['aria-label']).toBe('Chart window');
+    expect(segments(tree).map(({ label, href }) => [label, href])).toEqual([
       ['Week', '/pomodoro/stats?period=week'],
       ['Month', '/pomodoro/stats?period=month'],
       ['Year', '/pomodoro/stats?period=year'],
+    ]);
+    expect(segments(tree).filter((item) => item.active).map(({ label }) => label)).toEqual([
+      'Month',
     ]);
   });
 });

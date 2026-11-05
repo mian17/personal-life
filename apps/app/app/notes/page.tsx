@@ -1,10 +1,9 @@
 import { listNoteTagUsage, listNotes } from '@/lib/api';
-import { submitFeedbackAction } from '../feedback-actions';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
 import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink, ListShell, TagFilterNav } from '@life/ui';
-import { Plus, Settings, Tags, Trash2 } from 'lucide-react';
+import { formatLongDate, ListShell, Section, SettingsLink, TagFilterNav, todayIso } from '@life/ui';
+import { Plus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,45 +18,44 @@ export default async function NotesPage({
   // Usage ids resolve to names through the registry; ids the registry no longer
   // returns are detached and never rendered (kernel detach semantics).
   const namedTags = await resolveTagUsage(usage);
+  const tagNames: Record<number, string> = Object.fromEntries(
+    namedTags.map((tag) => [tag.tagId, tag.name]),
+  );
 
   const current = { tag, q };
-  const filterItems = [
-    ...(tagId !== undefined
-      ? [
-          {
-            name: 'All',
-            href: filterHref({ path: '/notes', current, overrides: { tag: undefined } }),
-            active: false,
-          },
-        ]
-      : []),
-    ...namedTags.map((t) => ({
-      name: t.name,
-      href: filterHref({ path: '/notes', current, overrides: { tag: String(t.tagId) } }),
-      active: tagId === t.tagId,
-    })),
-  ];
+  // Whether the page is narrowed at all decides which empty state an empty result gets.
+  const narrowed = Boolean(q?.trim()) || tagId !== undefined;
+  // The `All` chip is always the row's first option and is active whenever no tag filter is
+  // applied, so the row always shows the unfiltered state it can return to.
+  const allFilter = {
+    name: 'All',
+    href: filterHref({ path: '/notes', current, overrides: { tag: undefined } }),
+    active: tagId === undefined,
+  };
+  const tagFilters = namedTags.map((t) => ({
+    name: t.name,
+    href: filterHref({ path: '/notes', current, overrides: { tag: String(t.tagId) } }),
+    active: tagId === t.tagId,
+  }));
+  // The `All` chip is pinned outside the scrolling strip so it stays reachable however far the
+  // tag chips scroll; only the tags themselves scroll under it.
 
   return (
     <ListShell
       title="Notes"
-      navTrailing={
-        <>
-          <IconLink href="/notes/tags" label="Manage tags">
-            <Tags size={20} aria-hidden />
-          </IconLink>
-          <IconLink href="/notes/trash" label="Trash">
-            <Trash2 size={20} aria-hidden />
-          </IconLink>
-          <FeedbackNavItem app="notes" onSubmit={submitFeedbackAction} />
-          <IconLink href={settingsHref('/notes')} label="Settings">
-            <Settings size={20} aria-hidden />
-          </IconLink>
-        </>
-      }
+      subtitle={formatLongDate(todayIso())}
+      navTrailing={<SettingsLink href={settingsHref('/notes')} />}
       search={<PreservingSearchBox path="/notes" q={q} params={{ tag }} label="Search notes" />}
-      filters={namedTags.length > 0 ? <TagFilterNav label="Tags" items={filterItems} /> : undefined}
-      body={<NoteList notes={notes} />}
+      filters={
+        namedTags.length > 0 ? (
+          <TagFilterNav aria-label="Tags" pinned={allFilter} items={tagFilters} />
+        ) : undefined
+      }
+      body={
+        <Section label="Recent" count={notes.length === 1 ? '1 note' : `${notes.length} notes`}>
+          <NoteList notes={notes} tagNames={tagNames} isFiltered={narrowed} />
+        </Section>
+      }
       fabHref="/notes/new"
       fabLabel="New note"
       fabIcon={<Plus size={28} strokeWidth={2.5} aria-hidden />}

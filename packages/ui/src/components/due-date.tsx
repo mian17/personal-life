@@ -8,7 +8,7 @@ export interface DueDateProps {
   dueDate: string | null;
   /** Injected "today" (`YYYY-MM-DD`) for deterministic SSR/tests. */
   today?: string;
-  /** `plain` = muted (default); `signal` = overdue deep red, future lighter red. */
+  /** `plain` = quiet meta (default); `signal` = a date that earns a colour. */
   tone?: DueDateTone;
   className?: string;
 }
@@ -37,12 +37,12 @@ export function DueDate({ dueDate, today, tone = 'plain', className }: Readonly<
 }
 
 /**
- * Signal tone → colour: overdue earns the deep danger red, any other dated read-out
- * the lighter red. `plain` is muted, and so is an undated read-out either way.
+ * Signal tone → colour: overdue earns the danger word, any other dated read-out the warn
+ * word. `plain` is the quiet ink tier, and so is an undated read-out either way.
  */
 function toneColour(tone: DueDateTone, state: DueDateState): string {
-  if (tone === 'plain') return 'text-muted';
-  if (state === 'none') return 'text-muted';
+  if (tone === 'plain') return 'text-ink-2';
+  if (state === 'none') return 'text-ink-2';
   if (state === 'overdue') return 'text-danger';
-  return 'text-danger-soft';
+  return 'text-warn';
 }

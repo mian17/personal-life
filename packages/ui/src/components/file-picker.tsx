@@ -14,19 +14,20 @@ export interface FilePickerProps extends Omit<ComponentPropsWithRef<'input'>, 't
 }
 
 /**
- * The registry `input` recipe split in two: `sr-only` keeps the native file input in the tab
- * order and the accessibility tree without painting it, and the surface below it draws the
- * affordance. Being the input's sibling is what lets the surface take focus and disabled from
+ * The field shell split in two: `sr-only` keeps the native file input in the tab order and
+ * the accessibility tree without painting it, and the surface below it draws the affordance.
+ * Being the input's sibling is what lets the surface take focus and disabled from
  * `peer-focus-visible:` / `peer-disabled:` utilities instead of a stylesheet.
  *
- * Geometry and colour follow `input.tsx` — `border-border`, `bg-panel`, `rounded-md` — with a
- * dashed border to read as a drop zone. The visible label is also the control's accessible name,
- * so the atom is never `aria-label`-only (lesson 0014).
+ * Geometry and colour follow `input.tsx` on the revised tokens, with a dashed strong hairline
+ * so it reads as a drop zone. The visible label is also the control's accessible name, so the
+ * atom is never `aria-label`-only (lesson 0014).
  */
 const surfaceStyles = cx(
-  'flex flex-col gap-1 p-3 rounded-md border border-dashed border-border bg-panel text-text',
-  'cursor-pointer transition-colors',
-  'peer-focus-visible:outline-solid peer-focus-visible:outline-[length:var(--focus-ring)] peer-focus-visible:outline-offset-[var(--focus-ring)] peer-focus-visible:outline-accent',
+  'flex flex-col gap-[var(--s2)] p-[var(--s3)] rounded-[var(--r-md)]',
+  'border border-dashed border-line-strong bg-surface text-ink',
+  'cursor-pointer motion-safe:transition-colors',
+  'peer-focus-visible:outline-solid peer-focus-visible:outline-[length:var(--focus-ring)] peer-focus-visible:outline-offset-[var(--focus-ring)] peer-focus-visible:outline-focus',
   'peer-disabled:cursor-default peer-disabled:opacity-50',
 );
 
@@ -58,7 +59,9 @@ export function FilePicker({
       />
       <span className={cx('ui-file-picker__surface', surfaceStyles)}>
         {children}
-        <span className="ui-file-picker__label text-sm text-muted">{label}</span>
+        <span className="ui-file-picker__label text-[length:var(--fs-label)] text-ink-2">
+          {label}
+        </span>
       </span>
     </label>
   );

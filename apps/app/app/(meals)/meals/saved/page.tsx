@@ -20,7 +20,7 @@ export default async function SavedMealsPage() {
     <PageShell>
       <NavBar
         leading={
-          <IconLink href="/meals" label="Back">
+          <IconLink href="/meals/settings" label="Back">
             <ArrowLeft size={20} aria-hidden />
           </IconLink>
         }

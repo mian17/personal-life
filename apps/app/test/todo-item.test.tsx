@@ -301,6 +301,20 @@ describe('TodoItem sizes', () => {
     expect(html).toContain('ui-list-item--done');
   });
 
+  it('a done default row keeps the delete slot in the DOM, hidden from assistive tech', () => {
+    const html = markup(undefined, { done: true });
+    // Unticking used to INSERT the form (the slot was gated on `!done`), so the row reflowed
+    // around it. The slot is now always rendered and `invisible` when done: same node count in
+    // both states, still no affordance, because `visibility:hidden` leaves the a11y tree.
+    expect(html).toMatch(/<form[^>]*class="invisible"/);
+  });
+
+  it('an open default row renders the same delete slot, visible', () => {
+    const html = markup();
+    expect(html).toContain('<form');
+    expect(html).not.toContain('class="invisible"');
+  });
+
   it('a not-yet-done row renders neither --done nor --collapsing initially', () => {
     const html = markup();
     expect(html).not.toContain('ui-list-item--done');
@@ -438,6 +452,31 @@ describe('TodoItem tick keeps the row visible', () => {
     }
   });
 
+  it('the delete slot follows the durable prop, never the optimistic tick', () => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      // A done row is unticked: the row renders open optimistically while the server row is
+      // still done. The delete slot must stay hidden for that whole window.
+      const stillDone = { done: true, repeat: 'daily' } as const;
+      doneToggle(harness.renderTree({ overrides: stillDone })).props.onCheckedChange();
+      expect(harness.completed).toBe(false);
+      const optimisticOpen = harness.renderTree({ overrides: stillDone });
+      expect(harness.renderMarkup(optimisticOpen)).toMatch(/<form[^>]*class="invisible"/);
+
+      // The mirror case: an open row ticked optimistically still shows the slot. The trash
+      // stays until the row actually leaves Done — acceptable, and never the reverse flash.
+      const stillOpen = { done: false, repeat: 'daily' } as const;
+      doneToggle(harness.renderTree({ overrides: stillOpen })).props.onCheckedChange();
+      const optimisticDone = harness.renderTree({ overrides: stillOpen });
+      expect(harness.completed).toBe(true);
+      expect(harness.renderMarkup(optimisticDone)).not.toContain('class="invisible"');
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('does not show a snackbar when clicking an already-done repeating row (the click undoes)', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
@@ -523,6 +562,93 @@ describe('TodoItem tick keeps the row visible', () => {
 
       expect(completeMock).toHaveBeenCalledTimes(1);
       expect(completeMock).toHaveBeenCalledWith('t1', 0);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('TodoItem write failure', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  /** Drain the microtask chain that a fire-and-forget write's `catch` rides on. */
+  async function settled() {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  it('a rejected write drops the optimistic value so the row falls back to server truth', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    updateMock.mockRejectedValue(new Error('409 version conflict'));
+    try {
+      const optimistic = harness.renderTree({ overrides: { done: true } });
+      doneToggle(optimistic).props.onCheckedChange();
+      // The click un-ticks the row optimistically; the server row is still done.
+      expect(harness.intent).toEqual({ version: 0, done: false });
+      const optimisticRow = harness.renderTree({ overrides: { done: true } });
+      expect(doneToggle(optimisticRow).props.checked).toBe(false);
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      expect(updateMock).toHaveBeenCalledWith('t1', { done: false }, 0);
+
+      await settled();
+
+      expect(harness.intent).toBeNull();
+      // The durable prop wins again: a done row renders struck.
+      const row = harness.renderTree({ overrides: { done: true } });
+      expect(doneToggle(row).props.checked).toBe(true);
+      expect(harness.renderMarkup(row)).toContain('ui-list-item--done');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a rejected write surfaces the failure through the row snackbar', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    // A non-Error rejection is still surfaced: nothing may go silent.
+    updateMock.mockRejectedValue('boom');
+    try {
+      doneToggle(harness.renderTree({ overrides: { done: true } })).props.onCheckedChange();
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      expect(harness.showSnackbar).not.toHaveBeenCalled();
+
+      await settled();
+
+      expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
+      expect(harness.showSnackbar.mock.calls[0][0]).toEqual({
+        message: "Couldn't save that change.",
+      });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a successful write shows no failure message and keeps the Undo behaviour', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    updateMock.mockResolvedValue(undefined);
+    completeMock.mockResolvedValue(undefined);
+    try {
+      doneToggle(harness.renderTree()).props.onCheckedChange();
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      await settled();
+
+      // One message only — the completion snackbar, untouched by the failure path.
+      expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
+      const snackbar = harness.showSnackbar.mock.calls[0][0];
+      expect(snackbar.message).toBe('Task completed');
+      expect(snackbar.actionLabel).toBe('Undo');
+      expect(snackbar.onAction).toBeInstanceOf(Function);
+
+      snackbar.onAction();
+      expect(harness.intent).toBeNull();
+      expect(updateMock).toHaveBeenCalledWith('t1', { done: false });
     } finally {
       harness.restore();
     }

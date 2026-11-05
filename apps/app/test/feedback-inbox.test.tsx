@@ -18,7 +18,7 @@ jest.mock('@/lib/feedback-api', () => ({
 }));
 
 import type { CreateFeedbackInput, FeedbackDto, FeedbackSubmitResult } from '@life/shared';
-import { AlertBanner, FeedbackNavItem, Select } from '@life/ui';
+import { AlertBanner, FeedbackNavItem, Select, SettingsLink } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { revalidatePath } from 'next/cache';
 import { createFeedback, updateFeedbackStatus } from '@/lib/feedback-api';
@@ -117,6 +117,16 @@ const ENTRIES: FeedbackDto[] = [
 ];
 
 describe('FeedbackInbox grouping', () => {
+  it("reads the inbox sub-line and each app group's entry count", () => {
+    const plural = render(ENTRIES);
+    expect(plural).toContain('Across all five modules');
+    // Three apps, two entries each: §8's `.slabel__count` is plural on every group.
+    expect(plural.match(/>2 entries</g)).toHaveLength(3);
+
+    const singular = render([ENTRIES[0]]);
+    expect(singular).toContain('>1 entry<');
+  });
+
   it('nests app then type, in canonical order, preserving newest-first inside groups', () => {
     const html = render(ENTRIES);
 
@@ -194,16 +204,16 @@ describe('FeedbackInbox grouping', () => {
       setFeedbackStatusAction: noopStatusAction,
     }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
 
-    // The gear joins this app's own toolbar item inside one fragment (the
-    // meals-nav shape): feedback first, Settings trailing.
-    type NavChild = { type?: unknown; props: { app?: unknown; label?: unknown; href?: unknown } };
+    // The bare settings control joins this app's own toolbar item inside one fragment
+    // (the meals-nav shape): feedback first, Settings trailing.
+    type NavChild = { type?: unknown; props: { app?: unknown; href?: unknown } };
     const kids = el.props.navTrailing.props.children as NavChild[];
 
     const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
     expect(feedback?.props.app).toBe('feedback');
 
     const gear = kids[kids.length - 1];
-    expect(gear?.props.label).toBe('Settings');
+    expect(gear?.type).toBe(SettingsLink);
     expect(gear?.props.href).toBe(SETTINGS_HREF);
   });
 });

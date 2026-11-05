@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { List } from '../src/components/list';
 
-const STACKING_UTILITY = 'grid';
+const GROUP_SURFACE_UTILITY = 'bg-surface';
+const GROUP_LINE_UTILITY = 'border-line';
+const GROUP_RADIUS_UTILITY = 'rounded-[var(--r-lg)]';
+const ROW_DIVIDER_UTILITY = 'divide-line';
 const LIST_RESET_UTILITY = 'list-none';
 
 function classesOf(el: Element): string[] {
@@ -20,14 +23,23 @@ describe('List', () => {
     expect(classesOf(ul)).toContain('ui-list');
   });
 
-  it('takes its stacking from utilities rather than a stylesheet rule', () => {
+  it('paints the group surface from token utilities rather than a stylesheet rule', () => {
     render(
       <List>
         <li>row</li>
       </List>,
     );
     const classes = classesOf(screen.getByRole('list'));
-    expect(classes).toContain(STACKING_UTILITY);
+    // §8's `.group`: one surface, one hairline frame, one dividers rule between rows.
+    expect(classes).toContain(GROUP_SURFACE_UTILITY);
+    expect(classes).toContain('border');
+    expect(classes).toContain(GROUP_LINE_UTILITY);
+    expect(classes).toContain(GROUP_RADIUS_UTILITY);
+    expect(classes).toContain('divide-y');
+    expect(classes).toContain(ROW_DIVIDER_UTILITY);
+    expect(classes).toContain('overflow-hidden');
+    // Rows carry their own insets, so the group adds no gap between them.
+    expect(classes.some((c) => c.startsWith('gap-'))).toBe(false);
     // The browser's own bullet, indent and margin are cleared on the element itself:
     // `base.css` resets the document box only.
     expect(classes).toContain(LIST_RESET_UTILITY);

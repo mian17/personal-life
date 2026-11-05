@@ -42,9 +42,9 @@ describe('ButtonLink', () => {
       </ButtonLink>,
     );
     const link = screen.getByRole('link');
-    expect(link.classList.contains('h-auto')).toBe(true);
-    expect(link.classList.contains('bg-accent')).toBe(true);
-    expect(link.classList.contains('text-on-accent')).toBe(true);
+    expect(link.classList.contains('w-auto')).toBe(true);
+    expect(link.classList.contains('bg-max')).toBe(true);
+    expect(link.classList.contains('text-on-max')).toBe(true);
   });
 
   it('suppresses the anchor underline', () => {

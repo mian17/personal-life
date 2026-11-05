@@ -157,6 +157,10 @@ describe('manual-log door', () => {
       const html = renderToStaticMarkup(ReactModule.createElement(MealDoors));
       expect(html).toContain('href="/meals/entry/new?door=photo"');
       expect(html).toContain('href="/meals/entry/new?door=food"');
+      // The options are the outlined secondary button, so each takes the button
+      // radius inside the panel's own `--r-lg` instead of the pill.
+      expect(html.match(/ui-btn--ghost/g)).toHaveLength(2);
+      expect(html).not.toContain('ui-pill');
       expect(html).toContain('Log meal from photo');
       expect(html).toContain('Log food');
     } finally {

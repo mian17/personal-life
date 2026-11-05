@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "note": "target concepts this repo genuinely lacks. Each entry states why and what an agent must not do.",
+  "count": 11,
+  "unmatched": [
+    {
+      "target": "--ds-color-accent-secondary",
+      "reason": "The repo has exactly one accent (--accent #5b8cff dark / #2f6bff light). Status hues --amber, --green and --muted are semantic status colours, not a second accent; tokens.test.ts pins the status map to those four tokens only.",
+      "consequence": "Do not invent a secondary accent. Any second accent is a product decision with a token-test update."
+    },
+    {
+      "target": "--ds-color-border-strong / --ds-color-border-subtle",
+      "reason": "One border token exists (--border). Measured against --panel it is 1.29:1 in dark and 1.29:1 in light, so every border is a decorative hairline; there is no stronger variant.",
+      "consequence": "Do not raise border contrast by inventing a value. Borders are never the sole carrier of meaning."
+    },
+    {
+      "target": "--ds-shadow-1 / --ds-shadow-2 / --ds-shadow-3 (elevation levels)",
+      "reason": "The repo declares a single shadow, --shadow-fab (0 4px 12px rgba(0, 0, 0, 0.25)), reused by the fab, toast, menu, popover and dialog. No elevation ladder exists.",
+      "consequence": "Do not build an elevation scale. Every floating layer uses --ds-shadow-raised."
+    },
+    {
+      "target": "--ds-color-focus",
+      "reason": "No dedicated focus colour. The focus ring is `--focus-ring` (2px) drawn in `--accent` via `outline-accent` on every interactive primitive.",
+      "consequence": "Focus always reuses --ds-color-accent at 2px width and 2px offset."
+    },
+    {
+      "target": "--ds-radius-sm / --ds-radius-xl / --ds-radius-2xl",
+      "reason": "Only --radius-md 10px, --radius-lg 12px and --radius-pill 999px are declared. Small corners are written as spacing values (checkbox `rounded-[var(--space-0-2)]`) and the full-screen sheet uses `rounded-none`.",
+      "consequence": "Do not add new radius steps; pick md, lg, pill, the checkbox 0.2rem or 0."
+    },
+    {
+      "target": "--ds-font-size-* (a declared type scale)",
+      "reason": "The repo declares --font-size 16px, --fs-editor 1.05rem and --leading 1.5 only. Every other text size is a spacing token used in a font-size position (`text-[length:var(--space-0-85)]` etc.).",
+      "consequence": "Sizes in token-map/typography.json are derived names over real spacing tokens; use those values, not new ones."
+    },
+    {
+      "target": "--ds-space-* as a 4/8 step scale",
+      "reason": "The spacing scale in tokens.css is \"exactly the length literals present in globals.css\" — 19 irregular sub-rem steps (0.15rem to 5rem), not a geometric scale. tokens.test.ts freezes the inventory.",
+      "consequence": "Use the listed steps verbatim; there is no arithmetic to a missing step."
+    },
+    {
+      "target": "--ds-motion-ease-* (an easing family)",
+      "reason": "One easing exists (--ease-standard: ease-out) plus two durations (120ms, 200ms). No spring, no linear, no enter/exit pair beyond the snackbar EXIT_MS constant.",
+      "consequence": "Any new curve is a new token decision pinned to tokens.test.ts, not an artefact of this base."
+    },
+    {
+      "target": "--ds-breakpoint-* (breakpoint tokens)",
+      "reason": "Media queries cannot read custom properties, so tokens.css deliberately declares none; the scale lives in BREAKPOINTS in packages/ui/test/tokens.test.ts (sm 640, md 768, lg 1024, xl 1280, 2xl 1536).",
+      "consequence": "Breakpoints are a documented scale, not CSS variables. Write the literal with a breakpoint comment."
+    },
+    {
+      "target": "--ds-color-on-accent (light variant)",
+      "reason": "--on-accent is declared once on :root as `white` and never overridden, so light theme keeps white on #2f6bff (measured 4.50:1; the dark pair white on #5b8cff measures 3.16:1).",
+      "consequence": "Do not introduce a second on-accent value for light; the pair is frozen by tokens.test.ts."
+    },
+    {
+      "target": "gradient / --ds-gradient-*",
+      "reason": "No gradients exist in the tree; every surface is a flat token fill.",
+      "consequence": "Do not add gradients to any personal-life surface."
+    }
+  ]
+}

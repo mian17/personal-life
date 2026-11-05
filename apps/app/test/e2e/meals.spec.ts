@@ -16,7 +16,8 @@ import { logIn } from './journey';
 /**
  * The day view's entry doors, exactly as they render. Both wait in the log FAB
  * menu (`Log a meal` trigger): the photo capture door and the manual catalog
- * door. `Saved meals` is the toolbar nav icon.
+ * door. `Saved meals` and `Foods` are rows on `/meals/settings`; the day view's
+ * toolbar carries only the daily target and the gear.
  */
 const PHOTO_DOOR = 'Log meal from photo';
 const FOOD_DOOR = 'Log food';
@@ -36,7 +37,9 @@ const PHOTO = {
 async function openMeals(page: Page): Promise<void> {
   await logIn(page);
   await page.goto('/meals');
-  await expect(page.getByRole('heading', { name: /^Meals —/ })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Meals', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /** Opens the editor the given door leads to: the door waits in the log FAB menu. */
@@ -52,22 +55,23 @@ async function openDoor(page: Page, door: string): Promise<void> {
 }
 
 /**
- * The day's own total: the only `role="status"` on the day view (`<Card><StatusText>`).
- * The status text is the day summary (`"1220 kcal — No target set"`), so the
- * leading calorie figure is read off, not the whole string parsed.
+ * The day's own total: the one `role="status"` on the day view (the progress
+ * `Card` itself). Its text is the day summary — the `Kpi` figure, `kcal`, and
+ * what it is measured against — so the leading calorie figure is read off, not
+ * the whole string parsed. The figure is grouped (`1,180`), hence the comma.
  */
 async function dayTotal(page: Page): Promise<number> {
   const text = await page.getByRole('status').innerText();
-  const match = /([\d.]+)\s*kcal/.exec(text);
+  const match = /([\d,]+(?:\.\d+)?)\s*kcal/.exec(text);
   if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(text)}`);
-  return Number(match[1]);
+  return Number(match[1].replaceAll(',', ''));
 }
 
 /**
  * The confirmed entries the day view actually lists: every row carrying the
- * `N kcal × <portions>` read-out, each read back from its own calorie figure.
- * A row without a `×` is an unconfirmed entry and is skipped; a row that has a
- * `×` but no readable figure before it is spec drift and throws. Reading the
+ * `× <portions>` meta plus a calorie figure in its trailing pill, each read back
+ * that way. A row without a `×` is an unconfirmed entry and is skipped; a row
+ * that has a `×` but no readable figure is spec drift and throws. Reading the
  * day's sum off the page is the only honest check — a pre-known total would
  * have to be re-derived here, which is the drift this replaces.
  */
@@ -76,11 +80,19 @@ async function listedEntryCalories(page: Page): Promise<number[]> {
   const figures: number[] = [];
   for (const row of rows) {
     if (!row.includes('×')) continue;
-    const match = /(?:^|\s)([\d.]+)\s*kcal\s*×/.exec(row.replace(/\n/g, ' '));
+    const match = /([\d,]+(?:\.\d+)?)\s*kcal/.exec(row.replace(/\n/g, ' '));
     if (!match) throw new Error(`not a calorie read-out: ${JSON.stringify(row)}`);
-    figures.push(Number(match[1]));
+    figures.push(Number(match[1].replaceAll(',', '')));
   }
   return figures;
+}
+
+/** A day row as the view draws it: the portion in its meta, the kcal in its trailing pill. */
+function dayRow(page: Page, kcal: string, portions: string) {
+  return page
+    .getByRole('listitem')
+    .filter({ hasText: `${kcal} kcal` })
+    .filter({ hasText: `× ${portions}` });
 }
 
 /** A catalog food per run, so a rerun can never collide with the last one. */
@@ -149,12 +161,14 @@ async function createFoodViaCatalog(page: Page, food: NewCatalogFood): Promise<v
 /** Lands on the meals day view, waiting for its heading. */
 async function openDayView(page: Page): Promise<void> {
   await page.goto('/meals');
-  await expect(page.getByRole('heading', { name: /^Meals —/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Meals', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 /**
  * The foods catalog acts as one user sentence (`SPEC-food-catalog-ui` Testing
- * Strategy): the toolbar Foods icon reaches the catalog, the FAB opens the
+ * Strategy): the Foods row on `/meals/settings` reaches the catalog, the FAB opens the
  * create form, create persists and reads back at the edit page's own source,
  * and delete removes the food. History immutability is proven by the manual-log
  * journey, which owns a logged entry; this one owns the catalog CRUD. The two
@@ -166,7 +180,8 @@ test.describe('meals foods catalog', () => {
   test('the foods catalog door adds, edits, and deletes a staple', async ({ page }) => {
     await openMeals(page);
 
-    // The toolbar door opens the catalog: the promised entry point (`Foods`).
+    // The settings row opens the catalog: the promised entry point (`Foods`).
+    await page.goto('/meals/settings');
     await page.getByRole('link', { name: 'Foods', exact: true }).click();
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Foods', exact: true })).toBeVisible();
@@ -272,9 +287,7 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals$/, { timeout: 15_000 });
 
     // The day view lists the logged quantity and totals the snapshot.
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
     const loggedFigures = await listedEntryCalories(page);
     const loggedTotal = await dayTotal(page);
     expect(loggedFigures).toContain(130);
@@ -289,9 +302,7 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
 
     await page.goto('/meals');
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
 
@@ -306,13 +317,11 @@ test.describe('meals manual log', () => {
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
 
     await page.goto('/meals');
-    await expect(page.getByRole('listitem').filter({ hasText: '130 kcal × 2.5' })).toBeVisible({
+    await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
+    // The row still renders the deleted food's dish name, not the raw id.
+    await expect(page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal' })).toBeVisible({
       timeout: 15_000,
     });
-    // The row still renders the deleted food's dish name, not the raw id.
-    await expect(
-      page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal × 2.5' }),
-    ).toBeVisible({ timeout: 15_000 });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
     expect(await dayTotal(page)).toBe(loggedTotal);
   });
@@ -336,8 +345,8 @@ test.describe('meals day view', () => {
     await expect(page.getByRole('heading', { name: 'Log meal' })).toBeVisible();
     await expect(page.getByLabel('Choose a photo')).toBeVisible();
 
-    // The saved-meal toolbar door opens the saved list.
-    await page.goto('/meals');
+    // The saved-meal settings row opens the saved list.
+    await page.goto('/meals/settings');
     await page.getByRole('link', { name: SAVED_DOOR, exact: true }).click();
     await page.waitForURL(/\/meals\/saved$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Saved meals' })).toBeVisible();

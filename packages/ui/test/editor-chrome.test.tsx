@@ -11,6 +11,21 @@ const TAGS = [
 
 const back = { label: 'Back', onBack: () => {} };
 
+/**
+ * jsdom has no layout and no `ResizeObserver`; `cmdk`'s list measures itself on mount, and the
+ * popover test below opens that list.
+ */
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+beforeEach(() => {
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
+  (Element.prototype as unknown as { scrollIntoView: jest.Mock }).scrollIntoView = jest.fn();
+});
+
 describe('EditorChrome', () => {
   it('renders the toolbar slots: back label, title as a real h1, actions', () => {
     render(
@@ -82,7 +97,7 @@ describe('EditorChrome', () => {
     expect(stack.classList.contains('ui-editor-stack--lg')).toBe(false);
   });
 
-  it('renders the tag picker inside the stack when provided and passes onToggle through', () => {
+  it('renders the tag combobox inside the stack when provided and passes onToggle through', () => {
     const onToggle = jest.fn();
     const { container } = render(
       <EditorChrome
@@ -92,25 +107,29 @@ describe('EditorChrome', () => {
         <input aria-label="Body" />
       </EditorChrome>,
     );
-    const group = screen.getByRole('group', { name: 'Attached tags' });
-    expect(group.classList.contains('ui-tag-picker')).toBe(true);
-    expect(container.querySelector('.ui-editor-stack')!.contains(group)).toBe(true);
-    expect(screen.getByRole('button', { name: 'errand' }).getAttribute('aria-pressed')).toBe(
-      'true',
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'home' }));
+    // The caption names the field, so the trigger's name survives whatever chips it holds.
+    const trigger = screen.getByRole('button', { name: 'Attached tags' });
+    const control = container.querySelector('.ui-tag-combobox')!;
+    expect(control.contains(trigger)).toBe(true);
+    expect(container.querySelector('.ui-editor-stack')!.contains(control)).toBe(true);
+    expect(container.querySelector('.ui-tag-combobox__chips')!.textContent).toContain('errand');
+
+    fireEvent.click(trigger);
+    const rows = screen.getAllByRole('option');
+    expect(rows.map((row) => row.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+    fireEvent.click(rows[1]);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith(2);
   });
 
-  it('renders no tag picker when tagPicker is omitted', () => {
+  it('renders no tag combobox when tagPicker is omitted', () => {
     const { container } = render(
       <EditorChrome back={back}>
         <input aria-label="Body" />
       </EditorChrome>,
     );
-    expect(container.querySelector('.ui-tag-picker')).toBeNull();
-    expect(screen.queryByRole('group')).toBeNull();
+    expect(container.querySelector('.ui-tag-combobox')).toBeNull();
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('renders the back control as a button, never a link', () => {
