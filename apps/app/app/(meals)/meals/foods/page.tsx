@@ -1,6 +1,6 @@
 import { format } from '@life/nutrition';
 import { PreservingSearchBox } from '@life/app-kit';
-import { EmptyState, FabLink, List, ListItem, ManagerBlock } from '@life/ui';
+import { EmptyState, FabLink, List, ListItem, ManagerBlock, Section } from '@life/ui';
 import { listMealFoods, type MealFood } from '@/lib/meal-api';
 import { Plus } from 'lucide-react';
 
@@ -23,7 +23,11 @@ export default async function FoodsPage({
   return (
     <ManagerBlock title="Foods" backHref="/meals/settings">
       <PreservingSearchBox path="/meals/foods" q={q} label="Search foods" />
-      <FoodList foods={foods} query={q} />
+      {/* The search box owns the step above it and none below, so the body takes its
+          rhythm from an unlabelled section — the same way `/todos` opens below its tabs. */}
+      <Section>
+        <FoodList foods={foods} query={q} />
+      </Section>
       <FabLink href="/meals/foods/new" label="New food">
         <Plus size={28} strokeWidth={2.5} aria-hidden />
       </FabLink>

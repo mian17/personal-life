@@ -151,6 +151,29 @@ describe('foods catalog page', () => {
     expect(html).not.toContain('No foods yet.');
   });
 
+  it('opens the catalog body on the shared section rhythm, rows and empty states alike', async () => {
+    mockedListMealFoods.mockResolvedValue([food()]);
+    const listHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    mockedListMealFoods.mockResolvedValue([]);
+    const missHtml = renderToStaticMarkup(await loadFoodsPage('zzz'));
+    const emptyHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    // The whole body — a list of rows or either empty state — sits inside the one
+    // unlabelled `Section`, which is what supplies the gap below the search box.
+    for (const [html, body] of [
+      [listHtml, 'Milk, Brand X'],
+      [missHtml, 'No matches.'],
+      [emptyHtml, 'No foods yet.'],
+    ] as const) {
+      const open = html.indexOf('ui-section');
+      expect(open).toBeGreaterThan(-1);
+      expect(html.indexOf(body)).toBeGreaterThan(open);
+      expect(html.lastIndexOf('</section>')).toBeGreaterThan(html.indexOf(body));
+      expect(html.indexOf('aria-label="New food"')).toBeGreaterThan(html.indexOf(body));
+    }
+  });
+
   it('reaches create and edit through the catalog (AC1 create affordance, AC4 edit rows)', async () => {
     mockedListMealFoods.mockResolvedValue([
       food(),
