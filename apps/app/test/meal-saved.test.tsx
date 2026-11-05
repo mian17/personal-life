@@ -168,14 +168,14 @@ describe('saved meals list', () => {
     expect(html).not.toContain('No saved meals yet');
   });
 
-  it('leads with a back control to /meals and carries no nav actions', async () => {
+  it('leads with a back control to /meals/settings and carries no nav actions', async () => {
     mockedListSavedMeals.mockResolvedValue([savedMeal()]);
 
     const el = await SavedMealsPage();
     const html = renderToStaticMarkup(el);
 
     expect(html).toContain('aria-label="Back"');
-    expect(html).toContain('href="/meals"');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).not.toContain('aria-label="Daily target"');
     expect(html).not.toContain('aria-label="Settings"');
   });

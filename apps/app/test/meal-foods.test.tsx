@@ -114,7 +114,7 @@ describe('foods catalog page', () => {
 
     expect(el.type).toBe(ManagerBlock);
     expect(html).toContain('Foods');
-    expect(html).toContain('href="/meals"');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('Milk, Brand X');
     expect(html).toContain(`per 100 ml · ${format('calories', 52)}`);
     expect(html).toContain('Oats');

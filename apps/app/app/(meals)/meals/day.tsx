@@ -132,7 +132,7 @@ export async function mealDay(day: string, emptyBody: string) {
   ]);
   const totals: NutrientVector = sum(entries.map((entry) => entry.nutrients));
   const readout = dayReadout(totals.calories, target);
-  const energyPercent = target == null ? 0 : percentOf(totals.calories, target.calories);
+  const energyPercent = percentOf(totals.calories, target?.calories ?? 0);
 
   return (
     <ListShell
@@ -151,27 +151,44 @@ export async function mealDay(day: string, emptyBody: string) {
             <Card aria-live="polite" role="status">
               <Stack gap="sm">
                 <Kpi label="Logged so far" value={readout.eaten} unit={readout.unit} />
-                {target != null && (
-                  <>
+                {/* The tracks are the card's shape, not a target's: with no profile the
+                    fill stays empty and the bars still say what was eaten, only against
+                    no goal. */}
+                <ProgressBar
+                  tone="line"
+                  value={energyPercent}
+                  label={
+                    target == null
+                      ? 'No daily energy target set'
+                      : `${Math.round(energyPercent)} percent of the daily energy target`
+                  }
+                  className="mt-[var(--s3)]"
+                />
+                {MACRO_TRACKS.map(({ key, label, noun, goal }) => {
+                  const have = totals[key];
+                  const targetGoal = target == null ? null : goal(target);
+                  return (
                     <ProgressBar
-                      value={energyPercent}
-                      label={`${Math.round(energyPercent)} percent of the daily energy target`}
+                      key={key}
+                      tone="line"
+                      value={percentOf(have, targetGoal ?? 0)}
+                      label={
+                        targetGoal == null
+                          ? `${Math.round(have)} grams of ${noun} — no target set`
+                          : `${Math.round(have)} grams of ${noun} toward ${Math.round(targetGoal)}`
+                      }
+                      caption={label}
+                      // A logged amount with no goal to divide it by reads as the grams
+                      // alone; `0 / 0 g` would claim a target the owner never set.
+                      readout={
+                        targetGoal == null
+                          ? format(key, have)
+                          : `${Math.round(have)} / ${format(key, targetGoal)}`
+                      }
+                      className="mt-[var(--s3)]"
                     />
-                    {MACRO_TRACKS.map((track) => {
-                      const goal = track.goal(target);
-                      const have = totals[track.key];
-                      return (
-                        <ProgressBar
-                          key={track.key}
-                          value={percentOf(have, goal)}
-                          label={`${Math.round(have)} grams of ${track.noun} toward ${Math.round(goal)}`}
-                          caption={track.label}
-                          readout={`${Math.round(have)} / ${format(track.key, goal)}`}
-                        />
-                      );
-                    })}
-                  </>
-                )}
+                  );
+                })}
                 <ButtonLink href="/meals/target" variant="ghost">
                   {target ? 'Edit target' : 'Set target'}
                 </ButtonLink>

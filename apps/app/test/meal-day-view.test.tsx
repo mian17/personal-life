@@ -147,6 +147,28 @@ describe('meals day view', () => {
     expect(html).toContain('Logged so far');
   });
 
+  it('draws the energy track and all three macro tracks even with no target set', async () => {
+    mockedListDayEntries.mockResolvedValue([
+      entry({ id: 'a', nutrients: vector({ calories: 300, protein: 20 }) }),
+    ]);
+
+    const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
+
+    expect(html).toContain('No daily energy target set');
+    for (const label of ['Protein', 'Carbs', 'Fat']) {
+      expect(html).toMatch(
+        new RegExp(
+          `ui-progress--row[^>]*><span class="ui-progress__caption[^"]*">${label}</span>`,
+        ),
+      );
+    }
+    // Empty fill: there is no goal to divide by, so nothing claims a share.
+    expect(html.match(/aria-valuenow="0"/g)).toHaveLength(4);
+    // The read-out keeps the logged grams and drops the goal, never `0 / 0 g`.
+    expect(html).toContain('>20 g<');
+    expect(html).not.toContain('/ 0 g');
+  });
+
   it('names the day card read-out the way the reference does: "Logged so far"', async () => {
     mockedGetMealTarget.mockResolvedValue(target({ calories: 2000 }));
 

@@ -601,7 +601,8 @@ export function MealEditor({
 
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+      // Framed: a screen with a real border, like every other editor back control.
+      back={{ label: 'Back', variant: 'framed', onBack: () => router.back() }}
       title={entry ? 'Review meal' : 'Log meal'}
       sub={`${formatWeekday(date)}, ${formatDayMonth(date)}`}
       actions={

@@ -21,7 +21,7 @@ export default async function FoodsPage({
   const foods = await listMealFoods(q);
 
   return (
-    <ManagerBlock title="Foods" backHref="/meals">
+    <ManagerBlock title="Foods" backHref="/meals/settings">
       <PreservingSearchBox path="/meals/foods" q={q} label="Search foods" />
       <FoodList foods={foods} query={q} />
       <FabLink href="/meals/foods/new" label="New food">

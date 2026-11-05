@@ -63,7 +63,12 @@ function entry(overrides: Partial<MealEntry> = {}): MealEntry {
 }
 
 interface EditorTree extends ReactElement {
-  props: { children: ReactNode; banner?: ReactNode; actions?: ReactNode };
+  props: {
+    children: ReactNode;
+    banner?: ReactNode;
+    actions?: ReactNode;
+    back: { label: string; variant?: string };
+  };
 }
 
 /**
@@ -588,6 +593,21 @@ describe('MealEditor unknown affordance', () => {
       expect(
         find(tree, Button, (el) => text(el.props.children).includes('Save as meal'))!.props.disabled,
       ).toBe(true);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('MealEditor toolbar', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('frames the back control, the same face as the other editor screens', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree();
+
+      expect(tree.props.back).toEqual({ label: 'Back', variant: 'framed', onBack: expect.any(Function) });
     } finally {
       harness.restore();
     }

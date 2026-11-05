@@ -20,14 +20,28 @@ export interface ProgressBarProps {
    */
   readout?: ReactNode;
   className?: string;
+  /**
+   * The trough's wash. `press` is the atom's long-standing pressed token; `line` is the
+   * reference's `.track` hairline, drawn on the revised day card. Both are tokens, so the
+   * colour never comes from the caller.
+   */
+  tone?: ProgressBarTone;
 }
+
+export type ProgressBarTone = 'press' | 'line';
 
 const MIN_PERCENT = 0;
 const MAX_PERCENT = 100;
 
-/** The trough is the pressed wash, the fill the app accent, both on the pill radius (§6). */
+/** The fill is the app accent on the pill radius; the trough's wash is the caller's `tone` (§6). */
 const trackStyles =
-  'ui-progress-track block h-[var(--s2)] w-full appearance-none overflow-hidden rounded-[var(--r-pill)] bg-press [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
+  'ui-progress-track block h-[var(--s2)] w-full appearance-none overflow-hidden rounded-[var(--r-pill)] [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
+
+/** One trough wash per tone; `press` stays the default so existing bars do not move. */
+const troughStyles: Record<ProgressBarTone, string> = {
+  press: 'bg-press',
+  line: 'bg-line',
+};
 
 /** §8's `.row__meta` treatment for the caption line. */
 const captionStyles = 'text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
@@ -64,13 +78,14 @@ export function ProgressBar({
   caption,
   readout,
   className,
+  tone = 'press',
 }: Readonly<ProgressBarProps>) {
   const percent = clampedPercent(value);
   const bar = (
     <progress
       aria-label={label}
       aria-valuenow={Math.round(percent)}
-      className={cx(trackStyles, caption == null && className)}
+      className={cx(trackStyles, troughStyles[tone], caption == null && className)}
       max={MAX_PERCENT}
       value={percent}
     />

@@ -124,7 +124,13 @@ export function TargetProfileForm({
 
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+      // A literal destination, not history: `/meals/target` opens from the settings
+      // block, so Back lands back on it even after a cold load of this screen.
+      back={{
+        label: 'Back',
+        variant: 'framed',
+        onBack: () => router.push('/meals/settings'),
+      }}
       title="Daily target"
       actions={
         <IconButton label="Save" onClick={save} disabled={saving || !profileReady}>

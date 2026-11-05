@@ -93,6 +93,18 @@ describe('ProgressBar', () => {
     expect(screen.queryByText('12 / 30 min')).toBeNull();
   });
 
+  it('keeps the pressed trough by default and takes the reference hairline on request', () => {
+    const { container: pressed } = render(<ProgressBar value={10} label="Today: 3 of 30 minutes" />);
+    expect(classesOf(pressed.firstElementChild as HTMLElement)).toContain('bg-press');
+
+    const { container: hairline } = render(
+      <ProgressBar value={10} label="No daily energy target set" tone="line" />,
+    );
+    const trough = classesOf(hairline.firstElementChild as HTMLElement);
+    expect(trough).toContain('bg-line');
+    expect(trough).not.toContain('bg-press');
+  });
+
   it('styles itself from tokens, importing no chart library', () => {
     const source = readFileSync(join(__dirname, '../src/components/progress-bar.tsx'), 'utf8');
 
