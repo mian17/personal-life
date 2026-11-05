@@ -296,17 +296,18 @@ describe('ListItem', () => {
     expect(row).toContain(
       '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
     );
-    // The mark rides the target's leading edge, so it lands on the row's start inset.
+    // The mark rides the target's leading edge, so its inset is the target's start offset: the
+    // `--s4` corner lands it 10px inside the row, one step from the title and on the same scale
+    // as the row's own start inset. The title offset (`--s3` + `--s4` = 28px) does not move with it.
     expect(row).toContain('[&>.ui-checkbox]:justify-items-start');
-    // The 48px target paints over the title's first 20px (target x 0–48, title x 28). Its press
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+    // The 48px target now paints from x 4 to x 52 over a title that starts at 28px. Its press
     // wash is the only paint that can cover that text: the row already washes on press, so the
     // target's own square is redundant feedback and, on release, the only thing still fading over
     // the title (0.7 → 0.118 → 0.008 → 0 alpha across 200ms, measure in Chromium).
     expect(row).toContain('[&>.ui-checkbox:active]:bg-transparent');
-    // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 16px from the
-    // mark's trailing edge (the old row's 26.4px / 14.4px, at token granularity). The inset sits on
-    // the link's own class list — a `[&>.ui-list-item__link]` utility compiles to a selector
-    // Tailwind mangles at the `__` and never applies.
+    // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 6px past the
+    // mark's trailing edge at `--s4` (10px at the old `--s3` — the 4px the nudge spends). The inset sits on
     expect(link).toContain('ps-[var(--s4)]');
     expect(row).not.toContain('[&>.ui-list-item__link]');
     // The target no longer contributes height, so the row keeps the tap floor itself.
@@ -858,7 +859,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

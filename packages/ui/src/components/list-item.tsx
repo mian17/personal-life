@@ -71,7 +71,7 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * The end inset is one step tighter than the start (`pe-[var(--s2)]`): the pre-redesign dense row
  * ran `0.4rem` at the end against `0.9rem` at the start, and the matrix row has no trailing
  * control for that end inset to clear. The start inset stays `--s3`, the step that matches
- * `0.9rem` within the token scale.
+ * `0.9rem` within the token scale — it places the title, not the mark (see below).
  *
  * The leading control is taken out of flow. Its target is a full 48px square, and in flow that
  * square reserved 48px of row width, so the title started 60px from the row edge where the
@@ -79,12 +79,20 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * right place. The row becomes the target's positioning context and the target is pinned to the
  * row's start/top corner, so no part of the 48px press square leaves the row's `overflow-hidden`
  * clip. The offsets are stated net of the primitive's own negative margins (`-my-[var(--s2)]`
- * `-ms-[var(--s3)]`), because a margin still applies to an absolutely positioned box: `--s3`
- * start and `--s2` top land the painted square exactly on the corner without re-declaring a
+ * `-ms-[var(--s3)]`), because a margin still applies to an absolutely positioned box: `--s4`
+ * start and `--s2` top land the painted square one step inside the corner without re-declaring a
  * margin the control owns. The mark sits on the target's leading edge (`justify-items-start`, a
  * longhand of the target's `place-items-center` shorthand, so it wins without touching the
- * control), which puts the 12px mark on the row's start and bleeds the press square to its right
- * instead of reserving that width.
+ * control), which bleeds the press square to its right instead of reserving that width.
+ *
+ * The target's start offset is the mark's inset, so it is the one value that moves the mark and
+ * nothing else: the title is placed by the row's `ps-[var(--s3)]` plus the link's
+ * `ps-[var(--s4)]` and does not move. On the `--s3` corner the mark sat 6px from the row's edge
+ * against a 10px content inset on the row's other side, so the column read as crowding the left;
+ * `--s4` lands it 10px in, one step past the row's own `--s3` start inset. Measured on a
+ * quadrant at 375px, the mark's left gap to the panel's inner edge goes 8px → 12px against a 10px
+ * right inset, and the 4px it gains comes out of its gap to the title (10px → 6px), so it never
+ * reaches the text at any width.
  *
  * Vertically the mark cannot keep the target's centring. The target starts on the row's top edge,
  * so its centre is `--tap`/2 = 24px down; the title's first line starts one `--s2` down and is one
@@ -98,14 +106,15 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * `min-h-[var(--tap)]` keeps the row as tall as the target it no longer gets height from.
  *
  * Because the target is pinned out of flow over the row's start, its press wash (`--press`, a
- * 48px square) covers the first third of a title that starts at 28px, and its `transition-colors`
+ * 48px square reaching 52px from the row edge) covers the first third of a title that starts at
+ * 28px, and its `transition-colors`
  * keeps that square painted for a moment past the release, while the row's own wash snaps back.
  * Read as one gesture, a square appears over the title and then fades off it. The row is already
  * the press target (`rowSurfaceStyles`) and covers the whole row, so the wash survives without
  * this one: the dense row silences the target's own.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
