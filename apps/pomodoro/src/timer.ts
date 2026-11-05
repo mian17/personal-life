@@ -46,12 +46,7 @@ export const MINUTES_RANGE = { min: 1, max: 180 } as const;
  * to, so the app must not offer a value the service would reject.
  */
 export function isDailyGoal(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MINUTES_RANGE.min &&
-    value <= MINUTES_RANGE.max
-  );
+  return isWholeMinute(value);
 }
 
 export const DEFAULT_MINUTES = DEFAULT_DURATIONS.focus;
@@ -177,11 +172,12 @@ function phaseDurationMs(phase: Phase, durations: Durations): number {
 
 /** Out-of-range input is a mistyped preference, not a shorter phase, so it falls back. */
 export function clampMinutes(value: unknown): number {
-  if (!isMinutesInRange(value)) return DEFAULT_MINUTES;
+  if (!isWholeMinute(value)) return DEFAULT_MINUTES;
   return value;
 }
 
-function isMinutesInRange(value: unknown): value is number {
+/** The one rule both a recorded block and a daily goal are held to: a whole minute inside `MINUTES_RANGE`. */
+function isWholeMinute(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&

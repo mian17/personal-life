@@ -74,7 +74,7 @@ const titleBlockStyles = 'mt-0 mb-0';
  * The header's leading slot: the title block — `<h1>` plus the optional sub-line — level with
  * the trailing controls, matching `.phead`'s `<div>` wrapper.
  */
-function TitleBlock({ title, subtitle }: Pick<ListShellProps, 'title' | 'subtitle'>) {
+function TitleBlock({ title, subtitle }: Readonly<Pick<ListShellProps, 'title' | 'subtitle'>>) {
   return (
     <div className="ui-list-shell__title-block">
       <PageTitle className={titleBlockStyles}>{title}</PageTitle>

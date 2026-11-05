@@ -61,7 +61,9 @@ export interface AutosuggestProps {
  * this component (`inputProps` carries the value and the keys), so that report has nothing of
  * its own to say — and never fires, because the shell's own text never moves.
  */
-function noQueryReport() {}
+function noQueryReport() {
+  // Intentionally silent: the search shell's text is this component's, so there is nothing to report.
+}
 
 /**
  * A combobox from the registry recipe: an `Input` inside a `Popover`, over a `Command` root whose

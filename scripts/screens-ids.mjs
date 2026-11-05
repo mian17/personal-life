@@ -113,7 +113,7 @@ function writeCredentials(dir) {
 
 /** The first row a marker matches, or `undefined` when the stack was never seeded. */
 function findRow(service, resource, flags, matches, credentialsDir) {
-  return listRows(service, resource, flags, credentialsDir).find(matches);
+  return listRows(service, resource, flags, credentialsDir).find((row) => matches(row));
 }
 
 /**
@@ -186,7 +186,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(`screens:ids failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
-});
+}
