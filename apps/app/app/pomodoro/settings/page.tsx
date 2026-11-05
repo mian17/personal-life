@@ -9,7 +9,6 @@ import {
   StatusText,
 } from '@life/ui';
 import {
-  DAILY_GOAL_RANGE,
   DEFAULT_DURATIONS,
   MINUTES_RANGE,
   type Durations,
@@ -61,7 +60,7 @@ export default async function PomodoroSettingsRoute({
             <Stack gap="md">
               {goalRejected && (
                 <StatusText className="text-danger!">
-                  {`A daily goal is ${DAILY_GOAL_RANGE.min} to ${DAILY_GOAL_RANGE.max} whole minutes.`}
+                  {`A daily goal is ${MINUTES_RANGE.min} to ${MINUTES_RANGE.max} whole minutes.`}
                 </StatusText>
               )}
               <Button type="submit">Save goal</Button>
@@ -75,8 +74,8 @@ export default async function PomodoroSettingsRoute({
               <Input
                 type="number"
                 name="goal"
-                min={DAILY_GOAL_RANGE.min}
-                max={DAILY_GOAL_RANGE.max}
+                min={MINUTES_RANGE.min}
+                max={MINUTES_RANGE.max}
                 step={1}
                 aria-label="Daily goal"
                 defaultValue={dailyGoal ?? undefined}

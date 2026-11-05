@@ -19,7 +19,7 @@ jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }))
 jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
 
 import { readPrefNumber } from '@life/app-kit';
-import { DAILY_GOAL_RANGE, DEFAULT_DURATIONS } from '@life/pomodoro';
+import { DEFAULT_DURATIONS, MINUTES_RANGE } from '@life/pomodoro';
 import { listGoals, setGoal, type GoalRow } from '@/lib/focus-api';
 import { getToday } from '@/lib/today';
 import { redirect } from 'next/navigation';
@@ -179,7 +179,7 @@ describe('/pomodoro/settings page wiring', () => {
 });
 
 describe('/pomodoro/settings daily goal row', () => {
-  it('opens the input on the goal resolved for today, inside the day-total range', async () => {
+  it('opens the input on the goal resolved for today, inside the minutes range', async () => {
     mockedListGoals.mockResolvedValue([goal('2026-10-01', 30), goal(TODAY, 40)]);
 
     const page = await renderPage();
@@ -189,8 +189,8 @@ describe('/pomodoro/settings daily goal row', () => {
     expect(control.type).toBe(Input);
     expect(control.props.name).toBe('goal');
     expect(control.props['aria-label']).toBe('Daily goal');
-    expect(control.props.min).toBe(DAILY_GOAL_RANGE.min);
-    expect(control.props.max).toBe(DAILY_GOAL_RANGE.max);
+    expect(control.props.min).toBe(MINUTES_RANGE.min);
+    expect(control.props.max).toBe(MINUTES_RANGE.max);
     expect(control.props.defaultValue).toBe(40);
     expect(mockedListGoals).toHaveBeenCalledTimes(1);
   });
@@ -221,23 +221,16 @@ describe('/pomodoro/settings daily goal row', () => {
   });
 
   it('sends a refused daily goal back to the form instead of writing a number nobody chose', async () => {
-    await setPomodoroGoal(formData({ goal: String(DAILY_GOAL_RANGE.max + 1) }));
+    await setPomodoroGoal(formData({ goal: String(MINUTES_RANGE.max + 1) }));
 
     expect(mockedRedirect).toHaveBeenCalledWith('/pomodoro/settings?goal=rejected');
     expect(mockedSetGoal).not.toHaveBeenCalled();
   });
 
-  it('stores a daily goal past one block, since the goal is a day total', async () => {
-    await setPomodoroGoal(formData({ goal: '240' }));
-
-    expect(mockedSetGoal).toHaveBeenCalledWith(TODAY, 240);
-    expect(mockedRedirect).not.toHaveBeenCalled();
-  });
-
   it('shows the refused goal as a message above the button that sent it', async () => {
     const html = renderToStaticMarkup(await renderPage({ goal: 'rejected' }));
 
-    expect(html).toContain('A daily goal is 1 to 1440 whole minutes.');
+    expect(html).toContain('A daily goal is 1 to 180 whole minutes.');
     expect(html).toContain('role="status"');
   });
 });

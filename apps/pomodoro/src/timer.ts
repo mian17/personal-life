@@ -40,18 +40,17 @@ export const MINUTE_MS = 60_000;
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
 
 /**
- * A daily goal is a whole day's focus total, not one block's length, so its bound is a whole
- * day rather than `MINUTES_RANGE` (one block): every whole minute a day can hold is a goal.
+ * Whether `value` is a whole-minute daily goal the service would accept.
+ *
+ * Today the service bounds a goal by the same `MINUTES_RANGE` rule a recorded block is held
+ * to, so the app must not offer a value the service would reject.
  */
-export const DAILY_GOAL_RANGE = { min: 1, max: 1440 } as const;
-
-/** Whether `value` is a whole-minute daily goal inside `DAILY_GOAL_RANGE`. */
 export function isDailyGoal(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&
-    value >= DAILY_GOAL_RANGE.min &&
-    value <= DAILY_GOAL_RANGE.max
+    value >= MINUTES_RANGE.min &&
+    value <= MINUTES_RANGE.max
   );
 }
 
