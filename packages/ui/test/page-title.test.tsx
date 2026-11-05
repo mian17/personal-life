@@ -39,4 +39,25 @@ describe('PageTitle', () => {
     render(<PageTitle data-extra="1">Notes</PageTitle>);
     expect(screen.getByRole('heading', { level: 1 }).getAttribute('data-extra')).toBe('1');
   });
+
+  it('renders the optional sub-line under the heading, quiet and one step below', () => {
+    const { container } = render(<PageTitle sub="Across all five modules">Notes</PageTitle>);
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    const sub = container.querySelector('p');
+    if (!sub) throw new Error('no sub-line');
+    expect(sub.textContent).toBe('Across all five modules');
+    expect(heading.nextElementSibling).toBe(sub);
+    expect(classesOf(sub)).toContain('ui-page-title__sub');
+    expect(classesOf(sub)).toContain('text-[length:var(--fs-meta)]');
+    expect(classesOf(sub)).toContain('text-ink-2');
+    // The heading's own bottom step gives way to the sub-line's `--s1` gap.
+    expect(classesOf(heading)).toContain('mb-0');
+  });
+
+  it('renders nothing extra when sub is omitted', () => {
+    const { container } = render(<PageTitle>Notes</PageTitle>);
+    expect(container.querySelector('p')).toBeNull();
+    expect(classesOf(screen.getByRole('heading', { level: 1 }))).not.toContain('mb-0');
+  });
 });

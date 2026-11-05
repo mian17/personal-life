@@ -1,23 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { format } from '@life/nutrition';
-import { Check } from 'lucide-react';
 import {
+  Button,
   Card,
-  EditorChrome,
   Facts,
   FactsRow,
-  IconButton,
   Input,
   Kpi,
+  PageShell,
+  PageTitle,
   Pill,
   Section,
   Select,
   SettingsRow,
   Stack,
   StatusText,
+  SubNav,
 } from '@life/ui';
 import type { MealTarget } from '@/lib/meal-api';
 import { saveProfileAction } from './actions';
@@ -28,15 +28,17 @@ import { saveProfileAction } from './actions';
  * derived server-side and must never be sent from the browser ("Never: let the
  * client send computed kcal" — `forbidNonWhitelisted` rejects such a body).
  *
- * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `EditorChrome`
- * (back leading, save in `actions`, mirroring the meal entry editor), each field
- * is a `SettingsRow` (visible label left, control right) hosting an
- * `Input`/`Select`, feedback is `StatusText`. The derived-energy card and the
- * `Profile` read-out rows are the reference's read-only half; the form below
- * them is the only place a value changes. The `<form>` is glue (submit
- * semantics + native numeric validation), no className, no raw control, no app
- * CSS. Sex/activity/goal are `Select`s over the service enums, so a level the
- * service does not have cannot be offered here.
+ * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `PageShell`,
+ * the header is the reference's sub-view row (`SubNav` back to settings, the
+ * screen's name trailing) over `PageTitle` and its server-computed sub-line, each
+ * field is a `SettingsRow` (visible label left, control right) hosting an
+ * `Input`/`Select`, feedback is `StatusText`, and the one commit affordance is
+ * the footer's primary submit `Button`. The derived-energy card and the `Profile`
+ * read-out rows are the reference's read-only half; the form below them is the
+ * only place a value changes. The `<form>` is glue (submit semantics + native
+ * numeric validation), no className, no raw control, no app CSS.
+ * Sex/activity/goal are `Select`s over the service enums, so a level the service
+ * does not have cannot be offered here.
  */
 
 /** `SEXES` in the service's `target-calculator.ts`. */
@@ -85,7 +87,6 @@ export function TargetProfileForm({
   initial: MealTarget | null;
   summary?: string | null;
 }>) {
-  const router = useRouter();
   const [age, setAge] = useState(initial == null ? '' : String(initial.age));
   const [sex, setSex] = useState(initial?.sex ?? 'male');
   const [heightCm, setHeightCm] = useState(initial == null ? '' : String(initial.heightCm));
@@ -96,7 +97,7 @@ export function TargetProfileForm({
   const [error, setError] = useState('');
 
   // A blank or non-numeric body field would serialise to `0`/`null` and answer
-  // with an opaque 400, so the toolbar save stays disabled until the numerics
+  // with an opaque 400, so the footer commit stays disabled until the numerics
   // parse; the service DTO owns every bound.
   const profileReady = [age, heightCm, weightKg].every(
     (raw) => raw.trim() !== '' && Number.isFinite(Number(raw)),
@@ -123,26 +124,13 @@ export function TargetProfileForm({
   }
 
   return (
-    <EditorChrome
-      // A literal destination, not history: `/meals/target` opens from the settings
-      // block, so Back lands back on it even after a cold load of this screen.
-      back={{
-        label: 'Back',
-        variant: 'framed',
-        onBack: () => router.push('/meals/settings'),
-      }}
-      title="Daily target"
-      actions={
-        <IconButton
-          label="Save"
-          variant="framed"
-          onClick={save}
-          disabled={saving || !profileReady}
-        >
-          <Check size={20} aria-hidden />
-        </IconButton>
-      }
-    >
+    <PageShell>
+      <SubNav backHref="/meals/settings" backLabel="Meals" status="Daily target" />
+
+      <PageTitle sub="Computed on the server from these six values. Nothing here is guessed in the browser.">
+        Daily target
+      </PageTitle>
+
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -258,7 +246,14 @@ export function TargetProfileForm({
           />
           {error !== '' ? <StatusText>{error}</StatusText> : null}
         </Section>
+        {/* The footer is the screen's only commit affordance (reference `.subfoot`); a
+            label-less `Section` gives it the same `--s6` step the body's groups open with. */}
+        <Section>
+          <Button type="submit" disabled={saving || !profileReady}>
+            Update profile
+          </Button>
+        </Section>
       </form>
-    </EditorChrome>
+    </PageShell>
   );
 }

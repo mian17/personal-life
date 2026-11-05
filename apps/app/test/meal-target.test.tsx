@@ -1,13 +1,9 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from '@life/nutrition';
-import { EditorChrome, IconButton, Input, Select, SettingsRow, StatusText } from '@life/ui';
+import { Button, Input, PageTitle, Select, SettingsRow, StatusText, SubNav } from '@life/ui';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
-
-// The form's editor chrome reads the router on render (Back via `router.back()`),
-// so the hook must resolve off the raw module the compiled client component reads.
-jest.mock('next/navigation', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 
@@ -152,32 +148,106 @@ describe('target profile form composition', () => {
       const html = renderToStaticMarkup(tree);
       expect(html).toContain('ui-input');
       expect(html).toContain('ui-select');
-      // The toolbar save is an IconButton now — no bare submit button remains.
-      expect(html).toContain('ui-icon-btn');
       expect(html).not.toContain('Set target');
     } finally {
       harness.restore();
     }
   });
 
-  it('frames the fields in the editor chrome: one back control and one save', () => {
+  it('opens with the reference sub-view header and closes with the one commit button', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
 
-      const chrome = find(tree, EditorChrome);
-      expect(chrome).toBeDefined();
-      // Back is the chrome's own control, not an in-body link.
-      expect((chrome!.props.back as { label: string }).label).toBe('Back');
+      // Back is a literal route, not history, so a cold load still lands on settings.
+      const back = find(tree, SubNav);
+      expect(back).toBeDefined();
+      expect(back!.props.backHref).toBe('/meals/settings');
+      expect(back!.props.backLabel).toBe('Meals');
+      expect(back!.props.status).toBe('Daily target');
 
-      // Exactly one save trigger: the IconButton in `actions`, body provides none.
-      const save = find(chrome!.props.actions, IconButton);
-      expect(save).toBeDefined();
-      expect(save!.props.label).toBe('Save');
-      expect(find(tree, 'button', (el) => el.props.type === 'submit')).toBeUndefined();
+      // Exactly one commit affordance: the footer's submit button.
+      const submits = find(tree, Button, (el) => el.props.type === 'submit');
+      expect(submits).toBeDefined();
+      expect(text(submits)).toBe('Update profile');
+      expect(find(tree, Button, (el) => el.props.type !== 'submit')).toBeUndefined();
+      expect(find(tree, 'button', (el) => el.props.type === 'button')).toBeUndefined();
+
+      // The heading keeps its `<h1>` semantics and gains the server-computed sub-line.
+      const heading = find(tree, PageTitle);
+      expect(text(heading!.props.children)).toBe('Daily target');
+      expect(text(heading!.props.sub)).toContain('Computed on the server');
 
       const html = renderToStaticMarkup(tree);
-      expect(html).toContain('Daily target');
+      expect(html).toContain('ui-sub-nav');
+      expect(html).toContain('>Daily target</h1>');
+      expect(html).toContain('ui-page-title__sub');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('disables the commit button until the numbers parse', () => {
+    const harness = stateHarness();
+    try {
+      const empty = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(empty!.props.disabled).toBe(true);
+
+      const first = harness.renderTree();
+      type(first, 'Age', '30');
+      const second = harness.renderTree();
+      type(second, 'Height (cm)', '175');
+      const third = harness.renderTree();
+      type(third, 'Weight (kg)', '70');
+
+      // All three parsed: the button is live.
+      const ready = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(ready!.props.disabled).toBe(false);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('disables the commit button while a save is in flight and re-enables it on failure', async () => {
+    mockedGetToday.mockResolvedValue('2026-10-03');
+    // The PUT hangs until the test rejects it, so the in-flight state is observable.
+    let started = false;
+    let rejectSave: (error: Error) => void = () => {};
+    mockedPutMealProfile.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          started = true;
+          rejectSave = reject;
+        }),
+    );
+    const harness = stateHarness();
+    try {
+      for (const [label, value] of [
+        ['Age', '30'],
+        ['Height (cm)', '175'],
+        ['Weight (kg)', '70'],
+      ] as const) {
+        type(harness.renderTree(), label, value);
+      }
+
+      const form = find(harness.renderTree(), 'form');
+      if (!form) throw new Error('no form');
+      const pending = (form.props.onSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: jest.fn(),
+      });
+      while (!started) await Promise.resolve();
+
+      const inFlight = find(harness.renderTree(), Button, (el) => el.props.type === 'submit');
+      expect(inFlight!.props.disabled).toBe(true);
+
+      rejectSave(new Error('boom'));
+      await pending;
+
+      const failed = harness.renderTree();
+      expect(find(failed, Button, (el) => el.props.type === 'submit')!.props.disabled).toBe(false);
+      expect(
+        text(find(failed, StatusText, (el) => text(el).includes('Could not save the profile'))),
+      ).toBe('Could not save the profile. Try again.');
     } finally {
       harness.restore();
     }
@@ -350,13 +420,14 @@ describe('target page', () => {
     const el = await TargetPage();
     const html = renderToStaticMarkup(el);
 
-    // The page is an editor screen now (lesson 0014: the chrome is the shell) —
-    // assert the rendered markup, not the element tree: `el` is the form element
-    // and `find` only walks element props, not the function it points at.
-    expect(html).toContain('ui-editor-toolbar');
-    expect(html).toContain('aria-label="Back"');
+    // The page is the form itself (the shell lives inside it) — assert the rendered
+    // markup, not the element tree: `el` is the form element and `find` only walks
+    // element props, not the function it points at.
+    expect(html).toContain('ui-sub-nav');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('>Daily target</h1>');
-    expect(html).toContain('aria-label="Save"');
+    expect(html).toContain('>Update profile</button>');
+    expect(html).not.toContain('ui-editor-toolbar');
     expect(html).toContain('No target set yet');
     expect(html).toContain('Set your target');
   });

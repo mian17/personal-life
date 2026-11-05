@@ -65,6 +65,9 @@ export type { NavBarProps } from './components/nav-bar';
 export { PageTitle } from './components/page-title';
 export type { PageTitleProps } from './components/page-title';
 
+export { SubNav } from './components/sub-nav';
+export type { SubNavProps } from './components/sub-nav';
+
 export { FabLink } from './components/fab-link';
 export type { FabLinkProps } from './components/fab-link';
 
