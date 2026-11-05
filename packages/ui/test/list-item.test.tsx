@@ -286,10 +286,16 @@ describe('ListItem', () => {
     // the target paints over the row and only the row's own insets place the title.
     expect(row).toContain('relative');
     expect(row).toContain('[&>.ui-checkbox]:absolute');
-    // Pinned on the row's start/top corner, net of the control's own negative margins, so the
-    // painted 48px square stays inside the row's `overflow-hidden` clip.
-    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s3)]');
+    // The 48px target keeps the row's top corner: moving it up to reach the first line would
+    // push 6.89px of the painted square outside the row's `overflow-hidden` clip.
     expect(row).toContain('[&>.ui-checkbox]:top-[var(--s2)]');
+    // The mark alone is lifted onto the title's first-line centre — the target's half-height
+    // (`--tap`/2 = 24px) less the row's top inset (`--s2`) less half a title line
+    // (`--fs-meta` at `--lh-row-title` = 9.11px) = 6.89px. A row whose mark rides the target's
+    // own centring paints that 6.89px low, and low by the same amount on a two-line title.
+    expect(row).toContain(
+      '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
+    );
     // The mark rides the target's leading edge, so it lands on the row's start inset.
     expect(row).toContain('[&>.ui-checkbox]:justify-items-start');
     // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 16px from the
@@ -344,6 +350,10 @@ describe('ListItem', () => {
     // The default row keeps its control in flow: it has width to spare and the mark's own
     // 48px target is what places it, so the out-of-flow dense treatment must not leak here.
     expect(classes).not.toContain('[&>.ui-checkbox]:absolute');
+    // Nor may the dense first-line lift: at this scale the control's own centring against the
+    // row is the intended geometry, and a shifted mark would sit 11.43px off it.
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox>*]:-translate-y-'))).toBe(false);
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox]:top-'))).toBe(false);
     expect(classes.some((cls) => cls.startsWith('[&>.ui-list-item__link]:ps-'))).toBe(false);
   });
 
@@ -843,7 +853,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

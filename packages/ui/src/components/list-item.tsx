@@ -81,15 +81,24 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * clip. The offsets are stated net of the primitive's own negative margins (`-my-[var(--s2)]`
  * `-ms-[var(--s3)]`), because a margin still applies to an absolutely positioned box: `--s3`
  * start and `--s2` top land the painted square exactly on the corner without re-declaring a
- * margin the control owns. The mark keeps the target's vertical centring but sits on the
- * target's leading edge (`justify-items-start`, a longhand of the target's `place-items-center`
- * shorthand, so it wins without touching the control), which puts the 12px mark on the row's
- * start and bleeds the press square to its right instead of reserving that width.
+ * margin the control owns. The mark sits on the target's leading edge (`justify-items-start`, a
+ * longhand of the target's `place-items-center` shorthand, so it wins without touching the
+ * control), which puts the 12px mark on the row's start and bleeds the press square to its right
+ * instead of reserving that width.
+ *
+ * Vertically the mark cannot keep the target's centring. The target starts on the row's top edge,
+ * so its centre is `--tap`/2 = 24px down; the title's first line starts one `--s2` down and is one
+ * `--lh-row-title` line tall, so its centre is at 17.11px on the dense scale — the mark painted
+ * 6.89px low, and by the same amount on a two-line title, because a second line never moves the
+ * first. Lifting the 48px square would push it 6.89px outside the row's `overflow-hidden` clip, so
+ * the square keeps the corner and the mark alone is lifted by the target's half-height less the
+ * row's top inset less the first line's half-height. The offset is stated from the title's own
+ * hooks (`--fs-meta` at `--lh-row-title`), so it follows the line if the dense type scale moves.
  *
  * `min-h-[var(--tap)]` keeps the row as tall as the target it no longer gets height from.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
@@ -297,8 +306,8 @@ const collapsingRowStyles = 'h-0 min-h-0 opacity-0 overflow-hidden';
 /**
  * The row's utility classes: surface, box, alignment, slots, and state treatment. A dense row
  * top-aligns its slots so its meta line starts on the title's first line; its leading checkbox
- * is out of flow (`denseRowStyles`), so it takes no part in that alignment and the 48px target
- * centres its 12px mark on itself against the row's top corner.
+ * is out of flow (`denseRowStyles`), so it takes no part in that alignment — the row pins the
+ * target to its top corner and lifts the mark onto the title's first-line centre itself.
  */
 function rowStyleClassesFor({
   isDense,
