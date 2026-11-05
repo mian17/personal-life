@@ -133,7 +133,12 @@ export function TargetProfileForm({
       }}
       title="Daily target"
       actions={
-        <IconButton label="Save" onClick={save} disabled={saving || !profileReady}>
+        <IconButton
+          label="Save"
+          variant="framed"
+          onClick={save}
+          disabled={saving || !profileReady}
+        >
           <Check size={20} aria-hidden />
         </IconButton>
       }

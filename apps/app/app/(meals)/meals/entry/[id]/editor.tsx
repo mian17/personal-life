@@ -608,6 +608,7 @@ export function MealEditor({
       actions={
         <IconButton
           label="Save meal"
+          variant="framed"
           onClick={save}
           disabled={!canSave || saving}
         >

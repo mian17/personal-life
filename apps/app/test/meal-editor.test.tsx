@@ -602,12 +602,15 @@ describe('MealEditor unknown affordance', () => {
 describe('MealEditor toolbar', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('frames the back control, the same face as the other editor screens', () => {
+  it('frames the toolbar as a set: the back control and the save share one face', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
 
       expect(tree.props.back).toEqual({ label: 'Back', variant: 'framed', onBack: expect.any(Function) });
+
+      const save = button(tree, (el) => el.props.label === 'Save meal');
+      expect(save.props.variant).toBe('framed');
     } finally {
       harness.restore();
     }
