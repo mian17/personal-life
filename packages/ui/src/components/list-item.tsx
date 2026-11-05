@@ -96,9 +96,16 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * hooks (`--fs-meta` at `--lh-row-title`), so it follows the line if the dense type scale moves.
  *
  * `min-h-[var(--tap)]` keeps the row as tall as the target it no longer gets height from.
+ *
+ * Because the target is pinned out of flow over the row's start, its press wash (`--press`, a
+ * 48px square) covers the first third of a title that starts at 28px, and its `transition-colors`
+ * keeps that square painted for a moment past the release, while the row's own wash snaps back.
+ * Read as one gesture, a square appears over the title and then fades off it. The row is already
+ * the press target (`rowSurfaceStyles`) and covers the whole row, so the wash survives without
+ * this one: the dense row silences the target's own.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap

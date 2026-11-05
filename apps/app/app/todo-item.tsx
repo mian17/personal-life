@@ -124,8 +124,15 @@ export function TodoItem({
       size={size}
       tone={tone}
       deleteAction={
-        isDefault && !done ? (
-          <form action={deleteTodoAction.bind(null, todo.id)}>
+        isDefault ? (
+          // The slot is always present so a row's width never depends on `done`: gated instead,
+          // unticking inserted the form and the row reflowed around it. Hiding it keeps the
+          // reserved width and takes the control out of the accessibility tree, so a done row
+          // still offers no delete affordance.
+          <form
+            action={deleteTodoAction.bind(null, todo.id)}
+            className={done ? 'invisible' : undefined}
+          >
             <Button
               type="submit"
               variant="danger"

@@ -206,7 +206,7 @@ describe('/todos list page wiring', () => {
     expect(html).toContain('No todos');
   });
 
-  it('renders a done todo as a struck row with no trash control', async () => {
+  it('renders a done todo struck, with the delete slot reserved but not an affordance', async () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],
       nextCursor: null,
@@ -216,8 +216,12 @@ describe('/todos list page wiring', () => {
     const html = renderToStaticMarkup(el.props.body);
     expect(html).toContain('ui-list-item--done');
     expect(html).toContain('ui-checkbox--checked');
-    expect(html).not.toContain('ui-btn--danger');
-    expect(html).not.toContain('aria-label="Delete Pay rent"');
+    // The slot is always rendered so a row's width never depends on `done`; on a done row it is
+    // `invisible`, which keeps its box in flow and drops the button from the a11y tree. An
+    // untick therefore reflows nothing while the row still offers no delete affordance.
+    expect(html).toContain('<form');
+    expect(html).toMatch(/<form[^>]*class="invisible"/);
+    expect(html).toContain('aria-label="Delete Pay rent"');
   });
 
   it("renders a repeating todo's completed occurrence as a done TodoItem while the next occurrence stays open", async () => {

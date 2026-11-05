@@ -301,6 +301,20 @@ describe('TodoItem sizes', () => {
     expect(html).toContain('ui-list-item--done');
   });
 
+  it('a done default row keeps the delete slot in the DOM, hidden from assistive tech', () => {
+    const html = markup(undefined, { done: true });
+    // Unticking used to INSERT the form (the slot was gated on `!done`), so the row reflowed
+    // around it. The slot is now always rendered and `invisible` when done: same node count in
+    // both states, still no affordance, because `visibility:hidden` leaves the a11y tree.
+    expect(html).toMatch(/<form[^>]*class="invisible"/);
+  });
+
+  it('an open default row renders the same delete slot, visible', () => {
+    const html = markup();
+    expect(html).toContain('<form');
+    expect(html).not.toContain('class="invisible"');
+  });
+
   it('a not-yet-done row renders neither --done nor --collapsing initially', () => {
     const html = markup();
     expect(html).not.toContain('ui-list-item--done');
