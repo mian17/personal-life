@@ -36,10 +36,16 @@ const checkboxTarget = cx(
 /**
  * The revised `.check__box`: the mark's frame. `--checkbox-size` (24px) is the hook a dense row
  * narrows, and the box carries no padding.
+ *
+ * The corner is a row-supplied hook for the same reason the size is: a fixed `--r-sm` (8px)
+ * cannot survive the narrowing — on a dense row's 12px mark it clamps to 6px, half the box, and
+ * the mark paints as a disc. The row states the corner alongside the size it belongs to, so a
+ * narrowed mark stays the same rounded square; a row that states nothing keeps `.check__box`'s
+ * own `--r-sm`.
  */
 const checkboxBox = cx(
   'ui-checkbox__box grid size-[var(--checkbox-size)] place-items-center',
-  'rounded-[var(--r-sm)] border-[length:var(--border-width-strong)] border-line-strong',
+  'rounded-[var(--checkbox-radius,var(--r-sm))] border-[length:var(--border-width-strong)] border-line-strong',
   'bg-surface text-transparent',
   'group-data-[state=checked]:border-max group-data-[state=checked]:bg-max group-data-[state=checked]:text-on-max',
 );

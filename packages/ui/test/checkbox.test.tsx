@@ -1,6 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Checkbox } from '../src/components/checkbox';
 
+/**
+ * The mark's corner is a row-supplied hook, like its size: `--checkbox-radius` when a row states
+ * one, `.check__box`'s own `--r-sm` otherwise. A fixed 8px corner cannot survive the narrowing —
+ * on a dense row's 12px mark it clamps to 6px, half the box, and the mark paints as a disc.
+ */
+const MARK_CORNER = 'rounded-[var(--checkbox-radius,var(--r-sm))]';
+
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
@@ -66,12 +73,21 @@ describe('Checkbox', () => {
     render(<Checkbox />);
     const box = classesOf(screen.getByRole('checkbox').querySelector('.ui-checkbox__box')!);
     expect(box.filter((name) => name.startsWith('size-['))).toEqual(['size-[var(--checkbox-size)]']);
-    expect(box).toContain('rounded-[var(--r-sm)]');
+    expect(box).toContain(MARK_CORNER);
     // The mark rides the strong hairline on the surface; the accent only fills it when checked.
     expect(box).toContain('border-line-strong');
     expect(box).toContain('bg-surface');
     // §8 draws `.check__box` unpadded: its border box is the whole budget the glyph is drawn in.
     expect(box.filter((name) => /^p[xytblrse]?-/.test(name))).toEqual([]);
+  });
+
+  it('takes its corner from a row-supplied hook, defaulting to the box radius', () => {
+    render(<Checkbox />);
+    const box = classesOf(screen.getByRole('checkbox').querySelector('.ui-checkbox__box')!);
+    // The fallback keeps a row that states no corner exactly where §8 drew it (8px on 24px);
+    // a row that narrows the mark states a corner that still reads as a box, not a disc.
+    expect(box).toContain(MARK_CORNER);
+    expect(box).not.toContain('rounded-[var(--r-sm)]');
   });
 
   it('clamps the glyph to the box it is drawn in, so a narrowed box cannot overflow', () => {

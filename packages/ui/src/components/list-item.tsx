@@ -63,6 +63,11 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * `--s3` is that value at the frozen 16px root. The default todo row keeps the control's own
  * mark.
  *
+ * The mark's corner travels with its size, because the corner is a fraction of it: the frame's
+ * own `--r-sm` (8px) is a third of a 24px mark and a third reads as a box, but on this 12px mark
+ * 8px clamps to 6px — half the box — and the mark paints as a disc. `--s1` (4px) holds that same
+ * third at the dense scale, so the matrix mark stays the rounded square the list shows.
+ *
  * The end inset is one step tighter than the start (`pe-[var(--s2)]`): the pre-redesign dense row
  * ran `0.4rem` at the end against `0.9rem` at the start, and the matrix row has no trailing
  * control for that end inset to clear. The start inset stays `--s3`, the step that matches
@@ -70,7 +75,7 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * that inset, which is what keeps the target unclipped against the row's `overflow-hidden` edge.
  */
 const denseRowStyles =
-  'min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)]';
+  'min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap

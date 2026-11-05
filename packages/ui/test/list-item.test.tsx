@@ -267,6 +267,10 @@ describe('ListItem', () => {
     expect(row).toContain('items-start');
     expect(row).not.toContain('items-center');
     expect(row).toContain('[--checkbox-size:var(--s3)]');
+    // The corner travels with the size it is a fraction of: `--s1` (4px) is a third of this
+    // 12px mark, the same third `--r-sm` (8px) is of the default 24px one. Left at `--r-sm`,
+    // the 8px corner clamps to half the box and the mark paints as a disc instead of a box.
+    expect(row).toContain('[--checkbox-radius:var(--s1)]');
   });
 
   it('clamps the todo title to two lines, and leaves a base row one line', () => {
@@ -301,6 +305,9 @@ describe('ListItem', () => {
     // §8 gives the todo mark no size override, so the row leaves the control's own default
     // alone; only the dense row narrows it.
     expect(classes.some((cls) => cls.startsWith('[--checkbox-size:'))).toBe(false);
+    // The corner is a hook of the mark's own size, so a row that does not narrow the mark must
+    // not restate it either — the control's `.ui-checkbox__box` `--r-sm` stands.
+    expect(classes.some((cls) => cls.startsWith('[--checkbox-radius:'))).toBe(false);
     // The default todo row centres its leading control; a dense row top-aligns it on the title's
     // first line, and a `size="dense"` without the todo variant never reaches that branch.
     expect(classes).toContain('items-center');
@@ -803,7 +810,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });
