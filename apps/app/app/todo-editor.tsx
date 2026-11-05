@@ -164,12 +164,13 @@ export function TodoEditor({
 
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+      back={{ label: 'Back', onBack: () => router.back(), variant: 'framed' }}
       title={editing ? 'Edit Todo' : 'New Todo'}
       actions={
         <>
           <IconButton
             label={editing ? 'Save todo' : 'Add todo'}
+            variant="framed"
             onClick={save}
             disabled={!canSave || saving}
           >
@@ -181,6 +182,7 @@ export function TodoEditor({
               label="Task actions"
               open={menuOpen}
               onOpenChange={setMenuOpen}
+              triggerVariant="framed"
               triggerIcon={<MoreHorizontal size={16} aria-hidden />}
             >
               <MenuItem>
