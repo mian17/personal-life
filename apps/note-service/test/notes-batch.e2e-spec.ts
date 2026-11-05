@@ -34,6 +34,11 @@ const stranger = 'batch-stranger';
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 
 describe('Notes batch API (e2e)', () => {
+  // A cold ts-jest compile of this spec plus `@life/service-kit` outruns Jest's
+  // 5s default inside `beforeAll`, and the teardown that follows reads as a
+  // native-binding failure when it is only a slow first compile.
+  jest.setTimeout(30_000);
+
   let app: INestApplication;
   let harness: JwtTestHarness;
   let redis: FakeRedisClient;
