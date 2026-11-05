@@ -87,6 +87,9 @@
   --tap: 48px;
   --row-min-height: 56px;
   --checkbox-size: 24px;
+  /* §6 the mark's own corner, as an alias so a row can narrow it with the size it
+     narrows. `--r-sm` is the radius the reference draws `.check__box` with. */
+  --checkbox-radius: var(--r-sm);
   --fab-size: 56px;
 
   /* §6 four radii, two border widths, no product shadow */
