@@ -32,49 +32,49 @@ export class MealBatchController {
     private readonly savedMeals: SavedMealsService,
   ) {}
 
-  @Post('api/entries\\:batchCreate')
+  @Post(String.raw`api/entries\:batchCreate`)
   @HttpCode(201)
   createEntries(@Principal() principal: Principal, @Body() dto: BatchCreateEntriesDto) {
     return this.entries.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/entries\\:batchUpdate')
+  @Post(String.raw`api/entries\:batchUpdate`)
   @HttpCode(200)
   updateEntries(@Principal() principal: Principal, @Body() dto: BatchUpdateEntriesDto) {
     return this.entries.updateMany(principal.sub, dto.items);
   }
 
-  @Post('api/entries\\:batchDelete')
+  @Post(String.raw`api/entries\:batchDelete`)
   @HttpCode(200)
   deleteEntries(@Principal() principal: Principal, @Body() dto: BatchDeleteEntriesDto) {
     return this.entries.removeMany(principal.sub, dto.items);
   }
 
-  @Post('api/foods\\:batchCreate')
+  @Post(String.raw`api/foods\:batchCreate`)
   @HttpCode(201)
   createFoods(@Principal() principal: Principal, @Body() dto: BatchCreateFoodsDto) {
     return this.foods.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/foods\\:batchUpdate')
+  @Post(String.raw`api/foods\:batchUpdate`)
   @HttpCode(200)
   updateFoods(@Principal() principal: Principal, @Body() dto: BatchUpdateFoodsDto) {
     return this.foods.updateMany(principal.sub, dto.items);
   }
 
-  @Post('api/foods\\:batchDelete')
+  @Post(String.raw`api/foods\:batchDelete`)
   @HttpCode(200)
   deleteFoods(@Principal() principal: Principal, @Body() dto: BatchDeleteFoodsDto) {
     return this.foods.removeMany(principal.sub, dto.items);
   }
 
-  @Post('api/saved-meals\\:batchCreate')
+  @Post(String.raw`api/saved-meals\:batchCreate`)
   @HttpCode(201)
   createSavedMeals(@Principal() principal: Principal, @Body() dto: BatchCreateSavedMealsDto) {
     return this.savedMeals.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/saved-meals\\:batchDelete')
+  @Post(String.raw`api/saved-meals\:batchDelete`)
   @HttpCode(200)
   deleteSavedMeals(@Principal() principal: Principal, @Body() dto: BatchDeleteSavedMealsDto) {
     return this.savedMeals.removeMany(principal.sub, dto.items);

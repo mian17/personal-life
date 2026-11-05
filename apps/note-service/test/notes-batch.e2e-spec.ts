@@ -95,7 +95,11 @@ describe('Notes batch API (e2e)', () => {
     });
 
     it('does not answer on a slashed path, which would be the parameter route', async () => {
-      await apiPost('/api/notes/batchCreate', { items: [{ body: 'nope' }] }).expect(404);
+      const response = await apiPost('/api/notes/batchCreate', { items: [{ body: 'nope' }] }).expect(
+        404,
+      );
+
+      expect(response.body).toEqual(routedNowhere('POST', '/api/notes/batchCreate'));
     });
 
     it('rejects eleven items with 400 and leaves the list untouched', async () => {
@@ -234,6 +238,16 @@ describe('Notes batch API (e2e)', () => {
       expect(redis.sets).toHaveLength(before);
     });
   });
+
+  /**
+   * What Nest answers for a request that matched no route at all. An absent path
+   * answers exactly this body, so a 404 carrying a domain message (a batch route
+   * that did resolve and then failed on its items) can never pass for an absent
+   * route.
+   */
+  function routedNowhere(verb: string, path: string) {
+    return { statusCode: 404, message: `Cannot ${verb} ${path}`, error: 'Not Found' };
+  }
 
   function apiGet(path: string): request.Test {
     return request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`);
