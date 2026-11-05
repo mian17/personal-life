@@ -39,6 +39,22 @@ export const MINUTE_MS = 60_000;
 
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
 
+/**
+ * A daily goal is a whole day's focus total, not one block's length, so its bound is a whole
+ * day rather than `MINUTES_RANGE` (one block): every whole minute a day can hold is a goal.
+ */
+export const DAILY_GOAL_RANGE = { min: 1, max: 1440 } as const;
+
+/** Whether `value` is a whole-minute daily goal inside `DAILY_GOAL_RANGE`. */
+export function isDailyGoal(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= DAILY_GOAL_RANGE.min &&
+    value <= DAILY_GOAL_RANGE.max
+  );
+}
+
 export const DEFAULT_MINUTES = DEFAULT_DURATIONS.focus;
 
 export function initialState(durations: Durations): TimerState {

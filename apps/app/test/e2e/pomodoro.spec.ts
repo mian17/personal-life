@@ -252,7 +252,7 @@ async function arriveAtTimer(page: Page, load: () => Promise<unknown>): Promise<
 
 /** The page's own readiness signal: the timer mounts, then stores its mode. */
 async function waitForTimer(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Pomodoro', exact: true })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Focus', exact: true })).toBeVisible({
     timeout: 30_000,
   });
   await page.waitForFunction(

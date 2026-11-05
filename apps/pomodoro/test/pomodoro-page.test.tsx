@@ -207,7 +207,7 @@ describe('PomodoroPage', () => {
     );
 
     expect(rowTrail('Blocks finished')).toBe('50 min');
-    expect(rowTrail('Daily goal')).toBe('100 min');
+    expect(rowTrail('Daily goal')).toBe('50 of 100 min');
   });
 
   it('draws no day rows when the page handed the card nothing to read', () => {

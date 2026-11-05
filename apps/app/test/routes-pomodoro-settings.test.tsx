@@ -15,11 +15,14 @@ jest.mock('@life/app-kit', () => ({
 jest.mock('@/lib/focus-api', () => ({ listGoals: jest.fn(), setGoal: jest.fn() }));
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
+/** A refused goal leaves the form by redirect; the page reads the flag the action set. */
+jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
 
 import { readPrefNumber } from '@life/app-kit';
-import { DEFAULT_DURATIONS, MINUTES_RANGE } from '@life/pomodoro';
+import { DAILY_GOAL_RANGE, DEFAULT_DURATIONS } from '@life/pomodoro';
 import { listGoals, setGoal, type GoalRow } from '@/lib/focus-api';
 import { getToday } from '@/lib/today';
+import { redirect } from 'next/navigation';
 import PomodoroSettingsPage from '@/app/pomodoro/settings/page';
 import { setPomodoroGoal } from '@/app/pomodoro/actions';
 import { submitFeedbackAction } from '@/app/feedback-actions';
@@ -28,6 +31,7 @@ const mockedReadPrefNumber = readPrefNumber as jest.MockedFunction<typeof readPr
 const mockedListGoals = listGoals as jest.MockedFunction<typeof listGoals>;
 const mockedSetGoal = setGoal as jest.MockedFunction<typeof setGoal>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
+const mockedRedirect = redirect as jest.MockedFunction<typeof redirect>;
 
 const TODAY = '2026-10-28';
 
@@ -70,6 +74,11 @@ function goal(day: string, minutes: number): GoalRow {
   return { validFrom: day, minutes };
 }
 
+/** The route takes Next's `searchParams` promise; no flag is the plain form. */
+function renderPage(params: { goal?: string } = {}) {
+  return PomodoroSettingsPage({ searchParams: Promise.resolve(params) });
+}
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockedReadPrefNumber.mockImplementation(async (_name, fallback) => fallback);
@@ -80,7 +89,7 @@ beforeEach(() => {
 
 describe('/pomodoro/settings page wiring', () => {
   it('composes one SettingsShell titled Settings, backed to /pomodoro, wired to pomodoro feedback', async () => {
-    const page = await PomodoroSettingsPage();
+    const page = await renderPage();
 
     expect(page.type).toBe(SettingsShell);
     expect(page.props.title).toBe('Settings');
@@ -90,14 +99,14 @@ describe('/pomodoro/settings page wiring', () => {
   });
 
   it('renders the Appearance group with no Theme row: the shell draws the segment alone', async () => {
-    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const html = renderToStaticMarkup(await renderPage());
 
     expect(html).toContain('role="group" aria-label="Appearance"');
     expect(html).not.toContain('System, light, or dark.');
   });
 
   it('lays the appearance segment into the settings row: full width, no trough chrome', async () => {
-    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const html = renderToStaticMarkup(await renderPage());
     const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
 
     expect(segment).toContain('w-full');
@@ -105,7 +114,7 @@ describe('/pomodoro/settings page wiring', () => {
   });
 
   it('renders the Comfort group with the standard Reduce motion copy', async () => {
-    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const html = renderToStaticMarkup(await renderPage());
 
     expect(html).toContain('Reduce motion');
     expect(html).toContain(
@@ -114,7 +123,7 @@ describe('/pomodoro/settings page wiring', () => {
   });
 
   it('renders the three duration fields bound to their own preference', async () => {
-    const page = await PomodoroSettingsPage();
+    const page = await renderPage();
     const form = blockForm(page, 'Durations');
     const block = settingsBlock(form, 'Durations');
 
@@ -142,7 +151,7 @@ describe('/pomodoro/settings page wiring', () => {
       return 20;
     });
 
-    const page = await PomodoroSettingsPage();
+    const page = await renderPage();
     const block = settingsBlock(blockForm(page, 'Durations'), 'Durations');
 
     expect(settingsRow(block, 'Focus').props.control.props.defaultValue).toBe(40);
@@ -151,7 +160,7 @@ describe('/pomodoro/settings page wiring', () => {
   });
 
   it('renders the frozen copy, the footer meta line and a back affordance targeting /pomodoro', async () => {
-    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const html = renderToStaticMarkup(await renderPage());
 
     expect(html).toContain('Settings');
     expect(html).not.toContain('System, light, or dark.');
@@ -162,7 +171,7 @@ describe('/pomodoro/settings page wiring', () => {
   });
 
   it('renders the shared Support row as the dialog trigger', async () => {
-    const html = renderToStaticMarkup(await PomodoroSettingsPage());
+    const html = renderToStaticMarkup(await renderPage());
 
     expect(html).toContain('Send feedback');
     expect(html).toContain('Tell us what got in the way.');
@@ -170,18 +179,18 @@ describe('/pomodoro/settings page wiring', () => {
 });
 
 describe('/pomodoro/settings daily goal row', () => {
-  it('opens the input on the goal resolved for today, clamped to the minutes range', async () => {
+  it('opens the input on the goal resolved for today, inside the day-total range', async () => {
     mockedListGoals.mockResolvedValue([goal('2026-10-01', 30), goal(TODAY, 40)]);
 
-    const page = await PomodoroSettingsPage();
+    const page = await renderPage();
     const control = settingsRow(settingsBlock(blockForm(page, 'Focus'), 'Focus'), 'Daily goal')
       .props.control;
 
     expect(control.type).toBe(Input);
     expect(control.props.name).toBe('goal');
     expect(control.props['aria-label']).toBe('Daily goal');
-    expect(control.props.min).toBe(MINUTES_RANGE.min);
-    expect(control.props.max).toBe(MINUTES_RANGE.max);
+    expect(control.props.min).toBe(DAILY_GOAL_RANGE.min);
+    expect(control.props.max).toBe(DAILY_GOAL_RANGE.max);
     expect(control.props.defaultValue).toBe(40);
     expect(mockedListGoals).toHaveBeenCalledTimes(1);
   });
@@ -189,7 +198,7 @@ describe('/pomodoro/settings daily goal row', () => {
   it('leaves the input blank when the owner has no goal for today', async () => {
     mockedListGoals.mockResolvedValue([goal('2026-11-01', 50)]);
 
-    const page = await PomodoroSettingsPage();
+    const page = await renderPage();
     const control = settingsRow(
       settingsBlock(blockForm(page, 'Focus'), 'Focus'),
       'Daily goal',
@@ -198,8 +207,8 @@ describe('/pomodoro/settings daily goal row', () => {
     expect(control.props.defaultValue).toBeUndefined();
   });
 
-  it('submits through a server action that writes today with the clamped minutes', async () => {
-    const page = await PomodoroSettingsPage();
+  it('submits through a server action that writes today with the minutes the owner typed', async () => {
+    const page = await renderPage();
     const form = blockForm(page, 'Focus');
 
     expect(form.props.action).toBe(setPomodoroGoal);
@@ -211,10 +220,25 @@ describe('/pomodoro/settings daily goal row', () => {
     expect(mockedSetGoal).toHaveBeenCalledWith(TODAY, 40);
   });
 
-  it('clamps an out-of-range minute rather than sending it raw', async () => {
-    await setPomodoroGoal(formData({ goal: String(MINUTES_RANGE.max + 40) }));
+  it('sends a refused daily goal back to the form instead of writing a number nobody chose', async () => {
+    await setPomodoroGoal(formData({ goal: String(DAILY_GOAL_RANGE.max + 1) }));
 
-    expect(mockedSetGoal).toHaveBeenCalledWith(TODAY, DEFAULT_DURATIONS.focus);
+    expect(mockedRedirect).toHaveBeenCalledWith('/pomodoro/settings?goal=rejected');
+    expect(mockedSetGoal).not.toHaveBeenCalled();
+  });
+
+  it('stores a daily goal past one block, since the goal is a day total', async () => {
+    await setPomodoroGoal(formData({ goal: '240' }));
+
+    expect(mockedSetGoal).toHaveBeenCalledWith(TODAY, 240);
+    expect(mockedRedirect).not.toHaveBeenCalled();
+  });
+
+  it('shows the refused goal as a message above the button that sent it', async () => {
+    const html = renderToStaticMarkup(await renderPage({ goal: 'rejected' }));
+
+    expect(html).toContain('A daily goal is 1 to 1440 whole minutes.');
+    expect(html).toContain('role="status"');
   });
 });
 

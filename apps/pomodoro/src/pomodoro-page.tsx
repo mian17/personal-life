@@ -62,7 +62,7 @@ export interface PomodoroPageProps {
   onFocusBlockEnd?: (minutes: number) => void;
   /** Minutes recorded today; absent, the Today group has no first row to draw. */
   todayMinutes?: number;
-  /** Today's goal in minutes; absent or `null` before the owner sets one. */
+  /** The day's goal in minutes: total focus for the whole day, not one block. */
   todayGoalMinutes?: number | null;
 }
 
@@ -144,8 +144,13 @@ export function PomodoroPage({
               trailing={<Pill tone="done">{`${todayMinutes} min`}</Pill>}
             />
           )}
-          {todayGoalMinutes != null && (
-            <ListItem title="Daily goal" trailing={<Pill>{`${todayGoalMinutes} min`}</Pill>} />
+          {/* The goal is a day's total focus, so the row reads the day against it in the
+              same "X of Y" the stats screen's Today line uses, and the two cannot disagree. */}
+          {todayMinutes != null && todayGoalMinutes != null && (
+            <ListItem
+              title="Daily goal"
+              trailing={<Pill>{`${todayMinutes} of ${todayGoalMinutes} min`}</Pill>}
+            />
           )}
         </List>
       </Section>

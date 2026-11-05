@@ -19,7 +19,8 @@ export default async function PomodoroRoute() {
 
   return (
     <ListShell
-      title="Pomodoro"
+      title="Focus"
+      subtitle={`${durations.focus} minutes, then a ${durations.short} minute break`}
       navTrailing={<PomodoroNav />}
       body={
         <TimerRecorder

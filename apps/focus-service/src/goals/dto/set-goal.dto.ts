@@ -1,5 +1,5 @@
 import { IsInt, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from '../../sessions/dto/session-rules';
+import { DAILY_GOAL_RANGE, DATE_ONLY, SESSION_DATE_MAX } from '../../sessions/dto/session-rules';
 
 /**
  * Body of `PUT /api/goal`: a whole-minute daily goal plus the client's own day it
@@ -7,8 +7,8 @@ import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from '../../sessions/dto/s
  * `forbidNonWhitelisted` pipe rejects a body that carries it — ownership comes from
  * `@Principal()` only.
  *
- * The minutes bound is the same `MINUTES_RANGE` a recorded block is held to: one
- * rule, imported rather than restated.
+ * The minutes bound is `DAILY_GOAL_RANGE`, not the `MINUTES_RANGE` a recorded block is held
+ * to: a goal is a day's total focus, so one block's ceiling is not its ceiling.
  */
 export class SetGoalDto {
   /** The client-local day this goal takes effect on; never derived from a service clock. */
@@ -17,9 +17,9 @@ export class SetGoalDto {
   @Matches(DATE_ONLY)
   date: string;
 
-  /** Whole minutes inside `MINUTES_RANGE`, both bounds inclusive. */
+  /** Whole minutes inside `DAILY_GOAL_RANGE`, both bounds inclusive. */
   @IsInt()
-  @Min(MINUTES_RANGE.min)
-  @Max(MINUTES_RANGE.max)
+  @Min(DAILY_GOAL_RANGE.min)
+  @Max(DAILY_GOAL_RANGE.max)
   minutes: number;
 }

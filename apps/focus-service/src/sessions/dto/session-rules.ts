@@ -14,3 +14,9 @@ export const SESSION_DATE_MAX = 10;
 
 /** Both bounds inclusive: `0` is a discarded block, `181` is an impossible one. */
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
+
+/**
+ * A daily goal is a whole day's focus total, not one block's minutes, so it is bounded by a
+ * day rather than by `MINUTES_RANGE`: every whole minute a day can hold is a goal.
+ */
+export const DAILY_GOAL_RANGE = { min: 1, max: 1440 } as const;

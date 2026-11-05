@@ -90,9 +90,15 @@ describe('Daily focus goal (e2e)', () => {
     await putGoal(ownerToken, { date: '2026-02-31', minutes: 25 }).expect(400);
     await putGoal(ownerToken, { minutes: 25 }).expect(400);
     await putGoal(ownerToken, { date: FIRST_DAY, minutes: 0 }).expect(400);
-    await putGoal(ownerToken, { date: FIRST_DAY, minutes: 181 }).expect(400);
+    await putGoal(ownerToken, { date: FIRST_DAY, minutes: 1441 }).expect(400);
 
     expect((await getGoals(ownerToken).expect(200)).body).toEqual([]);
+  });
+
+  it('accepts a goal past one block, because a daily goal is a day total', async () => {
+    const accepted = await putGoal(ownerToken, { date: FIRST_DAY, minutes: 240 }).expect(200);
+
+    expect(accepted.body).toEqual({ validFrom: FIRST_DAY, minutes: 240 });
   });
 
   it('answers a goal for one owner only, whatever the other owner set', async () => {
