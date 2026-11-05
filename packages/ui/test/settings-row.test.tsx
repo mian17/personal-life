@@ -176,6 +176,43 @@ describe('SettingsRow', () => {
       expect(control.classList.contains('relative')).toBe(true);
     });
 
+    it('lets presses through the control column and re-enables its real controls', () => {
+      render(<SettingsRow label="Daily target" href="/meals/target" control={<span>Edit</span>} />);
+      const control = document.querySelector('.ui-settings-row__control')!;
+
+      // A read-out pill and the chevron are not destinations of their own, so the column
+      // that hosts them hands the press to the stretched label underneath.
+      expect(control.classList.contains('pointer-events-none')).toBe(true);
+      for (const optIn of [
+        '[&_a]:pointer-events-auto',
+        '[&_button]:pointer-events-auto',
+        '[&_input]:pointer-events-auto',
+        '[&_select]:pointer-events-auto',
+        '[&_textarea]:pointer-events-auto',
+      ]) {
+        expect(control.classList.contains(optIn)).toBe(true);
+      }
+    });
+
+    it("keeps a bare row's control column hit-testable", () => {
+      render(<SettingsRow label="Theme" control={<span>System</span>} />);
+      const control = document.querySelector('.ui-settings-row__control')!;
+
+      expect(control.classList.contains('pointer-events-none')).toBe(false);
+      expect(control.classList.contains('[&_button]:pointer-events-auto')).toBe(false);
+    });
+
+    it('keeps the chevron decorative rather than a second hit target', () => {
+      render(<SettingsRow label="Saved meals" href="/meals/saved" control={<span>Edit</span>} />);
+      const chevron = document.querySelector('.ui-settings-row__control svg')!;
+
+      expect(chevron.getAttribute('aria-hidden')).toBe('true');
+      expect(chevron.tagName.toLowerCase()).toBe('svg');
+      expect(chevron.hasAttribute('href')).toBe(false);
+      expect(chevron.hasAttribute('tabindex')).toBe(false);
+      expect(document.querySelectorAll('.ui-settings-row a')).toHaveLength(1);
+    });
+
     it('stretches the action button over the Support row', () => {
       const onClick = jest.fn();
       render(<SettingsRow label="Send feedback" description="Tell us." onClick={onClick} />);

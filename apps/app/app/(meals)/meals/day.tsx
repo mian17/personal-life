@@ -1,4 +1,4 @@
-import { format, sum, UNKNOWN, type Nutrient, type NutrientVector } from '@life/nutrition';
+import { format, sum, UNKNOWN, type NutrientVector } from '@life/nutrition';
 import {
   ButtonLink,
   Card,
@@ -23,7 +23,6 @@ import {
   restoredFoodName,
   type MealEntry,
   type MealFood,
-  type MealTarget,
 } from '@/lib/meal-api';
 
 /**
@@ -51,19 +50,6 @@ const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
   { key: 'lunch', label: 'Lunch' },
   { key: 'dinner', label: 'Dinner' },
   { key: 'snack', label: 'Snacks' },
-];
-
-/** The reference's three macro tracks, in its order; the goal grams live on the target row. */
-const MACRO_TRACKS: readonly {
-  key: Nutrient;
-  label: string;
-  /** The nutrient as the reference's track aria-label names it (`62 grams of carbohydrate toward 220`). */
-  noun: string;
-  goal: (target: MealTarget) => number;
-}[] = [
-  { key: 'protein', label: 'Protein', noun: 'protein', goal: (target) => target.proteinG },
-  { key: 'carbohydrates', label: 'Carbs', noun: 'carbohydrate', goal: (target) => target.carbG },
-  { key: 'fat', label: 'Fat', noun: 'fat', goal: (target) => target.fatG },
 ];
 
 /** Whole kcal with the reference's thousands separator (`1,180`); the formatter does not group. */
@@ -118,9 +104,9 @@ async function loadTarget(date: string) {
  * from its `sum()` (no app-local unit table); the upload atom itself lives on
  * the entry editor — the photo door opens it, it is not composed here.
  *
- * The headline card is the reference's progress card: the day's `Kpi`, one
- * energy track against the target calories, then the three macro tracks. The
- * card IS the read-out, so it carries the one `role="status"` the day view
+ * The headline card is the reference's progress card: the day's `Kpi` and one
+ * energy track against the target calories — the one figure the card reads out.
+ * The card IS the read-out, so it carries the one `role="status"` the day view
  * exposes — a `Kpi` is block content and cannot nest inside a phrasing
  * `StatusText`.
  */
@@ -151,8 +137,8 @@ export async function mealDay(day: string, emptyBody: string) {
             <Card aria-live="polite" role="status">
               <Stack gap="sm">
                 <Kpi label="Logged so far" value={readout.eaten} unit={readout.unit} />
-                {/* The tracks are the card's shape, not a target's: with no profile the
-                    fill stays empty and the bars still say what was eaten, only against
+                {/* The track is the card's shape, not a target's: with no profile the
+                    fill stays empty and the bar still says what was eaten, only against
                     no goal. */}
                 <ProgressBar
                   tone="line"
@@ -164,31 +150,6 @@ export async function mealDay(day: string, emptyBody: string) {
                   }
                   className="mt-[var(--s3)]"
                 />
-                {MACRO_TRACKS.map(({ key, label, noun, goal }) => {
-                  const have = totals[key];
-                  const targetGoal = target == null ? null : goal(target);
-                  return (
-                    <ProgressBar
-                      key={key}
-                      tone="line"
-                      value={percentOf(have, targetGoal ?? 0)}
-                      label={
-                        targetGoal == null
-                          ? `${Math.round(have)} grams of ${noun} — no target set`
-                          : `${Math.round(have)} grams of ${noun} toward ${Math.round(targetGoal)}`
-                      }
-                      caption={label}
-                      // A logged amount with no goal to divide it by reads as the grams
-                      // alone; `0 / 0 g` would claim a target the owner never set.
-                      readout={
-                        targetGoal == null
-                          ? format(key, have)
-                          : `${Math.round(have)} / ${format(key, targetGoal)}`
-                      }
-                      className="mt-[var(--s3)]"
-                    />
-                  );
-                })}
                 <ButtonLink href="/meals/target" variant="ghost">
                   {target ? 'Edit target' : 'Set target'}
                 </ButtonLink>

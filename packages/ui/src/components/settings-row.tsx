@@ -27,8 +27,9 @@ export interface SettingsRowProps {
  * chevron (plus the caller's control, when one is given). The row itself stays a
  * `div`: the label's anchor is stretched over the whole row instead of wrapping
  * it, which keeps the markup valid when the control is itself interactive (a pill
- * button, a toggle) — that control column is raised above the overlay so it keeps
- * its own clicks.
+ * button, a toggle) — and the control column lets presses through to that
+ * overlay, so the pill, the chevron and the empty middle all reach the row's
+ * destination. Only a real control opts back in, so it still activates itself.
  *
  * A control may be prose (`StatusText` under a switch that cannot render yet), and
  * prose has to wrap inside the row rather than run past the card's clipped edge.
@@ -56,6 +57,19 @@ const descriptionStyles = cx(
 
 /** The control keeps its natural width but may shrink under it, so a text control wraps. */
 const controlStyles = 'relative flex items-center gap-[var(--s2)]';
+
+/**
+ * An interactive row's control column is click-through: painted above the stretched label, a
+ * read-out pill or the chevron would otherwise swallow the press and leave a dead band on the row.
+ * Only a real control opts back in — a pill link, a toggle, a field — so it keeps its own click
+ * while a non-interactive pill and the decorative chevron pass the press to the row's overlay.
+ * A bare row (no destination, no action) keeps its column hit-testable, so prose stays selectable.
+ */
+const clickThroughStyles = cx(
+  'pointer-events-none',
+  '[&_a]:pointer-events-auto [&_button]:pointer-events-auto [&_input]:pointer-events-auto',
+  '[&_select]:pointer-events-auto [&_textarea]:pointer-events-auto',
+);
 
 /** The label's hit area is the whole row, so no empty space on the row is dead. */
 const stretchStyles = "after:absolute after:inset-0 after:content-['']";
@@ -121,7 +135,13 @@ export function SettingsRow({
           <span className={cx('ui-settings-row__desc', descriptionStyles)}>{description}</span>
         )}
       </div>
-      <div className={cx('ui-settings-row__control', controlStyles)}>
+      <div
+        className={cx(
+          'ui-settings-row__control',
+          controlStyles,
+          isInteractive && clickThroughStyles,
+        )}
+      >
         {control}
         {chevron}
       </div>

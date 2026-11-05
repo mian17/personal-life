@@ -115,7 +115,7 @@ describe('meals day view', () => {
     expect(html).not.toContain('No meals logged today.');
   });
 
-  it('draws the reference progress card: the energy track, then the three macro tracks', async () => {
+  it('draws the energy track only, never a macro bar', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({
         id: 'a',
@@ -128,26 +128,15 @@ describe('meals day view', () => {
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
-    // One energy track against the target calories, then one per macro, each a
-    // reference `.macro` row: its label, its track, and its grams read-out.
+    // The card is a calorie read-out: one energy track against the target, and no
+    // macro track of its own — the grams live on the target screen.
+    expect(html.match(/<progress/g)).toHaveLength(1);
     expect(html).toContain('aria-label="30 percent of the daily energy target"');
-    for (const [label, have, goal] of [
-      ['Protein', 62, 120],
-      ['Carbs', 131, 220],
-      ['Fat', 39, 68],
-    ] as const) {
-      expect(html).toMatch(
-        new RegExp(
-          `ui-progress--row[^>]*><span class="ui-progress__caption[^"]*">${label}</span>`,
-        ),
-      );
-      expect(html).toContain(`${have} / ${goal} g`);
-    }
-    expect(html).toContain('aria-label="62 grams of protein toward 120"');
+    expect(html).not.toContain('ui-progress--row');
     expect(html).toContain('Logged so far');
   });
 
-  it('draws the energy track and all three macro tracks even with no target set', async () => {
+  it('keeps the energy track with no target set, and no macro tracks either', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 'a', nutrients: vector({ calories: 300, protein: 20 }) }),
     ]);
@@ -155,18 +144,8 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('No daily energy target set');
-    for (const label of ['Protein', 'Carbs', 'Fat']) {
-      expect(html).toMatch(
-        new RegExp(
-          `ui-progress--row[^>]*><span class="ui-progress__caption[^"]*">${label}</span>`,
-        ),
-      );
-    }
     // Empty fill: there is no goal to divide by, so nothing claims a share.
-    expect(html.match(/aria-valuenow="0"/g)).toHaveLength(4);
-    // The read-out keeps the logged grams and drops the goal, never `0 / 0 g`.
-    expect(html).toContain('>20 g<');
-    expect(html).not.toContain('/ 0 g');
+    expect(html.match(/aria-valuenow="0"/g)).toHaveLength(1);
   });
 
   it('names the day card read-out the way the reference does: "Logged so far"', async () => {
