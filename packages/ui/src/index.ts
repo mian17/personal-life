@@ -106,6 +106,9 @@ export type { AutosuggestOption, AutosuggestProps } from './components/autosugge
 export { PillGroup } from './components/pill-group';
 export type { PillGroupProps } from './components/pill-group';
 
+export { Field } from './components/field';
+export type { FieldProps } from './components/field';
+
 export { Segmented, Tab, TabBar } from './components/tab-bar';
 export type { Segment, SegmentedProps, TabProps, TabBarProps } from './components/tab-bar';
 
