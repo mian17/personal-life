@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from '@life/nutrition';
-import { Button, Input, PageTitle, Select, SettingsBlock, SettingsRow, StatusText, SubNav } from '@life/ui';
+import { Button, Input, ManagerBlock, Select, SettingsBlock, SettingsRow, StatusText } from '@life/ui';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 
@@ -154,18 +154,18 @@ describe('target profile form composition', () => {
     }
   });
 
-  it('opens with the reference sub-view header and closes with the one commit button', () => {
+  it('opens with the shared manager header and closes with the one commit button', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree();
 
-      // Back is a literal route, not history, so a cold load still lands on settings.
-      const back = find(tree, SubNav);
-      expect(back).toBeDefined();
-      expect(back!.props.backHref).toBe('/meals/settings');
-      expect(back!.props.backLabel).toBe('Meals');
-      // The row ends at the back link: the heading already says `Daily target`.
-      expect('status' in back!.props).toBe(false);
+      // Back is the manager header's framed arrow to a literal route, not history, so a
+      // cold load still lands on settings. The label stays the shared `Back`.
+      const header = find(tree, ManagerBlock);
+      expect(header).toBeDefined();
+      expect(header!.props.title).toBe('Daily target');
+      expect(header!.props.backHref).toBe('/meals/settings');
+      expect('backLabel' in header!.props).toBe(false);
 
       // Exactly one commit affordance: the footer's submit button.
       const submits = find(tree, Button, (el) => el.props.type === 'submit');
@@ -175,13 +175,12 @@ describe('target profile form composition', () => {
       expect(find(tree, 'button', (el) => el.props.type === 'button')).toBeUndefined();
 
       // The heading keeps its `<h1>` semantics and gains the server-computed sub-line.
-      const heading = find(tree, PageTitle);
-      expect(text(heading!.props.children)).toBe('Daily target');
-      expect(text(heading!.props.sub)).toContain('Computed on the server');
+      expect(text(header!.props.sub)).toContain('Computed on the server');
 
       const html = renderToStaticMarkup(tree);
-      expect(html).toContain('ui-sub-nav');
-      expect(html).not.toContain('ui-sub-nav__status');
+      expect(html).toContain('ui-icon-link--framed');
+      expect(html).toContain('aria-label="Back"');
+      expect(html).toContain('href="/meals/settings"');
       expect(html).toContain('>Daily target</h1>');
       expect(html).toContain('ui-page-title__sub');
     } finally {
@@ -467,7 +466,7 @@ describe('target page', () => {
     // The page is the form itself (the shell lives inside it) — assert the rendered
     // markup, not the element tree: `el` is the form element and `find` only walks
     // element props, not the function it points at.
-    expect(html).toContain('ui-sub-nav');
+    expect(html).toContain('ui-icon-link--framed');
     expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('>Daily target</h1>');
     expect(html).toContain('>Update profile</button>');

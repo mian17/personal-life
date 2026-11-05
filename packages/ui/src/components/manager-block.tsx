@@ -13,6 +13,11 @@ export interface ManagerBlockProps {
   backHref: string;
   /** Back control aria-label; default `"Back"` (frozen). */
   backLabel?: string;
+  /**
+   * `PageTitle`'s `sub` passthrough: one quiet line under the heading, for a sub-view whose
+   * sub-line the server computed. Omitted, the heading renders alone.
+   */
+  sub?: ReactNode;
   /** The manager surface: an app-composed `TagManager`/`ListManager` node. */
   children: ReactNode;
 }
@@ -21,6 +26,7 @@ export function ManagerBlock({
   title,
   backHref,
   backLabel = 'Back',
+  sub,
   children,
 }: Readonly<ManagerBlockProps>): JSX.Element {
   return (
@@ -33,7 +39,7 @@ export function ManagerBlock({
         }
       />
 
-      <PageTitle>{title}</PageTitle>
+      <PageTitle sub={sub}>{title}</PageTitle>
 
       {children}
     </PageShell>

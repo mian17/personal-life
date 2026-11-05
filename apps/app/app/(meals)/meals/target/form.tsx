@@ -9,8 +9,7 @@ import {
   FactsRow,
   Input,
   Kpi,
-  PageShell,
-  PageTitle,
+  ManagerBlock,
   Pill,
   Section,
   Select,
@@ -18,7 +17,6 @@ import {
   SettingsRow,
   Stack,
   StatusText,
-  SubNav,
 } from '@life/ui';
 import type { MealTarget } from '@/lib/meal-api';
 import { saveProfileAction } from './actions';
@@ -29,10 +27,11 @@ import { saveProfileAction } from './actions';
  * derived server-side and must never be sent from the browser ("Never: let the
  * client send computed kcal" — `forbidNonWhitelisted` rejects such a body).
  *
- * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `PageShell`,
- * the header is the reference's sub-view row (`SubNav` back to settings) over
- * `PageTitle` and its server-computed sub-line, each field is a `SettingsRow`
- * (visible label left, control right) hosting an `Input`/`Select` on the
+ * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `ManagerBlock` — the
+ * same header every manager screen and the settings screen open with, so back is one
+ * framed 48px arrow to the same place, rather than a second back affordance that only
+ * this screen would draw. Its heading takes the server-computed sub-line. Each field is a
+ * `SettingsRow` (visible label left, control right) hosting an `Input`/`Select` on the
  * reference's shared surface group (`SettingsBlock`, a flush `Card` of
  * hairline-divided rows), feedback is `StatusText` outside that card, and the one
  * commit affordance is the footer's primary submit `Button`. The derived-energy
@@ -126,13 +125,11 @@ export function TargetProfileForm({
   }
 
   return (
-    <PageShell>
-      <SubNav backHref="/meals/settings" backLabel="Meals" />
-
-      <PageTitle sub="Computed on the server from these six values. Nothing here is guessed in the browser.">
-        Daily target
-      </PageTitle>
-
+    <ManagerBlock
+      title="Daily target"
+      backHref="/meals/settings"
+      sub="Computed on the server from these six values. Nothing here is guessed in the browser."
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -258,6 +255,6 @@ export function TargetProfileForm({
           </Button>
         </Section>
       </form>
-    </PageShell>
+    </ManagerBlock>
   );
 }
