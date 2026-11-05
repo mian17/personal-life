@@ -10,33 +10,25 @@ function asArray(node: { props: { children: unknown } }): any[] {
 }
 
 describe('pomodoro toolbar nav', () => {
-  it('renders the stats link, the feedback item, then the gear-last settings link', () => {
+  it('renders the stats link, then the gear-last settings link', () => {
     const html = renderToStaticMarkup(<PomodoroNav />);
 
     expect(html).toContain('href="/pomodoro/stats"');
     expect(html).toContain('aria-label="Stats"');
-    expect(html).toContain('aria-label="Send feedback"');
     expect(html).toContain('href="/pomodoro/settings"');
     expect(html).toContain('aria-label="Settings"');
-    expect(html.indexOf('aria-label="Send feedback"')).toBeGreaterThan(
-      html.indexOf('aria-label="Stats"'),
-    );
     expect(html.indexOf('aria-label="Settings"')).toBeGreaterThan(
-      html.indexOf('aria-label="Send feedback"'),
+      html.indexOf('aria-label="Stats"'),
     );
   });
 
-  it('files its feedback under pomodoro', () => {
+  it('carries no feedback control — the Support row on /pomodoro/settings is its only door', () => {
     const kids = asArray(PomodoroNav() as unknown as { props: { children: unknown } });
 
-    const feedback = kids.filter((k) => k.type === FeedbackNavItem);
-    expect(feedback).toHaveLength(1);
-    expect(feedback[0].props.app).toBe('pomodoro');
-
-    // Stats leads, the bare settings control trails, feedback sits between them.
+    expect(kids.some((k) => k.type === FeedbackNavItem)).toBe(false);
+    expect(kids).toHaveLength(2);
     expect(kids[0].props.label).toBe('Stats');
-    expect(kids[kids.length - 1].type).toBe(SettingsLink);
-    expect(kids[kids.length - 1].props.href).toBe('/pomodoro/settings');
-    expect(kids.indexOf(feedback[0])).toBe(kids.length - 2);
+    expect(kids[1].type).toBe(SettingsLink);
+    expect(kids[1].props.href).toBe('/pomodoro/settings');
   });
 });

@@ -1,16 +1,17 @@
 import { settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink, SettingsLink } from '@life/ui';
+import { IconLink, SettingsLink } from '@life/ui';
 import { ChartColumn } from 'lucide-react';
-import { submitFeedbackAction } from '../feedback-actions';
 
-/** The Pomodoro toolbar: stats, feedback, then the bare settings control last. */
+/**
+ * The Pomodoro toolbar: the stats lens, then the bare settings control last. Feedback is the
+ * Support row on `/pomodoro/settings`, exactly as the todos and meals toolbars keep only links.
+ */
 export function PomodoroNav() {
   return (
     <>
       <IconLink href="/pomodoro/stats" label="Stats" variant="bare">
         <ChartColumn size={20} aria-hidden />
       </IconLink>
-      <FeedbackNavItem app="pomodoro" onSubmit={submitFeedbackAction} />
       <SettingsLink href={settingsHref('/pomodoro')} />
     </>
   );
