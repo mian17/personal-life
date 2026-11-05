@@ -1,6 +1,17 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { List, Todo } from '@life/shared';
-import { Input, PillGroup, Select, Switch, type SwitchProps, type TagOption } from '@life/ui';
+import {
+  Button,
+  DueDatePill,
+  Field,
+  IconButton,
+  Input,
+  Menu,
+  Select,
+  Switch,
+  type SwitchProps,
+  type TagOption,
+} from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockBack = jest.fn();
@@ -29,12 +40,13 @@ jest.mock('@/lib/tags-api', () => ({
 jest.mock('@/app/todo-actions', () => ({
   createTodoAction: jest.fn(),
   updateTodoAction: jest.fn(),
+  deleteTodoAction: jest.fn(),
 }));
 
 import { notFound } from 'next/navigation';
 import { getTodo, listLists } from '@/lib/todo-api';
 import { listTags } from '@/lib/tags-api';
-import { createTodoAction, updateTodoAction } from '@/app/todo-actions';
+import { createTodoAction, deleteTodoAction, updateTodoAction } from '@/app/todo-actions';
 import EditTodoPage from '@/app/todos/[id]/edit/page';
 import { TodoEditor } from '@/app/todo-editor';
 import { RecurrenceDialog } from '@/app/recurrence-dialog';
@@ -45,6 +57,7 @@ const mockedListTags = listTags as jest.MockedFunction<typeof listTags>;
 const mockedNotFound = notFound as jest.MockedFunction<typeof notFound>;
 const mockedCreateTodoAction = createTodoAction as jest.MockedFunction<typeof createTodoAction>;
 const mockedUpdateTodoAction = updateTodoAction as jest.MockedFunction<typeof updateTodoAction>;
+const mockedDeleteTodoAction = deleteTodoAction as jest.MockedFunction<typeof deleteTodoAction>;
 
 function todo(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -187,7 +200,8 @@ function withRealUseState<T>(run: () => T): T {
 interface EditorTree extends ReactElement {
   props: {
     children: EditorField[];
-    actions: ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }>;
+    /** The toolbar actions fragment: the save check, plus the edit-mode actions menu. */
+    actions: ReactNode;
   };
 }
 
@@ -256,18 +270,16 @@ function switchOf(tree: EditorTree): ReactElement<SwitchProps> {
   return found as unknown as ReactElement<SwitchProps>;
 }
 
-/** The `PillGroup` whose visible label is `Important`. */
-function importantGroup(tree: EditorTree): ReactElement<Record<string, unknown>> {
-  const found = findByType(tree.props.children, PillGroup, (el) => el.props.label === 'Important');
-  if (!found) throw new Error('no PillGroup labelled Important');
-  return found;
+/** The `Field` whose visible caption is `label`. */
+function field(tree: EditorTree, label: string): ReactElement<Record<string, unknown>> | undefined {
+  return findByType(tree.props.children, Field, (el) => el.props.label === label);
 }
 
-/** The `PillGroup` whose visible label is `label`. */
-function pillGroup(tree: EditorTree, label: string): ReactElement<Record<string, unknown>> {
-  const found = findByType(tree.props.children, PillGroup, (el) => el.props.label === label);
-  if (!found) throw new Error(`no PillGroup labelled ${label}`);
-  return found;
+/** The toolbar's save control (the check `IconButton`), whatever rides beside it. */
+function saveButton(tree: EditorTree): ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }> {
+  const found = findByType(tree.props.actions, IconButton);
+  if (!found) throw new Error('no save IconButton in the todo editor toolbar');
+  return found as unknown as ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }>;
 }
 
 /** The field (`Input`) selected by its accessible name. */
@@ -311,7 +323,7 @@ describe('TodoEditor save awaits the write before navigating', () => {
 
     const { harness, tree } = renderEditing();
     try {
-      const pending = tree.props.actions.props.onClick();
+      const pending = saveButton(tree).props.onClick();
 
       // The old fire-and-forget code called `router.back()` in the same tick.
       expect(mockBack).not.toHaveBeenCalled();
@@ -330,7 +342,7 @@ describe('TodoEditor save awaits the write before navigating', () => {
 
     const { harness, tree } = renderEditing();
     try {
-      await tree.props.actions.props.onClick();
+      await saveButton(tree).props.onClick();
 
       expect(mockBack).not.toHaveBeenCalled();
     } finally {
@@ -348,13 +360,13 @@ describe('TodoEditor save awaits the write before navigating', () => {
 
     const { harness, tree } = renderEditing();
     try {
-      const first = tree.props.actions.props.onClick();
+      const first = saveButton(tree).props.onClick();
 
       // Re-render picks up the `saving` state, so the button is disabled and the
       // handler is a no-op until the in-flight write settles.
       const second = harness.renderTree(todo());
-      expect(second.props.actions.props.disabled).toBe(true);
-      await second.props.actions.props.onClick();
+      expect(saveButton(second).props.disabled).toBe(true);
+      await saveButton(second).props.onClick();
 
       resolveAction();
       await first;
@@ -399,13 +411,13 @@ describe('TodoEditor important Switch', () => {
       }
     });
 
-    it('wraps the switch in a PillGroup visibly labelled Important', () => {
+    it('wraps the switch in a Field captioned Important', () => {
       const harness = stateHarness();
       try {
-        const group = importantGroup(harness.renderTree(todo()));
-        expect(group.type).toBe(PillGroup);
-        expect(group.props.label).toBe('Important');
-        expect(findByType(group.props.children, Switch)).toBeDefined();
+        const block = field(harness.renderTree(todo()), 'Important');
+        expect(block?.type).toBe(Field);
+        expect(block!.props.label).toBe('Important');
+        expect(findByType(block!.props.children, Switch)).toBeDefined();
       } finally {
         harness.restore();
       }
@@ -459,8 +471,8 @@ describe('TodoEditor important Switch', () => {
         first.props.onCheckedChange!(false);
 
         const second = harness.renderTree(fixture);
-        expect(second.props.actions.props.label).toBe('Save todo');
-        await second.props.actions.props.onClick();
+        expect(saveButton(second).props.label).toBe('Save todo');
+        await saveButton(second).props.onClick();
 
         expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
         const [id, patch, version] = mockedUpdateTodoAction.mock.calls[0];
@@ -487,14 +499,13 @@ describe('TodoEditor important Switch', () => {
         expect(first.props.checked).toBe(false);
 
         first.props.onCheckedChange!(true);
-        const titleInput = harness
-          .renderTree(undefined)
-          .props.children.find((child) => child.props['aria-label'] === 'Todo title');
-        titleInput!.props.onChange!({ target: { value: 'New task' } });
+        inputByLabel(harness.renderTree(undefined), 'Todo title').props.onChange!({
+          target: { value: 'New task' },
+        });
 
         const second = harness.renderTree(undefined);
-        expect(second.props.actions.props.label).toBe('Add todo');
-        await second.props.actions.props.onClick();
+        expect(saveButton(second).props.label).toBe('Add todo');
+        await saveButton(second).props.onClick();
 
         expect(mockedCreateTodoAction).toHaveBeenCalledTimes(1);
         const [input] = mockedCreateTodoAction.mock.calls[0];
@@ -519,7 +530,7 @@ describe('TodoEditor important Switch', () => {
         const tree = harness.renderTree(fixture);
         expect(switchOf(tree).props.checked).toBe(true);
 
-        tree.props.actions.props.onClick();
+        saveButton(tree).props.onClick();
 
         expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
         const [, patch] = mockedUpdateTodoAction.mock.calls[0];
@@ -532,13 +543,12 @@ describe('TodoEditor important Switch', () => {
     it('create mode untouched save omits important', () => {
       const harness = stateHarness();
       try {
-        harness
-          .renderTree(undefined)
-          .props.children.find((child) => child.props['aria-label'] === 'Todo title')!
-          .props.onChange!({ target: { value: 'New task' } });
+        inputByLabel(harness.renderTree(undefined), 'Todo title').props.onChange!({
+          target: { value: 'New task' },
+        });
 
         const tree = harness.renderTree(undefined);
-        tree.props.actions.props.onClick();
+        saveButton(tree).props.onClick();
 
         expect(mockedCreateTodoAction).toHaveBeenCalledTimes(1);
         const [input] = mockedCreateTodoAction.mock.calls[0];
@@ -553,17 +563,17 @@ describe('TodoEditor important Switch', () => {
 describe('TodoEditor Time and Repeat fields', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('renders PillGroups visibly labelled Time and Repeat', () => {
+  it('renders Fields captioned Time and Repeat', () => {
     const harness = stateHarness();
     try {
       const tree = harness.renderTree(todo({ dueDate: '2026-10-05' }));
 
-      expect(pillGroup(tree, 'Time').type).toBe(PillGroup);
+      expect(field(tree, 'Time')?.type).toBe(Field);
       expect(inputByLabel(tree, 'Due time').props['aria-label']).toBe('Due time');
 
-      const repeat = pillGroup(tree, 'Repeat');
-      expect(repeat.type).toBe(PillGroup);
-      const select = findByType(repeat.props.children, Select);
+      const repeat = field(tree, 'Repeat');
+      expect(repeat?.type).toBe(Field);
+      const select = findByType(repeat!.props.children, Select);
       expect(select).toBeDefined();
       expect((select!.props.options as Array<{ value: string; label: string }>)[0]).toEqual({
         value: '',
@@ -578,13 +588,13 @@ describe('TodoEditor Time and Repeat fields', () => {
     const harness = stateHarness();
     try {
       const none = harness.renderTree(todo({ dueDate: null }));
-      expect(findByType(none.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeUndefined();
-      expect(findByType(none.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
+      expect(field(none, 'Time')).toBeUndefined();
+      expect(field(none, 'Repeat')).toBeUndefined();
 
       inputByLabel(none, 'Due date').props.onChange!({ target: { value: '2026-10-05' } });
       const withDue = harness.renderTree(todo({ dueDate: null }));
-      expect(findByType(withDue.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeDefined();
-      expect(findByType(withDue.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
+      expect(field(withDue, 'Time')).toBeDefined();
+      expect(field(withDue, 'Repeat')).toBeDefined();
     } finally {
       harness.restore();
     }
@@ -595,15 +605,15 @@ describe('TodoEditor Time and Repeat fields', () => {
     const harness = stateHarness();
     try {
       const first = harness.renderTree(fixture);
-      expect(pillGroup(first, 'Time').type).toBe(PillGroup);
-      expect(pillGroup(first, 'Repeat').type).toBe(PillGroup);
+      expect(field(first, 'Time')?.type).toBe(Field);
+      expect(field(first, 'Repeat')?.type).toBe(Field);
 
       inputByLabel(first, 'Due date').props.onChange!({ target: { value: '' } });
       const cleared = harness.renderTree(fixture);
-      expect(findByType(cleared.props.children, PillGroup, (el) => el.props.label === 'Time')).toBeUndefined();
-      expect(findByType(cleared.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
+      expect(field(cleared, 'Time')).toBeUndefined();
+      expect(field(cleared, 'Repeat')).toBeUndefined();
 
-      await cleared.props.actions.props.onClick();
+      await saveButton(cleared).props.onClick();
       expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
       expect(patch.dueDate).toBeNull();
@@ -625,11 +635,11 @@ describe('TodoEditor Time and Repeat fields', () => {
 
       const third = harness.renderTree(fixture);
       selectByLabel(third, 'Repeat').props.onChange!({ target: { value: 'weekly' } });
-      expect(findByType(third.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeDefined();
+      expect(field(third, 'Repeat')).toBeDefined();
 
       const fourth = harness.renderTree(fixture);
-      expect(fourth.props.actions.props.label).toBe('Save todo');
-      await fourth.props.actions.props.onClick();
+      expect(saveButton(fourth).props.label).toBe('Save todo');
+      await saveButton(fourth).props.onClick();
 
       expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
@@ -646,13 +656,13 @@ describe('TodoEditor Time and Repeat fields', () => {
     try {
       const first = harness.renderTree(titleOnly);
       // No due ⇒ no Repeat field, so the repeat-requires-due state cannot be reached.
-      expect(findByType(first.props.children, PillGroup, (el) => el.props.label === 'Repeat')).toBeUndefined();
-      expect(first.props.actions.props.disabled).toBe(false);
+      expect(field(first, 'Repeat')).toBeUndefined();
+      expect(saveButton(first).props.disabled).toBe(false);
 
       inputByLabel(first, 'Todo title').props.onChange!({ target: { value: 'Plain task' } });
       const second = harness.renderTree(titleOnly);
-      expect(second.props.actions.props.disabled).toBe(false);
-      await second.props.actions.props.onClick();
+      expect(saveButton(second).props.disabled).toBe(false);
+      await saveButton(second).props.onClick();
 
       expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
@@ -712,7 +722,7 @@ describe('TodoEditor custom repeat', () => {
       expect(options.find((option) => option.value === 'custom')?.label).toBe('Custom (Thu, Fri)');
       expect(findByType(confirmed.props.children, RecurrenceDialog)?.props.open).toBe(false);
 
-      await confirmed.props.actions.props.onClick();
+      await saveButton(confirmed).props.onClick();
 
       expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
@@ -742,7 +752,7 @@ describe('TodoEditor custom repeat', () => {
       expect(findByType(cleared.props.children, RecurrenceDialog)?.props.value).toEqual([]);
 
       // Time/Repeat fields are gone, so the save carries neither repeat nor days.
-      await cleared.props.actions.props.onClick();
+      await saveButton(cleared).props.onClick();
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
       expect(patch.repeat).toBeNull();
       expect(patch.repeatDays).toBeUndefined();
@@ -784,7 +794,7 @@ describe('TodoEditor custom repeat', () => {
       expect(findByType(cancelled.props.children, RecurrenceDialog)?.props.open).toBe(false);
       expect(selectByLabel(cancelled, 'Repeat').props.value).toBe('');
 
-      await cancelled.props.actions.props.onClick();
+      await saveButton(cancelled).props.onClick();
 
       expect(mockedUpdateTodoAction).toHaveBeenCalledTimes(1);
       const [, patch] = mockedUpdateTodoAction.mock.calls[0];
@@ -796,3 +806,72 @@ describe('TodoEditor custom repeat', () => {
   });
 });
 
+describe('TodoEditor screen shape', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('renders the due-date state strip with the editor', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(todo({ dueDate: '2026-10-02' }));
+      const strip = findByType(tree.props.children, DueDatePill);
+      expect(strip).toBeDefined();
+      expect(strip!.props.dueDate).toBe('2026-10-02');
+      expect(strip!.props.emptyLabel).toBe('No date');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('orders the fields Title, Note, Due date, Time, Repeat, List, Important', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(todo({ dueDate: '2026-10-05' }));
+      const captions = (tree.props.children as unknown as Array<ReactElement<{ label: string }>>)
+        .filter((child) => child.type === Field)
+        .map((child) => child.props.label);
+      expect(captions).toEqual([
+        'Title',
+        'Note',
+        'Due date',
+        'Time',
+        'Repeat',
+        'List',
+        'Important',
+      ]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('offers the Task actions menu with an immediate Move to trash in edit mode', async () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(todo());
+      const menu = findByType(tree.props.actions, Menu);
+      expect(menu).toBeDefined();
+      expect(menu!.props.label).toBe('Task actions');
+
+      const trash = findByType(menu!.props.children, Button);
+      expect(trash!.props.children).toBe('Move to trash');
+
+      await (trash!.props.onClick as () => Promise<void>)();
+
+      expect(mockedDeleteTodoAction).toHaveBeenCalledWith('t1');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      // No confirmation step: the delete is the press.
+      expect(mockedUpdateTodoAction).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('renders no Task actions menu in create mode', () => {
+    const harness = stateHarness();
+    try {
+      const tree = harness.renderTree(undefined);
+      expect(findByType(tree.props.actions, Menu)).toBeUndefined();
+    } finally {
+      harness.restore();
+    }
+  });
+});
