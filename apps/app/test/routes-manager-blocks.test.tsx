@@ -79,30 +79,30 @@ function list(overrides: Partial<List> = {}): List {
 }
 
 describe('manager-page routes on ManagerBlock', () => {
-  it('/notes/tags renders ManagerBlock titled Tags backed to /notes', () => {
+  it('/notes/tags renders ManagerBlock titled Tags backed to /notes/settings', () => {
     const el = NotesTagsPage();
 
     expect(el.type).toBe(ManagerBlock);
     expect(el.props.title).toBe('Tags');
-    expect(el.props.backHref).toBe('/notes');
+    expect(el.props.backHref).toBe('/notes/settings');
     expect(el.props.children.type).toBe(TagManagerSection);
   });
 
-  it('/todos/tags renders ManagerBlock titled Tags backed to /todos', () => {
+  it('/todos/tags renders ManagerBlock titled Tags backed to /todos/settings', () => {
     const el = TodosTagsPage();
 
     expect(el.type).toBe(ManagerBlock);
     expect(el.props.title).toBe('Tags');
-    expect(el.props.backHref).toBe('/todos');
+    expect(el.props.backHref).toBe('/todos/settings');
     expect(el.props.children.type).toBe(TagManagerSection);
   });
 
-  it('/todos/lists renders ManagerBlock titled Lists backed to /todos', () => {
+  it('/todos/lists renders ManagerBlock titled Lists backed to /todos/settings', () => {
     const el = TodosListsPage();
 
     expect(el.type).toBe(ManagerBlock);
     expect(el.props.title).toBe('Lists');
-    expect(el.props.backHref).toBe('/todos');
+    expect(el.props.backHref).toBe('/todos/settings');
     expect(el.props.children.type).toBe(ListManagerSection);
   });
 });

@@ -14,7 +14,7 @@ export default async function TrashPage() {
   return (
     <TrashBlock
       title="Trash"
-      backHref="/todos"
+      backHref="/todos/settings"
       items={todos.map((todo) => ({
         id: todo.id,
         title: todo.title,

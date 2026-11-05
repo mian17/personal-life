@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function ListsPage() {
   return (
-    <ManagerBlock title="Lists" backHref="/todos">
+    <ManagerBlock title="Lists" backHref="/todos/settings">
       <ListManagerSection />
     </ManagerBlock>
   );

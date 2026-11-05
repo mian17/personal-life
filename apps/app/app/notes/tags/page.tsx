@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function TagsPage() {
   return (
-    <ManagerBlock title="Tags" backHref="/notes">
+    <ManagerBlock title="Tags" backHref="/notes/settings">
       <TagManagerSection />
     </ManagerBlock>
   );
