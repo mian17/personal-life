@@ -19,19 +19,19 @@ import { NotesService } from './notes.service';
 export class NotesBatchController {
   constructor(private readonly notes: NotesService) {}
 
-  @Post('api/notes\\:batchCreate')
+  @Post(String.raw`api/notes\:batchCreate`)
   @HttpCode(201)
   createMany(@Principal() principal: Principal, @Body() dto: BatchCreateNotesDto) {
     return this.notes.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/notes\\:batchUpdate')
+  @Post(String.raw`api/notes\:batchUpdate`)
   @HttpCode(200)
   updateMany(@Principal() principal: Principal, @Body() dto: BatchUpdateNotesDto) {
     return this.notes.updateMany(principal.sub, dto.items);
   }
 
-  @Post('api/notes\\:batchDelete')
+  @Post(String.raw`api/notes\:batchDelete`)
   @HttpCode(200)
   deleteMany(@Principal() principal: Principal, @Body() dto: BatchDeleteNotesDto) {
     return this.notes.removeMany(principal.sub, dto.items);

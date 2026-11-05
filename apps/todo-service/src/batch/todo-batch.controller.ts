@@ -26,31 +26,31 @@ export class TodoBatchController {
     private readonly lists: ListsService,
   ) {}
 
-  @Post('api/todos\\:batchCreate')
+  @Post(String.raw`api/todos\:batchCreate`)
   @HttpCode(201)
   createTodos(@Principal() principal: Principal, @Body() dto: BatchCreateTodosDto) {
     return this.todos.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/todos\\:batchUpdate')
+  @Post(String.raw`api/todos\:batchUpdate`)
   @HttpCode(200)
   updateTodos(@Principal() principal: Principal, @Body() dto: BatchUpdateTodosDto) {
     return this.todos.updateMany(principal.sub, dto.items);
   }
 
-  @Post('api/todos\\:batchDelete')
+  @Post(String.raw`api/todos\:batchDelete`)
   @HttpCode(200)
   deleteTodos(@Principal() principal: Principal, @Body() dto: BatchDeleteTodosDto) {
     return this.todos.removeMany(principal.sub, dto.items);
   }
 
-  @Post('api/lists\\:batchCreate')
+  @Post(String.raw`api/lists\:batchCreate`)
   @HttpCode(201)
   createLists(@Principal() principal: Principal, @Body() dto: BatchCreateListsDto) {
     return this.lists.createMany(principal.sub, dto.items);
   }
 
-  @Post('api/lists\\:batchUpdate')
+  @Post(String.raw`api/lists\:batchUpdate`)
   @HttpCode(200)
   updateLists(@Principal() principal: Principal, @Body() dto: BatchUpdateListsDto) {
     return this.lists.updateMany(principal.sub, dto.items);
