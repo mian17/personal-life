@@ -71,11 +71,28 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * The end inset is one step tighter than the start (`pe-[var(--s2)]`): the pre-redesign dense row
  * ran `0.4rem` at the end against `0.9rem` at the start, and the matrix row has no trailing
  * control for that end inset to clear. The start inset stays `--s3`, the step that matches
- * `0.9rem` within the token scale; the mark's own box lands a quarter of the 48px target past
- * that inset, which is what keeps the target unclipped against the row's `overflow-hidden` edge.
+ * `0.9rem` within the token scale.
+ *
+ * The leading control is taken out of flow. Its target is a full 48px square, and in flow that
+ * square reserved 48px of row width, so the title started 60px from the row edge where the
+ * pre-redesign row started it at 26.4px — the mark itself was always the right size and in the
+ * right place. The row becomes the target's positioning context and the target is pinned to the
+ * row's start/top corner, so no part of the 48px press square leaves the row's `overflow-hidden`
+ * clip. The offsets are stated net of the primitive's own negative margins (`-my-[var(--s2)]`
+ * `-ms-[var(--s3)]`), because a margin still applies to an absolutely positioned box: `--s3`
+ * start and `--s2` top land the painted square exactly on the corner without re-declaring a
+ * margin the control owns. The mark keeps the target's vertical centring but sits on the
+ * target's leading edge (`justify-items-start`, a longhand of the target's `place-items-center`
+ * shorthand, so it wins without touching the control), which puts the 12px mark on the row's
+ * start and bleeds the press square to its right instead of reserving that width.
+ *
+ * The link then carries one `--s4` (16px) step on top of the row's `--s3` inset: a 28px title
+ * offset against the old 26.4px and a 16px mark-to-title gap against the old 14.4px — the
+ * nearest the token scale reaches in both cases. `min-h-[var(--tap)]` keeps the row as tall as
+ * the target it no longer gets height from.
  */
 const denseRowStyles =
-  'min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-list-item__link]:ps-[var(--s4)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
@@ -272,9 +289,9 @@ const collapsingRowStyles = 'h-0 min-h-0 opacity-0 overflow-hidden';
 
 /**
  * The row's utility classes: surface, box, alignment, slots, and state treatment. A dense row
- * top-aligns its slots so its leading mark rides the title's first line: the 48px target centres
- * its 12px mark on itself, and a centred target cannot lift that mark above the row's top edge
- * without bleeding past the row's `overflow-hidden` clip, so the top edge is the mark's ceiling.
+ * top-aligns its slots so its meta line starts on the title's first line; its leading checkbox
+ * is out of flow (`denseRowStyles`), so it takes no part in that alignment and the 48px target
+ * centres its 12px mark on itself against the row's top corner.
  */
 function rowStyleClassesFor({
   isDense,
