@@ -14,6 +14,7 @@ import {
   Pill,
   Section,
   Select,
+  SettingsBlock,
   SettingsRow,
   Stack,
   StatusText,
@@ -30,15 +31,16 @@ import { saveProfileAction } from './actions';
  *
  * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `PageShell`,
  * the header is the reference's sub-view row (`SubNav` back to settings) over
- * `PageTitle` and its server-computed sub-line, each
- * field is a `SettingsRow` (visible label left, control right) hosting an
- * `Input`/`Select`, feedback is `StatusText`, and the one commit affordance is
- * the footer's primary submit `Button`. The derived-energy card and the `Profile`
- * read-out rows are the reference's read-only half; the form below them is the
- * only place a value changes. The `<form>` is glue (submit semantics + native
- * numeric validation), no className, no raw control, no app CSS.
- * Sex/activity/goal are `Select`s over the service enums, so a level the service
- * does not have cannot be offered here.
+ * `PageTitle` and its server-computed sub-line, each field is a `SettingsRow`
+ * (visible label left, control right) hosting an `Input`/`Select` on the
+ * reference's shared surface group (`SettingsBlock`, a flush `Card` of
+ * hairline-divided rows), feedback is `StatusText` outside that card, and the one
+ * commit affordance is the footer's primary submit `Button`. The derived-energy
+ * card and the `Profile` read-out rows are the reference's read-only half; the
+ * form below them is the only place a value changes. The `<form>` is glue (submit
+ * semantics + native numeric validation), no className, no raw control, no app
+ * CSS. Sex/activity/goal are `Select`s over the service enums, so a level the
+ * service does not have cannot be offered here.
  */
 
 /** `SEXES` in the service's `target-calculator.ts`. */
@@ -153,7 +155,7 @@ export function TargetProfileForm({
                 </Facts>
               </Stack>
             </Card>
-            <Section label="Profile">
+            <SettingsBlock title="Profile">
               <SettingsRow label="Age" control={<Pill>{`${initial.age} years`}</Pill>} />
               <SettingsRow label="Height" control={<Pill>{`${initial.heightCm} cm`}</Pill>} />
               <SettingsRow label="Weight" control={<Pill>{`${initial.weightKg} kg`}</Pill>} />
@@ -163,12 +165,12 @@ export function TargetProfileForm({
                 control={<Pill>{optionLabel(ACTIVITY_OPTIONS, initial.activity)}</Pill>}
               />
               <SettingsRow label="Goal" control={<Pill>{optionLabel(GOAL_OPTIONS, initial.goal)}</Pill>} />
-            </Section>
+            </SettingsBlock>
           </>
         ) : (
           <StatusText>No target set yet — add your profile below.</StatusText>
         )}
-        <Section label={initial == null ? 'Set your target' : 'Update your profile'}>
+        <SettingsBlock title={initial == null ? 'Set your target' : 'Update your profile'}>
           <SettingsRow
             label="Age"
             control={
@@ -244,8 +246,10 @@ export function TargetProfileForm({
               />
             }
           />
-          {error !== '' ? <StatusText>{error}</StatusText> : null}
-        </Section>
+        </SettingsBlock>
+        {/* Outside the card: the feedback is not one of the profile's rows, so it must
+            not read as a seventh bordered group row. */}
+        {error !== '' ? <StatusText>{error}</StatusText> : null}
         {/* The footer is the screen's only commit affordance (reference `.subfoot`); a
             label-less `Section` gives it the same `--s6` step the body's groups open with. */}
         <Section>

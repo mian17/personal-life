@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from '@life/nutrition';
-import { Button, Input, PageTitle, Select, SettingsRow, StatusText, SubNav } from '@life/ui';
+import { Button, Input, PageTitle, Select, SettingsBlock, SettingsRow, StatusText, SubNav } from '@life/ui';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 
@@ -61,7 +61,7 @@ function stateHarness() {
   const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
 
-  function renderTree(initial: MealTarget | null = null): Tree {
+  function renderTree(initial: MealTarget | null = null, summary: string | null = null): Tree {
     let index = 0;
     spy.mockImplementation(((value: unknown) => {
       const i = index++;
@@ -73,7 +73,7 @@ function stateHarness() {
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
-    return TargetProfileForm({ initial }) as unknown as Tree;
+    return TargetProfileForm({ initial, summary }) as unknown as Tree;
   }
 
   return { renderTree, restore: () => spy.mockRestore() };
@@ -267,6 +267,48 @@ describe('target profile form composition', () => {
         expect(row).toBeDefined();
         expect(field(tree, label)).toBeDefined();
       }
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('sets both row groups on the shared surface card, with the feedback outside it', async () => {
+    const harness = stateHarness();
+    try {
+      // A blank numeric field fails before the service, so the error copy is reachable
+      // in the same tree as the rows.
+      const tree = harness.renderTree();
+      const form = find(tree, 'form');
+      if (!form) throw new Error('no form');
+      await (form.props.onSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: jest.fn(),
+      });
+
+      const failed = harness.renderTree();
+      const firstRun = find(failed, SettingsBlock, (el) => el.props.title === 'Set your target');
+      expect(firstRun).toBeDefined();
+      const firstRunHtml = renderToStaticMarkup(firstRun!);
+      // Six fields, one card: the surface, the hairline and the row insets belong to
+      // the block, and the heading keeps its `<h2>` group label.
+      expect(firstRunHtml).toContain('ui-settings-block__rows');
+      expect(firstRunHtml).toContain('ui-card--flush');
+      expect(firstRunHtml.match(/ui-settings-row(?![_-])/g)).toHaveLength(6);
+      expect(firstRunHtml).toContain('>Set your target</h2>');
+      // The feedback is not a row of the card: it renders after the block.
+      expect(firstRunHtml).not.toContain('Enter your age');
+      expect(renderToStaticMarkup(failed)).toContain('Enter your age');
+
+      const stored = harness.renderTree(target(), '2,400 kcal');
+      const edit = find(stored, SettingsBlock, (el) => el.props.title === 'Update your profile');
+      expect(edit).toBeDefined();
+      const editHtml = renderToStaticMarkup(edit!);
+      expect(editHtml).toContain('ui-card--flush');
+      expect(editHtml.match(/ui-settings-row(?![_-])/g)).toHaveLength(6);
+
+      // The read-only half sits on the same surface.
+      const profile = find(stored, SettingsBlock, (el) => el.props.title === 'Profile');
+      expect(profile).toBeDefined();
+      expect(renderToStaticMarkup(profile!)).toContain('ui-card--flush');
     } finally {
       harness.restore();
     }
