@@ -86,13 +86,10 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * shorthand, so it wins without touching the control), which puts the 12px mark on the row's
  * start and bleeds the press square to its right instead of reserving that width.
  *
- * The link then carries one `--s4` (16px) step on top of the row's `--s3` inset: a 28px title
- * offset against the old 26.4px and a 16px mark-to-title gap against the old 14.4px — the
- * nearest the token scale reaches in both cases. `min-h-[var(--tap)]` keeps the row as tall as
- * the target it no longer gets height from.
+ * `min-h-[var(--tap)]` keeps the row as tall as the target it no longer gets height from.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-list-item__link]:ps-[var(--s4)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button drops its default tap
@@ -125,8 +122,18 @@ const linkColumnStyles = cx(linkSharedStyles, 'flex-col items-stretch gap-[var(-
 /**
  * A dense row packs its line tighter than a full row. The mark-to-title gap is the pre-redesign
  * `0.5rem` (`--s2`), not the tighter `--s1` the redesigned row shrank it to.
+ *
+ * The link's own `--s4` (16px) start inset is the dense row's title offset, one step on top of
+ * the row's `--s3`: a 28px title against the old 26.4px and a 16px mark-to-title gap against the
+ * old 14.4px, the nearest the token scale reaches. It lives here rather than on the row because
+ * a child-selector utility cannot name this class: Tailwind reads the `__` in
+ * `[&>.ui-list-item__link]` as a descendant combinator and compiles a rule that never matches.
  */
-const linkDenseStyles = cx(linkSharedStyles, 'items-center gap-[var(--s2)]');
+const linkDenseStyles = cx(
+  linkSharedStyles,
+  'items-center gap-[var(--s2)]',
+  'ps-[var(--s4)]',
+);
 
 /** Title above, meta line below, one spacing step apart. */
 const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';

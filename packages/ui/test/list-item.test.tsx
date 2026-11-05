@@ -280,6 +280,7 @@ describe('ListItem', () => {
       </ul>,
     );
     const row = classesOf(screen.getByRole('listitem'));
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
     // The control's target is a 48px square. In flow it reserved 48px of row width and pushed
     // the title 60px off the row edge; the row is the target's positioning context instead, so
     // the target paints over the row and only the row's own insets place the title.
@@ -292,8 +293,11 @@ describe('ListItem', () => {
     // The mark rides the target's leading edge, so it lands on the row's start inset.
     expect(row).toContain('[&>.ui-checkbox]:justify-items-start');
     // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 16px from the
-    // mark's trailing edge (the old row's 26.4px / 14.4px, at token granularity).
-    expect(row).toContain('[&>.ui-list-item__link]:ps-[var(--s4)]');
+    // mark's trailing edge (the old row's 26.4px / 14.4px, at token granularity). The inset sits on
+    // the link's own class list — a `[&>.ui-list-item__link]` utility compiles to a selector
+    // Tailwind mangles at the `__` and never applies.
+    expect(link).toContain('ps-[var(--s4)]');
+    expect(row).not.toContain('[&>.ui-list-item__link]');
     // The target no longer contributes height, so the row keeps the tap floor itself.
     expect(row).toContain('min-h-[var(--tap)]');
   });
@@ -674,7 +678,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)] ps-[var(--s4)]',
     );
     denseRow.unmount();
 
@@ -839,7 +843,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-list-item__link]:ps-[var(--s4)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s3)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });
