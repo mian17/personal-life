@@ -199,6 +199,20 @@ describe('ListShell', () => {
     );
   });
 
+  it('reserves the fab band with fabBand when the fab is the page\'s own control', () => {
+    const { container } = render(<ListShell title="Meals" body={<span />} fabBand />);
+
+    const page = container.querySelector('.ui-page')!;
+    expect(
+      page.classList.contains(
+        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]!',
+      ),
+    ).toBe(true);
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
+      false,
+    );
+  });
+
   it('keeps the fab clearance while a fab renders', () => {
     const { container } = render(
       <ListShell

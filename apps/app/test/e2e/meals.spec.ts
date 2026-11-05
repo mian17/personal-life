@@ -16,7 +16,8 @@ import { logIn } from './journey';
 /**
  * The day view's entry doors, exactly as they render. Both wait in the log FAB
  * menu (`Log a meal` trigger): the photo capture door and the manual catalog
- * door. `Saved meals` is the toolbar nav icon.
+ * door. `Saved meals` and `Foods` are rows on `/meals/settings`; the day view's
+ * toolbar carries only the daily target and the gear.
  */
 const PHOTO_DOOR = 'Log meal from photo';
 const FOOD_DOOR = 'Log food';
@@ -36,7 +37,9 @@ const PHOTO = {
 async function openMeals(page: Page): Promise<void> {
   await logIn(page);
   await page.goto('/meals');
-  await expect(page.getByRole('heading', { name: /^Meals —/ })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Meals', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /** Opens the editor the given door leads to: the door waits in the log FAB menu. */
@@ -158,12 +161,14 @@ async function createFoodViaCatalog(page: Page, food: NewCatalogFood): Promise<v
 /** Lands on the meals day view, waiting for its heading. */
 async function openDayView(page: Page): Promise<void> {
   await page.goto('/meals');
-  await expect(page.getByRole('heading', { name: /^Meals —/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Meals', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 /**
  * The foods catalog acts as one user sentence (`SPEC-food-catalog-ui` Testing
- * Strategy): the toolbar Foods icon reaches the catalog, the FAB opens the
+ * Strategy): the Foods row on `/meals/settings` reaches the catalog, the FAB opens the
  * create form, create persists and reads back at the edit page's own source,
  * and delete removes the food. History immutability is proven by the manual-log
  * journey, which owns a logged entry; this one owns the catalog CRUD. The two
@@ -175,7 +180,8 @@ test.describe('meals foods catalog', () => {
   test('the foods catalog door adds, edits, and deletes a staple', async ({ page }) => {
     await openMeals(page);
 
-    // The toolbar door opens the catalog: the promised entry point (`Foods`).
+    // The settings row opens the catalog: the promised entry point (`Foods`).
+    await page.goto('/meals/settings');
     await page.getByRole('link', { name: 'Foods', exact: true }).click();
     await page.waitForURL(/\/meals\/foods$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Foods', exact: true })).toBeVisible();
@@ -339,8 +345,8 @@ test.describe('meals day view', () => {
     await expect(page.getByRole('heading', { name: 'Log meal' })).toBeVisible();
     await expect(page.getByLabel('Choose a photo')).toBeVisible();
 
-    // The saved-meal toolbar door opens the saved list.
-    await page.goto('/meals');
+    // The saved-meal settings row opens the saved list.
+    await page.goto('/meals/settings');
     await page.getByRole('link', { name: SAVED_DOOR, exact: true }).click();
     await page.waitForURL(/\/meals\/saved$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Saved meals' })).toBeVisible();

@@ -1,11 +1,12 @@
 import { settingsHref } from '@life/app-kit';
-import { FeedbackNavItem, IconLink, SettingsLink } from '@life/ui';
-import { Apple, Bookmark, Target } from 'lucide-react';
-import { submitFeedbackAction } from './feedback-actions';
+import { IconLink, SettingsLink } from '@life/ui';
+import { Target } from 'lucide-react';
 
 /**
- * The Meals toolbar nav icons, rendered by the day route. The target route is a
- * full-screen editor that renders its own chrome, so it has no nav.
+ * The Meals toolbar: the day's target and the settings gear, nothing else. The saved-meals and
+ * foods destinations moved to rows on `/meals/settings`, and feedback is that screen's Support
+ * row, exactly as the todos toolbar keeps only its gear. The target route is a full-screen editor
+ * that renders its own chrome, so it has no nav.
  */
 export function MealsNav() {
   return (
@@ -13,13 +14,6 @@ export function MealsNav() {
       <IconLink href="/meals/target" label="Daily target" variant="bare">
         <Target size={20} aria-hidden />
       </IconLink>
-      <IconLink href="/meals/saved" label="Saved meals" variant="bare">
-        <Bookmark size={20} aria-hidden />
-      </IconLink>
-      <IconLink href="/meals/foods" label="Foods" variant="bare">
-        <Apple size={20} aria-hidden />
-      </IconLink>
-      <FeedbackNavItem app="meals" onSubmit={submitFeedbackAction} />
       <SettingsLink href={settingsHref('/meals')} />
     </>
   );

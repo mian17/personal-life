@@ -49,7 +49,6 @@ import {
 } from '@/lib/meal-api';
 import { revalidatePath } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { MealsNav } from '@/app/meals-nav';
 import FoodsPage from '@/app/(meals)/meals/foods/page';
 import NewFoodPage from '@/app/(meals)/meals/foods/new/page';
 import EditFoodPage from '@/app/(meals)/meals/foods/[id]/page';
@@ -100,15 +99,6 @@ const bounds: FoodFormBounds = {
   portionsMax: PORTIONS_MAX,
   amountMax: AMOUNT_MAX,
 };
-
-describe('foods nav entry', () => {
-  it('adds one Foods icon linking to the catalog', () => {
-    const html = renderToStaticMarkup(<MealsNav />);
-
-    expect(html).toContain('href="/meals/foods"');
-    expect(html).toContain('aria-label="Foods"');
-  });
-});
 
 describe('foods catalog page', () => {
   beforeEach(() => jest.clearAllMocks());

@@ -3,13 +3,11 @@ import {
   ButtonLink,
   Card,
   EmptyState,
-  formatDate,
+  formatLongDate,
   Kpi,
   List,
   ListItem,
-  NavBar,
-  PageShell,
-  PageTitle,
+  ListShell,
   Pill,
   ProgressBar,
   Section,
@@ -24,6 +22,7 @@ import {
   listMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
+  type MealFood,
   type MealTarget,
 } from '@/lib/meal-api';
 
@@ -36,6 +35,15 @@ import {
  * 0006). `day` is the client's resolved `YYYY-MM-DD` (lesson 0019), never
  * derived inside the view.
  */
+
+/**
+ * A group with nothing logged keeps its heading, so the day always shows the four meals it is
+ * made of: the count slot reads the literal `Not logged` where a group with entries reads its
+ * subtotal, and the group's box carries this copy instead of a list.
+ */
+const EMPTY_GROUP_COUNT = 'Not logged';
+const EMPTY_GROUP_BODY = 'No meals logged in this meal yet.';
+const EMPTY_GROUP_HEADING = 'Nothing yet.';
 
 /** The four meal groups in display order (spec: day view). */
 const GROUPS: { key: MealEntry['mealGroup']; label: string }[] = [
@@ -98,9 +106,13 @@ async function loadTarget(date: string) {
 }
 
 /**
- * The one meals day view: total vs target, entries grouped by meal, and the
- * photo FAB front door into the editor (saved meals live in the toolbar nav).
- * The whole-page block both day routes render.
+ * The one meals day view: the page header (`ListShell`, the same block notes and
+ * todos render), total vs target, entries grouped by meal, and the log FAB front
+ * door into the editor. The whole-page block both day routes render.
+ *
+ * The day keeps every group on screen even when nothing is logged in it, so an
+ * empty day reads as four meals to fill rather than one blank page; only when no
+ * group has an entry does the single whole-body empty state stand in for all four.
  *
  * Nutrient strings come from the shared `@life/nutrition` formatter and totals
  * from its `sum()` (no app-local unit table); the upload atom itself lives on
@@ -123,76 +135,114 @@ export async function mealDay(day: string, emptyBody: string) {
   const energyPercent = target == null ? 0 : percentOf(totals.calories, target.calories);
 
   return (
-    <PageShell>
-      <NavBar trailing={<MealsNav />} />
-      <PageTitle>Meals — {formatDate(day)}</PageTitle>
-      <Card aria-live="polite" role="status">
-        <Stack gap="sm">
-          <Kpi label="Logged so far" value={readout.eaten} unit={readout.unit} />
-          {target != null && (
-            <>
-              <ProgressBar
-                value={energyPercent}
-                label={`${Math.round(energyPercent)} percent of the daily energy target`}
-              />
-              {MACRO_TRACKS.map((track) => {
-                const goal = track.goal(target);
-                const have = totals[track.key];
-                return (
-                  <ProgressBar
-                    key={track.key}
-                    value={percentOf(have, goal)}
-                    label={`${Math.round(have)} grams of ${track.noun} toward ${Math.round(goal)}`}
-                    caption={track.label}
-                    readout={`${Math.round(have)} / ${format(track.key, goal)}`}
-                  />
-                );
-              })}
-            </>
-          )}
-          <ButtonLink href="/meals/target" variant="ghost">
-            {target ? 'Edit target' : 'Set target'}
-          </ButtonLink>
-        </Stack>
-      </Card>
-      {entries.length === 0 ? (
-        <EmptyState body={emptyBody} />
-      ) : (
-        GROUPS.map((group) => {
-          const items = entries.filter((entry) => entry.mealGroup === group.key);
-          if (items.length === 0) return null;
-          const subtotal = format(
-            'calories',
-            sum(items.map((entry) => entry.nutrients)).calories,
-          );
-          return (
-            <Section key={group.key} label={group.label} count={subtotal}>
-              <List>
-                {items.map((entry) => {
-                  // The catalog resolves the stored id to a name; an id matching
-                  // no row — active or deleted — is a pre-feature entry whose
-                  // stored value is itself the dish (restoredFoodName). The read
-                  // includes soft-deleted foods, so a food deleted after logging
-                  // still names the entry it was logged as.
-                  // Blank (only a caller bypassing the editor's non-empty rule)
-                  // falls back to the old calories-title row, never blank.
-                  const label = restoredFoodName(entry.foodId, catalog).trim();
-                  const calories = format('calories', entry.nutrients.calories);
-                  return (
-                    <ListItem
-                      key={entry.id}
-                      title={label || calories}
-                      meta={`× ${entry.quantity}`}
-                      trailing={label ? <Pill>{calories}</Pill> : undefined}
+    <ListShell
+      title="Meals"
+      subtitle={formatLongDate(day)}
+      navTrailing={<MealsNav />}
+      // The log menu is the page's own fixed control rather than a `FabLink`, so
+      // the shell is told to keep the fab band and the last row clears it.
+      fabBand
+      body={
+        <>
+          {/* Label-less sections: `Section` owns the page's one block step (`--s6`), so the
+              card opens below the header and the empty box below the card like every other
+              block on the page. */}
+          <Section>
+            <Card aria-live="polite" role="status">
+              <Stack gap="sm">
+                <Kpi label="Logged so far" value={readout.eaten} unit={readout.unit} />
+                {target != null && (
+                  <>
+                    <ProgressBar
+                      value={energyPercent}
+                      label={`${Math.round(energyPercent)} percent of the daily energy target`}
                     />
-                  );
-                })}
-              </List>
+                    {MACRO_TRACKS.map((track) => {
+                      const goal = track.goal(target);
+                      const have = totals[track.key];
+                      return (
+                        <ProgressBar
+                          key={track.key}
+                          value={percentOf(have, goal)}
+                          label={`${Math.round(have)} grams of ${track.noun} toward ${Math.round(goal)}`}
+                          caption={track.label}
+                          readout={`${Math.round(have)} / ${format(track.key, goal)}`}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+                <ButtonLink href="/meals/target" variant="ghost">
+                  {target ? 'Edit target' : 'Set target'}
+                </ButtonLink>
+              </Stack>
+            </Card>
+          </Section>
+          {entries.length === 0 ? (
+            <Section>
+              <EmptyState body={emptyBody} />
             </Section>
-          );
-        })
+          ) : (
+            GROUPS.map((group) => (
+              <MealGroup
+                key={group.key}
+                group={group}
+                items={entries.filter((entry) => entry.mealGroup === group.key)}
+                catalog={catalog}
+              />
+            ))
+          )}
+          <MealDoors />
+        </>
+      }
+    />
+  );
+}
+
+/**
+ * One meal of the day: its heading with the subtotal (or `Not logged`), then either the rows
+ * that were logged in it or the group's own empty box.
+ */
+function MealGroup({
+  group,
+  items,
+  catalog,
+}: Readonly<{
+  group: { key: MealEntry['mealGroup']; label: string };
+  items: MealEntry[];
+  catalog: MealFood[];
+}>) {
+  const subtotal =
+    items.length === 0
+      ? EMPTY_GROUP_COUNT
+      : format('calories', sum(items.map((entry) => entry.nutrients)).calories);
+
+  return (
+    <Section label={group.label} count={subtotal}>
+      {items.length === 0 ? (
+        <EmptyState heading={EMPTY_GROUP_HEADING} body={EMPTY_GROUP_BODY} />
+      ) : (
+        <List>
+          {items.map((entry) => {
+            // The catalog resolves the stored id to a name; an id matching no
+            // row — active or deleted — is a pre-feature entry whose stored
+            // value is itself the dish (restoredFoodName). The read includes
+            // soft-deleted foods, so a food deleted after logging still names
+            // the entry it was logged as. Blank (only a caller bypassing the
+            // editor's non-empty rule) falls back to the calories-title row.
+            const label = restoredFoodName(entry.foodId, catalog).trim();
+            const calories = format('calories', entry.nutrients.calories);
+            return (
+              <ListItem
+                key={entry.id}
+                title={label || calories}
+                meta={`× ${entry.quantity}`}
+                trailing={label ? <Pill>{calories}</Pill> : undefined}
+              />
+            );
+          })}
+        </List>
       )}
-      <MealDoors />
-    </PageShell>
+    </Section>
   );
 }

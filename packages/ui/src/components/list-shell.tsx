@@ -28,6 +28,12 @@ export interface ListShellProps {
   /** Fab icon node (e.g. `<Plus size={28} strokeWidth={2.5} aria-hidden />`). */
   fabIcon?: ReactNode;
   /**
+   * Reserve the fab band although no `FabLink` renders: for a page whose fab is its own fixed
+   * control (e.g. `FabMenu`), so the last row does not scroll under it. Ignored when `fabHref`
+   * is set, since the rendered `FabLink` already reserves the band. Off by default.
+   */
+  fabBand?: boolean;
+  /**
    * Opt into a full-viewport-height page: the `body` slot grows to fill the
    * remaining space, for a full-height body such as the matrix. Off by default,
    * so other pages are unchanged.
@@ -85,6 +91,12 @@ function TitleBlock({ title, subtitle }: Pick<ListShellProps, 'title' | 'subtitl
  */
 const fablessPageStyles = 'pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!';
 
+/**
+ * The fab band `PageShell` draws, restated with `!` for a page that keeps `PageShell`'s band but
+ * supplies its own fixed fab control (`fabBand`), so the last row clears it.
+ */
+const fabBandPageStyles = 'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]!';
+
 export function ListShell({
   title,
   subtitle,
@@ -96,13 +108,14 @@ export function ListShell({
   fabHref,
   fabLabel,
   fabIcon,
+  fabBand,
   fill,
 }: Readonly<ListShellProps>): JSX.Element {
   return (
     <PageShell
       className={cx(
         fill && cx('ui-list-shell--fill', fillPageStyles),
-        fabHref == null && fablessPageStyles,
+        fabHref == null && (fabBand ? fabBandPageStyles : fablessPageStyles),
       )}
     >
       <NavBar leading={<TitleBlock title={title} subtitle={subtitle} />} trailing={navTrailing} />

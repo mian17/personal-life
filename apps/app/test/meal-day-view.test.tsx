@@ -1,5 +1,5 @@
 import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
-import { formatDate } from '@life/ui';
+import { formatLongDate } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
@@ -197,7 +197,7 @@ describe('meals day view', () => {
     expect(html).not.toContain('>Saved meals</a>');
   });
 
-  it('groups entries under their meal with a subtotal, in Breakfast/Lunch/Dinner/Snacks order', async () => {
+  it('keeps every meal on the page, an empty one reading Not logged', async () => {
     mockedListDayEntries.mockResolvedValue([
       entry({ id: 's1', mealGroup: 'snack', nutrients: vector({ calories: 100 }) }),
       entry({ id: 'b1', mealGroup: 'breakfast', nutrients: vector({ calories: 300 }) }),
@@ -216,8 +216,13 @@ describe('meals day view', () => {
       expect(html).toContain(`>${label}</h2>`);
       expect(html).toMatch(new RegExp(`ui-section__count[^>]*>${format('calories', kcal)}<`));
     }
-    expect(html).not.toContain('Dinner');
-    const order = ['Breakfast', 'Lunch', 'Snacks'].map((label) => html.indexOf(label));
+    // A group with nothing logged stays on the page rather than vanishing, so
+    // the day reads as the four meals it is made of.
+    expect(html).toContain('>Dinner</h2>');
+    expect(html).toMatch(/ui-section__count[^>]*>Not logged</);
+    expect(html).toContain('Nothing yet.');
+    expect(html).toContain('No meals logged in this meal yet.');
+    const order = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((label) => html.indexOf(label));
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
@@ -293,7 +298,9 @@ describe('meals day view', () => {
 
     expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-02');
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-02');
-    expect(html).toContain(`Meals — ${formatDate('2026-10-02')}`);
+    // The page header is the shared shell's: title over the day's long date.
+    expect(html).toContain('>Meals</h1>');
+    expect(html).toContain(formatLongDate('2026-10-02'));
     expect(html).toContain('aria-label="Log a meal"');
     expect(html).toContain('No meals logged on this day.');
   });

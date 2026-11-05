@@ -1,4 +1,4 @@
-import { SettingsShell } from '@life/ui';
+import { SettingsBlock, SettingsShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
@@ -24,8 +24,31 @@ describe('/meals/settings page wiring', () => {
     expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('passes no app-specific children: the shell draws the whole shape', () => {
-    expect(childList(MealsSettingsPage())).toHaveLength(0);
+  it('passes only the Meals group as app-specific children', () => {
+    const kids = childList(MealsSettingsPage());
+
+    expect(kids).toHaveLength(1);
+    expect(kids[0].type).toBe(SettingsBlock);
+    expect(kids[0].props.title).toBe('Meals');
+  });
+
+  it('adds the Meals group: the target row with an Edit pill, then saved meals and foods', () => {
+    const html = renderToStaticMarkup(MealsSettingsPage());
+
+    expect(html).toContain('>Meals</h2>');
+    for (const [label, href] of [
+      ['Daily target', '/meals/target'],
+      ['Saved meals', '/meals/saved'],
+      ['Foods', '/meals/foods'],
+    ] as const) {
+      expect(html).toContain(`>${label}</a>`);
+      expect(html).toContain(`href="${href}"`);
+    }
+    // Only the target row carries a control: it is the one destination whose
+    // screen is an editor, so the row reads as an edit rather than a browse.
+    expect(html).toMatch(/ui-pill[^>]*>Edit</);
+    // Feedback stays the shell's Support row alone, never a second row here.
+    expect(html.match(/>Send feedback</g)).toHaveLength(1);
   });
 
   it('renders the Appearance group as one pressed segment, with no Theme row', () => {
