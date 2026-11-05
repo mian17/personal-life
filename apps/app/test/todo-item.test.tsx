@@ -452,6 +452,31 @@ describe('TodoItem tick keeps the row visible', () => {
     }
   });
 
+  it('the delete slot follows the durable prop, never the optimistic tick', () => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      // A done row is unticked: the row renders open optimistically while the server row is
+      // still done. The delete slot must stay hidden for that whole window.
+      const stillDone = { done: true, repeat: 'daily' } as const;
+      doneToggle(harness.renderTree({ overrides: stillDone })).props.onCheckedChange();
+      expect(harness.completed).toBe(false);
+      const optimisticOpen = harness.renderTree({ overrides: stillDone });
+      expect(harness.renderMarkup(optimisticOpen)).toMatch(/<form[^>]*class="invisible"/);
+
+      // The mirror case: an open row ticked optimistically still shows the slot. The trash
+      // stays until the row actually leaves Done — acceptable, and never the reverse flash.
+      const stillOpen = { done: false, repeat: 'daily' } as const;
+      doneToggle(harness.renderTree({ overrides: stillOpen })).props.onCheckedChange();
+      const optimisticDone = harness.renderTree({ overrides: stillOpen });
+      expect(harness.completed).toBe(true);
+      expect(harness.renderMarkup(optimisticDone)).not.toContain('class="invisible"');
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('does not show a snackbar when clicking an already-done repeating row (the click undoes)', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();

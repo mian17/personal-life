@@ -128,10 +128,11 @@ export function TodoItem({
           // The slot is always present so a row's width never depends on `done`: gated instead,
           // unticking inserted the form and the row reflowed around it. Hiding it keeps the
           // reserved width and takes the control out of the accessibility tree, so a done row
-          // still offers no delete affordance.
+          // still offers no delete affordance. The gate reads the durable prop, never the
+          // optimistic `done`: an untick would otherwise paint the trash can mid-write.
           <form
             action={deleteTodoAction.bind(null, todo.id)}
-            className={done ? 'invisible' : undefined}
+            className={todo.done ? 'invisible' : undefined}
           >
             <Button
               type="submit"
