@@ -11,6 +11,9 @@ import { EntriesService } from './entries.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Entry]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
   controllers: [EntriesController],
+  // Exported so the batch controller in `AppModule` can reach the same service
+  // instance, whose write path the batch runs per item.
+  exports: [EntriesService],
   providers: [
     // Composition, not a second client: the service's ONE adapter is provided
     // once per module that consumes it (Task 7's `MEAL_CACHE` token/factory),

@@ -2,14 +2,25 @@ import { ConflictException, Inject, Injectable, Logger, NotFoundException } from
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { IsNull, Not, Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { Note } from './note.entity';
 import { NoteTag } from './note-tag.entity';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
 import { decodeTagUsage, normalizeTagIds } from '@life/shared';
 import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
+
+/** A note as a write carries it — the shape a batch item holds, per item. */
+type NoteDraft = { body: string; tagIds?: number[] };
+type NotePatch = { body?: string; tagIds?: number[]; expectedVersion?: number };
+
+/** One write's repositories: the transaction's when a batch supplies its manager. */
+interface WriteRepositories {
+  notes: Repository<Note>;
+  noteTags: Repository<NoteTag>;
+}
 
 /**
  * AAD for a note body (`SPEC-notes-at-rest` Encryption Rules). Byte-exact and
@@ -280,28 +291,82 @@ export class NotesService {
   }
 
   async create(sub: string, body: string, tagIds: number[] | undefined): Promise<NoteDto> {
+    const note = await this.insertOne(this.notes.manager, sub, { body, tagIds });
+    // Bump AFTER the insert: pre-mutation reads were born under the old
+    // generation and die here. A thrown insert never bumps (cache stays honest).
+    await this.cache.bumpGeneration(sub);
+    return note;
+  }
+
+  /**
+   * The `notes` batch create: one transaction, submission order, one bump
+   * (`SPEC-note-service.md` §6). The kernel owns all three, so this contributes
+   * only the per-item work.
+   */
+  async createMany(sub: string, items: NoteDraft[]): Promise<NoteDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+  }
+
+  /**
+   * One note's insert, through the manager the caller supplies, and with no bump.
+   * The singular route passes the repository's manager and keeps its own bump; a
+   * batch passes the transaction's manager, so the kernel owns one bump for the
+   * whole request.
+   */
+  private async insertOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    draft: NoteDraft,
+  ): Promise<NoteDto> {
+    const { notes, noteTags } = this.writeRepositories(manager);
     // Service-generated id: AAD binds it, so it must exist before the ciphertext.
     const id = randomUUID();
-    const ids = normalizeTagIds(tagIds);
+    const ids = normalizeTagIds(draft.tagIds);
     const dek = await this.requireKeys().getOrCreateDek(sub);
-    const note = this.notes.create({
+    const note = notes.create({
       id,
-      body: encryptField(dek, body, noteBodyAad(sub, id)),
+      body: encryptField(dek, draft.body, noteBodyAad(sub, id)),
       ownerSub: sub,
       version: 0,
       deletedAt: null,
       contentUpdatedAt: new Date(),
     });
-    const saved = await this.notes.save(note);
+    const saved = await notes.save(note);
     // Association rows are managed explicitly (TagRef joins, not a cascade
     // relation) so a write stores exactly the ids it carries.
     if (ids.length > 0) {
-      await this.noteTags.insert(ids.map((tagId) => ({ noteId: id, tagId })));
+      await noteTags.insert(ids.map((tagId) => ({ noteId: id, tagId })));
     }
-    // Bump AFTER the insert: pre-mutation reads were born under the old
-    // generation and die here. A thrown save never bumps (cache stays honest).
-    await this.cache.bumpGeneration(sub);
     return this.noteDto(saved, ids, sub, dek);
+  }
+
+  /**
+   * The repositories one write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it. No
+   * manager means the service's own repositories — the singular path, and the
+   * only shape a unit suite's repository double can supply.
+   */
+  private writeRepositories(manager: EntityManager | undefined): WriteRepositories {
+    if (!manager) return { notes: this.notes, noteTags: this.noteTags };
+    return { notes: manager.getRepository(Note), noteTags: manager.getRepository(NoteTag) };
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on (same DB as the writes).
+   *
+   * ponytail: taken from the injected repository rather than a fourth
+   * constructor argument, so the three existing suites that build this service
+   * positionally keep compiling. Upgrade path: `@InjectDataSource()` once those
+   * suites are converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.notes.manager.connection;
   }
 
   async findAll(
@@ -418,55 +483,124 @@ export class NotesService {
     tagIds?: number[],
     expectedVersion?: number,
   ): Promise<NoteDto> {
+    const note = await this.updateOne(this.notes.manager, sub, id, {
+      body,
+      tagIds,
+      expectedVersion,
+    });
+    // Bump AFTER the mutation — see bumpGeneration(); a 409 never bumps.
+    await this.cache.bumpGeneration(sub);
+    return note;
+  }
+
+  /** The `notes` batch update: one transaction, submission order, one bump. */
+  async updateMany(
+    sub: string,
+    items: (NotePatch & { id: string })[],
+  ): Promise<NoteDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+  }
+
+  /**
+   * One note's patch (plus its association rows), through the caller's manager,
+   * and with no bump. Optimistic concurrency is unchanged: a stale
+   * `expectedVersion` is a `409` and writes nothing, which for a batch means the
+   * whole request rolls back.
+   */
+  private async updateOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+    patch: NotePatch,
+  ): Promise<NoteDto> {
+    const { notes, noteTags } = this.writeRepositories(manager);
     // Load WITHOUT the relation: associations are managed explicitly below, and
     // leaving `noteTags` undefined keeps `save` from touching any join row (the
     // owning side would otherwise try to write a stale join column).
-    const note = await this.notes.findOne({
+    const note = await notes.findOne({
       where: { id, ownerSub: sub, deletedAt: IsNull() },
     });
     if (!note) throw new NotFoundException('Note not found');
-    if (expectedVersion !== undefined && note.version !== expectedVersion) {
+    if (patch.expectedVersion !== undefined && note.version !== patch.expectedVersion) {
       throw new ConflictException('Note was modified');
     }
     // Write path: always envelopes. Re-encrypting with a fresh nonce is correct
     // even when the plaintext is unchanged.
     const dek = await this.requireKeys().getOrCreateDek(sub);
-    if (body !== undefined) {
-      note.body = encryptField(dek, body, noteBodyAad(sub, note.id));
+    if (patch.body !== undefined) {
+      note.body = encryptField(dek, patch.body, noteBodyAad(sub, note.id));
       note.contentUpdatedAt = new Date();
     }
 
     let currentIds: number[];
-    if (tagIds !== undefined) {
+    if (patch.tagIds !== undefined) {
       // Updates REPLACE the association set: the ids the write carries are what
       // remains, so dangling ids fall away (kernel detach semantics; no registry
       // validation, no prune pass).
-      const ids = normalizeTagIds(tagIds);
-      await this.noteTags.delete({ noteId: note.id });
+      const ids = normalizeTagIds(patch.tagIds);
+      await noteTags.delete({ noteId: note.id });
       if (ids.length > 0) {
-        await this.noteTags.insert(ids.map((tagId) => ({ noteId: note.id, tagId })));
+        await noteTags.insert(ids.map((tagId) => ({ noteId: note.id, tagId })));
       }
       currentIds = ids;
     } else {
-      currentIds = (await this.noteTags.find({ where: { noteId: note.id } }))
-        .map((nt) => nt.tagId)
+      currentIds = (await noteTags.find({ where: { noteId: note.id } }))
+        .map((noteTag) => noteTag.tagId)
         .sort((a, b) => a - b);
     }
 
     note.version += 1;
-    const saved = await this.notes.save(note);
-    // Bump AFTER the mutation — see bumpGeneration(); a 409 above never bumps.
-    await this.cache.bumpGeneration(sub);
+    const saved = await notes.save(note);
     return this.noteDto(saved, currentIds, sub, dek);
   }
 
   async remove(sub: string, id: string): Promise<void> {
-    const note = await this.notes.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!note) throw new NotFoundException('Note not found');
-    note.deletedAt = new Date();
-    await this.notes.save(note);
+    await this.softDeleteOne(this.notes.manager, sub, id);
     // Bump AFTER the mutation: pre-mutation entries die here.
     await this.cache.bumpGeneration(sub);
+  }
+
+  /**
+   * The `notes` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning — the ids come back for per-item
+   * confirmation without a partial-success envelope.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
+    });
+    return { deleted };
+  }
+
+  /**
+   * One note's move to trash, through the caller's manager, and with no bump.
+   * Soft by definition — `deletedAt` is set and `version` is untouched — so a
+   * batch delete means exactly what the singular delete means and the note stays
+   * restorable.
+   */
+  private async softDeleteOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+  ): Promise<void> {
+    const { notes } = this.writeRepositories(manager);
+    const note = await notes.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!note) throw new NotFoundException('Note not found');
+    note.deletedAt = new Date();
+    await notes.save(note);
   }
 
   async restore(sub: string, id: string): Promise<NoteDto> {

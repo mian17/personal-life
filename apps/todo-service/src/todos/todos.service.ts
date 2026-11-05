@@ -29,7 +29,7 @@ import {
   nextOccurrence,
   parseRepeatDays,
 } from './recurrence';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
 import { ListsService } from '../lists/lists.service';
 import {
   TODO_ALL,
@@ -39,6 +39,18 @@ import {
   TODO_TRASH,
   TodosCache,
 } from '../cache/todo-cache';
+
+/** A todo as a create carries it — the shape one `:batchCreate` item holds. */
+type TodoDraft = {
+  title: string;
+  note?: string;
+  dueDate?: string;
+  repeat?: TodoRepeat | null;
+  repeatDays?: number[] | null;
+  listId?: string;
+  important?: boolean | null;
+  tagIds?: number[];
+};
 
 /** The `PATCH /api/todos/:id` field set, applied after the ownership/version checks. */
 type TodoPatch = {
@@ -610,19 +622,43 @@ export class TodosService {
   }
 
   /** `POST /api/todos` — 201 with `version: 0`. */
-  async create(
+  async create(sub: string, input: TodoDraft): Promise<TodoDto> {
+    const todo = await this.insertOne(this.todos.manager, sub, input);
+    // Bump AFTER the insert: pre-mutation reads die here; a thrown save never bumps.
+    await this.cache.bumpGeneration(sub);
+    // Warm the lists entry at the new generation when this todo references a list,
+    // mirroring the pre-refactor decode-after-bump so a following read does not
+    // repopulate a stale generation (todo-cache.e2e-spec).
+    if (todo.listId !== null) await this.lists.rawRows(sub);
+    return todo;
+  }
+
+  /** The `todos` batch create: one transaction, submission order, one bump (MAP §4). */
+  async createMany(sub: string, items: TodoDraft[]): Promise<TodoDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+    if (results.some((todo) => todo.listId !== null)) await this.lists.rawRows(sub);
+    return results;
+  }
+
+  /**
+   * One todo's insert, through the manager the caller supplies, and with no bump.
+   * The singular route passes the repository's manager and keeps its own bump; a
+   * batch passes the transaction's manager, so the kernel owns one bump for the
+   * whole request.
+   */
+  private async insertOne(
+    manager: EntityManager,
     sub: string,
-    input: {
-      title: string;
-      note?: string;
-      dueDate?: string;
-      repeat?: TodoRepeat | null;
-      repeatDays?: number[] | null;
-      listId?: string;
-      important?: boolean | null;
-      tagIds?: number[];
-    },
+    input: TodoDraft,
   ): Promise<TodoDto> {
+    const todos = manager.getRepository(Todo);
+    const todoTags = manager.getRepository(TodoTag);
     const dueDate = input.dueDate == null ? null : this.normalizeDue(input.dueDate, this.tz);
     const repeat = input.repeat ?? null;
     if (repeat !== null && dueDate === null) {
@@ -635,7 +671,7 @@ export class TodosService {
     const ids = normalizeTagIds(input.tagIds);
     const dek = await this.keys.getOrCreateDek(sub);
     const now = new Date();
-    const todo = this.todos.create({
+    const todo = todos.create({
       id,
       title: encryptField(dek, input.title, todoTitleAad(sub, id)),
       note:
@@ -655,14 +691,12 @@ export class TodosService {
       updatedAt: now,
       deletedAt: null,
     });
-    const saved = await this.todos.save(todo);
+    const saved = await todos.save(todo);
     // Association rows are managed explicitly (TagRef joins, not a cascade
     // relation) so a write stores exactly the ids it carries.
     if (ids.length > 0) {
-      await this.todoTags.insert(ids.map((tagId) => ({ todoId: id, tagId })));
+      await todoTags.insert(ids.map((tagId) => ({ todoId: id, tagId })));
     }
-    // Bump AFTER the insert: pre-mutation reads die here; a thrown save never bumps.
-    await this.cache.bumpGeneration(sub);
     const row = { ...toCachedTodoRow(saved), tagIds: ids };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
@@ -888,7 +922,53 @@ export class TodosService {
    * reminder; the `'~'` sentinel leaves the due untouched (N2/N3).
    */
   async update(sub: string, id: string, patch: TodoPatch): Promise<TodoDto> {
-    const todo = await this.loadForUpdate(sub, id, patch);
+    // The singular route owns its transaction, because a `done` patch writes the
+    // flag, the completion log and the advance as one unit.
+    const todo = await this.dataSource.transaction((manager) =>
+      this.updateOne(manager, sub, id, patch),
+    );
+    // Bump AFTER save/commit — a 409 above never bumps, a thrown transaction
+    // never reaches here.
+    await this.cache.bumpGeneration(sub);
+    if (todo.listId !== null) await this.lists.rawRows(sub);
+    return todo;
+  }
+
+  /**
+   * The `todos` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` on any item throws `409` and rolls the whole batch
+   * back, so the items before it are unchanged too.
+   */
+  async updateMany(
+    sub: string,
+    items: (TodoPatch & { id: string })[],
+  ): Promise<TodoDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+    if (results.some((todo) => todo.listId !== null)) await this.lists.rawRows(sub);
+    return results;
+  }
+
+  /**
+   * One todo's patch, through the manager the caller supplies, and with no bump.
+   *
+   * Every write this performs goes through `manager`, the `done`-tick completion
+   * rows included, and it never opens a transaction of its own: the singular
+   * route opens one above it and a batch arrives inside the kernel's, so a second
+   * one here would nest and break atomicity.
+   */
+  private async updateOne(
+    manager: EntityManager,
+    sub: string,
+    id: string,
+    patch: TodoPatch,
+  ): Promise<TodoDto> {
+    const todo = await this.loadForUpdate(manager, sub, id, patch);
     // Write path: always envelopes. Re-encrypting with a fresh nonce is correct
     // even when the plaintext is unchanged.
     const dek = await this.keys.getOrCreateDek(sub);
@@ -898,7 +978,7 @@ export class TodosService {
 
     // Advance-on-tick: a recurring tick moves the todo to its next occurrence
     // and keeps it open; a non-recurring `done:true` closes it. The mutation
-    // itself (flag + completion log + advance) runs in one transaction below.
+    // itself (flag + completion log + advance) is written below.
     const advance = patch.done === true && todo.repeat !== null && todo.dueDate !== null;
 
     // The repeat-requires-due invariant holds against the resulting due.
@@ -911,25 +991,39 @@ export class TodosService {
       todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
     }
 
-    const currentIds = await this.resolveTagIds(id, patch.tagIds);
+    const currentIds = await this.resolveTagIds(manager, id, patch.tagIds);
 
     todo.version += 1;
     todo.updatedAt = new Date();
-    const saved = await this.savePatch(todo, patch, sub, id, advance);
-    // Bump AFTER the save/commit — a 409 above never bumps, a thrown
-    // transaction never reaches here.
-    await this.cache.bumpGeneration(sub);
-    const row = { ...toCachedTodoRow(saved), tagIds: currentIds };
+    const saved = await this.savePatch(manager, todo, patch, sub, id, advance);
+    return this.answerWithDecodedTodo(saved, currentIds, sub, dek);
+  }
+
+  /** The wire DTO for a just-saved todo, assembled after the write, not inside it. */
+  private async answerWithDecodedTodo(
+    saved: Todo,
+    tagIds: number[],
+    sub: string,
+    dek: Buffer,
+  ): Promise<TodoDto> {
+    const row = { ...toCachedTodoRow(saved), tagIds };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
 
   /** Load + authorise a PATCH target (a foreign id and a missing one are one 404). */
-  private async loadForUpdate(sub: string, id: string, patch: TodoPatch): Promise<Todo> {
+  private async loadForUpdate(
+    manager: EntityManager,
+    sub: string,
+    id: string,
+    patch: TodoPatch,
+  ): Promise<Todo> {
     if (patch.listId !== undefined && patch.listId !== null) {
       await this.lists.assertOwnedList(sub, patch.listId);
     }
     // Load WITHOUT the relation: associations are managed explicitly by the caller.
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    const todo = await manager
+      .getRepository(Todo)
+      .findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!todo) throw new NotFoundException('Todo not found');
     if (patch.expectedVersion !== undefined && todo.version !== patch.expectedVersion) {
       throw new ConflictException('Todo was modified');
@@ -983,35 +1077,45 @@ export class TodosService {
   }
 
   /** Replace the association set on a `tagIds` write, else read the committed one. */
-  private async resolveTagIds(todoId: string, tagIds: number[] | undefined): Promise<number[]> {
+  private async resolveTagIds(
+    manager: EntityManager,
+    todoId: string,
+    tagIds: number[] | undefined,
+  ): Promise<number[]> {
+    const todoTags = manager.getRepository(TodoTag);
     if (tagIds === undefined) {
-      return (await this.todoTags.find({ where: { todoId } }))
-        .map((tt) => tt.tagId)
+      return (await todoTags.find({ where: { todoId } }))
+        .map((todoTag) => todoTag.tagId)
         .sort((a, b) => a - b);
     }
     const ids = normalizeTagIds(tagIds);
-    await this.todoTags.delete({ todoId });
+    await todoTags.delete({ todoId });
     if (ids.length > 0) {
-      await this.todoTags.insert(ids.map((tagId) => ({ todoId, tagId })));
+      await todoTags.insert(ids.map((tagId) => ({ todoId, tagId })));
     }
     return ids;
   }
 
-  /** Persist the row; a `done` patch mutates flag + completion log + advance atomically. */
-  private savePatch(
+  /**
+   * Persist the row through `manager`. A `done` patch also mutates the flag, the
+   * completion log and the advance, and those writes ride the same manager, so
+   * they commit or roll back with the row.
+   */
+  private async savePatch(
+    manager: EntityManager,
     todo: Todo,
     patch: TodoPatch,
     sub: string,
     id: string,
     advance: boolean,
   ): Promise<Todo> {
-    if (patch.done === undefined) return this.todos.save(todo);
-    return this.dataSource.transaction(async (manager) => {
-      if (advance) await this.advanceOnTick(manager, sub, todo, id);
-      else if (patch.done === true) await this.closeOnTick(manager, sub, todo, id);
-      else await this.undoCompletion(manager, sub, todo, id);
-      return manager.save(todo);
-    });
+    // A patch that carries no `done` moves no completion log, so the row alone
+    // is the write.
+    if (patch.done === undefined) return manager.save(todo);
+    if (advance) await this.advanceOnTick(manager, sub, todo, id);
+    else if (patch.done === true) await this.closeOnTick(manager, sub, todo, id);
+    else await this.undoCompletion(manager, sub, todo, id);
+    return manager.save(todo);
   }
 
   /**
@@ -1020,12 +1124,43 @@ export class TodosService {
    * ids are a byte-identical 404; a failed mutation never bumps the generation.
    */
   async remove(sub: string, id: string): Promise<void> {
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!todo) throw new NotFoundException('Todo not found');
-    todo.deletedAt = new Date();
-    await this.todos.save(todo);
+    await this.softDeleteOne(this.todos.manager, sub, id);
     // Bump AFTER the mutation: pre-mutation entries die here. No version change.
     await this.cache.bumpGeneration(sub);
+  }
+
+  /**
+   * The `todos` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning. The ids come back for per-item
+   * confirmation without a partial-success envelope; a foreign id is `404` and
+   * rolls the whole batch back, leaving every row live.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
+    });
+    return { deleted };
+  }
+
+  /**
+   * One todo's move to trash, through the manager the caller supplies, and with
+   * no bump. Soft by definition — `deletedAt` is set and `version` is untouched —
+   * so a batch delete means exactly what the singular delete means and the row
+   * stays restorable.
+   */
+  private async softDeleteOne(manager: EntityManager, sub: string, id: string): Promise<void> {
+    const todos = manager.getRepository(Todo);
+    const todo = await todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!todo) throw new NotFoundException('Todo not found');
+    todo.deletedAt = new Date();
+    await todos.save(todo);
   }
 
   /**

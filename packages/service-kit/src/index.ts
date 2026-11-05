@@ -6,6 +6,9 @@ export {
   type HealthOptions,
 } from './health.service';
 export { IS_PUBLIC_KEY, Public } from './public.decorator';
+export { assertBatchSize, MAX_BATCH_ITEMS } from './batch/batch-limits';
+export { runInSubmissionOrder } from './batch/batch-item';
+export { runAtomicBatch, type BatchRun } from './batch/batch-runner';
 export { AuthGuard, Principal, type AuthenticatedRequest } from './auth';
 export {
   createJwksResolver,

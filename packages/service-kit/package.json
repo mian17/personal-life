@@ -10,6 +10,7 @@
     "test:unit": "jest"
   },
   "peerDependencies": {
+    "@life/cache": "*",
     "@life/crypto": "*",
     "@life/shared": "*",
     "@nestjs/common": "^11.0.11",
@@ -19,6 +20,7 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
+    "@life/cache": "*",
     "@life/crypto": "*",
     "@life/shared": "*",
     "@nestjs/common": "^11.0.11",
@@ -53,6 +55,7 @@
     },
     "testEnvironment": "node",
     "moduleNameMapper": {
+      "^@life/cache$": "<rootDir>/../cache/src/index.ts",
       "^@life/shared$": "<rootDir>/../shared/src/index.ts",
       "^@life/crypto$": "<rootDir>/../crypto/src/index.ts"
     },

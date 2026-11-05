@@ -12,6 +12,7 @@ import { PhotoModule } from './photo/photo.module';
 import { SavedMeal } from './saved-meals/saved-meal.entity';
 import { SavedMealItem } from './saved-meals/saved-meal-item.entity';
 import { SavedMealsModule } from './saved-meals/saved-meals.module';
+import { MealBatchController } from './batch/meal-batch.controller';
 import { Target } from './targets/target.entity';
 import { TargetModule } from './targets/target.module';
 
@@ -31,5 +32,9 @@ import { TargetModule } from './targets/target.module';
     SavedMealsModule,
     PhotoModule,
   ],
+  // All eight batch routes live on one prefix-less controller (`SPEC-meal-service`
+  // §5), registered here so their literal paths resolve ahead of every imported
+  // resource module's parameter route.
+  controllers: [MealBatchController],
 })
 export class AppModule {}

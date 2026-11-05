@@ -1,10 +1,10 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
 import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 
 /** The list DTO (`SPEC-todo-service` API): `version` is the OCC counter. */
@@ -23,6 +23,13 @@ interface CachedListRow {
   importantDefault: boolean | null;
   version: number;
   createdAt: string;
+}
+
+/** A rename as `PATCH /api/lists/:id` (and one `:batchUpdate` item) carries it. */
+interface ListRename {
+  name: string;
+  importantDefault?: boolean | null;
+  expectedVersion?: number;
 }
 
 /**
@@ -126,8 +133,24 @@ export class ListsService {
    * collision check must not be decided by a possibly-stale entry, and a write
    * must not populate a generation it is about to invalidate.
    */
-  private ownerRows(sub: string): Promise<List[]> {
-    return this.lists.find({ where: { ownerSub: sub }, order: { createdAt: 'ASC' } });
+  private ownerRows(manager: EntityManager, sub: string): Promise<List[]> {
+    return manager.getRepository(List).find({
+      where: { ownerSub: sub },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the lists' own, at
+   * module init.
+   *
+   * ponytail: taken from the injected repository rather than a fourth
+   * constructor argument, so the shared unit harness that builds this service
+   * positionally keeps compiling. Upgrade path: `@InjectDataSource()` once that
+   * harness is converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.lists.manager.connection;
   }
 
   /** Decrypt the owner's rows (at most one DEK unwrap per read). */
@@ -168,8 +191,44 @@ export class ListsService {
     name: string,
     importantDefault: boolean | null = null,
   ): Promise<ListDto> {
+    const list = await this.createOne(this.lists.manager, sub, name, importantDefault);
+    // Bump AFTER the mutation: pre-write entries die here.
+    await this.cache.bumpGeneration(sub);
+    return list;
+  }
+
+  /**
+   * The `lists` batch create: one transaction, submission order, one bump. Two
+   * colliding names inside one batch are `409` and roll the whole batch back, so
+   * neither list is created.
+   */
+  async createMany(
+    sub: string,
+    items: { name: string; importantDefault?: boolean | null }[],
+  ): Promise<ListDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) =>
+        this.createOne(manager, sub, item.name, item.importantDefault ?? null),
+    });
+  }
+
+  /**
+   * One list's insert, through the manager the caller supplies, and with no bump.
+   * The collision check reads the transaction's own rows, so an earlier item in
+   * the same batch is visible to a later one.
+   */
+  private async createOne(
+    manager: EntityManager,
+    sub: string,
+    name: string,
+    importantDefault: boolean | null,
+  ): Promise<ListDto> {
     const dek = await this.keys.getOrCreateDek(sub);
-    const rows = await this.ownerRows(sub);
+    const rows = await this.ownerRows(manager, sub);
     const wanted = name.toLowerCase();
     const collision = rows.some(
       (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
@@ -178,8 +237,9 @@ export class ListsService {
 
     // The AAD binds the generated id, so it must exist before the ciphertext.
     const id = randomUUID();
-    const saved = await this.lists.save(
-      this.lists.create({
+    const lists = manager.getRepository(List);
+    const saved = await lists.save(
+      lists.create({
         id,
         name: encryptField(dek, name, listNameAad(sub, id)),
         importantDefault,
@@ -188,8 +248,6 @@ export class ListsService {
         createdAt: new Date(),
       }),
     );
-    // Bump AFTER the mutation: pre-write entries die here.
-    await this.cache.bumpGeneration(sub);
     return { ...toCachedListRow(saved), name };
   }
 
@@ -207,26 +265,59 @@ export class ListsService {
     importantDefault?: boolean | null,
     expectedVersion?: number,
   ): Promise<ListDto> {
-    const list = await this.lists.findOne({ where: { id, ownerSub: sub } });
+    const list = await this.renameOne(this.lists.manager, sub, id, {
+      name,
+      importantDefault,
+      expectedVersion,
+    });
+    await this.cache.bumpGeneration(sub);
+    return list;
+  }
+
+  /**
+   * The `lists` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` on any item is `409` and rolls the whole batch back.
+   */
+  async updateMany(sub: string, items: (ListRename & { id: string })[]): Promise<ListDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.renameOne(manager, sub, item.id, item),
+    });
+  }
+
+  /**
+   * One list's rename (and/or default-importance change), through the manager
+   * the caller supplies, and with no bump.
+   */
+  private async renameOne(
+    manager: EntityManager,
+    sub: string,
+    id: string,
+    rename: ListRename,
+  ): Promise<ListDto> {
+    const lists = manager.getRepository(List);
+    const list = await lists.findOne({ where: { id, ownerSub: sub } });
     if (!list) throw new NotFoundException('List not found');
-    if (expectedVersion !== undefined && list.version !== expectedVersion) {
+    if (rename.expectedVersion !== undefined && list.version !== rename.expectedVersion) {
       throw new ConflictException('List was modified');
     }
 
     const dek = await this.keys.getOrCreateDek(sub);
-    const wanted = name.toLowerCase();
-    const siblings = await this.ownerRows(sub);
+    const wanted = rename.name.toLowerCase();
+    const siblings = await this.ownerRows(manager, sub);
     const collision = siblings.some(
       (row) => row.id !== id && this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
     );
     if (collision) throw new ConflictException('List name already exists');
 
-    list.name = encryptField(dek, name, listNameAad(sub, id));
-    if (importantDefault !== undefined) list.importantDefault = importantDefault;
+    list.name = encryptField(dek, rename.name, listNameAad(sub, id));
+    if (rename.importantDefault !== undefined) list.importantDefault = rename.importantDefault;
     list.version += 1;
-    const saved = await this.lists.save(list);
-    await this.cache.bumpGeneration(sub);
-    return { ...toCachedListRow(saved), name };
+    const saved = await lists.save(list);
+    return { ...toCachedListRow(saved), name: rename.name };
   }
 
   /**

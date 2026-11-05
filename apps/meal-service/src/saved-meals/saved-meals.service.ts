@@ -1,15 +1,17 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService } from '@life/service-kit';
+import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import { completeVector, readStoredVector } from '../foods/content';
 import type { MealGroup } from '../entries/dto/create-entry.dto';
 import { SavedMeal } from './saved-meal.entity';
@@ -85,7 +87,40 @@ export class SavedMealsService {
     @InjectRepository(SavedMealItem) private readonly items: Repository<SavedMealItem>,
     private readonly cache: SavedMealsCache,
     private readonly keys: KeysService,
+    // Optional only so the unit suites that build this service positionally keep
+    // compiling; `SavedMealsModule` always provides the token, so a batch always
+    // has the service's one cache adapter to bump.
+    @Inject(MEAL_CACHE) private readonly mealCache?: MealCache,
   ) {}
+
+  /**
+   * The service's one cache adapter, as the batch kernel types it. The resource
+   * cache helper composes the adapter rather than extending it, so a batch hands
+   * the kernel the adapter itself — one bump then invalidates this owner's whole
+   * read set (`SPEC-meal-service.md` §6).
+   *
+   * The module always provides the token, so this never throws under Nest; the
+   * typed throw only guards a hand-built service in a unit suite.
+   */
+  private requireMealCache(): MealCache {
+    if (!this.mealCache) {
+      throw new Error('MEAL_CACHE is unavailable: the batch cache adapter is not wired');
+    }
+    return this.mealCache;
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * go to, taken from the injected repository instead of a fifth constructor
+   * argument so the existing suites that build this service positionally keep
+   * compiling.
+   *
+   * ponytail: upgrade path is `@InjectDataSource()` once those suites are
+   * converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.meals.manager.connection;
+  }
 
   /**
    * Decrypt-or-passthrough (mirrors `EntriesService`): an `enc.v1.` value is
@@ -197,10 +232,43 @@ export class SavedMealsService {
    * write (a thrown save never bumps).
    */
   async create(sub: string, dto: CreateSavedMealDto): Promise<SavedMealDto> {
+    const meal = await this.insertOne(this.meals.manager, sub, dto);
+    await this.cache.bump(sub);
+    return meal;
+  }
+
+  /**
+   * The `saved-meals` batch create: one transaction, submission order, one bump.
+   * Ten meals of ten items each is 110 rows and still commits or rolls back
+   * whole (§5).
+   */
+  async createMany(sub: string, items: CreateSavedMealDto[]): Promise<SavedMealDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+  }
+
+  /**
+   * One saved meal's insert plus its frozen item rows, through the manager the
+   * caller supplies, and with no bump. Every write here — the meal row and each
+   * frozen item — goes through `manager`, so a batch's items roll back with
+   * their meal.
+   */
+  private async insertOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    dto: CreateSavedMealDto,
+  ): Promise<SavedMealDto> {
+    const meals = this.mealsFor(manager);
+    const items = this.itemsFor(manager);
     const id = randomUUID();
     const dek = await this.keys.getOrCreateDek(sub);
 
-    const meal = this.meals.create({
+    const meal = meals.create({
       id,
       ownerSub: sub,
       name: encryptField(dek, dto.name, savedMealNameAad(sub, id)),
@@ -208,14 +276,25 @@ export class SavedMealsService {
       version: 0,
       deletedAt: null,
     });
-    const saved = await this.meals.save(meal);
+    const saved = await meals.save(meal);
+    const savedItems = await items.save(this.frozenItems(sub, saved.id, dto, dek, items));
+    return this.toDto(toCachedSavedMealRow(saved, savedItems), sub, dek);
+  }
 
-    const itemEntities = dto.items.map((item) => {
+  /** One saved meal's item rows, sealed from the client's corrected values. */
+  private frozenItems(
+    sub: string,
+    savedMealId: string,
+    dto: CreateSavedMealDto,
+    dek: Buffer,
+    items: Repository<SavedMealItem>,
+  ): SavedMealItem[] {
+    return dto.items.map((item) => {
       const itemId = randomUUID();
-      return this.items.create({
+      return items.create({
         id: itemId,
         ownerSub: sub,
-        savedMealId: saved.id,
+        savedMealId,
         foodId: item.foodId ?? null,
         quantity: item.quantity,
         nutrients: this.sealVector(
@@ -225,20 +304,65 @@ export class SavedMealsService {
         ),
       });
     });
-    const savedItems = await this.items.save(itemEntities);
-
-    await this.cache.bump(sub);
-    return this.toDto(toCachedSavedMealRow(saved, savedItems), sub, dek);
   }
 
+  /** `DELETE /api/saved-meals/:id` — soft delete; the meal leaves every read. */
   async remove(sub: string, id: string): Promise<void> {
-    const meal = await this.meals.findOne({
-      where: { id, ownerSub: sub, deletedAt: IsNull() },
+    await this.softDeleteOne(this.meals.manager, sub, id);
+    await this.cache.bump(sub);
+  }
+
+  /**
+   * The `saved-meals` batch delete: one transaction, submission order, one bump,
+   * and the singular route's soft-delete meaning. A foreign id is a 404 and
+   * rolls the whole batch back.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
     });
+    return { deleted };
+  }
+
+  /**
+   * One saved meal's move out of the reads, through the manager the caller
+   * supplies, and with no bump. Soft by definition, mirroring the singular
+   * delete: the frozen item rows stay with the trashed meal.
+   */
+  private async softDeleteOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+  ): Promise<void> {
+    const meals = this.mealsFor(manager);
+    const meal = await meals.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!meal) throw new NotFoundException('Saved meal not found');
     meal.deletedAt = new Date();
-    await this.meals.save(meal);
-    await this.cache.bump(sub);
+    await meals.save(meal);
+  }
+
+  /**
+   * The saved-meal repository a write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it. No
+   * manager means the service's own repository — the singular path, and the only
+   * shape a unit suite's repository double can supply.
+   */
+  private mealsFor(manager: EntityManager | undefined): Repository<SavedMeal> {
+    if (!manager) return this.meals;
+    return manager.getRepository(SavedMeal);
+  }
+
+  /** The frozen-item repository a write runs against, under the same rule. */
+  private itemsFor(manager: EntityManager | undefined): Repository<SavedMealItem> {
+    if (!manager) return this.items;
+    return manager.getRepository(SavedMealItem);
   }
 
   /**
