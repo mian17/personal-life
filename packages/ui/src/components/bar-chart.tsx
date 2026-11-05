@@ -1,10 +1,10 @@
 'use client';
 
-import type { ScaleFunction } from 'recharts';
+import type { BarShapeProps, ScaleFunction } from 'recharts';
 import {
   Bar,
   BarChart as RechartsBarChart,
-  Cell,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   XAxis,
@@ -105,24 +105,28 @@ export function BarChart({ data, label, height = DEFAULT_HEIGHT }: Readonly<BarC
               dataKey="value"
               minPointSize={EMPTY_BAR_HEIGHT}
               isAnimationActive={false}
-            >
-              {rows.map((row) => (
-                <Cell
-                  key={row.index}
-                  // An SVG `fill` cannot name a Tailwind colour utility, so it reads the token
-                  // directly: `--max` is declared in the app's scope, which this chart sits
-                  // inside, so the bar takes the app's accent in both schemes the way `bg-max`
-                  // does in the markup around it. A zero bucket keeps the muted chart tone.
-                  fill={row.value === 0 ? 'var(--chart-muted)' : 'var(--max)'}
-                />
-              ))}
-            </Bar>
+              shape={BucketBar}
+            />
           </RechartsBarChart>
         </ResponsiveContainer>
       </div>
       <BucketList buckets={data} />
     </div>
   );
+}
+
+/**
+ * One bar: recharts' own rectangle, filled from the bucket's token. `Cell` is deprecated in
+ * recharts 3 and removed in 4, so the per-bucket fill rides the series' `shape` instead — the
+ * same `Rectangle` the chart draws by default, given the fill its bucket earns.
+ */
+function BucketBar({ x, y, width, height, value }: BarShapeProps) {
+  // An SVG `fill` cannot name a Tailwind colour utility, so it reads the token directly: `--max`
+  // is declared in the app's scope, which this chart sits inside, so the bar takes the app's
+  // accent in both schemes the way `bg-max` does in the markup around it. A zero bucket keeps
+  // the muted chart tone.
+  const fill = value === 0 ? 'var(--chart-muted)' : 'var(--max)';
+  return <Rectangle x={x} y={y} width={width} height={height} fill={fill} />;
 }
 
 /**

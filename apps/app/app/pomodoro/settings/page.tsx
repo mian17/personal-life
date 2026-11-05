@@ -40,9 +40,9 @@ const GOAL_REJECTED_FLAG = 'rejected';
  */
 export default async function PomodoroSettingsRoute({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ goal?: string }>;
-}) {
+}>) {
   const [durations, dailyGoal] = await Promise.all([readDurations(), readDailyGoal()]);
   const goalRejected = (await searchParams).goal === GOAL_REJECTED_FLAG;
 

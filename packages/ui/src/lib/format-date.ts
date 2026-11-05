@@ -80,12 +80,17 @@ export function formatLongDate(iso: string): string {
 export function formatNoteMeta(iso: string, tagName?: string): string {
   const part = datePart(iso);
   if (part === '' || !isRealDate(part)) return '';
-  const base = todayIso();
-  const day =
-    part === base ? 'Today' : part === dayBefore(base) ? 'Yesterday' : formatDayMonth(part);
+  const day = relativeDayName(part, todayIso());
   const time = localTimePart(iso);
   const dated = time === '' ? day : `${day}, ${time}`;
   return tagName == null || tagName === '' ? dated : `${dated} · ${tagName}`;
+}
+
+/** `Today` / `Yesterday` for the two days around `base`, and the plain day-month date otherwise. */
+function relativeDayName(part: string, base: string): string {
+  if (part === base) return 'Today';
+  if (part === dayBefore(base)) return 'Yesterday';
+  return formatDayMonth(part);
 }
 
 /** The `YYYY-MM-DD` before `part`, via UTC so no timezone drift reaches it. */

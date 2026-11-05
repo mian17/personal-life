@@ -29,7 +29,7 @@ const subStyles = cx(
   'text-[length:var(--fs-meta)] leading-[var(--lh-meta)] text-ink-2',
 );
 
-export function PageTitle({ sub, className, children, ...rest }: PageTitleProps) {
+export function PageTitle({ sub, className, children, ...rest }: Readonly<PageTitleProps>) {
   return (
     <>
       <h1

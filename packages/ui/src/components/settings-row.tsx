@@ -89,6 +89,33 @@ const buttonLabelStyles = cx(
   linkLabelStyles,
 );
 
+/** The label's box: an anchor when the row routes, a button when it acts, plain text otherwise. */
+function RowLabel({
+  label,
+  href,
+  onClick,
+}: Readonly<Pick<SettingsRowProps, 'label' | 'href' | 'onClick'>>) {
+  const baseClassName = cx('ui-settings-row__label', labelStyles);
+
+  if (href != null) {
+    return (
+      <Link href={href} className={cx(baseClassName, linkLabelStyles)}>
+        {label}
+      </Link>
+    );
+  }
+
+  if (onClick != null) {
+    return (
+      <button type="button" onClick={onClick} className={cx(baseClassName, buttonLabelStyles)}>
+        {label}
+      </button>
+    );
+  }
+
+  return <span className={baseClassName}>{label}</span>;
+}
+
 export function SettingsRow({
   label,
   description,
@@ -98,23 +125,7 @@ export function SettingsRow({
   className,
 }: Readonly<SettingsRowProps>) {
   const isInteractive = href != null || onClick != null;
-
-  const labelNode =
-    href != null ? (
-      <Link href={href} className={cx('ui-settings-row__label', labelStyles, linkLabelStyles)}>
-        {label}
-      </Link>
-    ) : onClick != null ? (
-      <button
-        type="button"
-        onClick={onClick}
-        className={cx('ui-settings-row__label', labelStyles, buttonLabelStyles)}
-      >
-        {label}
-      </button>
-    ) : (
-      <span className={cx('ui-settings-row__label', labelStyles)}>{label}</span>
-    );
+  const labelNode = <RowLabel label={label} href={href} onClick={onClick} />;
 
   const chevron = isInteractive && (
     <ChevronRight size={18} aria-hidden className="shrink-0 text-ink-3" />
