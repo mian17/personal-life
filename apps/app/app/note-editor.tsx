@@ -484,7 +484,12 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
   return (
     <EditorChrome
       back={{ label: 'Back', onBack: () => void leave(), variant: 'framed' }}
-      status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
+      // The toolbar owns the screen's `<h1>`; without a title these two screens were
+      // headed-less. "New note" is the wording the index FAB already uses.
+      title={note == null ? 'New note' : 'Edit note'}
+      // A title replaces the status slot in the toolbar, so the save read-out moves
+      // to the sub-line — same `StatusText`, so it keeps its live region.
+      sub={<StatusText>{STATUS_TEXT[status]}</StatusText>}
       actions={
         note != null && (
           <Menu

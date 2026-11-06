@@ -21,7 +21,7 @@ export interface SettingsRowProps {
 /**
  * One setting on a single line at every width: label column left, the caller's
  * control column right. The reference `.row` has no media query, so neither does
- * this one — a narrow screen ellipsizes the label instead of restacking it.
+ * this one — a narrow screen wraps or ellipsizes the label instead of restacking it.
  *
  * With `href` the label is the link target and the row's far end carries the
  * chevron (plus the caller's control, when one is given). The row itself stays a
@@ -46,8 +46,22 @@ const interactiveRowStyles = 'cursor-pointer active:bg-press';
 /** The label column asks for its own text width, so a shrinking control leaves it some room. */
 const textStyles = 'flex flex-auto flex-col gap-[var(--s1)] min-w-0';
 
-/** A label may ellipsize only if its own box is allowed to shrink. */
-const labelStyles = 'min-w-0 truncate text-[length:var(--fs-row-title)]';
+/**
+ * A label may ellipsize only if its own box is allowed to shrink.
+ *
+ * A label carrying a description below it stays on one line — the two would otherwise compete for
+ * the row's height and the description would read as a second half of the label. A label that is
+ * the row's only text wraps onto a second line instead, because the column is the binding
+ * constraint in a narrow row: "Calories (kcal)" is 99px of content in a 94px box, and the unit an
+ * ellipsis removes is the part that says whether the number is kcal or kJ.
+ */
+const labelBaseStyles = 'min-w-0 text-[length:var(--fs-row-title)]';
+const labelOneLineStyles = 'truncate';
+const labelTwoLineStyles = 'line-clamp-2';
+
+function labelStylesFor(hasDescription: boolean): string {
+  return cx(labelBaseStyles, hasDescription ? labelOneLineStyles : labelTwoLineStyles);
+}
 
 /** §8's `.row__meta` treatment for the optional second line, clamped so it never grows the row. */
 const descriptionStyles = cx(
@@ -94,8 +108,9 @@ function RowLabel({
   label,
   href,
   onClick,
-}: Readonly<Pick<SettingsRowProps, 'label' | 'href' | 'onClick'>>) {
-  const baseClassName = cx('ui-settings-row__label', labelStyles);
+  hasDescription,
+}: Readonly<Pick<SettingsRowProps, 'label' | 'href' | 'onClick'> & { hasDescription: boolean }>) {
+  const baseClassName = cx('ui-settings-row__label', labelStylesFor(hasDescription));
 
   if (href != null) {
     return (
@@ -125,7 +140,9 @@ export function SettingsRow({
   className,
 }: Readonly<SettingsRowProps>) {
   const isInteractive = href != null || onClick != null;
-  const labelNode = <RowLabel label={label} href={href} onClick={onClick} />;
+  const labelNode = (
+    <RowLabel label={label} href={href} onClick={onClick} hasDescription={description != null} />
+  );
 
   const chevron = isInteractive && (
     <ChevronRight size={18} aria-hidden className="shrink-0 text-ink-3" />

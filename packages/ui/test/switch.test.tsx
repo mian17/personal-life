@@ -61,6 +61,32 @@ describe('Switch', () => {
     render(<Switch checked label="Eisenhower matrix" name="matrixEnabled" />);
     expect(screen.getByRole('switch').getAttribute('name')).toBe('matrixEnabled');
   });
+
+  /**
+   * Regression (visual defect H2): the track's 24px height used to *be* the button's height, so
+   * `button.ui-switch` measured 44x24 and a thumb aimed above or below the strip missed. The
+   * button now carries the `--tap` target while the painted strip keeps its own geometry.
+   */
+  it('carries the tap target on the button and the painted track on a child', () => {
+    const { container } = render(<Switch checked label="Eisenhower matrix" />);
+    const target = screen.getByRole('switch');
+    expect(target.classList.contains('size-[var(--tap)]')).toBe(true);
+    expect(target.classList.contains('h-[var(--s6)]')).toBe(false);
+
+    const track = container.querySelector('[data-slot="switch-track"]')!;
+    expect(track.tagName).toBe('SPAN');
+    expect(track.getAttribute('aria-hidden')).toBe('true');
+    expect(track.classList.contains('h-[var(--s6)]')).toBe(true);
+    expect(track.classList.contains('w-[calc(var(--s6)+var(--s5))]')).toBe(true);
+    expect(track.querySelector('[data-slot="switch-thumb"]')).not.toBeNull();
+  });
+
+  it('paints the track fill from the button state, so the accent still follows checked', () => {
+    const { container } = render(<Switch checked label="Eisenhower matrix" />);
+    expect(screen.getByRole('switch').classList.contains('group')).toBe(true);
+    const track = container.querySelector('[data-slot="switch-track"]')!;
+    expect(track.classList.contains('group-data-[state=checked]:bg-max')).toBe(true);
+  });
 });
 
 describe('Switch focus ring', () => {

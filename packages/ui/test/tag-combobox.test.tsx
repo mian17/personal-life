@@ -200,17 +200,44 @@ describe('TagCombobox', () => {
     expect(chipRow.classList.contains('pr-[var(--s6)]')).toBe(true);
   });
 
-  it('lets a chip-body press through to the trigger and takes it back for the remove control', () => {
+  it('makes each whole chip a press target and leaves the field blank area to the trigger', () => {
     setup({ selectedIds: [1, 2] });
 
     // jsdom computes no layout and no hit-testing, so the class pair is all a run can assert here;
-    // the browser does the rest — a press on a chip's body lands on the trigger underneath it.
+    // the browser does the rest — a press on a chip's body lands on the chip.
     const chipRow = document.querySelector('.ui-tag-combobox__chips')!;
     expect(chipRow.classList.contains('pointer-events-none')).toBe(true);
-    expect(chipRow.classList.contains('[&_button]:pointer-events-auto')).toBe(true);
+    expect(chipRow.classList.contains('[&_.ui-pill]:pointer-events-auto')).toBe(true);
+    // The row still passes the field's blank area through, so a press there opens the panel.
+    expect(chipRow.classList.contains('[&_button]:pointer-events-auto')).toBe(false);
+  });
 
-    // The chips' own controls opt back in, so a removal still lands on the chip, not the panel.
-    expect(chipRow.contains(screen.getByRole('button', { name: 'Remove home' }))).toBe(true);
+  it('detaches a tag on a press of the chip body, not only on its remove control', () => {
+    const { onToggle } = setup({ selectedIds: [2] });
+
+    fireEvent.click(screen.getByText('home'));
+
+    expect(onToggle).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('toggles a chip body press once, not twice, when the press is on the remove control', () => {
+    const { onToggle } = setup({ selectedIds: [2] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove home' }));
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith(2);
+  });
+
+  it('keeps the chip body press out of the panel, so it never reopens the dropdown', async () => {
+    render(<Controlled initialSelected={[2]} />);
+    await settle();
+
+    fireEvent.click(screen.getByText('home'));
+
+    expect(chips()).toHaveLength(0);
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('keeps every chip and its remove control when the row wraps', () => {

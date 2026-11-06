@@ -45,9 +45,13 @@ const gridStyles =
 const quadrantStyles =
   'flex flex-col gap-[var(--s2)] p-[var(--s3)] min-h-[calc(var(--s8)*4+var(--s1))] max-h-full overflow-hidden bg-surface-sunken border border-line rounded-[var(--r-lg)]';
 
-/** §8's `.quad__label`: one line of small caps; a long label ellipsizes rather than widening the panel. */
+/**
+ * §8's `.quad__label`: small caps. A long label wraps onto a second, balanced line rather than
+ * ellipsizing — the words a quadrant heading is told apart by are its last two, so an ellipsis
+ * would leave two quadrants reading the same. The panel's `min-h` floor holds two lines.
+ */
 const labelStyles =
-  'm-0 truncate text-[length:var(--fs-count)] [font-weight:var(--fw-section-label)] tracking-[0.04em] uppercase text-ink-2';
+  'm-0 text-balance leading-[var(--lh-meta)] text-[length:var(--fs-count)] [font-weight:var(--fw-section-label)] tracking-[0.04em] uppercase text-ink-2';
 
 /** Heading tint per quadrant tone (off by default). */
 const labelToneStyles: Record<MatrixTone, string> = {

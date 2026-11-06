@@ -17,6 +17,12 @@ export interface PillProps extends ComponentPropsWithRef<'span'> {
    */
   tone?: string;
   active?: boolean;
+  /**
+   * Marks the pill as the current one within its set, for the navigating branch only.
+   * Emits `aria-current="page"` — a filter chip lives in a `nav` and names the view
+   * itself, which is the APG meaning of `page`; `active` stays the visual signal.
+   */
+  current?: boolean;
   as?: PillTag;
   href?: string;
   disabled?: boolean;
@@ -34,7 +40,7 @@ export const pillToneStyles: Record<string, string> = {
   open: 'bg-surface-sunken text-ink-2',
   in_progress: 'bg-warn-soft text-warn',
   done: 'bg-ok-soft text-ok',
-  wont_do: 'bg-surface-sunken text-ink-2',
+  wont_do: 'bg-surface-sunken text-ink-3',
 };
 
 /**
@@ -59,8 +65,25 @@ const pillVariants = cva('inline-flex items-center whitespace-nowrap font-semibo
 const toggleStyles =
   'cursor-pointer appearance-none [font-family:inherit] [line-height:inherit] disabled:cursor-default disabled:opacity-50 focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus';
 
-const removeStyles =
-  'ui-pill__remove min-h-0 cursor-pointer rounded-[var(--r-pill)] border-0 bg-transparent px-[var(--s1)] py-0 text-[length:var(--fs-meta)] font-semibold leading-none text-ink-2 hover:text-danger [font-family:inherit]';
+/**
+ * The chip's remove control. A `--s6` chip cannot hold a 44px target, so the target is drawn
+ * larger than the chip and handed back through negative margins: `--s4` of padding around the
+ * 14px `X` makes a 46px-wide box, `min-h-[var(--tap)]` lifts the vertical side to 48, and the
+ * matching negative margins restore the old 22px advance and the chip's own 24px row. Because
+ * both the padding and the margins are symmetric the glyph does not move, the chip keeps its
+ * height, its trailing edge and its neighbours' positions, and the added area paints nothing
+ * (transparent face, `hover` recolours only the glyph).
+ *
+ * The price is 12px of hit area on each side outside the chip. It lands on its own label and on
+ * the gap to the next chip — never on another chip's remove control, which sits at that chip's
+ * far end — so the worst case is removing the chip whose label was pressed.
+ */
+const removeStyles = cx(
+  'ui-pill__remove inline-flex min-h-[var(--tap)] items-center justify-center p-[var(--s4)]',
+  '-mx-[var(--s3)] -my-[calc((var(--tap)_-_var(--s6))/2)]',
+  'cursor-pointer rounded-[var(--r-pill)] border-0 bg-transparent',
+  'text-[length:var(--fs-meta)] font-semibold leading-none text-ink-2 hover:text-danger [font-family:inherit]',
+);
 
 /** The one colour pair a pill wears: pressed filter, plain filter, or the tone's tint. */
 function pillColours(size: PillSize, tone: string | undefined, active: boolean): string {
@@ -73,6 +96,7 @@ export function Pill({
   size = 'chip',
   tone,
   active = false,
+  current = false,
   as = 'span',
   href,
   disabled,
@@ -138,7 +162,13 @@ export function Pill({
     // The no-href case was handled above as a button, so this branch always navigates.
     const linkProps = rest as unknown as ComponentPropsWithRef<'a'>;
     return (
-      <Link href={href} data-slot="badge" className={cx(classes, 'no-underline')} {...linkProps}>
+      <Link
+        href={href}
+        data-slot="badge"
+        className={cx(classes, 'no-underline')}
+        aria-current={current ? 'page' : undefined}
+        {...linkProps}
+      >
         {content}
       </Link>
     );

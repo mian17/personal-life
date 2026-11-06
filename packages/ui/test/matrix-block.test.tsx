@@ -34,6 +34,30 @@ describe('MatrixBlock', () => {
     expect(heading.classList.contains('ui-matrix__label')).toBe(true);
   });
 
+  /**
+   * M7: the label used to carry `truncate`, so the half-frame column (161px of box for 184px of
+   * `NOT URGENT & NOT IMPORTANT`) cut exactly the words that tell two quadrants apart. It wraps
+   * onto a second balanced line instead; the panel's `min-h` floor already holds the extra line.
+   */
+  it('wraps a long quadrant label instead of truncating its distinguishing words', () => {
+    render(
+      <MatrixBlock
+        quadrants={[
+          { id: 'q4', label: 'Not Urgent & Not Important', items: null, empty: 'Nothing' },
+        ]}
+      />,
+    );
+    const label = document.querySelector('.ui-matrix__label')!;
+
+    expect(label.textContent).toBe('Not Urgent & Not Important');
+    expect(label.classList.contains('truncate')).toBe(false);
+    expect(label.classList.contains('text-balance')).toBe(true);
+    expect(label.classList.contains('leading-[var(--lh-meta)]')).toBe(true);
+    // The rest of the heading treatment is untouched.
+    expect(label.classList.contains('uppercase')).toBe(true);
+    expect(label.classList.contains('text-[length:var(--fs-count)]')).toBe(true);
+  });
+
   it('renders items verbatim inside the quadrant', () => {
     render(<MatrixBlock quadrants={quadrants} />);
     expect(screen.getByTestId('i1').textContent).toBe('first');
@@ -116,7 +140,7 @@ describe('MatrixBlock', () => {
 
     const label = document.querySelector('.ui-matrix__label')!;
     expect(label.classList.contains('m-0')).toBe(true);
-    expect(label.classList.contains('truncate')).toBe(true);
+    expect(label.classList.contains('truncate')).toBe(false);
 
     const items = document.querySelector('.ui-matrix__items')!;
     expect(items.classList.contains('grid')).toBe(true);

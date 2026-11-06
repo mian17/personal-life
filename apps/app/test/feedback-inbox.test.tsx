@@ -59,9 +59,13 @@ function headings(html: string, level: 'h2' | 'h3'): string[] {
   );
 }
 
+/**
+ * The row's title text. A title line that carries an action wraps the text in its own
+ * span (the row primitive's H3 fix), so the read tolerates that one optional wrapper.
+ */
 function rowTitles(html: string): string[] {
   return [
-    ...html.matchAll(/class="ui-list-item__title(?: |")[^"]*"[^>]*>([^<]*)</g),
+    ...html.matchAll(/class="ui-list-item__title(?: |")[^"]*"[^>]*>(?:<span[^>]*>)?([^<]*)</g),
   ].map((m) => m[1]);
 }
 
@@ -196,7 +200,9 @@ describe('FeedbackInbox grouping', () => {
     const html = render([]);
 
     expect(html).toContain('No feedback yet.');
-    expect(html).toContain('Use the feedback button in the toolbar to send the first one.');
+    // The copy names the door that exists: the Settings screen's `Send feedback`
+    // row in its Support group — the toolbar control it used to name is gone.
+    expect(html).toContain('Open Settings → Send feedback to write the first one.');
     expect(html).not.toContain('<ul');
     // The body opens with the group step (a label-less `Section`), not the raw box.
     expect(html.indexOf('ui-section')).toBeGreaterThan(-1);

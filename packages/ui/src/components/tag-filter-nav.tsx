@@ -104,7 +104,7 @@ function useTrailingEdge(strip: HTMLElement | null): boolean {
 
 function FilterChip({ item }: Readonly<{ item: TagFilterItem }>) {
   return (
-    <Pill as="a" size="filter" href={item.href} active={item.active}>
+    <Pill as="a" size="filter" href={item.href} active={item.active} current={item.active}>
       {item.name}
     </Pill>
   );

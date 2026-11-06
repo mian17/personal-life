@@ -21,9 +21,15 @@ describe('EditorScreen', () => {
     expect(screenEl.classList.contains('flex')).toBe(true);
     expect(screenEl.classList.contains('flex-col')).toBe(true);
     expect(screenEl.classList.contains('min-h-[100dvh]')).toBe(true);
+    // L3: `--s3` put the back control at 12px here against 24px on every list and settings screen
+    // (`page-shell`'s `--s4` plus `nav-bar`'s `--s2`), so the one universal control jumped 12px
+    // between navigations inside one app. The frame carries both of the siblings' steps.
     expect(
-      screenEl.classList.contains('pt-[max(var(--s3),env(safe-area-inset-top))]'),
+      screenEl.classList.contains(
+        'pt-[calc(max(var(--s4),env(safe-area-inset-top))+var(--s2))]',
+      ),
     ).toBe(true);
+    expect(screenEl.classList.contains('pt-[max(var(--s3),env(safe-area-inset-top))]')).toBe(false);
     expect(
       screenEl.classList.contains('pb-[calc(var(--s4)+env(safe-area-inset-bottom))]'),
     ).toBe(true);

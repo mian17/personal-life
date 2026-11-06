@@ -45,11 +45,14 @@ const phaseStyles = cx(
   'tracking-[var(--tracking-section-label)]',
 );
 
-/** §8's `.timer__hint`: one label step, its own `--s3` above it, and a line reserved always. */
-const hintStyles = 'mt-[var(--s1)] min-h-[var(--s5)] text-[length:var(--fs-label)]';
+/** §8's `.timer__hint`: the line is reserved always, so the reservation is one `--s4`
+ *  row. The digits-to-track distance is then `--s2` + `--s4` + `--s2` = `--s8`, on the
+ *  ladder; the track adds no margin of its own or the sum lands at 36. */
+const hintStyles =
+  'h-[var(--s4)] overflow-hidden leading-[var(--lh-control)] text-[length:var(--fs-label)]';
 
-/** §8's `.track.mt3` and `.filters` own their top step; the stack supplies the rest. */
-const trackStyles = 'mt-[var(--s1)]';
+/** §8's `.filters` owns its top step; the stack supplies the rest. The track it follows
+ *  adds none — see `hintStyles`: its own step is what would land the band off the ladder. */
 const presetsStyles = 'mt-[var(--s1)]';
 
 /** §8's `.dots.mt4` and `.btn-row.mt4`. */
@@ -94,7 +97,6 @@ export function PomodoroPage({
             {timer.titles.next}
           </StatusText>
           <ProgressBar
-            className={trackStyles}
             value={percentSpent(timer.remainingMs, timer.phase, durations)}
             label="Session progress"
           />
@@ -140,7 +142,7 @@ export function PomodoroPage({
         <List>
           {todayMinutes != null && (
             <ListItem
-              title="Blocks finished"
+              title="Focus minutes"
               trailing={<Pill tone="done">{`${todayMinutes} min`}</Pill>}
             />
           )}
