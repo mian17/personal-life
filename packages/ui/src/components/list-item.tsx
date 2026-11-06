@@ -203,9 +203,12 @@ const denseTitleSizeStyles = 'text-[length:var(--fs-meta)]';
 
 /**
  * A todo row reads up to two title lines, and so does a base list row: the second line is what
- * stops a long note title truncating mid-phrase. A dense row stays one line — it is the tap
- * target and wrapping would grow it past `--tap` — and so do the nested and feedback labels,
- * which sit above their own body with an action beside them.
+ * stops a long title truncating mid-phrase. That holds for a dense row too — the press square
+ * takes 24px more of the row than the pre-redesign inset did, so the column is narrow enough
+ * that one line is where a quadrant title loses its ending. `--tap` is the dense row's floor,
+ * not its height, so a second line grows the row instead of shrinking the target. Only the
+ * nested and feedback labels stay one line: they sit above their own body, with an action
+ * beside them.
  */
 const titleOneLineStyles = 'truncate';
 const titleTwoLineStyles = 'line-clamp-2 whitespace-normal';
@@ -289,8 +292,8 @@ function titleSizeStylesFor(isDense: boolean): string {
   return isDense ? denseTitleSizeStyles : titleSizeStyles;
 }
 
-function titleFlowStylesFor({ variant, isDense }: Readonly<RowFlags>): string {
-  if (isDense || variant === 'nested' || variant === 'feedback') return titleOneLineStyles;
+function titleFlowStylesFor({ variant }: Readonly<RowFlags>): string {
+  if (variant === 'nested' || variant === 'feedback') return titleOneLineStyles;
   return titleTwoLineStyles;
 }
 

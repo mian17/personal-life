@@ -65,6 +65,25 @@ describe('IconButton', () => {
     expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
   });
 
+  /**
+   * Regression (M1): a `w-full` sibling makes the row's deficit 56px, and without `shrink-0` this
+   * control absorbed 56×36/350 = 5.76px of it — measured 42.23x48 against the `--tap` box. The
+   * floor belongs to the box, so the glyph keeps the size its caller gives it.
+   */
+  it('holds its --tap square instead of shrinking, leaving the glyph size to the caller', () => {
+    render(
+      <IconButton label="Add tag">
+        <svg data-testid="glyph" width="16" height="16" />
+      </IconButton>,
+    );
+    const classes = screen.getByRole('button', { name: 'Add tag' }).classList;
+    expect(classes.contains('size-[var(--tap)]')).toBe(true);
+    expect(classes.contains('shrink-0')).toBe(true);
+    const glyph = screen.getByTestId('glyph');
+    expect(glyph.getAttribute('width')).toBe('16');
+    expect(glyph.getAttribute('height')).toBe('16');
+  });
+
   it('merges className instead of replacing it', () => {
     render(
       <IconButton label="Save" className="legacy-hook">

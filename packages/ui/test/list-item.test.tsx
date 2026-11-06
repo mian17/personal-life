@@ -14,7 +14,7 @@ const ROW_UTILITY = 'flex';
 const ROW_PRESS_UTILITY = 'active:bg-press';
 const ROW_INSET_UTILITY = 'px-[var(--s4)]';
 const LINK_LAYOUT_UTILITY = 'self-stretch';
-/** A todo row and a base list row read up to two title lines; a dense or label row reads one. */
+/** Todo rows — dense included — and base list rows read two title lines; a label row reads one. */
 const TITLE_CLAMP_UTILITY = 'line-clamp-2';
 const ONE_LINE_TITLE_UTILITY = 'truncate';
 const DENSE_TYPE_UTILITY = 'text-[length:var(--fs-meta)]';
@@ -384,7 +384,7 @@ describe('ListItem', () => {
     expect(row).toContain('items-start');
   });
 
-  it('clamps a note title to two lines, and keeps a dense or label row on one', () => {
+  it('clamps a todo and a base row title to two lines', () => {
     const { unmount } = render(
       <ul>
         <ListItem variant="todo" title="Groceries" />
@@ -397,7 +397,7 @@ describe('ListItem', () => {
 
     // A base row reads two lines too: one line cut a note title mid-phrase, so two notes written
     // in the same minute rendered identically up to the ellipsis.
-    const baseRow = render(
+    render(
       <ul>
         <ListItem title="Seed: books to read next — Piranesi, The Overstory" />
       </ul>,
@@ -405,17 +405,31 @@ describe('ListItem', () => {
     const baseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
     expect(baseTitle).toContain(TITLE_CLAMP_UTILITY);
     expect(baseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
-    baseRow.unmount();
+  });
 
+  it('wraps a dense todo title without touching the press square inset', () => {
     render(
       <ul>
-        <ListItem variant="todo" size="dense" title="Groceries" />
+        <ListItem variant="todo" size="dense" title="Return the library book" meta="Today" />
       </ul>,
     );
-    // A dense row is the tap target, not a variable-height text block, so it stays one line.
     const denseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
-    expect(denseTitle).toContain(ONE_LINE_TITLE_UTILITY);
-    expect(denseTitle).not.toContain(TITLE_CLAMP_UTILITY);
+    expect(denseTitle).toContain(TITLE_CLAMP_UTILITY);
+    expect(denseTitle).toContain('whitespace-normal');
+    expect(denseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
+
+    // M5 stands: the title still starts where the 48px press square ends, and the row still
+    // parks that square out of flow on its corner.
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    expect(link).toContain(DENSE_TITLE_INSET_UTILITY);
+    const row = classesOf(screen.getByRole('listitem'));
+    expect(row).toContain('[&>.ui-checkbox]:absolute');
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+
+    // M4 stands: the anchor still stretches to the row's full height, so a wrapped title only
+    // makes the row taller — the tap area grows with it rather than leaving an inert band.
+    expect(link).toContain(LINK_LAYOUT_UTILITY);
+    expect(link).toContain('min-h-[var(--tap)]');
   });
 
   it('keeps a nested or feedback label on one line, above its own body', () => {
@@ -850,7 +864,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-meta)] truncate',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-meta)] line-clamp-2 whitespace-normal',
     );
     denseTodo.unmount();
 
