@@ -221,7 +221,7 @@ const SESSIONS = [
 ];
 
 /**
- * Two submissions; `id` is a client-supplied idempotency key (the encrypted
+ * Three submissions; `id` is a client-supplied idempotency key (the encrypted
  * envelope's AAD binds it), so each run mints a fresh one — the title is what marks
  * a row as already seeded.
  */
@@ -237,6 +237,13 @@ const FEEDBACK = [
     type: 'enhancement',
     title: 'Seed: remember the last meal group',
     description: 'Seeded so the feedback inbox is not empty. Safe to ignore.',
+  },
+  {
+    app: 'feedback',
+    type: 'bug_report',
+    title: 'Seed: note editor returns to the top after switching apps',
+    description:
+      'I was writing a longer note on the train and stopped halfway to answer a message. When I came back the cursor was at the very top of the note instead of where I left it, so I had to scroll down and hunt for the sentence I was still writing. The text itself was all there and saved correctly, which is why I waited a week before reporting this. It happens most when I leave the app to check something else and the note stays open in the background for a few minutes. It also happens if I put the phone in my pocket while the editor is focused and come back later. Short notes never move, so it feels like a length threshold rather than a fixed timer. Please keep the cursor and the scroll position where they were when the editor comes back into focus. I would rather wait half a second for the editor to settle than lose my place every time I glance at another app. I am on a Pixel 6 with the current Chrome, if that helps narrow it down. End of verify text.',
   },
 ];
 
