@@ -1,8 +1,8 @@
 import { listNoteTagUsage, listNotes } from '@/lib/api';
 import { resolveTagUsage } from '@/lib/tags-compose';
 import { NoteList } from '../note-list';
-import { filterHref, parseTagId, PreservingSearchBox, settingsHref } from '@life/app-kit';
-import { formatLongDate, ListShell, Section, SettingsLink, TagFilterNav, todayIso } from '@life/ui';
+import { filterHref, navActions, parseTagId, PreservingSearchBox } from '@life/app-kit';
+import { formatLongDate, ListShell, Section, TagFilterNav, todayIso } from '@life/ui';
 import { Plus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +44,7 @@ export default async function NotesPage({
     <ListShell
       title="Notes"
       subtitle={formatLongDate(todayIso())}
-      navTrailing={<SettingsLink href={settingsHref('/notes')} />}
+      navTrailing={navActions('notes')}
       search={<PreservingSearchBox path="/notes" q={q} params={{ tag }} label="Search notes" />}
       filters={
         namedTags.length > 0 ? (

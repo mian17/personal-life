@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
-import { Button, EmptyState, List, ListItem, PageShell } from '@life/ui';
+import { Button, EmptyState, List, ListItem, ManagerBlock } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 
 const mockEstimatePhoto = jest.fn();
@@ -134,10 +134,13 @@ describe('saved meals list', () => {
 
     const el = await SavedMealsPage();
 
-    expect(el.type).toBe(PageShell);
+    expect(el.type).toBe(ManagerBlock);
     expect(find(el, EmptyState)).toBeDefined();
     const html = renderToStaticMarkup(el);
     expect(html).toContain('No saved meals yet');
+    // The frame each page returns is `ManagerBlock`; pin what it actually renders.
+    expect(html).toContain('aria-label="Back"');
+    expect(html).toContain('href="/meals/settings"');
     expect(find(el, List)).toBeUndefined();
   });
 

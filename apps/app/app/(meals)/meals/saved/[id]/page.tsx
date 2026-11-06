@@ -2,17 +2,13 @@ import { format, sum } from '@life/nutrition';
 import {
   Button,
   Card,
-  IconLink,
   List,
   ListItem,
-  NavBar,
+  ManagerBlock,
   PageActions,
-  PageShell,
-  PageTitle,
   Pill,
   Section,
 } from '@life/ui';
-import { ArrowLeft } from 'lucide-react';
 import { loadOrNotFound } from '@life/app-kit';
 import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
@@ -37,15 +33,7 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
   const total = format('calories', sum(meal.items.map((item) => item.nutrients)).calories);
 
   return (
-    <PageShell>
-      <NavBar
-        leading={
-          <IconLink href="/meals/saved" label="Back">
-            <ArrowLeft size={20} aria-hidden />
-          </IconLink>
-        }
-      />
-      <PageTitle>{meal.name}</PageTitle>
+    <ManagerBlock title={meal.name} backHref="/meals/saved">
       <Card>Re-log {total} in one tap — the corrected numbers, not a new guess.</Card>
       <Section label="Items">
         <List>
@@ -70,6 +58,6 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
           <Button type="submit">Log this meal again</Button>
         </form>
       </PageActions>
-    </PageShell>
+    </ManagerBlock>
   );
 }
