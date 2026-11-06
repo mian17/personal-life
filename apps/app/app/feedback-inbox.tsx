@@ -5,13 +5,11 @@ import {
   feedbackStatusOption,
   FEEDBACK_STATUSES,
   FEEDBACK_TYPES,
-  FeedbackNavItem,
   List,
   ListShell,
-  Pill,
-  PillGroup,
   Section,
   SettingsLink,
+  TagFilterNav,
 } from '@life/ui';
 import { filterHref, settingsHref } from '@life/app-kit';
 import { FeedbackRow } from './feedback-row';
@@ -59,36 +57,25 @@ function orderedKeys(keys: string[], canonical: readonly string[]): string[] {
 }
 
 /**
- * The filter bar: All plus one pill per status — data straight from
- * `FEEDBACK_STATUSES`, so a vocabulary change rerenders here too. Each pill is a
- * navigation (the notes `TagFilterNav` shape): the filter lives in the URL
- * (`?status=done`; All drops the param), so the view is shareable and the server
- * renders the one the owner asked for.
+ * The filter row: All plus one chip per status — data straight from
+ * `FEEDBACK_STATUSES`, so a vocabulary change rerenders here too. It is the notes
+ * index's `TagFilterNav` shape (one row of link chips, All pinned at the leading
+ * edge): the filter lives in the URL (`?status=done`; All drops the param), so the
+ * view is shareable and the server renders the one the owner asked for.
  */
 function StatusFilter({ status }: Readonly<{ status: FeedbackStatus | undefined }>) {
-  return (
-    <PillGroup label="Status">
-      <Pill
-        size="filter"
-        as="a"
-        href={filterHref({ path: '/feedback', overrides: { status: undefined } })}
-        active={status === undefined}
-      >
-        All
-      </Pill>
-      {FEEDBACK_STATUSES.map(({ value, label }) => (
-        <Pill
-          key={value}
-          size="filter"
-          as="a"
-          href={filterHref({ path: '/feedback', overrides: { status: value } })}
-          active={status === value}
-        >
-          {label}
-        </Pill>
-      ))}
-    </PillGroup>
-  );
+  const allStatus = {
+    name: 'All',
+    href: filterHref({ path: '/feedback', overrides: { status: undefined } }),
+    active: status === undefined,
+  };
+  const statusFilters = FEEDBACK_STATUSES.map(({ value, label }) => ({
+    name: label,
+    href: filterHref({ path: '/feedback', overrides: { status: value } }),
+    active: status === value,
+  }));
+
+  return <TagFilterNav aria-label="Status" pinned={allStatus} items={statusFilters} />;
 }
 
 /**
@@ -103,12 +90,16 @@ function StatusFilter({ status }: Readonly<{ status: FeedbackStatus | undefined 
 export function FeedbackInbox({
   entries,
   status,
-  submitFeedbackAction,
   setFeedbackStatusAction,
 }: Readonly<{
   entries: FeedbackDto[];
   /** The validated `?status=` param; `undefined` (absent or unknown) is All. */
   status?: FeedbackStatus;
+  /**
+   * Kept in the signature because the page still passes it: the header carries only
+   * the Settings control, so the inbox no longer renders a feedback entry of its
+   * own. The prop goes when `apps/app/app/feedback/page.tsx` stops passing it.
+   */
   submitFeedbackAction: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
   setFeedbackStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
 }>) {
@@ -118,11 +109,21 @@ export function FeedbackInbox({
   const body = (() => {
     if (visible.length === 0) {
       // Only a non-empty inbox with an active filter can "match nothing"; an
-      // empty inbox keeps the frozen copy (`SPEC-feedback-status` §4).
+      // empty inbox keeps the frozen copy (`SPEC-feedback-status` §4). The
+      // label-less `Section` is the same body step a list group opens with, so the
+      // box sits one `--s6` under the filter row rather than flush against it.
       if (entries.length > 0 && status !== undefined) {
-        return <EmptyState {...matchesNothingState(status)} />;
+        return (
+          <Section>
+            <EmptyState {...matchesNothingState(status)} />
+          </Section>
+        );
       }
-      return <EmptyState heading={EMPTY_HEADING} body={EMPTY_BODY} />;
+      return (
+        <Section>
+          <EmptyState heading={EMPTY_HEADING} body={EMPTY_BODY} />
+        </Section>
+      );
     }
 
     const byApp = new Map<string, FeedbackDto[]>();
@@ -167,12 +168,7 @@ export function FeedbackInbox({
     <ListShell
       title="Feedback"
       subtitle={INBOX_SUBTITLE}
-      navTrailing={
-        <>
-          <FeedbackNavItem app="feedback" onSubmit={submitFeedbackAction} />
-          <SettingsLink href={settingsHref('/feedback')} />
-        </>
-      }
+      navTrailing={<SettingsLink href={settingsHref('/feedback')} />}
       filters={<StatusFilter status={status} />}
       body={body}
     />

@@ -18,7 +18,7 @@ jest.mock('@/lib/feedback-api', () => ({
 }));
 
 import type { CreateFeedbackInput, FeedbackDto, FeedbackSubmitResult } from '@life/shared';
-import { AlertBanner, FeedbackNavItem, Select, SettingsLink } from '@life/ui';
+import { AlertBanner, Select, SettingsLink } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { revalidatePath } from 'next/cache';
 import { createFeedback, updateFeedbackStatus } from '@/lib/feedback-api';
@@ -67,6 +67,18 @@ function rowTitles(html: string): string[] {
 
 function rowSnippets(html: string): string[] {
   return [...html.matchAll(/ui-list-item__snippet[^"]*">([^<]*)</g)].map((m) => m[1]);
+}
+
+/** The status filter row: the `TagFilterNav` markup, up to the first body section. */
+function filterRow(html: string): string {
+  const start = html.indexOf('ui-tag-filter-nav');
+  const end = html.indexOf('ui-section', start);
+  return html.slice(start, end === -1 ? undefined : end);
+}
+
+/** Every chip in the filter row, in render order. */
+function filterChipLabels(html: string): string[] {
+  return [...filterRow(html).matchAll(/<a[^>]*>([^<]*)<\/a>/g)].map((m) => m[1] ?? '');
 }
 
 /**
@@ -180,12 +192,15 @@ describe('FeedbackInbox grouping', () => {
     expect(headings(html, 'h3')).toEqual(['question']);
   });
 
-  it('renders one EmptyState and no list when there are zero entries', () => {
+  it('renders one EmptyState, in a section step, and no list when there are zero entries', () => {
     const html = render([]);
 
     expect(html).toContain('No feedback yet.');
     expect(html).toContain('Use the feedback button in the toolbar to send the first one.');
     expect(html).not.toContain('<ul');
+    // The body opens with the group step (a label-less `Section`), not the raw box.
+    expect(html.indexOf('ui-section')).toBeGreaterThan(-1);
+    expect(html.indexOf('ui-section')).toBeLessThan(html.indexOf('ui-empty'));
   });
 
   it('never renders an empty List', () => {
@@ -195,26 +210,25 @@ describe('FeedbackInbox grouping', () => {
     expect(rowTitles(html).length).toBeGreaterThan(0);
   });
 
-  it('mounts the feedback toolbar item for this app on the empty inbox', () => {
+  it('carries only the Settings control in the toolbar', () => {
     // `FeedbackInbox` is a server component (no hooks), so the direct call is
     // safe: it builds the `FeedbackRow` elements without rendering them.
     const el = FeedbackInbox({
       entries: [],
       submitFeedbackAction: noopAction,
       setFeedbackStatusAction: noopStatusAction,
-    }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
+    }) as unknown as { props: { navTrailing: { type?: unknown; props: { href?: unknown } } } };
 
-    // The bare settings control joins this app's own toolbar item inside one fragment
-    // (the meals-nav shape): feedback first, Settings trailing.
-    type NavChild = { type?: unknown; props: { app?: unknown; href?: unknown } };
-    const kids = el.props.navTrailing.props.children as NavChild[];
+    // The header's feedback entry is gone: the bare Settings control is the whole slot.
+    const trailing = el.props.navTrailing;
+    expect(trailing.type).toBe(SettingsLink);
+    expect(trailing.props.href).toBe(SETTINGS_HREF);
+  });
 
-    const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
-    expect(feedback?.props.app).toBe('feedback');
+  it('renders no feedback entry of its own, so nothing opens a dialog from this page', () => {
+    const html = render(ENTRIES);
 
-    const gear = kids[kids.length - 1];
-    expect(gear?.type).toBe(SettingsLink);
-    expect(gear?.props.href).toBe(SETTINGS_HREF);
+    expect(html).not.toContain('Send feedback');
   });
 });
 
@@ -409,20 +423,26 @@ function slotSpy(first: unknown): { mockRestore(): void; setIndex(at: number): v
 }
 
 describe('FeedbackInbox filtering', () => {
-  it('renders the All + per-status pill bar as links, All active by default', () => {
+  it('renders the All + per-status filter as one row of links, All active by default', () => {
     const html = render(ENTRIES);
+    const row = filterRow(html);
 
-    const bar = html.slice(html.indexOf('ui-pill-group'), html.indexOf('ui-section'));
-    expect(bar).toContain('>All</a>');
-    expect(bar).toContain('>Open</a>');
-    expect(bar).toContain('>In Progress</a>');
-    expect(bar).toContain('>Done</a>');
-    expect(bar).toContain('>Won&#x27;t Do</a>');
+    // The notes index's `TagFilterNav`: one chip row, named `Status`.
+    expect(row).toContain('aria-label="Status"');
+    expect(filterChipLabels(html)).toEqual([
+      'All',
+      'Open',
+      'In Progress',
+      'Done',
+      'Won&#x27;t Do',
+    ]);
     // The filter is a navigation: All drops the param, each status carries it.
-    expect(bar).toContain('href="/feedback"');
-    expect(bar).toContain('href="/feedback?status=done"');
-    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active\b/g) ?? [];
+    expect(row).toContain('href="/feedback"');
+    expect(row).toContain('href="/feedback?status=done"');
+    const active = row.match(/class="ui-pill ui-pill--filter ui-pill--active\b/g) ?? [];
     expect(active).toHaveLength(1);
+    // The old `PillGroup` row drew a hairline above it; the chip row draws none.
+    expect(row).not.toContain('border-t');
   });
 
   it('shows only the Done rows under the Done filter, same grouping and order', () => {
@@ -469,6 +489,8 @@ describe('FeedbackInbox filtering', () => {
     expect(html).toContain('No Done feedback.');
     expect(html).not.toContain('No feedback yet.');
     expect(html).not.toContain('<ul');
+    // Same section step as the frozen empty state, so both sit under the filter row.
+    expect(html.indexOf('ui-section')).toBeLessThan(html.indexOf('ui-empty'));
   });
 
   it('keeps the frozen empty state for a genuinely empty inbox under a filter', () => {

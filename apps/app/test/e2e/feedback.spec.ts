@@ -101,11 +101,17 @@ async function openNotesFeedback(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Send feedback' }).click();
 }
 
-/** Sends one entry from /feedback's own toolbar dialog as the picked type. */
+/**
+ * Sends one entry from `/feedback`'s own Settings Support row — the inbox header
+ * carries only the Settings control now, so the row is its only create entry —
+ * then returns to the inbox to read it back.
+ */
 async function submitFeedback(
   page: Page,
   entry: { title: string; description: string },
 ): Promise<void> {
+  await page.getByLabel('Settings').click();
+  await page.waitForURL(/\/feedback\/settings$/, { timeout: 15_000 });
   await page.getByRole('button', { name: 'Send feedback' }).click();
   const form = page.getByRole('dialog');
   await form.getByRole('button', { name: 'Enhancement' }).click();
@@ -113,6 +119,7 @@ async function submitFeedback(
   await form.getByLabel('Description').fill(entry.description);
   await form.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(form).toBeHidden();
+  await page.goto('/feedback');
 }
 
 /** The row's one status pill; its text is the entry's visible status. */
