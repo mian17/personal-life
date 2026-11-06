@@ -31,6 +31,11 @@ const DENSE_TITLE_INSET_UTILITY = 'ps-[calc(var(--tap)+var(--s1)-var(--s3))]';
  * unlinked shape.
  */
 const FEEDBACK_COLUMN_GAP_UTILITY = 'gap-[var(--s2)]';
+/**
+ * The description's own step: the text column pairs the title with its date at one `--s1`, and
+ * this offset adds a second, so the description sits `--s2` (8px) below the pair.
+ */
+const FEEDBACK_DESCRIPTION_OFFSET_UTILITY = 'mt-[var(--s1)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -663,6 +668,13 @@ describe('ListItem', () => {
     expect(subLines[0].nextElementSibling).toBe(subLines[1]);
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
 
+    // The title and its date are one pair one step apart; the description opens the next step,
+    // so only it carries the offset. Both stay siblings in the order the reader sees.
+    expect(classesOf(subLines[0])).not.toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(classesOf(subLines[1])).toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(subLines[0].parentElement).toBe(text);
+    expect(subLines[1].parentElement).toBe(text);
+
     const linkClasses = classesOf(link);
     expect(linkClasses).toContain('flex-col');
     expect(linkClasses).toContain('items-stretch');
@@ -1045,7 +1057,7 @@ describe('ListItem', () => {
       'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     expect(subs[1].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap mt-[var(--s1)]',
     );
     // M11: a feedback description has no detail route, so one ellipsized line hid the submitted
     // text for good. Two lines double what a reader can see; the string itself is unchanged.

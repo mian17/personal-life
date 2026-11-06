@@ -189,8 +189,20 @@ const linkDenseStyles = cx(
   'ps-[calc(var(--tap)+var(--s1)-var(--s3))] py-[var(--s2)] min-h-[var(--tap)]',
 );
 
-/** Title above, meta line below, one spacing step apart. */
+/**
+ * Title above, meta line below, one spacing step apart. A feedback row stacks three lines in this
+ * column, so this one step pairs the title with its date; that row's description adds
+ * `feedbackDescriptionStyles` to reach the next step.
+ */
 const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';
+
+/**
+ * A feedback description is the row's next block, not a third line of the date. The title and its
+ * date read as one pair one `--s1` step apart, and this offset adds a second step to the
+ * container's gap: `--s2` (8px) from the date, the rung above. Sized one step down without it, the
+ * description absorbed the date into itself and the pair stopped reading as a pair.
+ */
+const feedbackDescriptionStyles = 'mt-[var(--s1)]';
 
 /** §8's `.row__title`: 16px at 1.35, semibold, set slightly tight. */
 const titleBaseStyles =
@@ -353,13 +365,18 @@ function subNodeFor(
   );
 
   /* The base row reads meta and snippet on one line, separated by a `|`. A
-     feedback row reads title, then date, then the description: the date sits
-     directly under the title and the clamped description gets the lines beneath
-     it. Each line reuses the `__sub` typography and no separator is needed. */
+     feedback row reads title, then date, then the description: the date pairs
+     with the title one step beneath it, and the clamped description opens the
+     next step below that pair. Each line reuses the `__sub` typography and no
+     separator is needed. */
   return variant === 'feedback' ? (
     <>
       <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
-      {snippetNode && <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>}
+      {snippetNode && (
+        <span className={cx('ui-list-item__sub', subStyles, feedbackDescriptionStyles)}>
+          {snippetNode}
+        </span>
+      )}
     </>
   ) : (
     <span className={cx('ui-list-item__sub', subStyles)}>
