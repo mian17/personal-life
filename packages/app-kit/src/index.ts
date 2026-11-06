@@ -16,3 +16,4 @@ export {
 } from './preferences';
 export { setPref, setPrefNumber, setPrefNumbers } from './preference-action';
 export { settingsHref } from './settings-route';
+export { navActions } from './nav-actions';

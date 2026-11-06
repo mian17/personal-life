@@ -8,10 +8,9 @@ import {
   List,
   ListShell,
   Section,
-  SettingsLink,
   TagFilterNav,
 } from '@life/ui';
-import { filterHref, settingsHref } from '@life/app-kit';
+import { filterHref, navActions } from '@life/app-kit';
 import { FeedbackRow } from './feedback-row';
 
 const APP_LABELS: Record<string, string> = { notes: 'Notes', todos: 'Todos', meals: 'Meals', feedback: 'Feedback' };
@@ -168,7 +167,7 @@ export function FeedbackInbox({
     <ListShell
       title="Feedback"
       subtitle={INBOX_SUBTITLE}
-      navTrailing={<SettingsLink href={settingsHref('/feedback')} />}
+      navTrailing={navActions('feedback')}
       filters={<StatusFilter status={status} />}
       body={body}
     />
