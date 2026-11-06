@@ -105,7 +105,7 @@ describe('SettingsRow', () => {
       expect(row.classList.contains('max-sm:items-stretch')).toBe(false);
     });
 
-    it('lets the label column shrink and ellipsize, and the control keep its width', () => {
+    it('lets the label column shrink and wrap, and the control keep its width', () => {
       render(
         <SettingsRow
           label="Reduce motion"
@@ -120,11 +120,28 @@ describe('SettingsRow', () => {
 
       expect(text.classList.contains('min-w-0')).toBe(true);
       expect(text.classList.contains('flex-auto')).toBe(true);
+      // With a description under it the label must not add a third line, so it ellipsizes.
       expect(label.classList.contains('truncate')).toBe(true);
+      expect(label.classList.contains('line-clamp-2')).toBe(false);
       expect(desc.classList.contains('line-clamp-2')).toBe(true);
       // A compact control holds its size through the flex floor, not a frozen column.
       expect(control.classList.contains('shrink-0')).toBe(false);
       expect(control.classList.contains('min-w-0')).toBe(false);
+    });
+
+    /**
+     * L1: the nested nutrient rows render `Calories (kcal)` in a 94px column against 99px of
+     * content, so a single ellipsized line cut the unit and the field read as a bare "Calories".
+     * Two lines keep the whole label; the string itself is unchanged.
+     */
+    it('wraps a lone label onto a second line instead of cutting its unit off', () => {
+      render(<SettingsRow label="Calories (kcal)" control={<input type="number" />} />);
+      const label = document.querySelector('.ui-settings-row__label')!;
+
+      expect(label.textContent).toBe('Calories (kcal)');
+      expect(label.classList.contains('line-clamp-2')).toBe(true);
+      expect(label.classList.contains('truncate')).toBe(false);
+      expect(label.classList.contains('min-w-0')).toBe(true);
     });
   });
 

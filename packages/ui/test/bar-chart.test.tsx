@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { BarChart, labelsThatFit, visibleTickIndexes } from '../src/components/bar-chart';
+import { BarChart, PLOT_MARGIN, labelsThatFit, visibleTickIndexes } from '../src/components/bar-chart';
 import type { BarChartBucket } from '../src/components/bar-chart';
 
 const buckets: BarChartBucket[] = [
@@ -153,6 +153,26 @@ describe('BarChart', () => {
     const source = readFileSync(join(__dirname, '../src/components/bar-chart.tsx'), 'utf8');
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(source).not.toMatch(/rgba?\(/);
+  });
+
+  /**
+   * L5: recharts centres a y tick on its own gridline but shifts the boundary tick *down* by
+   * whatever part of half a line box does not fit above the plot (`getTicksEnd`), so the top label
+   * sat 8.5px under the line it names and the tallest bar read as overshooting the axis.
+   *
+   * The arithmetic is checked rather than the number: half the tick's line box is
+   * `--fs-body × --lh-body / 2`, and the old 4px margin leaves exactly the shift the audit
+   * measured. That the two agree is what confirms the mechanism.
+   */
+  it('leaves half a y tick line box above the plot, so the top label sits on its gridline', () => {
+    const tokens = readFileSync(join(__dirname, '../src/styles/tokens.css'), 'utf8');
+    const token = (name: string) =>
+      Number(new RegExp(`${name}:\\s*([\\d.]+)`).exec(tokens)![1]);
+    const halfLineBox = (token('--fs-body') * token('--lh-body')) / 2;
+
+    expect(PLOT_MARGIN.top).toBeGreaterThanOrEqual(halfLineBox);
+    // The value the audit reported with the old 4px top margin — 12.495 - 4 = 8.495.
+    expect(halfLineBox - 4).toBeCloseTo(8.5, 1);
   });
 
   it('pairs role="img" and an accessible name with a visually-hidden bucket list', () => {

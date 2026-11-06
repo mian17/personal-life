@@ -172,6 +172,8 @@ describe('PomodoroPage', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
     const line = screen.getByText(/^Next: /u);
+    // The reservation is one ladder row, so the digits-to-track band is `--s8`, not 44.
+    expect(line.classList.contains('h-[var(--s4)]')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
 
     expect(screen.getByText(/^Next: /u)).toBe(line);
@@ -206,14 +208,14 @@ describe('PomodoroPage', () => {
       <PomodoroPage durations={DEFAULT_DURATIONS} todayMinutes={50} todayGoalMinutes={100} />,
     );
 
-    expect(rowTrail('Blocks finished')).toBe('50 min');
+    expect(rowTrail('Focus minutes')).toBe('50 min');
     expect(rowTrail('Daily goal')).toBe('50 of 100 min');
   });
 
   it('draws no day rows when the page handed the card nothing to read', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
-    expect(screen.queryByText('Blocks finished')).toBeNull();
+    expect(screen.queryByText('Focus minutes')).toBeNull();
     expect(screen.queryByText('Daily goal')).toBeNull();
   });
 

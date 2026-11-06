@@ -38,7 +38,7 @@ export const buttonVariants = cva(
       },
       size: {
         default: 'w-full min-h-[var(--tap)] px-[var(--s5)]',
-        bare: 'w-auto min-h-0 px-[var(--s3)] py-[var(--s2)]',
+        bare: 'w-auto min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)]',
         icon: 'size-[var(--tap)] p-0',
       },
     },

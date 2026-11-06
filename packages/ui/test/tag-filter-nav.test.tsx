@@ -183,6 +183,24 @@ describe('TagFilterNav', () => {
     expect(strip.classList.contains(TRAILING_FADE)).toBe(false);
   });
 
+  it('names the active chip as the current page for assistive tech', () => {
+    const items: TagFilterItem[] = [
+      { name: 'All', href: '/' },
+      { name: 'errand', href: '/?tag=errand', active: true },
+    ];
+    render(<TagFilterNav items={items} />);
+    expect(screen.getByRole('link', { name: 'errand' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'All' }).getAttribute('aria-current')).toBeNull();
+  });
+
+  it('marks the pinned chip current too, so the unfiltered option reads as a state', () => {
+    render(
+      <TagFilterNav aria-label="Tags" pinned={{ name: 'All', href: '/', active: true }} items={twoTags} />,
+    );
+    expect(screen.getByRole('link', { name: 'All' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'errand' }).getAttribute('aria-current')).toBeNull();
+  });
+
   it('merges className instead of replacing it', () => {
     render(<TagFilterNav className="legacy-hook" items={[]} />);
     const nav = screen.getByRole('navigation');

@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 const EMPTY_HEADING = 'No feedback yet.';
-const EMPTY_BODY = 'Use the feedback button in the toolbar to send the first one.';
+const EMPTY_BODY = 'Open Settings → Send feedback to write the first one.';
 /** §8's `.phead__sub`: the one line under the title saying what the inbox spans. */
 const INBOX_SUBTITLE = 'Across all five modules';
 

@@ -57,10 +57,18 @@ const LABEL_GAP = 6;
 const Y_AXIS_WIDTH = 44;
 
 /**
- * Plot margins: the right side holds the final tick's half-label, which recharts centres on
+ * Plot margins. The right side holds the final x tick's half-label, which recharts centres on
  * the last band and would otherwise cut off at the plot edge.
+ *
+ * The top holds half a y tick's line box, and that is a floor rather than padding. A y tick label
+ * is centred on its own gridline, and recharts shifts the boundary tick *down* by however much of
+ * that half box does not fit above the plot (`getTicksEnd`: `tickCoord = coordinate - gap`, with
+ * `gap = size/2 - coordinate`). The tick carries no font of its own, so its box is the body's
+ * `--fs-body` at `--lh-body` — 17 × 1.47 = 24.99px, half 12.495 — and the old 4px left the top
+ * label exactly the 8.5px low the audit measured, which made the tallest bar read as overshooting
+ * its own axis maximum. `--s4` (16px) is the first scale step above that 12.5px floor.
  */
-const PLOT_MARGIN = { top: 4, right: 26, bottom: 0, left: 0 };
+export const PLOT_MARGIN = { top: 16, right: 26, bottom: 0, left: 0 };
 
 /** A zero-minute bucket still draws a hairline, so an empty day never looks like missing data. */
 const EMPTY_BAR_HEIGHT = 2;

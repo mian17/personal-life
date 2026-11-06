@@ -14,10 +14,18 @@ const ROW_UTILITY = 'flex';
 const ROW_PRESS_UTILITY = 'active:bg-press';
 const ROW_INSET_UTILITY = 'px-[var(--s4)]';
 const LINK_LAYOUT_UTILITY = 'self-stretch';
-/** A todo row clamps its title to two lines; every other row ellipsizes one. */
+/** Todo rows — dense included — and base list rows read two title lines; a label row reads one. */
 const TITLE_CLAMP_UTILITY = 'line-clamp-2';
 const ONE_LINE_TITLE_UTILITY = 'truncate';
 const DENSE_TYPE_UTILITY = 'text-[length:var(--fs-meta)]';
+/** The danger slot's floor: `--tap` is 48px, clearing the 44px contract minimum. */
+const DANGER_FLOOR_UTILITY = '[&>form>.ui-btn--danger]:min-h-[var(--tap)]';
+const DANGER_FLOOR_WIDTH_UTILITY = '[&>form>.ui-btn--danger]:min-w-[var(--tap)]';
+/**
+ * The dense title offset: the row's `--s3` plus this `--tap + --s1 - --s3` = 52px from the row
+ * edge, flush with the checkbox press square's trailing edge.
+ */
+const DENSE_TITLE_INSET_UTILITY = 'ps-[calc(var(--tap)+var(--s1)-var(--s3))]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -228,6 +236,41 @@ describe('ListItem', () => {
     expect(classesWithPrefix(classes, '[&>form>.ui-btn--danger]:p-')).toHaveLength(1);
   });
 
+  it('floors the danger slot at --tap without growing the glyph', () => {
+    render(
+      <ul>
+        <ListItem
+          title="Groceries"
+          deleteAction={
+            <form data-testid="delete-action">
+              <button type="submit" className="ui-btn ui-btn--danger ui-btn--icon">
+                x
+              </button>
+            </form>
+          }
+        />
+      </ul>,
+    );
+    const classes = classesOf(screen.getByRole('listitem'));
+    // `size="icon"`'s square is replaced by `h-auto`/`w-auto` and an inset, which left the box
+    // 34px — under the 44px floor — because the `<form>` sibling shrinks. The slot declares the
+    // floor itself, on the variant, so a `size="icon"` danger button and the unsized
+    // `ConfirmButton` the trash screens render both inherit it. `--tap` is 48px.
+    expect(classes).toContain(DANGER_FLOOR_UTILITY);
+    expect(classes).toContain(DANGER_FLOOR_WIDTH_UTILITY);
+    expect(classes).not.toContain('[&>form>.ui-btn--danger]:min-h-0');
+    expect(classes).not.toContain('[&>form>.ui-btn--danger]:min-w-0');
+    // The glyph keeps its 18px inset paint; only the box around it grows.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:p-[var(--s2)]');
+    // The box is anchored on the row's end inset, so the floor grows it leftward and the glyph
+    // stays on the text column's edge. The compound selector outranks `Button`'s own
+    // `justify-center` (0,3,0 against 0,1,0), so no `!important` and no wrapper element is needed.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:justify-end');
+    // A `--tap` box in flow is taller than the row's own content box, so it hands 8px back over
+    // each edge and the row keeps the height its text column asks for.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:-my-[var(--s2)]');
+  });
+
   it('renders leading as the first child, before the row body', () => {
     render(
       <ul>
@@ -297,24 +340,51 @@ describe('ListItem', () => {
       '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
     );
     // The mark rides the target's leading edge, so its inset is the target's start offset: the
-    // `--s4` corner lands it 10px inside the row, one step from the title and on the same scale
-    // as the row's own start inset. The title offset (`--s3` + `--s4` = 28px) does not move with it.
+    // `--s4` corner lands it 10px inside the row.
     expect(row).toContain('[&>.ui-checkbox]:justify-items-start');
     expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
-    // The 48px target now paints from x 4 to x 52 over a title that starts at 28px. Its press
-    // wash is the only paint that can cover that text: the row already washes on press, so the
-    // target's own square is redundant feedback and, on release, the only thing still fading over
-    // the title (0.7 → 0.118 → 0.008 → 0 alpha across 200ms, measure in Chromium).
+    // The row already washes on press, so the target's own square is redundant feedback and, on
+    // release, the only thing still fading over the row's gutter.
     expect(row).toContain('[&>.ui-checkbox:active]:bg-transparent');
-    // The link clears the mark: `--s3` row inset + `--s4` = a 28px title offset, 6px past the
-    // mark's trailing edge at `--s4` (10px at the old `--s3` — the 4px the nudge spends). The inset sits on
-    expect(link).toContain('ps-[var(--s4)]');
+
+    // M5 — the press square ends at x 52 in the row's coordinates: the control's `--s4` start
+    // offset less its own `-ms-[var(--s3)]` (`--s1` = 4px) plus `--tap` (48). The link's start
+    // inset puts the title at the row's `--s3` (12) + `--tap + --s1 - --s3` (40) = 52 — flush with
+    // the square's trailing edge, so the overlap is 0px where it was 24px. The full title string
+    // stays in the DOM and the checkbox keeps its 48 × 48 target.
+    expect(link).toContain(DENSE_TITLE_INSET_UTILITY);
     expect(row).not.toContain('[&>.ui-list-item__link]');
     // The target no longer contributes height, so the row keeps the tap floor itself.
     expect(row).toContain('min-h-[var(--tap)]');
   });
 
-  it('clamps the todo title to two lines, and leaves a base row one line', () => {
+  it('spans the dense anchor over the whole row, so no band of the row is inert', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/todos/1"
+          variant="todo"
+          size="dense"
+          title="Groceries"
+          meta="Today"
+        />
+      </ul>,
+    );
+    const row = classesOf(screen.getByRole('listitem'));
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    // M4 — the `--s2` block inset used to sit on the row, so the anchor was 41.11px inside a
+    // 57.11px row (8px above + 8px below that a tap did nothing in). The padding moved onto the
+    // anchor: the row carries no block padding at all, the anchor spans the full row, and the
+    // title's first line still starts one `--s2` down — so the mark's lift formula is unchanged.
+    expect(row.some((cls) => cls.startsWith('py-'))).toBe(false);
+    expect(link).toContain('py-[var(--s2)]');
+    expect(link).toContain('min-h-[var(--tap)]');
+    // `self-stretch` is inert against `items-start`, which is why the padding had to move rather
+    // than the alignment change: the row still top-aligns its slots on the title's first line.
+    expect(row).toContain('items-start');
+  });
+
+  it('clamps a todo and a base row title to two lines', () => {
     const { unmount } = render(
       <ul>
         <ListItem variant="todo" title="Groceries" />
@@ -325,14 +395,64 @@ describe('ListItem', () => {
     );
     unmount();
 
+    // A base row reads two lines too: one line cut a note title mid-phrase, so two notes written
+    // in the same minute rendered identically up to the ellipsis.
     render(
       <ul>
-        <ListItem title="Groceries" />
+        <ListItem title="Seed: books to read next — Piranesi, The Overstory" />
       </ul>,
     );
     const baseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
-    expect(baseTitle).not.toContain(TITLE_CLAMP_UTILITY);
-    expect(baseTitle).toContain(ONE_LINE_TITLE_UTILITY);
+    expect(baseTitle).toContain(TITLE_CLAMP_UTILITY);
+    expect(baseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
+  });
+
+  it('wraps a dense todo title without touching the press square inset', () => {
+    render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Return the library book" meta="Today" />
+      </ul>,
+    );
+    const denseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
+    expect(denseTitle).toContain(TITLE_CLAMP_UTILITY);
+    expect(denseTitle).toContain('whitespace-normal');
+    expect(denseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
+
+    // M5 stands: the title still starts where the 48px press square ends, and the row still
+    // parks that square out of flow on its corner.
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    expect(link).toContain(DENSE_TITLE_INSET_UTILITY);
+    const row = classesOf(screen.getByRole('listitem'));
+    expect(row).toContain('[&>.ui-checkbox]:absolute');
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+
+    // M4 stands: the anchor still stretches to the row's full height, so a wrapped title only
+    // makes the row taller — the tap area grows with it rather than leaving an inert band.
+    expect(link).toContain(LINK_LAYOUT_UTILITY);
+    expect(link).toContain('min-h-[var(--tap)]');
+  });
+
+  it('keeps a nested or feedback label on one line, above its own body', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toContain(
+      ONE_LINE_TITLE_UTILITY,
+    );
+    unmount();
+
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers" meta="Today" />
+      </ul>,
+    );
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toContain(
+      ONE_LINE_TITLE_UTILITY,
+    );
   });
 
   it('adds the todo variant alone: the default checkbox mark, centred against the row', () => {
@@ -454,14 +574,19 @@ describe('ListItem', () => {
     expect(classesOf(document.querySelector('.ui-list-item__nested-body')!)).toContain(
       'pr-[calc(var(--tap)+var(--s2))]',
     );
-    // ... and the title content stays the line's first child, so it grows.
-    expect(titleLine.firstChild!.textContent).toBe('Omelette');
+    // ... and the title content is the line's first child, so it absorbs the shrink.
+    expect(titleLine.firstElementChild!.textContent).toBe('Omelette');
 
     const line = classesOf(titleLine);
     expect(line).toContain('flex');
     expect(line).toContain('items-stretch');
-    expect(line).toContain('[&>:first-child]:flex-1');
-    expect(line).toContain('[&>:first-child]:min-w-0');
+
+    // H3: a bare text node is not a flex item, so `[&>:first-child]` never reached the title and
+    // the action kept its full width past the line's truncating box — cut at the clip edge with no
+    // ellipsis. The title is a real `<span>` now, sized by the line's own gap and `flex-1`.
+    const titleText = titleLine.firstElementChild!;
+    expect(classesOf(titleText)).toEqual(['flex-1', 'min-w-0', 'truncate'].sort());
+    expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
 
     // The action stretches to the line and never sets its own height.
     const action = classesOf(slot);
@@ -534,8 +659,10 @@ describe('ListItem', () => {
     const line = classesOf(titleLine);
     expect(line).toContain('flex');
     expect(line).toContain('items-stretch');
-    expect(line).toContain('[&>:first-child]:flex-1');
-    expect(line).toContain('[&>:first-child]:min-w-0');
+    // The title, not the pill, absorbs the line's shrink — the pill kept its width and ran past
+    // the line's clip edge (H3).
+    expect(classesOf(titleLine.firstElementChild!)).toContain('flex-1');
+    expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
   });
 
   it('leaves the feedback title a plain block when no pill is given', () => {
@@ -694,7 +821,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)] ps-[var(--s4)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)] ps-[calc(var(--tap)+var(--s1)-var(--s3))] py-[var(--s2)] min-h-[var(--tap)]',
     );
     denseRow.unmount();
 
@@ -717,7 +844,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] truncate',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] line-clamp-2 whitespace-normal',
     );
     baseTitle.unmount();
 
@@ -749,11 +876,35 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title ui-list-item__title--with-action font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] truncate flex items-stretch gap-[var(--s2)] [&>:first-child]:flex-1 [&>:first-child]:min-w-0',
+      'ui-list-item__title ui-list-item__title--with-action font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] flex items-stretch gap-[var(--s2)]',
     );
     expect(document.querySelector('.ui-list-item__title-action')!.className).toBe(
       'ui-list-item__title-action flex items-center shrink-0',
     );
+    // The title is a real element inside the action line, so it — not the action — shrinks.
+    expect(document.querySelector('.ui-list-item__title > span')!.className).toBe(
+      'min-w-0 flex-1 truncate',
+    );
+  });
+
+  it('shrinks a control title without truncating it', () => {
+    render(
+      <ul>
+        <ListItem
+          variant="nested"
+          title={<input aria-label="Food for item 1" />}
+          titleAction={<button>Remove</button>}
+        >
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    // The meal entry's dish field is the title. `overflow: hidden` would clip its focus ring
+    // against the line's edge, and a control has no text for an ellipsis to shorten.
+    expect(classesOf(document.querySelector('.ui-list-item__title > span')!)).toEqual([
+      'flex-1',
+      'min-w-0',
+    ]);
   });
 
   it('subNodeFor: pins the sub, separator and snippet class strings', () => {
@@ -772,7 +923,6 @@ describe('ListItem', () => {
       'ui-list-item__snippet min-w-0 truncate',
     );
     baseRow.unmount();
-
     const denseRow = render(
       <ul>
         <ListItem variant="todo" size="dense" title="Groceries" meta="Today" />
@@ -795,6 +945,11 @@ describe('ListItem', () => {
     );
     expect(subs[1].className).toBe(
       'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+    );
+    // M11: a feedback description has no detail route, so one ellipsized line hid the submitted
+    // text for good. Two lines double what a reader can see; the string itself is unchanged.
+    expect(document.querySelector('.ui-list-item__snippet')!.className).toBe(
+      'ui-list-item__snippet min-w-0 line-clamp-2',
     );
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
   });
@@ -859,7 +1014,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

@@ -4,7 +4,7 @@
 import { useCommandState } from 'cmdk';
 import { Check, ChevronDown } from 'lucide-react';
 import { useCallback, useId, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { cx } from '../lib/cx';
 import { Command, CommandEmpty, CommandItem, CommandList } from './command';
 import { Input } from './input';
@@ -96,14 +96,15 @@ const triggerStyles = cx(
  * The attached chips wrap onto further rows inside the field, one `--s2` apart. They sit above the
  * covering trigger so they paint over it, and stop short of the chevron's column.
  *
- * `pointer-events-none` takes the row out of hit-testing: painted above the trigger, a chip would
- * otherwise swallow every press on its body and the field would read dead — no panel, no focus.
- * Only the chips' own controls opt back in (`[&_button]:pointer-events-auto`), so a remove button
- * still works and any other press in the field falls through to the real trigger underneath. The
- * pair is one decision — drop either half and the chip body stops opening the panel again.
+ * The row itself is `pointer-events-none`, so the space between chips and around them falls
+ * through to the covering trigger: a press on the field's blank area opens the panel and focuses
+ * the control. Each chip opts back in whole (`[&_.ui-pill]:pointer-events-auto`) because a pill
+ * paints one control — its body and its × answer to the same press, so a press anywhere on the
+ * shape detaches the tag instead of opening the panel behind it. The two halves are one decision:
+ * the row's opt-out keeps the field live, the chip's opt-in keeps the pill honest.
  */
 const chipsStyles =
-  'ui-tag-combobox__chips pointer-events-none relative z-10 flex flex-wrap items-center gap-[var(--s2)] pr-[var(--s6)] [&_button]:pointer-events-auto';
+  'ui-tag-combobox__chips pointer-events-none relative z-10 flex flex-wrap items-center gap-[var(--s2)] pr-[var(--s6)] [&_.ui-pill]:pointer-events-auto';
 
 /**
  * The chevron trails whatever the field holds, in the icon tier. `ml-auto` rather than the
@@ -255,6 +256,16 @@ function TagComboboxControl({
     if (fieldHeldFocus) triggerRef.current?.focus();
   }
 
+  /**
+   * A press on the chip's body does what its × does, because the pill is drawn as one control and
+   * a body that only looks tappable is the defect this replaced. The × keeps its own handler and
+   * its own `aria-label`, so a press that started there is left to it rather than toggling twice.
+   */
+  function handleChipClick(event: MouseEvent<HTMLSpanElement>, id: number) {
+    if (event.target instanceof Element && event.target.closest('.ui-pill__remove')) return;
+    removeTag(id);
+  }
+
   function filter(next: string) {
     setQuery(next);
     // New rows mean the walked row may be gone: the list starts unchosen again.
@@ -276,6 +287,8 @@ function TagComboboxControl({
                     key={tag.id}
                     as="span"
                     size="chip"
+                    className="cursor-pointer"
+                    onClick={(event) => handleChipClick(event, tag.id)}
                     onRemove={() => removeTag(tag.id)}
                     removeLabel={`Remove ${tag.name}`}
                   >

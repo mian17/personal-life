@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
+import { isValidElement, type ComponentPropsWithRef, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 
 export type ListItemTone = 'danger' | 'amber' | 'accent';
@@ -85,14 +85,17 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * longhand of the target's `place-items-center` shorthand, so it wins without touching the
  * control), which bleeds the press square to its right instead of reserving that width.
  *
- * The target's start offset is the mark's inset, so it is the one value that moves the mark and
- * nothing else: the title is placed by the row's `ps-[var(--s3)]` plus the link's
- * `ps-[var(--s4)]` and does not move. On the `--s3` corner the mark sat 6px from the row's edge
- * against a 10px content inset on the row's other side, so the column read as crowding the left;
- * `--s4` lands it 10px in, one step past the row's own `--s3` start inset. Measured on a
+ * The target's start offset is the mark's inset. On the `--s3` corner the mark sat 6px from the
+ * row's edge against a 10px content inset on the row's other side, so the column read as crowding
+ * the left; `--s4` lands it 10px in, one step past the row's own `--s3` start inset. Measured on a
  * quadrant at 375px, the mark's left gap to the panel's inner edge goes 8px → 12px against a 10px
- * right inset, and the 4px it gains comes out of its gap to the title (10px → 6px), so it never
- * reaches the text at any width.
+ * right inset.
+ *
+ * The press square is a `--tap` square ending 52px from the row's edge (`--s1 + --tap`), so the
+ * title starts at or past 52 or the square swallows it. The link's old `--s4` put the title at 28,
+ * which left the square's trailing 24px over the first characters of every title — a tap there
+ * completed the todo instead of opening it. `linkDenseStyles` now starts the title at 52: flush
+ * with the square's trailing edge, no overlap, and the full string still in the DOM.
  *
  * Vertically the mark cannot keep the target's centring. The target starts on the row's top edge,
  * so its centre is `--tap`/2 = 24px down; the title's first line starts one `--s2` down and is one
@@ -103,28 +106,43 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * row's top inset less the first line's half-height. The offset is stated from the title's own
  * hooks (`--fs-meta` at `--lh-row-title`), so it follows the line if the dense type scale moves.
  *
+ * The vertical padding lives on the link (`linkDenseStyles`), not here: on the row it left an 8px
+ * band above and below the anchor that a tap did nothing in. The link spans the row's full height
+ * — 57.11px for a title and a meta line — so the whole row navigates. The target's `top` is an
+ * offset from the row's border box, so the padding move leaves the mark where it is.
+ *
  * `min-h-[var(--tap)]` keeps the row as tall as the target it no longer gets height from.
  *
- * Because the target is pinned out of flow over the row's start, its press wash (`--press`, a
- * 48px square reaching 52px from the row edge) covers the first third of a title that starts at
- * 28px, and its `motion-safe:transition-colors`
- * keeps that square painted for a moment past the release, while the row's own wash snaps back.
- * Read as one gesture, a square appears over the title and then fades off it. The row is already
- * the press target (`rowSurfaceStyles`) and covers the whole row, so the wash survives without
- * this one: the dense row silences the target's own.
+ * The target's own press wash stays silenced (`:active`): it no longer covers text, but the row
+ * already washes on press (`rowSurfaceStyles`), and a second `--press` square would paint the
+ * row's left gutter twice in one gesture.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] py-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-start [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
- * Action slots: a form wraps each one, and a danger delete button drops its default tap
- * square for a compact inset. The row's own end inset has already placed the slot, so the
- * glyph needs no negative margin to land on the text edge.
+ * Action slots: a form wraps each one, and a danger delete button takes a floor instead of
+ * `size="icon"`'s square. The slot's `h-auto`/`w-auto` otherwise let the box shrink to its own
+ * `--s2` inset plus the glyph — 34px, under the 44px floor the contract sets. The floor is
+ * declared on the variant, so both shapes in the slot inherit it: a `size="icon"` danger button
+ * and the unsized `ConfirmButton` the trash screens render.
+ *
+ * The glyph itself does not move: the box is anchored on the row's end inset, so its trailing edge
+ * is fixed, and `justify-end` puts the 18px glyph against that same trailing padding — its
+ * position is identical in the 34px box and the `--tap` one; only the leading edge travelled. The
+ * variant selector reaches the button with a class and an element, so it outranks the `Button`
+ * base's own `justify-center` without needing `!important`.
+ *
+ * The floor adds no row height because of the negative block margin: a `--tap` box in flow is
+ * taller than the row's content box (`--row-min-height` less `2 × --s3` = 32px), so the box hands
+ * 8px of itself back over each edge and the row keeps the height its text column asks for.
  */
 const rowSlotStyles = cx(
   '[&>form]:flex',
-  '[&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0',
-  '[&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0',
+  '[&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)]',
+  '[&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)]',
+  '[&>form>.ui-btn--danger]:justify-end',
+  '[&>form>.ui-btn--danger]:-my-[var(--s2)]',
   '[&>form>.ui-btn--danger]:p-[var(--s2)]',
   '[&>form>.ui-btn--danger]:rounded-[var(--r-md)]',
 );
@@ -132,8 +150,10 @@ const rowSlotStyles = cx(
 /**
  * The whole row is the target: the body stretches to the row height and takes its width.
  * Each shape below spells out its own alignment and gap, so nothing is applied twice and no
- * later class has to outrank an earlier one. Padding lives on the row box, not here, so the
- * slots and the body share one inset.
+ * later class has to outrank an earlier one. The horizontal insets live on the row box so the
+ * slots and the body share them; the vertical padding lives on the link of a dense row
+ * (`linkDenseStyles`), whose row box carries none — a row inset the anchor does not span is a
+ * band a tap passes through.
  */
 const linkSharedStyles =
   'flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent]';
@@ -148,16 +168,25 @@ const linkColumnStyles = cx(linkSharedStyles, 'flex-col items-stretch gap-[var(-
  * A dense row packs its line tighter than a full row. The mark-to-title gap is the pre-redesign
  * `0.5rem` (`--s2`), not the tighter `--s1` the redesigned row shrank it to.
  *
- * The link's own `--s4` (16px) start inset is the dense row's title offset, one step on top of
- * the row's `--s3`: a 28px title against the old 26.4px and a 16px mark-to-title gap against the
- * old 14.4px, the nearest the token scale reaches. It lives here rather than on the row because
- * a child-selector utility cannot name this class: Tailwind reads the `__` in
- * `[&>.ui-list-item__link]` as a descendant combinator and compiles a rule that never matches.
+ * The start inset is where the checkbox's press square ends: the square's start is the control's
+ * `--s4` offset less its own `-ms-[var(--s3)]` (`--s1`), and it is `--tap` wide, so it ends at
+ * `--s1 + --tap` = 52px. The row's own `ps-[var(--s3)]` already covers 12 of that, so the link
+ * starts the title at `--tap + --s1 - --s3` = 40px more, 52px from the row edge — flush with the
+ * square, no overlap, and the title keeps its full string in the DOM.
+ *
+ * It lives here rather than on the row because a child-selector utility cannot name this class:
+ * Tailwind reads the `__` in `[&>.ui-list-item__link]` as a descendant combinator and compiles a
+ * rule that never matches.
+ *
+ * The row's `--s2` block inset lives here too, so the anchor is as tall as the row and the 8px
+ * band above and below a matrix title navigates instead of doing nothing. The padding is stated
+ * here, not on the row, so the title's first line still starts one `--s2` down — the mark's lift
+ * formula is measured against that inset and does not move.
  */
 const linkDenseStyles = cx(
   linkSharedStyles,
   'items-center gap-[var(--s2)]',
-  'ps-[var(--s4)]',
+  'ps-[calc(var(--tap)+var(--s1)-var(--s3))] py-[var(--s2)] min-h-[var(--tap)]',
 );
 
 /** Title above, meta line below, one spacing step apart. */
@@ -172,9 +201,32 @@ const titleSizeStyles = 'text-[length:var(--fs-row-title)]';
 /** A dense row's title drops to the meta size, so a quadrant row reads as one compact block. */
 const denseTitleSizeStyles = 'text-[length:var(--fs-meta)]';
 
-/** The title is one ellipsized line — except a todo row, which reads up to two. */
-const titleLineStyles = 'truncate';
-const titleClampedStyles = 'line-clamp-2 whitespace-normal';
+/**
+ * A todo row reads up to two title lines, and so does a base list row: the second line is what
+ * stops a long title truncating mid-phrase. That holds for a dense row too — the press square
+ * takes 24px more of the row than the pre-redesign inset did, so the column is narrow enough
+ * that one line is where a quadrant title loses its ending. `--tap` is the dense row's floor,
+ * not its height, so a second line grows the row instead of shrinking the target. Only the
+ * nested and feedback labels stay one line: they sit above their own body, with an action
+ * beside them.
+ */
+const titleOneLineStyles = 'truncate';
+const titleTwoLineStyles = 'line-clamp-2 whitespace-normal';
+
+/**
+ * The title text inside an action line, as a real element. A text node is no flex item: the
+ * line's `[&>:first-child]` rule could not reach the title, so the action kept its full width
+ * and ran past the line's truncating box, cut at the clip edge with no ellipsis.
+ *
+ * A title that is a control rather than text — the meal entry's dish `Input` — takes the line's
+ * shrink but not the truncation: `overflow: hidden` would clip the control's own focus ring
+ * against the line's edge, and a control has no text to ellipsize.
+ */
+const actionTitleLineStyles = 'min-w-0 flex-1';
+
+function actionTitleStylesFor(title: ReactNode): string {
+  return isValidElement(title) ? actionTitleLineStyles : `${actionTitleLineStyles} truncate`;
+}
 
 /** §8's `.row__meta`: the second ink tier, one step below the title. */
 const subStyles = cx(
@@ -184,7 +236,9 @@ const subStyles = cx(
 );
 
 const separatorStyles = 'shrink-0 text-ink-3';
+/** One line on a base row; two on a feedback row, whose description has no other surface. */
 const snippetStyles = 'min-w-0 truncate';
+const feedbackSnippetStyles = 'min-w-0 line-clamp-2';
 const nestedBodyStyles = 'grid gap-[var(--s2)]';
 
 /**
@@ -195,10 +249,7 @@ const nestedBodyStyles = 'grid gap-[var(--s2)]';
 const nestedBodyActionInsetStyles = 'pr-[calc(var(--tap)+var(--s2))]';
 
 /** The title line carrying its action: the action sits against the title, not the child body. */
-const actionLineStyles = cx(
-  'flex items-stretch gap-[var(--s2)]',
-  '[&>:first-child]:flex-1 [&>:first-child]:min-w-0',
-);
+const actionLineStyles = 'flex items-stretch gap-[var(--s2)]';
 
 /** The action keeps the line's height and never sets one of its own. */
 const actionStyles = 'flex items-center shrink-0';
@@ -241,11 +292,17 @@ function titleSizeStylesFor(isDense: boolean): string {
   return isDense ? denseTitleSizeStyles : titleSizeStyles;
 }
 
+function titleFlowStylesFor({ variant }: Readonly<RowFlags>): string {
+  if (variant === 'nested' || variant === 'feedback') return titleOneLineStyles;
+  return titleTwoLineStyles;
+}
+
 function titleNodeFor(
-  { variant, isDense, done, carriesAction }: Readonly<RowFlags>,
+  flags: Readonly<RowFlags>,
   title: ReactNode,
   titleAction: ReactNode,
 ): ReactNode {
+  const { isDense, done, carriesAction } = flags;
   return (
     <span
       className={cx(
@@ -253,12 +310,15 @@ function titleNodeFor(
         carriesAction && 'ui-list-item__title--with-action',
         titleBaseStyles,
         titleSizeStylesFor(isDense),
-        variant === 'todo' ? titleClampedStyles : titleLineStyles,
+        carriesAction ? actionLineStyles : titleFlowStylesFor(flags),
         done && doneTitleStyles,
-        carriesAction && actionLineStyles,
       )}
     >
-      {title}
+      {carriesAction ? (
+        <span className={actionTitleStylesFor(title)}>{title}</span>
+      ) : (
+        title
+      )}
       {carriesAction && (
         <span className={cx('ui-list-item__title-action', actionStyles)}>{titleAction}</span>
       )}
@@ -272,7 +332,14 @@ function subNodeFor(
   snippet: ReactNode,
 ): ReactNode {
   const snippetNode = snippet != null && snippet !== false && (
-    <span className={cx('ui-list-item__snippet', snippetStyles)}>{snippet}</span>
+    <span
+      className={cx(
+        'ui-list-item__snippet',
+        variant === 'feedback' ? feedbackSnippetStyles : snippetStyles,
+      )}
+    >
+      {snippet}
+    </span>
   );
 
   /* The base row reads meta and snippet on one line, separated by a `|`. A

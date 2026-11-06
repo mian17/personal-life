@@ -13,9 +13,13 @@ export interface IconButtonProps extends ComponentPropsWithRef<'button'> {
  * Shared by every variant: the 48px tap target on `--r-md`, the `--press` wash under the finger,
  * the focus ring and the disabled treatment. Face — ink, border and fill — belongs to the variant
  * below, so two utilities never contest one property on the same element.
+ *
+ * `shrink-0` keeps the square at `--tap` inside a flex row: a `w-full` sibling (the create and rename
+ * rows) bases itself on the whole row, and the 56px deficit would otherwise be shared with this
+ * control, shaving it under the 44px floor.
  */
 const iconButtonStyles = cx(
-  'inline-flex size-[var(--tap)] items-center justify-center',
+  'inline-flex size-[var(--tap)] shrink-0 items-center justify-center',
   'rounded-[var(--r-md)]',
   'cursor-pointer outline-none motion-safe:transition-colors active:bg-press',
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
