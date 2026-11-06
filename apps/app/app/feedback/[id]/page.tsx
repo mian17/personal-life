@@ -27,7 +27,8 @@ export const dynamic = 'force-dynamic';
  * entry missing from it is not there to show.
  *
  * Read-only by design: the status dropdown lives with the row that owns its write
- * path, and this screen would only duplicate it.
+ * path, and this screen would only duplicate it. The status chip rides the meta line
+ * beside the creation date, so the card below holds the description and nothing else.
  */
 export default async function FeedbackDetailPage({
   params,
@@ -45,12 +46,17 @@ export default async function FeedbackDetailPage({
           </IconLink>
         }
       />
-      <PageTitle sub={<LocalTime dateTime={entry.createdAt} />}>{entry.title}</PageTitle>
+      <PageTitle
+        sub={
+          <>
+            <LocalTime dateTime={entry.createdAt} /> · <Pill tone={entry.status}>{label}</Pill>
+          </>
+        }
+      >
+        {entry.title}
+      </PageTitle>
       <Card>
-        <Stack gap="md">
-          <Pill tone={entry.status}>{label}</Pill>
-          {entry.description}
-        </Stack>
+        <Stack gap="md">{entry.description}</Stack>
       </Card>
     </PageShell>
   );

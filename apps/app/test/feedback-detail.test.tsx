@@ -36,6 +36,17 @@ async function markupFor(id: string): Promise<string> {
   return renderToStaticMarkup(await FeedbackDetailPage({ params: Promise.resolve({ id }) }));
 }
 
+/** PageTitle's `sub` line — the meta row the date and the status chip share. */
+function metaLine(html: string): string {
+  const start = html.indexOf('<p class="ui-page-title__sub');
+  return html.slice(start, html.indexOf('</p>', start));
+}
+
+/** The description card, from its opening tag to the end of the page. */
+function descriptionCard(html: string): string {
+  return html.slice(html.indexOf('data-slot="card"'));
+}
+
 describe('/feedback/[id] page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -68,6 +79,26 @@ describe('/feedback/[id] page wiring', () => {
 
   it('is read-only: the status dropdown stays with the row that owns its write path', async () => {
     expect(await markupFor('entry-1')).not.toContain('<select');
+  });
+
+  it('carries the status chip on the meta line, after the creation date', async () => {
+    const html = await markupFor('entry-1');
+    const meta = metaLine(html);
+
+    expect(meta).toContain('Open');
+    expect(meta).toContain('ui-pill');
+    // Date first, the literal separator between them, the chip last.
+    expect(meta.indexOf('<time')).toBeLessThan(meta.indexOf('ui-pill'));
+    expect(meta).toContain(' · ');
+    // Outside the heading, so the heading's accessible name stays the title alone.
+    expect(html.slice(html.indexOf('<h1'), html.indexOf('</h1>'))).not.toContain('ui-pill');
+  });
+
+  it('leaves the card to the description alone', async () => {
+    const card = descriptionCard(await markupFor('entry-1'));
+
+    expect(card).toContain('The first paint after a reload is light, then the theme snaps in.');
+    expect(card).not.toContain('ui-pill');
   });
 
   it('404s an id the owner does not have, instead of rendering an empty page', async () => {
