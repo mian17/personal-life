@@ -642,16 +642,22 @@ describe('ListItem', () => {
     expect(link.contains(screen.getByTestId('status-dropdown'))).toBe(true);
     expect(link.contains(titleLine)).toBe(true);
 
-    // Three lines: title, then the description line, then the meta line. The
-    // base row would put both on one line separated by a `|`, so a feedback row
-    // splits them into two `__sub` lines and drops the separator.
+    // Three lines: title, then the creation date, then the description. The base
+    // row would put both on one line separated by a `|`, so a feedback row splits
+    // them into two `__sub` lines and drops the separator.
     const text = document.querySelector('.ui-list-item__text')!;
     const snippet = document.querySelector('.ui-list-item__snippet')!;
     const subLines = text.querySelectorAll('.ui-list-item__sub');
     expect(snippet.textContent).toBe('On cold load');
     expect(subLines).toHaveLength(2);
-    expect(subLines[0].contains(snippet)).toBe(true);
-    expect(subLines[1].textContent).toBe('Today');
+    expect(subLines[0].textContent).toBe('Today');
+    expect(subLines[0].querySelector('time')).not.toBeNull();
+    expect(subLines[1].contains(snippet)).toBe(true);
+    // The date reads under the title, and the description under the date: the
+    // serialized order is the reading order, not just the box order.
+    const markup = text.innerHTML;
+    expect(markup.indexOf('ui-list-item__title')).toBeLessThan(markup.indexOf('<time'));
+    expect(markup.indexOf('<time')).toBeLessThan(markup.indexOf('ui-list-item__snippet'));
     expect(text.firstElementChild).toBe(titleLine);
     expect(titleLine.nextElementSibling).toBe(subLines[0]);
     expect(subLines[0].nextElementSibling).toBe(subLines[1]);
@@ -668,6 +674,26 @@ describe('ListItem', () => {
     // the line's clip edge (H3).
     expect(classesOf(titleLine.firstElementChild!)).toContain('flex-1');
     expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
+  });
+
+  it('keeps the base row one line with the `|` separator', () => {
+    render(
+      <ul>
+        <ListItem
+          title="Groceries"
+          meta={<time dateTime="2026-10-16">Today</time>}
+          snippet="On cold load"
+        />
+      </ul>,
+    );
+
+    // The feedback order is a feedback-row rule only: a base row still reads meta,
+    // separator, snippet on one `__sub` line.
+    const subs = document.querySelectorAll('.ui-list-item__sub');
+    expect(subs).toHaveLength(1);
+    expect(subs[0].firstElementChild!.textContent).toBe('Today');
+    expect(document.querySelector('.ui-list-item__sep')!.textContent).toBe('|');
+    expect(document.querySelector('.ui-list-item__snippet')!.textContent).toBe('On cold load');
   });
 
   it('renders an interactive control beside the link, not inside it', () => {

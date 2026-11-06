@@ -353,12 +353,13 @@ function subNodeFor(
   );
 
   /* The base row reads meta and snippet on one line, separated by a `|`. A
-     feedback row gives the description its own line above the meta line, so
-     each line reuses the `__sub` typography and no separator is needed. */
+     feedback row reads title, then date, then the description: the date sits
+     directly under the title and the clamped description gets the lines beneath
+     it. Each line reuses the `__sub` typography and no separator is needed. */
   return variant === 'feedback' ? (
     <>
-      {snippetNode && <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>}
       <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
+      {snippetNode && <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>}
     </>
   ) : (
     <span className={cx('ui-list-item__sub', subStyles)}>
