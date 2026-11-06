@@ -28,6 +28,7 @@
     { "slug": "pomodoro-stats", "title": "Stats", "module": "pomodoro", "route": "/pomodoro/stats" },
     { "slug": "pomodoro-settings", "title": "Pomodoro settings", "module": "pomodoro", "route": "/pomodoro/settings" },
     { "slug": "feedback-inbox", "title": "Feedback inbox", "module": "shared", "route": "/feedback" },
+    { "slug": "feedback-detail", "title": "Feedback detail", "module": "shared", "route": "/feedback/{feedback}" },
     { "slug": "feedback-settings", "title": "Feedback settings", "module": "shared", "route": "/feedback/settings" }
   ]
 }

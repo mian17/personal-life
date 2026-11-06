@@ -665,6 +665,52 @@ describe('ListItem', () => {
     expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
   });
 
+  it('renders an interactive control beside the link, not inside it', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    const link = screen.getByRole('link');
+    const dropdown = screen.getByTestId('status-dropdown');
+
+    // Nested interactive content is invalid, and the control stops answering its own presses.
+    expect(link.contains(dropdown)).toBe(false);
+    expect(dropdown.closest('a')).toBeNull();
+
+    // The row still navigates: the title and the description are the anchor's own text.
+    expect(link.getAttribute('href')).toBe('/feedback/abc');
+    expect(link.textContent).toContain('Dark mode flickers');
+    expect(link.textContent).toContain('On cold load');
+
+    // One wrapper holds both, so the dropdown keeps its place under the text it belongs to.
+    expect(link.parentElement!.contains(dropdown)).toBe(true);
+    expect(link.nextElementSibling).toBe(dropdown);
+  });
+
+  it('keeps a feedback row without href exactly as it was: one box holding text and control', () => {
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers">
+          <span data-testid="status-dropdown" />
+        </ListItem>
+      </ul>,
+    );
+
+    const box = document.querySelector('.ui-list-item__link')!;
+    expect(box.tagName).toBe('SPAN');
+    expect(box.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+    expect(document.querySelector('a')).toBeNull();
+  });
+
   it('leaves the feedback title a plain block when no pill is given', () => {
     render(
       <ul>

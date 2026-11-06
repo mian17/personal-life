@@ -254,6 +254,12 @@ const actionLineStyles = 'flex items-stretch gap-[var(--s2)]';
 /** The action keeps the line's height and never sets one of its own. */
 const actionStyles = 'flex items-center shrink-0';
 
+/**
+ * A linked feedback row's outline: the result of lifting its child body out of the link. See
+ * `linkNodeFor`. A block, so the link and the children beneath it fill the row's width.
+ */
+const bodyColumnStyles = 'w-full';
+
 /** A done row is struck and muted; so is the due date that would otherwise read red. */
 const doneTitleStyles = 'text-ink-2 line-through';
 const doneRowStyles =
@@ -271,6 +277,7 @@ const toneStyles: Record<ListItemTone, string> = {
 
 /** The row's computed shape, resolved once so every class and node builder reads one source. */
 interface RowFlags {
+  href: string | undefined;
   variant: ListItemVariant | undefined;
   isDense: boolean;
   isColumn: boolean;
@@ -411,6 +418,61 @@ function rowStyleClassesFor({
   );
 }
 
+/**
+ * The row's link, or its plain box when the consumer passes no `href`.
+ *
+ * A linked row puts its whole body inside its anchor, and a body may hold controls that are
+ * illegal there: an `<a>` cannot contain interactive content, so a `<select>` inside one loses
+ * its own click target and the row navigates instead of the control answering. Only a feedback
+ * row has that shape today — its child body is the status dropdown — so only that shape lifts
+ * the children out. The link becomes the title text and the description; the children keep their
+ * own place beneath it, beside the anchor inside one block wrapper.
+ *
+ * The other two linked shapes keep their link unbroken, and nothing moves out of it: a todo row's
+ * controls are slots beside the link, and a nested row's fields are the body it edits, so
+ * escaping the anchor would cost it the whole-row tap target.
+ */
+function linkNodeFor(
+  { href, variant }: Readonly<RowFlags>,
+  linkStyles: string,
+  text: ReactNode,
+  childBody: ReactNode,
+): ReactNode {
+  if (variant === 'feedback') {
+    if (href == null) {
+      return (
+        <span className={cx('ui-list-item__link', linkStyles)}>
+          {text}
+          {childBody}
+        </span>
+      );
+    }
+    return (
+      <div className={bodyColumnStyles}>
+        <Link href={href} className={cx('ui-list-item__link', linkStyles)}>
+          {text}
+        </Link>
+        {childBody}
+      </div>
+    );
+  }
+
+  const body = (
+    <>
+      {text}
+      {childBody}
+    </>
+  );
+  const linkClasses = cx('ui-list-item__link', linkStyles);
+  return href == null ? (
+    <span className={linkClasses}>{body}</span>
+  ) : (
+    <Link href={href} className={linkClasses}>
+      {body}
+    </Link>
+  );
+}
+
 export function ListItem({
   href,
   title,
@@ -430,6 +492,7 @@ export function ListItem({
   ...rest
 }: Readonly<ListItemProps>) {
   const flags: RowFlags = {
+    href,
     variant,
     isDense: variant === 'todo' && size === 'dense',
     isColumn: variant === 'nested' || variant === 'feedback',
@@ -440,38 +503,31 @@ export function ListItem({
     tone,
   };
 
-  const body = (
-    <>
-      <span className={cx('ui-list-item__text', textStyles)}>
-        {titleNodeFor(flags, title, titleAction)}
-        {subNodeFor(flags, meta, snippet)}
-      </span>
-      {variant === 'nested' ? (
-        <span
-          className={cx(
-            'ui-list-item__nested-body',
-            nestedBodyStyles,
-            flags.carriesAction && nestedBodyActionInsetStyles,
-          )}
-        >
-          {children}
-        </span>
-      ) : (
-        children
+  const text = (
+    <span className={cx('ui-list-item__text', textStyles)}>
+      {titleNodeFor(flags, title, titleAction)}
+      {subNodeFor(flags, meta, snippet)}
+    </span>
+  );
+
+  const childBody = variant === 'nested' ? (
+    <span
+      className={cx(
+        'ui-list-item__nested-body',
+        nestedBodyStyles,
+        flags.carriesAction && nestedBodyActionInsetStyles,
       )}
-    </>
+    >
+      {children}
+    </span>
+  ) : (
+    children
   );
 
   return (
     <li className={cx(rowHookClassesFor(flags), rowStyleClassesFor(flags), className)} {...rest}>
       {leading}
-      {href != null ? (
-        <Link href={href} className={cx('ui-list-item__link', linkStylesFor(flags))}>
-          {body}
-        </Link>
-      ) : (
-        <span className={cx('ui-list-item__link', linkStylesFor(flags))}>{body}</span>
-      )}
+      {linkNodeFor(flags, linkStylesFor(flags), text, childBody)}
       {trailing}
       {deleteAction}
     </li>
