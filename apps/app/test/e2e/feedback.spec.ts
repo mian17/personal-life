@@ -54,6 +54,15 @@ test('submit feedback from the notes toolbar and read it back in the inbox', asy
   const row = notesGroup.locator('li', { hasText: title });
   await expect(row.getByText(title)).toBeVisible();
   await expect(row.getByText(description)).toBeVisible();
+
+  // M11: the row clamps the description to two lines, so it links to the entry's own
+  // screen, which reads the submitted text in full under its title.
+  await row.getByRole('link').click();
+  await expect(page).toHaveURL(new RegExp(`/feedback/[^/]+$`));
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
+  await expect(page.getByText(description)).toBeVisible();
+  await page.getByRole('link', { name: 'Back' }).click();
+  await expect(page).toHaveURL(/\/feedback$/);
 });
 
 /**

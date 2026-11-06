@@ -26,6 +26,16 @@ const DANGER_FLOOR_WIDTH_UTILITY = '[&>form>.ui-btn--danger]:min-w-[var(--tap)]'
  * edge, flush with the checkbox press square's trailing edge.
  */
 const DENSE_TITLE_INSET_UTILITY = 'ps-[calc(var(--tap)+var(--s1)-var(--s3))]';
+/**
+ * A linked feedback row's child gap: one `--s2` step, the same gap `linkColumnStyles` gives the
+ * unlinked shape.
+ */
+const FEEDBACK_COLUMN_GAP_UTILITY = 'gap-[var(--s2)]';
+/**
+ * The description's own step: the text column pairs the title with its date at one `--s1`, and
+ * this offset adds `--s2` on top of that gap, so the description sits 12px below the pair.
+ */
+const FEEDBACK_DESCRIPTION_OFFSET_UTILITY = 'mt-[var(--s2)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -637,20 +647,33 @@ describe('ListItem', () => {
     expect(link.contains(screen.getByTestId('status-dropdown'))).toBe(true);
     expect(link.contains(titleLine)).toBe(true);
 
-    // Three lines: title, then the description line, then the meta line. The
-    // base row would put both on one line separated by a `|`, so a feedback row
-    // splits them into two `__sub` lines and drops the separator.
+    // Three lines: title, then the creation date, then the description. The base
+    // row would put both on one line separated by a `|`, so a feedback row splits
+    // them into two `__sub` lines and drops the separator.
     const text = document.querySelector('.ui-list-item__text')!;
     const snippet = document.querySelector('.ui-list-item__snippet')!;
     const subLines = text.querySelectorAll('.ui-list-item__sub');
     expect(snippet.textContent).toBe('On cold load');
     expect(subLines).toHaveLength(2);
-    expect(subLines[0].contains(snippet)).toBe(true);
-    expect(subLines[1].textContent).toBe('Today');
+    expect(subLines[0].textContent).toBe('Today');
+    expect(subLines[0].querySelector('time')).not.toBeNull();
+    expect(subLines[1].contains(snippet)).toBe(true);
+    // The date reads under the title, and the description under the date: the
+    // serialized order is the reading order, not just the box order.
+    const markup = text.innerHTML;
+    expect(markup.indexOf('ui-list-item__title')).toBeLessThan(markup.indexOf('<time'));
+    expect(markup.indexOf('<time')).toBeLessThan(markup.indexOf('ui-list-item__snippet'));
     expect(text.firstElementChild).toBe(titleLine);
     expect(titleLine.nextElementSibling).toBe(subLines[0]);
     expect(subLines[0].nextElementSibling).toBe(subLines[1]);
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
+
+    // The title and its date are one pair one step apart; the description opens the next step,
+    // so only it carries the offset. Both stay siblings in the order the reader sees.
+    expect(classesOf(subLines[0])).not.toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(classesOf(subLines[1])).toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(subLines[0].parentElement).toBe(text);
+    expect(subLines[1].parentElement).toBe(text);
 
     const linkClasses = classesOf(link);
     expect(linkClasses).toContain('flex-col');
@@ -663,6 +686,96 @@ describe('ListItem', () => {
     // the line's clip edge (H3).
     expect(classesOf(titleLine.firstElementChild!)).toContain('flex-1');
     expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
+  });
+
+  it('keeps the base row one line with the `|` separator', () => {
+    render(
+      <ul>
+        <ListItem
+          title="Groceries"
+          meta={<time dateTime="2026-10-16">Today</time>}
+          snippet="On cold load"
+        />
+      </ul>,
+    );
+
+    // The feedback order is a feedback-row rule only: a base row still reads meta,
+    // separator, snippet on one `__sub` line.
+    const subs = document.querySelectorAll('.ui-list-item__sub');
+    expect(subs).toHaveLength(1);
+    expect(subs[0].firstElementChild!.textContent).toBe('Today');
+    expect(document.querySelector('.ui-list-item__sep')!.textContent).toBe('|');
+    expect(document.querySelector('.ui-list-item__snippet')!.textContent).toBe('On cold load');
+  });
+
+  it('renders an interactive control beside the link, not inside it', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    const link = screen.getByRole('link');
+    const dropdown = screen.getByTestId('status-dropdown');
+
+    // Nested interactive content is invalid, and the control stops answering its own presses.
+    expect(link.contains(dropdown)).toBe(false);
+    expect(dropdown.closest('a')).toBeNull();
+
+    // The row still navigates: the title and the description are the anchor's own text.
+    expect(link.getAttribute('href')).toBe('/feedback/abc');
+    expect(link.textContent).toContain('Dark mode flickers');
+    expect(link.textContent).toContain('On cold load');
+
+    // One wrapper holds both, so the dropdown keeps its place under the text it belongs to.
+    expect(link.parentElement!.contains(dropdown)).toBe(true);
+    expect(link.nextElementSibling).toBe(dropdown);
+  });
+
+  it('returns the feedback child gap to a linked row, so the body is not flush on the control', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    // Lifting the control out of the anchor left it in a plain block, and a block has no child
+    // gap: the meta line sat flush against the dropdown. The wrapper is the column now, so the
+    // linked shape owns the step the unlinked shape gets from its own column link.
+    const wrapper = screen.getByRole('link').parentElement!;
+    expect(wrapper.tagName).toBe('DIV');
+    expect(classesOf(wrapper)).toContain('flex-col');
+    expect(classesOf(wrapper)).toContain(FEEDBACK_COLUMN_GAP_UTILITY);
+    expect(wrapper.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+  });
+
+  it('keeps a feedback row without href exactly as it was: one box holding text and control', () => {
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers">
+          <span data-testid="status-dropdown" />
+        </ListItem>
+      </ul>,
+    );
+
+    const box = document.querySelector('.ui-list-item__link')!;
+    expect(box.tagName).toBe('SPAN');
+    expect(box.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+    expect(document.querySelector('a')).toBeNull();
   });
 
   it('leaves the feedback title a plain block when no pill is given', () => {
@@ -944,7 +1057,7 @@ describe('ListItem', () => {
       'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
     );
     expect(subs[1].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap mt-[var(--s2)]',
     );
     // M11: a feedback description has no detail route, so one ellipsized line hid the submitted
     // text for good. Two lines double what a reader can see; the string itself is unchanged.

@@ -189,8 +189,20 @@ const linkDenseStyles = cx(
   'ps-[calc(var(--tap)+var(--s1)-var(--s3))] py-[var(--s2)] min-h-[var(--tap)]',
 );
 
-/** Title above, meta line below, one spacing step apart. */
+/**
+ * Title above, meta line below, one spacing step apart. A feedback row stacks three lines in this
+ * column, so this one step pairs the title with its date; that row's description adds
+ * `feedbackDescriptionStyles` to reach the next step.
+ */
 const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';
+
+/**
+ * A feedback description is the row's next block, not a third line of the date. The title and its
+ * date read as one pair one `--s1` step apart; this margin is `--s2` (8px) on top of the column's
+ * `--s1` gap, so the description opens `--s2` + `--s1` = 12px below the date. One margin is the
+ * whole cost — a row-specific spacing value, not a new token.
+ */
+const feedbackDescriptionStyles = 'mt-[var(--s2)]';
 
 /** §8's `.row__title`: 16px at 1.35, semibold, set slightly tight. */
 const titleBaseStyles =
@@ -254,6 +266,15 @@ const actionLineStyles = 'flex items-stretch gap-[var(--s2)]';
 /** The action keeps the line's height and never sets one of its own. */
 const actionStyles = 'flex items-center shrink-0';
 
+/**
+ * A linked feedback row's outline: the result of lifting its child body out of the link. See
+ * `linkNodeFor`. A column, so the link and the children beneath it fill the row's width and sit
+ * one `--s2` step apart — the gap `linkColumnStyles` gives the unlinked shape, which the split
+ * into two boxes lost. The gap lives here, not on the child body: that body is shared with the
+ * nested variant, whose `nestedBodyStyles` owns its own spacing.
+ */
+const bodyColumnStyles = cx('flex w-full flex-col gap-[var(--s2)]');
+
 /** A done row is struck and muted; so is the due date that would otherwise read red. */
 const doneTitleStyles = 'text-ink-2 line-through';
 const doneRowStyles =
@@ -271,6 +292,7 @@ const toneStyles: Record<ListItemTone, string> = {
 
 /** The row's computed shape, resolved once so every class and node builder reads one source. */
 interface RowFlags {
+  href: string | undefined;
   variant: ListItemVariant | undefined;
   isDense: boolean;
   isColumn: boolean;
@@ -343,12 +365,18 @@ function subNodeFor(
   );
 
   /* The base row reads meta and snippet on one line, separated by a `|`. A
-     feedback row gives the description its own line above the meta line, so
-     each line reuses the `__sub` typography and no separator is needed. */
+     feedback row reads title, then date, then the description: the date pairs
+     with the title one step beneath it, and the clamped description opens the
+     next step below that pair. Each line reuses the `__sub` typography and no
+     separator is needed. */
   return variant === 'feedback' ? (
     <>
-      {snippetNode && <span className={cx('ui-list-item__sub', subStyles)}>{snippetNode}</span>}
       <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
+      {snippetNode && (
+        <span className={cx('ui-list-item__sub', subStyles, feedbackDescriptionStyles)}>
+          {snippetNode}
+        </span>
+      )}
     </>
   ) : (
     <span className={cx('ui-list-item__sub', subStyles)}>
@@ -411,6 +439,61 @@ function rowStyleClassesFor({
   );
 }
 
+/**
+ * The row's link, or its plain box when the consumer passes no `href`.
+ *
+ * A linked row puts its whole body inside its anchor, and a body may hold controls that are
+ * illegal there: an `<a>` cannot contain interactive content, so a `<select>` inside one loses
+ * its own click target and the row navigates instead of the control answering. Only a feedback
+ * row has that shape today — its child body is the status dropdown — so only that shape lifts
+ * the children out. The link becomes the title text and the description; the children keep their
+ * own place beneath it, beside the anchor inside one block wrapper.
+ *
+ * The other two linked shapes keep their link unbroken, and nothing moves out of it: a todo row's
+ * controls are slots beside the link, and a nested row's fields are the body it edits, so
+ * escaping the anchor would cost it the whole-row tap target.
+ */
+function linkNodeFor(
+  { href, variant }: Readonly<RowFlags>,
+  linkStyles: string,
+  text: ReactNode,
+  childBody: ReactNode,
+): ReactNode {
+  if (variant === 'feedback') {
+    if (href == null) {
+      return (
+        <span className={cx('ui-list-item__link', linkStyles)}>
+          {text}
+          {childBody}
+        </span>
+      );
+    }
+    return (
+      <div className={bodyColumnStyles}>
+        <Link href={href} className={cx('ui-list-item__link', linkStyles)}>
+          {text}
+        </Link>
+        {childBody}
+      </div>
+    );
+  }
+
+  const body = (
+    <>
+      {text}
+      {childBody}
+    </>
+  );
+  const linkClasses = cx('ui-list-item__link', linkStyles);
+  return href == null ? (
+    <span className={linkClasses}>{body}</span>
+  ) : (
+    <Link href={href} className={linkClasses}>
+      {body}
+    </Link>
+  );
+}
+
 export function ListItem({
   href,
   title,
@@ -430,6 +513,7 @@ export function ListItem({
   ...rest
 }: Readonly<ListItemProps>) {
   const flags: RowFlags = {
+    href,
     variant,
     isDense: variant === 'todo' && size === 'dense',
     isColumn: variant === 'nested' || variant === 'feedback',
@@ -440,38 +524,31 @@ export function ListItem({
     tone,
   };
 
-  const body = (
-    <>
-      <span className={cx('ui-list-item__text', textStyles)}>
-        {titleNodeFor(flags, title, titleAction)}
-        {subNodeFor(flags, meta, snippet)}
-      </span>
-      {variant === 'nested' ? (
-        <span
-          className={cx(
-            'ui-list-item__nested-body',
-            nestedBodyStyles,
-            flags.carriesAction && nestedBodyActionInsetStyles,
-          )}
-        >
-          {children}
-        </span>
-      ) : (
-        children
+  const text = (
+    <span className={cx('ui-list-item__text', textStyles)}>
+      {titleNodeFor(flags, title, titleAction)}
+      {subNodeFor(flags, meta, snippet)}
+    </span>
+  );
+
+  const childBody = variant === 'nested' ? (
+    <span
+      className={cx(
+        'ui-list-item__nested-body',
+        nestedBodyStyles,
+        flags.carriesAction && nestedBodyActionInsetStyles,
       )}
-    </>
+    >
+      {children}
+    </span>
+  ) : (
+    children
   );
 
   return (
     <li className={cx(rowHookClassesFor(flags), rowStyleClassesFor(flags), className)} {...rest}>
       {leading}
-      {href != null ? (
-        <Link href={href} className={cx('ui-list-item__link', linkStylesFor(flags))}>
-          {body}
-        </Link>
-      ) : (
-        <span className={cx('ui-list-item__link', linkStylesFor(flags))}>{body}</span>
-      )}
+      {linkNodeFor(flags, linkStylesFor(flags), text, childBody)}
       {trailing}
       {deleteAction}
     </li>
