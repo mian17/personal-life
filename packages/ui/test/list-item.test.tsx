@@ -26,6 +26,11 @@ const DANGER_FLOOR_WIDTH_UTILITY = '[&>form>.ui-btn--danger]:min-w-[var(--tap)]'
  * edge, flush with the checkbox press square's trailing edge.
  */
 const DENSE_TITLE_INSET_UTILITY = 'ps-[calc(var(--tap)+var(--s1)-var(--s3))]';
+/**
+ * A linked feedback row's child gap: one `--s2` step, the same gap `linkColumnStyles` gives the
+ * unlinked shape.
+ */
+const FEEDBACK_COLUMN_GAP_UTILITY = 'gap-[var(--s2)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -694,6 +699,30 @@ describe('ListItem', () => {
     // One wrapper holds both, so the dropdown keeps its place under the text it belongs to.
     expect(link.parentElement!.contains(dropdown)).toBe(true);
     expect(link.nextElementSibling).toBe(dropdown);
+  });
+
+  it('returns the feedback child gap to a linked row, so the body is not flush on the control', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    // Lifting the control out of the anchor left it in a plain block, and a block has no child
+    // gap: the meta line sat flush against the dropdown. The wrapper is the column now, so the
+    // linked shape owns the step the unlinked shape gets from its own column link.
+    const wrapper = screen.getByRole('link').parentElement!;
+    expect(wrapper.tagName).toBe('DIV');
+    expect(classesOf(wrapper)).toContain('flex-col');
+    expect(classesOf(wrapper)).toContain(FEEDBACK_COLUMN_GAP_UTILITY);
+    expect(wrapper.contains(screen.getByTestId('status-dropdown'))).toBe(true);
   });
 
   it('keeps a feedback row without href exactly as it was: one box holding text and control', () => {

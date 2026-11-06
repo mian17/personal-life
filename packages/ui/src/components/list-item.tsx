@@ -256,9 +256,12 @@ const actionStyles = 'flex items-center shrink-0';
 
 /**
  * A linked feedback row's outline: the result of lifting its child body out of the link. See
- * `linkNodeFor`. A block, so the link and the children beneath it fill the row's width.
+ * `linkNodeFor`. A column, so the link and the children beneath it fill the row's width and sit
+ * one `--s2` step apart — the gap `linkColumnStyles` gives the unlinked shape, which the split
+ * into two boxes lost. The gap lives here, not on the child body: that body is shared with the
+ * nested variant, whose `nestedBodyStyles` owns its own spacing.
  */
-const bodyColumnStyles = 'w-full';
+const bodyColumnStyles = cx('flex w-full flex-col gap-[var(--s2)]');
 
 /** A done row is struck and muted; so is the due date that would otherwise read red. */
 const doneTitleStyles = 'text-ink-2 line-through';
