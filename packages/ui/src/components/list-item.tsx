@@ -198,11 +198,11 @@ const textStyles = 'flex flex-col gap-[var(--s1)] flex-1 min-w-0';
 
 /**
  * A feedback description is the row's next block, not a third line of the date. The title and its
- * date read as one pair one `--s1` step apart, and this offset adds a second step to the
- * container's gap: `--s2` (8px) from the date, the rung above. Sized one step down without it, the
- * description absorbed the date into itself and the pair stopped reading as a pair.
+ * date read as one pair one `--s1` step apart; this margin is `--s2` (8px) on top of the column's
+ * `--s1` gap, so the description opens `--s2` + `--s1` = 12px below the date. One margin is the
+ * whole cost — a row-specific spacing value, not a new token.
  */
-const feedbackDescriptionStyles = 'mt-[var(--s1)]';
+const feedbackDescriptionStyles = 'mt-[var(--s2)]';
 
 /** §8's `.row__title`: 16px at 1.35, semibold, set slightly tight. */
 const titleBaseStyles =
