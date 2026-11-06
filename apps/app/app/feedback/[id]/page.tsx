@@ -1,17 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { FeedbackDto } from '@life/shared';
-import {
-  Card,
-  feedbackStatusOption,
-  IconLink,
-  LocalTime,
-  NavBar,
-  PageShell,
-  PageTitle,
-  Pill,
-  Stack,
-} from '@life/ui';
-import { ArrowLeft } from 'lucide-react';
+import { Card, feedbackStatusOption, LocalTime, ManagerBlock, Pill, Stack } from '@life/ui';
 import { listFeedback } from '@/lib/feedback-api';
 
 export const dynamic = 'force-dynamic';
@@ -38,27 +27,19 @@ export default async function FeedbackDetailPage({
   const { label } = feedbackStatusOption(entry.status);
 
   return (
-    <PageShell>
-      <NavBar
-        leading={
-          <IconLink href="/feedback" label="Back">
-            <ArrowLeft size={20} aria-hidden />
-          </IconLink>
-        }
-      />
-      <PageTitle
-        sub={
-          <>
-            <LocalTime dateTime={entry.createdAt} /> · <Pill tone={entry.status}>{label}</Pill>
-          </>
-        }
-      >
-        {entry.title}
-      </PageTitle>
+    <ManagerBlock
+      title={entry.title}
+      backHref="/feedback"
+      sub={
+        <>
+          <LocalTime dateTime={entry.createdAt} /> · <Pill tone={entry.status}>{label}</Pill>
+        </>
+      }
+    >
       <Card>
         <Stack gap="md">{entry.description}</Stack>
       </Card>
-    </PageShell>
+    </ManagerBlock>
   );
 }
 

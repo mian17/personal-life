@@ -1,6 +1,6 @@
 import { format, sum } from '@life/nutrition';
-import { Button, EmptyState, IconLink, List, ListItem, NavBar, PageShell, PageTitle } from '@life/ui';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { Button, EmptyState, List, ListItem, ManagerBlock } from '@life/ui';
+import { Trash2 } from 'lucide-react';
 import { listSavedMeals } from '@/lib/meal-api';
 import { deleteSavedMealAction } from './actions';
 
@@ -10,22 +10,14 @@ export const dynamic = 'force-dynamic';
  * The saved-meals list (`SPEC-meal-capture-ui` project structure). Every row is
  * one frozen meal linking to its own detail route; the calorie figure is the
  * sum of the **stored** item vectors, never a fresh derivation. Composition is
- * `@life/ui` only (Contract 1 Rule 1): `PageShell`/`PageTitle` frame it,
+ * `@life/ui` only (Contract 1 Rule 1): `ManagerBlock` frames it,
  * `List`/`ListItem` render the rows, `EmptyState` covers none saved.
  */
 export default async function SavedMealsPage() {
   const saved = await listSavedMeals();
 
   return (
-    <PageShell>
-      <NavBar
-        leading={
-          <IconLink href="/meals/settings" label="Back">
-            <ArrowLeft size={20} aria-hidden />
-          </IconLink>
-        }
-      />
-      <PageTitle>Saved meals</PageTitle>
+    <ManagerBlock title="Saved meals" backHref="/meals/settings">
       {saved.length === 0 ? (
         <EmptyState body="No saved meals yet. Correct a meal and save it to re-log it in one tap." />
       ) : (
@@ -52,6 +44,6 @@ export default async function SavedMealsPage() {
           ))}
         </List>
       )}
-    </PageShell>
+    </ManagerBlock>
   );
 }
