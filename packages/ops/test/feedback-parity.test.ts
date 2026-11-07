@@ -125,8 +125,13 @@ describe('the feedback registry', () => {
     ]);
   });
 
-  it('addresses the listing with no fields at all', () => {
-    expect(Object.keys(findOp(registryOf(), 'list').fields)).toEqual([]);
+  it('addresses the listing with the two paging fields, in order', () => {
+    const list = findOp(registryOf(), 'list');
+
+    expect(Object.keys(list.fields)).toEqual(['limit', 'cursor']);
+    expect(list.fields['limit'].type).toBe('number');
+    expect(list.fields['limit'].description).toContain('1 to 200');
+    expect(list.fields['cursor'].description).toContain('passed back untouched');
   });
 
   it('takes the five fields `CreateFeedbackDto` declares, in its order', () => {
@@ -201,6 +206,21 @@ describe('the feedback registry', () => {
 });
 
 describe('feedback operation parity', () => {
+  it('sends the same paged listing and renders the same page', async () => {
+    const pair = await runBoth({
+      argv: ['feedback', 'list', '--limit', '20'],
+      tool: 'feedback_list',
+      args: { limit: 20 },
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.method).toBe('GET');
+    expect(pair.cliWire?.path).toBe('/api/feedback');
+    expect(pair.cliWire?.query).toEqual({ limit: '20' });
+    expect(pair.cliWire?.body).toBeUndefined();
+    expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
   it('sends the same listing and renders the same rows', async () => {
     const pair = await runBoth({ argv: ['feedback', 'list'], tool: 'feedback_list', args: {} });
 

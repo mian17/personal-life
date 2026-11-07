@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { ListFeedbackQuery } from './dto/list-feedback.query';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { FeedbackService } from './feedback.service';
 
@@ -19,10 +20,14 @@ export class FeedbackController {
     return this.feedback.create(principal.sub, dto);
   }
 
-  /** `200` bare `FeedbackDto[]`, newest-first. */
+  /**
+   * `200 FeedbackPage` — `{ feedback, nextCursor }`, newest-first — or `400` for a
+   * `limit`/`cursor` the query DTO rejects. A `limit` the request omits gets the
+   * seam's default (50); the cap (200) is the seam's constant, not a literal here.
+   */
   @Get()
-  findAll(@Principal() principal: Principal) {
-    return this.feedback.findAll(principal.sub);
+  findAll(@Principal() principal: Principal, @Query() query: ListFeedbackQuery) {
+    return this.feedback.findAll(principal.sub, query);
   }
 
   /** `200 { id, status }`; `404` for a foreign or missing id, `400` a bad status or id. */
