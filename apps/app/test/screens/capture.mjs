@@ -17,8 +17,11 @@
  * set. Relative paths resolve from the repo root (see below), never the cwd.
  *
  * The app's identity gate answers `/auth/login` without a session cookie, so a
- * run needs a logged-in state: save one from a real browser and point
- * `SCREENS_STORAGE_STATE` at that JSON file.
+ * run needs a logged-in state: point `SCREENS_STORAGE_STATE` at a Playwright
+ * storage-state JSON file. `test/screens/login-state.mjs` writes one — it signs in
+ * against the running stack and carries the preference cookies a few screens
+ * assume (`/todos/matrix` 404s without `pref_matrix`), so use it rather than
+ * hand-building the file in a browser.
  *
  * A screen whose `route` carries `{placeholder}` tokens is resolved from
  * `screens.ids.json` (written by `seed.mjs`) at capture time. When an id is

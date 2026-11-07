@@ -12,7 +12,7 @@
  *
  * The rows it looks for are the ones `scripts/seed-stack.mjs` writes, recognised by
  * that script's own markers (`Seed: weekly groceries …`, `Water the garden`,
- * `Oats`, `Seed: oats breakfast`, and for a meal entry the
+ * `Oats`, `Seed: oats breakfast`, `Seed: note editor …` and, for a meal entry, the
  * `date|mealGroup|foodId|quantity` tuple it files one under). Markers are matched,
  * never re-created: a stack that was not seeded makes this fail loudly instead of
  * silently inventing a target for the harness.
@@ -56,12 +56,36 @@ function clientDay() {
   return `${date.getFullYear()}-${month}-${monthDay}`;
 }
 
-/** The marker texts a seeded note, todo, food and saved meal are recognised by (`seed-stack.mjs`). */
+/**
+ * The marker texts a seeded note, todo, food, saved meal and feedback row are
+ * recognised by (`seed-stack.mjs`).
+ */
 const SEEDED_NOTE = 'Seed: weekly groceries — tomatoes, basil, olive oil';
 const SEEDED_SAVED_MEAL = 'Seed: oats breakfast';
 const SEEDED_TODO = 'Water the garden';
 const SEEDED_FOOD = 'Oats';
 const SEEDED_ENTRY = { mealGroup: 'breakfast', quantity: 80 };
+
+/**
+ * The `feedback` seeder writes three rows; this is the long-description one, because it
+ * is the row `/feedback/[id]` is measured against — it is the only seeded report whose
+ * body is long enough to wrap. Matched on `title` alone: the description is 958
+ * characters and would make the marker unreadable here.
+ */
+const SEEDED_FEEDBACK = 'Seed: note editor returns to the top after switching apps';
+
+/** Whether a feedback row is the seeded report `/feedback/{feedback}` is captured from. */
+export function isSeededFeedback(row) {
+  return row?.title === SEEDED_FEEDBACK;
+}
+
+/**
+ * The keys no id was found for. A partial `screens.ids.json` would let the harness
+ * capture a wrong screen silently, so these fail the run before anything is written.
+ */
+export function missingIds(ids) {
+  return ids.filter(([, value]) => value === undefined || value === '').map(([key]) => key);
+}
 
 /** The CLI's `list` call for a resource, returning the rows the service sent back. */
 function listRows(service, resource, flags, credentialsDir) {
@@ -117,7 +141,7 @@ function findRow(service, resource, flags, matches, credentialsDir) {
 }
 
 /**
- * The six ids `screens.config.json` needs, in the order the harness reads them. Each
+ * The seven ids `screens.config.json` needs, in the order the harness reads them. Each
  * entry reads the resource `seed-stack.mjs` wrote and matches that script's marker;
  * `mealDate` is the client-local day the seeded entry was filed under, which is also
  * why `entry` cannot be looked up without `food`.
@@ -151,6 +175,7 @@ function readIds(credentialsDir) {
       'savedMeal',
       findRow('meal', 'saved-meals', [], (row) => row.name === SEEDED_SAVED_MEAL, credentialsDir)?.id,
     ],
+    ['feedback', findRow('feedback', 'feedback', [], isSeededFeedback, credentialsDir)?.id],
   ];
   return ids;
 }
@@ -169,7 +194,7 @@ async function main() {
 
     // A partial file would let the harness capture a wrong screen silently, so a
     // missing key fails the run before anything is written.
-    const missing = ids.filter(([, value]) => value === undefined || value === '').map(([key]) => key);
+    const missing = missingIds(ids);
     for (const [key, value] of ids) console.log(`${key}: ${value ?? '(missing)'}`);
     if (missing.length > 0) {
       console.error(`screens:ids found no seeded row for: ${missing.join(', ')} (run npm run seed:stack)`);
@@ -186,9 +211,12 @@ async function main() {
   }
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`screens:ids failed: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
+// Importable for `scripts/screens-ids.test.mjs`; only a direct run reads the stack.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`screens:ids failed: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  }
 }
