@@ -103,20 +103,69 @@ describe('Tags API (e2e)', () => {
       expect(b.body.id).toBeDefined();
 
       const res = await list().expect(200);
-      expect(res.body.map((t: { name: string }) => t.name)).toEqual(['Alpha', 'zeta']);
-      for (const tag of res.body) {
+      // `{ tags, nextCursor }` — the bare array this route used to answer with is gone.
+      expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+        'nextCursor',
+        'tags',
+      ]);
+      expect(res.body.nextCursor).toBeNull();
+      const tags = res.body.tags as Array<{ id: number; name: string; version: number; createdAt: string }>;
+      expect(tags.map((t) => t.name)).toEqual(['Alpha', 'zeta']);
+      for (const tag of tags) {
         expect(Object.keys(tag).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'name', 'version']);
         expect(typeof tag.version).toBe('number');
         expect(typeof tag.createdAt).toBe('string');
         expect(tag.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(res.body.map((t: { id: number }) => t.id).sort((a: number, b: number) => a - b)).toEqual(
+      expect(tags.map((t) => t.id).sort((a: number, b: number) => a - b)).toEqual(
         [a1.body.id, a2.body.id].sort((a: number, b: number) => a - b),
       );
 
       // B's vocabulary never appears to A.
       const bList = await list(tokenB).expect(200);
-      expect(bList.body.map((t: { name: string }) => t.name)).toEqual(['beta']);
+      expect(bList.body.tags.map((t: { name: string }) => t.name)).toEqual(['beta']);
+    });
+
+    it('pages the case-insensitive name order with no gap and no duplicate', async () => {
+      // A fresh owner so the walk sees only these rows. The names deliberately mix
+      // cases and share no spelling, and two of them (`Zebra`/`apple`) straddle the
+      // case fold — a predicate comparing raw names would order them the other way
+      // and repeat or skip one at a page edge.
+      const pageToken = await harness.sign({ subject: 'user-page', expiresIn: 3600 });
+      for (const name of ['apple', 'Zebra', 'mango', 'Banana', 'cherry']) {
+        await create(name, pageToken).expect(201);
+      }
+
+      const whole = await auth(
+        request(app.getHttpServer()).get('/api/tags?limit=200'),
+        pageToken,
+      ).expect(200);
+      const expected = (whole.body.tags as Array<{ name: string }>).map((t) => t.name);
+      expect(expected).toEqual(['apple', 'Banana', 'cherry', 'mango', 'Zebra']);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
+        const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query), pageToken).expect(200);
+        const page = res.body as { tags: Array<{ name: string }>; nextCursor: string | null };
+        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+          'nextCursor',
+          'tags',
+        ]);
+        expect(page.tags.length).toBeLessThanOrEqual(2);
+        seen.push(...page.tags.map((t) => t.name));
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 20);
+
+      // The walk ended because the service said so, not because the guard tripped.
+      expect(cursor).toBeNull();
+      expect(pages).toBeGreaterThan(1);
+      // No gap, no duplicate: the pages reassemble the one stable order exactly.
+      expect(seen).toEqual(expected);
+      expect(new Set(seen).size).toBe(expected.length);
     });
   });
 
@@ -154,7 +203,7 @@ describe('Tags API (e2e)', () => {
       expect(stored).not.toContain('TOPSECRET-NAME');
       // The read path returns the original plaintext.
       const listed = await list().expect(200);
-      expect(listed.body.find((t: { id: number }) => t.id === created.body.id).name).toBe(
+      expect(listed.body.tags.find((t: { id: number }) => t.id === created.body.id).name).toBe(
         'TOPSECRET-NAME',
       );
     });
@@ -194,7 +243,7 @@ describe('Tags API (e2e)', () => {
       expect(resolved.body).toEqual([{ id: created.body.id, name: 'Renamed' }]);
 
       const listed = await list().expect(200);
-      expect(listed.body.find((t: { id: number }) => t.id === created.body.id).name).toBe(
+      expect(listed.body.tags.find((t: { id: number }) => t.id === created.body.id).name).toBe(
         'Renamed',
       );
     });
@@ -221,8 +270,8 @@ describe('Tags API (e2e)', () => {
       await rename(alpha.body.id, { name: 'C-BETA' }).expect(409);
 
       const listed = await list().expect(200);
-      expect(listed.body.find((t: { id: number }) => t.id === alpha.body.id).name).toBe('C-alpha');
-      expect(listed.body.find((t: { id: number }) => t.id === betaTag.body.id).name).toBe('C-beta');
+      expect(listed.body.tags.find((t: { id: number }) => t.id === alpha.body.id).name).toBe('C-alpha');
+      expect(listed.body.tags.find((t: { id: number }) => t.id === betaTag.body.id).name).toBe('C-beta');
     });
 
     it('allows a pure case change of the same tag (no self-collision)', async () => {
@@ -240,7 +289,7 @@ describe('Tags API (e2e)', () => {
       await rename(created.body.id, { name: 'Optimistic stale', expectedVersion: 0 }).expect(409);
 
       const listed = await list().expect(200);
-      const row = listed.body.find((t: { id: number }) => t.id === created.body.id);
+      const row = listed.body.tags.find((t: { id: number }) => t.id === created.body.id);
       expect(row.name).toBe('Optimistic 1');
       expect(row.version).toBe(1);
     });
@@ -263,8 +312,8 @@ describe('Tags API (e2e)', () => {
       expect(removed.body).toMatchObject({ ok: true });
 
       const listed = await list().expect(200);
-      expect(listed.body.map((t: { id: number }) => t.id)).toContain(keep.body.id);
-      expect(listed.body.map((t: { id: number }) => t.id)).not.toContain(drop.body.id);
+      expect(listed.body.tags.map((t: { id: number }) => t.id)).toContain(keep.body.id);
+      expect(listed.body.tags.map((t: { id: number }) => t.id)).not.toContain(drop.body.id);
 
       // Consumers treat an omitted id as detached.
       const resolved = await resolve([keep.body.id, drop.body.id]).expect(201);
@@ -320,7 +369,7 @@ describe('Tags API (e2e)', () => {
 
       // A's row was never touched by B's failed attempts.
       const listed = await list().expect(200);
-      expect(listed.body.find((t: { id: number }) => t.id === foreign.body.id).name).toBe(
+      expect(listed.body.tags.find((t: { id: number }) => t.id === foreign.body.id).name).toBe(
         'Foreign-target',
       );
     });

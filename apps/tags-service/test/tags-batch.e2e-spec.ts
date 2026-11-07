@@ -291,7 +291,8 @@ describe('Tags batch API (e2e)', () => {
       .get('/api/tags')
       .set('Authorization', `Bearer ${bearer}`)
       .expect(200);
-    return listed.body.map((tag: TagDto) => tag.name);
+    // `GET /api/tags` answers `{ tags, nextCursor }`; the batch suite reads the page.
+    return listed.body.tags.map((tag: TagDto) => tag.name);
   }
 
   /** The owner's generation counter — absent means untouched since the process began. */

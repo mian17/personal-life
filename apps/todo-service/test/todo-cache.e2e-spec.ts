@@ -1,5 +1,6 @@
 import { rmSync } from 'fs';
 import { ENC_PREFIX } from '@life/crypto';
+import { encodeCursor } from '@life/service-kit';
 import {
   TODO_ALL,
   TODO_LISTS,
@@ -130,7 +131,9 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     await h.todos.findAll(SUB, { listId: l.id });
     await h.todos.findAll(SUB, { done: false });
     await h.todos.findAll(SUB, { dueBefore: '2030-01-01', dueAfter: '2000-01-01' });
-    await h.todos.findAll(SUB, { limit: 1, cursor: 'x' });
+    // A cursor the seam itself issued: since the seam landed, a hand-made string is
+    // a `400` by contract (`paging.ts` `decodeCursor`), so it is round-tripped first.
+    await h.todos.findAll(SUB, { limit: 1, cursor: encodeCursor(['~', '2020-01-01T00:00:00.000Z', 'x']) });
 
     expect(loaderCalls(h, 'todo')).toBe(1);
     expect(client.setCalls).toEqual([`todo:${SUB}:v${gen}:all`]);
@@ -272,6 +275,27 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(reread.reminderScheduledAt).toBeNull();
     // Clearing a fired reminder is not a domain write: version is untouched.
     expect(reread.version).toBe(0);
+  });
+
+  it('every page of a paged lists listing is served from the one todo:lists entry', async () => {
+    const client = new CapturingRedisClient();
+    h = await makeUnitHarness(new TodosCache(client));
+    for (const name of ['apple', 'Banana', 'cherry']) await h.lists.create(SUB, name);
+    const gen = currentGen(client, SUB);
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await h.lists.page(SUB, { limit: 1, cursor });
+      seen.push(...page.lists.map((list) => list.name));
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+
+    expect(seen).toEqual(['apple', 'Banana', 'cherry']);
+    // One populate for every page: `limit`/`cursor` are projections after the hit,
+    // so neither can reach the key.
+    expect(client.setCalls).toEqual([`todo:${SUB}:v${gen}:lists`]);
   });
 
   it('list rows carry the plaintext importantDefault boolean while name stays ciphertext-only', async () => {

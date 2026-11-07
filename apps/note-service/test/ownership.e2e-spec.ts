@@ -283,12 +283,12 @@ describe('Notes ownership (e2e)', () => {
     await post({ body: 'iso-b', tagIds: [202] }, tokenB).expect(201);
 
     const aTags = await tags(tokenA).expect(200);
-    const aIds = aTags.body.map((t: { tagId: number }) => t.tagId);
+    const aIds = aTags.body.tagUsages.map((t: { tagId: number }) => t.tagId);
     expect(aIds).toContain(101);
     expect(aIds).not.toContain(202);
 
     const bTags = await tags(tokenB).expect(200);
-    const bIds = bTags.body.map((t: { tagId: number }) => t.tagId);
+    const bIds = bTags.body.tagUsages.map((t: { tagId: number }) => t.tagId);
     expect(bIds).toContain(202);
     expect(bIds).not.toContain(101);
   });
@@ -301,7 +301,7 @@ describe('Notes ownership (e2e)', () => {
     expect(first.body.tagIds).toEqual([303]);
     expect(second.body.tagIds).toEqual([303]);
 
-    const listed = (await tags(tokenA).expect(200)).body.find(
+    const listed = (await tags(tokenA).expect(200)).body.tagUsages.find(
       (t: { tagId: number }) => t.tagId === 303,
     );
     expect(listed).toBeDefined();
@@ -317,10 +317,10 @@ describe('Notes ownership (e2e)', () => {
     expect(a.body.tagIds).toEqual([404]);
     expect(b.body.tagIds).toEqual([404]);
 
-    const aListed = (await tags(tokenA).expect(200)).body.find(
+    const aListed = (await tags(tokenA).expect(200)).body.tagUsages.find(
       (t: { tagId: number }) => t.tagId === 404,
     );
-    const bListed = (await tags(tokenB).expect(200)).body.find(
+    const bListed = (await tags(tokenB).expect(200)).body.tagUsages.find(
       (t: { tagId: number }) => t.tagId === 404,
     );
     expect(aListed).toBeDefined();

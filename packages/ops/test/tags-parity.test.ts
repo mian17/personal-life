@@ -132,6 +132,15 @@ describe('the tags registry', () => {
     expect(Object.keys(update.fields)).toEqual(['id', 'name', 'expectedVersion']);
   });
 
+  it('addresses the listing with the two paging fields, in order', () => {
+    const list = findOp(registryOf('tags'), 'list');
+
+    expect(Object.keys(list.fields)).toEqual(['limit', 'cursor']);
+    expect(list.fields['limit'].type).toBe('number');
+    expect(list.fields['limit'].description).toContain('1 to 200');
+    expect(list.fields['cursor'].description).toContain('passed back untouched');
+  });
+
   it('requires a numeric id list to resolve', () => {
     const resolve = findOp(registryOf('tags-resolve'), 'create');
     expect(resolve.fields['ids'].type).toBe('number[]');
@@ -168,6 +177,24 @@ describe('tags operation parity', () => {
     expect(pair.cliWire?.method).toBe('GET');
     expect(pair.cliWire?.path).toBe('/api/tags');
     expect(pair.cliWire?.body).toBeUndefined();
+    expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
+  it('sends the same paged listing and passes the cursor through untouched', async () => {
+    const cursor = Buffer.from('home', 'utf8').toString('base64url');
+    const pair = await runBoth({
+      resource: 'tags',
+      argv: ['tags', 'list', '--limit', '20', '--cursor', cursor],
+      tool: 'tags_list',
+      args: { limit: 20, cursor },
+      seed: seededTags,
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.method).toBe('GET');
+    expect(pair.cliWire?.path).toBe('/api/tags');
+    expect(pair.cliWire?.query).toEqual({ limit: '20', cursor });
+    expect(pair.mcpWire?.query).toEqual(pair.cliWire?.query);
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 

@@ -2,6 +2,7 @@ import 'server-only';
 import type {
   CreateTodoInput,
   List,
+  ListPage,
   PushSubscribeInput,
   TagUsage,
   Todo,
@@ -97,9 +98,37 @@ export function emptyTodoTrash(): Promise<{ ok: true; count: number }> {
   return call<{ ok: true; count: number }>('/api/todos/trash', { method: 'DELETE' });
 }
 
-/** `GET /api/lists` — the owner's todo-local lists. */
-export function listLists(): Promise<List[]> {
-  return call<List[]>('/api/lists');
+/**
+ * `GET /api/lists?limit=&cursor=` — one page of the owner's todo-local lists,
+ * name-sorted.
+ */
+export function fetchListPage(opts: { limit?: number; cursor?: string } = {}): Promise<ListPage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
+  const qs = params.toString();
+  return call<ListPage>(`/api/lists${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * The owner's **whole** list vocabulary, walked page by page.
+ *
+ * Every caller needs all of it: the manager panel renames and re-defaults from the
+ * full set, the matrix and the todo list group by list, and every editor's list
+ * picker offers every list. One page would hide the lists past the boundary — a
+ * todo would lose its group or a picker would omit its list — so the walk is the
+ * only correct read for a screen. `maxItems` is a safety bound, not an expected
+ * size.
+ */
+export async function listLists(maxItems = 1000): Promise<List[]> {
+  const collected: List[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchListPage({ cursor });
+    collected.push(...page.lists);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 export function createList(name: string): Promise<List> {

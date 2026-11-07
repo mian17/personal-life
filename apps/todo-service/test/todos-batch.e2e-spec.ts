@@ -425,8 +425,9 @@ describe('Todos and lists batch API (e2e)', () => {
   }
 
   async function listedListNames(): Promise<string[]> {
-    const listed = await apiGet('/api/lists').expect(200);
-    return listed.body.map((list: ListDto) => list.name);
+    const listed = await apiGet('/api/lists?limit=200').expect(200);
+    // `GET /api/lists` answers `{ lists, nextCursor }`; this helper reads the page.
+    return listed.body.lists.map((list: ListDto) => list.name);
   }
 
   /** The list name `GET /api/todos/completions` joins for one todo's close. */
