@@ -1,5 +1,5 @@
-import { settingsHref } from '@life/app-kit';
-import { IconLink, SettingsLink } from '@life/ui';
+import { navActions } from '@life/app-kit';
+import { IconLink } from '@life/ui';
 import { Target } from 'lucide-react';
 
 /**
@@ -9,12 +9,10 @@ import { Target } from 'lucide-react';
  * that renders its own chrome, so it has no nav.
  */
 export function MealsNav() {
-  return (
-    <>
-      <IconLink href="/meals/target" label="Daily target" variant="bare">
-        <Target size={20} aria-hidden />
-      </IconLink>
-      <SettingsLink href={settingsHref('/meals')} />
-    </>
+  return navActions(
+    'meals',
+    <IconLink href="/meals/target" label="Daily target" variant="bare">
+      <Target size={20} aria-hidden />
+    </IconLink>,
   );
 }

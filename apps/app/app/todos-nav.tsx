@@ -1,5 +1,4 @@
-import { settingsHref } from '@life/app-kit';
-import { SettingsLink } from '@life/ui';
+import { navActions } from '@life/app-kit';
 
 /**
  * The Todos toolbar, shared by `/todos` and its lenses. Settings is its only control: the tags,
@@ -7,5 +6,5 @@ import { SettingsLink } from '@life/ui';
  * Support row.
  */
 export function TodosNav() {
-  return <SettingsLink href={settingsHref('/todos')} />;
+  return navActions('todos');
 }
