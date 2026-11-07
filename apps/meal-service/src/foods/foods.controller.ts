@@ -19,12 +19,14 @@ export class FoodsController {
     return this.foods.create(principal.sub, dto);
   }
 
-  /** The owner's foods; `q` filters decrypted names in memory, never in SQL.
-   * `?includeDeleted=1` adds the soft-deleted rows (same DTO, same owner
-   * scoping) so past entries and saved-meal items keep resolving the dish name. */
+  /** The owner's foods, one page at a time. `q` filters decrypted names in
+   * memory, never in SQL. `?includeDeleted=1` adds the soft-deleted rows (same
+   * DTO, same owner scoping) so past entries and saved-meal items keep resolving
+   * the dish name. `limit`/`cursor` page an already-cached set, so no paging
+   * parameter reaches the cache key. */
   @Get()
   findAll(@Principal() principal: Principal, @Query() query: ListFoodsQuery) {
-    return this.foods.findAll(principal.sub, query.q, query.includeDeleted ?? false);
+    return this.foods.findAll(principal.sub, query);
   }
 
   @Get(':id')

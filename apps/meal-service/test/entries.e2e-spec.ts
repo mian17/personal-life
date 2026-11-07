@@ -70,9 +70,11 @@ describe('Diary entries (e2e)', () => {
 
   const post = (body: Record<string, unknown>) =>
     auth(request(app.getHttpServer()).post('/api/entries'), tokenA).send(body);
-  const day = (date: string, meal?: string) =>
+  const day = (date: string, meal?: string, extra?: string) =>
     auth(
-      request(app.getHttpServer()).get(`/api/entries?date=${date}${meal ? `&meal=${meal}` : ''}`),
+      request(app.getHttpServer()).get(
+        `/api/entries?date=${date}${meal ? `&meal=${meal}` : ''}${extra ?? ''}`,
+      ),
       tokenA,
     );
   const one = (id: string) =>
@@ -107,8 +109,9 @@ describe('Diary entries (e2e)', () => {
     await post({ date: OTHER_DAY, mealGroup: 'dinner', foodId: 'food-3', quantity: 1, nutrients: second }).expect(201);
 
     const listed = await day(OTHER_DAY).expect(200);
-    expect(listed.body).toHaveLength(2);
-    const total = sum(listed.body.map((e: { nutrients: NutrientVector }) => e.nutrients));
+    expect(listed.body.entries).toHaveLength(2);
+    expect(listed.body.nextCursor).toBeNull();
+    const total = sum(listed.body.entries.map((e: { nutrients: NutrientVector }) => e.nutrients));
     expect(total).toEqual(sum([first, second]));
     expect(total.calories).toBe(1000);
     expect(total.protein).toBe(30);
@@ -116,22 +119,56 @@ describe('Diary entries (e2e)', () => {
     await remove(a.body.id).expect(200);
 
     const after = await day(OTHER_DAY).expect(200);
-    expect(after.body).toHaveLength(1);
-    const moved = sum(after.body.map((e: { nutrients: NutrientVector }) => e.nutrients));
+    expect(after.body.entries).toHaveLength(1);
+    const moved = sum(after.body.entries.map((e: { nutrients: NutrientVector }) => e.nutrients));
     expect(moved).toEqual(second);
     expect(moved.calories).toBe(600);
   });
 
   it('filters by meal group in memory and never leaks another day', async () => {
     const listed = await day(DAY).expect(200);
-    expect(listed.body.length).toBeGreaterThanOrEqual(1);
+    expect(listed.body.entries.length).toBeGreaterThanOrEqual(1);
 
     const breakfast = await day(DAY, 'breakfast').expect(200);
-    expect(breakfast.body.length).toBeGreaterThanOrEqual(1);
-    for (const entry of breakfast.body) expect(entry.mealGroup).toBe('breakfast');
+    expect(breakfast.body.entries.length).toBeGreaterThanOrEqual(1);
+    for (const entry of breakfast.body.entries) expect(entry.mealGroup).toBe('breakfast');
 
     const lunch = await day(DAY, 'lunch').expect(200);
-    expect(lunch.body).toEqual([]);
+    expect(lunch.body.entries).toEqual([]);
+    expect(lunch.body.nextCursor).toBeNull();
+  });
+
+  it('pages a day with no gap and no duplicate across the boundary', async () => {
+    const pagingDay = '2026-09-05';
+    const created: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const entry = await post({
+        date: pagingDay,
+        mealGroup: 'snack',
+        foodId: `page-food-${index}`,
+        quantity: 1,
+        nutrients: vector({ calories: 100 + index }),
+      }).expect(201);
+      created.push(entry.body.id);
+    }
+
+    const first = await day(pagingDay, undefined, '&limit=2').expect(200);
+    expect(first.body.entries).toHaveLength(2);
+    expect(first.body.nextCursor).toEqual(expect.any(String));
+
+    const second = await day(
+      pagingDay,
+      undefined,
+      `&limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`,
+    ).expect(200);
+    expect(second.body.entries).toHaveLength(1);
+    expect(second.body.nextCursor).toBeNull();
+
+    // Every entry of the day appears exactly once across the two pages.
+    const paged = [...first.body.entries, ...second.body.entries].map((e: { id: string }) => e.id);
+    expect(new Set(paged).size).toBe(paged.length);
+    expect(paged).toHaveLength(created.length);
+    expect([...paged].sort()).toEqual([...created].sort());
   });
 
   it('a quantity change without a corrected vector is a 400, with one it replaces the snapshot', async () => {

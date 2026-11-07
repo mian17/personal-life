@@ -1,7 +1,7 @@
 import { format, sum } from '@life/nutrition';
 import { Button, EmptyState, List, ListItem, ManagerBlock } from '@life/ui';
 import { Trash2 } from 'lucide-react';
-import { listSavedMeals } from '@/lib/meal-api';
+import { collectSavedMeals } from '@/lib/meal-api';
 import { deleteSavedMealAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,9 @@ export const dynamic = 'force-dynamic';
  * `List`/`ListItem` render the rows, `EmptyState` covers none saved.
  */
 export default async function SavedMealsPage() {
-  const saved = await listSavedMeals();
+  // No load-more control yet, so the screen walks the cursor to completion: the
+  // browsable saved-meal history is exactly what this list is for.
+  const saved = await collectSavedMeals();
 
   return (
     <ManagerBlock title="Saved meals" backHref="/meals/settings">

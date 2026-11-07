@@ -24,6 +24,12 @@ export interface MealEntry {
   updatedAt: string;
 }
 
+/** The wire shape of one page of entries (`EntriesService.EntryPage`). */
+export interface EntryPage {
+  entries: MealEntry[];
+  nextCursor: string | null;
+}
+
 /** The wire shape of a target row (`TargetService.TargetDto`). */
 export interface MealTarget {
   id: string;
@@ -45,12 +51,33 @@ export interface MealTarget {
 }
 
 /**
- * `GET /api/entries?date=` — the owner's entries for one day. `date` is the
- * **client's** resolved `YYYY-MM-DD` (lesson 0019); the service never derives a
- * day from its own clock, so the BFF passes `getToday()`'s value through.
+ * `GET /api/entries?date=` — one page of the owner's entries for one day. `date`
+ * is the **client's** resolved `YYYY-MM-DD` (lesson 0019); the service never
+ * derives a day from its own clock, so the BFF passes `getToday()`'s value
+ * through. The day is bounded by the date query, so one page is normally the
+ * whole day; callers that need every row walk cursors (`collectDayEntries`).
  */
-export function listDayEntries(date: string): Promise<MealEntry[]> {
-  return call<MealEntry[]>(`/api/entries?${new URLSearchParams({ date })}`);
+export function listDayEntries(date: string, cursor?: string): Promise<EntryPage> {
+  const query = new URLSearchParams({ date });
+  if (cursor) query.set('cursor', cursor);
+  return call<EntryPage>(`/api/entries?${query}`);
+}
+
+/**
+ * Every entry of one day, walked cursor by cursor. The day view sums the whole
+ * day, and a paged subset would make the totals quietly wrong — the same reason
+ * `collectTodos` exists (`lib/todo-query.ts`). `maxItems` is a safety bound, not
+ * an expected size.
+ */
+export async function collectDayEntries(date: string, maxItems = 1000): Promise<MealEntry[]> {
+  const collected: MealEntry[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await listDayEntries(date, cursor);
+    collected.push(...page.entries);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 /** `GET /api/entries/:id` — one entry by id (owner-scoped; a foreign id is a 404). */
@@ -198,6 +225,12 @@ export interface SavedMeal {
   updatedAt: string;
 }
 
+/** The wire shape of one page of saved meals (`SavedMealsService.SavedMealPage`). */
+export interface SavedMealPage {
+  savedMeals: SavedMeal[];
+  nextCursor: string | null;
+}
+
 /**
  * `CreateEntryDto.FOOD_ID_MAX` on the service — the bound a write's `foodId`
  * must respect (lesson 0016: one owner for the value; the entry editor mirrors
@@ -260,25 +293,73 @@ export interface MealFood {
   updatedAt: string;
 }
 
-/**
- * `GET /api/foods?q=` — the owner's active (non-deleted) catalog, or the foods
- * whose decrypted name matches `q`. The service filters after the cache hit, so
- * the search never enters the cache key (`SPEC-meal-service` Cache Rules); the
- * names arrive decrypted, so the log path can compare them in memory.
- */
-export function listMealFoods(q?: string): Promise<MealFood[]> {
-  const query = q ? `?${new URLSearchParams({ q })}` : '';
-  return call<MealFood[]>(`/api/foods${query}`);
+/** The wire shape of one page of the catalog (`FoodsService.FoodPage`). */
+export interface FoodPage {
+  foods: MealFood[];
+  nextCursor: string | null;
 }
 
 /**
- * `GET /api/foods?includeDeleted=1` — the owner's whole catalog, soft-deleted
- * rows included (same DTO, same owner scoping). Only past-entry name resolution
- * reads this: a deleted food still names the entries and saved-meal items that
- * logged it (`SPEC-food-catalog-ui` AC5). Pickers and lists keep the active read.
+ * `GET /api/foods?q=` — one page of the owner's active (non-deleted) catalog,
+ * or the foods whose decrypted name matches `q`. The service filters after the
+ * cache hit, so the search never enters the cache key (`SPEC-meal-service`
+ * Cache Rules); the names arrive decrypted, so the log path can compare them in
+ * memory. Screens that need the **whole** set call `collectMealFoods` — a dish
+ * name resolved from a page would come back as a raw id.
  */
-export function listMealFoodsIncludingDeleted(): Promise<MealFood[]> {
-  return call<MealFood[]>('/api/foods?includeDeleted=1');
+export function listMealFoods(q?: string, cursor?: string): Promise<FoodPage> {
+  const query = new URLSearchParams();
+  if (q) query.set('q', q);
+  if (cursor) query.set('cursor', cursor);
+  const suffix = query.size > 0 ? `?${query}` : '';
+  return call<FoodPage>(`/api/foods${suffix}`);
+}
+
+/**
+ * `GET /api/foods?includeDeleted=1` — one page of the owner's whole catalog,
+ * soft-deleted rows included (same DTO, same owner scoping). Pair it with
+ * `collectMealFoodsIncludingDeleted`: name resolution reads every id, so a page
+ * alone would turn a deleted dish's name into a raw id (`SPEC-food-catalog-ui`
+ * AC5).
+ */
+export function listMealFoodsIncludingDeleted(cursor?: string): Promise<FoodPage> {
+  const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+  return call<FoodPage>(`/api/foods?includeDeleted=1${cursorParam}`);
+}
+
+/**
+ * The owner's **entire** active catalog, walked cursor by cursor. This is the
+ * read the log path and the picker need: both match a dish by name across the
+ * whole catalog, so a single page would silently miss a food and create a
+ * duplicate row. `maxItems` is a safety bound for a pathological owner, not an
+ * expected size.
+ */
+export function collectMealFoods(q?: string, maxItems = 1000): Promise<MealFood[]> {
+  return collectFoodPages((cursor) => listMealFoods(q, cursor), maxItems);
+}
+
+/**
+ * The owner's **entire** catalog including soft-deleted rows, walked cursor by
+ * cursor. Every `restoredFoodName` call site reads this: an id whose food has
+ * been deleted still has to name the entry that logged it.
+ */
+export function collectMealFoodsIncludingDeleted(maxItems = 1000): Promise<MealFood[]> {
+  return collectFoodPages(listMealFoodsIncludingDeleted, maxItems);
+}
+
+/** Follow the catalog cursor until exhausted (or `maxItems`), preserving the order. */
+async function collectFoodPages(
+  fetchPage: (cursor?: string) => Promise<FoodPage>,
+  maxItems: number,
+): Promise<MealFood[]> {
+  const collected: MealFood[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchPage(cursor);
+    collected.push(...page.foods);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 /** `GET /api/foods/:id` — one catalog food by id (owner-scoped; a foreign id is a 404). */
@@ -345,9 +426,26 @@ export function createSavedMeal(input: CreateSavedMealInput): Promise<SavedMeal>
   return call<SavedMeal>('/api/saved-meals', { method: 'POST', body: JSON.stringify(input) });
 }
 
-/** `GET /api/saved-meals` — the owner's frozen meals, newest-first. */
-export function listSavedMeals(): Promise<SavedMeal[]> {
-  return call<SavedMeal[]>('/api/saved-meals');
+/** `GET /api/saved-meals` — one page of the owner's frozen meals, newest-first. */
+export function listSavedMeals(cursor?: string): Promise<SavedMealPage> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return call<SavedMealPage>(`/api/saved-meals${query}`);
+}
+
+/**
+ * Every saved meal, walked cursor by cursor — the saved-meals screen renders the
+ * whole browsable history, so a single page would hide rows behind a control
+ * that does not exist yet.
+ */
+export async function collectSavedMeals(maxItems = 1000): Promise<SavedMeal[]> {
+  const collected: SavedMeal[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await listSavedMeals(cursor);
+    collected.push(...page.savedMeals);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 /** `GET /api/saved-meals/:id` — one frozen meal by id (a foreign id is a 404). */

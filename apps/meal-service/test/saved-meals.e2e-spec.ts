@@ -3,7 +3,7 @@ import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { NUTRIENTS, type Nutrient } from '@life/nutrition';
 import { SavedMealsService } from '../src/saved-meals/saved-meals.service';
-import { KeysService } from '@life/service-kit';
+import { KeysService, MAX_PAGE_LIMIT } from '@life/service-kit';
 
 /**
  * The frozen-snapshot contract for saved meals (`docs/intent/meal-nutrition.md`:
@@ -113,6 +113,38 @@ describe('Saved meals — frozen snapshots', () => {
 
     await expect(service.findOne('user-b', created.id)).rejects.toMatchObject({ status: 404 });
     await expect(service.findOne('user-b', MISSING_ID)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('pages the list with no gap and no duplicate across the boundary', async () => {
+    const created: string[] = [];
+    for (const name of ['Page one', 'Page two', 'Page three']) {
+      const meal = await service.create(SUB, {
+        name,
+        mealGroup: 'lunch',
+        items: [{ quantity: 1, nutrients: vector(100) }],
+      });
+      created.push(meal.id);
+    }
+
+    // Every row this owner holds (earlier cases in this file left some), walked
+    // two at a time. The whole-set read is the reference the pages must match.
+    const whole = await service.findAll(SUB, { limit: MAX_PAGE_LIMIT });
+    expect(whole.nextCursor).toBeNull();
+
+    const walked: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await service.findAll(SUB, { limit: 2, cursor });
+      expect(page.savedMeals.length).toBeGreaterThan(0);
+      expect(page.savedMeals.length).toBeLessThanOrEqual(2);
+      walked.push(...page.savedMeals.map((meal) => meal.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+
+    // The walked order is the whole set's order: no gap, no duplicate.
+    expect(walked).toEqual(whole.savedMeals.map((meal) => meal.id));
+    expect(new Set(walked).size).toBe(walked.length);
+    for (const id of created) expect(walked).toContain(id);
   });
 
   it('rejects a partial nutrient vector rather than sealing a wrong snapshot', async () => {

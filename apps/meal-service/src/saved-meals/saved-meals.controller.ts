@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
 import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
+import { ListSavedMealsQuery } from './dto/list-saved-meals.query';
 import { SavedMealsService } from './saved-meals.service';
 
 /**
@@ -22,9 +23,11 @@ export class SavedMealsController {
     return this.savedMeals.create(principal.sub, dto);
   }
 
+  /** One page of the owner's saved meals, newest-first. The paging window is
+   * applied after the cache hit, so it never enters the key. */
   @Get()
-  findAll(@Principal() principal: Principal) {
-    return this.savedMeals.findAll(principal.sub);
+  findAll(@Principal() principal: Principal, @Query() query: ListSavedMealsQuery) {
+    return this.savedMeals.findAll(principal.sub, query);
   }
 
   @Get(':id')

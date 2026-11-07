@@ -1,7 +1,7 @@
 import { format } from '@life/nutrition';
 import { PreservingSearchBox } from '@life/app-kit';
 import { EmptyState, FabLink, List, ListItem, ManagerBlock, Section } from '@life/ui';
-import { listMealFoods, type MealFood } from '@/lib/meal-api';
+import { collectMealFoods, type MealFood } from '@/lib/meal-api';
 import { Plus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,9 @@ export default async function FoodsPage({
   searchParams: Promise<{ q?: string }>;
 }>) {
   const { q } = await searchParams;
-  const foods = await listMealFoods(q);
+  // The screen renders the whole matching catalog (no load-more control yet), so
+  // it walks the cursor to completion rather than showing page 1.
+  const foods = await collectMealFoods(q);
 
   return (
     <ManagerBlock title="Foods" backHref="/meals/settings">

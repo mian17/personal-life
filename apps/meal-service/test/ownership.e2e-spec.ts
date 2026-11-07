@@ -82,10 +82,10 @@ describe('Meal ownership (e2e)', () => {
       await post({ name: 'A oats', servingGrams: 100 }, tokenA).expect(201);
 
       const bList = await list(tokenB).expect(200);
-      expect(bList.body).toEqual([]);
+      expect(bList.body.foods).toEqual([]);
 
       const aList = await list(tokenA).expect(200);
-      expect(aList.body.map((f: { name: string }) => f.name)).toContain('A oats');
+      expect(aList.body.foods.map((f: { name: string }) => f.name)).toContain('A oats');
     });
 
     it('returns a byte-identical 404 for a foreign id and a missing id', async () => {
@@ -121,10 +121,10 @@ describe('Meal ownership (e2e)', () => {
       await post({ name: 'shared-token-B', servingGrams: 100 }, tokenB).expect(201);
 
       const aSearch = await list(tokenA, 'shared-token').expect(200);
-      expect(aSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-A']);
+      expect(aSearch.body.foods.map((f: { name: string }) => f.name)).toEqual(['shared-token-A']);
 
       const bSearch = await list(tokenB, 'shared-token').expect(200);
-      expect(bSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
+      expect(bSearch.body.foods.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
     });
   });
 
@@ -156,12 +156,12 @@ describe('Meal ownership (e2e)', () => {
       ).expect(201);
 
       const bList = await list(DAY, tokenB).expect(200);
-      expect(bList.body).toEqual([]);
+      expect(bList.body.entries).toEqual([]);
 
       const aList = await list(DAY, tokenA).expect(200);
-      expect(aList.body).toHaveLength(1);
-      expect(aList.body[0].nutrients.calories).toBe(500);
-      expect(aList.body[0]).not.toHaveProperty('ownerSub');
+      expect(aList.body.entries).toHaveLength(1);
+      expect(aList.body.entries[0].nutrients.calories).toBe(500);
+      expect(aList.body.entries[0]).not.toHaveProperty('ownerSub');
     });
 
     it("returns a byte-identical 404 for a foreign id and a missing id", async () => {
@@ -198,7 +198,7 @@ describe('Meal ownership (e2e)', () => {
 
     it("does not let B's entries move A's day total", async () => {
       const aBefore = await list(DAY, tokenA).expect(200);
-      const totalBefore = aBefore.body.reduce(
+      const totalBefore = aBefore.body.entries.reduce(
         (n: number, e: { nutrients: { calories: number } }) => n + e.nutrients.calories,
         0,
       );
@@ -209,7 +209,7 @@ describe('Meal ownership (e2e)', () => {
       ).expect(201);
 
       const aAfter = await list(DAY, tokenA).expect(200);
-      const totalAfter = aAfter.body.reduce(
+      const totalAfter = aAfter.body.entries.reduce(
         (n: number, e: { nutrients: { calories: number } }) => n + e.nutrients.calories,
         0,
       );
@@ -284,12 +284,12 @@ describe('Meal ownership (e2e)', () => {
       const created = await post(body('A dinner', 640), tokenA).expect(201);
 
       const bList = await list(tokenB).expect(200);
-      expect(bList.body).toEqual([]);
+      expect(bList.body.savedMeals).toEqual([]);
 
       const aList = await list(tokenA).expect(200);
-      expect(aList.body).toHaveLength(1);
-      expect(aList.body[0].items[0].nutrients.calories).toBe(640);
-      expect(aList.body[0]).not.toHaveProperty('ownerSub');
+      expect(aList.body.savedMeals).toHaveLength(1);
+      expect(aList.body.savedMeals[0].items[0].nutrients.calories).toBe(640);
+      expect(aList.body.savedMeals[0]).not.toHaveProperty('ownerSub');
 
       await one(created.body.id, tokenB).expect(404);
       await one(created.body.id, tokenA).expect(200);

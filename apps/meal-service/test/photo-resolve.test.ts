@@ -55,7 +55,7 @@ class FakeFoods {
 
   constructor(readonly rows: FoodDto[] = []) {}
 
-  async findAll(_sub: string, query?: string): Promise<FoodDto[]> {
+  async findMatching(_sub: string, query?: string): Promise<FoodDto[]> {
     if (!query) return this.rows;
     return this.rows.filter((food) => food.name.toLowerCase().includes(query.toLowerCase()));
   }
