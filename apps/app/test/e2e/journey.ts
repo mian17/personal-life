@@ -85,12 +85,17 @@ export async function search(page: Page, term: string): Promise<void> {
   await page.waitForURL((url) => url.searchParams.get('q') === term, { timeout: 15_000 });
 }
 
-/** Moves a note to trash from the note detail's actions menu. */
+/**
+ * Moves a note to trash from the note detail's actions menu.
+ *
+ * The entry is a `menuitem`, not a `button`: `@life/ui`'s `Menu` wraps every entry in
+ * Radix's `Item asChild`, which overrides the danger `Button`'s implicit role.
+ */
 export async function trashNote(page: Page, title: string): Promise<void> {
   await page.getByRole('link', { name: new RegExp(escape(title)) }).first().click();
   await page.waitForURL(/\/notes\/[^/]+$/, { timeout: 15_000 });
   await page.getByLabel('Note actions').click();
-  await page.getByRole('button', { name: 'Delete note' }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Delete note' }).click();
   await page.waitForURL(/\/notes$/, { timeout: 15_000 });
   await expect(page.getByText(title, { exact: false })).toHaveCount(0, { timeout: 15_000 });
 }
