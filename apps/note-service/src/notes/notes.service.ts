@@ -10,7 +10,7 @@ import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
 import { decodeTagUsage, normalizeTagIds } from '@life/shared';
-import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
+import type { Note as NoteDto, NotePage, TagUsage, TagUsagePage } from '@life/shared';
 
 /** A note as a write carries it — the shape a batch item holds, per item. */
 type NoteDraft = { body: string; tagIds?: number[] };
@@ -159,6 +159,16 @@ function newestContentFirst(a: RankedNote, b: RankedNote): number {
 function afterListPosition(row: RankedNote, at: string[]): boolean {
   const [timestamp, id] = at;
   return row.listTimestamp < timestamp || (row.listTimestamp === timestamp && row.id < id);
+}
+
+/**
+ * The tag-usage list's strictly-after test: `tagId ASC`, the order the loader's
+ * `GROUP BY tagId … ORDER BY tagId ASC` produces. `tagId` is numeric, so the
+ * cursor's text component is read back as a number — comparing the strings would
+ * put `10` before `9` and skip rows at that boundary.
+ */
+function afterTagUsagePosition(row: TagUsage, at: string[]): boolean {
+  return row.tagId > Number(at[0]);
 }
 
 /** True when a note passes the list's tag and text filters. */
@@ -607,14 +617,15 @@ export class NotesService {
   }
 
   /**
-   * The owner's tag usage surface (kernel `GET …/tags → [{tagId, count}]`):
-   * association ids + how many non-trashed notes carry each. Ids and counts only
-   * — names live in `tags-service` (resolved by the BFF), so nothing here is
-   * content and the `note:tags` cache is metadata-only by design.
+   * The owner's whole tag-usage surface (kernel `GET …/tags → [{tagId, count}]`):
+   * association ids + how many non-trashed notes carry each, `tagId ASC`. Ids and
+   * counts only — names live in `tags-service` (resolved by the BFF), so nothing
+   * here is content and the `note:tags` cache is metadata-only by design.
    */
   async listTagUsage(sub: string): Promise<TagUsage[]> {
-    // Key: `note:<sub>:v<gen>:tags` — the owner's used-id+count rows.
-    const rows = await this.cache.getThrough(
+    // Key: `note:<sub>:v<gen>:tags` — the owner's used-id+count rows. Paging is a
+    // projection after the hit, so neither limit nor cursor enters the key.
+    return this.cache.getThrough(
       sub,
       'note:tags',
       async () => {
@@ -634,6 +645,24 @@ export class NotesService {
       },
       { decode: decodeTagUsage },
     );
-    return rows;
+  }
+
+  /**
+   * `GET /api/tags?limit=&cursor=` — one page of the same surface on the shared
+   * cursor seam. The set is bounded by the owner's tag vocabulary, so the window
+   * is the shared list contract rather than a smaller read.
+   */
+  async tagUsagePage(
+    sub: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<TagUsagePage> {
+    const ordered = await this.listTagUsage(sub);
+    const page = paginate(ordered, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (row) => [String(row.tagId)],
+      after: afterTagUsagePosition,
+    });
+    return { tagUsages: page.rows, nextCursor: page.nextCursor };
   }
 }

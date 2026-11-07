@@ -87,16 +87,61 @@ describe('Lists API (e2e)', () => {
       expect(b.body.id).toBeDefined();
 
       const res = await listLists().expect(200);
-      expect(res.body.map((l: { name: string }) => l.name)).toEqual(['Alpha', 'zeta']);
-      for (const l of res.body) {
+      // `{ lists, nextCursor }` — the bare array this route used to answer with is gone.
+      expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+        'lists',
+        'nextCursor',
+      ]);
+      expect(res.body.nextCursor).toBeNull();
+      const lists = res.body.lists as Array<{ id: string; name: string; version: number; createdAt: string }>;
+      expect(lists.map((l) => l.name)).toEqual(['Alpha', 'zeta']);
+      for (const l of lists) {
         expect(Object.keys(l).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
         expect(typeof l.version).toBe('number');
         expect(l.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(res.body.map((l: { id: string }) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)));
+      expect(lists.map((l) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       // B's lists never appear to A.
-      expect((await listLists(tokenB).expect(200)).body.map((l: { name: string }) => l.name)).toEqual(['beta']);
+      expect((await listLists(tokenB).expect(200)).body.lists.map((l: { name: string }) => l.name)).toEqual(['beta']);
+    });
+
+    it('pages the case-insensitive name order with no gap and no duplicate', async () => {
+      // A fresh owner so the walk sees only these rows. `apple` and `Zebra`
+      // straddle the case fold: a predicate comparing raw names would order them
+      // the other way and repeat or skip one at a page edge.
+      const pageToken = await harness.sign({ subject: 'user-page', expiresIn: 3600 });
+      for (const name of ['apple', 'Zebra', 'mango', 'Banana', 'cherry']) {
+        await createList(name, pageToken).expect(201);
+      }
+
+      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(200);
+      const expected = (whole.body.lists as Array<{ name: string }>).map((l) => l.name);
+      expect(expected).toEqual(['apple', 'Banana', 'cherry', 'mango', 'Zebra']);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
+        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(200);
+        const page = res.body as { lists: Array<{ name: string }>; nextCursor: string | null };
+        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+          'lists',
+          'nextCursor',
+        ]);
+        expect(page.lists.length).toBeLessThanOrEqual(2);
+        seen.push(...page.lists.map((l) => l.name));
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 20);
+
+      // The walk ended because the service said so, not because the guard tripped.
+      expect(cursor).toBeNull();
+      expect(pages).toBeGreaterThan(1);
+      // No gap, no duplicate: the pages reassemble the one stable order exactly.
+      expect(seen).toEqual(expected);
+      expect(new Set(seen).size).toBe(expected.length);
     });
   });
 
@@ -106,7 +151,7 @@ describe('Lists API (e2e)', () => {
       const stored = (await rawNames('user-a')).find((n) => n.startsWith(ENC_PREFIX));
       expect(stored).toBeDefined();
       expect(stored).not.toContain('TOPSECRET-LIST');
-      expect((await listLists().expect(200)).body.find((l: { id: string }) => l.id === created.body.id).name).toBe(
+      expect((await listLists().expect(200)).body.lists.find((l: { id: string }) => l.id === created.body.id).name).toBe(
         'TOPSECRET-LIST',
       );
     });
@@ -147,8 +192,8 @@ describe('Lists API (e2e)', () => {
       await renameList(alpha.body.id, { name: 'C-BETA' }).expect(409);
 
       const listed = await listLists().expect(200);
-      expect(listed.body.find((l: { id: string }) => l.id === alpha.body.id).name).toBe('C-alpha');
-      expect(listed.body.find((l: { id: string }) => l.id === beta.body.id).name).toBe('C-beta');
+      expect(listed.body.lists.find((l: { id: string }) => l.id === alpha.body.id).name).toBe('C-alpha');
+      expect(listed.body.lists.find((l: { id: string }) => l.id === beta.body.id).name).toBe('C-beta');
     });
 
     it('allows a pure case change of the same list', async () => {
@@ -165,7 +210,7 @@ describe('Lists API (e2e)', () => {
       await renameList(created.body.id, { name: 'Optimistic stale', expectedVersion: 0 }).expect(409);
 
       const listed = await listLists().expect(200);
-      const row = listed.body.find((l: { id: string }) => l.id === created.body.id);
+      const row = listed.body.lists.find((l: { id: string }) => l.id === created.body.id);
       expect(row).toMatchObject({ name: 'Optimistic 1', version: 1 });
     });
 
@@ -248,7 +293,7 @@ describe('Lists API (e2e)', () => {
 
       // The list is gone, and a second delete is a missing id → 404.
       await deleteList(l.body.id).expect(404);
-      expect((await listLists().expect(200)).body.map((l2: { id: string }) => l2.id)).not.toContain(l.body.id);
+      expect((await listLists().expect(200)).body.lists.map((l2: { id: string }) => l2.id)).not.toContain(l.body.id);
     });
 
     it('only detaches the caller\'s todo (a foreign list delete is a 404, rows untouched)', async () => {

@@ -5,7 +5,7 @@ import {
   NotesCache,
 } from '../src/notes/notes-cache';
 import { NotesService } from '../src/notes/notes.service';
-import { KeysService } from '@life/service-kit';
+import { KeysService, encodeCursor } from '@life/service-kit';
 import { ENC_PREFIX, encryptField, generateDek, wrapDek } from '@life/crypto';
 import { FakeRedisClient, FailingRedisClient } from './fake-redis';
 
@@ -312,6 +312,35 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       expect(client.values[0].value).not.toContain(ENC_PREFIX);
     });
 
+    it('pages tag usage from the one unpaged entry: tagId ASC, no gap and no duplicate', async () => {
+      const client = new CapturingRedisClient();
+      const h = makeHarness(new NotesCache(client));
+      // Numbers above 9 prove the order is numeric: the cursor carries the id as
+      // text, so a string comparison would put `10` before `9`.
+      h.state.tagUsageRows = [
+        { tagId: 1, count: 5 },
+        { tagId: 9, count: 2 },
+        { tagId: 10, count: 7 },
+        { tagId: 11, count: 1 },
+      ];
+
+      const seen: number[] = [];
+      let cursor: string | undefined;
+      for (;;) {
+        const page = await h.service.tagUsagePage(SUB, { limit: 2, cursor });
+        seen.push(...page.tagUsages.map((row) => row.tagId));
+        if (!page.nextCursor) break;
+        cursor = page.nextCursor;
+      }
+
+      expect(seen).toEqual([1, 9, 10, 11]);
+      // Both pages came from the one `note:tags` entry: `limit`/`cursor` never
+      // enter the key, so the loader ran once.
+      expect(h.noteTags.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(client.sets).toHaveLength(1);
+      expect(client.sets[0].key).toBe(`note:${SUB}:v0:tags`);
+    });
+
     it('applies q and tagId filtering to a cache hit (post-decrypt, one loader call)', async () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
@@ -347,9 +376,14 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
 
+      // A cursor the seam itself issued: since the seam landed, a hand-made string is
+      // a `400` by contract (`paging.ts` `decodeCursor`), so the key assertion needs
+      // one round-tripped through `encodeCursor`.
+      const issued = encodeCursor(['2024-01-01T00:00:00.000Z', 'n1']);
+
       await h.service.findAll(SUB, { q: 'a' });
       await h.service.findAll(SUB, { tagId: 1 });
-      await h.service.findAll(SUB, { limit: 1, cursor: 'x' });
+      await h.service.findAll(SUB, { limit: 1, cursor: issued });
 
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(1);
       expect(client.setCalls).toEqual([`note:${SUB}:v0:list`]);

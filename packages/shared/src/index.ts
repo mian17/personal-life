@@ -35,6 +35,16 @@ export interface TagUsage {
   count: number;
 }
 
+/**
+ * One cursor page of a domain's tag-usage surface (`SPEC-pagination-seam` §4),
+ * shaped like `NotePage`. The usage list is bounded by the tag vocabulary, so the
+ * envelope buys one uniform list contract rather than a smaller read.
+ */
+export interface TagUsagePage {
+  tagUsages: TagUsage[];
+  nextCursor: string | null;
+}
+
 export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
 
 export interface Note {
@@ -181,6 +191,16 @@ export interface List {
   importantDefault: boolean | null;
   version: number;
   createdAt: string;
+}
+
+/**
+ * One cursor page of the owner's todo lists (`SPEC-pagination-seam` §4), shaped
+ * like `NotePage`. Lists are a named vocabulary (tens), so the envelope is
+ * contract uniformity, not a performance fix.
+ */
+export interface ListPage {
+  lists: List[];
+  nextCursor: string | null;
 }
 
 export const TODO_TITLE_MAX = 500;

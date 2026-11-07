@@ -116,7 +116,7 @@ export const resources: ResourceRegistry[] = [
     ops: [
       { kind: 'create', fields: listDetails() },
 
-      { kind: 'list', fields: {} },
+      { kind: 'list', fields: pageWindow() },
 
       {
         kind: 'update',
