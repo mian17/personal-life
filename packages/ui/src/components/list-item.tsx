@@ -51,45 +51,10 @@ const rowSurfaceStyles = cx(
 );
 
 /**
- * A row keeps its place in the DOM and its box; only its contents stop costing paint and layout
- * while it is off-screen. That is what separates this from virtualization: nothing is unmounted,
- * so no row ever leaves the document, a row's DOM and accessibility hooks are the same whether it
- * is on-screen or not, and nothing has to measure a viewport to decide what to render.
- *
- * This Tailwind build ships no `content-visibility-*` utility family (the property only appears
- * in the default `transition-property` list), so the declaration is an arbitrary property. The
- * row's own `transition-[height,opacity]` names its properties explicitly and does not include
- * `content-visibility`, so the skip is applied, never animated.
- *
- * The implied `contain: layout paint style` is a no-op on the geometry this file has already
- * fixed. The dense row already pins its checkbox against itself with `relative`, so layout
- * containment gives that target the containing block it already had, and paint containment clips
- * at the padding box the row's `overflow-hidden` already clips at — the 48px press square and the
- * `-translate-y-` lift measure exactly where they did before.
- */
-const rowSkipOffscreenStyles = '[content-visibility:auto]';
-
-/**
  * §8's `.row` box: the row's own insets and its 56px floor, which is what keeps a row without
  * a meta line from collapsing to its title.
- *
- * The intrinsic size is that same floor, and it is what makes the off-screen skip
- * (`rowSkipOffscreenStyles`) safe. A skipped row has no contents of its own, so the size
- * containment that comes with the skip would give it zero height: every off-screen row would
- * collapse, the scroll length would shrink, and the page would jump as rows crossed the viewport
- * edge. The `auto` keyword is the other half of the choice — it tells the browser to remember the
- * size the row actually painted and use `--row-min-height` only on the first pass, before the row
- * has ever been rendered. A bare length would force every skipped row to the placeholder on every
- * pass, so a row taller than its floor (a two-line title, a snippet stack) would shrink each time
- * it left the viewport: the same thrash with a smaller amplitude.
- *
- * One `auto <length>` pair, not a bare length and not a per-axis split: the shorthand's single
- * length applies to both axes, and the inline half is inert. A block-level `<li>` takes its width
- * from the `<ul>`'s block formatting context, so it contributes nothing to a shrink-to-fit or flex
- * inline size for the placeholder to stand in for.
  */
-const rowBoxStyles =
-  'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)] [contain-intrinsic-size:auto_var(--row-min-height)]';
+const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)]';
 
 /**
  * A dense row is exactly the tap target tall, on the tighter inset, and narrows the checkbox
@@ -155,16 +120,9 @@ const rowBoxStyles =
  * The target's own press wash stays silenced (`:active`): it no longer covers text, but the row
  * already washes on press (`rowSurfaceStyles`), and a second `--press` square would paint the
  * row's left gutter twice in one gesture.
- *
- * The skip (`rowSkipOffscreenStyles`) would otherwise impose size containment with no size of its
- * own, so a skipped dense row collapses to zero and the matrix lens jumps as rows cross the
- * viewport edge. Its floor is `--tap`, not `--row-min-height`: a dense row is the tap target tall
- * and a base row is a step taller, so the base placeholder would overstate every skipped dense
- * row by 8px. `auto` in front keeps the painted height once the row has been rendered, so only a
- * never-yet-painted row falls back to the floor.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] [contain-intrinsic-size:auto_var(--tap)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button takes a floor instead of
@@ -480,7 +438,6 @@ function rowStyleClassesFor({
 }: Readonly<RowFlags>): string {
   return cx(
     rowSurfaceStyles,
-    rowSkipOffscreenStyles,
     isDense ? denseRowStyles : rowBoxStyles,
     isColumn || isDense ? 'items-start' : 'items-center',
     hasSlot && rowSlotStyles,

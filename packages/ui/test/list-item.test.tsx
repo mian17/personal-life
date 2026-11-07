@@ -36,13 +36,6 @@ const FEEDBACK_COLUMN_GAP_UTILITY = 'gap-[var(--s2)]';
  * this offset adds `--s2` on top of that gap, so the description sits 12px below the pair.
  */
 const FEEDBACK_DESCRIPTION_OFFSET_UTILITY = 'mt-[var(--s2)]';
-/**
- * The off-screen skip, and the placeholder that keeps a skipped row's box: a skipped row has no
- * contents, so without the placeholder it would measure zero and the list would jump.
- */
-const SKIP_OFFSCREEN_UTILITY = '[content-visibility:auto]';
-const BASE_ROW_PLACEHOLDER_UTILITY = '[contain-intrinsic-size:auto_var(--row-min-height)]';
-const DENSE_ROW_PLACEHOLDER_UTILITY = '[contain-intrinsic-size:auto_var(--tap)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -62,8 +55,7 @@ describe('ListItem', () => {
         <ListItem title="Groceries" />
       </ul>,
     );
-    const row = screen.getByRole('listitem');
-    const classes = classesOf(row);
+    const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain(ROW_UTILITY);
     expect(classes).toContain(ROW_INSET_UTILITY);
     // §8's `.group`/`.row` split: the group paints the surface, so a row only carries its
@@ -71,16 +63,6 @@ describe('ListItem', () => {
     expect(classes).toContain(ROW_PRESS_UTILITY);
     expect(classes).not.toContain('bg-surface');
     expect(classes.some((cls) => cls.startsWith('rounded-'))).toBe(false);
-
-    // The row stays in the DOM and keeps its box while its off-screen contents skip paint and
-    // layout, and the placeholder is the row's own 56px floor — without it a skipped row would
-    // measure zero and the scroll length would thrash as rows crossed the viewport edge.
-    expect(classes).toContain(SKIP_OFFSCREEN_UTILITY);
-    expect(classes).toContain(BASE_ROW_PLACEHOLDER_UTILITY);
-    // The skip is a rendering hint, not a removal: the row is still a list item and its title is
-    // still its own text node, so a locator by role and by visible text finds it either way.
-    expect(row.tagName).toBe('LI');
-    expect(row.textContent).toBe('Groceries');
   });
 
   it('renders href as a link carrying the ui-list-item__link hook', () => {
@@ -338,12 +320,6 @@ describe('ListItem', () => {
     expect(row).toContain('items-start');
     expect(row).not.toContain('items-center');
     expect(row).toContain('[--checkbox-size:var(--s3)]');
-    // The skip's placeholder is the dense row's own floor, not the base row's: a dense row is the
-    // 48px tap target tall, so `--row-min-height` would overstate every skipped dense row by 8px
-    // and the matrix lens would still jump — just less.
-    expect(row).toContain(SKIP_OFFSCREEN_UTILITY);
-    expect(row).toContain(DENSE_ROW_PLACEHOLDER_UTILITY);
-    expect(row).not.toContain(BASE_ROW_PLACEHOLDER_UTILITY);
     // The corner travels with the size it is a fraction of: `--s1` (4px) is a third of this
     // 12px mark, the same third `--r-sm` (8px) is of the default 24px one. Left at `--r-sm`,
     // the 8px corner clamps to half the box and the mark paints as a disc instead of a box.
@@ -1137,7 +1113,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] [content-visibility:auto] min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)] [contain-intrinsic-size:auto_var(--row-min-height)] items-center',
+      'ui-list-item flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)] items-center',
     );
     unmount();
 
@@ -1156,7 +1132,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] [content-visibility:auto] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] [contain-intrinsic-size:auto_var(--tap)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });
