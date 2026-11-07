@@ -81,16 +81,19 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * clip. The offsets are stated net of the primitive's own negative margins (`-my-[var(--s2)]`
  * `-ms-[var(--s3)]`), because a margin still applies to an absolutely positioned box: `--s4`
  * start and `--s2` top land the painted square one step inside the corner without re-declaring a
- * margin the control owns. The mark sits on the target's trailing edge (`justify-items-end`, a
- * longhand of the target's `place-items-center` shorthand, so it wins without touching the
- * control), so it reads with the title and its label instead of stranded 30px from them, and a
- * `--s2` trailing inset on the mark keeps it off the square's edge rather than flush against it.
+ * margin the control owns. The mark is centred in the target (`justify-items-center`, a longhand
+ * of the target's `place-items-center` shorthand, so it wins without touching the control), so it
+ * sits on the press square's own centre rather than pinned to an edge — measured, mark 22→34 in a
+ * target of 4→52. No inset rides on the mark: an inset still applies inside a centring box, so a
+ * `--s2` trailing margin would push the mark 4px off centre, and centring only holds with the
+ * inset gone. The mark therefore sits 4px further from the title than a trailing alignment put
+ * it (26→38 became 22→34, title still at 52): the mark→title gap is 18px where it was 14px.
  *
  * The target keeps an `--s4` start offset, not the row's own `--s3`. On a dense row the square's
  * trailing edge is what matters: it ends at `--s1 + --tap` = 52px, exactly where the title starts,
  * and an `--s3` start would end it at 48 and put 4px of press square over the title's first
  * characters — a tap there completes the todo instead of opening it. `--s4` holds the square flush
- * with the title; the trailing alignment then places the mark inside it.
+ * with the title; the centring then places the mark inside it.
  *
  * The press square is a `--tap` square ending 52px from the row's edge (`--s1 + --tap`), so the
  * title starts at or past 52 or the square swallows it. The link's old `--s4` put the title at 28,
@@ -119,7 +122,7 @@ const rowBoxStyles = 'min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)
  * row's left gutter twice in one gesture.
  */
 const denseRowStyles =
-  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-end [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:me-[var(--s2)] [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
+  'relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]';
 
 /**
  * Action slots: a form wraps each one, and a danger delete button takes a floor instead of

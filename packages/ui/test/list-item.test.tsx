@@ -349,12 +349,14 @@ describe('ListItem', () => {
     expect(row).toContain(
       '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
     );
-    // The mark rides the target's trailing edge, so it sits beside the title instead of stranded
-    // on the square's leading edge: mark 26→38 in a 52px-wide square, title at 52, gap 14px
-    // where it measured 30px. The `--s2` trailing inset keeps the mark off the square's edge.
-    expect(row).toContain('[&>.ui-checkbox]:justify-items-end');
+    // The mark is centred in its target, so it sits beside the title instead of stranded on the
+    // square's leading edge. Centred in a target of 4→52 it measures 22→34, title at 52: gap
+    // 18px where it measured 30px. No `me` inset rides on the mark — an inset still applies
+    // inside a centring box and would push the mark 4px off centre, so that utility is gone.
+    expect(row).toContain('[&>.ui-checkbox]:justify-items-center');
     expect(row).not.toContain('[&>.ui-checkbox]:justify-items-start');
-    expect(row).toContain('[&>.ui-checkbox>*]:me-[var(--s2)]');
+    expect(row).not.toContain('[&>.ui-checkbox]:justify-items-end');
+    expect(row).not.toContain('[&>.ui-checkbox>*]:me-[var(--s2)]');
     expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
     // The row already washes on press, so the target's own square is redundant feedback and, on
     // release, the only thing still fading over the row's gutter.
@@ -1130,7 +1132,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-end [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:me-[var(--s2)] [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });
