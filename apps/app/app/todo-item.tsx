@@ -2,7 +2,6 @@
 
 import type { List, Todo } from '@life/shared';
 import {
-  Button,
   Checkbox,
   DueDate,
   ListItem,
@@ -10,9 +9,8 @@ import {
   type TagOption,
   useSnackbar,
 } from '@life/ui';
-import { Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { completeTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
+import { completeTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
 
@@ -25,13 +23,16 @@ const WRITE_FAILED_MESSAGE = "Couldn't save that change.";
  * clamped to two lines, with the signal due date. The row links to its edit
  * screen (`/todos/[id]/edit`, the same editor as create, in edit mode).
  *
- * `size="default"` (the `/todos` List) keeps the extras: list name, note
- * snippet and the trash delete action, at the base type scale (`--checkbox-size`
- * 1.25rem). `size="dense"` (the Eisenhower matrix) is the minimal lens — name +
- * signal due date only, compact type, and the same anatomy at 0.75rem. `tone`
- * tints the leading checkbox for a coloured matrix quadrant; the matrix passes
+ * `size="default"` (the `/todos` List) keeps the extras: list name and note
+ * snippet, at the base type scale (`--checkbox-size` 1.25rem). `size="dense"`
+ * (the Eisenhower matrix) is the minimal lens — name + signal due date only,
+ * compact type, and the same anatomy at 0.75rem. `tone` tints the leading
+ * checkbox for a coloured matrix quadrant; the matrix passes
  * `DueDate tone="signal"` (overdue deep red, any future lighter red) and the
  * List row uses it too, so the two views of one todo agree.
+ *
+ * Deleting is not a row affordance: a row is an index entry, and the trash
+ * control lives on the todo's own screen (`/todos/[id]/edit`, "Move to trash").
  */
 export function TodoItem({
   todo,
@@ -158,29 +159,6 @@ export function TodoItem({
       variant="todo"
       size={size}
       tone={tone}
-      deleteAction={
-        isDefault ? (
-          // The slot is always present so a row's width never depends on `done`: gated instead,
-          // unticking inserted the form and the row reflowed around it. Hiding it keeps the
-          // reserved width and takes the control out of the accessibility tree, so a done row
-          // still offers no delete affordance. The gate reads the durable prop, never the
-          // optimistic `done`: an untick would otherwise paint the trash can mid-write.
-          <form
-            action={deleteTodoAction.bind(null, todo.id)}
-            className={todo.done ? 'invisible' : undefined}
-          >
-            <Button
-              type="submit"
-              variant="danger"
-              size="icon"
-              aria-label={`Delete ${todo.title}`}
-            >
-              <Trash2 size={18} aria-hidden />
-            </Button>
-          </form>
-        ) : undefined
-      }
-    >
-    </ListItem>
+    />
   );
 }

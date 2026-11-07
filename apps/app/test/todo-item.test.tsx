@@ -279,11 +279,8 @@ describe('TodoItem sizes', () => {
     expect(html).not.toContain('ui-list-item--dense');
   });
 
-  it('default: keeps the delete action, list name and note snippet', () => {
+  it('default: keeps the list name and note snippet', () => {
     const html = markup();
-    expect(html).toContain('<form');
-    expect(html).toMatch(/ui-btn ui-btn--danger/);
-    expect(html).toContain('aria-label="Delete Buy milk"');
     expect(html).toContain('Groceries');
     expect(html).toContain('ui-list-item__snippet');
     expect(html).toContain('a note snippet');
@@ -301,18 +298,20 @@ describe('TodoItem sizes', () => {
     expect(html).toContain('ui-list-item--done');
   });
 
-  it('a done default row keeps the delete slot in the DOM, hidden from assistive tech', () => {
+  it('a done default row renders no delete control', () => {
     const html = markup(undefined, { done: true });
-    // Unticking used to INSERT the form (the slot was gated on `!done`), so the row reflowed
-    // around it. The slot is now always rendered and `invisible` when done: same node count in
-    // both states, still no affordance, because `visibility:hidden` leaves the a11y tree.
-    expect(html).toMatch(/<form[^>]*class="invisible"/);
+    // Deleting moved to the todo's own screen, so the slot and its `invisible` gate are gone
+    // with it: neither state of the row paints a trash form at all.
+    expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('ui-btn--danger');
+    expect(html).not.toContain('<form');
   });
 
-  it('an open default row renders the same delete slot, visible', () => {
+  it('an open default row renders no delete control either', () => {
     const html = markup();
-    expect(html).toContain('<form');
-    expect(html).not.toContain('class="invisible"');
+    expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('ui-btn--danger');
+    expect(html).not.toContain('<form');
   });
 
   it('a not-yet-done row renders neither --done nor --collapsing initially', () => {
@@ -452,26 +451,37 @@ describe('TodoItem tick keeps the row visible', () => {
     }
   });
 
-  it('the delete slot follows the durable prop, never the optimistic tick', () => {
+  it('renders no delete control — deletion lives on the todo detail page', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
     completeMock.mockClear();
     try {
-      // A done row is unticked: the row renders open optimistically while the server row is
-      // still done. The delete slot must stay hidden for that whole window.
-      const stillDone = { done: true, repeat: 'daily' } as const;
-      doneToggle(harness.renderTree({ overrides: stillDone })).props.onCheckedChange();
-      expect(harness.completed).toBe(false);
-      const optimisticOpen = harness.renderTree({ overrides: stillDone });
-      expect(harness.renderMarkup(optimisticOpen)).toMatch(/<form[^>]*class="invisible"/);
+      // Both durable states, and both optimistic windows on top of them: the row must never
+      // paint a trash affordance, because the only delete path is the editor at /todos/[id]/edit.
+      const open = { done: false, repeat: 'daily' } as const;
+      const done = { done: true, repeat: 'daily' } as const;
 
-      // The mirror case: an open row ticked optimistically still shows the slot. The trash
-      // stays until the row actually leaves Done — acceptable, and never the reverse flash.
-      const stillOpen = { done: false, repeat: 'daily' } as const;
-      doneToggle(harness.renderTree({ overrides: stillOpen })).props.onCheckedChange();
-      const optimisticDone = harness.renderTree({ overrides: stillOpen });
-      expect(harness.completed).toBe(true);
-      expect(harness.renderMarkup(optimisticDone)).not.toContain('class="invisible"');
+      const openRow = harness.renderMarkup(harness.renderTree({ overrides: open }));
+      expect(openRow).not.toContain('aria-label="Delete');
+      expect(openRow).not.toContain('ui-btn--danger');
+      expect(openRow).not.toContain('<form');
+
+      doneToggle(harness.renderTree({ overrides: open })).props.onCheckedChange();
+      const tickedRow = harness.renderMarkup(harness.renderTree({ overrides: open }));
+      expect(tickedRow).not.toContain('aria-label="Delete');
+      expect(tickedRow).not.toContain('ui-btn--danger');
+      expect(tickedRow).not.toContain('<form');
+
+      const doneRow = harness.renderMarkup(harness.renderTree({ overrides: done }));
+      expect(doneRow).not.toContain('aria-label="Delete');
+      expect(doneRow).not.toContain('ui-btn--danger');
+      expect(doneRow).not.toContain('<form');
+
+      doneToggle(harness.renderTree({ overrides: done })).props.onCheckedChange();
+      const untickedRow = harness.renderMarkup(harness.renderTree({ overrides: done }));
+      expect(untickedRow).not.toContain('aria-label="Delete');
+      expect(untickedRow).not.toContain('ui-btn--danger');
+      expect(untickedRow).not.toContain('<form');
     } finally {
       harness.restore();
     }
