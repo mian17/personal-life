@@ -3,10 +3,10 @@ import { formatLongDate, ListShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
-  listDayEntries: jest.fn(),
+  collectDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
-  listMealFoods: jest.fn(),
-  listMealFoodsIncludingDeleted: jest.fn(),
+  collectMealFoods: jest.fn(),
+  collectMealFoodsIncludingDeleted: jest.fn(),
   restoredFoodName: jest.fn(),
 }));
 jest.mock('@/lib/today', () => ({
@@ -15,21 +15,21 @@ jest.mock('@/lib/today', () => ({
 
 import { ApiError } from '@/lib/api-error';
 import {
-  listDayEntries,
+  collectDayEntries,
   getMealTarget,
-  listMealFoods,
-  listMealFoodsIncludingDeleted,
+  collectMealFoods,
+  collectMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
 } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import MealsPage from '@/app/(meals)/meals/page';
 
-const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
+const mockedCollectDayEntries = collectDayEntries as jest.MockedFunction<typeof collectDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
-const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
-const mockedIncludeDeleted = listMealFoodsIncludingDeleted as jest.MockedFunction<
-  typeof listMealFoodsIncludingDeleted
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
+const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
+  typeof collectMealFoodsIncludingDeleted
 >;
 const mockedRestoredFoodName = restoredFoodName as jest.MockedFunction<typeof restoredFoodName>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
@@ -57,9 +57,9 @@ describe('/meals day route wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetToday.mockResolvedValue('2026-10-03');
-    mockedListDayEntries.mockResolvedValue([]);
-    mockedListMealFoods.mockResolvedValue([]);
-    mockedIncludeDeleted.mockResolvedValue([]);
+    mockedCollectDayEntries.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([]);
     mockedRestoredFoodName.mockImplementation((foodId: string) => foodId);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
   });
@@ -68,7 +68,7 @@ describe('/meals day route wiring', () => {
     await MealsPage();
 
     expect(mockedGetToday).toHaveBeenCalled();
-    expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-03');
+    expect(mockedCollectDayEntries).toHaveBeenCalledWith('2026-10-03');
   });
 
   it('renders the mocked day, proving it consumes getToday rather than re-deriving', async () => {
@@ -88,7 +88,7 @@ describe('/meals day route wiring', () => {
   });
 
   it('renders the day total as the sum of confirmed entries via @life/nutrition', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', nutrients: vector({ calories: 420 }) }),
       entry({ id: 'b', nutrients: vector({ calories: 180 }) }),
     ]);

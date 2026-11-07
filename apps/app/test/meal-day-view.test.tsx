@@ -3,19 +3,19 @@ import { formatLongDate } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
-  listDayEntries: jest.fn(),
+  collectDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
-  listMealFoods: jest.fn(),
-  listMealFoodsIncludingDeleted: jest.fn(),
+  collectMealFoods: jest.fn(),
+  collectMealFoodsIncludingDeleted: jest.fn(),
   restoredFoodName: jest.requireActual('@/lib/meal-api').restoredFoodName,
 }));
 
 import { ApiError } from '@/lib/api-error';
 import {
-  listDayEntries,
+  collectDayEntries,
   getMealTarget,
-  listMealFoods,
-  listMealFoodsIncludingDeleted,
+  collectMealFoods,
+  collectMealFoodsIncludingDeleted,
   type MealEntry,
   type MealFood,
   type MealTarget,
@@ -23,11 +23,11 @@ import {
 import { mealDay } from '@/app/(meals)/meals/day';
 import MealDatePage from '@/app/(meals)/meals/[date]/page';
 
-const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
+const mockedCollectDayEntries = collectDayEntries as jest.MockedFunction<typeof collectDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
-const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
-const mockedListMealFoodsIncludingDeleted = listMealFoodsIncludingDeleted as jest.MockedFunction<
-  typeof listMealFoodsIncludingDeleted
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
+const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
+  typeof collectMealFoodsIncludingDeleted
 >;
 
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
@@ -89,14 +89,14 @@ function target(overrides: Partial<MealTarget> = {}): MealTarget {
 describe('meals day view', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListDayEntries.mockResolvedValue([]);
+    mockedCollectDayEntries.mockResolvedValue([]);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
-    mockedListMealFoods.mockResolvedValue([]);
-    mockedListMealFoodsIncludingDeleted.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([]);
   });
 
   it('renders the day total as the sum of confirmed entries, against the target', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', nutrients: vector({ calories: 420 }) }),
       entry({ id: 'b', nutrients: vector({ calories: 180 }) }),
     ]);
@@ -116,7 +116,7 @@ describe('meals day view', () => {
   });
 
   it('draws the energy track only, never a macro bar', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({
         id: 'a',
         nutrients: vector({ calories: 600, protein: 62, carbohydrates: 131, fat: 39 }),
@@ -137,7 +137,7 @@ describe('meals day view', () => {
   });
 
   it('keeps the energy track with no target set, and no macro tracks either', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', nutrients: vector({ calories: 300, protein: 20 }) }),
     ]);
 
@@ -199,7 +199,7 @@ describe('meals day view', () => {
   });
 
   it('keeps every meal on the page, an empty one reading Not logged', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 's1', mealGroup: 'snack', nutrients: vector({ calories: 100 }) }),
       entry({ id: 'b1', mealGroup: 'breakfast', nutrients: vector({ calories: 300 }) }),
       entry({ id: 'l1', mealGroup: 'lunch', nutrients: vector({ calories: 500 }) }),
@@ -228,7 +228,7 @@ describe('meals day view', () => {
   });
 
   it('keeps the portion in meta and draws the calories as a trailing pill', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: 'Toast', quantity: 2, nutrients: vector({ calories: 123 }) }),
     ]);
 
@@ -242,10 +242,10 @@ describe('meals day view', () => {
 
   it('titles a catalog entry with the resolved food name, never the raw id', async () => {
     const uuid = '8bac894d-9a96-4102-8c49-ad9978ddfde4';
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: uuid, quantity: 2, nutrients: vector({ calories: 123 }) }),
     ]);
-    mockedListMealFoodsIncludingDeleted.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
@@ -259,26 +259,26 @@ describe('meals day view', () => {
   it('resolves the day view through the include-deleted read (a deleted food still names the entry)', async () => {
     const uuid = '8bac894d-9a96-4102-8c49-ad9978ddfde4';
     const deletedUuid = '4c2a0000-1111-2222-3333-444455556666';
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: uuid, quantity: 2, nutrients: vector({ calories: 123 }) }),
       entry({ id: 'b', foodId: deletedUuid, quantity: 1, nutrients: vector({ calories: 200 }) }),
     ]);
-    mockedListMealFoodsIncludingDeleted.mockResolvedValue([
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([
       food({ id: uuid, name: 'Chicken' }),
       food({ id: deletedUuid, name: 'Milk, Brand X' }),
     ]);
 
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
-    expect(mockedListMealFoodsIncludingDeleted).toHaveBeenCalledTimes(1);
-    expect(mockedListMealFoods).not.toHaveBeenCalled();
+    expect(mockedCollectMealFoodsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(mockedCollectMealFoods).not.toHaveBeenCalled();
     expect(html).toContain('Chicken');
     expect(html).toContain('Milk, Brand X');
     expect(html).not.toContain(deletedUuid);
   });
 
   it('falls back to calories as the title when a dish is blank', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', foodId: '   ', nutrients: vector({ calories: 123 }) }),
     ]);
 
@@ -297,7 +297,7 @@ describe('meals day view', () => {
     const el = await MealDatePage({ params: Promise.resolve({ date: '2026-10-02' }) });
     const html = renderToStaticMarkup(el);
 
-    expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-02');
+    expect(mockedCollectDayEntries).toHaveBeenCalledWith('2026-10-02');
     expect(mockedGetMealTarget).toHaveBeenCalledWith('2026-10-02');
     // The page header is the shared shell's: title over the day's long date.
     expect(html).toContain('>Meals</h1>');

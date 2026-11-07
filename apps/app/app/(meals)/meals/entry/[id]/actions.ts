@@ -3,11 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import type { NutrientVector } from '@life/nutrition';
 import {
+  collectMealFoods,
   createMealEntry,
   createMealFood,
   createSavedMeal,
   estimatePhoto,
-  listMealFoods,
   updateMealEntry,
   type MealFood,
   type MealGroup,
@@ -81,7 +81,7 @@ export async function saveEntryAction(
   if (id === null) {
     // A Food row is created only here, at log time — never at estimate time
     // (`SPEC-meal-capture-grams § The log-time create path`).
-    const catalog = await listMealFoods();
+    const catalog = await collectMealFoods();
     const pendingCreates = new Map<string, Promise<string>>();
     for (const item of items) {
       await createMealEntry({

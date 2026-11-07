@@ -189,7 +189,7 @@ describe('Photo estimates (e2e)', () => {
 
     // Route-level: a confirmed entry would appear here; it does not.
     const listed = await auth(request(app.getHttpServer()).get('/api/entries?date=2026-10-03')).expect(200);
-    expect(listed.body).toEqual([]);
+    expect(listed.body.entries).toEqual([]);
   });
 
   it('takes the owner from the token, never the body', async () => {
