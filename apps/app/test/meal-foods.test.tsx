@@ -10,6 +10,7 @@ import { ApiError } from '@/lib/api-error';
 // a catalog form that reached for a model would fail loudly, not silently pass.
 jest.mock('@/lib/meal-api', () => ({
   collectMealFoods: jest.fn(),
+  listMealFoods: jest.fn(),
   getMealFood: jest.fn(),
   listDayEntries: jest.fn(),
   createMealFood: jest.fn(),
@@ -43,6 +44,7 @@ import {
   getMealFood,
   collectDayEntries,
   collectMealFoods,
+  listMealFoods,
   updateMealFood,
   type MealEntry,
   type MealFood,
@@ -53,10 +55,12 @@ import FoodsPage from '@/app/(meals)/meals/foods/page';
 import NewFoodPage from '@/app/(meals)/meals/foods/new/page';
 import EditFoodPage from '@/app/(meals)/meals/foods/[id]/page';
 import { FoodForm, type FoodFormBounds } from '@/app/(meals)/meals/foods/food-form';
+import { FoodCatalog } from '@/app/(meals)/meals/foods/food-catalog';
 import { FOOD_NUTRITION } from '@/app/(meals)/meals/foods/fields';
 import { createFoodAction, deleteFoodAction, updateFoodAction } from '@/app/(meals)/meals/actions';
 
 const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
+const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
 const mockedGetMealFood = getMealFood as jest.MockedFunction<typeof getMealFood>;
 const mockedCreateMealFood = createMealFood as jest.MockedFunction<typeof createMealFood>;
 const mockedUpdateMealFood = updateMealFood as jest.MockedFunction<typeof updateMealFood>;
@@ -100,14 +104,21 @@ const bounds: FoodFormBounds = {
   amountMax: AMOUNT_MAX,
 };
 
+/** One page of the `{ foods, nextCursor }` envelope the service returns. */
+function foodPage(foods: MealFood[], nextCursor: string | null = null) {
+  return { foods, nextCursor };
+}
+
 describe('foods catalog page', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('lists each owner food with its per-100 facts under a Foods heading', async () => {
-    mockedCollectMealFoods.mockResolvedValue([
-      food(),
-      food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
-    ]);
+    mockedListMealFoods.mockResolvedValue(
+      foodPage([
+        food(),
+        food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
+      ]),
+    );
 
     const el = await loadFoodsPage();
     const html = renderToStaticMarkup(el);
@@ -123,15 +134,33 @@ describe('foods catalog page', () => {
   });
 
   it('forwards the search query to the service instead of filtering rows here', async () => {
-    mockedCollectMealFoods.mockResolvedValue([food()]);
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
 
     await loadFoodsPage('milk');
 
-    expect(mockedCollectMealFoods).toHaveBeenCalledWith('milk');
+    // The query goes out on the request, with no cursor (page 1); the page never
+    // filters rows it already holds, and never walks the whole catalog.
+    expect(mockedListMealFoods.mock.calls[0]).toEqual(['milk', undefined]);
+    expect(mockedCollectMealFoods).not.toHaveBeenCalled();
+  });
+
+  it('server-renders page 1 and offers load-more only when a next cursor exists', async () => {
+    mockedListMealFoods.mockResolvedValue(foodPage([food()], 'cursor-2'));
+    const withMore = renderToStaticMarkup(await loadFoodsPage());
+
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
+    const exhausted = renderToStaticMarkup(await loadFoodsPage());
+
+    // Page 1 is in the server markup either way — the frozen row locators see it.
+    expect(withMore).toContain('Milk, Brand X');
+    expect(exhausted).toContain('Milk, Brand X');
+    // The control is additive: present only while the service reports another page.
+    expect(withMore).toContain('>Load more<');
+    expect(exhausted).not.toContain('Load more');
   });
 
   it('invites the first food when the catalog is empty', async () => {
-    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
 
     const el = await loadFoodsPage();
     const html = renderToStaticMarkup(el);
@@ -139,10 +168,11 @@ describe('foods catalog page', () => {
     expect(el.type).toBe(ManagerBlock);
     expect(html).toContain('No foods yet.');
     expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('Load more');
   });
 
   it('reports an empty result as a miss, not an empty catalog', async () => {
-    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
 
     const el = await loadFoodsPage('zzz');
     const html = renderToStaticMarkup(el);
@@ -152,10 +182,10 @@ describe('foods catalog page', () => {
   });
 
   it('opens the catalog body on the shared section rhythm, rows and empty states alike', async () => {
-    mockedCollectMealFoods.mockResolvedValue([food()]);
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
     const listHtml = renderToStaticMarkup(await loadFoodsPage());
 
-    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
     const missHtml = renderToStaticMarkup(await loadFoodsPage('zzz'));
     const emptyHtml = renderToStaticMarkup(await loadFoodsPage());
 
@@ -175,10 +205,12 @@ describe('foods catalog page', () => {
   });
 
   it('reaches create and edit through the catalog (AC1 create affordance, AC4 edit rows)', async () => {
-    mockedCollectMealFoods.mockResolvedValue([
-      food(),
-      food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
-    ]);
+    mockedListMealFoods.mockResolvedValue(
+      foodPage([
+        food(),
+        food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
+      ]),
+    );
 
     const html = renderToStaticMarkup(await loadFoodsPage());
 
@@ -187,6 +219,24 @@ describe('foods catalog page', () => {
     expect(html).toContain('aria-label="New food"');
     expect(html).toContain('href="/meals/foods/food-1"');
     expect(html).toContain('href="/meals/foods/food-2"');
+  });
+
+  it('mounts a fresh catalog when the query changes, so an old cursor cannot continue it', async () => {
+    mockedListMealFoods.mockResolvedValue(foodPage([food()], 'cursor-2'));
+
+    const plain = await loadFoodsPage();
+    const searched = await loadFoodsPage('milk');
+
+    const catalogOf = (el: ReactElement<Record<string, unknown>>) => find(el, FoodCatalog)!;
+    const plainCatalog = catalogOf(plain as ReactElement<Record<string, unknown>>);
+    const searchedCatalog = catalogOf(searched as ReactElement<Record<string, unknown>>);
+
+    // `key` is what makes React remount: a different key is a different shell, and a
+    // remount drops the appended rows and the cursor with it.
+    expect(plainCatalog.key).toBe('');
+    expect(searchedCatalog.key).toBe('milk');
+    // The query rides along, so appended pages stay inside the same filter.
+    expect(searchedCatalog.props.query).toBe('milk');
   });
 });
 
