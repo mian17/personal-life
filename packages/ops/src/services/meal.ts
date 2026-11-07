@@ -104,6 +104,7 @@ export const resources: ResourceRegistry[] = [
             enum: MEAL_GROUPS,
             description: 'Only entries logged in this meal group',
           },
+          ...pageWindow('entries'),
         },
       },
       { kind: 'get', fields: { id: identifier('entry to read') } },
@@ -165,6 +166,7 @@ export const resources: ResourceRegistry[] = [
             type: 'boolean',
             description: 'Whether foods removed from the catalog appear too',
           },
+          ...pageWindow('foods'),
         },
       },
       { kind: 'get', fields: { id: identifier('food to read') } },
@@ -206,7 +208,7 @@ export const resources: ResourceRegistry[] = [
           items: requiredItemList(),
         },
       },
-      { kind: 'list', fields: {} },
+      { kind: 'list', fields: pageWindow('saved meals') },
       { kind: 'get', fields: { id: identifier('saved meal to read') } },
       { kind: 'delete', fields: { id: identifier('saved meal to remove') } },
     ],
@@ -228,6 +230,22 @@ export const resources: ResourceRegistry[] = [
     ],
   }),
 ];
+
+/**
+ * One page of a meal listing: how many rows, and where the page starts. The
+ * descriptions copy `pageWindow()` in `./todo.ts` because `@life/ops` imports
+ * no service constant — `meal-parity.test.ts` pins the wording, so a drifted
+ * number fails parity rather than production (`SPEC-pagination-seam` §5).
+ */
+function pageWindow(entity: string): Record<string, FieldSpec> {
+  return {
+    limit: { type: 'number', description: `Page size, 1 to 200 ${entity}` },
+    cursor: {
+      type: 'string',
+      description: 'Opaque cursor the previous page returned; passed back untouched',
+    },
+  };
+}
 
 /** A nutrient vector the caller must send: the amounts already confirmed for this snapshot. */
 function requiredVector(): FieldSpec {

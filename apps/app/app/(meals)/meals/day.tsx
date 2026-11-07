@@ -17,9 +17,9 @@ import { MealDoors } from './meal-doors';
 import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';
 import {
+  collectMealFoodsIncludingDeleted,
+  collectDayEntries,
   getMealTarget,
-  listDayEntries,
-  listMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
   type MealFood,
@@ -112,9 +112,9 @@ async function loadTarget(date: string) {
  */
 export async function mealDay(day: string, emptyBody: string) {
   const [entries, target, catalog] = await Promise.all([
-    listDayEntries(day),
+    collectDayEntries(day),
     loadTarget(day),
-    listMealFoodsIncludingDeleted(),
+    collectMealFoodsIncludingDeleted(),
   ]);
   const totals: NutrientVector = sum(entries.map((entry) => entry.nutrients));
   const readout = dayReadout(totals.calories, target);

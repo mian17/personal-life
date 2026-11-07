@@ -210,6 +210,23 @@ describe('the meal registry', () => {
     const vector = deriveInputSchema(registryOf('entries'), 'create').properties['nutrients'];
     expect(vector.required).toEqual(NUTRIENTS.map((nutrient) => nutrient.key));
   });
+
+  it('pages the three meal listings through the one 1-to-200 window', () => {
+    // Every meal list endpoint pages (`SPEC-pagination-seam` §7), so each `list`
+    // op carries the same two optional fields. `target` is a single-row read of
+    // the day's profile, so it keeps its one required `date`.
+    for (const resource of ['entries', 'foods', 'saved-meals']) {
+      const fields = findOp(registryOf(resource), 'list').fields;
+      // `normalizeOp` fills the default, so an optional field reads `required: false`.
+      expect(fields['limit']).toMatchObject({
+        type: 'number',
+        required: false,
+        description: expect.stringContaining('1 to 200'),
+      });
+      expect(fields['cursor']).toMatchObject({ type: 'string', required: false });
+    }
+    expect(Object.keys(findOp(registryOf('target'), 'list').fields)).toEqual(['date']);
+  });
 });
 
 describe('meal operation parity', () => {
@@ -247,13 +264,13 @@ describe('meal operation parity', () => {
   it('sends the same entry listing and renders the same page', async () => {
     const pair = await runBoth({
       resource: 'entries',
-      argv: ['entries', 'list', '--date', '2026-02-01', '--meal', 'lunch'],
+      argv: ['entries', 'list', '--date', '2026-02-01', '--meal', 'lunch', '--limit', '25'],
       tool: 'entries_list',
-      args: { date: '2026-02-01', meal: 'lunch' },
+      args: { date: '2026-02-01', meal: 'lunch', limit: 25 },
     });
 
     expectSuccessful(pair);
-    expect(pair.cliWire?.query).toEqual({ date: '2026-02-01', meal: 'lunch' });
+    expect(pair.cliWire?.query).toEqual({ date: '2026-02-01', meal: 'lunch', limit: '25' });
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 
@@ -347,14 +364,18 @@ describe('meal operation parity', () => {
   it('sends the same food listing and renders the same page', async () => {
     const pair = await runBoth({
       resource: 'foods',
-      argv: ['foods', 'list', '--q', 'yoghurt', '--includeDeleted'],
+      argv: ['foods', 'list', '--q', 'yoghurt', '--includeDeleted', '--cursor', 'next-page'],
       tool: 'foods_list',
-      args: { q: 'yoghurt', includeDeleted: true },
+      args: { q: 'yoghurt', includeDeleted: true, cursor: 'next-page' },
       seed: seededFoods,
     });
 
     expectSuccessful(pair);
-    expect(pair.cliWire?.query).toEqual({ q: 'yoghurt', includeDeleted: 'true' });
+    expect(pair.cliWire?.query).toEqual({
+      q: 'yoghurt',
+      includeDeleted: 'true',
+      cursor: 'next-page',
+    });
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 
@@ -438,14 +459,15 @@ describe('meal operation parity', () => {
   it('sends the same saved-meal listing and renders the same page', async () => {
     const pair = await runBoth({
       resource: 'saved-meals',
-      argv: ['saved-meals', 'list'],
+      argv: ['saved-meals', 'list', '--limit', '10'],
       tool: 'saved-meals_list',
-      args: {},
+      args: { limit: 10 },
       seed: seededSavedMeals,
     });
 
     expectSuccessful(pair);
     expect(pair.cliWire?.path).toBe('/api/saved-meals');
+    expect(pair.cliWire?.query).toEqual({ limit: '10' });
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 

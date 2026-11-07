@@ -145,13 +145,13 @@ describe('MealCache (read-through + generation invalidation)', () => {
       const h = makeHarness(client);
       await h.service.create(SUB, body());
 
-      const first = await h.service.findAll(SUB, DAY);
+      const first = await h.service.findAll(SUB, { date: DAY });
       const dbCallsOnHit = h.repo.find.mock.calls.length;
-      const second = await h.service.findAll(SUB, DAY);
+      const second = await h.service.findAll(SUB, { date: DAY });
 
       // The API output is byte-identical across a miss and a hit.
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
-      expect(first[0].nutrients.calories).toBe(200);
+      expect(first.entries[0].nutrients.calories).toBe(200);
       // The second read did not run the loader again.
       expect(h.repo.find.mock.calls).toHaveLength(dbCallsOnHit);
       // One entry was written for the day, under the current generation.
@@ -189,7 +189,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
         body({ nutrients: vector({ calories: 777, protein: 12 }) }),
       );
 
-      await h.service.findAll(SUB, DAY);
+      await h.service.findAll(SUB, { date: DAY });
       await h.service.findOne(SUB, created.id);
 
       expect(client.values.map((v) => v.key)).toEqual([
@@ -224,9 +224,9 @@ describe('MealCache (read-through + generation invalidation)', () => {
         },
       ];
 
-      const page = await h.service.findAll(SUB, DAY);
+      const page = await h.service.findAll(SUB, { date: DAY });
 
-      expect(page[0].nutrients.calories).toBe(111);
+      expect(page.entries[0].nutrients.calories).toBe(111);
       // The loader's result is returned, but nothing was written to Redis.
       expect(client.values).toHaveLength(0);
       expect(client.setCalls).toHaveLength(0);
@@ -238,7 +238,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
       const client = new FakeRedisClient();
       const h = makeHarness(client);
       await h.service.create(SUB, body({ nutrients: vector({ calories: 100 }) }));
-      await h.service.findAll(SUB, DAY);
+      await h.service.findAll(SUB, { date: DAY });
       expect(client.setCalls).toEqual([`meal:${SUB}:v1:entries:${DAY}`]);
 
       // The next write bumps to v2; the v1 entry can no longer be addressed.
@@ -248,10 +248,10 @@ describe('MealCache (read-through + generation invalidation)', () => {
       );
       expect(client.incrCalls).toContain(generationKey(SUB));
 
-      const after = await h.service.findAll(SUB, DAY);
+      const after = await h.service.findAll(SUB, { date: DAY });
 
       // The read missed (the old key is dead) and repopulated under v2.
-      expect(after).toHaveLength(2);
+      expect(after.entries).toHaveLength(2);
       expect(client.setCalls).toContain(`meal:${SUB}:v2:entries:${DAY}`);
     });
 
@@ -260,17 +260,17 @@ describe('MealCache (read-through + generation invalidation)', () => {
       const h = makeHarness(client);
       const created = await h.service.create(SUB, body({ nutrients: vector({ calories: 100 }) }));
 
-      await h.service.findAll(SUB, DAY);
+      await h.service.findAll(SUB, { date: DAY });
       expect(client.setCalls).toEqual([`meal:${SUB}:v1:entries:${DAY}`]);
 
       await h.service.update(SUB, created.id, { nutrients: vector({ calories: 999 }) });
-      const afterUpdate = await h.service.findAll(SUB, DAY);
-      expect(afterUpdate[0].nutrients.calories).toBe(999);
+      const afterUpdate = await h.service.findAll(SUB, { date: DAY });
+      expect(afterUpdate.entries[0].nutrients.calories).toBe(999);
       expect(client.setCalls).toContain(`meal:${SUB}:v2:entries:${DAY}`);
 
       await h.service.remove(SUB, created.id);
-      const afterRemove = await h.service.findAll(SUB, DAY);
-      expect(afterRemove).toHaveLength(0);
+      const afterRemove = await h.service.findAll(SUB, { date: DAY });
+      expect(afterRemove.entries).toHaveLength(0);
       expect(client.setCalls).toContain(`meal:${SUB}:v3:entries:${DAY}`);
     });
 
@@ -308,8 +308,8 @@ describe('MealCache (read-through + generation invalidation)', () => {
       const A = 'user-a';
       const B = 'user-b';
 
-      await h.service.findAll(A, DAY);
-      await h.service.findAll(B, DAY);
+      await h.service.findAll(A, { date: DAY });
+      await h.service.findAll(B, { date: DAY });
       expect(client.setCalls).toEqual([
         `meal:${A}:v0:entries:${DAY}`,
         `meal:${B}:v0:entries:${DAY}`,
@@ -321,7 +321,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
 
       // B's entry survived A's write: B's next read is still a hit.
       const dbCallsBefore = h.repo.find.mock.calls.length;
-      await h.service.findAll(B, DAY);
+      await h.service.findAll(B, { date: DAY });
       expect(h.repo.find.mock.calls).toHaveLength(dbCallsBefore);
     });
   });
@@ -331,8 +331,8 @@ describe('MealCache (read-through + generation invalidation)', () => {
       const h = makeHarness(new FailingRedisClient());
       const created = await h.service.create(SUB, body({ nutrients: vector({ calories: 444 }) }));
 
-      const page = await h.service.findAll(SUB, DAY);
-      expect(page[0].nutrients.calories).toBe(444);
+      const page = await h.service.findAll(SUB, { date: DAY });
+      expect(page.entries[0].nutrients.calories).toBe(444);
       const one = await h.service.findOne(SUB, created.id);
       expect(one.nutrients.calories).toBe(444);
     });

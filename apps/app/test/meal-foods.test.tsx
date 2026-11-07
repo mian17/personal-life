@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api-error';
 // The whole meal-service surface this test may touch. No photo/estimate export:
 // a catalog form that reached for a model would fail loudly, not silently pass.
 jest.mock('@/lib/meal-api', () => ({
-  listMealFoods: jest.fn(),
+  collectMealFoods: jest.fn(),
   getMealFood: jest.fn(),
   listDayEntries: jest.fn(),
   createMealFood: jest.fn(),
@@ -41,8 +41,8 @@ import {
   createMealFood,
   deleteMealFood,
   getMealFood,
-  listDayEntries,
-  listMealFoods,
+  collectDayEntries,
+  collectMealFoods,
   updateMealFood,
   type MealEntry,
   type MealFood,
@@ -56,7 +56,7 @@ import { FoodForm, type FoodFormBounds } from '@/app/(meals)/meals/foods/food-fo
 import { FOOD_NUTRITION } from '@/app/(meals)/meals/foods/fields';
 import { createFoodAction, deleteFoodAction, updateFoodAction } from '@/app/(meals)/meals/actions';
 
-const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
 const mockedGetMealFood = getMealFood as jest.MockedFunction<typeof getMealFood>;
 const mockedCreateMealFood = createMealFood as jest.MockedFunction<typeof createMealFood>;
 const mockedUpdateMealFood = updateMealFood as jest.MockedFunction<typeof updateMealFood>;
@@ -104,7 +104,7 @@ describe('foods catalog page', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('lists each owner food with its per-100 facts under a Foods heading', async () => {
-    mockedListMealFoods.mockResolvedValue([
+    mockedCollectMealFoods.mockResolvedValue([
       food(),
       food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
     ]);
@@ -123,15 +123,15 @@ describe('foods catalog page', () => {
   });
 
   it('forwards the search query to the service instead of filtering rows here', async () => {
-    mockedListMealFoods.mockResolvedValue([food()]);
+    mockedCollectMealFoods.mockResolvedValue([food()]);
 
     await loadFoodsPage('milk');
 
-    expect(mockedListMealFoods).toHaveBeenCalledWith('milk');
+    expect(mockedCollectMealFoods).toHaveBeenCalledWith('milk');
   });
 
   it('invites the first food when the catalog is empty', async () => {
-    mockedListMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
 
     const el = await loadFoodsPage();
     const html = renderToStaticMarkup(el);
@@ -142,7 +142,7 @@ describe('foods catalog page', () => {
   });
 
   it('reports an empty result as a miss, not an empty catalog', async () => {
-    mockedListMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
 
     const el = await loadFoodsPage('zzz');
     const html = renderToStaticMarkup(el);
@@ -152,10 +152,10 @@ describe('foods catalog page', () => {
   });
 
   it('opens the catalog body on the shared section rhythm, rows and empty states alike', async () => {
-    mockedListMealFoods.mockResolvedValue([food()]);
+    mockedCollectMealFoods.mockResolvedValue([food()]);
     const listHtml = renderToStaticMarkup(await loadFoodsPage());
 
-    mockedListMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
     const missHtml = renderToStaticMarkup(await loadFoodsPage('zzz'));
     const emptyHtml = renderToStaticMarkup(await loadFoodsPage());
 
@@ -175,7 +175,7 @@ describe('foods catalog page', () => {
   });
 
   it('reaches create and edit through the catalog (AC1 create affordance, AC4 edit rows)', async () => {
-    mockedListMealFoods.mockResolvedValue([
+    mockedCollectMealFoods.mockResolvedValue([
       food(),
       food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
     ]);

@@ -8,9 +8,9 @@ import {
   type NutrientVector,
 } from '@life/nutrition';
 import {
+  collectMealFoods,
+  collectMealFoodsIncludingDeleted,
   getMealEntry,
-  listMealFoods,
-  listMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealFood,
 } from '@/lib/meal-api';
@@ -43,7 +43,9 @@ const NUTRITION: NutritionFields = {
 /**
  * The catalog the `door=food` picker offers, with the per-100 facts formatted
  * here so the client needs no `@life/nutrition` (same row rule as the catalog
- * page's own list).
+ * page's own list). The caller hands it the **whole** catalog
+ * (`collectMealFoods`), never one page: the editor matches a typed dish name
+ * across every food, so a paged subset would create a duplicate row.
  */
 function pickerFoods(foods: MealFood[]): PickerFood[] {
   return foods.map((food) => ({
@@ -76,7 +78,7 @@ export default async function MealEntryPage({
     const mealDoor = (await searchParams).door === 'food' ? ('food' as const) : null;
     const date = await getToday();
     const defaultMealGroup = await getDefaultMealGroup();
-    const foods = mealDoor === 'food' ? pickerFoods(await listMealFoods()) : [];
+    const foods = mealDoor === 'food' ? pickerFoods(await collectMealFoods()) : [];
     return (
       <MealEditor
         entry={null}
@@ -92,7 +94,7 @@ export default async function MealEntryPage({
   const entry = await loadOrNotFound(() => getMealEntry(id));
   // Name resolution reads the whole catalog (soft-deleted rows included): the
   // entry's dish name must survive the food being deleted (AC5).
-  const catalog = await listMealFoodsIncludingDeleted();
+  const catalog = await collectMealFoodsIncludingDeleted();
   return (
     <MealEditor
       entry={entry}

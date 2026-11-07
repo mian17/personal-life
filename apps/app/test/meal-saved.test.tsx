@@ -9,10 +9,10 @@ const mockEstimatePhoto = jest.fn();
 // The only meal-service read/write surface the re-log may touch: no photo/estimate
 // path is exported here, so a re-log that reached for Gemini would fail loudly.
 jest.mock('@/lib/meal-api', () => ({
-  listSavedMeals: jest.fn(),
+  collectSavedMeals: jest.fn(),
   getSavedMeal: jest.fn(),
-  listMealFoods: jest.fn(),
-  listMealFoodsIncludingDeleted: jest.fn(),
+  collectMealFoods: jest.fn(),
+  collectMealFoodsIncludingDeleted: jest.fn(),
   createMealEntry: jest.fn(),
   deleteSavedMeal: jest.fn(),
   estimatePhoto: mockEstimatePhoto,
@@ -34,9 +34,9 @@ import {
   createMealEntry,
   deleteSavedMeal,
   getSavedMeal,
-  listMealFoods,
-  listMealFoodsIncludingDeleted,
-  listSavedMeals,
+  collectMealFoods,
+  collectMealFoodsIncludingDeleted,
+  collectSavedMeals,
   type MealFood,
   type SavedMeal,
 } from '@/lib/meal-api';
@@ -47,11 +47,11 @@ import SavedMealsPage from '@/app/(meals)/meals/saved/page';
 import { relogMealAction } from '@/app/(meals)/meals/actions';
 import { deleteSavedMealAction } from '@/app/(meals)/meals/saved/actions';
 
-const mockedListSavedMeals = listSavedMeals as jest.MockedFunction<typeof listSavedMeals>;
+const mockedCollectSavedMeals = collectSavedMeals as jest.MockedFunction<typeof collectSavedMeals>;
 const mockedGetSavedMeal = getSavedMeal as jest.MockedFunction<typeof getSavedMeal>;
-const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
-const mockedIncludeDeleted = listMealFoodsIncludingDeleted as jest.MockedFunction<
-  typeof listMealFoodsIncludingDeleted
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
+const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
+  typeof collectMealFoodsIncludingDeleted
 >;
 const mockedCreateMealEntry = createMealEntry as jest.MockedFunction<typeof createMealEntry>;
 const mockedDeleteSavedMeal = deleteSavedMeal as jest.MockedFunction<typeof deleteSavedMeal>;
@@ -130,7 +130,7 @@ describe('saved meals list', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('renders the empty state when the owner has saved nothing', async () => {
-    mockedListSavedMeals.mockResolvedValue([]);
+    mockedCollectSavedMeals.mockResolvedValue([]);
 
     const el = await SavedMealsPage();
 
@@ -145,7 +145,7 @@ describe('saved meals list', () => {
   });
 
   it('renders one row per saved meal linking to its detail route, summed from stored vectors', async () => {
-    mockedListSavedMeals.mockResolvedValue([
+    mockedCollectSavedMeals.mockResolvedValue([
       savedMeal({ id: 's1' }),
       savedMeal({
         id: 's2',
@@ -172,7 +172,7 @@ describe('saved meals list', () => {
   });
 
   it('leads with a back control to /meals/settings and carries no nav actions', async () => {
-    mockedListSavedMeals.mockResolvedValue([savedMeal()]);
+    mockedCollectSavedMeals.mockResolvedValue([savedMeal()]);
 
     const el = await SavedMealsPage();
     const html = renderToStaticMarkup(el);
@@ -184,7 +184,7 @@ describe('saved meals list', () => {
   });
 
   it('gives each row a delete control wired to the server action', async () => {
-    mockedListSavedMeals.mockResolvedValue([
+    mockedCollectSavedMeals.mockResolvedValue([
       savedMeal({ id: 's1', name: 'Overnight oats' }),
       savedMeal({ id: 's2', name: 'Chicken salad' }),
     ]);
@@ -217,8 +217,8 @@ describe('saved meals list', () => {
 describe('one saved meal detail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListMealFoods.mockResolvedValue([]);
-    mockedIncludeDeleted.mockResolvedValue([]);
+    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([]);
   });
 
   it('renders the frozen items from the stored snapshot, never a re-derivation', async () => {
@@ -240,16 +240,16 @@ describe('one saved meal detail', () => {
         items: [{ id: 'i1', foodId: uuid, quantity: 1, nutrients: vector({ calories: 380 }) }],
       }),
     );
-    mockedListMealFoods.mockResolvedValue([]);
-    mockedIncludeDeleted.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
+    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([food({ id: uuid, name: 'Chicken' })]);
 
     const el = await SavedMealPage({ params: Promise.resolve({ id: 's1' }) });
     const html = renderToStaticMarkup(el);
 
     expect(html).toContain('Chicken');
     expect(html).not.toContain(uuid);
-    expect(mockedIncludeDeleted).toHaveBeenCalledTimes(1);
-    expect(mockedListMealFoods).not.toHaveBeenCalled();
+    expect(mockedCollectMealFoodsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(mockedCollectMealFoods).not.toHaveBeenCalled();
   });
 
   it('resolves a soft-deleted food to its surviving dish name (AC5), never the raw id', async () => {
@@ -259,7 +259,7 @@ describe('one saved meal detail', () => {
         items: [{ id: 'i1', foodId: deletedUuid, quantity: 1, nutrients: vector({ calories: 380 }) }],
       }),
     );
-    mockedIncludeDeleted.mockResolvedValue([food({ id: deletedUuid, name: 'Milk, Brand X' })]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([food({ id: deletedUuid, name: 'Milk, Brand X' })]);
 
     const el = await SavedMealPage({ params: Promise.resolve({ id: 's1' }) });
     const html = renderToStaticMarkup(el);
