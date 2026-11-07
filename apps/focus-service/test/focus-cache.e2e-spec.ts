@@ -106,6 +106,10 @@ describe('FocusCache (read-through, generation invalidation, fail-open)', () => 
       expect(redis.setCalls).toEqual([key]);
       // The cached value is the row as persisted, not a presentation shape.
       expect(JSON.parse(redis.valueFor(key)!)).toEqual(await persistedSessions(dataSource));
+      // Paging is a projection over that cached range: the page is the whole set here
+      // because it fits in one page, and no cursor is left over.
+      expect(first.sessions).toEqual(await persistedSessions(dataSource));
+      expect(first.nextCursor).toBeNull();
       // Deviation, recorded: non-content rows, so no at-rest envelope exists here.
       expect(redis.valueFor(key)).not.toContain('enc.v1.');
     });
@@ -123,6 +127,8 @@ describe('FocusCache (read-through, generation invalidation, fail-open)', () => 
       const key = `focus:${OWNER}:v2:goal`;
       expect(redis.setCalls).toEqual([key]);
       expect(JSON.parse(redis.valueFor(key)!)).toEqual(await persistedGoals(dataSource));
+      expect(first.goals).toEqual(await persistedGoals(dataSource));
+      expect(first.nextCursor).toBeNull();
       expect(redis.valueFor(key)).not.toContain('enc.v1.');
     });
   });
@@ -168,8 +174,8 @@ describe('FocusCache (read-through, generation invalidation, fail-open)', () => 
     try {
       await sessions.create(OWNER, { date: DAY, minutes: 25 });
 
-      const rows = await sessions.findAll(OWNER, RANGE);
-      const again = await sessions.findAll(OWNER, RANGE);
+      const rows = (await sessions.findAll(OWNER, RANGE)).sessions;
+      const again = (await sessions.findAll(OWNER, RANGE)).sessions;
 
       expect(rows).toHaveLength(1);
       expect(again).toEqual(rows);

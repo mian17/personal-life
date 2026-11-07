@@ -21,6 +21,7 @@ import {
 
 const DAY = '2026-09-03';
 const NEXT_DAY = '2026-09-04';
+const THIRD_DAY = '2026-09-05';
 const OTHER_OWNER = 'user-b';
 
 describe('Focus sessions (e2e)', () => {
@@ -44,6 +45,12 @@ describe('Focus sessions (e2e)', () => {
   const listSessions = (token: string, from: string, to: string) =>
     request(running.app.getHttpServer())
       .get(`/api/sessions?from=${from}&to=${to}`)
+      .set('Authorization', `Bearer ${token}`);
+  /** One page of a range: the same route with the shared paging window. */
+  const listSessionPage = (token: string, from: string, to: string, limit: number, cursor?: string) =>
+    request(running.app.getHttpServer())
+      .get(`/api/sessions?from=${from}&to=${to}&limit=${limit}`)
+      .query(cursor === undefined ? {} : { cursor })
       .set('Authorization', `Bearer ${token}`);
   const recordSession = (token: string, body: Record<string, unknown>) =>
     postSession(token, body).expect(201);
@@ -73,7 +80,8 @@ describe('Focus sessions (e2e)', () => {
     const created = await recordSession(ownerToken, { date: DAY, minutes: 25 });
 
     const served = await listSessions(ownerToken, DAY, DAY).expect(200);
-    expect(served.body).toEqual([created.body]);
+    const envelope = { sessions: [created.body], nextCursor: null };
+    expect(served.body).toEqual(envelope);
     expect(redis.setCalls).toContain(`focus:user-a:v1:sessions:${DAY}:${DAY}`);
 
     // Flush the cache, drop the process: nothing but the SQLite file survives this.
@@ -89,9 +97,49 @@ describe('Focus sessions (e2e)', () => {
 
     const afterRebuild = await listSessions(ownerToken, DAY, DAY).expect(200);
     expect(afterRebuild.body).toEqual(beforeRebuild);
-    expect(afterRebuild.body).toEqual([created.body]);
+    expect(afterRebuild.body).toEqual(envelope);
     // The rebuilt app had to reach the database: its fresh cache starts at generation 0.
     expect(rebuiltRedis.setCalls).toEqual([`focus:user-a:v0:sessions:${DAY}:${DAY}`]);
+  });
+
+  it('pages a range with no gap and no duplicate across the boundary', async () => {
+    // Three days, so the page boundary falls between two `date` values — the order's
+    // leading component, not the same-instant tie-break (every row here shares a
+    // `createdAt` second, so `id` would order them, not insertion).
+    const first = await recordSession(ownerToken, { date: DAY, minutes: 10 });
+    const second = await recordSession(ownerToken, { date: NEXT_DAY, minutes: 20 });
+    const third = await recordSession(ownerToken, { date: THIRD_DAY, minutes: 30 });
+
+    const pageOne = await listSessionPage(ownerToken, DAY, THIRD_DAY, 2).expect(200);
+    expect(pageOne.body.sessions).toEqual([first.body, second.body]);
+    expect(pageOne.body.nextCursor).toEqual(expect.any(String));
+
+    const pageTwo = await listSessionPage(
+      ownerToken,
+      DAY,
+      THIRD_DAY,
+      2,
+      pageOne.body.nextCursor,
+    ).expect(200);
+    expect(pageTwo.body.sessions).toEqual([third.body]);
+    expect(pageTwo.body.nextCursor).toBeNull();
+
+    // Every row exactly once, in the order one unpaged read produces.
+    const whole = await listSessions(ownerToken, DAY, THIRD_DAY).expect(200);
+    expect([...pageOne.body.sessions, ...pageTwo.body.sessions]).toEqual(whole.body.sessions);
+  });
+
+  it('serves the same cache entry to every page of one range', async () => {
+    // Paging is a projection over the cached range, so limit/cursor must not enter
+    // the key: two page requests leave exactly one populate behind.
+    await recordSession(ownerToken, { date: DAY, minutes: 10 });
+    await recordSession(ownerToken, { date: NEXT_DAY, minutes: 20 });
+
+    const pageOne = await listSessionPage(ownerToken, DAY, NEXT_DAY, 1).expect(200);
+    await listSessionPage(ownerToken, DAY, NEXT_DAY, 1, pageOne.body.nextCursor).expect(200);
+
+    // v2: one write per session, each bumping the owner's generation.
+    expect(redis.setCalls).toEqual([`focus:user-a:v2:sessions:${DAY}:${NEXT_DAY}`]);
   });
 
   it('keeps two owners apart on write and on read', async () => {
@@ -99,14 +147,20 @@ describe('Focus sessions (e2e)', () => {
     const theirs = await recordSession(otherOwnerToken, { date: NEXT_DAY, minutes: 50 });
 
     const myRange = await listSessions(ownerToken, DAY, NEXT_DAY).expect(200);
-    expect(myRange.body).toEqual([mine.body]);
+    expect(myRange.body).toEqual({ sessions: [mine.body], nextCursor: null });
 
     const theirRange = await listSessions(otherOwnerToken, DAY, NEXT_DAY).expect(200);
-    expect(theirRange.body).toEqual([theirs.body]);
+    expect(theirRange.body).toEqual({ sessions: [theirs.body], nextCursor: null });
 
     // The same day, asked by the other owner, is not a shared answer.
-    expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual([]);
-    expect((await listSessions(ownerToken, NEXT_DAY, NEXT_DAY).expect(200)).body).toEqual([]);
+    expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual({
+      sessions: [],
+      nextCursor: null,
+    });
+    expect((await listSessions(ownerToken, NEXT_DAY, NEXT_DAY).expect(200)).body).toEqual({
+      sessions: [],
+      nextCursor: null,
+    });
   });
 
   it('refuses an owner claim in the body: identity comes from the token alone', async () => {
@@ -116,6 +170,9 @@ describe('Focus sessions (e2e)', () => {
       ownerSub: OTHER_OWNER,
     }).expect(400);
 
-    expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual([]);
+    expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual({
+      sessions: [],
+      nextCursor: null,
+    });
   });
 });

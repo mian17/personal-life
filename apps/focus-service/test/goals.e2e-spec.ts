@@ -41,6 +41,12 @@ describe('Daily focus goal (e2e)', () => {
     request(running.app.getHttpServer())
       .get('/api/goal')
       .set('Authorization', `Bearer ${token}`);
+  /** One page of the goal history: the same route with the shared paging window. */
+  const getGoalPage = (token: string, limit: number, cursor?: string) =>
+    request(running.app.getHttpServer())
+      .get('/api/goal?limit=' + limit)
+      .query(cursor === undefined ? {} : { cursor })
+      .set('Authorization', `Bearer ${token}`);
 
   beforeAll(async () => {
     database = await startThrowawayDatabase('goals');
@@ -68,10 +74,46 @@ describe('Daily focus goal (e2e)', () => {
     await putGoal(ownerToken, { date: SECOND_DAY, minutes: 50 }).expect(200);
 
     const goals = await getGoals(ownerToken).expect(200);
-    expect(goals.body).toEqual([
-      { validFrom: FIRST_DAY, minutes: 25 },
-      { validFrom: SECOND_DAY, minutes: 50 },
-    ]);
+    expect(goals.body).toEqual({
+      goals: [
+        { validFrom: FIRST_DAY, minutes: 25 },
+        { validFrom: SECOND_DAY, minutes: 50 },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it('pages the history with no gap and no duplicate across the boundary', async () => {
+    const first = { validFrom: FIRST_DAY, minutes: 25 };
+    const second = { validFrom: SECOND_DAY, minutes: 50 };
+    const third = { validFrom: THIRD_DAY, minutes: 75 };
+    for (const goal of [first, second, third]) {
+      await putGoal(ownerToken, { date: goal.validFrom, minutes: goal.minutes }).expect(200);
+    }
+
+    const pageOne = await getGoalPage(ownerToken, 2).expect(200);
+    expect(pageOne.body.goals).toEqual([first, second]);
+    expect(pageOne.body.nextCursor).toEqual(expect.any(String));
+
+    const pageTwo = await getGoalPage(ownerToken, 2, pageOne.body.nextCursor).expect(200);
+    expect(pageTwo.body.goals).toEqual([third]);
+    expect(pageTwo.body.nextCursor).toBeNull();
+
+    // Every row exactly once, in the order one unpaged read produces.
+    const whole = await getGoals(ownerToken).expect(200);
+    expect([...pageOne.body.goals, ...pageTwo.body.goals]).toEqual(whole.body.goals);
+  });
+
+  it('serves the same cache entry to every page of the history', async () => {
+    // Paging is a projection over the cached history, so limit/cursor must not enter
+    // the one per-owner `goal` key: two page requests leave one populate behind.
+    await putGoal(ownerToken, { date: FIRST_DAY, minutes: 25 }).expect(200);
+    await putGoal(ownerToken, { date: SECOND_DAY, minutes: 50 }).expect(200);
+
+    const pageOne = await getGoalPage(ownerToken, 1).expect(200);
+    await getGoalPage(ownerToken, 1, pageOne.body.nextCursor).expect(200);
+
+    expect(redis.setCalls).toEqual([`focus:user-a:v2:goal`]);
   });
 
   it('replaces the same day on a second set and touches no other day', async () => {
@@ -80,10 +122,25 @@ describe('Daily focus goal (e2e)', () => {
     const replaced = await putGoal(ownerToken, { date: SECOND_DAY, minutes: 90 }).expect(200);
 
     expect(replaced.body).toEqual({ validFrom: SECOND_DAY, minutes: 90 });
-    expect((await getGoals(ownerToken).expect(200)).body).toEqual([
-      { validFrom: FIRST_DAY, minutes: 25 },
-      { validFrom: SECOND_DAY, minutes: 90 },
-    ]);
+    expect((await getGoals(ownerToken).expect(200)).body).toEqual({
+      goals: [
+        { validFrom: FIRST_DAY, minutes: 25 },
+        { validFrom: SECOND_DAY, minutes: 90 },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it('refuses a page size outside the seam\'s cap rather than clamping silently', async () => {
+    // The DTO imports `MAX_PAGE_LIMIT`, so a page can never be asked to exceed it.
+    await request(running.app.getHttpServer())
+      .get('/api/goal?limit=0')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(400);
+    await request(running.app.getHttpServer())
+      .get('/api/goal?limit=201')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(400);
   });
 
   it('refuses a missing or impossible day rather than defaulting to one', async () => {
@@ -92,18 +149,23 @@ describe('Daily focus goal (e2e)', () => {
     await putGoal(ownerToken, { date: FIRST_DAY, minutes: 0 }).expect(400);
     await putGoal(ownerToken, { date: FIRST_DAY, minutes: 181 }).expect(400);
 
-    expect((await getGoals(ownerToken).expect(200)).body).toEqual([]);
+    expect((await getGoals(ownerToken).expect(200)).body).toEqual({
+      goals: [],
+      nextCursor: null,
+    });
   });
 
   it('answers a goal for one owner only, whatever the other owner set', async () => {
     await putGoal(ownerToken, { date: FIRST_DAY, minutes: 25 }).expect(200);
     await putGoal(otherOwnerToken, { date: THIRD_DAY, minutes: 60 }).expect(200);
 
-    expect((await getGoals(ownerToken).expect(200)).body).toEqual([
-      { validFrom: FIRST_DAY, minutes: 25 },
-    ]);
-    expect((await getGoals(otherOwnerToken).expect(200)).body).toEqual([
-      { validFrom: THIRD_DAY, minutes: 60 },
-    ]);
+    expect((await getGoals(ownerToken).expect(200)).body).toEqual({
+      goals: [{ validFrom: FIRST_DAY, minutes: 25 }],
+      nextCursor: null,
+    });
+    expect((await getGoals(otherOwnerToken).expect(200)).body).toEqual({
+      goals: [{ validFrom: THIRD_DAY, minutes: 60 }],
+      nextCursor: null,
+    });
   });
 });
