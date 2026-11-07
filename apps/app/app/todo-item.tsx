@@ -149,7 +149,7 @@ export function TodoItem({
       meta={
         <>
           <DueDate dueDate={todo.dueDate} today={today} tone="signal" />
-          {repeat && <span>{repeat}</span>}
+          {isDefault && repeat && <span>{repeat}</span>}
           {isDefault && list && <span>{list.name}</span>}
         </>
       }

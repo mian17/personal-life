@@ -340,6 +340,14 @@ describe('TodoItem timed and repeat meta', () => {
     expect(markup()).not.toContain('>Daily<');
     expect(markup()).not.toContain('>Weekly (Thursday)<');
   });
+
+  it('drops the repeat label on a dense row, where the lens is name + due date only', () => {
+    // The contract in this component's doc comment: a dense row is the minimal lens. On a ~180px
+    // quadrant the repeat string was the noisiest thing in the row, wrapping mid-label.
+    expect(markup('dense', { repeat: 'weekly' })).not.toContain('>Weekly (Thursday)<');
+    // The default row keeps it: same todo, same label.
+    expect(markup('default', { repeat: 'weekly' })).toContain('>Weekly (Thursday)<');
+  });
 });
 
 describe('TodoItem tick keeps the row visible', () => {
