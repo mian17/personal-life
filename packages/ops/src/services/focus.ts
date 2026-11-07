@@ -10,7 +10,11 @@
  * against.
  *
  * The session listing carries `from` and `to` as required query parameters — the
- * range is part of the fetch identity, so the service never defaults it. `minutes`
+ * range is part of the fetch identity, so the service never defaults it. Both
+ * listings also carry the shared paging window (`limit`/`cursor`), whose
+ * descriptions copy the seam's cap because this package takes no dependency on
+ * `@life/service-kit`: parity pins the number instead of importing it.
+ * `minutes`
  * arrives whole and unbounded here: the service owns the recorded 1–180 bound
  * (§9.13), and a second copy in this package would be a bound that can drift.
  */
@@ -23,7 +27,16 @@ export const resources: ResourceRegistry[] = [
     basePath: '/api/goal',
     ops: [
 
-      { kind: 'list', fields: {} },
+      {
+        kind: 'list',
+        fields: {
+          limit: { type: 'number', description: 'Page size, 1 to 200 goals' },
+          cursor: {
+            type: 'string',
+            description: 'Opaque cursor the previous page returned; passed back untouched',
+          },
+        },
+      },
 
     ],
   }),
@@ -50,6 +63,11 @@ export const resources: ResourceRegistry[] = [
         fields: {
           from: sessionDay('the range starts on, inclusive, `YYYY-MM-DD`'),
           to: sessionDay('the range ends on, inclusive, `YYYY-MM-DD`'),
+          limit: { type: 'number', description: 'Page size, 1 to 200 sessions' },
+          cursor: {
+            type: 'string',
+            description: 'Opaque cursor the previous page returned; passed back untouched',
+          },
         },
       },
 

@@ -101,20 +101,26 @@ describe('GoalsService', () => {
     await goals.setGoal(OWNER, { date: A_DAY, minutes: 30 });
     await goals.setGoal(OWNER, { date: A_DAY, minutes: 40 });
 
-    await expect(goals.findAll(OWNER)).resolves.toEqual([
-      { validFrom: EARLIER_DAY, minutes: 30 },
-      { validFrom: A_DAY, minutes: 40 },
-    ]);
+    await expect(goals.findAll(OWNER)).resolves.toEqual({
+      goals: [
+        { validFrom: EARLIER_DAY, minutes: 30 },
+        { validFrom: A_DAY, minutes: 40 },
+      ],
+      nextCursor: null,
+    });
   });
 
-  it('answers an empty list for an owner who never set a goal', async () => {
-    await expect(createService().findAll('fresh-owner')).resolves.toEqual([]);
+  it('answers an empty page for an owner who never set a goal', async () => {
+    await expect(createService().findAll('fresh-owner')).resolves.toEqual({
+      goals: [],
+      nextCursor: null,
+    });
   });
 
   it('keeps one owner’s goals out of another owner’s list', async () => {
     const goals = createService();
     await goals.setGoal(OWNER, { date: A_DAY, minutes: 40 });
 
-    await expect(goals.findAll('fresh-owner')).resolves.toEqual([]);
+    await expect(goals.findAll('fresh-owner')).resolves.toEqual({ goals: [], nextCursor: null });
   });
 });

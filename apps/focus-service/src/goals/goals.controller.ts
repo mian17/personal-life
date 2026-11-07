@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
+import { ListGoalsQuery } from './dto/list-goals.query';
 import { SetGoalDto } from './dto/set-goal.dto';
 import { GoalsService } from './goals.service';
 
@@ -20,9 +21,9 @@ export class GoalsController {
     return this.goals.setGoal(principal.sub, dto);
   }
 
-  /** Every goal row the owner has, oldest first; the app resolves day → goal. */
+  /** One page of the owner's goal history, oldest first; the app resolves day → goal. */
   @Get()
-  findAll(@Principal() principal: Principal) {
-    return this.goals.findAll(principal.sub);
+  findAll(@Principal() principal: Principal, @Query() query: ListGoalsQuery) {
+    return this.goals.findAll(principal.sub, query);
   }
 }
