@@ -24,6 +24,7 @@ import { revalidatePath } from 'next/cache';
 import { createFeedback, updateFeedbackStatus } from '@/lib/feedback-api';
 import { setFeedbackStatusAction, submitFeedbackAction } from '../app/feedback-actions';
 import { FeedbackInbox } from '../app/feedback-inbox';
+import { FeedbackInboxBody } from '../app/feedback-inbox-body';
 
 const mockedCreateFeedback = createFeedback as jest.MockedFunction<typeof createFeedback>;
 const mockedUpdateFeedbackStatus = updateFeedbackStatus as jest.MockedFunction<
@@ -42,6 +43,16 @@ const noopStatusAction = async (
 ): Promise<FeedbackSubmitResult> => ({ ok: true, id: _id });
 
 const STATUS_FAILURE = "Couldn't update status. Try again.";
+
+/** A page the row tests never request: they seed no cursor, so the control never renders. */
+const noopLoadPage = async () => ({ feedback: [], nextCursor: null });
+
+/**
+ * The hook slot the first row starts at: the body makes three `useState` calls
+ * (appended entries, cursor, failure) before any row renders, so a re-render of that
+ * row must start past them.
+ */
+const ROW_HOOK_BASE = 3;
 
 /** The settings path the inbox builds itself through `settingsHref('/feedback')`. */
 const SETTINGS_HREF = '/feedback/settings';
@@ -87,7 +98,9 @@ function filterChipLabels(html: string): string[] {
 
 /**
  * The inbox render under a preset `status` — the same validated prop the server
- * page hands down after reading `?status=` (`render(entries)` is All).
+ * page hands down after reading `?status=` (`render(entries)` is All). The entries
+ * are page 1 and no cursor is passed, so the body renders the list and nothing to
+ * load: the paging cases below seed a cursor themselves.
  */
 function render(entries: FeedbackDto[], status?: FeedbackDto['status']): string {
   return renderToStaticMarkup(
@@ -236,6 +249,52 @@ describe('FeedbackInbox grouping', () => {
 
     expect(html).not.toContain('Send feedback');
   });
+});
+
+describe('FeedbackInbox paging', () => {
+  /** The inbox with a cursor, i.e. the service reported another page. */
+  function renderWithCursor(entries: FeedbackDto[], nextCursor: string | null): string {
+    return renderToStaticMarkup(
+      <FeedbackInbox
+        entries={entries}
+        nextCursor={nextCursor}
+        submitFeedbackAction={noopAction}
+        setFeedbackStatusAction={noopStatusAction}
+      />,
+    );
+  }
+
+  it('server-renders page 1 unchanged', () => {
+    const html = renderWithCursor(ENTRIES, 'cursor-2');
+
+    // The same rows, groups and counts page 1 always produced: the control is additive.
+    expect(rowTitles(html)).toEqual([
+      'notes feat title',
+      'notes bug title',
+      'todos feat title',
+      'todos bug title',
+      'fb feat title',
+      'fb feat old title',
+    ]);
+    expect(headings(html, 'h2')).toEqual(['Notes', 'Todos', 'Feedback']);
+  });
+
+  it('offers one load-more control while a next cursor exists', () => {
+    const html = renderWithCursor(ENTRIES, 'cursor-2');
+
+    expect(html.match(/>Load more</g)).toHaveLength(1);
+    // A real `Button` primitive: the focusable atom, not a div with a click handler.
+    expect(html).toContain('ui-btn--ghost');
+  });
+
+  it('renders no load-more control once the list is exhausted', () => {
+    const html = renderWithCursor(ENTRIES, null);
+
+    expect(html).not.toContain('Load more');
+    // An intentionally cursor-less inbox (the default) is the same exhausted state.
+    expect(render(ENTRIES)).not.toContain('Load more');
+  });
+
 });
 
 describe('FeedbackInbox rows', () => {
@@ -515,17 +574,19 @@ describe('FeedbackInbox filtering', () => {
       calls.push({ id, status });
       return { ok: true, id };
     };
-    const { mockRestore, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy([]);
     try {
-      const el = FeedbackInbox({
+      // The rows live in the body's tree now, so the island is called directly: the
+      // hook slots below stand in for the three `useState` calls it makes.
+      const el = FeedbackInboxBody({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'wire me', description: 'w', status: 'open' })],
-        submitFeedbackAction: noopAction,
+        nextCursor: null,
+        loadPage: noopLoadPage,
         setFeedbackStatusAction: wiredAction,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      setIndex(0);
       const selects = findSelects(rows[0]!.render(rows[0]!.props));
       expect(selects).toHaveLength(1);
       expect(selects[0]?.value).toBe('open');
@@ -547,17 +608,17 @@ describe('FeedbackInbox filtering', () => {
   it('renders the seam failure message in the row when a write fails.', async () => {
     const action = jest
       .fn(async (): Promise<FeedbackSubmitResult> => ({ ok: false, message: STATUS_FAILURE }));
-    const { mockRestore, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy([]);
     try {
-      const el = FeedbackInbox({
+      const el = FeedbackInboxBody({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'fail me', description: 'w', status: 'open' })],
-        submitFeedbackAction: noopAction,
+        nextCursor: null,
+        loadPage: noopLoadPage,
         setFeedbackStatusAction: action,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      setIndex(0);
       const first = rows[0]!.render(rows[0]!.props);
       findSelects(first)[0]!.onChange({ target: { value: 'done' } });
       await flushMicrotasks();
@@ -565,7 +626,7 @@ describe('FeedbackInbox filtering', () => {
       // Re-render the same row off the settled slots: the failure message the
       // seam documents is now rendered, and the dropdown falls back to the
       // server's status (the pill's value) instead of diverging from it.
-      const second = renderRow(rows[0]!, 0, { setIndex });
+      const second = renderRow(rows[0]!, ROW_HOOK_BASE, { setIndex });
       expect(collectBannerTexts(second)).toContain(STATUS_FAILURE);
       expect(findSelects(second)[0]!.value).toBe('open');
     } finally {
