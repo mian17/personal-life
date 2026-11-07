@@ -217,6 +217,16 @@ export interface FeedbackDto {
   createdAt: string;
 }
 
+/**
+ * One cursor page of an owner's feedback (`SPEC-pagination-seam` §4), shaped like
+ * `NotePage`/`TodoPage`. The envelope key is `feedback`, the mass noun: the entity
+ * has no plural, so `feedbacks` would not be English.
+ */
+export interface FeedbackPage {
+  feedback: FeedbackDto[];
+  nextCursor: string | null;
+}
+
 export interface CreateFeedbackInput {
   id: string;
   app: FeedbackApp;

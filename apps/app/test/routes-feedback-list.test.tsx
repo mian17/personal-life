@@ -1,20 +1,20 @@
 import type { FeedbackDto } from '@life/shared';
 
 // The `/feedback` page is a thin server shell over two seams (the
-// `routes-todos-trash.test.tsx` pattern): it fetches the list, then hands a
-// validated status down. The filter behaviour itself lives in the inbox suite.
-jest.mock('@/lib/feedback-api', () => ({
-  listFeedback: jest.fn(),
-}));
+// `routes-todos-trash.test.tsx` pattern): it fetches the whole owner list, then hands
+// a validated status down. The wire layer is what gets mocked, so the real
+// `listFeedback` cursor walk runs and a page boundary is exercised rather than
+// assumed. The filter behaviour itself lives in the inbox suite.
+jest.mock('@/lib/client', () => ({ callService: jest.fn() }));
 jest.mock('@/app/feedback-actions', () => ({
   submitFeedbackAction: jest.fn(),
   setFeedbackStatusAction: jest.fn(),
 }));
 
-import { listFeedback } from '@/lib/feedback-api';
+import { callService } from '@/lib/client';
 import FeedbackPage from '@/app/feedback/page';
 
-const mockedListFeedback = listFeedback as jest.MockedFunction<typeof listFeedback>;
+const mockCallService = callService as unknown as jest.Mock;
 
 function entry(id: string): FeedbackDto {
   return {
@@ -30,11 +30,16 @@ function entry(id: string): FeedbackDto {
   };
 }
 
+/** One page of the `{ feedback, nextCursor }` envelope the service returns. */
+function page(feedback: FeedbackDto[], nextCursor: string | null = null) {
+  return { feedback, nextCursor };
+}
+
 /** The page's only contract: a validated status plus the full list, untouched. */
 describe('/feedback page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListFeedback.mockResolvedValue([entry('a'), entry('b')]);
+    mockCallService.mockResolvedValue(page([entry('a'), entry('b')]));
   });
 
   it('reads an absent status as All (undefined) and passes the full list down', async () => {
@@ -48,6 +53,18 @@ describe('/feedback page wiring', () => {
     const el = await FeedbackPage({ searchParams: Promise.resolve({ status: 'done' }) });
 
     expect(el.props.status).toBe('done');
+  });
+
+  it('follows the cursor so the inbox still receives the whole owner list', async () => {
+    mockCallService
+      .mockResolvedValueOnce(page([entry('a')], 'page-2'))
+      .mockResolvedValueOnce(page([entry('b')]));
+
+    const el = await FeedbackPage({ searchParams: Promise.resolve({}) });
+
+    expect(el.props.entries.map((e: FeedbackDto) => e.id)).toEqual(['a', 'b']);
+    const paths = mockCallService.mock.calls.map((call) => call[1] as string);
+    expect(paths).toEqual(['/api/feedback', '/api/feedback?cursor=page-2']);
   });
 
   it('reads an unknown status as All, so a hand-typed URL never hides everything', async () => {

@@ -17,6 +17,7 @@
  */
 import type { ServiceModule } from '../cli/run';
 import { defineResource } from '../core/registry';
+import type { FieldSpec } from '../core/types';
 
 /**
  * The status vocabulary `@life/shared` owns (`FEEDBACK_STATUS_VALUES`), written in
@@ -30,12 +31,28 @@ const FEEDBACK_APPS = ['notes', 'todos', 'meals', 'pomodoro', 'feedback'] as con
 /** The kinds of report a submission may carry, in `FEEDBACK_TYPE_VALUES` order. */
 const FEEDBACK_TYPE_VALUES = ['feature_request', 'enhancement', 'bug_report'] as const;
 
+/**
+ * One page of a feedback listing: how many, and where the page starts
+ * (`pageWindow()` in `todo.ts`). The numbers are copied rather than imported —
+ * `@life/ops` declares no dependency on `@life/service-kit` — and
+ * `feedback-parity.test.ts` pins them against the service's own cap.
+ */
+function pageWindow(): Record<string, FieldSpec> {
+  return {
+    limit: { type: 'number', description: 'Page size, 1 to 200 entries' },
+    cursor: {
+      type: 'string',
+      description: 'Opaque cursor the previous page returned; passed back untouched',
+    },
+  };
+}
+
 export const service: ServiceModule = {
   registry: defineResource({
     name: 'feedback',
     basePath: '/api/feedback',
     ops: [
-      { kind: 'list', fields: {} },
+      { kind: 'list', fields: pageWindow() },
 
       {
         kind: 'create',

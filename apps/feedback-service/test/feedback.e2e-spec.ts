@@ -1,5 +1,5 @@
 import { ENC_PREFIX } from '@life/crypto';
-import type { FeedbackDto } from '@life/shared';
+import type { FeedbackPage } from '@life/shared';
 import {
   FakeRedisClient,
   JwtHarness,
@@ -161,7 +161,7 @@ describeDb('Feedback API (e2e)', () => {
       expect(overLength.status).toBe(400);
     });
 
-    it('GET returns a bare owner-scoped array (no envelope), newest-first', async () => {
+    it('GET returns the owner-scoped page envelope, newest-first', async () => {
       const mine = [feedbackId(), feedbackId()];
       await post(app, token, validBody(mine[0], 'list a')).expect(201);
       await sleep(5);
@@ -169,19 +169,25 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, otherToken, validBody(feedbackId(), 'not mine')).expect(201);
 
       const mineRes = await get(app, token).expect(200);
-      expect(Array.isArray(mineRes.body)).toBe(true);
-      const ids = (mineRes.body as FeedbackDto[]).map((entry) => entry.id);
+      // `{ feedback, nextCursor }` — the envelope key is the mass noun, and the
+      // bare array this route used to answer with is gone.
+      expect(Object.keys(mineRes.body).sort()).toEqual(['feedback', 'nextCursor']);
+      const list = (mineRes.body as FeedbackPage).feedback;
+      expect(Array.isArray(list)).toBe(true);
+      expect((mineRes.body as FeedbackPage).nextCursor).toBeNull();
+      const ids = list.map((entry) => entry.id);
       for (const id of mine) expect(ids).toContain(id);
-      const theirs = (mineRes.body as FeedbackDto[]).map((entry) => entry.description);
+      const theirs = list.map((entry) => entry.description);
       expect(theirs).not.toContain('not mine');
 
       const otherRes = await get(app, otherToken).expect(200);
-      expect((otherRes.body as FeedbackDto[]).map((entry) => entry.id)).not.toContain(mine[0]);
+      expect((otherRes.body as FeedbackPage).feedback.map((entry) => entry.id)).not.toContain(
+        mine[0],
+      );
 
       // Newest-first (`createdAt DESC, id DESC`) across the two known ids. The
       // contract's order, not insertion order: the two rows can share a
       // createdAt, in which case the id DESC tie-break decides.
-      const list = mineRes.body as FeedbackDto[];
       const known = list.filter((entry) => mine.includes(entry.id));
       expect(known).toHaveLength(2);
       for (const entry of known) expect(entry.status).toBe('open');
@@ -199,6 +205,46 @@ describeDb('Feedback API (e2e)', () => {
         first.createdAt > second.createdAt ||
           (first.createdAt === second.createdAt && first.id > second.id),
       ).toBe(true);
+    });
+
+    it('pages the list without a gap or a duplicate across a cursor boundary', async () => {
+      // Five fresh rows, each with its own `createdAt`, so the boundaries this
+      // walk crosses are timestamp ones (the `id` tie-break has its own order test
+      // in `pagination.test.ts` and needs no second proof here).
+      const created: string[] = [];
+      for (let index = 0; index < 5; index += 1) {
+        const id = feedbackId();
+        await post(app, token, validBody(id, `page entry ${index}`)).expect(201);
+        created.push(id);
+        await sleep(5);
+      }
+
+      // The unpaged order, from one capped read, is what the pages must reassemble.
+      const whole = await get(app, token).query({ limit: 200 }).expect(200);
+      const wholeIds = (whole.body as FeedbackPage).feedback.map((entry) => entry.id);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor === null ? { limit: 2 } : { limit: 2, cursor };
+        const res = await get(app, token).query(query).expect(200);
+        const page = res.body as FeedbackPage;
+        expect(Object.keys(res.body).sort()).toEqual(['feedback', 'nextCursor']);
+        expect(page.feedback.length).toBeLessThanOrEqual(2);
+        seen.push(...page.feedback.map((entry) => entry.id));
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 20);
+
+      // The walk ended because the service said so, not because the guard tripped.
+      expect(cursor).toBeNull();
+      expect(pages).toBeGreaterThan(1);
+      // No gap and no duplicate: every row appears exactly once, and a page is only
+      // ever the next slice of one stable order.
+      expect(new Set(seen).size).toBe(wholeIds.length);
+      expect(seen).toEqual(wholeIds);
+      for (const id of created) expect(seen).toContain(id);
     });
   });
 
@@ -256,7 +302,7 @@ describeDb('Feedback API (e2e)', () => {
       await patchFeedbackStatus(app, token, id, { status: 'in_progress' }).expect(200);
 
       const listed = await get(app, token).expect(200);
-      const entry = (listed.body as FeedbackDto[]).find((row) => row.id === id);
+      const entry = (listed.body as FeedbackPage).feedback.find((row) => row.id === id);
       expect(entry?.status).toBe('in_progress');
     });
 
@@ -339,7 +385,7 @@ describeDb('Feedback API (e2e)', () => {
 
       // Decrypts in the request path only — plaintext never exists beyond it.
       const listed = await get(app, token).expect(200);
-      const entry = (listed.body as FeedbackDto[]).find((row) => row.id === id);
+      const entry = (listed.body as FeedbackPage).feedback.find((row) => row.id === id);
       expect(entry?.title).toBe(TITLE);
       expect(entry?.description).toBe(PLAINTEXT);
 
@@ -423,7 +469,7 @@ describeDb('Feedback API (e2e)', () => {
       // re-queries the DB and repopulates under generation 1.
       const afterWrite = await get(app, token).expect(200);
       expect(redis.setCalls).toContain(listKey(1));
-      expect((afterWrite.body as FeedbackDto[]).some((entry) => entry.id === id)).toBe(true);
+      expect((afterWrite.body as FeedbackPage).feedback.some((entry) => entry.id === id)).toBe(true);
 
       // An identical read is a hit: no second populate, no second DB loader run.
       const setsSoFar = redis.setCalls.filter((key) => key === listKey(1)).length;
@@ -440,6 +486,40 @@ describeDb('Feedback API (e2e)', () => {
         (row) => row.status,
       );
       expect(cachedStatuses).toEqual(['open']);
+    });
+
+    it('serves every page of a paged read from the one unpaged cache entry', async () => {
+      const OWNER_PAGED = 'owner-cache-paged';
+      const pagedToken = await jwt.sign(OWNER_PAGED);
+      await post(app, pagedToken, validBody(feedbackId(), 'paged alpha')).expect(201);
+      await sleep(5);
+      await post(app, pagedToken, validBody(feedbackId(), 'paged beta')).expect(201);
+
+      const setsForOwner = (): number =>
+        redis.setCalls.filter((key) => key.startsWith(`feedback:${OWNER_PAGED}:`)).length;
+
+      // Page 1 populates the entry; page 2 is a hit on that same key, because
+      // `limit`/`cursor` are projections after the hit and never a fetch identity.
+      const first = await get(app, pagedToken).query({ limit: 1 }).expect(200);
+      const populated = setsForOwner();
+      expect(populated).toBe(1);
+      const cursor = (first.body as FeedbackPage).nextCursor;
+      expect(cursor).not.toBeNull();
+
+      const second = await get(app, pagedToken).query({ limit: 1, cursor }).expect(200);
+      expect(setsForOwner()).toBe(populated);
+      expect((second.body as FeedbackPage).nextCursor).toBeNull();
+
+      // Both pages came from one unpaged row set: together they are the whole list.
+      const both = [
+        ...(first.body as FeedbackPage).feedback,
+        ...(second.body as FeedbackPage).feedback,
+      ];
+      expect(both.map((entry) => entry.description)).toEqual(['paged beta', 'paged alpha']);
+      for (const key of redis.setCalls) {
+        expect(key).not.toContain('limit');
+        expect(key).not.toContain('cursor');
+      }
     });
   });
 
@@ -461,7 +541,7 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, token, validBody(id, 'survives a broken cache')).expect(201);
 
       const listed = await get(app, token).expect(200);
-      expect((listed.body as FeedbackDto[]).find((entry) => entry.id === id)?.description).toBe(
+      expect((listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description).toBe(
         'survives a broken cache',
       );
       await get(app, token).expect(200);
@@ -488,7 +568,7 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, token, validBody(id, 'direct from the database')).expect(201);
 
       const listed = await get(app, token).expect(200);
-      expect((listed.body as FeedbackDto[]).find((entry) => entry.id === id)?.description).toBe(
+      expect((listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description).toBe(
         'direct from the database',
       );
 
