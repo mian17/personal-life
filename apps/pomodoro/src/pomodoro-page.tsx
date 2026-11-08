@@ -124,9 +124,13 @@ export function PomodoroPage({
   const timer = useTimer(chosen);
   const canReset = resetAllowed(timer.status);
   const finishedBlocks = completedFocuses(timer.phase, timer.status, timer.session);
-  const breakPhase = breakPhaseAt(timer.status, timer.nextPhase);
-  const breakMinutes = breakPhase === 'short' ? shortMinutes : longMinutes;
-  const focusPresetsHidden = hidesFocusPresets(timer.status);
+  const presets = presetsFor(timer.status, timer.nextPhase);
+  // The digits are a read-out of the length that will run next, not a second timer: at a
+  // boundary the phase in hand is spent (`00:00`), while the phase Start will begin is the
+  // one the row beside it is sizing. A phase in hand keeps its own remaining time, so a pick
+  // can never move a fixed deadline — that stays `applyDurations`' rule, not a display one.
+  const previewMs =
+    timer.status === 'boundary' ? chosen[timer.nextPhase] * MINUTE_MS : timer.remainingMs;
 
   useFocusRecorded(
     {
@@ -143,6 +147,11 @@ export function PomodoroPage({
     onFocusLengthChange?.(minutes);
   }
 
+  /** The chosen length of one of the two breaks: two lengths, never one shared value. */
+  function breakMinutes(phase: BreakPhase): number {
+    return phase === 'short' ? shortMinutes : longMinutes;
+  }
+
   function pickBreakLength(phase: BreakPhase, minutes: number): void {
     if (phase === 'short') setShortMinutes(minutes);
     else setLongMinutes(minutes);
@@ -154,7 +163,7 @@ export function PomodoroPage({
       <Card>
         <Stack>
           <StatusText className={phaseStyles}>{PHASE_LABELS[timer.phase]}</StatusText>
-          <Countdown remainingMs={timer.remainingMs} />
+          <Countdown remainingMs={previewMs} />
           {/* The waiting-state line stays mounted and merely loses its paint: unmounting
               it shrinks the card, and every row below it would step up by its height. The
               action row needs none of that: every status puts a button in the same slot. */}
@@ -165,41 +174,39 @@ export function PomodoroPage({
             value={percentSpent(timer.remainingMs, timer.phase, chosen)}
             label="Session progress"
           />
-          {/* The row is hidden, never unmounted: `visibility: hidden` keeps the box so the
-              rows below it do not step up when a phase starts (the `StatusText` rule). */}
-          <Row
-            className={cx(presetsStyles, focusPresetsHidden && 'ui-invisible invisible')}
-            role="group"
-            aria-label="Focus length"
-          >
-            {FOCUS_PRESETS.map((minutes) => (
-              <Pill
-                key={minutes}
-                as="button"
-                size="filter"
-                active={minutes === focusMinutes}
-                onClick={() => pickFocusLength(minutes)}
-                disabled={onFocusLengthChange == null}
-              >
-                {`${minutes} min`}
-              </Pill>
-            ))}
-          </Row>
-          {/* Boundary-only, and only a boundary that leads to a break: a break is chosen just
-              before it starts, and `start()` sizes the phase from the durations in hand at that
-              press, so a pick made here lands on the break the button offers. Every other
-              moment draws nothing at all — no wrapper, no reserved row — because a length
-              chosen mid-phase could not be honoured and a row of dead chips is a lie. */}
-          {breakPhase != null && (
+          {/* ONE length row, and `presetsFor` is the only thing that decides which: a second
+              row cannot exist by construction. A phase in flight keeps the row's box while it
+              loses its paint (`visibility: hidden`), so the rows below it do not step up when
+              it starts (the `StatusText` rule); the focus row is the one that stays there. */}
+          {presets.kind === 'break' ? (
             <Row className={presetsStyles} role="group" aria-label="Break length">
-              {BREAK_PRESETS[breakPhase].map((minutes) => (
+              {BREAK_PRESETS[presets.phase].map((minutes) => (
                 <Pill
                   key={minutes}
                   as="button"
                   size="filter"
-                  active={minutes === breakMinutes}
-                  onClick={() => pickBreakLength(breakPhase, minutes)}
+                  active={minutes === breakMinutes(presets.phase)}
+                  onClick={() => pickBreakLength(presets.phase, minutes)}
                   disabled={onBreakLengthChange == null}
+                >
+                  {`${minutes} min`}
+                </Pill>
+              ))}
+            </Row>
+          ) : (
+            <Row
+              className={cx(presetsStyles, presets.hidden && 'ui-invisible invisible')}
+              role="group"
+              aria-label="Focus length"
+            >
+              {FOCUS_PRESETS.map((minutes) => (
+                <Pill
+                  key={minutes}
+                  as="button"
+                  size="filter"
+                  active={minutes === focusMinutes}
+                  onClick={() => pickFocusLength(minutes)}
+                  disabled={onFocusLengthChange == null}
                 >
                   {`${minutes} min`}
                 </Pill>
@@ -266,25 +273,23 @@ function percentSpent(remainingMs: number, phase: Phase, durations: Durations): 
   return ((phaseMs - remainingMs) / phaseMs) * 100;
 }
 
-/**
- * Whether the focus-length chips are out of the way. They are configuration — how long a
- * phase *will* run — and never a measure of the one in flight, so a phase counting down
- * (`running`) or frozen mid-count (`paused`) hides them: the card would otherwise read as
- * if the lengths were part of the session. A phase that has not begun (`idle`) and one
- * that just ended (`boundary`) are the two moments the owner retunes, so there they show.
- */
-function hidesFocusPresets(status: Status): boolean {
-  return status === 'running' || status === 'paused';
-}
+/** The one length row the card draws. `hidden` keeps the row's box while the paint goes. */
+type PresetRow =
+  | { kind: 'focus'; hidden: boolean }
+  | { kind: 'break'; phase: BreakPhase };
 
 /**
- * The break a boundary is about to begin, or `null` whenever no break is imminent: a phase
- * counting down, a paused one, and the untouched start all answer `null`. A break boundary
- * answers `null` too — the phase it ended is a break, and what follows is another focus.
+ * The row the card draws, decided in one place: a length is configuration for the phase that
+ * will run, so the row is named by what is about to start and nothing else can draw a second
+ * one. A phase in flight has nothing to size, so the focus row stays there invisible — the
+ * same row as the idle start, which keeps the box and the identity consistent. A boundary
+ * leading to a break offers the break's lengths; a boundary after a break leads to a focus,
+ * so it is back to the focus row.
  */
-function breakPhaseAt(status: Status, nextPhase: Phase): BreakPhase | null {
-  if (status !== 'boundary' || nextPhase === 'focus') return null;
-  return nextPhase;
+function presetsFor(status: Status, nextPhase: Phase): PresetRow {
+  if (status === 'running' || status === 'paused') return { kind: 'focus', hidden: true };
+  if (status === 'boundary' && nextPhase !== 'focus') return { kind: 'break', phase: nextPhase };
+  return { kind: 'focus', hidden: false };
 }
 
 /**

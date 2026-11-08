@@ -3,10 +3,10 @@ import { logIn } from './journey';
 
 /**
  * The pomodoro timer's phase boundary, driven the way its owner meets it
- * (`SPEC-pomodoro-flow` Testing Strategy): a focus phase runs out, the card holds
- * `00:00` and names the next phase, one beep sounds, the tab title flashes, and
- * nothing advances until the focused button is pressed. A reload keeps the time
- * that is left, and the durations saved on `/pomodoro/settings` size the phases.
+ * (`SPEC-pomodoro-flow` Testing Strategy): a focus phase runs out, the card previews the
+ * length of the phase Start will begin and names it, one beep sounds, the tab title
+ * flashes, and nothing advances until the focused button is pressed. A reload keeps the
+ * time that is left, and the durations saved on `/pomodoro/settings` size the phases.
  *
  * Time is Playwright's fake clock, installed before the first navigation and
  * paused once the page is interactive, so a 25-minute phase costs no real wait.
@@ -68,13 +68,13 @@ test.describe('pomodoro timer', () => {
     // The whole focus phase, in fake time.
     await page.clock.runFor(FOCUS_MINUTES * MINUTE_MS);
 
-    await expectBoundary(page, 'Short break');
+    await expectBoundary(page, 'Short break', SHORT_BREAK_MINUTES);
     await expectStartedOscillators(page, 1);
     await expectTitleFlashing(page, 'Next: Short break');
 
     // Nothing counts once the phase is over: five more fake minutes leave the card as it was.
     await page.clock.runFor(SHORT_BREAK_MINUTES * MINUTE_MS);
-    await expectBoundary(page, 'Short break');
+    await expectBoundary(page, 'Short break', SHORT_BREAK_MINUTES);
     await expectStartedOscillators(page, 1);
 
     // A finished focus is progress, so the reset is live here even though the break
@@ -122,18 +122,18 @@ test.describe('pomodoro timer', () => {
     // The timer is not on screen, so nothing observes the focus deadline passing.
     await page.clock.runFor(FOCUS_MINUTES * MINUTE_MS);
     await visitPomodoro(page);
-    await expectBoundary(page, 'Short break');
+    await expectBoundary(page, 'Short break', CHOSEN_MINUTES.short);
 
     // A deadline that passed while the page was gone lands on the boundary card,
     // and the card stays there: another fake minute moves nothing.
     await page.clock.runFor(MINUTE_MS);
-    await expectBoundary(page, 'Short break');
+    await expectBoundary(page, 'Short break', CHOSEN_MINUTES.short);
 
     // The saved lengths size the phases the boundary button starts.
     await startButton(page, 'Short break').click();
     await expectCountdownSeconds(page, minutesToSeconds(CHOSEN_MINUTES.short));
     await page.clock.runFor(CHOSEN_MINUTES.short * MINUTE_MS);
-    await expectBoundary(page, 'Focus');
+    await expectBoundary(page, 'Focus', CHOSEN_MINUTES.focus);
 
     await startButton(page, 'Focus').click();
     await expectCountdownSeconds(page, minutesToSeconds(CHOSEN_MINUTES.focus));
@@ -294,9 +294,17 @@ function resetButton(page: Page): Locator {
   return page.getByRole('button', { name: 'Reset', exact: true });
 }
 
-/** A phase that ran out: `00:00` held, the next phase named, its start button focused. */
-async function expectBoundary(page: Page, nextPhase: TimerPhase): Promise<void> {
-  await expectCountdownSeconds(page, 0);
+/**
+ * A phase that ran out: the digits preview the length the next phase will run, that phase is
+ * named, and its start button holds focus. The length is the one Start will give the phase, so
+ * it is the caller's to pass: the card's own chips and the saved durations both decide it.
+ */
+async function expectBoundary(
+  page: Page,
+  nextPhase: TimerPhase,
+  nextMinutes: number,
+): Promise<void> {
+  await expectCountdownSeconds(page, minutesToSeconds(nextMinutes));
   await expect(page.getByText(`Next: ${nextPhase}`, { exact: true })).toBeVisible();
   await expect(startButton(page, nextPhase)).toBeFocused();
 }
