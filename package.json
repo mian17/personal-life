@@ -40,6 +40,7 @@
     "test:dev-infra": "node --test scripts/dev-infra.test.mjs",
     "test:e2e": "npm run test:e2e:prod-build -w apps/app && npm run test:e2e:dev-server -w apps/app",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "format:check": "prettier --check .",
     "lint": "npm run lint --workspaces --if-present",
     "db:backup": "npm run db:backup -w @life/db --",
     "db:restore": "npm run db:restore -w @life/db --",
@@ -47,6 +48,7 @@
     "db:restore:pg": "npm run db:restore:pg -w @life/db --"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "prettier": "^3.9.10"
   }
 }

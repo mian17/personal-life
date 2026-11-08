@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+dist/
+.next/
+coverage/
+.coverage/
+test-results/
+
+# Generated, not authored
+package-lock.json
+
+# Run scratch (docs/ holds design-system HTML mockups too, not shipped source)
+docs/**
+tasks/
+.pi/
+.unipi/
+
+# Binary assets
+pictures/**

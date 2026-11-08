@@ -5,7 +5,11 @@ name: Tests
 
 on:
   pull_request:
-    branches: [dev]
+    # Both lines are listed because a `dev -> main` promotion is a real PR carrying
+    # the same diff to the release line: listing only `dev` leaves that one PR — the
+    # only one that reaches production — running zero checks. Verifying it here is
+    # what makes the release line as tested as the integration line.
+    branches: [dev, main]
   # Manual run for reproducing a failure without pushing a commit.
   workflow_dispatch:
 
@@ -57,6 +61,14 @@ jobs:
       # `dist/`, so every suite importing another workspace fails with TS2307.
       - name: Build workspaces
         run: npm run build
+
+      # Typecheck sits here on purpose, on both sides. After `Build workspaces`
+      # because `@life/*` types only exist once `dist/` is built — run on a fresh
+      # clone it fails with TS2307, not with a real type error. Before the test
+      # suite because a type error should fail in seconds, not after a full
+      # coverage run.
+      - name: Typecheck
+        run: npm run typecheck
 
       # Suites that boot a sqlite service need a writable data directory, and
       # those directories are gitignored, so a fresh checkout has none.
