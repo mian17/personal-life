@@ -31,7 +31,7 @@ services publish nothing.
 
 Packages, all `workspaces` in the root `package.json`:
 
-- Frontend: `packages/ui` (the visual language — 70 components plus
+- Frontend: `packages/ui` (the visual language — 68 components plus
   `packages/ui/src/styles/tokens.css`), `packages/app-kit` (Next helpers: route layout, query
   suffix, preferences, pending actions), `apps/pomodoro` (focus-screen React components, no port).
 - Contracts and kernel: `packages/shared` (DTOs), `packages/crypto` (`enc.v1.` envelopes, `kw.v1.`
@@ -128,7 +128,7 @@ namespace, none forks the mechanics.
 
 ## The UI contract
 
-Every app renders from `@life/ui`. `packages/ui/src/components` holds 70 files; the package root
+Every app renders from `@life/ui`. `packages/ui/src/components` holds 70 files (68 components plus two shared style modules); the package root
 exports them from `packages/ui/src/index.ts`, and `packages/ui/src/styles.css` (which pulls in
 `base.css`, `theme.css`, `tokens.css`) is imported exactly once, in `apps/app/app/layout.tsx`.
 
