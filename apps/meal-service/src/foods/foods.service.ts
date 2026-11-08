@@ -14,6 +14,7 @@ import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
+import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
 import {
   completeVector,
   foodNameAad,
@@ -475,7 +476,7 @@ export class FoodsService {
 
   /** `DELETE /api/foods/:id` — soft delete; the row stays readable by id only. */
   async remove(sub: string, id: string): Promise<void> {
-    await this.softDeleteOne(this.foods.manager, sub, id);
+    await softDeleteOne(this.trashable, this.foods.manager, sub, id);
     await this.cache.bump(sub);
   }
 
@@ -484,36 +485,24 @@ export class FoodsService {
    * the singular route's soft-delete meaning. A foreign id is a 404 and rolls
    * the whole batch back.
    */
-  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
-    const deleted = await runAtomicBatch({
+  removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    return softDeleteBatch(this.trashable, {
       items,
       sub,
       dataSource: this.writeDataSource,
       cache: this.requireMealCache(),
-      runItem: async (item, manager) => {
-        await this.softDeleteOne(manager, sub, item.id);
-        return item.id;
-      },
     });
-    return { deleted };
   }
 
   /**
-   * One food's move out of the active list, through the manager the caller
-   * supplies, and with no bump. Soft by definition, mirroring the singular
-   * delete: the row keeps naming past entries and saved-meal items.
+   * What the shared soft delete needs to know about a food, stated once for both
+   * the singular and the batch path: where a food lives, and what a missing one
+   * is called.
    */
-  private async softDeleteOne(
-    manager: EntityManager | undefined,
-    sub: string,
-    id: string,
-  ): Promise<void> {
-    const foods = this.foodsFor(manager);
-    const food = await foods.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!food) throw new NotFoundException('Food not found');
-    food.deletedAt = new Date();
-    await foods.save(food);
-  }
+  private readonly trashable: SoftDeleteTarget<Food> = {
+    repositoryFor: (manager) => this.foodsFor(manager),
+    notFound: 'Food not found',
+  };
 
   /**
    * The food repository a write runs against. A manager means "inside this
