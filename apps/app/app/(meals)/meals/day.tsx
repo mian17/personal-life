@@ -10,7 +10,8 @@ import {
   Section,
   Stack,
 } from '@life/ui';
-import { DayEntriesScroll, GROUPS, type DayEntriesPage, type DayEntryRow, type MealGroupSummary } from './day-entries-scroll';
+import { DayEntriesScroll, type DayEntriesPage, type DayEntryRow, type MealGroupSummary } from './day-entries-scroll';
+import { GROUPS } from './meal-groups';
 import { MealDoors } from './meal-doors';
 import { MealsNav } from '../../meals-nav';
 import { ApiError } from '@/lib/api-error';

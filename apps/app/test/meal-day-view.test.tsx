@@ -25,12 +25,12 @@ import {
 import { mealDay } from '@/app/(meals)/meals/day';
 import {
   DayEntriesScroll,
-  GROUPS,
   appendNextPage,
   groupedRows,
   type DayEntryRow,
   type DayEntriesPage,
 } from '@/app/(meals)/meals/day-entries-scroll';
+import { GROUPS } from '@/app/(meals)/meals/meal-groups';
 import MealDatePage from '@/app/(meals)/meals/[date]/page';
 
 const mockedCollectDayEntries = collectDayEntries as jest.MockedFunction<typeof collectDayEntries>;

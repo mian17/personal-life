@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { AlertBanner, EmptyState, List, ListItem, LoadMore, Pill, Section } from '@life/ui';
 import type { MealGroup } from '@/lib/meal-api';
+// A plain module, so the server day view receives the array itself rather than a client reference.
+import { GROUPS } from './meal-groups';
 
 /**
  * One day-view row as the server sends it: which meal it belongs to, the dish name already
@@ -41,14 +43,6 @@ export interface MealGroupSummary {
   /** The group's calorie subtotal, formatted; `null` when the whole day has no entry in it. */
   calories: string | null;
 }
-
-/** The four meal groups in display order (spec: day view). */
-export const GROUPS: { key: MealGroup; label: string }[] = [
-  { key: 'breakfast', label: 'Breakfast' },
-  { key: 'lunch', label: 'Lunch' },
-  { key: 'dinner', label: 'Dinner' },
-  { key: 'snack', label: 'Snacks' },
-];
 
 /**
  * A group with nothing logged keeps its heading, so the day always shows the four meals it is
