@@ -2,9 +2,19 @@
 'use client';
 
 import type { MouseEvent, ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button, type ButtonProps } from './button';
+
+/**
+ * How long a form submission may take to be reported before the latch lets go.
+ *
+ * `useFormStatus` only speaks on a render, so a submission React never reports at all — a
+ * click whose default another handler prevented, a form the browser refuses to validate —
+ * would hold the latch for good. Past this window the click that armed it is spent and the
+ * control re-arms unconditionally: a control that looks dead is the worse bug.
+ */
+const SUBMIT_START_GRACE_MS = 4000;
 
 /**
  * The confirm is the only way through: a dismissal fires neither the form
@@ -31,7 +41,24 @@ export interface PendingGate {
 }
 
 /**
- * The confirmed write: one intent, one write.
+ * The veto both confirmed paths share: a write already in flight, or a dismissed confirm,
+ * stops the click here. What it prevents is the click, never the form's own submit, so a
+ * refused second tap cannot start a second submission.
+ */
+function confirmAllows(event: Preventable, message: string, gate: PendingGate): boolean {
+  if (gate.isPending()) {
+    event.preventDefault();
+    return false;
+  }
+  if (!window.confirm(message)) {
+    event.preventDefault();
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The confirmed write for a consumer handler: one intent, one write.
  *
  * `disabled` alone is not a guard. It lands on the render after the click, so two taps in
  * the same frame both reach this function; the synchronous `isPending` check is what
@@ -46,14 +73,7 @@ export async function runConfirmed(
   onClick: ((event: never) => unknown) | undefined,
   gate: PendingGate,
 ): Promise<void> {
-  if (gate.isPending()) {
-    event.preventDefault();
-    return;
-  }
-  if (!window.confirm(message)) {
-    event.preventDefault();
-    return;
-  }
+  if (!confirmAllows(event, message, gate)) return;
   // No consumer handler: the default submit proceeds and React tracks its action.
   if (!onClick) return;
   gate.setPending(true);
@@ -67,9 +87,13 @@ export async function runConfirmed(
 /**
  * A destructive action that asks first and writes once.
  *
- * Two pending sources, because a form action is a promise React owns rather than one we
- * can await: a consumer `onClick` is guarded and awaited here, and a form action is
- * reported by `useFormStatus` (false anywhere the button is outside a form).
+ * One latch, armed from the click on both paths, because the click is the last moment a
+ * second tap can still be refused. A consumer `onClick` is awaited here, so `finally`
+ * releases the latch. A form action's promise belongs to React instead: `useFormStatus`
+ * reports it a render later, too late for a second tap in the same frame, so the click
+ * arms the latch itself and the release waits for that report — a start, then a settle.
+ * A start that never comes (a prevented click, a validation stop) releases the latch
+ * after `SUBMIT_START_GRACE_MS`.
  *
  * The guard is local rather than `usePendingAction` from `@life/app-kit`: that package
  * depends on `@life/ui`, so importing back would close a dependency cycle.
@@ -83,6 +107,8 @@ export function ConfirmButton({
 }: Readonly<ConfirmButtonProps>) {
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  const submissionReported = useRef(false);
+  const releaseTimer = useRef<number | undefined>(undefined);
   const { pending: submitting } = useFormStatus();
   const gate = useMemo<PendingGate>(
     () => ({
@@ -95,6 +121,35 @@ export function ConfirmButton({
     [],
   );
 
+  // The only release for a form action: open the latch once React has reported a
+  // submission start and then its settle.
+  useEffect(() => {
+    if (submitting) {
+      submissionReported.current = true;
+      window.clearTimeout(releaseTimer.current);
+      return;
+    }
+    if (!submissionReported.current) return;
+    submissionReported.current = false;
+    gate.setPending(false);
+  }, [submitting, gate]);
+
+  // A pending grace window belongs to this control; it must not outlive it.
+  useEffect(() => () => window.clearTimeout(releaseTimer.current), []);
+
+  function armSubmitLatch() {
+    gate.setPending(true);
+    releaseTimer.current = window.setTimeout(() => gate.setPending(false), SUBMIT_START_GRACE_MS);
+  }
+
+  function confirmThenSubmit(event: MouseEvent<HTMLButtonElement>) {
+    if (!confirmAllows(event, message, gate)) return;
+    // Outside a form there is no submission for `useFormStatus` to report, so arming
+    // would only leave the control looking dead; such a button submits nothing anyway.
+    if (!event.currentTarget.form) return;
+    armSubmitLatch();
+  }
+
   function confirmThenClick(event: MouseEvent<HTMLButtonElement>) {
     void runConfirmed(event, message, onClick as ((event: never) => unknown) | undefined, gate);
   }
@@ -102,7 +157,7 @@ export function ConfirmButton({
   return (
     <Button
       type="submit"
-      onClick={confirmThenClick}
+      onClick={onClick ? confirmThenClick : confirmThenSubmit}
       disabled={disabled || pending || submitting}
       {...rest}
     >

@@ -1,9 +1,23 @@
 import type { FormEvent } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConfirmButton } from '../src/components/confirm-button';
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
+}
+
+/**
+ * Resolves a submission the test itself controls, then lets React retire it.
+ *
+ * An action left in flight holds React's pending state open past the test that started it,
+ * and a later test's own settle is then never reported — the release test below would fail
+ * on the tests above it rather than on the code.
+ */
+async function settleSubmission(settlements: ReadonlyArray<() => void>): Promise<void> {
+  await act(async () => {
+    settlements.forEach((settle) => settle());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 describe('ConfirmButton', () => {
@@ -99,7 +113,8 @@ describe('ConfirmButton', () => {
   });
 
   it('is disabled while a form action of its own form is in flight', async () => {
-    const action = jest.fn(() => new Promise<void>(() => {}));
+    const settlements: Array<() => void> = [];
+    const action = jest.fn(() => new Promise<void>((resolve) => settlements.push(() => resolve())));
     jest.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(
@@ -115,6 +130,84 @@ describe('ConfirmButton', () => {
 
     expect(action).toHaveBeenCalledTimes(1);
     expect(button.hasAttribute('disabled')).toBe(true);
+
+    await settleSubmission(settlements);
+  });
+
+  it('submits a form action once when two taps land in the same frame', async () => {
+    const settlements: Array<() => void> = [];
+    const action = jest.fn(() => new Promise<void>((resolve) => settlements.push(() => resolve())));
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <form action={action}>
+        <ConfirmButton message="Delete?">Delete</ConfirmButton>
+      </form>,
+    );
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    // There is no onClick to await here, and `useFormStatus` reports the submission a
+    // render later — the click itself is the only thing that can shut this window.
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(button.hasAttribute('disabled')).toBe(true);
+
+    await settleSubmission(settlements);
+  });
+
+  it('releases the form latch once the submission settles, so a later delete still runs', async () => {
+    const settlements: Array<() => void> = [];
+    const action = jest.fn(() => new Promise<void>((resolve) => settlements.push(() => resolve())));
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <form action={action}>
+        <ConfirmButton message="Delete?">Delete</ConfirmButton>
+      </form>,
+    );
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    await act(async () => {
+      button.click();
+    });
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(button.hasAttribute('disabled')).toBe(true);
+
+    await act(async () => {
+      settlements[0]();
+    });
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+
+    await act(async () => {
+      button.click();
+    });
+    expect(action).toHaveBeenCalledTimes(2);
+
+    await settleSubmission(settlements);
+  });
+
+  it('a dismissed confirm arms nothing: no submit, no latch, the button stays live', () => {
+    const action = jest.fn(() => new Promise<void>(() => {}));
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(
+      <form action={action}>
+        <ConfirmButton message="Delete?">Delete</ConfirmButton>
+      </form>,
+    );
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(action).not.toHaveBeenCalled();
+    expect(button.hasAttribute('disabled')).toBe(false);
+    // A latch would have refused the second tap instead of asking again.
+    expect(window.confirm).toHaveBeenCalledTimes(2);
   });
 
   it('respects a caller-supplied disabled', () => {
