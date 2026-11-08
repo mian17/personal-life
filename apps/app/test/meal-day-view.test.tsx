@@ -252,7 +252,7 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toContain('Toast');
-    expect(html).toMatch(/ui-list-item__sub[^"]*">× 2</);
+    expect(html).toMatch(/ui-list-item__sub[^"]*"><span class="ui-list-item__meta[^"]*">× 2</);
     // The kcal is the reference's `.row__trail` neutral pill, read once.
     expect(html).toMatch(/ui-pill[^>]*>123 kcal</);
   });
@@ -267,7 +267,7 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toMatch(
-      /ui-list-item__title[^"]*">Chicken<\/span><span class="ui-list-item__sub[^"]*">× 2</,
+      /ui-list-item__title[^"]*">Chicken<\/span><span class="ui-list-item__sub[^"]*"><span class="ui-list-item__meta[^"]*">× 2</,
     );
     expect(html).toMatch(/ui-pill[^>]*>123 kcal</);
     expect(html).not.toContain(uuid);
@@ -302,7 +302,7 @@ describe('meals day view', () => {
     const html = renderToStaticMarkup(await mealDay('2026-10-03', 'No meals logged today.'));
 
     expect(html).toMatch(
-      /ui-list-item__title[^"]*">123 kcal<\/span><span class="ui-list-item__sub[^"]*">× 1</,
+      /ui-list-item__title[^"]*">123 kcal<\/span><span class="ui-list-item__sub[^"]*"><span class="ui-list-item__meta[^"]*">× 1</,
     );
     // The pill is skipped when the title already IS the figure, so the row never
     // reads the same kcal twice.

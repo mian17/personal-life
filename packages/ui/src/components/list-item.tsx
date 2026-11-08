@@ -255,6 +255,16 @@ const subStyles = cx(
   '[&>span:not(.line-clamp-2)]:whitespace-nowrap',
 );
 
+/**
+ * Text meta needs a box of its own. A meta *string* passed as a child of the line is an anonymous
+ * flex item, and the rules above are descendant selectors: they cannot name an anonymous box, so
+ * neither the nowrap nor the no-shrink reach it. A note row's `Today, 08:14 · garden` therefore
+ * shrank to its narrowest column and stacked a word per line beside the body it was squeezing.
+ * This box carries those same two rules, so a plain string reads exactly like the element meta
+ * next to it and the note body keeps one line.
+ */
+const metaStyles = 'shrink-0 whitespace-nowrap';
+
 const separatorStyles = 'shrink-0 text-ink-3';
 /** One line on a base row; two on a feedback row, whose description has no other surface. */
 const snippetStyles = 'min-w-0 truncate';
@@ -356,6 +366,16 @@ function titleNodeFor(
   );
 }
 
+/**
+ * The meta as the line can rule on it. Meta that is already an element keeps its own children as
+ * the line's items — a todo row's due date, repeat and list are spaced by the line's gap, and a
+ * box around them would run the three words together — so only text meta takes the box.
+ */
+function metaNodeFor(meta: ReactNode): ReactNode {
+  if (meta == null || isValidElement(meta)) return meta;
+  return <span className={cx('ui-list-item__meta', metaStyles)}>{meta}</span>;
+}
+
 function subNodeFor(
   { variant }: Readonly<RowFlags>,
   meta: ReactNode,
@@ -379,7 +399,7 @@ function subNodeFor(
      separator is needed. */
   return variant === 'feedback' ? (
     <>
-      <span className={cx('ui-list-item__sub', subStyles)}>{meta}</span>
+      <span className={cx('ui-list-item__sub', subStyles)}>{metaNodeFor(meta)}</span>
       {snippetNode && (
         <span className={cx('ui-list-item__sub', subStyles, feedbackDescriptionStyles)}>
           {snippetNode}
@@ -388,7 +408,7 @@ function subNodeFor(
     </>
   ) : (
     <span className={cx('ui-list-item__sub', subStyles)}>
-      {meta}
+      {metaNodeFor(meta)}
       {snippetNode && (
         <>
           <span className={cx('ui-list-item__sep', separatorStyles)}>|</span>
