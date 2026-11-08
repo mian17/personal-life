@@ -13,7 +13,7 @@
     "test:e2e:dev-server": "playwright test --config playwright.dev.config.ts",
     "screens": "node test/screens/capture.mjs && node test/screens/gallery.mjs",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json --noEmit"
   },
   "dependencies": {
     "@life/app-kit": "*",

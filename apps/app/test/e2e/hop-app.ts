@@ -119,7 +119,9 @@ export function sessionKey(sessionId: string): string {
  * test-owned endpoint) tamper the shared record. An `error` listener is
  * mandatory — Node treats an unhandled client error as a crash.
  */
-export async function openTestRedis(url: string) {
+export async function openTestRedis(
+  url: string,
+): Promise<ReturnType<typeof createClient>> {
   const client = createClient({ url });
   client.on('error', () => {});
   await client.connect();

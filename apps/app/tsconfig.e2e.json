@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["esnext", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "declaration": false,
+    "incremental": false,
+    "isolatedModules": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "test/e2e/**/*.ts",
+    "playwright.config.ts",
+    "playwright.dev.config.ts"
+  ]
+}
