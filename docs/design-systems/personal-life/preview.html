@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Life — Design System Preview</title>
+<style>
+  /* Values copied verbatim from packages/ui/src/styles/tokens.css (dark theme is :root). */
+  :root {
+    --bg: #0f1115;
+    --panel: #181b22;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #5b8cff;
+    --danger: #ff6b6b;
+    --danger-soft: #ff9e9e;
+    --amber: #f2b64c;
+    --green: #4cc38a;
+    --border: #2a2f3a;
+    --on-accent: white;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-pill: 999px;
+    --tap-height: 48px;
+    --content-width: 640px;
+    --focus-ring: 2px;
+    --icon-btn-size: 40px;
+    --fab-size: 56px;
+    --font-size: 16px;
+    --leading: 1.5;
+    --font-stack: system-ui, -apple-system, sans-serif;
+    --fs-editor: 1.05rem;
+    --shadow-fab: 0 4px 12px rgba(0, 0, 0, 0.25);
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --ease-standard: ease-out;
+    --space-0-15: 0.15rem;
+    --space-0-2: 0.2rem;
+    --space-0-25: 0.25rem;
+    --space-0-3: 0.3rem;
+    --space-0-35: 0.35rem;
+    --space-0-4: 0.4rem;
+    --space-0-5: 0.5rem;
+    --space-0-6: 0.6rem;
+    --space-0-7: 0.7rem;
+    --space-0-75: 0.75rem;
+    --space-0-8: 0.8rem;
+    --space-0-85: 0.85rem;
+    --space-0-9: 0.9rem;
+    --space-0-95: 0.95rem;
+    --space-1: 1rem;
+    --space-1-25: 1.25rem;
+    --space-2: 2rem;
+    --space-3: 3rem;
+    --space-5: 5rem;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: var(--font-size)/var(--leading) var(--font-stack);
+  }
+
+  main {
+    max-width: var(--content-width);
+    margin: 0 auto;
+    padding: var(--space-1) var(--space-1) var(--space-5);
+  }
+
+  h1 { font-size: var(--space-2); line-height: 1.2; margin: 0 0 var(--space-0-5); letter-spacing: -0.02em; }
+  h2 { font-size: var(--space-1-25); line-height: 1.3; margin: var(--space-2) 0 var(--space-0-5); letter-spacing: -0.02em; }
+  h3 { font-size: var(--font-size); font-weight: 600; margin: var(--space-1) 0 var(--space-0-5); }
+  p { margin: 0 0 var(--space-0-75); }
+  .caption { color: var(--muted); margin: 0 0 var(--space-1); }
+  .label { font-weight: 600; margin: 0; }
+  .meta { color: var(--muted); margin: 0; }
+
+  /* Rails and stages: normal flow only — no absolutely positioned content. */
+  .stage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-0-75);
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--panel);
+    margin: 0 0 var(--space-1);
+  }
+  .stage--column { flex-direction: column; align-items: stretch; }
+  .stage--right { justify-content: flex-end; }
+  .stage--split { justify-content: space-between; }
+
+  /* Button: cva base + variants + sizes from packages/ui/src/components/button.tsx */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-0-5);
+    white-space: nowrap;
+    border-radius: var(--radius-md);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    border: 0;
+    outline: none;
+    transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
+  }
+  .btn:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+  .btn--primary { background: var(--accent); color: var(--on-accent); }
+  .btn--ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn--danger { background: transparent; color: var(--danger); }
+  .btn--quiet { background: transparent; color: var(--accent); }
+  .btn--default { height: var(--tap-height); padding: var(--space-0-75) var(--space-1-25); }
+  .btn--bare { padding: var(--space-0-35) var(--space-0-85); }
+  .btn--icon { width: var(--tap-height); height: var(--tap-height); padding: 0; }
+  .btn:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--icon-btn-size);
+    height: var(--icon-btn-size);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--duration-base) var(--ease-standard);
+  }
+  .icon-btn--ghost { border-color: transparent; background: transparent; }
+  .icon-btn:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+
+  .fab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--fab-size);
+    height: var(--fab-size);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: var(--shadow-fab);
+    cursor: pointer;
+    outline: none;
+  }
+  .fab:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+
+  /* Field shell: input.tsx / select.tsx / textarea.tsx */
+  .field {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--tap-height);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--panel);
+    padding: var(--space-0-5) var(--space-0-75);
+    color: var(--text);
+    font: inherit;
+    outline: none;
+    transition: border-color var(--duration-base) var(--ease-standard);
+  }
+  .field::placeholder { color: var(--muted); }
+  .field:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+  textarea.field { height: auto; min-height: var(--space-3); resize: vertical; }
+  .field--editor {
+    height: auto;
+    min-height: var(--space-2);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    font-size: var(--fs-editor);
+  }
+  .field-label { display: block; font-weight: 600; margin: 0 0 var(--space-0-5); }
+
+  /* Checkbox: 20px box (todo rows set --checkbox-size: var(--space-1-25)), 0.2rem corner, check at stroke 3. */
+  .checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--space-1-25);
+    height: var(--space-1-25);
+    padding: var(--space-0-15);
+    border: 1px solid currentColor;
+    border-radius: var(--space-0-2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    outline: none;
+  }
+  .checkbox[aria-checked="true"] { background: currentColor; }
+  .checkbox[aria-checked="true"] svg { color: var(--panel); }
+  .checkbox:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+
+  /* Switch: 22.4px track, 16px thumb, 20px travel, --border off / --accent on. */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: calc(var(--space-1) + var(--space-0-4));
+    width: calc(var(--space-1) + var(--space-0-4) + var(--space-1-25));
+    padding: var(--space-0-2);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+    cursor: pointer;
+    outline: none;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+  .switch__thumb {
+    display: block;
+    width: var(--space-1);
+    height: var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--muted);
+    transition: transform var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard);
+  }
+  .switch[aria-checked="true"] .switch__thumb { background: var(--on-accent); transform: translateX(var(--space-1-25)); }
+
+  /* Tab rail: 0.4rem gaps and padding, active = accent fill. */
+  .tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-0-4);
+    padding: var(--space-0-4);
+    margin: 0 0 var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel);
+  }
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: var(--space-0-5) var(--space-0-75);
+    border-radius: var(--radius-md);
+    color: var(--muted);
+    text-decoration: none;
+    cursor: pointer;
+    outline: none;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+  .tab[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+  .tab:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: var(--focus-ring); }
+
+  /* Dialog panel (centred variant), rendered in flow inside a page-ground frame. */
+  .scrim-frame {
+    padding: var(--space-2) var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+    margin: 0 0 var(--space-1);
+  }
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    max-width: var(--content-width);
+    margin: 0 auto;
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-fab);
+  }
+  .dialog__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-0-5); margin-bottom: var(--space-1); }
+  .dialog__title { margin: 0; font-size: var(--space-1-25); font-weight: 700; }
+  .dialog__body { display: flex; flex-direction: column; gap: var(--space-1); }
+  .dialog__footer { display: flex; justify-content: flex-end; gap: var(--space-0-5); margin-top: var(--space-1); }
+
+  /* Toast: panel ground, accent action, fab shadow. */
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: var(--space-0-75);
+    padding: var(--space-0-6) var(--space-0-75);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-fab);
+    margin: 0 0 var(--space-1);
+  }
+
+  /* List rows: panel fill, 12px radius, 0.9rem text inset, 0.85rem muted meta line. */
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-0-5); }
+  .row { display: flex; align-items: center; overflow: hidden; background: var(--panel); border-radius: var(--radius-lg); }
+  .row__body { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: var(--space-0-15); padding: var(--space-0-9); text-decoration: none; color: inherit; }
+  .row__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row__sub { display: flex; align-items: baseline; gap: var(--space-0-4); color: var(--muted); font-size: var(--space-0-85); }
+  .row__sep { color: var(--border); }
+  .row--done .row__title { color: var(--muted); text-decoration: line-through; }
+  .row--dense .row__body { padding: var(--space-0-6) var(--space-0-4) var(--space-0-6) var(--space-0-9); }
+  .row--dense .row__title, .row--dense .row__sub { font-size: var(--space-0-7); }
+  .row__lead { display: flex; align-items: center; padding-left: var(--space-0-9); }
+  .row__trail { display: flex; align-items: center; padding-right: var(--space-0-5); }
+
+  /* Card, status pill, chip, alert banner. */
+  .card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--panel); padding: var(--space-0-9); margin: 0 0 var(--space-1); }
+  .pill { display: inline-flex; align-items: center; gap: var(--space-0-3); border-radius: var(--radius-pill); padding: var(--space-0-2) var(--space-0-5); border: 1px solid var(--border); background: var(--panel); }
+  .pill--open { color: var(--accent); }
+  .pill--in_progress { color: var(--amber); }
+  .pill--done { color: var(--green); }
+  .pill--wont_do { color: var(--muted); }
+  .alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-0-5); margin: 0 0 var(--space-0-5); padding: var(--space-0-6) var(--space-0-75); border: 1px solid var(--danger); border-radius: var(--radius-md); background: var(--panel); }
+
+  /* Palette + specimen tables. */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: var(--space-0-5); margin: 0 0 var(--space-1); }
+  .swatch { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--panel); padding: var(--space-0-6) var(--space-0-75); }
+  .swatch__chip { height: var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--border); margin: 0 0 var(--space-0-5); }
+  .scale { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-0-4); }
+  .scale__row { display: flex; align-items: center; gap: var(--space-0-75); }
+  .scale__bar { height: var(--space-0-75); border-radius: var(--space-0-15); background: var(--accent); flex-shrink: 0; }
+  .scale__note { color: var(--muted); }
+  .radii { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0 0 var(--space-1); }
+  .radii__box { width: var(--space-3); height: var(--space-3); background: var(--panel); border: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: center; padding: var(--space-0-4); }
+  .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-1); border-bottom: 1px solid var(--border); padding: var(--space-0-5) 0; }
+  .type-row__sample { margin: 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Personal Life — Design System</h1>
+  <p class="caption">Dark theme (the repo default, <code>:root</code>). Values copied from
+    <code>packages/ui/src/styles/tokens.css</code> at commit <code>1b7b4c5</code>. Light theme
+    lives behind <code>data-theme="light"</code>.</p>
+
+  <h2>Colour</h2>
+  <p class="caption">One accent, one warning, one success, one danger. Contrast on the page
+    ground is measured, not asserted: body text 15.71:1, muted 6.15:1, accent 5.97:1.</p>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch__chip" style="background: var(--bg)"></div><p class="label">--bg</p><p class="meta">#0f1115 · light #f4f5f7</p><p class="meta">page ground</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--panel)"></div><p class="label">--panel</p><p class="meta">#181b22 · light #ffffff</p><p class="meta">raised surface</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--text)"></div><p class="label">--text</p><p class="meta">#e8eaf0 · light #1a1d24</p><p class="meta">14.33:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--muted)"></div><p class="label">--muted</p><p class="meta">#8b93a7 · light #5c6577</p><p class="meta">5.60:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--accent)"></div><p class="label">--accent</p><p class="meta">#5b8cff · light #2f6bff</p><p class="meta">5.45:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--danger)"></div><p class="label">--danger</p><p class="meta">#ff6b6b · light #d64545</p><p class="meta">6.21:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--danger-soft)"></div><p class="label">--danger-soft</p><p class="meta">#ff9e9e · light #d97070</p><p class="meta">8.73:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--amber)"></div><p class="label">--amber</p><p class="meta">#f2b64c · light #b45309</p><p class="meta">9.49:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--green)"></div><p class="label">--green</p><p class="meta">#4cc38a · light #15803d</p><p class="meta">7.78:1 on panel</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--border)"></div><p class="label">--border</p><p class="meta">#2a2f3a · light #dfe3ea</p><p class="meta">1.29:1 — decorative only</p></div>
+    <div class="swatch"><div class="swatch__chip" style="background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center">Aa</div><p class="label">--on-accent</p><p class="meta">white · both themes</p><p class="meta">3.16:1 on accent</p></div>
+  </div>
+
+  <h2>Typography</h2>
+  <p class="caption">One family: <code>--font-stack</code> = system-ui, -apple-system, sans-serif at
+    <code>--font-size</code> 16px / <code>--leading</code> 1.5. Sizes below are the real tokens,
+    including the spacing tokens the repo uses in a font-size position.</p>
+  <div class="stage stage--column">
+    <div class="type-row"><p class="type-row__sample" style="font-size: var(--space-2); font-weight: 700; letter-spacing: -0.02em">Compose a page</p><p class="meta">--space-2 · 2rem</p></div>
+    <div class="type-row"><p class="type-row__sample" style="font-size: var(--space-1-25); font-weight: 700; letter-spacing: -0.02em">Section heading</p><p class="meta">--space-1-25 · 1.25rem</p></div>
+    <div class="type-row"><p class="type-row__sample" style="font-size: var(--fs-editor)">Editor body text at the writing size</p><p class="meta">--fs-editor · 1.05rem</p></div>
+    <div class="type-row"><p class="type-row__sample">Body copy sits in the panel, never in a card</p><p class="meta">--font-size · 16px</p></div>
+    <div class="type-row"><p class="type-row__sample" style="color: var(--muted)">A meta line under a row title</p><p class="meta">--space-0-85 · 0.85rem</p></div>
+  </div>
+
+  <h2>Spacing</h2>
+  <p class="caption">Nineteen frozen steps, irregular by design — they are the lengths the pre-migration
+    stylesheet already used. Pick a step; never interpolate one.</p>
+  <ul class="scale">
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-0-15)"></span><span>--space-0-15</span><span class="scale__note">0.15rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-0-5)"></span><span>--space-0-5</span><span class="scale__note">0.5rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-0-75)"></span><span>--space-0-75</span><span class="scale__note">0.75rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-0-9)"></span><span>--space-0-9</span><span class="scale__note">0.9rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-1)"></span><span>--space-1</span><span class="scale__note">1rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-1-25)"></span><span>--space-1-25</span><span class="scale__note">1.25rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-2)"></span><span>--space-2</span><span class="scale__note">2rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-3)"></span><span>--space-3</span><span class="scale__note">3rem</span></li>
+    <li class="scale__row"><span class="scale__bar" style="width: var(--space-5)"></span><span>--space-5</span><span class="scale__note">5rem</span></li>
+  </ul>
+
+  <h2>Radii, borders, shadow</h2>
+  <p class="caption"><code>--radius-md</code> 10px for controls and panels, <code>--radius-lg</code> 12px for
+    cards and rows, <code>--radius-pill</code> 999px for pills and the fab. One elevation,
+    <code>--shadow-fab</code> = 0 4px 12px rgba(0, 0, 0, 0.25), only for floating layers.</p>
+  <div class="radii">
+    <div class="radii__box" style="border-radius: var(--radius-md)"><span class="meta">md 10px</span></div>
+    <div class="radii__box" style="border-radius: var(--radius-lg)"><span class="meta">lg 12px</span></div>
+    <div class="radii__box" style="border-radius: var(--space-0-2)"><span class="meta">0.2rem</span></div>
+    <div class="radii__box" style="border-radius: var(--radius-pill)"><span class="meta">pill</span></div>
+    <div class="radii__box" style="border-radius: var(--radius-md); box-shadow: var(--shadow-fab); border-color: var(--panel)"><span class="meta">shadow-fab</span></div>
+  </div>
+
+  <h2>Buttons</h2>
+  <p class="caption">Every variant is a text or fill treatment; destructive actions are borderless
+    text buttons. Sizes: default 48px tall, bare compact, icon 48px square. Icon buttons are 40px.</p>
+  <div class="stage">
+    <button class="btn btn--primary btn--default" type="button">Save note</button>
+    <button class="btn btn--ghost btn--default" type="button">Cancel</button>
+    <button class="btn btn--danger btn--default" type="button">Delete</button>
+    <button class="btn btn--quiet btn--default" type="button">Learn more</button>
+    <button class="btn btn--primary btn--default" type="button" disabled>Disabled</button>
+  </div>
+  <div class="stage">
+    <button class="btn btn--primary btn--bare" type="button">Undo</button>
+    <button class="btn btn--danger btn--bare" type="button">Discard</button>
+    <button class="btn btn--primary btn--icon" type="button" aria-label="Add note">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="icon-btn" type="button" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <button class="icon-btn icon-btn--ghost" type="button" aria-label="More actions">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5h.01M12 12h.01M12 19h.01"/></svg>
+    </button>
+  </div>
+  <p class="caption">A primary fill measures 3.16:1 white-on-accent in dark and 4.50:1 in light; the
+    accent-fill pairing is the repo's frozen token pair, so keep primary labels bold.</p>
+
+  <h2>Fields</h2>
+  <div class="stage stage--column">
+    <label class="field-label" for="p-title">Note title</label>
+    <input class="field" id="p-title" type="text" placeholder="Placeholder reads in --muted">
+    <label class="field-label" for="p-select">List</label>
+    <select class="field" id="p-select">
+      <option>Today</option>
+      <option>Someday</option>
+    </select>
+    <label class="field-label" for="p-body">Note body</label>
+    <textarea class="field" id="p-body" rows="3" placeholder="Write the first line"></textarea>
+    <label class="field-label" for="p-editor">Editor variant</label>
+    <textarea class="field field--editor" id="p-editor" rows="2">The editor variant drops the shell, the padding and the focus ring.</textarea>
+  </div>
+
+  <h2>Checkbox and switch</h2>
+  <div class="stage">
+    <button class="checkbox" type="button" role="checkbox" aria-checked="false" aria-label="Mark done"></button>
+    <button class="checkbox" type="button" role="checkbox" aria-checked="true" aria-label="Mark not done">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+    </button>
+    <button class="switch" type="button" role="switch" aria-checked="false" aria-label="Notifications off"><span class="switch__thumb"></span></button>
+    <button class="switch" type="button" role="switch" aria-checked="true" aria-label="Notifications on"><span class="switch__thumb"></span></button>
+  </div>
+
+  <h2>Tabs</h2>
+  <div class="tabs" role="tablist" aria-label="Todos">
+    <a class="tab" role="tab" aria-selected="true" href="#tabs">Todos</a>
+    <a class="tab" role="tab" aria-selected="false" href="#tabs">Lists</a>
+    <a class="tab" role="tab" aria-selected="false" href="#tabs">Matrix</a>
+    <a class="tab" role="tab" aria-selected="false" href="#tabs">Trash</a>
+  </div>
+
+  <h2>Dialog</h2>
+  <p class="caption">Scrim is <code>--bg</code> at 50%; the panel is <code>--panel</code> with
+    <code>--radius-lg</code>, <code>--space-1</code> padding and <code>--shadow-fab</code>. Shown in
+    flow on the page ground rather than stacked over it.</p>
+  <div class="scrim-frame">
+    <div class="dialog" role="dialog" aria-modal="false" aria-labelledby="p-dialog-title">
+      <div class="dialog__head">
+        <h3 class="dialog__title" id="p-dialog-title">Move to list</h3>
+        <button class="icon-btn" type="button" aria-label="Close dialog">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="dialog__body">
+        <label class="field-label" for="p-dialog-list">Destination</label>
+        <select class="field" id="p-dialog-list">
+          <option>Today</option>
+          <option>Groceries</option>
+        </select>
+      </div>
+      <div class="dialog__footer">
+        <button class="btn btn--ghost btn--default" type="button">Cancel</button>
+        <button class="btn btn--primary btn--default" type="button">Move</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Toast</h2>
+  <div class="toast" role="status">
+    <span>Note saved</span>
+    <button class="btn btn--quiet btn--bare" type="button">Undo</button>
+  </div>
+
+  <h2>Lists</h2>
+  <p class="caption">Row meta lines are 0.85rem and dense rows 0.7rem: those are the repo's own scale
+    steps, shown here at their real size. Everything outside a specimen is 16px body text.</p>
+  <ul class="list">
+    <li class="row">
+      <span class="row__lead"><button class="checkbox" type="button" role="checkbox" aria-checked="false" aria-label="Mark done"></button></span>
+      <a class="row__body" href="#lists">
+        <span class="row__title">Call the dentist</span>
+        <span class="row__sub"><span>Today</span><span class="row__sep">|</span><span>Health</span></span>
+      </a>
+      <span class="row__trail"><button class="icon-btn icon-btn--ghost" type="button" aria-label="Delete todo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+      </button></span>
+    </li>
+    <li class="row row--done">
+      <span class="row__lead"><button class="checkbox" type="button" role="checkbox" aria-checked="true" aria-label="Mark not done">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+      </button></span>
+      <a class="row__body" href="#lists">
+        <span class="row__title">Post the parcel</span>
+        <span class="row__sub"><span>Yesterday</span></span>
+      </a>
+    </li>
+    <li class="row row--dense">
+      <span class="row__lead"><button class="checkbox" type="button" role="checkbox" aria-checked="false" aria-label="Mark done"></button></span>
+      <a class="row__body" href="#lists">
+        <span class="row__title">Water the plants</span>
+      </a>
+    </li>
+  </ul>
+
+  <h2>Status, card, banner, fab</h2>
+  <div class="stage">
+    <span class="pill pill--open">Open</span>
+    <span class="pill pill--in_progress">In progress</span>
+    <span class="pill pill--done">Done</span>
+    <span class="pill pill--wont_do">Won't do</span>
+  </div>
+  <div class="card">
+    <p class="label">Feedback intake</p>
+    <p class="meta">Cards carry the panel fill, a hairline border, a 12px radius and 0.9rem padding. They cast no shadow.</p>
+  </div>
+  <div class="alert">
+    <p class="label">Sync failed — the note is kept locally</p>
+    <button class="btn btn--ghost btn--bare" type="button">Retry</button>
+  </div>
+  <div class="stage stage--right">
+    <button class="fab" type="button" aria-label="New note">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+
+  <h2>Focus</h2>
+  <p class="caption">Tab through the specimens: every control draws a 2px <code>--accent</code> outline
+    at a 2px offset, on <code>:focus-visible</code> only. Rows and cards never draw a ring.</p>
+  <p class="meta">Source: packages/ui/src/styles/tokens.css · theme.css · base.css ·
+    components at packages/ui/src/components · tokens pinned by packages/ui/test/tokens.test.ts</p>
+</main>
+</body>
+</html>

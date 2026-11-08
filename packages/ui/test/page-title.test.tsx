@@ -5,8 +5,8 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-const DISPLAY_SIZE_UTILITY = 'text-[length:var(--space-2)]';
-const HEADING_MARGIN_UTILITY = 'm-[0_0_var(--space-1)]';
+const DISPLAY_SIZE_UTILITY = 'text-[length:var(--fs-title)]';
+const HEADING_MARGIN_UTILITY = 'm-[var(--s2)_0_var(--s4)]';
 
 describe('PageTitle', () => {
   it('renders an <h1> heading with the ui-page-title hook', () => {
@@ -38,5 +38,26 @@ describe('PageTitle', () => {
   it('forwards arbitrary attributes', () => {
     render(<PageTitle data-extra="1">Notes</PageTitle>);
     expect(screen.getByRole('heading', { level: 1 }).getAttribute('data-extra')).toBe('1');
+  });
+
+  it('renders the optional sub-line under the heading, quiet and one step below', () => {
+    const { container } = render(<PageTitle sub="Across all five modules">Notes</PageTitle>);
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    const sub = container.querySelector('p');
+    if (!sub) throw new Error('no sub-line');
+    expect(sub.textContent).toBe('Across all five modules');
+    expect(heading.nextElementSibling).toBe(sub);
+    expect(classesOf(sub)).toContain('ui-page-title__sub');
+    expect(classesOf(sub)).toContain('text-[length:var(--fs-meta)]');
+    expect(classesOf(sub)).toContain('text-ink-2');
+    // The heading's own bottom step gives way to the sub-line's `--s1` gap.
+    expect(classesOf(heading)).toContain('mb-0');
+  });
+
+  it('renders nothing extra when sub is omitted', () => {
+    const { container } = render(<PageTitle>Notes</PageTitle>);
+    expect(container.querySelector('p')).toBeNull();
+    expect(classesOf(screen.getByRole('heading', { level: 1 }))).not.toContain('mb-0');
   });
 });

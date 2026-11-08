@@ -25,7 +25,7 @@ const OWNER = 'owner-a';
 const VALID_REFRESH = 'stub.refresh.token';
 
 const MISSING_TOKEN_MESSAGE =
-  'sample.get failed (unauthenticated): no token found, run `life-ops login` first';
+  'sample.get failed (unauthenticated): no token found, run `npm run ops -- login` first';
 const REFUSED_TOKEN_MESSAGE = 'sample.get failed (unauthenticated): Unauthorized';
 const ABSENT_ROW_MESSAGE = 'sample.get failed (notFound): Sample not found';
 const STALE_VERSION_MESSAGE = 'sample.update failed (conflict): Sample was modified';
@@ -256,7 +256,7 @@ async function driveCli(argv: string[], stub: StubApi): Promise<CliOutcome> {
   const stderr: string[] = [];
   const exit = await runCli({
     argv,
-    service: { registry: sampleRegistry },
+    service: async () => ({ registry: sampleRegistry }),
     env: { ...process.env, LIFE_OPS_API_BASE: stub.baseUrl },
     stdout: (line) => {
       stdout.push(line);

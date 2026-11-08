@@ -20,30 +20,44 @@ export interface SwitchProps {
 }
 
 /**
- * The registry track and thumb, with the geometry taken from the spacing tokens rather
- * than the utility scale so the switch keeps its `1rem + 0.4rem` height and one thumb
- * travel of extra width: thumb `1rem`, inset `0.2rem`. Colours are theme-mapped:
- * track `--border` off / `--accent` on, thumb `--muted` off / `--on-accent` on.
+ * The revised control language applied to the switch the revision does not draw: the track
+ * is the two-step pill, the thumb one 16px step, and one thumb-travel of extra width, so the
+ * checked thumb lands on the track's right inner edge.
+ *
+ * Colour follows the accent rule: an off track is the strong hairline, an on track the app
+ * accent, and the thumb stays the raised surface so it reads on both.
+ *
+ * The track is a 44x24 painted strip, so the button around it carries the `--tap` target —
+ * the same split `checkbox.tsx` draws between the 24px mark and the 48px press square. A
+ * thumb aimed above or below the strip still lands on the control. The target is a definite
+ * size rather than a `min-` floor, so a column that stretches its children (`Field`) cannot
+ * widen the button and shift the strip off its inset.
+ *
+ * The ring and the disabled fade stay on the button for that reason: they belong to the
+ * target, not to the paint.
  */
-const switchTrack = cx(
-  'relative inline-flex shrink-0 items-center',
-  'h-[calc(var(--space-1)+var(--space-0-4))]',
-  'w-[calc(var(--space-1)+var(--space-0-4)+var(--space-1-25))]',
-  'p-[var(--space-0-2)] rounded-full border-0',
-  'bg-border data-[state=checked]:bg-accent',
-  'cursor-pointer transition-colors outline-hidden',
+const switchTarget = cx(
+  'inline-flex size-[var(--tap)] shrink-0 items-center justify-center',
+  'group cursor-pointer border-0 bg-transparent p-0 outline-hidden',
   // `outline-hidden` zeroes `--tw-outline-style`, and `outline-<width>` draws with that
   // variable — so the ring needs `outline-solid` to exist. Without it Chromium computes
   // `outline-style: none` and the focus ring is invisible.
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)]',
-  'focus-visible:outline-accent',
+  'focus-visible:outline-focus',
   'disabled:cursor-default disabled:opacity-50',
 );
 
+/** The painted strip: its own height is the strip's, never the target's. */
+const switchTrack = cx(
+  'relative inline-flex shrink-0 items-center',
+  'h-[var(--s6)] w-[calc(var(--s6)+var(--s5))] p-[var(--s1)]',
+  'rounded-[var(--r-pill)] bg-line-strong group-data-[state=checked]:bg-max',
+  'motion-safe:transition-colors',
+);
+
 const switchThumb = cx(
-  'pointer-events-none block size-[var(--space-1)] rounded-full bg-muted',
-  'transition-transform data-[state=checked]:translate-x-[var(--space-1-25)]',
-  'data-[state=checked]:bg-on-accent',
+  'pointer-events-none block size-[var(--s4)] rounded-[var(--r-pill)] bg-surface',
+  'motion-safe:transition-transform data-[state=checked]:translate-x-[var(--s5)]',
 );
 
 export function Switch({
@@ -66,9 +80,11 @@ export function Switch({
         name={name}
         aria-label={label}
         data-slot="switch"
-        className={cx('ui-switch', checked && 'ui-switch--on', switchTrack, className)}
+        className={cx('ui-switch', checked && 'ui-switch--on', switchTarget, className)}
       >
-        <SwitchPrimitive.Thumb data-slot="switch-thumb" className={switchThumb} />
+        <span data-slot="switch-track" aria-hidden className={switchTrack}>
+          <SwitchPrimitive.Thumb data-slot="switch-thumb" className={switchThumb} />
+        </span>
       </button>
     </SwitchPrimitive.Root>
   );

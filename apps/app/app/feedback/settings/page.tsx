@@ -1,11 +1,18 @@
-import { ManagerBlock, SettingsBlock, SettingsRow, ThemeToggle } from '@life/ui';
+import { SettingsShell } from '@life/ui';
+import { submitFeedbackAction } from '../../feedback-actions';
 
+/**
+ * Feedback settings renders the shared settings shape: the `SettingsShell` owns the Appearance,
+ * Comfort, Support groups and the closing prototype line. The inbox has no app-specific settings,
+ * so the shell's `children` slot stays empty.
+ */
 export default function FeedbackSettingsPage() {
   return (
-    <ManagerBlock title="Settings" backHref="/feedback">
-      <SettingsBlock title="Appearance">
-        <SettingsRow label="Theme" description="System, light, or dark." control={<ThemeToggle />} />
-      </SettingsBlock>
-    </ManagerBlock>
+    <SettingsShell
+      title="Settings"
+      backHref="/feedback"
+      app="feedback"
+      onSubmit={submitFeedbackAction}
+    />
   );
 }

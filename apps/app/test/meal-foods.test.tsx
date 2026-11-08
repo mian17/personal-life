@@ -3,12 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { NUTRIENTS, format, sum, type NutrientVector } from '@life/nutrition';
-import { Button, ConfirmButton, IconButton, Input, ManagerBlock, Row, Select, SettingsRow, StatusText } from '@life/ui';
+import { Button, ConfirmButton, IconButton, Input, ManagerBlock, Row, Select, SettingsRow, StatusText, runConfirmed } from '@life/ui';
+import type { PendingGate } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 
 // The whole meal-service surface this test may touch. No photo/estimate export:
 // a catalog form that reached for a model would fail loudly, not silently pass.
 jest.mock('@/lib/meal-api', () => ({
+  collectMealFoods: jest.fn(),
   listMealFoods: jest.fn(),
   getMealFood: jest.fn(),
   listDayEntries: jest.fn(),
@@ -41,7 +43,8 @@ import {
   createMealFood,
   deleteMealFood,
   getMealFood,
-  listDayEntries,
+  collectDayEntries,
+  collectMealFoods,
   listMealFoods,
   updateMealFood,
   type MealEntry,
@@ -49,14 +52,15 @@ import {
 } from '@/lib/meal-api';
 import { revalidatePath } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { MealsNav } from '@/app/meals-nav';
 import FoodsPage from '@/app/(meals)/meals/foods/page';
 import NewFoodPage from '@/app/(meals)/meals/foods/new/page';
 import EditFoodPage from '@/app/(meals)/meals/foods/[id]/page';
 import { FoodForm, type FoodFormBounds } from '@/app/(meals)/meals/foods/food-form';
+import { FoodCatalog } from '@/app/(meals)/meals/foods/food-catalog';
 import { FOOD_NUTRITION } from '@/app/(meals)/meals/foods/fields';
 import { createFoodAction, deleteFoodAction, updateFoodAction } from '@/app/(meals)/meals/actions';
 
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
 const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
 const mockedGetMealFood = getMealFood as jest.MockedFunction<typeof getMealFood>;
 const mockedCreateMealFood = createMealFood as jest.MockedFunction<typeof createMealFood>;
@@ -101,30 +105,28 @@ const bounds: FoodFormBounds = {
   amountMax: AMOUNT_MAX,
 };
 
-describe('foods nav entry', () => {
-  it('adds one Foods icon linking to the catalog', () => {
-    const html = renderToStaticMarkup(<MealsNav />);
-
-    expect(html).toContain('href="/meals/foods"');
-    expect(html).toContain('aria-label="Foods"');
-  });
-});
+/** One page of the `{ foods, nextCursor }` envelope the service returns. */
+function foodPage(foods: MealFood[], nextCursor: string | null = null) {
+  return { foods, nextCursor };
+}
 
 describe('foods catalog page', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('lists each owner food with its per-100 facts under a Foods heading', async () => {
-    mockedListMealFoods.mockResolvedValue([
-      food(),
-      food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
-    ]);
+    mockedListMealFoods.mockResolvedValue(
+      foodPage([
+        food(),
+        food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
+      ]),
+    );
 
     const el = await loadFoodsPage();
     const html = renderToStaticMarkup(el);
 
     expect(el.type).toBe(ManagerBlock);
     expect(html).toContain('Foods');
-    expect(html).toContain('href="/meals"');
+    expect(html).toContain('href="/meals/settings"');
     expect(html).toContain('Milk, Brand X');
     expect(html).toContain(`per 100 ml · ${format('calories', 52)}`);
     expect(html).toContain('Oats');
@@ -133,15 +135,33 @@ describe('foods catalog page', () => {
   });
 
   it('forwards the search query to the service instead of filtering rows here', async () => {
-    mockedListMealFoods.mockResolvedValue([food()]);
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
 
     await loadFoodsPage('milk');
 
-    expect(mockedListMealFoods).toHaveBeenCalledWith('milk');
+    // The query goes out on the request, with no cursor (page 1); the page never
+    // filters rows it already holds, and never walks the whole catalog.
+    expect(mockedListMealFoods.mock.calls[0]).toEqual(['milk', undefined]);
+    expect(mockedCollectMealFoods).not.toHaveBeenCalled();
+  });
+
+  it('server-renders page 1 and offers load-more only when a next cursor exists', async () => {
+    mockedListMealFoods.mockResolvedValue(foodPage([food()], 'cursor-2'));
+    const withMore = renderToStaticMarkup(await loadFoodsPage());
+
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
+    const exhausted = renderToStaticMarkup(await loadFoodsPage());
+
+    // Page 1 is in the server markup either way — the frozen row locators see it.
+    expect(withMore).toContain('Milk, Brand X');
+    expect(exhausted).toContain('Milk, Brand X');
+    // The control is additive: present only while the service reports another page.
+    expect(withMore).toContain('>Load more<');
+    expect(exhausted).not.toContain('Load more');
   });
 
   it('invites the first food when the catalog is empty', async () => {
-    mockedListMealFoods.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
 
     const el = await loadFoodsPage();
     const html = renderToStaticMarkup(el);
@@ -149,10 +169,11 @@ describe('foods catalog page', () => {
     expect(el.type).toBe(ManagerBlock);
     expect(html).toContain('No foods yet.');
     expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('Load more');
   });
 
   it('reports an empty result as a miss, not an empty catalog', async () => {
-    mockedListMealFoods.mockResolvedValue([]);
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
 
     const el = await loadFoodsPage('zzz');
     const html = renderToStaticMarkup(el);
@@ -161,11 +182,36 @@ describe('foods catalog page', () => {
     expect(html).not.toContain('No foods yet.');
   });
 
+  it('opens the catalog body on the shared section rhythm, rows and empty states alike', async () => {
+    mockedListMealFoods.mockResolvedValue(foodPage([food()]));
+    const listHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    mockedListMealFoods.mockResolvedValue(foodPage([]));
+    const missHtml = renderToStaticMarkup(await loadFoodsPage('zzz'));
+    const emptyHtml = renderToStaticMarkup(await loadFoodsPage());
+
+    // The whole body — a list of rows or either empty state — sits inside the one
+    // unlabelled `Section`, which is what supplies the gap below the search box.
+    for (const [html, body] of [
+      [listHtml, 'Milk, Brand X'],
+      [missHtml, 'No matches.'],
+      [emptyHtml, 'No foods yet.'],
+    ] as const) {
+      const open = html.indexOf('ui-section');
+      expect(open).toBeGreaterThan(-1);
+      expect(html.indexOf(body)).toBeGreaterThan(open);
+      expect(html.lastIndexOf('</section>')).toBeGreaterThan(html.indexOf(body));
+      expect(html.indexOf('aria-label="New food"')).toBeGreaterThan(html.indexOf(body));
+    }
+  });
+
   it('reaches create and edit through the catalog (AC1 create affordance, AC4 edit rows)', async () => {
-    mockedListMealFoods.mockResolvedValue([
-      food(),
-      food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
-    ]);
+    mockedListMealFoods.mockResolvedValue(
+      foodPage([
+        food(),
+        food({ id: 'food-2', name: 'Oats', unit: 'g', nutrients: vector({ calories: 389 }) }),
+      ]),
+    );
 
     const html = renderToStaticMarkup(await loadFoodsPage());
 
@@ -174,6 +220,24 @@ describe('foods catalog page', () => {
     expect(html).toContain('aria-label="New food"');
     expect(html).toContain('href="/meals/foods/food-1"');
     expect(html).toContain('href="/meals/foods/food-2"');
+  });
+
+  it('mounts a fresh catalog when the query changes, so an old cursor cannot continue it', async () => {
+    mockedListMealFoods.mockResolvedValue(foodPage([food()], 'cursor-2'));
+
+    const plain = await loadFoodsPage();
+    const searched = await loadFoodsPage('milk');
+
+    const catalogOf = (el: ReactElement<Record<string, unknown>>) => find(el, FoodCatalog)!;
+    const plainCatalog = catalogOf(plain as ReactElement<Record<string, unknown>>);
+    const searchedCatalog = catalogOf(searched as ReactElement<Record<string, unknown>>);
+
+    // `key` is what makes React remount: a different key is a different shell, and a
+    // remount drops the appended rows and the cursor with it.
+    expect(plainCatalog.key).toBe('');
+    expect(searchedCatalog.key).toBe('milk');
+    // The query rides along, so appended pages stay inside the same filter.
+    expect(searchedCatalog.props.query).toBe('milk');
   });
 });
 
@@ -239,6 +303,11 @@ function control(
   const found = find(tree, IconButton, match) ?? find(tree, Button, match);
   if (!found) throw new Error('control not found');
   return found;
+}
+
+/** A gate that is never pending: the confirm cases prove the gate, not the re-entry guard. */
+function idleGate(): PendingGate {
+  return { isPending: () => false, setPending: () => {} };
 }
 
 /**
@@ -442,18 +511,17 @@ describe('food form behaviour', () => {
       const confirm = find(tree, ConfirmButton);
       if (!confirm) throw new Error('no delete control');
 
-      // The click goes through the real atom's guarded handler — the same code
-      // the DOM runs — so the confirm decision is what reaches the delete.
-      const button = ConfirmButton(
-        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
-      );
+      // The click goes through `runConfirmed` — the same production function the
+      // atom's handler calls — so the confirm decision is what reaches the delete.
       const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => true };
       try {
-        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
-        // The atom's guarded handler returns void, so the delete's own await
-        // chain is settled by a macrotask flush before the assertions.
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await runConfirmed(
+          { preventDefault: jest.fn() },
+          confirm.props.message as string,
+          confirm.props.onClick as never,
+          idleGate(),
+        );
       } finally {
         (globalThis as { window?: unknown }).window = previousWindow;
       }
@@ -473,14 +541,15 @@ describe('food form behaviour', () => {
       const confirm = find(tree, ConfirmButton);
       if (!confirm) throw new Error('no delete control');
 
-      const button = ConfirmButton(
-        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
-      );
       const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => false };
       try {
-        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await runConfirmed(
+          { preventDefault: jest.fn() },
+          confirm.props.message as string,
+          confirm.props.onClick as never,
+          idleGate(),
+        );
       } finally {
         (globalThis as { window?: unknown }).window = previousWindow;
       }

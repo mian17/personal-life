@@ -7,13 +7,44 @@
 | `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
 | `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
 | `max-test-runs` | 2 |
-| `frozen-surfaces` | e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`); token values (`packages/ui/test/tokens.test.ts` is the value table); PWA constants (`public/manifest-*.json`, `viewport.themeColor`) |
+| `frozen-surfaces` | PWA constants (`public/manifest-*.json`, `viewport.themeColor`) — always frozen; e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`) and token values (`packages/ui/test/tokens.test.ts` is the value table) — frozen by default, released per-run by an explicit intent that names them and moves the tests in the same commit |
 | `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
 | `lessons` | `docs/lessons/` |
 | `base-branch` | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main` |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
-thinking discipline) are in the global protocol at `~/.config/opencode/AGENTS.md`.
+thinking discipline) are in the global protocol at `~/.pi/agent/AGENTS.md`.
+
+## Delegation — the mandatory task template
+
+Every subagent prompt in this repo is written in the global protocol's
+`## 5. Mandatory Subagent Task Template`, because a lane's scope and testing budget
+are only enforceable when they are checkable strings in the prompt. The template
+itself lives there and is not copied here — a second copy drifts from the first.
+This repo contributes the values below and the two plan-field bullets from the
+contracts, so a lane never has to guess what a slot should say.
+
+| Template slot | Where the value comes from |
+|---|---|
+| `[VERIFICATION & TESTING RULES]` → `Permitted test command` | the profile's `unit-test` row — `npm run test:unit -- <file>` from the owning workspace |
+| `[VERIFICATION & TESTING RULES]` → `max test executions` | the profile's `max-test-runs` row, `2` |
+| `[DEFINITION OF DONE]` → typecheck box | the profile's `typecheck` row — `npm run typecheck` in the touched workspace |
+| `[IMPLEMENTATION REQUIREMENTS]` | the profile's `frozen-surfaces` row, named as paths the lane may not change, and the `hard-lines` row for anything the human has to run |
+| `[SCOPE & REPOSITORY CONTEXT]` | the profile's `base-branch` row — the worktree is cut from `origin/dev`, so the prompt names that branch and never `main` |
+| `[IMPLEMENTATION REQUIREMENTS]` → plan fields | Contract 1's delegation plan fields for a UI task (the primitive reuse plan) and Contract 2's for a backend service task (the cache plan) |
+
+Two rules sit in every prompt's `[IMPLEMENTATION REQUIREMENTS]`, in addition to the
+slots above:
+
+- A lane commits, pushes, and opens a pull request when its prompt says so — none of
+  those is a scope violation. Merging is the parent's alone: a lane never merges a pull
+  request. A lane never force-pushes or rewrites shared history, and never stages a file
+  outside its allowed list. Stage explicit paths, never `git add -A`; report the commit
+  hash and the PR URL so the diff stays in view. The parent keeps the decision, the
+  review and the merge.
+- No intent, spec, report or task-plan file may be staged, because `docs/intent/`,
+  `docs/specs/`, `docs/reports/` and `tasks/` are gitignored run scratch that never
+  enters a commit.
 
 ## Branching — always from `dev`
 
@@ -36,7 +67,8 @@ that conflicts), stop and report it rather than branching anyway: a branch built
 on a diverged base is worse than no branch.
 
 Never branch from `main`, never rebase onto `main`, never push to `main` or to `dev`
-directly, and never merge a pull request without the user asking. Promotion from
+directly, and never merge a pull request — the parent merges, and only when the user
+asks. Promotion from
 `dev` to `main` is a human decision, not part of any task.
 
 This applies to agents too, including short mechanical ones such as the
@@ -87,11 +119,12 @@ a visual element and Rule 3 applies.
 ### Rule 3 — when no primitive fits
 
 1. Extend `@life/ui` upstream. Prop/slot/variant first; a new atom/block only when the
-   concept is genuinely reusable across apps. Spec-first, always: update
-   `docs/specs/SPEC-ui-*.md` (and `MAP-ui-primitives.md` for a new component) in the
-   same change, implement in `packages/ui` with tests, then consume from the app. Those
-   specs were removed from the tree in `d1f54c9` — restore the one you need from
-   `git show d1f54c9^:<path>` instead of starting a competing copy.
+   concept is genuinely reusable across apps. Spec-first, always: write the spec
+   `docs/specs/SPEC-ui-*.md` (and a `MAP-ui-primitives.md` entry for a new component)
+   before the code, implement in `packages/ui` with tests, then consume from the app.
+   The spec lives on disk only — `docs/specs/` is gitignored per-run scratch, so it is
+   never staged and never committed. It is still the standard the change is judged
+   against, so being uncommitted does not lower the bar.
 2. Genuinely app-specific **behavior** (page glue, domain widgets like the editor's
    autosave engine) stays in `apps/*` — but it must be composed FROM primitives and
    may not introduce new visual language. A new visual concept is case 1, not case 2.
@@ -177,8 +210,9 @@ improvised at implementation time.
   read-through cache into a shared workspace package first (same no-fork rule as
   `@life/ui`).
 - Content-bearing services additionally follow the notes at-rest contract — envelope at
-  rest, `@life/crypto` consumption (`docs/specs/SPEC-notes-at-rest.md` at `d1f54c9^` when
-  you need the wording). This cache contract is one half of that at-rest contract.
+  rest, `@life/crypto` consumption, written per run as
+  `docs/specs/SPEC-notes-at-rest.md`. This cache contract is one half of that at-rest
+  contract.
 
 ### Mechanical checks (tech lead runs at every review touching a backend service)
 
@@ -188,8 +222,8 @@ improvised at implementation time.
   asserts serialized values contain `enc.v1.` and no known plaintext (pattern:
   `apps/note-service/test/notes-cache.e2e-spec.ts`).
 - Every backend service spec carries a `## Cache Rules` section → the service has one.
-  The spec corpus was removed in `d1f54c9`, so a service you touch needs its spec
-  restored from `d1f54c9^` before the check can see it.
+  A service you touch gets its spec written or updated for the change, on disk only
+  (`docs/specs/` is gitignored), because the review checks the service against it.
 - No content matching in SQL over encrypted columns — filters run in memory
   post-decrypt (`content-match.ts` pattern).
 

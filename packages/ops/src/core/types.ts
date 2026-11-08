@@ -4,18 +4,46 @@
  * descriptors — an adapter that restates any of them is a bug.
  */
 export interface FieldSpec {
-  type: 'string' | 'number' | 'boolean' | 'string[]';
+  /**
+   * The closed type set: `string`, `number`, `boolean`, `string[]`, `number[]`,
+   * `object`, `object[]`. `number[]` carries service ids (`tagIds`); the service
+   * rejects text entries, so the CLI converts repeated numeric flags rather than
+   * the wire. The nested types carry their key set in `properties`.
+   */
+  type: 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'object' | 'object[]';
   required?: boolean;
   enum?: readonly string[];
+  /**
+   * The keys of one nested value, legal exactly on `object` and `object[]` and
+   * forbidden on every flat type. Recursive: an `object[]`'s `properties`
+   * describe one element, which may nest again (saved-meal item nutrients).
+   */
+  properties?: Record<string, FieldSpec>;
   description: string;
 }
 
 export interface OpSpec {
-  /** create | get | list | update | delete — the closed op set (SPEC.md §3). */
-  kind: 'create' | 'get' | 'list' | 'update' | 'delete';
+  /**
+   * create | get | list | update | delete | restore — the closed op set
+   * (SPEC.md §3). `restore` brings one deleted row back and addresses it with
+   * the same `id` segment the other row ops use. The four `getMany`… kinds are
+   * bulk ops, derived from their single-row sibling rather than written by hand
+   * (SPEC-bulk-ops §2.1, §2.2); core/bulk.ts owns their vocabulary.
+   */
+  kind:
+    | 'create'
+    | 'get'
+    | 'list'
+    | 'update'
+    | 'delete'
+    | 'restore'
+    | 'getMany'
+    | 'createMany'
+    | 'updateMany'
+    | 'deleteMany';
   fields: Record<string, FieldSpec>;
   /**
-   * Overrides the kind default. Defaults: true for create/update/delete,
+   * Overrides the kind default. Defaults: true for create/update/delete/restore,
    * false for get/list. `false` on a mutating op is an explicit statement
    * that this write may run without human approval (SPEC-ops-agent-contract §3.2).
    */
@@ -26,6 +54,12 @@ export interface ResourceSpec {
   name: string;
   basePath: string;
   ops: OpSpec[];
+  /**
+   * Whether this resource offers the four bulk kinds, derived from its own
+   * single-row ops (SPEC-bulk-ops §2.2). Absent or `false` keeps the resource
+   * holding zero bulk ops, so bulk stays invisible until a resource asks for it.
+   */
+  bulk?: boolean;
 }
 
 export type ResourceRegistry = ResourceSpec;

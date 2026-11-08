@@ -394,3 +394,74 @@ describe('Autosuggest', () => {
     expect(input.value).toBe('app');
   });
 });
+
+describe('Autosuggest field shell', () => {
+  it('defaults to today’s field: the input is the anchor and no shell wraps it', () => {
+    const { input } = setup();
+
+    expect(input.closest('.ui-search-box')).toBeNull();
+    expect(input.getAttribute('type')).toBe('text');
+    expect(input.getAttribute('aria-label')).toBe('Search foods');
+  });
+
+  it('wears the SearchField shell when field="search"', () => {
+    const { input } = setup({ field: 'search' });
+    const shell = document.querySelector('.ui-search-box');
+
+    expect(shell?.tagName).toBe('DIV');
+    expect(shell!.contains(input)).toBe(true);
+    expect(input.getAttribute('data-slot')).toBe('input');
+    expect(input.getAttribute('type')).toBe('text');
+  });
+
+  it('keeps the combobox wiring and the minChars gate inside the shell', () => {
+    const { input, onQueryChange } = setup({ field: 'search' });
+
+    type(input, 'ap');
+
+    expect(onQueryChange).toHaveBeenLastCalledWith('');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+
+    type(input, '  app  ');
+
+    expect(onQueryChange).toHaveBeenLastCalledWith('app');
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(input.getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id);
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+  });
+
+  it('reports every keystroke immediately in the shell, never on the shell’s own timer', () => {
+    jest.useFakeTimers();
+    const { input, onQueryChange } = setup({ field: 'search' });
+
+    type(input, 'app');
+    type(input, 'appl');
+
+    expect(onQueryChange.mock.calls).toEqual([['app'], ['appl']]);
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(onQueryChange.mock.calls).toEqual([['app'], ['appl']]);
+  });
+
+  it('keeps the keyboard walk, the dismissal and the pick inside the shell', () => {
+    const { input, onSelect } = setup({ field: 'search' });
+
+    type(input, 'app');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(activeRow(input)).toBe(rows()[0]);
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(input.value).toBe('app');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(activeRow(input)).toBe(rows()[0]);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith(OPTIONS[0]);
+    expect(input.value).toBe('');
+  });
+});

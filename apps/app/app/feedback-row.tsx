@@ -22,6 +22,11 @@ const STATUS_OPTIONS = FEEDBACK_STATUSES.map(({ value, label }) => ({ value, lab
  * pill's `tone` is the vocabulary value; `atoms.css` maps it to the status's
  * semantic token, and `tokens.test.ts` pins that mapping against `tokens.css`.
  *
+ * `href` is the M11 fix: the inbox can only show two clamped lines of a
+ * description, so the row links to `/feedback/[id]`, which reads the submitted
+ * text in full. The link carries the title and the description only — the
+ * dropdown stays outside it, because an anchor may not hold interactive content.
+ *
  * The only client island on `/feedback` (the `todo-item.tsx` precedent): the
  * dropdown writes through the server action the inbox hands it, so `ListShell`
  * and the rest of the inbox stay server-rendered.
@@ -65,6 +70,7 @@ export function FeedbackRow({
 
   return (
     <ListItem
+      href={`/feedback/${entry.id}`}
       variant="feedback"
       title={entry.title}
       snippet={entry.description}

@@ -239,7 +239,7 @@ describe('Todos API (e2e)', () => {
       do {
         const query = `?listId=${l.body.id}&limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
         const res = await list(query).expect(200);
-        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['nextCursor', 'todos']);
+        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['nextCursor', 'todos', 'total']);
         seen.push(...res.body.todos.map((t: { id: string }) => t.id));
         cursor = res.body.nextCursor ?? undefined;
         pages += 1;

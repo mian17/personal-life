@@ -12,9 +12,9 @@ export interface RowProps extends ComponentPropsWithRef<'div'> {
 const rowStyles = 'flex flex-wrap';
 
 const gapStyles: Record<StackGap, string> = {
-  sm: 'gap-[var(--space-0-5)]',
-  md: 'gap-[var(--space-1)]',
-  lg: 'gap-[var(--space-2)]',
+  sm: 'gap-[var(--s1)]',
+  md: 'gap-[var(--s2)]',
+  lg: 'gap-[var(--s4)]',
 };
 
 /**

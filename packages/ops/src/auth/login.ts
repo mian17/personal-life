@@ -1,5 +1,5 @@
 /**
- * `life-ops login` (SPEC.md §3): OIDC authorization code + PKCE against the
+ * `npm run ops -- login` (SPEC.md §3): OIDC authorization code + PKCE against the
  * existing IdP, audience `life-api` (SPEC-service-kernel token model), client
  * `LIFE_OPS_CLIENT_ID` (default `dev` — a dedicated CLI registration would
  * touch `apps/idp`, which is out of scope). The browser lands back on a
@@ -47,7 +47,14 @@ export interface IdpEndpoints {
 }
 
 const FALLBACK_EXPIRY_S = 3600;
-const CALLBACK_PATH = '/callback';
+/**
+ * The one loopback callback the seeded `dev` client registers
+ * (`apps/idp/src/oidc/clients.ts` `DEV_REDIRECT_URIS`): `http://127.0.0.1:8080/cb`.
+ * Both parts are fixed — a random port or a different path is rejected by the
+ * IdP as `invalid_redirect_uri` once the browser arrives at `/auth`.
+ */
+const CALLBACK_PORT = 8080;
+const CALLBACK_PATH = '/cb';
 
 /** Runs the full dance and returns what landed in the store. */
 export async function login(partial?: Partial<LoginOptions>): Promise<StoredTokens> {
@@ -233,16 +240,27 @@ interface LoopbackListener {
 function listenOnLoopback(): Promise<LoopbackListener> {
   return new Promise((resolve, reject) => {
     const server = createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (address === null || typeof address === 'string') {
-        reject(new Error('login failed: loopback listener has no port'));
-        return;
-      }
-      resolve({ server, port: address.port, waitForCallback: () => waitForCallback(server) });
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      reject(listenError(error));
+    });
+    server.listen(CALLBACK_PORT, '127.0.0.1', () => {
+      resolve({ server, port: CALLBACK_PORT, waitForCallback: () => waitForCallback(server) });
     });
   });
+}
+
+/**
+ * The port is not negotiable: an ephemeral one only moves the failure to the IdP,
+ * where it arrives as an opaque `invalid_redirect_uri`. Naming the port here keeps
+ * the fix (`free 8080`) inside the error the user reads.
+ */
+function listenError(error: NodeJS.ErrnoException): Error {
+  if (error.code === 'EADDRINUSE') {
+    return new Error(
+      `login failed: port ${CALLBACK_PORT} is already in use; the dev client only accepts ${redirectUriFor(CALLBACK_PORT)}, so free the port and run login again`,
+    );
+  }
+  return new Error(`login failed: cannot listen on 127.0.0.1:${CALLBACK_PORT} (${error.code ?? error.message})`);
 }
 
 function waitForCallback(server: Server): Promise<CallbackQuery> {

@@ -48,10 +48,10 @@ interface DetailCase {
 }
 
 const DETAIL_CASES: DetailCase[] = [
-  { name: 'a message field', body: '{"message":"boom"}', statusText: 'Boom', detail: 'boom' },
-  { name: 'a bare string', body: '"boom"', statusText: 'Boom', detail: 'boom' },
-  { name: 'a list of strings', body: '["a","b"]', statusText: 'Boom', detail: 'a; b' },
-  { name: 'a message list', body: '{"message":["a","b"]}', statusText: 'Boom', detail: 'a; b' },
+  { name: 'a message field', body: '{"message":"boom"}', statusText: 'Boom', detail: '503 Boom: boom' },
+  { name: 'a bare string', body: '"boom"', statusText: 'Boom', detail: '503 Boom: boom' },
+  { name: 'a list of strings', body: '["a","b"]', statusText: 'Boom', detail: '503 Boom: a; b' },
+  { name: 'a message list', body: '{"message":["a","b"]}', statusText: 'Boom', detail: '503 Boom: a; b' },
   { name: 'plain text', body: 'not json', statusText: 'Boom', detail: '503 Boom' },
   { name: 'an empty body', body: '', statusText: 'Boom', detail: '503 Boom' },
 ];
@@ -83,6 +83,34 @@ describe('the failure detail', () => {
       expect(error.message).toBe(`sample.get failed (requestFailed): ${detailCase.detail}`);
     });
   }
+
+  it('keeps a self-naming status out of the detail, since the code already says it', async () => {
+    const error = await failureFromResponse(
+      OPERATION,
+      new Response('{"message":"Unauthorized"}', { status: 401, statusText: 'Unauthorized' }),
+    );
+
+    expect(error.message).toBe('sample.get failed (unauthenticated): Unauthorized');
+  });
+});
+
+describe('a service that cannot be reached', () => {
+  it('reports the operation, the code, and the endpoint instead of a bare reason', async () => {
+    const refused = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new TypeError('fetch failed'));
+    try {
+      const error = await executorWith({ baseUrl: 'http://127.0.0.1:3999', token: VALID_TOKEN })
+        .run('get', { id: SEEDED_IDS[0] })
+        .catch((thrown: unknown) => thrown);
+
+      expect(renderOpsError(error as OpsError)).toBe(
+        'sample.get failed (requestFailed): cannot reach http://127.0.0.1:3999: fetch failed',
+      );
+    } finally {
+      refused.mockRestore();
+    }
+  });
 });
 
 describe('the executor token gate', () => {
@@ -100,7 +128,7 @@ describe('the executor token gate', () => {
     const executor = executorWith({ baseUrl: stub.baseUrl, token: undefined });
 
     await expect(executor.run('get', { id: SEEDED_IDS[0] })).rejects.toThrow(
-      'sample.get failed (unauthenticated): no token found, run `life-ops login` first',
+      'sample.get failed (unauthenticated): no token found, run `npm run ops -- login` first',
     );
     expect(stub.requestLog).toHaveLength(0);
   });
@@ -213,7 +241,7 @@ describe('the per-call deadline', () => {
     try {
       const exit = await runCli({
         argv: ['sample', 'get', '--id', 'row-a'],
-        service: { registry: sampleRegistry },
+        service: async () => ({ registry: sampleRegistry }),
         env: { LIFE_OPS_API_BASE: silentApi.baseUrl, LIFE_OPS_DEADLINE_MS: '100' },
         stdout: () => {},
         stderr: (line) => stderr.push(line),

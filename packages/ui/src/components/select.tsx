@@ -13,20 +13,19 @@ export interface SelectProps extends Omit<ComponentPropsWithRef<'select'>, 'chil
 }
 
 /**
- * Registry `native-select` class string, theme-mapped the way `input` is: `border-input`
- * → `--border`, `text-foreground` → `--text`, `bg-transparent` → `bg-panel` so the picker
- * reads as the field shell standing beside `Input`. Registry's `h-9` becomes the repo's
- * 48px `h-12`, and `[font:inherit]` stands in for the preflight this repo never loads.
+ * The revised `.select` (REVISED-DESIGN §8): the 48px field shell beside `Input`, its value
+ * set at 15px / 600 so a chosen option reads as a choice rather than as body copy.
  *
  * Native over a Radix `select`: the platform picker brings OS `<option>` mapping and
  * combobox semantics for free, and single select needs no portal to get them.
  */
 const selectStyles = cx(
-  'block w-full min-w-0 h-12 rounded-md border border-border bg-panel px-3 py-2',
-  'text-base text-text [font:inherit] outline-none transition-colors',
-  'cursor-pointer [-webkit-tap-highlight-color:transparent]',
-  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-accent',
-  'disabled:cursor-not-allowed disabled:text-muted',
+  'block w-full min-w-0 h-[var(--tap)] px-[var(--s3)]',
+  'rounded-[var(--r-md)] border border-line-strong bg-surface',
+  'text-[length:var(--fs-chip)] font-semibold text-ink [font:inherit] outline-none',
+  'cursor-pointer [-webkit-tap-highlight-color:transparent] motion-safe:transition-colors',
+  'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
+  'disabled:cursor-not-allowed disabled:text-ink-3',
 );
 
 export function Select({ options, className, ...rest }: Readonly<SelectProps>) {

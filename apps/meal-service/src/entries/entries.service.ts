@@ -1,16 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
+import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
 import { completeVector, readStoredVector } from '../foods/content';
 import { Entry } from './entry.entity';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto';
@@ -37,6 +40,37 @@ export interface EntryDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One page of one day's entries plus the cursor that continues it. The envelope
+ * key is the entity plural (`SPEC-pagination-seam` §4).
+ */
+export interface EntryPage {
+  entries: EntryDto[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
+/** What one day read is narrowed by; `limit`/`cursor` page it, the rest filter it. */
+export interface ListEntriesOptions {
+  /** Client-local `YYYY-MM-DD`; required, and always the client's own day. */
+  date: string;
+  /** Meal-group filter, applied after the cache hit. */
+  meal?: MealGroup;
+  limit?: number;
+  cursor?: string;
+}
+
+/**
+ * The day's strictly-after test: `updatedAt ASC, id ASC` (the loader's order —
+ * a corrected entry moves to the end). `id` breaks an `updatedAt` tie, so the
+ * boundary can neither repeat nor skip a row (`SPEC-pagination-seam` §3).
+ */
+function afterDayPosition(entry: EntryDto, at: string[]): boolean {
+  const [updatedAt, id] = at;
+  return entry.updatedAt > updatedAt || (entry.updatedAt === updatedAt && entry.id > id);
 }
 
 /**
@@ -74,7 +108,40 @@ export class EntriesService {
     @InjectRepository(Entry) private readonly entries: Repository<Entry>,
     private readonly cache: EntriesCache,
     private readonly keys: KeysService,
+    // Optional only so the unit suites that build this service positionally keep
+    // compiling; `EntriesModule` always provides the token, so a batch always
+    // has the service's one cache adapter to bump.
+    @Inject(MEAL_CACHE) private readonly mealCache?: MealCache,
   ) {}
+
+  /**
+   * The service's one cache adapter, as the batch kernel types it. The resource
+   * cache helper composes the adapter rather than extending it, so a batch hands
+   * the kernel the adapter itself — one bump then invalidates this owner's whole
+   * read set (`SPEC-meal-service.md` §6).
+   *
+   * The module always provides the token, so this never throws under Nest; the
+   * typed throw only guards a hand-built service in a unit suite.
+   */
+  private requireMealCache(): MealCache {
+    if (!this.mealCache) {
+      throw new Error('MEAL_CACHE is unavailable: the batch cache adapter is not wired');
+    }
+    return this.mealCache;
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * go to, taken from the injected repository instead of a fifth constructor
+   * argument so the existing suites that build this service positionally keep
+   * compiling.
+   *
+   * ponytail: upgrade path is `@InjectDataSource()` once those suites are
+   * converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.entries.manager.connection;
+  }
 
   /**
    * Decrypt-or-passthrough (`SPEC-meal-service` Code Style, mirroring
@@ -125,21 +192,35 @@ export class EntriesService {
   }
 
   /**
-   * The owner's non-trashed entries for a date, optionally narrowed to one meal
-   * group. Key `meal:<sub>:v<gen>:entries:<date>`.
+   * One page of the owner's non-trashed entries for a date, optionally narrowed
+   * to one meal group. Key `meal:<sub>:v<gen>:entries:<date>`.
    *
    * The date is part of the fetch identity (one entry set per day per owner),
    * so it is in the key; the meal-group filter is applied **post-hit, in
    * memory, after decrypt** (`SPEC-meal-service` Cache Rules) and never enters
    * the key. Freshness is the request's UTC instants, `updatedAt ASC` with an
    * `id` tie-break, so the order can never depend on the host clock.
+   *
+   * The pagination here is a **uniform surface, not a performance fix**: a day
+   * is already bounded structurally by the required `date` (`entries.controller`
+   * — one day holds a handful of logged items), and this read still refuses to
+   * work without one. Every meal list pages through the same seam so clients and
+   * adapters have one list contract; do not read the cursor here as a claim that
+   * an unbounded scan needed bounding.
    */
-  async findAll(sub: string, date: string, meal?: MealGroup): Promise<EntryDto[]> {
+  async findAll(sub: string, opts: ListEntriesOptions): Promise<EntryPage> {
+    const { date, meal } = opts;
     const rows = await this.cache.day(sub, date, () => this.loadDay(sub, date));
     const dek = await this.readDek(sub, rows);
     const decoded = rows.map((row) => this.toDto(row, sub, dek));
-    if (!meal) return decoded;
-    return decoded.filter((entry) => entry.mealGroup === meal);
+    const matching = meal ? decoded.filter((entry) => entry.mealGroup === meal) : decoded;
+    const page = paginate(matching, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (entry) => [entry.updatedAt, entry.id],
+      after: afterDayPosition,
+    });
+    return { entries: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**
@@ -174,13 +255,44 @@ export class EntriesService {
     return found.map(toCachedEntryRow);
   }
 
+  /** `POST /api/entries` — 201 with the sealed confirmed snapshot. */
   async create(sub: string, dto: CreateEntryDto): Promise<EntryDto> {
+    const entry = await this.insertOne(this.entries.manager, sub, dto);
+    // Bump AFTER the mutation: pre-write reads were born under the old
+    // generation and die here; a thrown save never bumps.
+    await this.cache.bump(sub);
+    return entry;
+  }
+
+  /** The `entries` batch create: one transaction, submission order, one bump (§5). */
+  async createMany(sub: string, items: CreateEntryDto[]): Promise<EntryDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+  }
+
+  /**
+   * One entry's insert, through the manager the caller supplies, and with no
+   * bump. The singular route passes the repository's manager and keeps its own
+   * bump; a batch passes the transaction's manager, so the kernel owns one bump
+   * for the whole request.
+   */
+  private async insertOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    dto: CreateEntryDto,
+  ): Promise<EntryDto> {
+    const entries = this.entriesFor(manager);
     // Service-generated id: the AAD binds it, so it exists before the ciphertext.
     const id = randomUUID();
     const dek = await this.keys.getOrCreateDek(sub);
     const vector = this.requireVector(dto.nutrients);
 
-    const entry = this.entries.create({
+    const entry = entries.create({
       id,
       ownerSub: sub,
       date: dto.date,
@@ -191,26 +303,51 @@ export class EntriesService {
       version: 0,
       deletedAt: null,
     });
-    const saved = await this.entries.save(entry);
-
-    // Bump AFTER the mutation: pre-write reads were born under the old
-    // generation and die here; a thrown save never bumps.
-    await this.cache.bump(sub);
+    const saved = await entries.save(entry);
     return this.toDto(toCachedEntryRow(saved), sub, dek);
   }
 
+  /** `PATCH /api/entries/:id` — a stale `expectedVersion` is a 409. */
   async update(sub: string, id: string, dto: UpdateEntryDto): Promise<EntryDto> {
-    const entry = await this.entries.findOne({
-      where: { id, ownerSub: sub, deletedAt: IsNull() },
-    });
-    if (!entry) throw new NotFoundException('Entry not found');
-    if (dto.expectedVersion !== undefined && entry.version !== dto.expectedVersion) {
-      throw new ConflictException('Entry was modified');
-    }
+    const entry = await this.updateOne(this.entries.manager, sub, id, dto);
+    await this.cache.bump(sub);
+    return entry;
+  }
 
-    // The snapshot changes only when the client sends corrected numbers; the
-    // stored row is never re-derived from a live food. A quantity change
-    // without a corrected vector is rejected so the pair can never disagree.
+  /**
+   * The `entries` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` on any item is a 409 and rolls the whole batch back.
+   */
+  async updateMany(
+    sub: string,
+    items: (UpdateEntryDto & { id: string })[]
+  ): Promise<EntryDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+  }
+
+  /**
+   * One entry's patch, through the manager the caller supplies, and with no
+   * bump. The snapshot changes only when the client sends corrected numbers; the
+   * stored row is never re-derived from a live food.
+   */
+  private async updateOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: string,
+    dto: UpdateEntryDto,
+  ): Promise<EntryDto> {
+    const entries = this.entriesFor(manager);
+    const entry = await entries.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!entry) throw new NotFoundException('Entry not found');
+    this.rejectStaleVersion(entry, dto.expectedVersion);
+    // A quantity change without a corrected vector is rejected so the pair can
+    // never disagree.
     if (dto.quantity !== undefined && dto.nutrients === undefined) {
       throw new BadRequestException('nutrients are required to change quantity');
     }
@@ -228,20 +365,55 @@ export class EntriesService {
     }
 
     entry.version += 1;
-    const saved = await this.entries.save(entry);
-
-    await this.cache.bump(sub);
+    const saved = await entries.save(entry);
     return this.toDto(toCachedEntryRow(saved), sub, dek);
   }
 
+  /** `DELETE /api/entries/:id` — soft delete; the row leaves every read. */
   async remove(sub: string, id: string): Promise<void> {
-    const entry = await this.entries.findOne({
-      where: { id, ownerSub: sub, deletedAt: IsNull() },
-    });
-    if (!entry) throw new NotFoundException('Entry not found');
-    entry.deletedAt = new Date();
-    await this.entries.save(entry);
+    await softDeleteOne(this.trashable, this.entries.manager, sub, id);
     await this.cache.bump(sub);
+  }
+
+  /**
+   * The `entries` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning. A foreign id is a 404 and rolls
+   * the whole batch back, leaving every row live.
+   */
+  removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    return softDeleteBatch(this.trashable, {
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.requireMealCache(),
+    });
+  }
+
+  /**
+   * What the shared soft delete needs to know about an entry, stated once for
+   * both the singular and the batch path: where an entry lives, and what a
+   * missing one is called.
+   */
+  private readonly trashable: SoftDeleteTarget<Entry> = {
+    repositoryFor: (manager) => this.entriesFor(manager),
+    notFound: 'Entry not found',
+  };
+
+  /**
+   * The entry repository a write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it. No
+   * manager means the service's own repository — the singular path, and the only
+   * shape a unit suite's repository double can supply.
+   */
+  private entriesFor(manager: EntityManager | undefined): Repository<Entry> {
+    if (!manager) return this.entries;
+    return manager.getRepository(Entry);
+  }
+
+  /** Optimistic concurrency: an explicit version that no longer matches is a 409. */
+  private rejectStaleVersion(entry: Entry, expectedVersion: number | undefined): void {
+    if (expectedVersion === undefined || entry.version === expectedVersion) return;
+    throw new ConflictException('Entry was modified');
   }
 
   /**

@@ -35,6 +35,24 @@ describe('ManagerBlock', () => {
     expect(screen.queryByRole('link', { name: 'Back' })).toBeNull();
   });
 
+  it('renders an optional sub-line under the heading, and nothing without one', () => {
+    const { container, unmount } = render(
+      <ManagerBlock title="Daily target" backHref="/meals/settings" sub="Computed on the server.">
+        <span />
+      </ManagerBlock>,
+    );
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Daily target');
+    expect(container.querySelector('.ui-page-title__sub')!.textContent).toBe('Computed on the server.');
+    unmount();
+
+    const bare = render(
+      <ManagerBlock title="Tags" backHref="/notes">
+        <span />
+      </ManagerBlock>,
+    );
+    expect(bare.container.querySelector('.ui-page-title__sub')).toBeNull();
+  });
+
   it('renders children inside the shell as-is, including a Card wrapper node', () => {
     render(
       <ManagerBlock title="Tags" backHref="/notes">

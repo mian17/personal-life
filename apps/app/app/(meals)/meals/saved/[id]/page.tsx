@@ -1,8 +1,16 @@
 import { format, sum } from '@life/nutrition';
-import { Button, Card, IconLink, List, ListItem, NavBar, PageShell, PageTitle, Section } from '@life/ui';
-import { ArrowLeft } from 'lucide-react';
+import {
+  Button,
+  Card,
+  List,
+  ListItem,
+  ManagerBlock,
+  PageActions,
+  Pill,
+  Section,
+} from '@life/ui';
 import { loadOrNotFound } from '@life/app-kit';
-import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
+import { collectMealFoodsIncludingDeleted, getSavedMeal, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -21,19 +29,11 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
   const meal = await loadOrNotFound(() => getSavedMeal(id));
   // Name resolution reads the whole catalog (soft-deleted rows included): the
   // item's dish name must survive the food being deleted (AC5).
-  const catalog = await listMealFoodsIncludingDeleted();
+  const catalog = await collectMealFoodsIncludingDeleted();
   const total = format('calories', sum(meal.items.map((item) => item.nutrients)).calories);
 
   return (
-    <PageShell>
-      <NavBar
-        leading={
-          <IconLink href="/meals/saved" label="Back">
-            <ArrowLeft size={20} aria-hidden />
-          </IconLink>
-        }
-      />
-      <PageTitle>{meal.name}</PageTitle>
+    <ManagerBlock title={meal.name} backHref="/meals/saved">
       <Card>Re-log {total} in one tap — the corrected numbers, not a new guess.</Card>
       <Section label="Items">
         <List>
@@ -47,16 +47,17 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
               // stored; null means the item was saved without a catalog food,
               // so the meal name labels it.
               title={item.foodId ? restoredFoodName(item.foodId, catalog) : meal.name}
-              meta={`× ${item.quantity} · ${format('calories', item.nutrients.calories)}`}
+              meta={`× ${item.quantity}`}
+              trailing={<Pill>{format('calories', item.nutrients.calories)}</Pill>}
             />
           ))}
         </List>
       </Section>
-      <Section>
+      <PageActions>
         <form action={relogMealAction.bind(null, meal.id)}>
           <Button type="submit">Log this meal again</Button>
         </form>
-      </Section>
-    </PageShell>
+      </PageActions>
+    </ManagerBlock>
   );
 }

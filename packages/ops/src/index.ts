@@ -16,6 +16,22 @@ export type {
   WireRequest,
 } from './core/types';
 export { defineResource, fieldEntry, fieldNames, findOp } from './core/registry';
+export {
+  BULK_KINDS,
+  DEFAULT_BULK_LIMIT,
+  assembleBulkEnvelope,
+  bulkItemInput,
+  bulkSourceKind,
+  isBulkKind,
+  resolveBulkLimit,
+} from './core/bulk';
+export type {
+  BulkEnvelope,
+  BulkFailedItem,
+  BulkItemResult,
+  BulkKind,
+  BulkSucceededItem,
+} from './core/bulk';
 export { describeIssues, validateInput } from './core/validate';
 export { deriveInputSchema, toolName } from './core/schema';
 export type { JsonSchema, JsonSchemaProperty } from './core/schema';

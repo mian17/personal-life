@@ -12,18 +12,22 @@ export const viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f5f7' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f1115' },
+    { media: '(prefers-color-scheme: light)', color: '#f4f4f1' },
+    { media: '(prefers-color-scheme: dark)', color: '#16171a' },
   ],
 };
 
-const themeScript = `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t}}catch(e){}`;
+/** Appearance plumbing, before first paint: the stored scheme lands on `html`. The screen's
+    accent scope is not this script's job — each area layout declares its own scope, so the
+    accent follows a client-side route change with no reload. The scope cannot live on `html`
+    because tokens.css reaches its accents through a descendant selector. */
+const applyStoredTheme = `try{var choice=localStorage.getItem('calm-theme');if(choice==='light'||choice==='dark'){document.documentElement.dataset.theme=choice}}catch(unavailableStorage){}`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      <body suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: applyStoredTheme }} />
         <TimeZoneSync />
         {children}
       </body>

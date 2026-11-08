@@ -1,22 +1,24 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { pruneRoutineSnapshots } from './backup';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { finalizeBackup } from './backup';
 import {
   createComposePgRunner,
   pgDump,
   pgRestoreListOk,
-  resolveFeedbackDb,
+  resolvePgDatabases,
+  selectPgDatabases,
   tableCounts,
 } from './pg-client';
-import type { PgRunner } from './pg-client';
+import type { PgIdentity, PgRunner } from './pg-client';
 
 /**
- * `db:backup:pg` core (`SPEC-feedback-infra.md` "Backup behavior"). Dumps the
- * Postgres database named by `FEEDBACK_DB_URL` via `pg_dump -Fc --no-owner`
- * inside the DB container, verifies with `pg_restore --list`, records
- * per-table counts, and archives `<database>.dump` + `manifest.json` into one
- * UTC-stamped `backup/` directory. Retention reuses `pruneRoutineSnapshots`
- * unchanged (shared routine pool with the SQLite variant). Non-interactive.
+ * `db:backup:pg` core (`SPEC-feedback-infra.md` "Backup behavior"). Dumps every Postgres
+ * database `resolvePgDatabases` reports (feedback only — `focus-service` is SQLite) via
+ * `pg_dump -Fc --no-owner` inside the DB container, verifies each with
+ * `pg_restore --list`, records per-table counts, and archives `<database>.dump` +
+ * `manifest.json` into one UTC-stamped `backup/` directory. `--only <name>` restricts the
+ * run to the named databases. Retention reuses `pruneRoutineSnapshots` unchanged (shared
+ * routine pool with the SQLite variant). Non-interactive.
  */
 
 export type BackupPgMode = 'routine' | 'deliberate';
@@ -43,25 +45,50 @@ export interface BackupPgResult {
   snapshots: PgManifestEntry[];
 }
 
-/** `--only feedback` (or `--only=feedback`); anything but the URL's database is rejected here, before any write. */
-function parseOnly(argv: string[], database: string): void {
+/** `--only feedback` (or `--only=…`); `undefined` selects every database. */
+function parseOnly(argv: string[]): string | undefined {
   const index = argv.findIndex((arg) => arg === '--only' || arg.startsWith('--only='));
-  if (index === -1) return;
+  if (index === -1) return undefined;
   const raw = argv[index] === '--only' ? argv[index + 1] : argv[index].slice('--only='.length);
   if (!raw) throw new Error('--only requires a comma-separated database list');
-  for (const part of raw.split(',')) {
-    const name = part.trim();
-    if (name !== database) {
-      throw new Error(`unknown database name: ${name}`);
-    }
-  }
+  return raw;
+}
+
+interface BackupTarget {
+  runner: PgRunner;
+  destination: string;
+  containerDirectory: string;
 }
 
 /**
- * Run one backup. Unknown `--only` names and an existing destination throw
- * before anything is written; a routine run prunes after its own snapshot is
- * verified. The URL comes from the passed `env` (`FEEDBACK_DB_URL`, explicit) —
- * a test var is never read implicitly.
+ * Dump, verify and copy out one database, answering its manifest entry. Every archive
+ * lands in the run's container directory; file names carry the database name.
+ */
+function dumpDatabase(target: BackupTarget, db: PgIdentity): PgManifestEntry {
+  const file = `${db.database}.dump`;
+  const containerPath = join(target.containerDirectory, file);
+  pgDump(target.runner, containerPath, db);
+  if (!pgRestoreListOk(target.runner, containerPath)) {
+    throw new Error(`pg_restore --list failed for ${containerPath}`);
+  }
+  const tables = tableCounts(target.runner, db);
+  const archived = join(target.destination, file);
+  target.runner.copyOut(containerPath, archived);
+  return {
+    name: db.database,
+    file,
+    source: db.database,
+    bytes: statSync(archived).size,
+    pgRestoreList: 'ok',
+    tables,
+  };
+}
+
+/**
+ * Run one backup. Unknown `--only` names and an existing destination throw before anything
+ * is written; a routine run prunes after its own snapshot is verified. The URL comes from
+ * the passed `env` (`FEEDBACK_DB_URL`, explicit) — a test var is never read
+ * implicitly.
  */
 export function runBackupPg(options: {
   argv: string[];
@@ -70,8 +97,7 @@ export function runBackupPg(options: {
   now?: () => Date;
 }): BackupPgResult {
   const env = options.env ?? process.env;
-  const db = resolveFeedbackDb(env);
-  parseOnly(options.argv, db.database);
+  const databases = selectPgDatabases(parseOnly(options.argv), resolvePgDatabases(env));
   const pinned = options.argv.includes('--pin');
 
   const at = options.now ? options.now() : new Date();
@@ -86,40 +112,28 @@ export function runBackupPg(options: {
 
   const runner =
     options.runner ?? createComposePgRunner({ composeFile: join(root, 'compose.yaml') });
-  const file = `${db.database}.dump`;
-  const containerPath = `/tmp/db-backup-${stamp}/${db.database}.dump`;
-  runner.exec(['mkdir', '-p', dirname(containerPath)]);
-  pgDump(runner, containerPath, db);
-  if (!pgRestoreListOk(runner, containerPath)) {
-    throw new Error(`pg_restore --list failed for ${containerPath}`);
-  }
-  const tables = tableCounts(runner, db);
-  const target = join(destination, file);
-  runner.copyOut(containerPath, target);
-
-  const entry: PgManifestEntry = {
-    name: db.database,
-    file,
-    source: db.database,
-    bytes: statSync(target).size,
-    pgRestoreList: 'ok',
-    tables,
+  // `pg_dump -f` never creates its parent directory, so the container dump directory is
+  // made once, before the first dump (`restore-pg.ts` does the same).
+  const target: BackupTarget = {
+    runner,
+    destination,
+    containerDirectory: `/tmp/db-backup-${stamp}`,
   };
-  const manifest: PgBackupManifest = {
-    mode: pinned ? 'deliberate' : 'routine',
-    createdAt: at.toISOString(),
+  runner.exec(['mkdir', '-p', target.containerDirectory]);
+  const snapshots = databases.map((db) => dumpDatabase(target, db));
+
+  const mode: BackupPgMode = pinned ? 'deliberate' : 'routine';
+  finalizeBackup({
+    destination,
+    backupRoot,
     pinned,
-    databases: [entry],
-  };
-  writeFileSync(join(destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  if (pinned) writeFileSync(join(destination, 'PINNED'), '');
+    mode,
+    createdAt: at.toISOString(),
+    entries: snapshots,
+    warnPrefix: 'db:backup:pg',
+  });
 
-  if (!pinned) {
-    const { failed } = pruneRoutineSnapshots(backupRoot);
-    for (const dir of failed) console.warn(`db:backup:pg: could not prune ${dir}`);
-  }
-
-  return { destination, mode: manifest.mode, snapshots: [entry] };
+  return { destination, mode, snapshots };
 }
 
 /**

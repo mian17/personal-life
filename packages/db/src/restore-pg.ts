@@ -7,7 +7,8 @@ import {
   pgDump,
   pgRestoreListOk,
   replaceDatabase,
-  resolveFeedbackDb,
+  resolvePgDatabases,
+  selectPgDatabases,
   tableCounts,
 } from './pg-client';
 import type { PgIdentity, PgRunner } from './pg-client';
@@ -16,11 +17,12 @@ import type { StackProbe, StackState } from './restore';
 
 /**
  * `db:restore:pg` core (`SPEC-feedback-infra.md` "Restore behavior", "Restore safety
- * check"). Replaces the whole feedback database from a chosen snapshot, but only after
- * fail-closed preconditions (snapshot verified by `pg_restore --list`, stack probed
- * stopped) and after taking a verified, pinned pre-restore snapshot of the database it is
- * about to overwrite. Post-write table counts are compared against the snapshot's
- * manifest; a mismatch exits 1 and names the undo path. Non-interactive, no stdin.
+ * check"). Replaces the whole selected database from a chosen
+ * snapshot, but only after fail-closed preconditions (snapshot verified by
+ * `pg_restore --list`, stack probed stopped) and after taking a verified, pinned
+ * pre-restore snapshot of the database it is about to overwrite. Post-write table counts
+ * are compared against that database's manifest entry; a mismatch exits 1 and names the
+ * undo path. Non-interactive, no stdin.
  */
 
 const STACK_PORTS: readonly number[] = [3002, 3003];
@@ -56,14 +58,13 @@ function parseFrom(argv: string[]): string {
   return from;
 }
 
-/** Raw `--only` value (`undefined` when the flag is absent); validated against the URL's database. */
+/** Raw `--only` value (`undefined` when the flag is absent); names resolved later. */
 function parseOnly(argv: string[]): string | undefined {
   const raw = parseFlag(argv, '--only');
   if (raw === undefined) return undefined;
   if (!raw) throw new RestorePgError('--only requires a database name');
   return raw;
 }
-
 
 /**
  * The authoritative "database in use" signal, run inside the container: other backends
@@ -89,34 +90,20 @@ function databaseInUse(runner: PgRunner, db: PgIdentity): StackState {
   return count === 0 ? 'down' : 'up';
 }
 
-/**
- * Restore the database named by `FEEDBACK_DB_URL` from the snapshot directory `from`.
- * Every precondition fails closed before the live database is touched: the `*.dump` must
- * exist and pass `pg_restore --list`, and the stack must probe stopped on ports 3002/3003
- * *and* show no other database client. A verified, pinned pre-restore snapshot is taken
- * first; post-write counts are compared against the snapshot manifest's `tables`
- * (missing/unreadable manifest → comparison skipped, never a crash), and a mismatch
- * throws while naming the pre-restore dump as the recovery path.
- */
-/** `--only` may only name the URL's database; anything else is a usage error. */
-function assertOnlyMatchesDatabase(only: string | undefined, database: string): void {
-  if (only === undefined) return;
-  for (const part of only.split(',')) {
-    const name = part.trim();
-    if (name !== database) throw new RestorePgError(`unknown database name: ${name}`);
-  }
-}
-
-interface SnapshotDir {
+interface SnapshotDirectory {
   root: string;
   backupRoot: string;
   fromDir: string;
+}
+
+/** A database to restore, bound to its archive inside the snapshot directory. */
+interface RestoreTarget extends PgIdentity {
   file: string;
   snapshotPath: string;
 }
 
-/** Resolve the snapshot directory (under `backup/`) and the archive inside it. */
-function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string, database: string): SnapshotDir {
+/** Resolve the snapshot directory and hold it inside `backup/`. */
+function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string): SnapshotDirectory {
   const root = resolve(env.INIT_CWD ?? process.cwd());
   const backupRoot = join(root, 'backup');
   const fromDir = resolve(root, from);
@@ -127,12 +114,26 @@ function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string, database: stri
   if (rel.startsWith('..') || isAbsolute(rel)) {
     throw new RestorePgError(`snapshot directory must be under ${backupRoot}: ${fromDir}`);
   }
-  const file = `${database}.dump`;
-  const snapshotPath = join(fromDir, file);
-  if (!existsSync(snapshotPath)) {
-    throw new RestorePgError(`snapshot file does not exist: ${snapshotPath}`);
-  }
-  return { root, backupRoot, fromDir, file, snapshotPath };
+  return { root, backupRoot, fromDir };
+}
+
+/**
+ * The selected databases that this snapshot actually holds, paired with their archive.
+ * A snapshot with no archive at all is a usage error, never a silent no-op; a snapshot of
+ * one database restores that one, which keeps single-database archives restorable.
+ */
+function withArchiveIn(
+  databases: PgIdentity[],
+  fromDir: string,
+): RestoreTarget[] {
+  const archived = databases.flatMap((db) => {
+    const file = `${db.database}.dump`;
+    const snapshotPath = join(fromDir, file);
+    return existsSync(snapshotPath) ? [{ ...db, file, snapshotPath }] : [];
+  });
+  if (archived.length > 0) return archived;
+  const missing = databases.map((db) => join(fromDir, `${db.database}.dump`)).join(', ');
+  throw new RestorePgError(`snapshot file does not exist: ${missing}`);
 }
 
 /** Every stack port must probe `down`; `up` or `unknown` fails closed.
@@ -211,25 +212,25 @@ function takePreRestoreSnapshot(
   };
 }
 
-/** Write the pinned pre-restore manifest, making the undo path discoverable. */
+/** Write the pinned pre-restore manifest, making every undo path discoverable. */
 function writePreRestoreManifest(
   preRestoreDir: string,
   at: Date,
-  entry: PgManifestEntry,
+  entries: PgManifestEntry[],
 ): void {
   const preManifest: PreRestorePgManifest = {
     mode: 'pre-restore',
     createdAt: at.toISOString(),
     pinned: true,
-    databases: [entry],
+    databases: entries,
   };
   writeFileSync(join(preRestoreDir, 'manifest.json'), `${JSON.stringify(preManifest, null, 2)}\n`);
   writeFileSync(join(preRestoreDir, 'PINNED'), '');
 }
 
 /**
- * Post-write verification against the chosen snapshot's manifest; a missing or
- * unreadable manifest leaves the expectation unknown → skip, never crash the restore.
+ * Post-write verification against the restored database's own manifest entry; a missing
+ * or unreadable manifest leaves the expectation unknown → skip, never crash the restore.
  */
 function assertRowCountsMatch(
   runner: PgRunner,
@@ -238,7 +239,7 @@ function assertRowCountsMatch(
   preRestorePath: string,
 ): void {
   const snapshotManifest = readManifest(fromDir) as { databases?: PgManifestEntry[] } | null;
-  const expected: Record<string, number> | undefined = snapshotManifest?.databases?.[0]?.tables;
+  const expected = snapshotManifest?.databases?.find((entry) => entry.name === db.database)?.tables;
   if (!expected || Object.keys(expected).length === 0) return;
   const restored = tableCounts(runner, db);
   for (const [table, count] of Object.entries(expected)) {
@@ -250,6 +251,51 @@ function assertRowCountsMatch(
       );
     }
   }
+}
+
+
+interface RestoreRun {
+  runner: PgRunner;
+  probe: StackProbe;
+  preRestoreDir: string;
+  fromDir: string;
+  stamp: string;
+  at: Date;
+  /** Undo paths taken so far, so the pre-restore manifest names every archive. */
+  preRestoreEntries: PgManifestEntry[];
+}
+
+/**
+ * Restore one database: preconditions, the pinned pre-restore snapshot, the replacement,
+ * then the post-write count check against that database's own manifest entry.
+ */
+async function restoreOne(
+  run: RestoreRun,
+  target: RestoreTarget,
+): Promise<RestorePgResult['replaced'][number]> {
+  const containerPath = `/tmp/db-restore-${run.stamp}/${target.file}`;
+  await assertSafeToRestore(run.runner, run.probe, target, target.snapshotPath, containerPath);
+
+  const preRestore = takePreRestoreSnapshot(
+    run.runner,
+    target,
+    run.preRestoreDir,
+    target.file,
+    run.stamp,
+  );
+  run.preRestoreEntries.push(preRestore.entry);
+
+  // Replace the live database (drop/recreate + pg_restore, `src/pg-client.ts`).
+  replaceDatabase(run.runner, target, containerPath);
+  writePreRestoreManifest(run.preRestoreDir, run.at, run.preRestoreEntries);
+  assertRowCountsMatch(run.runner, target, run.fromDir, preRestore.path);
+
+  return {
+    name: target.database,
+    file: target.file,
+    snapshot: target.snapshotPath,
+    preRestore: preRestore.path,
+  };
 }
 
 export async function runRestorePg(options: {
@@ -264,34 +310,35 @@ export async function runRestorePg(options: {
   // The SQLite variant owns the identical read-only TCP probe, so this reuses it
   // instead of keeping a local copy.
   const probe = options.probe ?? defaultProbe;
-  const db = resolveFeedbackDb(env);
-  assertOnlyMatchesDatabase(options.only, db.database);
+  const selected = selectPgDatabases(options.only, resolvePgDatabases(env));
 
-  const { root, backupRoot, fromDir, file, snapshotPath } = resolveSnapshotDir(
-    env,
-    options.from,
-    db.database,
-  );
+  const { root, backupRoot, fromDir } = resolveSnapshotDir(env, options.from);
+  const targets = withArchiveIn(selected, fromDir);
+
   const at = options.now ? options.now() : new Date();
   const stamp = at.toISOString().replace(/[:.]/g, '-');
   const runner =
     options.runner ?? createComposePgRunner({ composeFile: join(root, 'compose.yaml') });
 
-  const containerPath = `/tmp/db-restore-${stamp}/${file}`;
-  await assertSafeToRestore(runner, probe, db, snapshotPath, containerPath);
-
   const preRestoreDir = join(backupRoot, `pre-restore-${stamp}`);
-  const preRestore = takePreRestoreSnapshot(runner, db, preRestoreDir, file, stamp);
-
-  // Replace the live database (drop/recreate + pg_restore, `src/pg-client.ts`).
-  replaceDatabase(runner, db, containerPath);
-  writePreRestoreManifest(preRestoreDir, at, preRestore.entry);
-  assertRowCountsMatch(runner, db, fromDir, preRestore.path);
-
-  return {
+  const run: RestoreRun = {
+    runner,
+    probe,
     preRestoreDir,
-    replaced: [{ name: db.database, file, snapshot: snapshotPath, preRestore: preRestore.path }],
+    fromDir,
+    stamp,
+    at,
+    preRestoreEntries: [],
   };
+  // Strictly sequential: each restore appends its own undo path to `run` and rewrites the
+  // shared pre-restore manifest, so the databases must be replaced one at a time and in
+  // order. A reducer over an async accumulator keeps that ordering explicit.
+  const replaced = await targets.reduce<Promise<RestorePgResult['replaced']>>(
+    async (done, target) => [...(await done), await restoreOne(run, target)],
+    Promise.resolve([]),
+  );
+
+  return { preRestoreDir, replaced };
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   wrapDek,
 } from '@life/crypto';
 import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
-import { resolveDbPath } from '@life/shared';
+import { resolveDbPath } from '@life/shared/node';
 
 /**
  * `import-tags` core (`SPEC-tags-extraction` Migration script + Testing

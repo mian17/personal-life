@@ -1,14 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PomodoroPage } from '../src/pomodoro-page';
-import { DEFAULT_DURATIONS, MINUTE_MS } from '../src/timer';
+import { DEFAULT_DURATIONS, MINUTE_MS, SESSIONS_PER_CYCLE } from '../src/timer';
 
-/**
- * The card centres its rows with `place-content`, so a row that unmounts makes
- * the card shorter and the whole read-out shifts by half of what was lost. Every
- * row therefore stays mounted and only loses its paint — this is the property,
- * not the class name: the row is still the same node, in the same position, and
- * the card still has the same number of children.
- */
+/** The three chips the card draws, by their visible label. */
+const FOCUS_PRESET_LABELS = ['15 min', '25 min', '50 min'] as const;
+
 /** The mode the hook writes back on every settle, which is also what a reload restores. */
 function storeMode(mode: {
   phase: string;
@@ -47,7 +43,7 @@ describe('PomodoroPage', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
   }
 
-  /** The card's rows are the layout: a row that unmounts shrinks the centring. */
+  /** The card's rows are the layout: a row that unmounts shrinks the card's rhythm. */
   function actionRow(button: HTMLElement): HTMLElement {
     const row = button.parentElement;
     if (!row) throw new Error('action button has no parent row');
@@ -59,24 +55,26 @@ describe('PomodoroPage', () => {
 
     const start = screen.getByRole('button', { name: 'Start focus' });
     const row = actionRow(start);
-    const stack = row.parentElement;
-    const rows = stack?.children.length ?? 0;
+    const card = row.parentElement;
+    const slot = Array.from(card?.children ?? []).indexOf(row);
+    const rows = card?.children.length ?? 0;
     expect(row.classList.contains('ui-invisible')).toBe(false);
     expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 
     // Same node, same slot: the label changes, the box does not move or vanish.
-    expect(stack?.children[4]).toBe(row);
+    expect(slot).toBeGreaterThan(-1);
+    expect(card?.children[slot]).toBe(row);
     expect(start.isConnected).toBe(true);
     expect(start.textContent).toBe('Pause');
-    expect(stack?.children.length).toBe(rows);
+    expect(card?.children.length).toBe(rows);
     expect(row.children).toHaveLength(2);
 
     fireEvent.click(start);
 
     expect(start.textContent).toBe('Resume');
-    expect(stack?.children[4]).toBe(row);
+    expect(card?.children[slot]).toBe(row);
   });
 
   it('cannot reset before the cycle has begun', () => {
@@ -177,9 +175,381 @@ describe('PomodoroPage', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
     const line = screen.getByText(/^Next: /u);
+    // The reservation is one ladder row, so the digits-to-track band is `--s8`, not 44.
+    expect(line.classList.contains('h-[var(--s4)]')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
 
     expect(screen.getByText(/^Next: /u)).toBe(line);
     expect(line.classList.contains('ui-invisible')).toBe(true);
   });
+
+  it('draws the session progress track from the phase the card is counting', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    // Nothing spent before the first start: the track is drawn at rest, at zero.
+    expect(progress()).toBe('0');
+  });
+
+  it('marks the chip of the focus length the settings chose as the pressed one', () => {
+    render(<PomodoroPage durations={{ ...DEFAULT_DURATIONS, focus: 50 }} />);
+
+    const pressed = screen
+      .getAllByText(/^\d+ min$/u)
+      .filter((chip) => chip.closest('.ui-pill--active') != null);
+
+    expect(pressed.map((chip) => chip.textContent)).toEqual(['50 min']);
+  });
+
+  it('reports and starts a focus length a chip was tapped for', () => {
+    const onFocusLengthChange = jest.fn();
+    render(
+      <PomodoroPage durations={DEFAULT_DURATIONS} onFocusLengthChange={onFocusLengthChange} />,
+    );
+
+    expect(digits()).toBe('25:00');
+
+    fireEvent.click(screen.getByRole('button', { name: '50 min' }));
+
+    expect(onFocusLengthChange).toHaveBeenCalledWith(50);
+    expect(pressedChips()).toEqual(['50 min']);
+    // The timer re-seeded from the choice, not from the prop it mounted with.
+    expect(digits()).toBe('50:00');
+    expect(progress()).toBe('0');
+  });
+
+  it('draws the chips as disabled buttons when there is nowhere to report a choice', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    const chips = FOCUS_PRESET_LABELS.map((name) => screen.getByRole('button', { name }));
+
+    expect(chips.map((chip) => chip.hasAttribute('disabled'))).toEqual([true, true, true]);
+  });
+
+  it('hides the focus-length chips while a phase counts down', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    const row = focusRow();
+    expect(row.classList.contains('ui-invisible')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+
+    // Configuration for the next phase, never part of this one: the row stops being
+    // painted but keeps its box, so the rows under it do not step up.
+    expect(row.classList.contains('ui-invisible')).toBe(true);
+    expect(row.classList.contains('invisible')).toBe(true);
+    expect(row.isConnected).toBe(true);
+    expect(focusRow()).toBe(row);
+    // Still one row: the break row is not rendered, because no break is imminent.
+    expect(lengthRowLabels()).toEqual(['Focus length']);
+  });
+
+  it('hides the focus-length chips while a phase is paused', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
+    expect(focusRow().classList.contains('ui-invisible')).toBe(true);
+    expect(focusRow().classList.contains('invisible')).toBe(true);
+    expect(lengthRowLabels()).toEqual(['Focus length']);
+  });
+
+  it('shows the focus-length chips at the untouched start and the break-length chips at a break boundary', () => {
+    const { unmount } = render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    // `idle`: nothing has begun, which is when a length is configured.
+    expect(focusRow().classList.contains('ui-invisible')).toBe(false);
+    unmount();
+
+    // `boundary`: the focus is spent, so the row it draws is the break that is about to start —
+    // one row, and not the focus lengths, which configure nothing here.
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByRole('button', { name: 'Start break' })).toBeTruthy();
+    expect(lengthRowLabels()).toEqual(['Break length']);
+  });
+
+  it('draws exactly one length row at a break boundary, and it is the break row', () => {
+    renderBreakBoundary(1);
+
+    // One group, named by the session about to start: the focus row is absent, not painted out,
+    // so nothing configures the break except the break's own lengths.
+    expect(lengthRowLabels()).toEqual(['Break length']);
+    expect(breakChipLabels()).toEqual(['5 min', '10 min', '15 min']);
+    expect(screen.queryByRole('button', { name: '25 min' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '50 min' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Focus length' })).toBeNull();
+  });
+
+  it('draws exactly one length row at a boundary after a break, and it is the focus row', () => {
+    storeMode({ phase: 'short', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByText('Next: Focus')).toBeTruthy();
+    expect(lengthRowLabels()).toEqual(['Focus length']);
+    expect(focusRow().classList.contains('ui-invisible')).toBe(false);
+    expect(breakChips()).toHaveLength(0);
+  });
+
+  it('offers the short break lengths at every boundary inside the cycle', () => {
+    for (const session of [1, 2, SESSIONS_PER_CYCLE - 1]) {
+      const { unmount } = renderBreakBoundary(session);
+
+      expect(breakChipLabels()).toEqual(['5 min', '10 min', '15 min']);
+      expect(screen.getByText('Next: Short break')).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it('offers the long break lengths at the boundary that closes the cycle', () => {
+    renderBreakBoundary(SESSIONS_PER_CYCLE);
+
+    expect(breakChipLabels()).toEqual(['15 min', '25 min', '30 min']);
+    expect(screen.getByText('Next: Long break')).toBeTruthy();
+  });
+
+  it('marks the stored break length as the pressed chip before a pick', () => {
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={{ ...DEFAULT_DURATIONS, short: 10 }} />);
+
+    expect(pressedBreakChips()).toEqual(['10 min']);
+  });
+
+  it('reports the break length a chip picked and starts the break that long', () => {
+    const onBreakLengthChange = jest.fn();
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(
+      <PomodoroPage
+        durations={DEFAULT_DURATIONS}
+        onBreakLengthChange={onBreakLengthChange}
+      />,
+    );
+
+    fireEvent.click(breakChip('10 min'));
+
+    expect(onBreakLengthChange).toHaveBeenCalledWith('short', 10);
+    expect(pressedBreakChips()).toEqual(['10 min']);
+    // The pick sizes the break and does not begin it: the boundary still waits for Start. What
+    // the digits show is that size, so the owner reads the length before committing to it.
+    expect(digits()).toBe('10:00');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start break' }));
+
+    expect(digits()).toBe('10:00');
+  });
+
+  it('previews every break pick in the digits before Start, not just the first', () => {
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} onBreakLengthChange={jest.fn()} />);
+
+    fireEvent.click(breakChip('15 min'));
+    expect(digits()).toBe('15:00');
+
+    fireEvent.click(breakChip('5 min'));
+    expect(digits()).toBe('05:00');
+  });
+
+  it('previews the long break length at the boundary that closes the cycle', () => {
+    storeMode({
+      phase: 'focus',
+      session: SESSIONS_PER_CYCLE,
+      status: 'boundary',
+      remainingMs: 0,
+      endsAt: 1_000,
+    });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} onBreakLengthChange={jest.fn()} />);
+
+    // The stored long break is 15, and that is what the digits read before any pick.
+    expect(digits()).toBe('15:00');
+
+    fireEvent.click(breakChip('30 min'));
+
+    expect(digits()).toBe('30:00');
+  });
+
+  it('replaces an earlier pick, so the last chip pressed is the break that starts', () => {
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} onBreakLengthChange={jest.fn()} />);
+
+    fireEvent.click(breakChip('15 min'));
+    fireEvent.click(breakChip('5 min'));
+    fireEvent.click(screen.getByRole('button', { name: 'Start break' }));
+
+    expect(digits()).toBe('05:00');
+  });
+
+  it('hides the focus chips mid-break, so a running break keeps the deadline it was started with', () => {
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    const { rerender } = render(
+      <PomodoroPage
+        durations={DEFAULT_DURATIONS}
+        onFocusLengthChange={jest.fn()}
+        onBreakLengthChange={jest.fn()}
+      />,
+    );
+    fireEvent.click(breakChip('15 min'));
+    fireEvent.click(screen.getByRole('button', { name: 'Start break' }));
+    expect(digits()).toBe('15:00');
+
+    // A length is configuration for the phase that will run, so the chips are out of reach
+    // while this one runs. Both paths that reach `applyDurations` still must not move a fixed
+    // deadline: the fresh object the write revalidates in, and a press on a chip that is no
+    // longer paintable (`timer.test.ts` pins the same rule on the machine itself).
+    expect(focusRow().classList.contains('ui-invisible')).toBe(true);
+
+    rerender(
+      <PomodoroPage
+        durations={{ ...DEFAULT_DURATIONS, short: 5, long: 30 }}
+        onFocusLengthChange={jest.fn()}
+        onBreakLengthChange={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '50 min' }));
+
+    expect(digits()).toBe('15:00');
+    expect(screen.queryByRole('group', { name: 'Break length' })).toBeNull();
+  });
+
+  it('draws no break row while a phase counts down', () => {
+    storeMode({
+      phase: 'focus',
+      session: 1,
+      status: 'running',
+      remainingMs: 20 * MINUTE_MS,
+      endsAt: Date.now() + 20 * MINUTE_MS,
+    });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.queryByRole('group', { name: 'Break length' })).toBeNull();
+  });
+
+  it('draws no break row at the idle start of a later focus', () => {
+    storeMode({
+      phase: 'focus',
+      session: 2,
+      status: 'idle',
+      remainingMs: 25 * MINUTE_MS,
+      endsAt: 0,
+    });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.queryByRole('group', { name: 'Break length' })).toBeNull();
+  });
+
+  it('draws no break row at a break boundary, because the next step is a focus', () => {
+    storeMode({ phase: 'short', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByText('Next: Focus')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Break length' })).toBeNull();
+  });
+
+  it('draws the break chips as disabled buttons when there is nowhere to report a choice', () => {
+    renderBreakBoundary(1);
+
+    const chips = breakChips();
+
+    expect(chips.map((chip) => chip.hasAttribute('disabled'))).toEqual([true, true, true]);
+  });
+
+  it('names the cycle position in the Today count', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByText(`0 of ${SESSIONS_PER_CYCLE}`)).toBeTruthy();
+  });
+
+  it('reads the day the page handed the card as two pill rows', () => {
+    render(
+      <PomodoroPage durations={DEFAULT_DURATIONS} todayMinutes={50} todayGoalMinutes={100} />,
+    );
+
+    expect(rowTrail('Focus minutes')).toBe('50 min');
+    expect(rowTrail('Daily goal')).toBe('50 of 100 min');
+  });
+
+  it('draws no day rows when the page handed the card nothing to read', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.queryByText('Focus minutes')).toBeNull();
+    expect(screen.queryByText('Daily goal')).toBeNull();
+  });
+
+  /** The digits' own read-out, as the owner reads them. */
+  function digits(): string {
+    return screen.getByRole('timer').textContent ?? '';
+  }
+
+  /** A focus block that has just run out, so the break it earns is the next step. */
+  function renderBreakBoundary(session: number) {
+    storeMode({ phase: 'focus', session, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+
+    return render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+  }
+
+  /** The focus-length row, which is hidden — never unmounted — while a phase is in flight. */
+  function focusRow(): HTMLElement {
+    return screen.getByRole('group', { name: 'Focus length' });
+  }
+
+  /** The name of every length row on the card: exactly one, whatever the state. */
+  function lengthRowLabels(): string[] {
+    return screen
+      .getAllByRole('group')
+      .map((row) => row.getAttribute('aria-label') ?? '')
+      .filter((label) => label === 'Focus length' || label === 'Break length');
+  }
+
+  /** The break row's chips; empty when the row is absent, which is most of the cycle. */
+  function breakChips(): HTMLElement[] {
+    const row = screen.queryByRole('group', { name: 'Break length' });
+    return row ? within(row).getAllByRole('button') : [];
+  }
+
+  function breakChipLabels(): (string | null)[] {
+    return breakChips().map((chip) => chip.textContent);
+  }
+
+  function breakChip(label: string): HTMLElement {
+    const chip = breakChips().find((candidate) => candidate.textContent === label);
+    if (!chip) throw new Error(`no break chip reading ${label}`);
+    return chip;
+  }
+
+  function pressedBreakChips(): string[] {
+    return breakChips()
+      .filter((chip) => chip.classList.contains('ui-pill--active'))
+      .map((chip) => chip.textContent ?? '');
+  }
+
+  /** The labels of the chips carrying the pressed treatment, in the order they are drawn. */
+  function pressedChips(): string[] {
+    return screen
+      .getAllByText(/^\d+ min$/u)
+      .filter((chip) => chip.closest('.ui-pill--active') != null)
+      .map((chip) => chip.textContent ?? '');
+  }
+
+  /** The track's own read-out: `<progress>` exposes its value as the element's `value`. */
+  function progress(): string {
+    return screen.getByRole('progressbar').getAttribute('aria-valuenow') ?? '';
+  }
+
+  /** The trailing pill of a read-out row, read by its label. */
+  function rowTrail(title: string): string | null {
+    const label = screen.getByText(title);
+    const row = label.closest('li');
+    if (!row) throw new Error(`no row for ${title}`);
+    return within(row).getByText(/min$/u).textContent;
+  }
 });

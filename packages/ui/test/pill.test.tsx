@@ -43,10 +43,30 @@ describe('Pill', () => {
         <Pill tone="wont_do">w</Pill>
       </>,
     );
-    expect(screen.getByText('o').classList.contains('text-accent')).toBe(true);
-    expect(screen.getByText('p').classList.contains('text-amber')).toBe(true);
-    expect(screen.getByText('d').classList.contains('text-green')).toBe(true);
-    expect(screen.getByText('w').classList.contains('text-muted')).toBe(true);
+    expect(screen.getByText('o').classList.contains('bg-surface-sunken')).toBe(true);
+    expect(screen.getByText('p').classList.contains('bg-warn-soft')).toBe(true);
+    expect(screen.getByText('p').classList.contains('text-warn')).toBe(true);
+    expect(screen.getByText('d').classList.contains('bg-ok-soft')).toBe(true);
+    expect(screen.getByText('d').classList.contains('text-ok')).toBe(true);
+    expect(screen.getByText('w').classList.contains('text-ink-3')).toBe(true);
+  });
+
+  /**
+   * M8: `Open` and `Won't Do` shared one tint, so a dismissed item read as untouched and the
+   * vocabulary's declared `--ink-3` for `wont_do` was dead on this surface.
+   */
+  it('gives wont_do its own ink tier, distinct from open', () => {
+    render(
+      <>
+        <Pill tone="open">o</Pill>
+        <Pill tone="wont_do">w</Pill>
+      </>
+    );
+    const open = screen.getByText('o');
+    const wontDo = screen.getByText('w');
+    expect(wontDo.classList.contains('text-ink-3')).toBe(true);
+    expect(wontDo.classList.contains('text-ink-2')).toBe(false);
+    expect(open.classList.contains('text-ink-2')).toBe(true);
   });
 
   it('renders an anchor when as="a", preserving href', () => {
@@ -70,6 +90,20 @@ describe('Pill', () => {
     // The jest moduleNameMapper resolves `next/link` to the stub, which stamps
     // `data-next-link`; a raw <a> would carry no such marker.
     expect(link.hasAttribute('data-next-link')).toBe(true);
+  });
+
+
+  it('drops the underline on the navigating branch only', () => {
+    render(
+      <Pill as="a" href="/?tag=errand" size="filter">
+        errand
+      </Pill>,
+    );
+    expect(screen.getByRole('link').classList.contains('no-underline')).toBe(true);
+
+    render(<Pill>errand</Pill>);
+    const chips = screen.getAllByText('errand');
+    expect(chips[chips.length - 1].classList.contains('no-underline')).toBe(false);
   });
 
   it('adds the active modifier only when active', () => {
@@ -119,6 +153,60 @@ describe('Pill', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Remove tag work' }));
     expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * M6: a filter chip is an anchor in a `nav` and names the view itself, so the current one
+   * says `aria-current="page"` — the APG meaning of the attribute, and the same signal
+   * `tab-bar.tsx` sends. `active` stays the visual channel.
+   */
+  it('emits aria-current="page" on the navigating branch only when current', () => {
+    const { rerender } = render(
+      <Pill as="a" href="/?tag=errand" size="filter" current>
+        errand
+      </Pill>,
+    );
+    expect(screen.getByRole('link', { name: 'errand' }).getAttribute('aria-current')).toBe('page');
+
+    rerender(
+      <Pill as="a" href="/?tag=errand" size="filter">
+        errand
+      </Pill>,
+    );
+    expect(screen.getByRole('link', { name: 'errand' }).getAttribute('aria-current')).toBeNull();
+  });
+
+  it('leaves the visual active modifier independent of aria-current', () => {
+    render(
+      <Pill as="a" href="/x" size="filter" active>
+        t
+      </Pill>,
+    );
+    const link = screen.getByRole('link');
+    expect(link.classList.contains('ui-pill--active')).toBe(true);
+    expect(link.getAttribute('aria-current')).toBeNull();
+  });
+
+  /**
+   * H1: the chip is 24px tall, so a 44px target cannot be the chip. The button's own box grows
+   * to the touch minimum and the negative margins hand the growth back, leaving the chip's
+   * height, its trailing edge and the 14px glyph where they were.
+   */
+  it('draws the remove control as a --tap target handed back by a negative margin', () => {
+    render(
+      <Pill onRemove={() => {}} removeLabel="Remove tag work">
+        work
+      </Pill>,
+    );
+    const remove = screen.getByRole('button', { name: 'Remove tag work' });
+    expect(remove.classList.contains('min-h-[var(--tap)]')).toBe(true);
+    expect(remove.classList.contains('p-[var(--s4)]')).toBe(true);
+    expect(remove.classList.contains('-my-[calc((var(--tap)_-_var(--s6))/2)]')).toBe(true);
+    expect(remove.classList.contains('-mx-[var(--s3)]')).toBe(true);
+    // The floor remover M3/H1 named must be gone; `min-h-0` is what flattened the target.
+    expect(remove.classList.contains('min-h-0')).toBe(false);
+    // The glyph is untouched, which is what keeps the chip's own geometry intact.
+    expect(remove.querySelector('svg')?.getAttribute('width')).toBe('14');
   });
 
   it('types the tag as span|a', () => {

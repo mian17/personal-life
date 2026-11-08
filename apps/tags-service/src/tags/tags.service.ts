@@ -1,10 +1,20 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { KeysService } from '@life/service-kit';
+import { likeMatch } from '@life/shared';
+import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
 import { Tag } from './tag.entity';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
+import type { CreateTagDto } from './dto/create-tag.dto';
+import type { BatchUpdateTagItem } from './dto/batch-tags.dto';
+
+/** A create-or-get that either wrote a row or reused one. */
+interface CreatedOrReused {
+  tag: TagDto;
+  created: boolean;
+}
 
 /** The registry DTO (`SPEC-tags-service` API): the `version` is the OCC counter. */
 export interface TagDto {
@@ -12,6 +22,18 @@ export interface TagDto {
   name: string;
   version: number;
   createdAt: string;
+}
+
+/**
+ * One page of the owner's vocabulary (`SPEC-pagination-seam` §4: plural key,
+ * `Tag` → `tags`). The set is hand-curated and naturally small, so the envelope
+ * is one uniform list contract, not a bounded scan.
+ */
+export interface TagPage {
+  tags: TagDto[];
+  nextCursor: string | null;
+  /** How many tags the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** The single cached shape: the owner's serialized **ciphertext** tag rows. */
@@ -39,6 +61,16 @@ function toCachedRow(tag: Tag): CachedTagRow {
     version: tag.version,
     createdAt: tag.createdAt.toISOString(),
   };
+}
+
+/**
+ * True when a decrypted tag name passes the list's `q` filter. Matching is the
+ * shared `LIKE` parity comparator, so the service and the app agree character
+ * for character; a blank `q` is "no filter", never "match nothing".
+ */
+function matchesQuery(name: string, q: string | undefined): boolean {
+  const wanted = q?.trim();
+  return !wanted || likeMatch(name, `%${wanted}%`);
 }
 
 /** True when the stored name is an `enc.v1.` envelope (M5: the store starts encrypted). */
@@ -116,8 +148,35 @@ export class TagsService {
    * to invalidate. The cache is read-only plumbing for `list`/`resolve` — the
    * same split as note-service's `resolveTags` vs `listTags`.
    */
-  private ownerRows(sub: string): Promise<Tag[]> {
-    return this.tags.find({ where: { ownerSub: sub }, order: { id: 'ASC' } });
+  private ownerRows(manager: EntityManager | undefined, sub: string): Promise<Tag[]> {
+    return this.tagsRepository(manager).find({
+      where: { ownerSub: sub },
+      order: { id: 'ASC' },
+    });
+  }
+
+  /**
+   * The repository one write runs against. A manager means "inside this
+   * transaction", and every write a batch performs must go through it — an item
+   * of a batch has to see the items submitted before it. No manager means the
+   * service's own repository: the singular path.
+   */
+  private tagsRepository(manager: EntityManager | undefined): Repository<Tag> {
+    if (!manager) return this.tags;
+    return manager.getRepository(Tag);
+  }
+
+  /**
+   * The datasource a batch opens its one transaction on — the same DB the writes
+   * use.
+   *
+   * ponytail: taken from the injected repository rather than a fourth
+   * constructor argument, so the cache suite that builds this service
+   * positionally keeps compiling. Upgrade path: `@InjectDataSource()` once that
+   * suite is converted to a Nest testing module.
+   */
+  private get writeDataSource() {
+    return this.tags.manager.connection;
   }
 
   /**
@@ -144,7 +203,21 @@ export class TagsService {
     return a.id - b.id;
   }
 
-  /** `GET /api/tags` — decrypted, name-sorted (case-insensitive). */
+  /**
+   * `byName`'s strictly-after test, in that same order: a row comes after the
+   * cursor when its **lower-cased** name sorts later, or when the names tie and
+   * its numeric `id` is larger. Folding case exactly as the sort does is what
+   * keeps the boundary honest — comparing raw names here would let `Zebra` sort
+   * before `apple` and repeat or skip a row at a page edge.
+   */
+  private static afterName(row: TagDto, at: string[]): boolean {
+    const [name, id] = at;
+    const lowered = row.name.toLowerCase();
+    if (lowered !== name) return lowered > name;
+    return row.id > Number(id);
+  }
+
+  /** `GET /api/tags` — decrypted, name-sorted (case-insensitive): the whole set. */
   async list(sub: string): Promise<TagDto[]> {
     const rows = await this.rawRows(sub);
     const decoded = await this.decodeRows(sub, rows);
@@ -152,17 +225,73 @@ export class TagsService {
   }
 
   /**
-   * `POST /api/tags {name}` — create-or-get, case-insensitive per owner. Any
-   * matching row (of the caller) is reused with its original spelling; only a
-   * brand-new name writes and bumps the generation.
+   * `GET /api/tags?q=&limit=&cursor=` — one page of that same order on the shared
+   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor`/`q` never
+   * enter the `tags:<sub>:v<gen>:all` key, so one entry serves every page and
+   * every search variant.
+   *
+   * The vocabulary is hand-curated and small, so the window is the shared list
+   * contract, not a bounded scan; the app still needs every tag (the picker offers
+   * all of them), so it walks this envelope to exhaustion.
    */
-  async create(sub: string, name: string): Promise<{ tag: TagDto; created: boolean }> {
+  async page(
+    sub: string,
+    opts: { q?: string; limit?: number; cursor?: string } = {},
+  ): Promise<TagPage> {
+    const ordered = (await this.list(sub)).filter((tag) => matchesQuery(tag.name, opts.q));
+    const page = paginate(ordered, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      // The cursor carries the *lower-cased* name, matching the sort key and
+      // `afterName`; `id` last keeps it unique per row.
+      keyOf: (tag) => [tag.name.toLowerCase(), String(tag.id)],
+      after: TagsService.afterName,
+    });
+    return { tags: page.rows, nextCursor: page.nextCursor, total: page.total };
+  }
+
+  /**
+   * `POST /api/tags {name}` — create-or-get, case-insensitive per owner. Only a
+   * brand-new name writes, so only a brand-new name bumps the generation.
+   */
+  async create(sub: string, name: string): Promise<CreatedOrReused> {
+    const result = await this.createOrGetOne(this.tags.manager, sub, name);
+    if (result.created) {
+      await this.cache.bumpGeneration(sub);
+    }
+    return result;
+  }
+
+  /**
+   * The `tags` batch create: one transaction, submission order, and one bump —
+   * only if some item actually wrote (`SPEC-tags-service.md` §6). A batch of
+   * already-existing names is all create-or-get hits, so it commits no write and
+   * leaves the owner's counter alone.
+   */
+  async createMany(sub: string, items: CreateTagDto[]): Promise<TagDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.createOrGetOne(manager, sub, item.name),
+      invalidate: (rows) => rows.some((row) => row.created),
+    });
+    return results.map((result) => result.tag);
+  }
+
+  /**
+   * One name's create-or-get, through the caller's manager, and with no bump.
+   * Any matching row of the caller is reused with its original spelling; only a
+   * brand-new name writes.
+   */
+  private async createOrGetOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    name: string,
+  ): Promise<CreatedOrReused> {
     const dek = await this.keys.getOrCreateDek(sub);
-    const rows = await this.ownerRows(sub);
-    const wanted = name.toLowerCase();
-    const existing = rows.find(
-      (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
-    );
+    const existing = await this.findByName(manager, sub, dek, name);
     if (existing) {
       return {
         tag: {
@@ -175,23 +304,35 @@ export class TagsService {
       };
     }
 
-    const saved = await this.tags.save(
-      this.tags.create({
+    const tags = this.tagsRepository(manager);
+    const saved = await tags.save(
+      tags.create({
         name: encryptField(dek, name, tagNameAad(sub)),
         ownerSub: sub,
         version: 0,
         createdAt: new Date(),
       }),
     );
-    // Bump AFTER the mutation: pre-write entries die here, a thrown save never bumps.
-    await this.cache.bumpGeneration(sub);
     return { tag: { ...toCachedRow(saved), name }, created: true };
   }
 
+  /** The caller's row whose decrypted name matches `name`, case-insensitively. */
+  private async findByName(
+    manager: EntityManager | undefined,
+    sub: string,
+    dek: Buffer,
+    name: string,
+  ): Promise<Tag | undefined> {
+    const wanted = name.toLowerCase();
+    const rows = await this.ownerRows(manager, sub);
+    return rows.find(
+      (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
+    );
+  }
+
   /**
-   * `PATCH /api/tags/:id {name, expectedVersion?}` — rename. A foreign or missing
-   * id is a byte-identical 404 (never 403). A case-insensitive collision with a
-   * *different* tag of the same owner is 409; a stale `expectedVersion` is 409.
+   * `PATCH /api/tags/:id {name, expectedVersion?}` — rename. Every path here
+   * mutates, so the singular route bumps unconditionally after it returns.
    */
   async rename(
     sub: string,
@@ -199,7 +340,40 @@ export class TagsService {
     name: string,
     expectedVersion?: number,
   ): Promise<TagDto> {
-    const tag = await this.tags.findOne({ where: { id, ownerSub: sub } });
+    const tag = await this.renameOne(this.tags.manager, sub, id, name, expectedVersion);
+    // Bump AFTER the mutation — see bumpGeneration(); a thrown rename never bumps.
+    await this.cache.bumpGeneration(sub);
+    return tag;
+  }
+
+  /** The `tags` batch rename: one transaction, submission order, one bump. */
+  async renameMany(sub: string, items: BatchUpdateTagItem[]): Promise<TagDto[]> {
+    return runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.writeDataSource,
+      cache: this.cache,
+      runItem: (item, manager) =>
+        this.renameOne(manager, sub, item.id, item.name, item.expectedVersion),
+    });
+  }
+
+  /**
+   * One tag's rename, through the caller's manager, and with no bump. A foreign
+   * or missing id is a byte-identical 404 (never 403). A case-insensitive
+   * collision with a *different* tag of the same owner is 409; a stale
+   * `expectedVersion` is 409. Any of those throws, which for a batch rolls the
+   * whole request back.
+   */
+  private async renameOne(
+    manager: EntityManager | undefined,
+    sub: string,
+    id: number,
+    name: string,
+    expectedVersion?: number,
+  ): Promise<TagDto> {
+    const tags = this.tagsRepository(manager);
+    const tag = await tags.findOne({ where: { id, ownerSub: sub } });
     if (!tag) throw new NotFoundException('Tag not found');
     if (expectedVersion !== undefined && tag.version !== expectedVersion) {
       throw new ConflictException('Tag was modified');
@@ -207,7 +381,7 @@ export class TagsService {
 
     const dek = await this.keys.getOrCreateDek(sub);
     const wanted = name.toLowerCase();
-    const siblings = await this.ownerRows(sub);
+    const siblings = await this.ownerRows(manager, sub);
     const collision = siblings.some(
       (row) =>
         row.id !== id && this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
@@ -216,8 +390,7 @@ export class TagsService {
 
     tag.name = encryptField(dek, name, tagNameAad(sub));
     tag.version += 1;
-    const saved = await this.tags.save(tag);
-    await this.cache.bumpGeneration(sub);
+    const saved = await tags.save(tag);
     return { ...toCachedRow(saved), name };
   }
 

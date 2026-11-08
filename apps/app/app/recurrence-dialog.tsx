@@ -17,6 +17,10 @@ export interface RecurrenceDialogProps {
  * this component owns only the in-progress draft, reseeded each time it opens
  * (C3): the committed days when non-empty, else the due date's ISO weekday,
  * else nothing. Confirm is disabled until the draft holds a day.
+ *
+ * The panel is the bottom sheet: §8 makes the feedback form the only sheet the
+ * system draws, and the todos reference draws no repeat-builder dialog (its
+ * rule is a `.fact` row) — so the sheet shape stands on its own authority.
  */
 export function RecurrenceDialog({
   open,
@@ -43,6 +47,7 @@ export function RecurrenceDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Custom repeat"
+      size="sheet"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -74,7 +79,7 @@ export function RecurrenceDialog({
             <Pill
               key={day}
               as="button"
-              size="chip"
+              size="filter"
               active={active}
               aria-pressed={active}
               onClick={() => toggle(day)}

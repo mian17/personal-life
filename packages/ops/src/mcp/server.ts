@@ -8,13 +8,19 @@
  * one shared executor and the one canonical render the CLI uses, so adapter
  * parity is a string comparison, not a convention.
  */
+import { answerUntilStdinCloses, errorAnswer, idOf, readMessage } from '@life/shared';
+import type { RpcRequest } from '@life/shared';
 import type { OpSpec, ResourceRegistry } from '../core/types';
+import type { BulkEnvelope } from '../core/bulk';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk';
 import { createExecutor, resolveDeadlineMs } from '../transport/executor';
 import type { Executor } from '../transport/executor';
 import { currentAccessToken } from '../auth/token-provider';
 import { renderFailure, renderOpsResult } from '../cli/render';
-import { loadService } from '../cli/run';
-import { findTool, listTools } from './tools';
+import { apiBaseFor, loadService } from '../cli/run';
+import type { LoadedModule, ServiceModule } from '../cli/run';
+import { everyRegistry, findTool, listTools } from './tools';
+import type { RegistryUnion, ToolLocation } from './tools';
 
 const SERVER_NAME = 'life-ops';
 
@@ -24,9 +30,15 @@ const PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25', '2025-06-18'];
 /** `serverInfo.version`, pinned to the published package version by `test/mcp-lifecycle.test.ts`. */
 const SERVER_VERSION: string = (require('../../package.json') as { version: string }).version;
 
-/** The stdio-facing server contract: registry + env + injected writers (tests drive stubs). */
+/**
+ * The stdio-facing server contract: the resources it serves, the loaded modules, the
+ * environment, and the injected writers (tests drive stubs).
+ */
 export interface McpServerOptions {
-  registry: ResourceRegistry;
+  /** Every resource the loaded modules register, in load order; a single-service run names one. */
+  registry: RegistryUnion;
+  /** The modules `LIFE_OPS_SERVICE` loaded, when it named several; the base precedence reads them. */
+  modules?: LoadedModule[];
   /** Overrides `LIFE_OPS_API_BASE` when the service module knows its own base. */
   apiBase?: string;
   env: NodeJS.ProcessEnv;
@@ -44,15 +56,7 @@ export interface McpServer {
 }
 
 export function createMcpServer(options: McpServerOptions): McpServer {
-  const session: Session = {
-    options,
-    executor: createExecutor({
-      registry: options.registry,
-      baseUrl: apiBase(options),
-      readToken: currentAccessToken,
-      deadlineMs: resolveDeadlineMs(options.env),
-    }),
-  };
+  const session: Session = { options, service: servedService(options) };
   return { handle: (message) => answer(message, session) };
 }
 
@@ -61,12 +65,13 @@ export async function main(options: McpServerOptions): Promise<number> {
   return await answerRequestsUntilStdinCloses({ server: createMcpServer(options), options });
 }
 
-/** The stdio entry: the service module named by `LIFE_OPS_SERVICE`, then the loop. */
+/** The stdio entry: the service modules named by `LIFE_OPS_SERVICE`, then the loop. */
 async function serveFromEnvironment(): Promise<void> {
   try {
     const service = await loadService(process.env);
     process.exitCode = await main({
-      registry: service.registry,
+      registry: service.resources ?? service.registry,
+      modules: service.modules,
       apiBase: service.apiBase,
       env: process.env,
       stdout: (line) => process.stdout.write(`${line}\n`),
@@ -78,31 +83,14 @@ async function serveFromEnvironment(): Promise<void> {
   }
 }
 
+/** This server's line loop: the shared reader, told how an escaped failure is rendered here. */
 function answerRequestsUntilStdinCloses(loop: ServerLoop): Promise<number> {
-  return new Promise((finish) => {
-    let buffered = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: string) => {
-      buffered += chunk;
-      for (;;) {
-        const lineEnd = buffered.indexOf('\n');
-        if (lineEnd === -1) return;
-        const line = buffered.slice(0, lineEnd);
-        buffered = buffered.slice(lineEnd + 1);
-        void respondToLine(loop, line);
-      }
-    });
-    process.stdin.on('end', () => finish(0));
+  return answerUntilStdinCloses({
+    server: loop.server,
+    stdout: loop.options.stdout,
+    stderr: loop.options.stderr,
+    renderFailure,
   });
-}
-
-async function respondToLine(loop: ServerLoop, line: string): Promise<void> {
-  try {
-    const response = await loop.server.handle(line);
-    if (response !== null) loop.options.stdout(JSON.stringify(response));
-  } catch (error) {
-    loop.options.stderr(renderFailure(error));
-  }
 }
 
 async function answer(message: unknown, session: Session): Promise<unknown> {
@@ -131,7 +119,7 @@ async function answerRequest(request: RpcRequest, session: Session): Promise<unk
   if (request.id === undefined) return null; // a notification gets no answer
   if (request.method === 'initialize') return initializeAnswer(request);
   if (request.method === 'ping') return pingAnswer(request);
-  if (request.method === 'tools/list') return listAnswer(request, session.options.registry);
+  if (request.method === 'tools/list') return listAnswer(request, session);
   if (request.method === 'tools/call') return callAnswer(request, session);
   return methodNotSupportedAnswer(request);
 }
@@ -159,8 +147,10 @@ function pingAnswer(request: RpcRequest): unknown {
   return { jsonrpc: '2.0', id: idOf(request), result: {} };
 }
 
-function listAnswer(request: RpcRequest, registry: ResourceRegistry): unknown {
-  return { jsonrpc: '2.0', id: idOf(request), result: { tools: listTools(registry) } };
+function listAnswer(request: RpcRequest, session: Session): unknown {
+  const bulkLimit = resolveBulkLimit(session.options.env);
+  const tools = listTools(session.options.registry, bulkLimit);
+  return { jsonrpc: '2.0', id: idOf(request), result: { tools } };
 }
 
 async function callAnswer(request: RpcRequest, session: Session): Promise<unknown> {
@@ -175,14 +165,20 @@ async function callAnswer(request: RpcRequest, session: Session): Promise<unknow
  * The call's result object: the canonical text always, `structuredContent` when the
  * body carries structure (an array wrapped as `{ items }`), `isError` when the call
  * failed (and then nothing structured — a failure is not a payload an agent may branch
- * on).
+ * on). A batch that ran and succeeded on nothing is an error that keeps its envelope:
+ * the per-item failures are what the caller needs in order to retry.
  */
 function callResultAnswer(request: RpcRequest, outcome: ToolOutcome): unknown {
   const result: Record<string, unknown> = { content: [{ type: 'text', text: outcome.text }] };
   const structuredBody = structuredBodyOf(outcome);
   if (structuredBody !== undefined) result['structuredContent'] = structuredBody;
-  if (outcome.failed) result['isError'] = true;
+  if (reportsError(outcome)) result['isError'] = true;
   return { jsonrpc: '2.0', id: idOf(request), result };
+}
+
+/** The call threw, or a batch ran and not one item succeeded; one success is still a success. */
+function reportsError(outcome: ToolOutcome): boolean {
+  return outcome.failed || outcome.nothingSucceeded;
 }
 
 /**
@@ -209,13 +205,54 @@ function invalidCallAnswer(request: RpcRequest, error: unknown): unknown {
 }
 
 async function runTool(request: RpcRequest, session: Session): Promise<ToolOutcome> {
-  const operation = nameOf(request, session.options.registry);
+  const { registry, operation } = locateTool(request, session.options.registry);
   try {
-    const result = await session.executor.run(operation, inputOf(request));
-    return { text: renderOpsResult(result), body: result.body, failed: false };
+    const result = await executorFor(session, registry).run(operation.kind, inputOf(request));
+    return {
+      text: renderOpsResult(result),
+      body: result.body,
+      failed: false,
+      nothingSucceeded: noItemSucceeded(operation.kind, result.body),
+    };
   } catch (error) {
-    return { text: renderFailure(error), body: undefined, failed: true };
+    return {
+      text: renderFailure(error),
+      body: undefined,
+      failed: true,
+      nothingSucceeded: false,
+    };
   }
+}
+
+/** A batch's envelope reports how many items ran; only a batch has one to report on (§2.7). */
+function noItemSucceeded(kind: OpSpec['kind'], body: unknown): boolean {
+  return isBulkKind(kind) && (body as BulkEnvelope).succeeded === 0;
+}
+
+/** The registry that owns the named tool, and the op there; a thrown error when none serves it. */
+function locateTool(request: RpcRequest, registrySet: RegistryUnion): ToolLocation {
+  const name = paramsOf(request)?.['name'];
+  if (typeof name !== 'string') throw new Error('tools/call has no tool name string');
+  const location = findTool(registrySet, name);
+  if (location === undefined) throw new Error(`unknown tool: ${name}`);
+  return location;
+}
+
+/** The executor one call runs: it dials the owning resource's own base, resolved per call. */
+function executorFor(session: Session, registry: ResourceRegistry): Executor {
+  return createExecutor({
+    registry,
+    baseUrl: apiBaseFor({ service: session.service, registry, env: session.options.env }),
+    readToken: currentAccessToken,
+    deadlineMs: resolveDeadlineMs(session.options.env),
+    bulkLimit: resolveBulkLimit(session.options.env),
+  });
+}
+
+/** The service a session serves, in the shape the CLI's base precedence reads. */
+function servedService(options: McpServerOptions): ServiceModule {
+  const resources = everyRegistry(options.registry);
+  return { registry: resources[0], resources, apiBase: options.apiBase, modules: options.modules };
 }
 
 function methodNotSupportedAnswer(request: RpcRequest): unknown {
@@ -226,13 +263,10 @@ function methodNotSupportedAnswer(request: RpcRequest): unknown {
   });
 }
 
-function errorAnswer(failure: RpcFailure): unknown {
-  return { jsonrpc: '2.0', id: failure.id, error: { code: failure.code, message: failure.message } };
-}
-
 interface Session {
   options: McpServerOptions;
-  executor: Executor;
+  /** The service the CLI's base precedence reads, built once from the served resources. */
+  service: ServiceModule;
 }
 
 interface ServerLoop {
@@ -245,69 +279,10 @@ interface ToolOutcome {
   text: string;
   /** The service body as the executor parsed it; `undefined` when there was none. */
   body: unknown;
+  /** The call threw, so there is no payload to branch on. */
   failed: boolean;
-}
-
-/** `id === undefined` is the notification shape; every other field arrives verbatim. */
-interface RpcRequest {
-  id: string | number | undefined;
-  method: string;
-  params: unknown;
-}
-
-/** A JSON-RPC error reply's varying part; `null` id is what the protocol asks for a bad line. */
-interface RpcFailure {
-  id: string | number | null;
-  code: number;
-  message: string;
-}
-
-/** What one delivered message turned out to be. */
-type MessageRead =
-  | { kind: 'request'; request: RpcRequest }
-  | { kind: 'notARequest' }
-  | { kind: 'unparseable' };
-
-function readMessage(message: unknown): MessageRead {
-  if (typeof message !== 'string') return readRequest(message);
-  const parsed = parseLine(message);
-  return parsed.kind === 'unparseable' ? parsed : readRequest(parsed.value);
-}
-
-function parseLine(line: string): { kind: 'parsed'; value: unknown } | { kind: 'unparseable' } {
-  try {
-    return { kind: 'parsed', value: JSON.parse(line) as unknown };
-  } catch {
-    return { kind: 'unparseable' };
-  }
-}
-
-function readRequest(parsed: unknown): MessageRead {
-  if (typeof parsed !== 'object' || parsed === null) return { kind: 'notARequest' };
-  const record = parsed as Record<string, unknown>;
-  if (typeof record['method'] !== 'string') return { kind: 'notARequest' };
-  return {
-    kind: 'request',
-    request: { id: requestId(record), method: record['method'], params: record['params'] },
-  };
-}
-
-function requestId(record: Record<string, unknown>): string | number | undefined {
-  if (typeof record['id'] === 'string' || typeof record['id'] === 'number') return record['id'];
-  return undefined;
-}
-
-function idOf(request: RpcRequest): string | number | null {
-  return request.id ?? null;
-}
-
-/** The op kind a `tools/call` names, or a thrown error when the registry has no such tool. */
-function nameOf(request: RpcRequest, registry: ResourceRegistry): OpSpec['kind'] {
-  const name = paramsOf(request)?.['name'];
-  if (typeof name !== 'string') throw new Error('tools/call has no tool name string');
-  const operation = findTool(registry, name);
-  if (operation === undefined) throw new Error(`unknown tool: ${name}`);
-  return operation.kind;
+  /** A batch ran and every item failed; the envelope is still the payload. */
+  nothingSucceeded: boolean;
 }
 
 /** The `arguments` object of the call; an absent one behaves as an empty input. */
@@ -328,13 +303,6 @@ function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
   const params = request.params;
   if (typeof params !== 'object' || params === null || Array.isArray(params)) return undefined;
   return params as Record<string, unknown>;
-}
-
-/** `service.apiBase` wins over `LIFE_OPS_API_BASE`, the same rule the CLI applies. */
-function apiBase(options: McpServerOptions): string {
-  const configured = options.apiBase ?? options.env.LIFE_OPS_API_BASE?.trim();
-  if (!configured) throw new Error('LIFE_OPS_API_BASE is not set; point it at the service API base');
-  return configured;
 }
 
 if (require.main === module) {

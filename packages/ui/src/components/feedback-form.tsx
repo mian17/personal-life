@@ -9,12 +9,11 @@ import type {
 } from '@life/shared';
 import { FEEDBACK_TITLE_MAX } from '@life/shared';
 import { cx } from '../lib/cx';
-import { AlertBanner } from './alert-banner';
 import { Button } from './button';
 import { Dialog } from './dialog';
 import { Input } from './input';
-import { Pill } from './pill';
-import { PillGroup } from './pill-group';
+import { StatusText } from './status-text';
+import { segActiveStyles, segControlStyles, segTroughBaseStyles } from './tab-bar';
 import { Textarea } from './textarea';
 import { FEEDBACK_TYPES } from './feedback-types';
 
@@ -27,27 +26,51 @@ export interface FeedbackFormProps {
   onSubmit: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
   /** Dialog title (frozen visible text). Default "Send feedback". */
   title?: string;
+  /** Line under the title. Default the sheet's own one-line promise. */
+  description?: string;
   /** Submit button label. Default "Send". */
   submitLabel?: string;
 }
 
-/** Label above its control, the layout the retired `.ui-field` rule gave. */
-const fieldStyles = 'ui-field flex flex-col gap-[var(--space-0-4)]';
+const DEFAULT_DESCRIPTION = 'One thing. It goes to the inbox, not to a ticket queue.';
 
 /**
- * A stacked field caption reads as text, not as the quiet chip-row caption: it takes
- * the colour and weight the retired `.ui-field-label--strong` rule gave. Both class
- * hooks stay on the label, so the caption is still reachable by name.
+ * §8's `.field`: label over control, one `--s2` apart. The `--s4` between blocks comes from
+ * `Dialog`'s body gap alone; a margin here would double it.
+ */
+const fieldStyles = 'ui-field flex flex-col gap-[var(--s2)]';
+
+/**
+ * §8's `.field__label`: 13px, 650, `0.06em`, upper case, second ink tier. Both class hooks stay
+ * on the label, so the caption is still reachable by name.
  */
 const labelStyles = cx(
   'ui-field-label ui-field-label--strong',
-  'shrink-0 text-text font-semibold text-[length:var(--space-0-85)]',
+  'shrink-0 uppercase text-ink-2',
+  'text-[length:var(--fs-section-label)] font-[var(--fw-section-label)]',
+  'tracking-[var(--tracking-section-label)]',
 );
 
-const requiredMarkerStyles = cx(
-  'ui-field-label__required',
-  'ml-[var(--space-0-3)] text-danger',
-);
+/**
+ * §8's `.seg--theme` in the sheet: the shared trough from `segTroughBaseStyles` (borders, sunken
+ * surface, `--s1` padding and gaps) stretched to the sheet's width, each control taking an equal
+ * share of it.
+ */
+const typeTroughStyles = cx(segTroughBaseStyles, 'w-full', '[&>*]:flex-1');
+
+/**
+ * The picker's controls give up `segControlStyles`' `--s4` side padding for `--s2`: inside the
+ * sheet a control's equal third is 109px at 375px, and "Enhancement" needs ~91px of text plus
+ * two of these 8px paddings to fit, where `--s4` would floor it at ~123px and break the thirds.
+ * `!` for the same reason `failureStyles` carries one — the `--s4` base is unconditional.
+ */
+const typeControlStyles = 'px-[var(--s2)]!';
+
+/**
+ * The one status line under the fields. A failure takes the danger ink, a validation hint keeps
+ * the meta ink `StatusText` already carries; `!` because that base ink is unconditional.
+ */
+const failureStyles = 'text-danger!';
 
 const TITLE_REQUIRED = 'Title is required.';
 const DESCRIPTION_REQUIRED = 'Description is required.';
@@ -64,11 +87,12 @@ export function FeedbackForm({
   app,
   onSubmit,
   title: dialogTitle = 'Send feedback',
+  description = DEFAULT_DESCRIPTION,
   submitLabel = 'Send',
 }: Readonly<FeedbackFormProps>) {
   const [type, setType] = useState<FeedbackType>(FEEDBACK_TYPES[0].value);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [descriptionText, setDescriptionText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<'title' | 'description' | null>(null);
   const [pending, setPending] = useState(false);
@@ -90,7 +114,7 @@ export function FeedbackForm({
     setErrorField(null);
     setType(FEEDBACK_TYPES[0].value);
     setTitle('');
-    setDescription('');
+    setDescriptionText('');
   }, [open]);
 
   async function submit() {
@@ -102,7 +126,7 @@ export function FeedbackForm({
       titleRef.current?.focus();
       return;
     }
-    if (description.trim().length === 0) {
+    if (descriptionText.trim().length === 0) {
       setError(DESCRIPTION_REQUIRED);
       setErrorField('description');
       descriptionRef.current?.focus();
@@ -117,12 +141,12 @@ export function FeedbackForm({
         app: app as FeedbackApp,
         type,
         title: title.trim(),
-        description: description.trim(),
+        description: descriptionText.trim(),
       });
       if (result.ok) {
         onOpenChange(false);
       } else {
-        // Same banner, dialog stays open, same id kept for the retry.
+        // Same line, dialog stays open, same id kept for the retry.
         setError(result.message);
       }
     } catch (cause) {
@@ -137,39 +161,45 @@ export function FeedbackForm({
       open={open}
       onOpenChange={onOpenChange}
       title={dialogTitle}
+      description={description}
+      size="sheet"
       footer={
-        <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button disabled={pending} onClick={submit}>
-            {pending ? 'Sending…' : submitLabel}
-          </Button>
-        </>
+        <Button disabled={pending} onClick={submit}>
+          {pending ? 'Sending…' : submitLabel}
+        </Button>
       }
     >
-      {error != null && <AlertBanner role="alert">{error}</AlertBanner>}
-      <PillGroup role="group" aria-label="Feedback type">
-        {FEEDBACK_TYPES.map((feedbackType) => (
-          <Pill
-            key={feedbackType.value}
-            as="button"
-            active={type === feedbackType.value}
-            aria-pressed={type === feedbackType.value}
-            onClick={() => setType(feedbackType.value)}
-          >
-            {feedbackType.label}
-          </Pill>
-        ))}
-      </PillGroup>
+      <div role="group" aria-label="Kind of feedback" className={typeTroughStyles}>
+        {FEEDBACK_TYPES.map((feedbackType) => {
+          const pressed = type === feedbackType.value;
+          return (
+            <button
+              key={feedbackType.value}
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => setType(feedbackType.value)}
+              className={cx(
+                'ui-seg__btn',
+                pressed && 'ui-seg__btn--active',
+                segControlStyles,
+                typeControlStyles,
+                // A `<button>` carries a UA face; the links `Tab`/`Segmented` render do not, so only
+                // the unpressed branch here needs transparency, and it never sits beside the accent.
+                pressed ? segActiveStyles : 'bg-transparent',
+              )}
+            >
+              {feedbackType.shortLabel}
+            </button>
+          );
+        })}
+      </div>
       <div className={fieldStyles}>
         <label className={labelStyles} htmlFor={titleId}>
-          Title <span className={requiredMarkerStyles} aria-hidden="true">*</span>
+          Title
         </label>
         <Input
           ref={titleRef}
           id={titleId}
-          placeholder="Short summary of your feedback"
           aria-required
           maxLength={FEEDBACK_TITLE_MAX}
           aria-invalid={errorField === 'title' || undefined}
@@ -179,18 +209,20 @@ export function FeedbackForm({
       </div>
       <div className={fieldStyles}>
         <label className={labelStyles} htmlFor={descriptionId}>
-          Description <span className={requiredMarkerStyles} aria-hidden="true">*</span>
+          Description
         </label>
         <Textarea
           ref={descriptionRef}
           id={descriptionId}
-          placeholder="What happened, and what did you expect?"
           aria-required
           aria-invalid={errorField === 'description' || undefined}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          value={descriptionText}
+          onChange={(event) => setDescriptionText(event.target.value)}
         />
       </div>
+      {error != null && (
+        <StatusText className={errorField != null ? undefined : failureStyles}>{error}</StatusText>
+      )}
     </Dialog>
   );
 }

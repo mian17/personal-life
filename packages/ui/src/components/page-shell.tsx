@@ -4,12 +4,14 @@ import { cx } from '../lib/cx';
 export type PageShellProps = ComponentPropsWithRef<'main'>;
 
 /**
- * The page column: capped at the content width and centred, with side padding for the
- * screen edges and bottom padding that clears the fixed fab and the home indicator.
+ * §5's `.frame` + `.panel`: the column is capped at `--frame-max` and centred, its side and top
+ * insets are the panel's `--s4`, and its bottom inset clears the home indicator plus the fixed
+ * fab — a fab is `--fab-size` tall and floats `--s4` above the home indicator, so the band is
+ * the fab's own height plus one full spacing step.
  */
 const pageStyles = [
-  'max-w-[var(--content-width)] mx-auto',
-  'px-[var(--space-1)] pt-[var(--space-1)] pb-[calc(var(--space-5)+env(safe-area-inset-bottom))]',
+  'max-w-[var(--frame-max)] mx-auto',
+  'px-[var(--s4)] pt-[var(--s4)] pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]',
 ].join(' ');
 
 /** The frame every screen renders inside: the column the app's blocks stack down. */

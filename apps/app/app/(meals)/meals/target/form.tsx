@@ -1,9 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Check } from 'lucide-react';
-import { EditorChrome, IconButton, Input, Section, Select, SettingsRow, StatusText } from '@life/ui';
+import { format } from '@life/nutrition';
+import {
+  Button,
+  Card,
+  Facts,
+  FactsRow,
+  Input,
+  Kpi,
+  ManagerBlock,
+  Pill,
+  Section,
+  Select,
+  SettingsBlock,
+  SettingsRow,
+  Stack,
+  StatusText,
+} from '@life/ui';
 import type { MealTarget } from '@/lib/meal-api';
 import { saveProfileAction } from './actions';
 
@@ -13,10 +27,16 @@ import { saveProfileAction } from './actions';
  * derived server-side and must never be sent from the browser ("Never: let the
  * client send computed kcal" — `forbidNonWhitelisted` rejects such a body).
  *
- * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `EditorChrome`
- * (back leading, save in `actions`, mirroring the meal entry editor), each field
- * is a `SettingsRow` (visible label left, control right) hosting an
- * `Input`/`Select`, feedback is `StatusText`. The `<form>` is glue (submit
+ * Composition is `@life/ui` only (Contract 1 Rule 1): the frame is `ManagerBlock` — the
+ * same header every manager screen and the settings screen open with, so back is one
+ * framed 48px arrow to the same place, rather than a second back affordance that only
+ * this screen would draw. Its heading takes the server-computed sub-line. Each field is a
+ * `SettingsRow` (visible label left, control right) hosting an `Input`/`Select` on the
+ * reference's shared surface group (`SettingsBlock`, a flush `Card` of
+ * hairline-divided rows), feedback is `StatusText` outside that card, and the one
+ * commit affordance is the footer's primary submit `Button`. The derived-energy
+ * card and the `Profile` read-out rows are the reference's read-only half; the
+ * form below them is the only place a value changes. The `<form>` is glue (submit
  * semantics + native numeric validation), no className, no raw control, no app
  * CSS. Sex/activity/goal are `Select`s over the service enums, so a level the
  * service does not have cannot be offered here.
@@ -44,12 +64,22 @@ const GOAL_OPTIONS = [
   { value: 'gain', label: 'Gain weight' },
 ];
 
+/** Whole kcal with the reference's thousands separator (`2,050`); the formatter does not group. */
+const KCAL = new Intl.NumberFormat('en-US');
+
+/** The stored enum value as its own option list spells it (the service owns the vocabulary). */
+function optionLabel(options: { value: string; label: string }[], value: string): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
 /**
  * The profile form. `initial` is the current target row's stored profile, so an
  * existing profile opens as an edit rather than an empty onboarding form; with no
  * target the fields start on the defaults a first-run user changes at most a few.
  * `summary` is the day's derived-calorie headline the server page computed — it
- * renders read-only above the fields and never travels back down the save path.
+ * is non-null exactly when a target exists, which is the same condition that
+ * draws the derived-energy card, so the card replaces the sentence and the
+ * figures are never printed twice.
  */
 export function TargetProfileForm({
   initial,
@@ -58,7 +88,6 @@ export function TargetProfileForm({
   initial: MealTarget | null;
   summary?: string | null;
 }>) {
-  const router = useRouter();
   const [age, setAge] = useState(initial == null ? '' : String(initial.age));
   const [sex, setSex] = useState(initial?.sex ?? 'male');
   const [heightCm, setHeightCm] = useState(initial == null ? '' : String(initial.heightCm));
@@ -69,7 +98,7 @@ export function TargetProfileForm({
   const [error, setError] = useState('');
 
   // A blank or non-numeric body field would serialise to `0`/`null` and answer
-  // with an opaque 400, so the toolbar save stays disabled until the numerics
+  // with an opaque 400, so the footer commit stays disabled until the numerics
   // parse; the service DTO owns every bound.
   const profileReady = [age, heightCm, weightKg].every(
     (raw) => raw.trim() !== '' && Number.isFinite(Number(raw)),
@@ -96,14 +125,10 @@ export function TargetProfileForm({
   }
 
   return (
-    <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+    <ManagerBlock
       title="Daily target"
-      actions={
-        <IconButton label="Save" onClick={save} disabled={saving || !profileReady}>
-          <Check size={20} aria-hidden />
-        </IconButton>
-      }
+      backHref="/meals/settings"
+      sub="Computed on the server from these six values. Nothing here is guessed in the browser."
     >
       <form
         onSubmit={(event) => {
@@ -111,12 +136,38 @@ export function TargetProfileForm({
           return save();
         }}
       >
-        {summary != null ? (
-          <StatusText>{summary}</StatusText>
+        {initial != null && summary != null ? (
+          <>
+            <Card>
+              <Stack gap="sm">
+                <Kpi
+                  label="Derived energy"
+                  value={KCAL.format(Math.round(initial.calories))}
+                  unit="kcal"
+                />
+                <Facts>
+                  <FactsRow label="Protein" value={format('protein', initial.proteinG)} />
+                  <FactsRow label="Carbs" value={format('carbohydrates', initial.carbG)} />
+                  <FactsRow label="Fat" value={format('fat', initial.fatG)} />
+                </Facts>
+              </Stack>
+            </Card>
+            <SettingsBlock title="Profile">
+              <SettingsRow label="Age" control={<Pill>{`${initial.age} years`}</Pill>} />
+              <SettingsRow label="Height" control={<Pill>{`${initial.heightCm} cm`}</Pill>} />
+              <SettingsRow label="Weight" control={<Pill>{`${initial.weightKg} kg`}</Pill>} />
+              <SettingsRow label="Sex" control={<Pill>{optionLabel(SEX_OPTIONS, initial.sex)}</Pill>} />
+              <SettingsRow
+                label="Activity"
+                control={<Pill>{optionLabel(ACTIVITY_OPTIONS, initial.activity)}</Pill>}
+              />
+              <SettingsRow label="Goal" control={<Pill>{optionLabel(GOAL_OPTIONS, initial.goal)}</Pill>} />
+            </SettingsBlock>
+          </>
         ) : (
           <StatusText>No target set yet — add your profile below.</StatusText>
         )}
-        <Section label={initial == null ? 'Set your target' : 'Update your profile'}>
+        <SettingsBlock title={initial == null ? 'Set your target' : 'Update your profile'}>
           <SettingsRow
             label="Age"
             control={
@@ -192,9 +243,18 @@ export function TargetProfileForm({
               />
             }
           />
-          {error !== '' ? <StatusText>{error}</StatusText> : null}
+        </SettingsBlock>
+        {/* Outside the card: the feedback is not one of the profile's rows, so it must
+            not read as a seventh bordered group row. */}
+        {error !== '' ? <StatusText>{error}</StatusText> : null}
+        {/* The footer is the screen's only commit affordance (reference `.subfoot`); a
+            label-less `Section` gives it the same `--s6` step the body's groups open with. */}
+        <Section>
+          <Button type="submit" disabled={saving || !profileReady}>
+            Update profile
+          </Button>
         </Section>
       </form>
-    </EditorChrome>
+    </ManagerBlock>
   );
 }

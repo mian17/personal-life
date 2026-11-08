@@ -1,12 +1,13 @@
-import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
-import { formatDate, PageShell } from '@life/ui';
+import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
+import { formatLongDate, ListShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
+  collectDayEntries: jest.fn(),
   listDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
-  listMealFoods: jest.fn(),
-  listMealFoodsIncludingDeleted: jest.fn(),
+  collectMealFoods: jest.fn(),
+  collectMealFoodsIncludingDeleted: jest.fn(),
   restoredFoodName: jest.fn(),
 }));
 jest.mock('@/lib/today', () => ({
@@ -15,21 +16,23 @@ jest.mock('@/lib/today', () => ({
 
 import { ApiError } from '@/lib/api-error';
 import {
+  collectDayEntries,
   listDayEntries,
   getMealTarget,
-  listMealFoods,
-  listMealFoodsIncludingDeleted,
+  collectMealFoods,
+  collectMealFoodsIncludingDeleted,
   restoredFoodName,
   type MealEntry,
 } from '@/lib/meal-api';
 import { getToday } from '@/lib/today';
 import MealsPage from '@/app/(meals)/meals/page';
 
+const mockedCollectDayEntries = collectDayEntries as jest.MockedFunction<typeof collectDayEntries>;
 const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
-const mockedListMealFoods = listMealFoods as jest.MockedFunction<typeof listMealFoods>;
-const mockedIncludeDeleted = listMealFoodsIncludingDeleted as jest.MockedFunction<
-  typeof listMealFoodsIncludingDeleted
+const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
+const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
+  typeof collectMealFoodsIncludingDeleted
 >;
 const mockedRestoredFoodName = restoredFoodName as jest.MockedFunction<typeof restoredFoodName>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
@@ -57,9 +60,15 @@ describe('/meals day route wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetToday.mockResolvedValue('2026-10-03');
-    mockedListDayEntries.mockResolvedValue([]);
-    mockedListMealFoods.mockResolvedValue([]);
-    mockedIncludeDeleted.mockResolvedValue([]);
+    mockedCollectDayEntries.mockResolvedValue([]);
+    // The row list reads page 1 from the cursor read; these fixtures model a one-page day, so it
+    // is the same entry set the headline sums.
+    mockedListDayEntries.mockImplementation(async (date) => {
+      const entries = await mockedCollectDayEntries(date);
+      return { entries, nextCursor: null, total: entries.length };
+    });
+    mockedCollectMealFoods.mockResolvedValue([]);
+    mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([]);
     mockedRestoredFoodName.mockImplementation((foodId: string) => foodId);
     mockedGetMealTarget.mockRejectedValue(new ApiError(404, 'API 404 on /api/target'));
   });
@@ -68,26 +77,27 @@ describe('/meals day route wiring', () => {
     await MealsPage();
 
     expect(mockedGetToday).toHaveBeenCalled();
-    expect(mockedListDayEntries).toHaveBeenCalledWith('2026-10-03');
+    expect(mockedCollectDayEntries).toHaveBeenCalledWith('2026-10-03');
   });
 
   it('renders the mocked day, proving it consumes getToday rather than re-deriving', async () => {
     const el = await MealsPage();
 
     const html = renderToStaticMarkup(el);
-    expect(html).toContain(`Meals — ${formatDate('2026-10-03')}`);
+    expect(html).toContain('>Meals</h1>');
+    expect(html).toContain(formatLongDate('2026-10-03'));
   });
 
-  it('renders PageShell and the empty state when the day has no entries', async () => {
+  it('renders the shared ListShell and the empty state when the day has no entries', async () => {
     const el = await MealsPage();
 
-    expect(el.type).toBe(PageShell);
+    expect(el.type).toBe(ListShell);
     const html = renderToStaticMarkup(el);
     expect(html).toContain('No meals logged today.');
   });
 
   it('renders the day total as the sum of confirmed entries via @life/nutrition', async () => {
-    mockedListDayEntries.mockResolvedValue([
+    mockedCollectDayEntries.mockResolvedValue([
       entry({ id: 'a', nutrients: vector({ calories: 420 }) }),
       entry({ id: 'b', nutrients: vector({ calories: 180 }) }),
     ]);
@@ -95,7 +105,11 @@ describe('/meals day route wiring', () => {
     const el = await MealsPage();
     const html = renderToStaticMarkup(el);
 
-    expect(html).toContain(format('calories', 600));
+    // `Kpi` splits the read-out into two slots, so the figure is asserted in the
+    // value slot rather than as one `format('calories', …)` literal; the no-target
+    // path (this route mocks a 404 target) is the `"kcal — No target set"` unit.
+    expect(html).toMatch(/ui-kpi__value[^>]*>600</);
+    expect(html).toContain('kcal — No target set');
     expect(html).not.toContain('No meals logged today.');
   });
 });

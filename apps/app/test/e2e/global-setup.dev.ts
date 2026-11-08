@@ -28,7 +28,7 @@ export default async function globalSetup(): Promise<void> {
 }
 
 function developmentStackConfig(slot: number): StackConfig {
-  const { idpPort, notePort, tagsPort, todoPort, mealPort, appPort } = devPorts(slot);
+  const { idpPort, notePort, tagsPort, todoPort, mealPort, focusPort, appPort } = devPorts(slot);
 
   return {
     mode: 'development',
@@ -37,6 +37,7 @@ function developmentStackConfig(slot: number): StackConfig {
     tagsPort,
     todoPort,
     mealPort,
+    focusPort,
     appPort,
     // Dev is reached on 127.0.0.1 (the human's URL and the app's default).
     appOrigin: `http://127.0.0.1:${appPort}`,

@@ -29,7 +29,7 @@ import {
   nextOccurrence,
   parseRepeatDays,
 } from './recurrence';
-import { KeysService } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { ListsService } from '../lists/lists.service';
 import {
   TODO_ALL,
@@ -39,6 +39,18 @@ import {
   TODO_TRASH,
   TodosCache,
 } from '../cache/todo-cache';
+
+/** A todo as a create carries it — the shape one `:batchCreate` item holds. */
+type TodoDraft = {
+  title: string;
+  note?: string;
+  dueDate?: string;
+  repeat?: TodoRepeat | null;
+  repeatDays?: number[] | null;
+  listId?: string;
+  important?: boolean | null;
+  tagIds?: number[];
+};
 
 /** The `PATCH /api/todos/:id` field set, applied after the ownership/version checks. */
 type TodoPatch = {
@@ -237,88 +249,58 @@ function compareTodos(a: OrderedTodo, b: OrderedTodo): number {
   return a.dto.id > b.dto.id ? -1 : 1;
 }
 
-/** Decode the `base64(<dueDate-or-~>|<createdAt>|<id>)` cursor (kernel clause). */
-function decodeCursor(cursor: string): { due: string; createdAt: string; id: string } {
-  const [due, createdAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { due, createdAt, id };
-}
-
-function encodeCursor(item: OrderedTodo): string {
-  return Buffer.from(`${item.due}|${item.dto.createdAt}|${item.dto.id}`).toString('base64');
-}
-
-/** True when `item` falls strictly after the cursor in the domain order. */
-function afterCursor(item: OrderedTodo, cursor: { due: string; createdAt: string; id: string }): boolean {
+/**
+ * True when `item` falls strictly after the cursor in the domain order. The
+ * cursor's parts are this list's own key, `[due, createdAt, id]`.
+ */
+function afterCursor(item: OrderedTodo, at: string[]): boolean {
+  const [cursorDue, cursorCreatedAt, cursorId] = at;
   const { dto, due } = item;
-  if (cursor.due === '~') {
+  if (cursorDue === '~') {
     // Cursor is in the undated group: only undated rows can follow.
     if (due !== '~') return false;
     return (
-      dto.createdAt < cursor.createdAt ||
-      (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
+      dto.createdAt < cursorCreatedAt ||
+      (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
     );
   }
   // Cursor is dated: undated rows always follow.
   if (due === '~') return true;
-  if (due > cursor.due) return true;
-  if (due < cursor.due) return false;
+  if (due > cursorDue) return true;
+  if (due < cursorDue) return false;
   return (
-    dto.createdAt < cursor.createdAt ||
-    (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
+    dto.createdAt < cursorCreatedAt ||
+    (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
   );
 }
 
 /**
- * Trash keyset cursor, `base64(<deletedAt>|<id>)`. Trash order is
- * `deletedAt DESC, id DESC`, so the pair is the stable boundary key.
- */
-function encodeTrashCursor(item: { deletedAt: string; id: string }): string {
-  return Buffer.from(`${item.deletedAt}|${item.id}`).toString('base64');
-}
-
-function decodeTrashCursor(cursor: string): { deletedAt: string; id: string } {
-  const [deletedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { deletedAt, id };
-}
-
-/**
- * True when `item` falls strictly after the cursor in `deletedAt DESC, id DESC`
- * order, so a page boundary can neither repeat nor skip a row.
+ * True when a trash row falls strictly after the cursor in `deletedAt DESC, id
+ * DESC` order, so a page boundary can neither repeat nor skip a row.
  */
 function afterTrashCursor(
   item: { deletedAt: string; id: string },
-  cursor: { deletedAt: string; id: string },
+  at: string[],
 ): boolean {
+  const [deletedAt, id] = at;
   return (
-    item.deletedAt < cursor.deletedAt ||
-    (item.deletedAt === cursor.deletedAt && item.id < cursor.id)
+    item.deletedAt < deletedAt ||
+    (item.deletedAt === deletedAt && item.id < id)
   );
 }
 
 /**
- * Completion keyset cursor, `base64(<completedAt>|<id>)`. Completion order is
- * `completedAt DESC, id DESC`, so the pair is the stable boundary key.
- */
-function encodeCompletionCursor(item: { completedAt: string; id: string }): string {
-  return Buffer.from(`${item.completedAt}|${item.id}`).toString('base64');
-}
-
-function decodeCompletionCursor(cursor: string): { completedAt: string; id: string } {
-  const [completedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { completedAt, id };
-}
-
-/**
- * True when `item` falls strictly after the cursor in `completedAt DESC, id
- * DESC` order, so a page boundary can neither repeat nor skip a row.
+ * True when a completion row falls strictly after the cursor in `completedAt
+ * DESC, id DESC` order, so a page boundary can neither repeat nor skip a row.
  */
 function afterCompletionCursor(
   item: { completedAt: string; id: string },
-  cursor: { completedAt: string; id: string },
+  at: string[],
 ): boolean {
+  const [completedAt, id] = at;
   return (
-    item.completedAt < cursor.completedAt ||
-    (item.completedAt === cursor.completedAt && item.id < cursor.id)
+    item.completedAt < completedAt ||
+    (item.completedAt === completedAt && item.id < id)
   );
 }
 
@@ -610,19 +592,43 @@ export class TodosService {
   }
 
   /** `POST /api/todos` — 201 with `version: 0`. */
-  async create(
+  async create(sub: string, input: TodoDraft): Promise<TodoDto> {
+    const todo = await this.insertOne(this.todos.manager, sub, input);
+    // Bump AFTER the insert: pre-mutation reads die here; a thrown save never bumps.
+    await this.cache.bumpGeneration(sub);
+    // Warm the lists entry at the new generation when this todo references a list,
+    // mirroring the pre-refactor decode-after-bump so a following read does not
+    // repopulate a stale generation (todo-cache.e2e-spec).
+    if (todo.listId !== null) await this.lists.rawRows(sub);
+    return todo;
+  }
+
+  /** The `todos` batch create: one transaction, submission order, one bump (MAP §4). */
+  async createMany(sub: string, items: TodoDraft[]): Promise<TodoDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.insertOne(manager, sub, item),
+    });
+    if (results.some((todo) => todo.listId !== null)) await this.lists.rawRows(sub);
+    return results;
+  }
+
+  /**
+   * One todo's insert, through the manager the caller supplies, and with no bump.
+   * The singular route passes the repository's manager and keeps its own bump; a
+   * batch passes the transaction's manager, so the kernel owns one bump for the
+   * whole request.
+   */
+  private async insertOne(
+    manager: EntityManager,
     sub: string,
-    input: {
-      title: string;
-      note?: string;
-      dueDate?: string;
-      repeat?: TodoRepeat | null;
-      repeatDays?: number[] | null;
-      listId?: string;
-      important?: boolean | null;
-      tagIds?: number[];
-    },
+    input: TodoDraft,
   ): Promise<TodoDto> {
+    const todos = manager.getRepository(Todo);
+    const todoTags = manager.getRepository(TodoTag);
     const dueDate = input.dueDate == null ? null : this.normalizeDue(input.dueDate, this.tz);
     const repeat = input.repeat ?? null;
     if (repeat !== null && dueDate === null) {
@@ -635,7 +641,7 @@ export class TodosService {
     const ids = normalizeTagIds(input.tagIds);
     const dek = await this.keys.getOrCreateDek(sub);
     const now = new Date();
-    const todo = this.todos.create({
+    const todo = todos.create({
       id,
       title: encryptField(dek, input.title, todoTitleAad(sub, id)),
       note:
@@ -655,14 +661,12 @@ export class TodosService {
       updatedAt: now,
       deletedAt: null,
     });
-    const saved = await this.todos.save(todo);
+    const saved = await todos.save(todo);
     // Association rows are managed explicitly (TagRef joins, not a cascade
     // relation) so a write stores exactly the ids it carries.
     if (ids.length > 0) {
-      await this.todoTags.insert(ids.map((tagId) => ({ todoId: id, tagId })));
+      await todoTags.insert(ids.map((tagId) => ({ todoId: id, tagId })));
     }
-    // Bump AFTER the insert: pre-mutation reads die here; a thrown save never bumps.
-    await this.cache.bumpGeneration(sub);
     const row = { ...toCachedTodoRow(saved), tagIds: ids };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
@@ -686,7 +690,7 @@ export class TodosService {
       cursor?: string;
     },
   ): Promise<TodoPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.rawRows(sub);
     const dek = await this.readDek(sub, rows);
     // One join against the owner's cached `todo:lists` row-set serves the whole
@@ -704,15 +708,15 @@ export class TodosService {
     }));
     ordered.sort(compareTodos);
 
-    const after = opts.cursor
-      ? ordered.filter((item) => afterCursor(item, decodeCursor(opts.cursor!)))
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor = hasMore && last ? encodeCursor(last) : null;
-    return { todos: page.map((item) => item.dto), nextCursor };
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      // `due` is the local `dueSortKey` (`~` = undated) and the first key part, so
+      // the cursor carries the domain order the rows were sorted into.
+      keyOf: (item) => [item.due, item.dto.createdAt, item.dto.id],
+      after: afterCursor,
+    });
+    return { todos: page.map((item) => item.dto), nextCursor, total };
   }
 
   /**
@@ -723,7 +727,7 @@ export class TodosService {
    * after the hit. The loader lives inside `getThrough` (Contract 2 Rule 1).
    */
   async findTrash(sub: string, opts: { limit?: number; cursor?: string }): Promise<TodoPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.cache.getThrough(
       sub,
       TODO_TRASH,
@@ -761,18 +765,13 @@ export class TodosService {
       (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
     );
 
-    const after = opts.cursor
-      ? ordered.filter((item) =>
-          afterTrashCursor({ deletedAt: item.deletedAt, id: item.id }, decodeTrashCursor(opts.cursor!)),
-        )
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor =
-      hasMore && last ? encodeTrashCursor({ deletedAt: last.deletedAt, id: last.id }) : null;
-    return { todos: page, nextCursor };
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (item) => [item.deletedAt, item.id],
+      after: afterTrashCursor,
+    });
+    return { todos: page, nextCursor, total };
   }
 
   /**
@@ -788,7 +787,7 @@ export class TodosService {
     sub: string,
     opts: { limit?: number; cursor?: string },
   ): Promise<TodoCompletionPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.cache.getThrough(
       sub,
       TODO_COMPLETIONS,
@@ -817,16 +816,12 @@ export class TodosService {
     const ordered = [...joined].sort(
       (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
     );
-    const after = opts.cursor
-      ? ordered.filter((item) =>
-          afterCompletionCursor(item, decodeCompletionCursor(opts.cursor!)),
-        )
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor = hasMore && last ? encodeCompletionCursor(last) : null;
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (row) => [row.completedAt, row.id],
+      after: afterCompletionCursor,
+    });
 
     // Resolve list names only when a page row is actually listed.
     const listedIds = new Set(
@@ -851,7 +846,7 @@ export class TodosService {
         listName: todo.listId !== null ? names.get(todo.listId) ?? null : null,
       };
     });
-    return { completions, nextCursor };
+    return { completions, nextCursor, total };
   }
 
   /**
@@ -888,7 +883,53 @@ export class TodosService {
    * reminder; the `'~'` sentinel leaves the due untouched (N2/N3).
    */
   async update(sub: string, id: string, patch: TodoPatch): Promise<TodoDto> {
-    const todo = await this.loadForUpdate(sub, id, patch);
+    // The singular route owns its transaction, because a `done` patch writes the
+    // flag, the completion log and the advance as one unit.
+    const todo = await this.dataSource.transaction((manager) =>
+      this.updateOne(manager, sub, id, patch),
+    );
+    // Bump AFTER save/commit — a 409 above never bumps, a thrown transaction
+    // never reaches here.
+    await this.cache.bumpGeneration(sub);
+    if (todo.listId !== null) await this.lists.rawRows(sub);
+    return todo;
+  }
+
+  /**
+   * The `todos` batch update: one transaction, submission order, one bump. A
+   * stale `expectedVersion` on any item throws `409` and rolls the whole batch
+   * back, so the items before it are unchanged too.
+   */
+  async updateMany(
+    sub: string,
+    items: (TodoPatch & { id: string })[],
+  ): Promise<TodoDto[]> {
+    const results = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: (item, manager) => this.updateOne(manager, sub, item.id, item),
+    });
+    if (results.some((todo) => todo.listId !== null)) await this.lists.rawRows(sub);
+    return results;
+  }
+
+  /**
+   * One todo's patch, through the manager the caller supplies, and with no bump.
+   *
+   * Every write this performs goes through `manager`, the `done`-tick completion
+   * rows included, and it never opens a transaction of its own: the singular
+   * route opens one above it and a batch arrives inside the kernel's, so a second
+   * one here would nest and break atomicity.
+   */
+  private async updateOne(
+    manager: EntityManager,
+    sub: string,
+    id: string,
+    patch: TodoPatch,
+  ): Promise<TodoDto> {
+    const todo = await this.loadForUpdate(manager, sub, id, patch);
     // Write path: always envelopes. Re-encrypting with a fresh nonce is correct
     // even when the plaintext is unchanged.
     const dek = await this.keys.getOrCreateDek(sub);
@@ -898,7 +939,7 @@ export class TodosService {
 
     // Advance-on-tick: a recurring tick moves the todo to its next occurrence
     // and keeps it open; a non-recurring `done:true` closes it. The mutation
-    // itself (flag + completion log + advance) runs in one transaction below.
+    // itself (flag + completion log + advance) is written below.
     const advance = patch.done === true && todo.repeat !== null && todo.dueDate !== null;
 
     // The repeat-requires-due invariant holds against the resulting due.
@@ -911,25 +952,39 @@ export class TodosService {
       todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
     }
 
-    const currentIds = await this.resolveTagIds(id, patch.tagIds);
+    const currentIds = await this.resolveTagIds(manager, id, patch.tagIds);
 
     todo.version += 1;
     todo.updatedAt = new Date();
-    const saved = await this.savePatch(todo, patch, sub, id, advance);
-    // Bump AFTER the save/commit — a 409 above never bumps, a thrown
-    // transaction never reaches here.
-    await this.cache.bumpGeneration(sub);
-    const row = { ...toCachedTodoRow(saved), tagIds: currentIds };
+    const saved = await this.savePatch(manager, todo, patch, sub, id, advance);
+    return this.answerWithDecodedTodo(saved, currentIds, sub, dek);
+  }
+
+  /** The wire DTO for a just-saved todo, assembled after the write, not inside it. */
+  private async answerWithDecodedTodo(
+    saved: Todo,
+    tagIds: number[],
+    sub: string,
+    dek: Buffer,
+  ): Promise<TodoDto> {
+    const row = { ...toCachedTodoRow(saved), tagIds };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
   }
 
   /** Load + authorise a PATCH target (a foreign id and a missing one are one 404). */
-  private async loadForUpdate(sub: string, id: string, patch: TodoPatch): Promise<Todo> {
+  private async loadForUpdate(
+    manager: EntityManager,
+    sub: string,
+    id: string,
+    patch: TodoPatch,
+  ): Promise<Todo> {
     if (patch.listId !== undefined && patch.listId !== null) {
       await this.lists.assertOwnedList(sub, patch.listId);
     }
     // Load WITHOUT the relation: associations are managed explicitly by the caller.
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    const todo = await manager
+      .getRepository(Todo)
+      .findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
     if (!todo) throw new NotFoundException('Todo not found');
     if (patch.expectedVersion !== undefined && todo.version !== patch.expectedVersion) {
       throw new ConflictException('Todo was modified');
@@ -983,35 +1038,45 @@ export class TodosService {
   }
 
   /** Replace the association set on a `tagIds` write, else read the committed one. */
-  private async resolveTagIds(todoId: string, tagIds: number[] | undefined): Promise<number[]> {
+  private async resolveTagIds(
+    manager: EntityManager,
+    todoId: string,
+    tagIds: number[] | undefined,
+  ): Promise<number[]> {
+    const todoTags = manager.getRepository(TodoTag);
     if (tagIds === undefined) {
-      return (await this.todoTags.find({ where: { todoId } }))
-        .map((tt) => tt.tagId)
+      return (await todoTags.find({ where: { todoId } }))
+        .map((todoTag) => todoTag.tagId)
         .sort((a, b) => a - b);
     }
     const ids = normalizeTagIds(tagIds);
-    await this.todoTags.delete({ todoId });
+    await todoTags.delete({ todoId });
     if (ids.length > 0) {
-      await this.todoTags.insert(ids.map((tagId) => ({ todoId, tagId })));
+      await todoTags.insert(ids.map((tagId) => ({ todoId, tagId })));
     }
     return ids;
   }
 
-  /** Persist the row; a `done` patch mutates flag + completion log + advance atomically. */
-  private savePatch(
+  /**
+   * Persist the row through `manager`. A `done` patch also mutates the flag, the
+   * completion log and the advance, and those writes ride the same manager, so
+   * they commit or roll back with the row.
+   */
+  private async savePatch(
+    manager: EntityManager,
     todo: Todo,
     patch: TodoPatch,
     sub: string,
     id: string,
     advance: boolean,
   ): Promise<Todo> {
-    if (patch.done === undefined) return this.todos.save(todo);
-    return this.dataSource.transaction(async (manager) => {
-      if (advance) await this.advanceOnTick(manager, sub, todo, id);
-      else if (patch.done === true) await this.closeOnTick(manager, sub, todo, id);
-      else await this.undoCompletion(manager, sub, todo, id);
-      return manager.save(todo);
-    });
+    // A patch that carries no `done` moves no completion log, so the row alone
+    // is the write.
+    if (patch.done === undefined) return manager.save(todo);
+    if (advance) await this.advanceOnTick(manager, sub, todo, id);
+    else if (patch.done === true) await this.closeOnTick(manager, sub, todo, id);
+    else await this.undoCompletion(manager, sub, todo, id);
+    return manager.save(todo);
   }
 
   /**
@@ -1020,12 +1085,43 @@ export class TodosService {
    * ids are a byte-identical 404; a failed mutation never bumps the generation.
    */
   async remove(sub: string, id: string): Promise<void> {
-    const todo = await this.todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!todo) throw new NotFoundException('Todo not found');
-    todo.deletedAt = new Date();
-    await this.todos.save(todo);
+    await this.softDeleteOne(this.todos.manager, sub, id);
     // Bump AFTER the mutation: pre-mutation entries die here. No version change.
     await this.cache.bumpGeneration(sub);
+  }
+
+  /**
+   * The `todos` batch delete: one transaction, submission order, one bump, and
+   * the singular route's soft-delete meaning. The ids come back for per-item
+   * confirmation without a partial-success envelope; a foreign id is `404` and
+   * rolls the whole batch back, leaving every row live.
+   */
+  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    const deleted = await runAtomicBatch({
+      items,
+      sub,
+      dataSource: this.dataSource,
+      cache: this.cache,
+      runItem: async (item, manager) => {
+        await this.softDeleteOne(manager, sub, item.id);
+        return item.id;
+      },
+    });
+    return { deleted };
+  }
+
+  /**
+   * One todo's move to trash, through the manager the caller supplies, and with
+   * no bump. Soft by definition — `deletedAt` is set and `version` is untouched —
+   * so a batch delete means exactly what the singular delete means and the row
+   * stays restorable.
+   */
+  private async softDeleteOne(manager: EntityManager, sub: string, id: string): Promise<void> {
+    const todos = manager.getRepository(Todo);
+    const todo = await todos.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
+    if (!todo) throw new NotFoundException('Todo not found');
+    todo.deletedAt = new Date();
+    await todos.save(todo);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { join } from 'node:path';
-import { resolveDbPath } from '@life/shared';
+import { resolveDbPath } from '@life/shared/node';
 
-export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal';
+export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal' | 'focus';
 
 export interface ResolvedPath {
   name: DatabaseName;
@@ -16,6 +16,7 @@ export const DEFAULT_TAGS_DB_PATH = join(REPO_ROOT, 'apps', 'tags-service', 'dat
 export const DEFAULT_TODO_DB_PATH = join(REPO_ROOT, 'apps', 'todo-service', 'data', 'todo.db');
 export const DEFAULT_IDP_DB_PATH = join(REPO_ROOT, 'apps', 'idp', 'data', 'idp.db');
 export const DEFAULT_MEAL_DB_PATH = join(REPO_ROOT, 'apps', 'meal-service', 'data', 'meal.db');
+export const DEFAULT_FOCUS_DB_PATH = join(REPO_ROOT, 'apps', 'focus-service', 'data', 'focus.db');
 
 export function resolvePaths(env: NodeJS.ProcessEnv = process.env): ResolvedPath[] {
   return [
@@ -24,6 +25,7 @@ export function resolvePaths(env: NodeJS.ProcessEnv = process.env): ResolvedPath
     { name: 'todo', envName: 'TODO_DB_PATH', source: resolveDbPath('TODO_DB_PATH', DEFAULT_TODO_DB_PATH, env) },
     { name: 'idp', envName: 'IDP_DB_PATH', source: resolveDbPath('IDP_DB_PATH', DEFAULT_IDP_DB_PATH, env) },
     { name: 'meal', envName: 'MEAL_DB_PATH', source: resolveDbPath('MEAL_DB_PATH', DEFAULT_MEAL_DB_PATH, env) },
+    { name: 'focus', envName: 'FOCUS_DB_PATH', source: resolveDbPath('FOCUS_DB_PATH', DEFAULT_FOCUS_DB_PATH, env) },
   ];
 }
 

@@ -2,6 +2,7 @@ import 'server-only';
 import type {
   CreateTodoInput,
   List,
+  ListPage,
   PushSubscribeInput,
   TagUsage,
   Todo,
@@ -9,6 +10,7 @@ import type {
   TodoPage,
   UpdateTodoInput,
 } from '@life/shared';
+import { withQuery } from '@life/app-kit';
 import { callService } from './client';
 
 const TODO_API_URL = process.env.TODO_API_URL ?? 'http://127.0.0.1:3005';
@@ -39,9 +41,7 @@ export function listTodos(filters: TodoFilters = {}): Promise<TodoPage> {
   if (filters.dueAfter !== undefined) params.set('dueAfter', filters.dueAfter);
   if (filters.limit !== undefined) params.set('limit', String(filters.limit));
   if (filters.cursor !== undefined) params.set('cursor', filters.cursor);
-  const qs = params.toString();
-  const query = qs ? `?${qs}` : '';
-  return call<TodoPage>(`/api/todos${query}`);
+  return call<TodoPage>(withQuery('/api/todos', params));
 }
 
 export function getTodo(id: string): Promise<Todo> {
@@ -63,9 +63,7 @@ export function listTodoCompletions(
   const params = new URLSearchParams();
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
-  const qs = params.toString();
-  const query = qs ? `?${qs}` : '';
-  return call<TodoCompletionPage>(`/api/todos/completions${query}`);
+  return call<TodoCompletionPage>(withQuery('/api/todos/completions', params));
 }
 
 export function createTodo(input: CreateTodoInput): Promise<Todo> {
@@ -97,9 +95,42 @@ export function emptyTodoTrash(): Promise<{ ok: true; count: number }> {
   return call<{ ok: true; count: number }>('/api/todos/trash', { method: 'DELETE' });
 }
 
-/** `GET /api/lists` — the owner's todo-local lists. */
-export function listLists(): Promise<List[]> {
-  return call<List[]>('/api/lists');
+/**
+ * `GET /api/lists?q=&limit=&cursor=` — one page of the owner's todo-local lists,
+ * name-sorted, narrowed by an optional name substring.
+ *
+ * `q` is filtered by the service **after** the cache hit, so it never enters the
+ * cache key: one cached entry serves every search variant (Contract 2 Rule 3).
+ */
+export function fetchListPage(
+  opts: { q?: string; limit?: number; cursor?: string } = {},
+): Promise<ListPage> {
+  const params = new URLSearchParams();
+  if (opts.q) params.set('q', opts.q);
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
+  return call<ListPage>(withQuery('/api/lists', params));
+}
+
+/**
+ * The owner's **whole** list vocabulary, walked page by page.
+ *
+ * Every caller needs all of it: the manager panel renames and re-defaults from the
+ * full set, the matrix and the todo list group by list, and every editor's list
+ * picker offers every list. One page would hide the lists past the boundary — an
+ * item would lose its group or a picker would omit its list — so the walk is the
+ * only correct read for a screen. `maxItems` is a safety bound, not an expected
+ * size.
+ */
+export async function listLists(maxItems = 1000): Promise<List[]> {
+  const collected: List[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchListPage({ cursor });
+    collected.push(...page.lists);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 export function createList(name: string): Promise<List> {

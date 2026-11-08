@@ -25,7 +25,14 @@ export function TodoList({
   const total = groups.reduce((count, group) => count + group.todos.length, 0);
 
   if (total === 0) {
-    return <EmptyState heading="No todos" body="Tap + to add your first todo." />;
+    // Labelled or not, a section opens one token step down; the empty state takes the
+    // page's rhythm from it instead of an ad-hoc margin. `autoHideStyles` stays inert
+    // here: it only hides a section holding a `.ui-list` with no row.
+    return (
+      <Section>
+        <EmptyState heading="No todos" body="Tap + to add your first todo." />
+      </Section>
+    );
   }
 
   return (

@@ -57,6 +57,7 @@ function makeRestoreFixture(): RestoreFixture {
     todo: join(root, 'apps', 'todo-service', 'data', 'todo.db'),
     idp: join(root, 'apps', 'idp', 'data', 'idp.db'),
     meal: join(root, 'apps', 'meal-service', 'data', 'meal.db'),
+    focus: join(root, 'apps', 'focus-service', 'data', 'focus.db'),
   };
   return { root, backupRoot: join(root, 'backup'), targets };
 }
@@ -66,7 +67,10 @@ function snapshotPath(fx: RestoreFixture, name: DatabaseName, stamp = STAMP): st
   return join(fx.backupRoot, stamp, `${name}.db`);
 }
 
-function envFor(fx: RestoreFixture, names: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal']) {
+function envFor(
+  fx: RestoreFixture,
+  names: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'],
+) {
   const env: NodeJS.ProcessEnv = { INIT_CWD: fx.root };
   const vars: Record<DatabaseName, string> = {
     life: 'NOTE_DB_PATH',
@@ -74,6 +78,7 @@ function envFor(fx: RestoreFixture, names: DatabaseName[] = ['life', 'tags', 'to
     todo: 'TODO_DB_PATH',
     idp: 'IDP_DB_PATH',
     meal: 'MEAL_DB_PATH',
+    focus: 'FOCUS_DB_PATH',
   };
   for (const name of names) env[vars[name]] = fx.targets[name];
   return env;

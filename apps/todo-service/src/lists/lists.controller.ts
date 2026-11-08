@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
 import { CreateListDto } from './dto/create-list.dto';
+import { ListListsQuery } from './dto/list-lists.query';
 import { UpdateListDto } from './dto/update-list.dto';
 import { ListsService } from './lists.service';
 
@@ -14,9 +15,14 @@ export class ListsController {
     return this.lists.create(principal.sub, dto.name, dto.importantDefault ?? null);
   }
 
+  /**
+   * `200 ListPage` — `{ lists, nextCursor }` in `byName` order — or `400` for a
+   * `limit`/`cursor` the query DTO rejects. Lists are a named vocabulary (tens),
+   * so the window is the shared list contract, not a bounded scan.
+   */
   @Get()
-  list(@Principal() principal: Principal) {
-    return this.lists.list(principal.sub);
+  list(@Principal() principal: Principal, @Query() query: ListListsQuery) {
+    return this.lists.page(principal.sub, query);
   }
 
   @Patch(':id')

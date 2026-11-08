@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { resolveDbPath } from '../src/index';
+import { resolveDbPath } from '../src/node';
 
 /**
  * Contract for the generic `resolveDbPath(envName, defaultPath, env?)` extracted

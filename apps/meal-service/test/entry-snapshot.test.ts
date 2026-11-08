@@ -180,7 +180,7 @@ describe('Entry snapshot immutability', () => {
     expect(reread.nutrients.calories).toBe(200);
     expect(reread.nutrients).toEqual(scale(food(original), 2));
     expect(h.repo.rows[0].nutrients).toBe(storedBefore);
-    expect((await h.service.findAll(SUB, DAY))[0].nutrients).toEqual(scale(food(original), 2));
+    expect((await h.service.findAll(SUB, { date: DAY })).entries[0].nutrients).toEqual(scale(food(original), 2));
   });
 
   it('changes the snapshot only through an explicit corrected write', async () => {
@@ -218,13 +218,13 @@ describe('Entry snapshot immutability', () => {
     const a = await h.service.create(SUB, body({ mealGroup: 'lunch', nutrients: first }));
     await h.service.create(SUB, body({ mealGroup: 'dinner', foodId: 'food-2', nutrients: second }));
 
-    const listed: EntryDto[] = await h.service.findAll(SUB, DAY);
+    const listed: EntryDto[] = (await h.service.findAll(SUB, { date: DAY })).entries;
     expect(listed).toHaveLength(2);
     expect(sum(listed.map((entry) => entry.nutrients))).toEqual(sum([first, second]));
 
     await h.service.remove(SUB, a.id);
 
-    const after = await h.service.findAll(SUB, DAY);
+    const after = (await h.service.findAll(SUB, { date: DAY })).entries;
     expect(after).toHaveLength(1);
     expect(sum(after.map((entry) => entry.nutrients))).toEqual(second);
   });
@@ -236,7 +236,7 @@ describe('EntriesService — read path discipline', () => {
     await h.service.create(SUB, body({ mealGroup: 'breakfast' }));
     await h.service.create(SUB, body({ mealGroup: 'dinner', foodId: 'food-2' }));
 
-    const filtered = await h.service.findAll(SUB, DAY, 'dinner');
+    const filtered = (await h.service.findAll(SUB, { date: DAY, meal: 'dinner' })).entries;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].mealGroup).toBe('dinner');
 
@@ -255,7 +255,7 @@ describe('EntriesService — read path discipline', () => {
     await expect(
       h.service.findOne(OTHER_SUB, '11111111-1111-4111-8111-111111111111'),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(await h.service.findAll(OTHER_SUB, DAY)).toEqual([]);
+    expect((await h.service.findAll(OTHER_SUB, { date: DAY })).entries).toEqual([]);
 
     await expect(h.service.update(OTHER_SUB, created.id, {} as UpdateEntryDto)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -276,7 +276,7 @@ describe('EntriesService — read path discipline', () => {
 
     // First read after the write: the owner's generation is 1, so the day key
     // embeds it and the value is the row as persisted — ciphertext, never a DTO.
-    const fromCache = await h.service.findAll(SUB, DAY);
+    const fromCache = (await h.service.findAll(SUB, { date: DAY })).entries;
     expect(fromCache[0].nutrients).toEqual(created.nutrients);
     const key = `meal:${SUB}:v1:entries:${DAY}`;
     expect(h.client.setCalls).toContain(key);
@@ -286,7 +286,7 @@ describe('EntriesService — read path discipline', () => {
 
     // A second read is a hit: the loader (a DB query) does not run again.
     const dbCallsBefore = h.repo.find.mock.calls.length;
-    const again = await h.service.findAll(SUB, DAY);
+    const again = (await h.service.findAll(SUB, { date: DAY })).entries;
     expect(again[0].nutrients).toEqual(created.nutrients);
     expect(h.repo.find.mock.calls).toHaveLength(dbCallsBefore);
   });

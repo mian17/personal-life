@@ -19,13 +19,26 @@ export interface StubIdp {
   openBrowser: (authorizationUrl: string) => Promise<void>;
   /** How many refresh rotations have happened; the auth suite asserts the store changed. */
   rotations: () => number;
+  /** Every authorization the browser stand-in completed, in arrival order. */
+  grants: () => readonly StubGrant[];
   stop: () => Promise<void>;
+}
+
+/**
+ * What one authorization asked for: the client, the RFC 8707 resource it named,
+ * and the audience that resource maps to, which is what the minted token carries.
+ */
+export interface StubGrant {
+  clientId: string;
+  resource: string;
+  audience: string;
 }
 
 interface StubIdpState {
   authorizations: Map<string, string>;
   refreshTokens: Set<string>;
   rotationCount: number;
+  grants: StubGrant[];
 }
 
 interface StubIdpOptions {
@@ -42,6 +55,7 @@ export async function startStubIdp(options: StubIdpOptions = {}): Promise<StubId
     authorizations: new Map(),
     refreshTokens: new Set(),
     rotationCount: 0,
+    grants: [],
   };
   const server = createServer((request, response) => {
     void answer(request, response, state);
@@ -52,6 +66,7 @@ export async function startStubIdp(options: StubIdpOptions = {}): Promise<StubId
     issuer,
     openBrowser: (authorizationUrl) => followAuthorization(authorizationUrl),
     rotations: () => state.rotationCount,
+    grants: () => state.grants,
     stop: () => closeServer(server),
   };
 }
@@ -151,7 +166,46 @@ function authorize(request: IncomingMessage, response: ServerResponse, state: St
   }
   const code = randomUUID();
   state.authorizations.set(code, challenge);
+  state.grants.push(grantOf(query));
   sendRedirect(response, callbackUrl(redirectUri, code, stateParam));
+}
+
+/** The authorization as this stub reads it: which client asked for which resource. */
+function grantOf(query: URLSearchParams): StubGrant {
+  const resource = query.get('resource') ?? '';
+  return {
+    clientId: query.get('client_id') ?? '',
+    resource,
+    audience: audienceFor(resource),
+  };
+}
+
+/**
+ * The IdP's `OIDC_AUDIENCE_MAP` reading (`apps/idp/src/oidc/access-token.policy.ts`,
+ * `audienceFor`): comma-separated `resource=audience` pairs, an unmapped resource
+ * contributing its hostname. Restated here, not imported, so no test reaches into
+ * `apps/`; a drift shows up as the wrong `aud` on the recorded grant.
+ */
+function audienceFor(resource: string): string {
+  const mapped = audienceMap().get(resource.trim());
+  if (mapped !== undefined) return mapped;
+  try {
+    return new URL(resource).hostname || resource;
+  } catch {
+    return resource;
+  }
+}
+
+function audienceMap(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const entry of (process.env.OIDC_AUDIENCE_MAP ?? '').split(',')) {
+    const equals = entry.indexOf('=');
+    if (equals === -1) continue;
+    const resource = entry.slice(0, equals).trim();
+    const audience = entry.slice(equals + 1).trim();
+    if (resource && audience) map.set(resource, audience);
+  }
+  return map;
 }
 
 function callbackUrl(redirectUri: string, code: string, state: string): string {

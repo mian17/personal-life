@@ -19,6 +19,20 @@ export function formatDate(iso: string): string {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
@@ -43,6 +57,46 @@ export function formatDayMonth(iso: string): string {
   if (part === '' || !isRealDate(part)) return '';
   const [, month, day] = part.split('-').map(Number);
   return `${day} ${MONTHS[month - 1]}`;
+}
+
+/**
+ * `Thursday, 30 October` — the page header's long form: the English weekday, a
+ * comma, then the unpadded day and the full month. Empty or malformed input
+ * renders as `''`.
+ */
+export function formatLongDate(iso: string): string {
+  const part = datePart(iso);
+  if (part === '' || !isRealDate(part)) return '';
+  const [, month, day] = part.split('-').map(Number);
+  return `${formatWeekday(part)}, ${day} ${MONTHS_LONG[month - 1]}`;
+}
+
+/**
+ * A note row's meta line: the relative day (`Today` / `Yesterday`, else
+ * `formatDayMonth`), a comma and the local `HH:mm`, then ` · <tag>` when the
+ * note carries one (`Today, 08:14 · garden`). A note with no time part keeps the
+ * day alone; a malformed date renders as `''`.
+ */
+export function formatNoteMeta(iso: string, tagName?: string): string {
+  const part = datePart(iso);
+  if (part === '' || !isRealDate(part)) return '';
+  const day = relativeDayName(part, todayIso());
+  const time = localTimePart(iso);
+  const dated = time === '' ? day : `${day}, ${time}`;
+  return tagName == null || tagName === '' ? dated : `${dated} · ${tagName}`;
+}
+
+/** `Today` / `Yesterday` for the two days around `base`, and the plain day-month date otherwise. */
+function relativeDayName(part: string, base: string): string {
+  if (part === base) return 'Today';
+  if (part === dayBefore(base)) return 'Yesterday';
+  return formatDayMonth(part);
+}
+
+/** The `YYYY-MM-DD` before `part`, via UTC so no timezone drift reaches it. */
+function dayBefore(part: string): string {
+  const [year, month, day] = part.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
 }
 
 /** The `YYYY-MM-DD` after `part`, via UTC so no timezone drift reaches it. */

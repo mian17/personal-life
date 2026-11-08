@@ -6,6 +6,7 @@
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { login } from '../src/auth/login';
@@ -72,6 +73,18 @@ describe('login', () => {
     const stored = await readFile(credentialsPath(), 'utf8');
     expect(stored).toContain(sampleApiToken);
     expect(printed()).not.toContain(sampleApiToken);
+  });
+
+  it('fails naming port 8080 when the callback port is taken', async () => {
+    const occupant = createServer();
+    await new Promise<void>((resolve, reject) => {
+      occupant.once('error', reject);
+      occupant.listen(8080, '127.0.0.1', resolve);
+    });
+
+    await expect(loginAgainstStub()).rejects.toThrow(/port 8080/);
+
+    await new Promise<void>((resolve) => occupant.close(() => resolve()));
   });
 });
 

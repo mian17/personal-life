@@ -35,7 +35,7 @@ export interface BackupResult {
   snapshots: ManifestEntry[];
 }
 
-const DATABASE_NAMES: readonly DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal'];
+const DATABASE_NAMES: readonly DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'];
 const DEFAULT_KEEP = 10;
 
 /** Raised before anything is written; `paths` are the missing sources. */
@@ -118,6 +118,35 @@ export function pruneRoutineSnapshots(
 }
 
 /**
+ * The finalize step both backup variants share: record the manifest, mark a deliberate
+ * snapshot with `PINNED`, then prune the routine pool the run itself belongs to.
+ */
+export function finalizeBackup(options: {
+  destination: string;
+  backupRoot: string;
+  pinned: boolean;
+  mode: BackupMode;
+  createdAt: string;
+  /** This run's per-database manifest entries, as the caller's engine typed them. */
+  entries: object[];
+  warnPrefix: string;
+}): void {
+  const manifest = {
+    mode: options.mode,
+    createdAt: options.createdAt,
+    pinned: options.pinned,
+    databases: options.entries,
+  };
+  writeFileSync(join(options.destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  if (options.pinned) writeFileSync(join(options.destination, 'PINNED'), '');
+
+  if (!options.pinned) {
+    const { failed } = pruneRoutineSnapshots(options.backupRoot);
+    for (const dir of failed) console.warn(`${options.warnPrefix}: could not prune ${dir}`);
+  }
+}
+
+/**
  * Run one backup. Missing selected inputs throw before the destination directory
  * is created; a routine run prunes after its own snapshot is verified.
  */
@@ -155,21 +184,18 @@ export function runBackup(options: {
     };
   });
 
-  const manifest: BackupManifest = {
-    mode: pinned ? 'deliberate' : 'routine',
-    createdAt: at.toISOString(),
+  const mode = pinned ? 'deliberate' : 'routine';
+  finalizeBackup({
+    destination,
+    backupRoot,
     pinned,
-    databases: snapshots,
-  };
-  writeFileSync(join(destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  if (pinned) writeFileSync(join(destination, 'PINNED'), '');
+    mode,
+    createdAt: at.toISOString(),
+    entries: snapshots,
+    warnPrefix: 'db:backup',
+  });
 
-  if (!pinned) {
-    const { failed } = pruneRoutineSnapshots(backupRoot);
-    for (const dir of failed) console.warn(`db:backup: could not prune ${dir}`);
-  }
-
-  return { destination, mode: manifest.mode, snapshots };
+  return { destination, mode, snapshots };
 }
 
 /**

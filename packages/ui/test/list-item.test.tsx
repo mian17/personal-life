@@ -11,12 +11,31 @@ function classesWithPrefix(classes: string[], prefix: string): string[] {
 
 /** The row body carries its layout as utilities; the hook rides along for locators. */
 const ROW_UTILITY = 'flex';
-const ROW_TINT_UTILITY = 'bg-panel';
+const ROW_PRESS_UTILITY = 'active:bg-press';
+const ROW_INSET_UTILITY = 'px-[var(--s4)]';
 const LINK_LAYOUT_UTILITY = 'self-stretch';
-/** A todo row clamps its title to two lines; every other row ellipsizes one. */
+/** Todo rows — dense included — and base list rows read two title lines; a label row reads one. */
 const TITLE_CLAMP_UTILITY = 'line-clamp-2';
 const ONE_LINE_TITLE_UTILITY = 'truncate';
-const DENSE_TYPE_UTILITY = 'text-[length:var(--space-0-7)]';
+const DENSE_TYPE_UTILITY = 'text-[length:var(--fs-meta)]';
+/** The danger slot's floor: `--tap` is 48px, clearing the 44px contract minimum. */
+const DANGER_FLOOR_UTILITY = '[&>form>.ui-btn--danger]:min-h-[var(--tap)]';
+const DANGER_FLOOR_WIDTH_UTILITY = '[&>form>.ui-btn--danger]:min-w-[var(--tap)]';
+/**
+ * The dense title offset: the row's `--s3` plus this `--tap + --s1 - --s3` = 52px from the row
+ * edge, flush with the checkbox press square's trailing edge.
+ */
+const DENSE_TITLE_INSET_UTILITY = 'ps-[calc(var(--tap)+var(--s1)-var(--s3))]';
+/**
+ * A linked feedback row's child gap: one `--s2` step, the same gap `linkColumnStyles` gives the
+ * unlinked shape.
+ */
+const FEEDBACK_COLUMN_GAP_UTILITY = 'gap-[var(--s2)]';
+/**
+ * The description's own step: the text column pairs the title with its date at one `--s1`, and
+ * this offset adds `--s2` on top of that gap, so the description sits 12px below the pair.
+ */
+const FEEDBACK_DESCRIPTION_OFFSET_UTILITY = 'mt-[var(--s2)]';
 
 describe('ListItem', () => {
   it('renders an <li> row with the ui-list-item hook', () => {
@@ -30,7 +49,7 @@ describe('ListItem', () => {
     expect(classesOf(li)).toContain('ui-list-item');
   });
 
-  it('takes the row surface from utilities rather than a stylesheet rule', () => {
+  it('takes its geometry from utilities and leaves the surface to its group', () => {
     render(
       <ul>
         <ListItem title="Groceries" />
@@ -38,7 +57,12 @@ describe('ListItem', () => {
     );
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain(ROW_UTILITY);
-    expect(classes).toContain(ROW_TINT_UTILITY);
+    expect(classes).toContain(ROW_INSET_UTILITY);
+    // §8's `.group`/`.row` split: the group paints the surface, so a row only carries its
+    // own press wash — a per-row panel fill would double the surface the group already has.
+    expect(classes).toContain(ROW_PRESS_UTILITY);
+    expect(classes).not.toContain('bg-surface');
+    expect(classes.some((cls) => cls.startsWith('rounded-'))).toBe(false);
   });
 
   it('renders href as a link carrying the ui-list-item__link hook', () => {
@@ -133,24 +157,23 @@ describe('ListItem', () => {
     expect(children[2]).toBe(screen.getByTestId('delete-action'));
   });
 
-  it('insets the trailing delete glyph to the row text inset', () => {
+  it('insets the row box, not each slot, so the delete glyph lands on the text edge', () => {
     render(
       <ul>
         <ListItem href="/meals/1" title="Oats" deleteAction={<button>x</button>} />
       </ul>,
     );
-    const row = document.querySelector('.ui-list-item')!;
-    const rowClasses = classesOf(row);
-    // The row's text inset and the glyph's right inset resolve to the same token, so the
-    // trailing control cannot sit tighter to the edge than the text opposite it.
-    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))]');
-    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:p-[var(--space-0-5)]');
-    expect(document.querySelector('.ui-list-item__link')!.className).toContain(
-      'p-[var(--space-0-9)]',
-    );
+    const rowClasses = classesOf(document.querySelector('.ui-list-item')!);
+    // §8 gives the inset to the row, so neither the body nor the trailing glyph needs a
+    // compensating inset or a negative margin to line up with the text opposite it.
+    expect(rowClasses).toContain(ROW_INSET_UTILITY);
+    expect(rowClasses).toContain('[&>form>.ui-btn--danger]:p-[var(--s2)]');
+    expect(rowClasses.some((cls) => cls.includes('mr-[calc('))).toBe(false);
+    const linkClasses = classesOf(document.querySelector('.ui-list-item__link')!);
+    expect(linkClasses.some((cls) => cls.startsWith('p-') || cls.startsWith('px-'))).toBe(false);
   });
 
-  it('keeps the leading and trailing row insets on one token', () => {
+  it('takes one row inset for both edges instead of per-side adjustments', () => {
     render(
       <ul>
         <ListItem
@@ -161,17 +184,14 @@ describe('ListItem', () => {
         />
       </ul>,
     );
-    const token = (cls: string) => cls.match(/var\(--space-[\w-]+\)/)![0];
     const rowClasses = classesOf(screen.getByRole('listitem'));
-    const startInset = rowClasses.find((cls) => cls.startsWith('has-[>.ui-checkbox]:ps-'))!;
-    // The row's leading start inset and the trailing glyph's right inset resolve to the same
-    // token, so neither side can drift tighter than the other.
-    expect(token(startInset)).toBe('var(--space-0-9)');
-    const glyphInset = rowClasses.find((cls) => cls.includes('mr-[calc('))!;
-    expect(token(glyphInset)).toBe(token(startInset));
+    // `px-…` is one declaration for both edges, so the leading and trailing sides cannot
+    // drift apart the way two independent insets could.
+    expect(rowClasses).toContain('px-[var(--s4)]');
+    expect(rowClasses.some((cls) => cls.startsWith('ps-') || cls.startsWith('pe-'))).toBe(false);
   });
 
-  it('starts the leading checkbox on the row inset instead of a fixed icon-square slot', () => {
+  it('drops the fixed icon-square slot: the checkbox shrinks, the box inset does not move', () => {
     const { unmount } = render(
       <ul>
         <ListItem
@@ -182,9 +202,10 @@ describe('ListItem', () => {
       </ul>,
     );
     const rowClasses = classesOf(screen.getByRole('listitem'));
-    // The removed 40px `IconButton` wrapper centred its control, which parked the checkbox
-    // inside that square. The row starts the checkbox box on its own inset instead.
-    expect(rowClasses).toContain('has-[>.ui-checkbox]:ps-[var(--space-0-9)]');
+    // The old 40px `IconButton` wrapper parked the checkbox inside its square. The row now
+    // keeps its own inset for leading slots, and the checkbox's mark is internally offset so
+    // the glyph — not the control box — lands on that inset.
+    expect(rowClasses).toContain('px-[var(--s4)]');
     expect(rowClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
     unmount();
 
@@ -198,9 +219,11 @@ describe('ListItem', () => {
         />
       </ul>,
     );
-    // A dense row keeps the checkbox flush to its clipped quadrant edge: no start inset.
+    // A dense row keeps the same rule at the tighter dense inset: `--s3` at the start, one
+    // step tighter at the end, because a matrix row carries no trailing control.
     const denseClasses = classesOf(screen.getByRole('listitem'));
-    expect(denseClasses.some((cls) => cls.includes('ps-[var(--space-0-9)]'))).toBe(false);
+    expect(denseClasses).toContain('ps-[var(--s3)]');
+    expect(denseClasses).toContain('pe-[var(--s2)]');
     expect(denseClasses.some((cls) => cls.includes('mx-[calc('))).toBe(false);
   });
 
@@ -221,6 +244,41 @@ describe('ListItem', () => {
     expect(classes).toContain('[&>form]:flex');
     // The delete control keeps a compact inset rather than its default tap square.
     expect(classesWithPrefix(classes, '[&>form>.ui-btn--danger]:p-')).toHaveLength(1);
+  });
+
+  it('floors the danger slot at --tap without growing the glyph', () => {
+    render(
+      <ul>
+        <ListItem
+          title="Groceries"
+          deleteAction={
+            <form data-testid="delete-action">
+              <button type="submit" className="ui-btn ui-btn--danger ui-btn--icon">
+                x
+              </button>
+            </form>
+          }
+        />
+      </ul>,
+    );
+    const classes = classesOf(screen.getByRole('listitem'));
+    // `size="icon"`'s square is replaced by `h-auto`/`w-auto` and an inset, which left the box
+    // 34px — under the 44px floor — because the `<form>` sibling shrinks. The slot declares the
+    // floor itself, on the variant, so a `size="icon"` danger button and the unsized
+    // `ConfirmButton` the trash screens render both inherit it. `--tap` is 48px.
+    expect(classes).toContain(DANGER_FLOOR_UTILITY);
+    expect(classes).toContain(DANGER_FLOOR_WIDTH_UTILITY);
+    expect(classes).not.toContain('[&>form>.ui-btn--danger]:min-h-0');
+    expect(classes).not.toContain('[&>form>.ui-btn--danger]:min-w-0');
+    // The glyph keeps its 18px inset paint; only the box around it grows.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:p-[var(--s2)]');
+    // The box is anchored on the row's end inset, so the floor grows it leftward and the glyph
+    // stays on the text column's edge. The compound selector outranks `Button`'s own
+    // `justify-center` (0,3,0 against 0,1,0), so no `!important` and no wrapper element is needed.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:justify-end');
+    // A `--tap` box in flow is taller than the row's own content box, so it hands 8px back over
+    // each edge and the row keeps the height its text column asks for.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:-my-[var(--s2)]');
   });
 
   it('renders leading as the first child, before the row body', () => {
@@ -254,13 +312,94 @@ describe('ListItem', () => {
     );
     expect(classesOf(document.querySelector('.ui-list-item__sub')!)).toContain(DENSE_TYPE_UTILITY);
 
-    // A dense row is exactly its content height, at the compact control scale.
+    // A dense row is exactly the tap target tall, at the compact control scale: the matrix
+    // mark is `--s3` (12px), the value the pre-redesign row gave this variant (`0.75rem`),
+    // and its slots top-align so the mark rides the title's first line.
     const row = classesOf(screen.getByRole('listitem'));
-    expect(row).toContain('min-h-0');
-    expect(row).toContain('[--checkbox-size:var(--space-0-75)]');
+    expect(row).toContain('min-h-[var(--tap)]');
+    expect(row).toContain('items-start');
+    expect(row).not.toContain('items-center');
+    expect(row).toContain('[--checkbox-size:var(--s3)]');
+    // The corner travels with the size it is a fraction of: `--s1` (4px) is a third of this
+    // 12px mark, the same third `--r-sm` (8px) is of the default 24px one. Left at `--r-sm`,
+    // the 8px corner clamps to half the box and the mark paints as a disc instead of a box.
+    expect(row).toContain('[--checkbox-radius:var(--s1)]');
   });
 
-  it('clamps the todo title to two lines, and leaves a base row one line', () => {
+  it('takes the dense row checkbox target out of flow so it reserves no row width', () => {
+    render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Groceries" />
+      </ul>,
+    );
+    const row = classesOf(screen.getByRole('listitem'));
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    // The control's target is a 48px square. In flow it reserved 48px of row width and pushed
+    // the title 60px off the row edge; the row is the target's positioning context instead, so
+    // the target paints over the row and only the row's own insets place the title.
+    expect(row).toContain('relative');
+    expect(row).toContain('[&>.ui-checkbox]:absolute');
+    // The 48px target keeps the row's top corner: moving it up to reach the first line would
+    // push 6.89px of the painted square outside the row's `overflow-hidden` clip.
+    expect(row).toContain('[&>.ui-checkbox]:top-[var(--s2)]');
+    // The mark alone is lifted onto the title's first-line centre — the target's half-height
+    // (`--tap`/2 = 24px) less the row's top inset (`--s2`) less half a title line
+    // (`--fs-meta` at `--lh-row-title` = 9.11px) = 6.89px. A row whose mark rides the target's
+    // own centring paints that 6.89px low, and low by the same amount on a two-line title.
+    expect(row).toContain(
+      '[&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)]',
+    );
+    // The mark is centred in its target, so it sits beside the title instead of stranded on the
+    // square's leading edge. Centred in a target of 4→52 it measures 22→34, title at 52: gap
+    // 18px where it measured 30px. No `me` inset rides on the mark — an inset still applies
+    // inside a centring box and would push the mark 4px off centre, so that utility is gone.
+    expect(row).toContain('[&>.ui-checkbox]:justify-items-center');
+    expect(row).not.toContain('[&>.ui-checkbox]:justify-items-start');
+    expect(row).not.toContain('[&>.ui-checkbox]:justify-items-end');
+    expect(row).not.toContain('[&>.ui-checkbox>*]:me-[var(--s2)]');
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+    // The row already washes on press, so the target's own square is redundant feedback and, on
+    // release, the only thing still fading over the row's gutter.
+    expect(row).toContain('[&>.ui-checkbox:active]:bg-transparent');
+
+    // M5 — the press square ends at x 52 in the row's coordinates: the control's `--s4` start
+    // offset less its own `-ms-[var(--s3)]` (`--s1` = 4px) plus `--tap` (48). The link's start
+    // inset puts the title at the row's `--s3` (12) + `--tap + --s1 - --s3` (40) = 52 — flush with
+    // the square's trailing edge, so the overlap is 0px where it was 24px. The full title string
+    // stays in the DOM and the checkbox keeps its 48 × 48 target.
+    expect(link).toContain(DENSE_TITLE_INSET_UTILITY);
+    expect(row).not.toContain('[&>.ui-list-item__link]');
+    // The target no longer contributes height, so the row keeps the tap floor itself.
+    expect(row).toContain('min-h-[var(--tap)]');
+  });
+
+  it('spans the dense anchor over the whole row, so no band of the row is inert', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/todos/1"
+          variant="todo"
+          size="dense"
+          title="Groceries"
+          meta="Today"
+        />
+      </ul>,
+    );
+    const row = classesOf(screen.getByRole('listitem'));
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    // M4 — the `--s2` block inset used to sit on the row, so the anchor was 41.11px inside a
+    // 57.11px row (8px above + 8px below that a tap did nothing in). The padding moved onto the
+    // anchor: the row carries no block padding at all, the anchor spans the full row, and the
+    // title's first line still starts one `--s2` down — so the mark's lift formula is unchanged.
+    expect(row.some((cls) => cls.startsWith('py-'))).toBe(false);
+    expect(link).toContain('py-[var(--s2)]');
+    expect(link).toContain('min-h-[var(--tap)]');
+    // `self-stretch` is inert against `items-start`, which is why the padding had to move rather
+    // than the alignment change: the row still top-aligns its slots on the title's first line.
+    expect(row).toContain('items-start');
+  });
+
+  it('clamps a todo and a base row title to two lines', () => {
     const { unmount } = render(
       <ul>
         <ListItem variant="todo" title="Groceries" />
@@ -271,17 +410,67 @@ describe('ListItem', () => {
     );
     unmount();
 
+    // A base row reads two lines too: one line cut a note title mid-phrase, so two notes written
+    // in the same minute rendered identically up to the ellipsis.
     render(
       <ul>
-        <ListItem title="Groceries" />
+        <ListItem title="Seed: books to read next — Piranesi, The Overstory" />
       </ul>,
     );
     const baseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
-    expect(baseTitle).not.toContain(TITLE_CLAMP_UTILITY);
-    expect(baseTitle).toContain(ONE_LINE_TITLE_UTILITY);
+    expect(baseTitle).toContain(TITLE_CLAMP_UTILITY);
+    expect(baseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
   });
 
-  it('adds the todo variant alone: the large checkbox, centred against the row', () => {
+  it('wraps a dense todo title without touching the press square inset', () => {
+    render(
+      <ul>
+        <ListItem variant="todo" size="dense" title="Return the library book" meta="Today" />
+      </ul>,
+    );
+    const denseTitle = classesOf(document.querySelector('.ui-list-item__title')!);
+    expect(denseTitle).toContain(TITLE_CLAMP_UTILITY);
+    expect(denseTitle).toContain('whitespace-normal');
+    expect(denseTitle).not.toContain(ONE_LINE_TITLE_UTILITY);
+
+    // M5 stands: the title still starts where the 48px press square ends, and the row still
+    // parks that square out of flow on its corner.
+    const link = classesOf(document.querySelector('.ui-list-item__link')!);
+    expect(link).toContain(DENSE_TITLE_INSET_UTILITY);
+    const row = classesOf(screen.getByRole('listitem'));
+    expect(row).toContain('[&>.ui-checkbox]:absolute');
+    expect(row).toContain('[&>.ui-checkbox]:start-[var(--s4)]');
+
+    // M4 stands: the anchor still stretches to the row's full height, so a wrapped title only
+    // makes the row taller — the tap area grows with it rather than leaving an inert band.
+    expect(link).toContain(LINK_LAYOUT_UTILITY);
+    expect(link).toContain('min-h-[var(--tap)]');
+  });
+
+  it('keeps a nested or feedback label on one line, above its own body', () => {
+    const { unmount } = render(
+      <ul>
+        <ListItem variant="nested" title="Omelette">
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toContain(
+      ONE_LINE_TITLE_UTILITY,
+    );
+    unmount();
+
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers" meta="Today" />
+      </ul>,
+    );
+    expect(classesOf(document.querySelector('.ui-list-item__title')!)).toContain(
+      ONE_LINE_TITLE_UTILITY,
+    );
+  });
+
+  it('adds the todo variant alone: the default checkbox mark, centred against the row', () => {
     render(
       <ul>
         <ListItem variant="todo" title="Groceries" />
@@ -289,10 +478,24 @@ describe('ListItem', () => {
     );
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain('ui-list-item--todo');
-    expect(classes).toContain('[--checkbox-size:var(--space-1-25)]');
-    // The default todo row centres its leading control; the dense scale does too.
+    // §8 gives the todo mark no size override, so the row leaves the control's own default
+    // alone; only the dense row narrows it.
+    expect(classes.some((cls) => cls.startsWith('[--checkbox-size:'))).toBe(false);
+    // The corner is a hook of the mark's own size, so a row that does not narrow the mark must
+    // not restate it either — the control's `.ui-checkbox__box` `--r-sm` stands.
+    expect(classes.some((cls) => cls.startsWith('[--checkbox-radius:'))).toBe(false);
+    // The default todo row centres its leading control; a dense row top-aligns it on the title's
+    // first line, and a `size="dense"` without the todo variant never reaches that branch.
     expect(classes).toContain('items-center');
     expect(classes).not.toContain('ui-list-item--dense');
+    // The default row keeps its control in flow: it has width to spare and the mark's own
+    // 48px target is what places it, so the out-of-flow dense treatment must not leak here.
+    expect(classes).not.toContain('[&>.ui-checkbox]:absolute');
+    // Nor may the dense first-line lift: at this scale the control's own centring against the
+    // row is the intended geometry, and a shifted mark would sit 11.43px off it.
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox>*]:-translate-y-'))).toBe(false);
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-checkbox]:top-'))).toBe(false);
+    expect(classes.some((cls) => cls.startsWith('[&>.ui-list-item__link]:ps-'))).toBe(false);
   });
 
   it('treats size="dense" without the todo variant as a no-op', () => {
@@ -307,15 +510,15 @@ describe('ListItem', () => {
     expect(classes).toContain('items-center');
   });
 
-  it('centres the dense todo row on its leading control, and keeps a column row top-aligned', () => {
+  it('top-aligns the dense todo row on its first line, and keeps a column row top-aligned', () => {
     const { unmount } = render(
       <ul>
         <ListItem variant="todo" size="dense" title="Groceries" />
       </ul>,
     );
     const denseRow = classesOf(screen.getByRole('listitem'));
-    expect(denseRow).toContain('items-center');
-    expect(denseRow).not.toContain('items-start');
+    expect(denseRow).toContain('items-start');
+    expect(denseRow).not.toContain('items-center');
     unmount();
 
     render(
@@ -348,14 +551,16 @@ describe('ListItem', () => {
     // No extra indent: the nested body starts on the title's own column, so a child
     // field and the title field share a left edge.
     const bodyClasses = classesOf(body);
-    expect(bodyClasses).not.toContain('pl-[var(--space-1)]');
+    expect(bodyClasses).not.toContain('pl-[var(--s2)]');
     expect(bodyClasses.some((token) => token.startsWith('pl-'))).toBe(false);
     // Without a title-line action there is no action column to reserve.
     expect(bodyClasses.some((token) => token.startsWith('pr-'))).toBe(false);
     const row = classesOf(screen.getByRole('listitem'));
     expect(row).toContain('items-start');
-    expect(classesWithPrefix(row, '[&>.ui-icon-btn]:mt-')).toHaveLength(1);
-    expect(classesWithPrefix(row, '[&>form]:mt-')).toHaveLength(1);
+    // The title line and the child body both start at the row's own top inset, so no slot
+    // needs a top offset to align with the title.
+    expect(classesWithPrefix(row, '[&>.ui-icon-btn]:mt-')).toHaveLength(0);
+    expect(classesWithPrefix(row, '[&>form]:mt-')).toHaveLength(0);
   });
 
   it('renders the nested titleAction inside the title line, and marks the line for it', () => {
@@ -379,19 +584,24 @@ describe('ListItem', () => {
     // The action rides the title line, not the indented child body.
     expect(titleLine.contains(slot)).toBe(true);
     expect(document.querySelector('.ui-list-item__nested-body')!.contains(slot)).toBe(false);
-    // The nested body reserves the action's column (`--icon-btn-size` + the action-line
+    // The nested body reserves the action's column (a full tap target plus the action-line
     // gap), so its right edge matches the title field's rather than the row's.
     expect(classesOf(document.querySelector('.ui-list-item__nested-body')!)).toContain(
-      'pr-[calc(var(--icon-btn-size)+var(--space-0-5))]',
+      'pr-[calc(var(--tap)+var(--s2))]',
     );
-    // ... and the title content stays the line's first child, so it grows.
-    expect(titleLine.firstChild!.textContent).toBe('Omelette');
+    // ... and the title content is the line's first child, so it absorbs the shrink.
+    expect(titleLine.firstElementChild!.textContent).toBe('Omelette');
 
     const line = classesOf(titleLine);
     expect(line).toContain('flex');
     expect(line).toContain('items-stretch');
-    expect(line).toContain('[&>:first-child]:flex-1');
-    expect(line).toContain('[&>:first-child]:min-w-0');
+
+    // H3: a bare text node is not a flex item, so `[&>:first-child]` never reached the title and
+    // the action kept its full width past the line's truncating box — cut at the clip edge with no
+    // ellipsis. The title is a real `<span>` now, sized by the line's own gap and `flex-1`.
+    const titleText = titleLine.firstElementChild!;
+    expect(classesOf(titleText)).toEqual(['flex-1', 'min-w-0', 'truncate'].sort());
+    expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
 
     // The action stretches to the line and never sets its own height.
     const action = classesOf(slot);
@@ -442,20 +652,33 @@ describe('ListItem', () => {
     expect(link.contains(screen.getByTestId('status-dropdown'))).toBe(true);
     expect(link.contains(titleLine)).toBe(true);
 
-    // Three lines: title, then the description line, then the meta line. The
-    // base row would put both on one line separated by a `|`, so a feedback row
-    // splits them into two `__sub` lines and drops the separator.
+    // Three lines: title, then the creation date, then the description. The base
+    // row would put both on one line separated by a `|`, so a feedback row splits
+    // them into two `__sub` lines and drops the separator.
     const text = document.querySelector('.ui-list-item__text')!;
     const snippet = document.querySelector('.ui-list-item__snippet')!;
     const subLines = text.querySelectorAll('.ui-list-item__sub');
     expect(snippet.textContent).toBe('On cold load');
     expect(subLines).toHaveLength(2);
-    expect(subLines[0].contains(snippet)).toBe(true);
-    expect(subLines[1].textContent).toBe('Today');
+    expect(subLines[0].textContent).toBe('Today');
+    expect(subLines[0].querySelector('time')).not.toBeNull();
+    expect(subLines[1].contains(snippet)).toBe(true);
+    // The date reads under the title, and the description under the date: the
+    // serialized order is the reading order, not just the box order.
+    const markup = text.innerHTML;
+    expect(markup.indexOf('ui-list-item__title')).toBeLessThan(markup.indexOf('<time'));
+    expect(markup.indexOf('<time')).toBeLessThan(markup.indexOf('ui-list-item__snippet'));
     expect(text.firstElementChild).toBe(titleLine);
     expect(titleLine.nextElementSibling).toBe(subLines[0]);
     expect(subLines[0].nextElementSibling).toBe(subLines[1]);
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
+
+    // The title and its date are one pair one step apart; the description opens the next step,
+    // so only it carries the offset. Both stay siblings in the order the reader sees.
+    expect(classesOf(subLines[0])).not.toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(classesOf(subLines[1])).toContain(FEEDBACK_DESCRIPTION_OFFSET_UTILITY);
+    expect(subLines[0].parentElement).toBe(text);
+    expect(subLines[1].parentElement).toBe(text);
 
     const linkClasses = classesOf(link);
     expect(linkClasses).toContain('flex-col');
@@ -464,8 +687,100 @@ describe('ListItem', () => {
     const line = classesOf(titleLine);
     expect(line).toContain('flex');
     expect(line).toContain('items-stretch');
-    expect(line).toContain('[&>:first-child]:flex-1');
-    expect(line).toContain('[&>:first-child]:min-w-0');
+    // The title, not the pill, absorbs the line's shrink — the pill kept its width and ran past
+    // the line's clip edge (H3).
+    expect(classesOf(titleLine.firstElementChild!)).toContain('flex-1');
+    expect(classesWithPrefix(line, '[&>:first-child]:')).toHaveLength(0);
+  });
+
+  it('keeps the base row one line with the `|` separator', () => {
+    render(
+      <ul>
+        <ListItem
+          title="Groceries"
+          meta={<time dateTime="2026-10-16">Today</time>}
+          snippet="On cold load"
+        />
+      </ul>,
+    );
+
+    // The feedback order is a feedback-row rule only: a base row still reads meta,
+    // separator, snippet on one `__sub` line.
+    const subs = document.querySelectorAll('.ui-list-item__sub');
+    expect(subs).toHaveLength(1);
+    expect(subs[0].firstElementChild!.textContent).toBe('Today');
+    expect(document.querySelector('.ui-list-item__sep')!.textContent).toBe('|');
+    expect(document.querySelector('.ui-list-item__snippet')!.textContent).toBe('On cold load');
+  });
+
+  it('renders an interactive control beside the link, not inside it', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    const link = screen.getByRole('link');
+    const dropdown = screen.getByTestId('status-dropdown');
+
+    // Nested interactive content is invalid, and the control stops answering its own presses.
+    expect(link.contains(dropdown)).toBe(false);
+    expect(dropdown.closest('a')).toBeNull();
+
+    // The row still navigates: the title and the description are the anchor's own text.
+    expect(link.getAttribute('href')).toBe('/feedback/abc');
+    expect(link.textContent).toContain('Dark mode flickers');
+    expect(link.textContent).toContain('On cold load');
+
+    // One wrapper holds both, so the dropdown keeps its place under the text it belongs to.
+    expect(link.parentElement!.contains(dropdown)).toBe(true);
+    expect(link.nextElementSibling).toBe(dropdown);
+  });
+
+  it('returns the feedback child gap to a linked row, so the body is not flush on the control', () => {
+    render(
+      <ul>
+        <ListItem
+          href="/feedback/abc"
+          variant="feedback"
+          title="Dark mode flickers"
+          snippet="On cold load"
+        >
+          <select data-testid="status-dropdown" aria-label="Set status for Dark mode flickers" />
+        </ListItem>
+      </ul>,
+    );
+
+    // Lifting the control out of the anchor left it in a plain block, and a block has no child
+    // gap: the meta line sat flush against the dropdown. The wrapper is the column now, so the
+    // linked shape owns the step the unlinked shape gets from its own column link.
+    const wrapper = screen.getByRole('link').parentElement!;
+    expect(wrapper.tagName).toBe('DIV');
+    expect(classesOf(wrapper)).toContain('flex-col');
+    expect(classesOf(wrapper)).toContain(FEEDBACK_COLUMN_GAP_UTILITY);
+    expect(wrapper.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+  });
+
+  it('keeps a feedback row without href exactly as it was: one box holding text and control', () => {
+    render(
+      <ul>
+        <ListItem variant="feedback" title="Dark mode flickers">
+          <span data-testid="status-dropdown" />
+        </ListItem>
+      </ul>,
+    );
+
+    const box = document.querySelector('.ui-list-item__link')!;
+    expect(box.tagName).toBe('SPAN');
+    expect(box.contains(screen.getByTestId('status-dropdown'))).toBe(true);
+    expect(document.querySelector('a')).toBeNull();
   });
 
   it('leaves the feedback title a plain block when no pill is given', () => {
@@ -545,7 +860,7 @@ describe('ListItem', () => {
       </ul>,
     );
     const classes = classesOf(document.querySelector('.ui-list-item__title')!);
-    expect(classes).toContain('text-muted');
+    expect(classes).toContain('text-ink-2');
     expect(classes).toContain('line-through');
   });
 
@@ -559,8 +874,8 @@ describe('ListItem', () => {
     // The tone hook stays for locators, but no tone colour is applied to a done row.
     expect(row).toContain('ui-list-item--danger');
     expect(row).not.toContain('[&_.ui-icon-btn]:text-danger');
-    expect(row).toContain('[&_.ui-icon-btn]:text-muted');
-    expect(row).toContain('[&_.ui-due-date]:text-muted');
+    expect(row).toContain('[&_.ui-icon-btn]:text-ink-3');
+    expect(row).toContain('[&_.ui-due-date]:text-ink-3');
   });
 
   it('applies one done treatment at both todo sizes', () => {
@@ -580,8 +895,8 @@ describe('ListItem', () => {
     const classes = classesOf(screen.getByRole('listitem'));
     expect(classes).toContain('ui-list-item--done');
     expect(classes).toContain('ui-list-item--dense');
-    // The done rules key off `--done`, never a size, so the due date is muted at both.
-    expect(classes).toContain('[&_.ui-due-date]:text-muted');
+    // The done rules key off the done flag, never a size, so the due date is muted at both.
+    expect(classes).toContain('[&_.ui-due-date]:text-ink-3');
   });
 
   it('collapses the row to zero height while hiding', () => {
@@ -596,16 +911,15 @@ describe('ListItem', () => {
     expect(classes).toContain('overflow-hidden');
   });
 
-  it('transitions the base row through the motion tokens', () => {
+  it('transitions the base row on the collapse properties and names no duration itself', () => {
     render(
       <ul>
         <ListItem title="Groceries" />
       </ul>,
     );
     const classes = classesOf(screen.getByRole('listitem'));
-    expect(classes).toContain('transition-[height,opacity]');
-    expect(classes).toContain('duration-[var(--duration-base)]');
-    expect(classes).toContain('ease-[var(--ease-standard)]');
+    expect(classes).toContain('motion-safe:transition-[height,opacity]');
+    expect(classes).not.toContain('duration-[var(--d-base)]');
   });
 
   it('linkStylesFor: pins the link body class string for row, dense and column shapes', () => {
@@ -615,7 +929,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)]',
     );
     baseRow.unmount();
 
@@ -625,7 +939,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--space-0-5)] py-[var(--space-0-6)] ps-[var(--space-0-9)] pe-[var(--space-0-4)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] items-center gap-[var(--s2)] ps-[calc(var(--tap)+var(--s1)-var(--s3))] py-[var(--s2)] min-h-[var(--tap)]',
     );
     denseRow.unmount();
 
@@ -637,7 +951,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__link')!.className).toBe(
-      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] flex-col items-stretch gap-[var(--space-0-75)] p-[var(--space-0-9)]',
+      'ui-list-item__link flex flex-1 min-w-0 self-stretch text-inherit no-underline [-webkit-tap-highlight-color:transparent] flex-col items-stretch gap-[var(--s2)]',
     );
   });
 
@@ -648,7 +962,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold truncate',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] line-clamp-2 whitespace-normal',
     );
     baseTitle.unmount();
 
@@ -658,7 +972,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-muted line-through',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] line-clamp-2 whitespace-normal text-ink-2 line-through',
     );
     doneTodo.unmount();
 
@@ -668,7 +982,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title font-semibold line-clamp-2 whitespace-normal text-[length:var(--space-0-7)]',
+      'ui-list-item__title font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-meta)] line-clamp-2 whitespace-normal',
     );
     denseTodo.unmount();
 
@@ -680,11 +994,35 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__title')!.className).toBe(
-      'ui-list-item__title ui-list-item__title--with-action font-semibold truncate flex items-stretch gap-[var(--space-0-5)] [&>:first-child]:flex-1 [&>:first-child]:min-w-0',
+      'ui-list-item__title ui-list-item__title--with-action font-semibold leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)] text-[length:var(--fs-row-title)] flex items-stretch gap-[var(--s2)]',
     );
     expect(document.querySelector('.ui-list-item__title-action')!.className).toBe(
       'ui-list-item__title-action flex items-center shrink-0',
     );
+    // The title is a real element inside the action line, so it — not the action — shrinks.
+    expect(document.querySelector('.ui-list-item__title > span')!.className).toBe(
+      'min-w-0 flex-1 truncate',
+    );
+  });
+
+  it('shrinks a control title without truncating it', () => {
+    render(
+      <ul>
+        <ListItem
+          variant="nested"
+          title={<input aria-label="Food for item 1" />}
+          titleAction={<button>Remove</button>}
+        >
+          <span />
+        </ListItem>
+      </ul>,
+    );
+    // The meal entry's dish field is the title. `overflow: hidden` would clip its focus ring
+    // against the line's edge, and a control has no text for an ellipsis to shorten.
+    expect(classesOf(document.querySelector('.ui-list-item__title > span')!)).toEqual([
+      'flex-1',
+      'min-w-0',
+    ]);
   });
 
   it('subNodeFor: pins the sub, separator and snippet class strings', () => {
@@ -694,23 +1032,22 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap [&>span:not(.line-clamp-2)]:whitespace-nowrap',
     );
     expect(document.querySelector('.ui-list-item__sep')!.className).toBe(
-      'ui-list-item__sep shrink-0 text-border',
+      'ui-list-item__sep shrink-0 text-ink-3',
     );
     expect(document.querySelector('.ui-list-item__snippet')!.className).toBe(
       'ui-list-item__snippet min-w-0 truncate',
     );
     baseRow.unmount();
-
     const denseRow = render(
       <ul>
         <ListItem variant="todo" size="dense" title="Groceries" meta="Today" />
       </ul>,
     );
     expect(document.querySelector('.ui-list-item__sub')!.className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap text-[length:var(--space-0-7)]',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap [&>span:not(.line-clamp-2)]:whitespace-nowrap',
     );
     denseRow.unmount();
 
@@ -722,10 +1059,15 @@ describe('ListItem', () => {
     const subs = document.querySelectorAll('.ui-list-item__sub');
     expect(subs).toHaveLength(2);
     expect(subs[0].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap [&>span:not(.line-clamp-2)]:whitespace-nowrap',
     );
     expect(subs[1].className).toBe(
-      'ui-list-item__sub flex items-baseline gap-[var(--space-0-4)] min-w-0 text-muted text-[length:var(--space-0-85)] [&>time]:shrink-0 [&>time]:whitespace-nowrap',
+      'ui-list-item__sub flex items-baseline gap-[var(--s1)] min-w-0 text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)] [&>time]:shrink-0 [&>time]:whitespace-nowrap [&>span:not(.line-clamp-2)]:whitespace-nowrap mt-[var(--s2)]',
+    );
+    // M11: a feedback description has no detail route, so one ellipsized line hid the submitted
+    // text for good. Two lines double what a reader can see; the string itself is unchanged.
+    expect(document.querySelector('.ui-list-item__snippet')!.className).toBe(
+      'ui-list-item__snippet min-w-0 line-clamp-2',
     );
     expect(document.querySelector('.ui-list-item__sep')).toBeNull();
   });
@@ -771,7 +1113,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] has-[>.ui-checkbox]:ps-[var(--space-0-9)] items-center min-h-[calc(var(--space-0-9)*2+var(--space-1)*var(--leading)+var(--space-0-15)+var(--space-0-85)*var(--leading))]',
+      'ui-list-item flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] min-h-[var(--row-min-height)] px-[var(--s4)] py-[var(--s3)] items-center',
     );
     unmount();
 
@@ -790,7 +1132,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex bg-panel rounded-[var(--radius-lg)] overflow-hidden transition-[height,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] [interpolate-size:allow-keywords] [--checkbox-size:var(--space-0-75)] items-center min-h-0 [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-0 [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-0 [&>form>.ui-btn--danger]:p-[var(--space-0-5)] [&>form>.ui-btn--danger]:mr-[calc(var(--space-0-9)-var(--space-0-5))] [&>form>.ui-btn--danger]:rounded-[var(--radius-lg)] [&_.ui-icon-btn]:text-muted [&_.ui-checkbox]:text-muted [&_.ui-due-date]:text-muted h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

@@ -24,7 +24,7 @@ export interface PgIdentity {
 export const DEFAULT_FEEDBACK_DB_URL = 'postgresql://feedback@postgres-feedback:5432/feedback';
 
 /** Parse a `postgresql://` URL into `{ user, database }` via `new URL()`. */
-export function parseFeedbackDbUrl(raw: string): PgIdentity {
+export function parsePgDbUrl(raw: string): PgIdentity {
   const url = new URL(raw);
   const user = decodeURIComponent(url.username);
   const database = decodeURIComponent(url.pathname.split('/')[1] ?? '');
@@ -33,9 +33,34 @@ export function parseFeedbackDbUrl(raw: string): PgIdentity {
   return { user, database };
 }
 
-/** `FEEDBACK_DB_URL` with the spec default; the single source of DB identity. */
+/** `FEEDBACK_DB_URL` with the spec default. */
 export function resolveFeedbackDb(env: NodeJS.ProcessEnv = process.env): PgIdentity {
-  return parseFeedbackDbUrl(env.FEEDBACK_DB_URL ?? DEFAULT_FEEDBACK_DB_URL);
+  return parsePgDbUrl(env.FEEDBACK_DB_URL ?? DEFAULT_FEEDBACK_DB_URL);
+}
+
+/**
+ * Every Postgres database the backup and restore tools cover, in archive order.
+ * `focus-service` is SQLite (`SPEC-focus-service` Storage), so `feedback` is the only one.
+ */
+export function resolvePgDatabases(env: NodeJS.ProcessEnv = process.env): PgIdentity[] {
+  return [resolveFeedbackDb(env)];
+}
+
+/**
+ * Databases named by an `--only a,b` value, in the requested order; no value selects every
+ * resolved database. An unknown name throws before any dump, copy or write happens.
+ */
+export function selectPgDatabases(
+  only: string | undefined,
+  databases: PgIdentity[],
+): PgIdentity[] {
+  if (only === undefined) return databases;
+  return only.split(',').map((part) => {
+    const name = part.trim();
+    const database = databases.find((candidate) => candidate.database === name);
+    if (!database) throw new Error(`unknown database name: ${name}`);
+    return database;
+  });
 }
 
 interface ExecResult {

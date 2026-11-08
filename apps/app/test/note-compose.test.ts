@@ -1,18 +1,33 @@
 import type { Note } from '@life/shared';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { ApiError } from '@/lib/api-error';
 
 jest.mock('@/lib/api', () => ({
   createNote: jest.fn(),
   updateNote: jest.fn(),
+  deleteNote: jest.fn(),
 }));
 jest.mock('@/lib/tags-api', () => ({
   createOrGetTag: jest.fn(),
   resolveTags: jest.fn(),
 }));
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  }),
+}));
+jest.mock('@/app/actions', () => ({ deleteNoteAction: jest.fn() }));
 
 import { createNote, updateNote } from '@/lib/api';
 import { createOrGetTag, resolveTags } from '@/lib/tags-api';
 import { createNoteWithTags, updateNoteWithTags } from '@/lib/note-compose';
+import { NoteEditor } from '@/app/note-editor';
 
 const mockedCreate = createNote as jest.MockedFunction<typeof createNote>;
 const mockedUpdate = updateNote as jest.MockedFunction<typeof updateNote>;
@@ -145,5 +160,48 @@ describe('updateNoteWithTags', () => {
 
     await expect(updateNoteWithTags('n1', 'b #home', [], ['home'], 1)).rejects.toThrow('API 409');
     expect(mockedUpdate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The toolbar is the editor's only heading slot, so the rendered markup is what
+ * proves the screen is headed at all. The autosave drain is covered by `note-drain.test.ts`.
+ */
+describe('NoteEditor heading', () => {
+  const render = (props: Readonly<{ note?: Note }>) =>
+    renderToStaticMarkup(createElement(NoteEditor, { ...props, availableTags: [] }));
+
+  it('heads the create screen with exactly one h1 naming it "New note" for assistive tech', () => {
+    const html = render({});
+
+    expect(html).toContain('<h1 class="ui-editor-toolbar__title');
+    // The name is the heading's content but visually hidden, so the screen keeps an
+    // accessible name without a visible label over the field body.
+    expect(html).toContain('<span class="sr-only">New note</span></h1>');
+    expect(html).not.toContain('>New note</h1>');
+    expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  it('heads the existing-note screen "Edit note", visually hidden', () => {
+    const html = render({ note: note() });
+
+    expect(html).toContain('<span class="sr-only">Edit note</span></h1>');
+    expect(html).not.toContain('>Edit note</h1>');
+    expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  it('keeps the save read-out as a live region under the heading', () => {
+    const html = render({});
+
+    expect(html).toContain('ui-editor-toolbar__sub');
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+  });
+
+  it('still labels the body field for assistive tech', () => {
+    const html = render({ note: note() });
+
+    expect(html).toContain('aria-label="Note body"');
+    expect(html).toContain('ui-textarea--editor');
   });
 });

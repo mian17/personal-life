@@ -23,6 +23,13 @@ export interface TimerState {
   endsAt: number;
   /** The time left when the owner paused, in milliseconds; only a paused phase reads it. */
   heldMs: number;
+  /**
+   * The length the phase in hand was started with, in milliseconds, or the length its
+   * durations give while it has not begun. It is the one base a phase's progress may be
+   * read against: `durations` is a preference the owner can retune at any moment (the
+   * focus chips do), so deriving minutes from it would credit time never focused.
+   */
+  startedPhaseMs: number;
 }
 
 /** What the machine needs from outside its state: the chosen lengths and the wall clock. */
@@ -39,15 +46,39 @@ export const MINUTE_MS = 60_000;
 
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
 
+/**
+ * Whether `value` is a whole-minute daily goal the service would accept.
+ *
+ * Today the service bounds a goal by the same `MINUTES_RANGE` rule a recorded block is held
+ * to, so the app must not offer a value the service would reject.
+ */
+export function isDailyGoal(value: unknown): value is number {
+  return isWholeMinute(value);
+}
+
 export const DEFAULT_MINUTES = DEFAULT_DURATIONS.focus;
 
 export function initialState(durations: Durations): TimerState {
-  return { phase: 'focus', session: 1, durations, status: 'idle', endsAt: 0, heldMs: 0 };
+  return {
+    phase: 'focus',
+    session: 1,
+    durations,
+    status: 'idle',
+    endsAt: 0,
+    heldMs: 0,
+    startedPhaseMs: phaseDurationMs('focus', durations),
+  };
 }
 
 export function start(state: TimerState, now: number): TimerState {
   const phaseMs = phaseDurationMs(state.phase, state.durations);
-  return { ...state, status: 'running', endsAt: now + phaseMs, heldMs: 0 };
+  return {
+    ...state,
+    status: 'running',
+    endsAt: now + phaseMs,
+    heldMs: 0,
+    startedPhaseMs: phaseMs,
+  };
 }
 
 /** Freezing the remaining time is what stops the count; the deadline stops mattering. */
@@ -73,6 +104,8 @@ export function startNext(state: TimerState, now: number): TimerState {
 }
 
 export function remainingMs(state: TimerState, now: number): number {
+  // An idle phase has not begun, so its whole length is the length its durations hold now —
+  // nothing was ever started for it, and a chip retuning it moves the digits, and only them.
   if (state.status === 'idle') return phaseDurationMs(state.phase, state.durations);
   if (state.status === 'paused') return state.heldMs;
   return Math.max(0, state.endsAt - now);
@@ -85,9 +118,15 @@ export function tick(state: TimerState, now: number): TimerState {
   return { ...state, status: 'boundary' };
 }
 
-/** New durations size the phase that starts after this one; a running deadline stays as it is. */
+/**
+ * New durations size the phase that starts after this one. A phase already in hand keeps the
+ * length it was started with — its deadline, its held time and `startedPhaseMs` are left
+ * alone — so a length retuned mid-phase neither restretches the countdown nor rewrites what
+ * the phase has already spent. An idle phase has not begun, so it takes the new length.
+ */
 export function applyDurations(state: TimerState, durations: Durations): TimerState {
-  return { ...state, durations };
+  if (state.status !== 'idle') return { ...state, durations };
+  return { ...state, durations, startedPhaseMs: phaseDurationMs(state.phase, durations) };
 }
 
 export function serializeMode(state: TimerState, now: number): string {
@@ -98,6 +137,7 @@ export function serializeMode(state: TimerState, now: number): string {
     remainingMs: remainingMs(state, now),
     endsAt: state.endsAt,
     heldMs: state.heldMs,
+    startedPhaseMs: state.startedPhaseMs,
   } satisfies StoredMode);
 }
 
@@ -117,6 +157,8 @@ interface StoredMode extends TimerMode {
   remainingMs: number;
   endsAt: number;
   heldMs: number;
+  /** The length the phase was started with; absent in a blob written before it was carried. */
+  startedPhaseMs?: number;
 }
 
 /** A boundary belongs to the phase it ended, so advancing starts from the phase after it. */
@@ -136,7 +178,24 @@ function restoreMode(stored: StoredMode, context: TimerContext): TimerState {
     status,
     endsAt: status === 'idle' ? 0 : stored.endsAt,
     heldMs: status === 'paused' ? stored.heldMs : 0,
+    startedPhaseMs: restoredPhaseMs(stored, context.durations),
   };
+}
+
+/**
+ * The length the restored phase was started with. A phase still in hand carries it; an idle
+ * one has not begun, so its durations are its length. A boundary was reported by the page that
+ * reached it, so its `00:00` is all this mount may read it as.
+ *
+ * A blob from before this field existed cannot know its own length, so it falls back to the
+ * durations in hand. That is the old reading, correct whenever no chip retuned the phase —
+ * which is every blob older than the bug being fixed, because a retune is what made it wrong.
+ */
+function restoredPhaseMs(stored: StoredMode, durations: Durations): number {
+  if (stored.status === 'running' || stored.status === 'paused') {
+    return stored.startedPhaseMs ?? phaseDurationMs(stored.phase, durations);
+  }
+  return phaseDurationMs(stored.phase, durations);
 }
 
 /** A `running` deadline that passed while the page was gone belongs to the boundary. */
@@ -162,11 +221,12 @@ function phaseDurationMs(phase: Phase, durations: Durations): number {
 
 /** Out-of-range input is a mistyped preference, not a shorter phase, so it falls back. */
 export function clampMinutes(value: unknown): number {
-  if (!isMinutesInRange(value)) return DEFAULT_MINUTES;
+  if (!isWholeMinute(value)) return DEFAULT_MINUTES;
   return value;
 }
 
-function isMinutesInRange(value: unknown): value is number {
+/** The one rule both a recorded block and a daily goal are held to: a whole minute inside `MINUTES_RANGE`. */
+function isWholeMinute(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&
@@ -188,6 +248,7 @@ function readMode(raw: string | null | undefined): StoredMode | null {
     remainingMs: storedRemaining,
     endsAt,
     heldMs,
+    startedPhaseMs,
   } = parsed as Partial<StoredMode>;
   if (!isPhase(phase) || !isSession(session) || !isStatus(status)) return null;
   if (!isRuntimeNumber(storedRemaining) || !isRuntimeNumber(endsAt)) return null;
@@ -197,7 +258,17 @@ function readMode(raw: string | null | undefined): StoredMode | null {
   const storedHeld = isRuntimeNumber(heldMs) ? heldMs : 0;
   if (status === 'paused' && !isRuntimeNumber(heldMs)) return null;
 
-  return { phase, session, status, remainingMs: storedRemaining, endsAt, heldMs: storedHeld };
+  return {
+    phase,
+    session,
+    status,
+    remainingMs: storedRemaining,
+    endsAt,
+    heldMs: storedHeld,
+    // Absence stays absent, so `restoredPhaseMs` can tell a blob that never carried
+    // the length from one that carried a length of zero.
+    ...(isRuntimeNumber(startedPhaseMs) ? { startedPhaseMs } : {}),
+  };
 }
 
 function parseJson(raw: string): unknown {

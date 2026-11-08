@@ -1,0 +1,434 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "family": "space",
+  "source": "packages/ui/src/styles/tokens.css",
+  "tokens": [
+    {
+      "family": "space",
+      "target": "--ds-space-0-15",
+      "source": "--space-0-15",
+      "value": "0.15rem",
+      "computedPx": 2.4,
+      "declaredAt": "packages/ui/src/styles/tokens.css:48",
+      "role": "hairline gaps: title-to-meta inside a row, checkbox inset",
+      "usageSites": [
+        "packages/ui/src/components/checkbox.tsx:25",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:112",
+        "packages/ui/src/components/settings-row.tsx:26",
+        "packages/ui/test/list-item.test.tsx:774"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-2",
+      "source": "--space-0-2",
+      "value": "0.2rem",
+      "computedPx": 3.2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:49",
+      "role": "checkbox inset and its corner radius, switch thumb inset",
+      "usageSites": [
+        "packages/ui/src/components/checkbox.tsx:26",
+        "packages/ui/src/components/pill.tsx:49",
+        "packages/ui/src/components/switch.tsx:32",
+        "packages/ui/test/checkbox.test.tsx:57"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-25",
+      "source": "--space-0-25",
+      "value": "0.25rem",
+      "computedPx": 4,
+      "declaredAt": "packages/ui/src/styles/tokens.css:50",
+      "role": "nav-bar bottom margin",
+      "usageSites": [
+        "packages/ui/src/components/command.tsx:33",
+        "packages/ui/src/components/command.tsx:35",
+        "packages/ui/src/components/empty-state.tsx:26",
+        "packages/ui/src/components/matrix-block.tsx:63",
+        "packages/ui/src/components/nav-bar.tsx:11",
+        "packages/ui/test/matrix-block.test.tsx:120"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-3",
+      "source": "--space-0-3",
+      "value": "0.3rem",
+      "computedPx": 4.8,
+      "declaredAt": "packages/ui/src/styles/tokens.css:51",
+      "role": "chip icon gap",
+      "usageSites": [
+        "packages/ui/src/components/command.tsx:42",
+        "packages/ui/src/components/feedback-form.tsx:49",
+        "packages/ui/src/components/pill.tsx:49"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-35",
+      "source": "--space-0-35",
+      "value": "0.35rem",
+      "computedPx": 5.6,
+      "declaredAt": "packages/ui/src/styles/tokens.css:52",
+      "role": "filter pill vertical padding, pill remove padding",
+      "usageSites": [
+        "packages/ui/src/components/pill.tsx:51",
+        "packages/ui/src/components/pill.tsx:62"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-4",
+      "source": "--space-0-4",
+      "value": "0.4rem",
+      "computedPx": 6.4,
+      "declaredAt": "packages/ui/src/styles/tokens.css:53",
+      "role": "title-line remainder gap, tab rail gap and inner padding",
+      "usageSites": [
+        "packages/ui/src/components/command.tsx:34",
+        "packages/ui/src/components/fab-menu.tsx:48",
+        "packages/ui/src/components/feedback-form.tsx:35",
+        "packages/ui/src/components/list-item.tsx:108",
+        "packages/ui/src/components/list-item.tsx:123",
+        "packages/ui/src/components/manager-surface.tsx:44",
+        "packages/ui/src/components/menu.tsx:27",
+        "packages/ui/src/components/menu.tsx:39"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-5",
+      "source": "--space-0-5",
+      "value": "0.5rem",
+      "computedPx": 8,
+      "declaredAt": "packages/ui/src/styles/tokens.css:54",
+      "role": "row/stack tight gap, menu and dialog footer gap, list row gap",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:21",
+        "packages/ui/src/components/alert-banner.tsx:21",
+        "packages/ui/src/components/alert-banner.tsx:36",
+        "packages/ui/src/components/command.tsx:41",
+        "packages/ui/src/components/command.tsx:42",
+        "packages/ui/src/components/dialog.tsx:47",
+        "packages/ui/src/components/dialog.tsx:56",
+        "packages/ui/src/components/editor-stack.tsx:25"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-6",
+      "source": "--space-0-6",
+      "value": "0.6rem",
+      "computedPx": 9.6,
+      "declaredAt": "packages/ui/src/styles/tokens.css:55",
+      "role": "dense row vertical padding, alert banner vertical padding, toast padding",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:22",
+        "packages/ui/src/components/list-item.tsx:108",
+        "packages/ui/src/components/pill-group.tsx:15",
+        "packages/ui/src/components/snackbar.tsx:35",
+        "packages/ui/test/list-item.test.tsx:628"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-7",
+      "source": "--space-0-7",
+      "value": "0.7rem",
+      "computedPx": 11.2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:56",
+      "role": "filter pill horizontal padding",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:120",
+        "packages/ui/src/components/matrix-block.tsx:46",
+        "packages/ui/src/components/pill.tsx:51",
+        "packages/ui/test/list-item.test.tsx:19",
+        "packages/ui/test/list-item.test.tsx:671",
+        "packages/ui/test/list-item.test.tsx:713"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-75",
+      "source": "--space-0-75",
+      "value": "0.75rem",
+      "computedPx": 12,
+      "declaredAt": "packages/ui/src/styles/tokens.css:57",
+      "role": "default row gap, tab trigger padding, chip padding, icon slot",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:22",
+        "packages/ui/src/components/checkbox.tsx:25",
+        "packages/ui/src/components/editor-screen.tsx:12",
+        "packages/ui/src/components/list-item.tsx:91",
+        "packages/ui/src/components/list-item.tsx:97",
+        "packages/ui/src/components/list-item.tsx:165",
+        "packages/ui/src/components/snackbar.tsx:33",
+        "packages/ui/src/components/snackbar.tsx:35"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-8",
+      "source": "--space-0-8",
+      "value": "0.8rem",
+      "computedPx": 12.8,
+      "declaredAt": "packages/ui/src/styles/tokens.css:58",
+      "role": "chip text sizing step",
+      "usageSites": [
+        "packages/ui/src/components/pill.tsx:49"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-85",
+      "source": "--space-0-85",
+      "value": "0.85rem",
+      "computedPx": 13.6,
+      "declaredAt": "packages/ui/src/styles/tokens.css:59",
+      "role": "meta line text sizing step",
+      "usageSites": [
+        "packages/ui/src/components/due-date-pill.tsx:44",
+        "packages/ui/src/components/feedback-form.tsx:44",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:124",
+        "packages/ui/src/components/matrix-block.tsx:67",
+        "packages/ui/src/components/pill.tsx:51",
+        "packages/ui/src/components/settings-row.tsx:31",
+        "packages/ui/src/components/status-text.tsx:19"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-9",
+      "source": "--space-0-9",
+      "value": "0.9rem",
+      "computedPx": 14.4,
+      "declaredAt": "packages/ui/src/styles/tokens.css:60",
+      "role": "row body padding (the standard text inset), card padding",
+      "usageSites": [
+        "packages/ui/src/components/alert-banner.tsx:35",
+        "packages/ui/src/components/card.tsx:21",
+        "packages/ui/src/components/list-item.tsx:51",
+        "packages/ui/src/components/list-item.tsx:67",
+        "packages/ui/src/components/list-item.tsx:78",
+        "packages/ui/src/components/list-item.tsx:91",
+        "packages/ui/src/components/list-item.tsx:97",
+        "packages/ui/src/components/list-item.tsx:108"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-0-95",
+      "source": "--space-0-95",
+      "value": "0.95rem",
+      "computedPx": 15.2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:61",
+      "role": "pill remove glyph sizing step",
+      "usageSites": [
+        "packages/ui/src/components/editor-toolbar.tsx:26",
+        "packages/ui/src/components/pill.tsx:62"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-1",
+      "source": "--space-1",
+      "value": "1rem",
+      "computedPx": 16,
+      "declaredAt": "packages/ui/src/styles/tokens.css:62",
+      "role": "grid/stack base gap (Stack md), page padding, dialog padding, fab inset",
+      "usageSites": [
+        "packages/ui/src/components/command.tsx:38",
+        "packages/ui/src/components/dialog.tsx:31",
+        "packages/ui/src/components/dialog.tsx:32",
+        "packages/ui/src/components/dialog.tsx:47",
+        "packages/ui/src/components/dialog.tsx:52",
+        "packages/ui/src/components/dialog.tsx:56",
+        "packages/ui/src/components/editor-screen.tsx:12",
+        "packages/ui/src/components/editor-screen.tsx:13"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-1-25",
+      "source": "--space-1-25",
+      "value": "1.25rem",
+      "computedPx": 20,
+      "declaredAt": "packages/ui/src/styles/tokens.css:63",
+      "role": "switch thumb travel, dialog title sizing step",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx:50",
+        "packages/ui/src/components/list-item.tsx:164",
+        "packages/ui/src/components/page-actions.tsx:7",
+        "packages/ui/src/components/section.tsx:28",
+        "packages/ui/src/components/switch.tsx:31",
+        "packages/ui/src/components/switch.tsx:45",
+        "packages/ui/src/components/tag-filter-nav.tsx:22",
+        "packages/ui/test/list-item.test.tsx:292"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-2",
+      "source": "--space-2",
+      "value": "2rem",
+      "computedPx": 32,
+      "declaredAt": "packages/ui/src/styles/tokens.css:64",
+      "role": "Stack lg gap, dialog horizontal margin",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx:38",
+        "packages/ui/src/components/editor-stack.tsx:27",
+        "packages/ui/src/components/page-title.tsx:12",
+        "packages/ui/src/components/row.tsx:17",
+        "packages/ui/src/components/section.tsx:15",
+        "packages/ui/src/components/stack.tsx:26",
+        "packages/ui/test/page-title.test.tsx:8",
+        "packages/ui/test/row.test.tsx:14"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-3",
+      "source": "--space-3",
+      "value": "3rem",
+      "computedPx": 48,
+      "declaredAt": "packages/ui/src/styles/tokens.css:65",
+      "role": "extra-large gap",
+      "usageSites": [
+        "packages/ui/src/components/empty-state.tsx:19",
+        "packages/ui/src/components/status-text.tsx:20"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-space-5",
+      "source": "--space-5",
+      "value": "5rem",
+      "computedPx": 80,
+      "declaredAt": "packages/ui/src/styles/tokens.css:66",
+      "role": "page bottom padding clearing the fab",
+      "usageSites": [
+        "packages/ui/src/components/matrix-block.tsx:43",
+        "packages/ui/src/components/page-shell.tsx:12",
+        "packages/ui/test/matrix-block.test.tsx:106",
+        "packages/ui/test/page-shell.test.tsx:25"
+      ],
+      "status": "matched"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-tap-height",
+      "source": "--tap-height",
+      "value": "48px",
+      "computedPx": 48,
+      "declaredAt": "packages/ui/src/styles/tokens.css:21",
+      "role": "minimum touch target (48px)",
+      "usageSites": [
+        "packages/ui/src/components/autosuggest.tsx:273",
+        "packages/ui/src/components/command.tsx:35"
+      ],
+      "status": "matched",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-content-width",
+      "source": "--content-width",
+      "value": "640px",
+      "computedPx": 640,
+      "declaredAt": "packages/ui/src/styles/tokens.css:22",
+      "role": "page column cap and dialog max width (640px)",
+      "usageSites": [
+        "packages/ui/src/components/dialog.tsx:38",
+        "packages/ui/src/components/page-shell.tsx:11",
+        "packages/ui/test/page-shell.test.tsx:21"
+      ],
+      "status": "matched",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-border-width",
+      "source": "--border-width",
+      "value": "1px",
+      "computedPx": 1,
+      "declaredAt": "packages/ui/src/styles/tokens.css:23",
+      "role": "declared hairline width token (1px)",
+      "usageSites": [],
+      "status": "declared-unused",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-focus-ring",
+      "source": "--focus-ring",
+      "value": "2px",
+      "computedPx": 2,
+      "declaredAt": "packages/ui/src/styles/tokens.css:24",
+      "role": "focus outline width and offset (2px)",
+      "usageSites": [
+        "packages/ui/src/components/button.tsx:19",
+        "packages/ui/src/components/button.tsx:19",
+        "packages/ui/src/components/checkbox.tsx:28",
+        "packages/ui/src/components/checkbox.tsx:28",
+        "packages/ui/src/components/fab-link.tsx:32",
+        "packages/ui/src/components/fab-link.tsx:33",
+        "packages/ui/src/components/fab-menu.tsx:42",
+        "packages/ui/src/components/fab-menu.tsx:43"
+      ],
+      "status": "matched",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-icon-button-size",
+      "source": "--icon-btn-size",
+      "value": "40px",
+      "computedPx": 40,
+      "declaredAt": "packages/ui/src/styles/tokens.css:25",
+      "role": "icon button square (40px)",
+      "usageSites": [
+        "packages/ui/src/components/list-item.tsx:137",
+        "packages/ui/test/list-item.test.tsx:385"
+      ],
+      "status": "matched",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    },
+    {
+      "family": "space",
+      "target": "--ds-layout-fab-size",
+      "source": "--fab-size",
+      "value": "56px",
+      "computedPx": 56,
+      "declaredAt": "packages/ui/src/styles/tokens.css:26",
+      "role": "floating action button diameter (56px)",
+      "usageSites": [
+        "packages/ui/src/components/fab-link.tsx:27",
+        "packages/ui/src/components/fab-menu.tsx:39",
+        "packages/ui/test/fab-link.test.tsx:8"
+      ],
+      "status": "matched",
+      "note": "fixed layout measure, not a step of the spacing scale"
+    }
+  ]
+}

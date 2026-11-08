@@ -17,9 +17,7 @@ const DB = 'feedback';
 const SNAPSHOT_NAME = STAMP;
 const at = () => new Date('2026-10-01T12:34:56.789Z');
 
-const TABLE_NAMES = ['events', 'notes'];
 const TABLE_COUNTS: Record<string, number> = { events: 3, notes: 5 };
-const TABLE_LIST_STDOUT = `${TABLE_NAMES.join('\n')}\n`;
 
 interface FakeRunner extends PgRunner {
   calls: string[][];
@@ -29,16 +27,20 @@ interface FakeRunner extends PgRunner {
 
 /**
  * Fake runner: records argv/copies. Echoes the table list for the `pg_tables` query and
- * a count for `COUNT(*)` (`counts`), answers `pg_restore --list` from `restoreListOk`,
- * the DB-native "in use" query from `otherBackends`, and lands a small archive file for
- * `copyOut`.
+ * a count for `COUNT(*)` from the connected database's row in `tablesByDatabase` (feedback
+ * by default), answers `pg_restore --list` from `restoreListOk`, the DB-native "in use"
+ * query from `otherBackends`, and lands a small archive file for `copyOut`.
  */
 function makeRunner(
-  options: { restoreListOk?: boolean; otherBackends?: number; counts?: Record<string, number> } = {},
+  options: {
+    restoreListOk?: boolean;
+    otherBackends?: number;
+    tablesByDatabase?: Record<string, Record<string, number>>;
+  } = {},
 ): FakeRunner {
   const restoreListOk = options.restoreListOk ?? true;
   const otherBackends = options.otherBackends ?? 0;
-  const counts = options.counts ?? TABLE_COUNTS;
+  const tablesByDatabase = options.tablesByDatabase ?? { [DB]: TABLE_COUNTS };
   const runner: FakeRunner = {
     calls: [],
     copiesIn: [],
@@ -46,16 +48,19 @@ function makeRunner(
     exec(argv: string[]): { status: number; stdout: string; stderr: string } {
       runner.calls.push(argv);
       const sql = argv[argv.length - 1] ?? '';
+      const tables = tablesByDatabase[argv[argv.indexOf('-d') + 1] ?? ''] ?? {};
       if (argv[0] === 'pg_restore' && argv[1] === '--list') {
         return { status: restoreListOk ? 0 : 1, stdout: '', stderr: 'bad dump' };
       }
       if (sql.includes('pg_stat_activity')) {
         return { status: 0, stdout: `${otherBackends}\n`, stderr: '' };
       }
-      if (sql.includes('pg_tables')) return { status: 0, stdout: TABLE_LIST_STDOUT, stderr: '' };
+      if (sql.includes('pg_tables')) {
+        return { status: 0, stdout: `${Object.keys(tables).join('\n')}\n`, stderr: '' };
+      }
       if (sql.includes('COUNT(*)')) {
-        const table = TABLE_NAMES.find((name) => sql.includes(`public."${name}"`)) ?? '';
-        return { status: 0, stdout: `${counts[table] ?? 0}\n`, stderr: '' };
+        const table = Object.keys(tables).find((name) => sql.includes(`public."${name}"`)) ?? '';
+        return { status: 0, stdout: `${tables[table] ?? 0}\n`, stderr: '' };
       }
       return { status: 0, stdout: '', stderr: '' };
     },
@@ -76,33 +81,45 @@ function makeFixture(): { root: string; backupRoot: string; env: NodeJS.ProcessE
   return { root, backupRoot: join(root, 'backup'), env: { INIT_CWD: root } };
 }
 
-function makeSnapshotManifest(tables: Record<string, number>): object {
+/** A backup manifest holding one entry per seeded database, each with its own counts. */
+function makeSnapshotManifest(
+  tablesByDatabase: Record<string, Record<string, number>>,
+): object {
   return {
     mode: 'routine',
     createdAt: '2026-10-01T00:00:00.000Z',
     pinned: false,
-    databases: [
-      { name: DB, file: `${DB}.dump`, source: DB, bytes: 14, pgRestoreList: 'ok', tables },
-    ],
+    databases: Object.entries(tablesByDatabase).map(([name, tables]) => ({
+      name,
+      file: `${name}.dump`,
+      source: name,
+      bytes: 14,
+      pgRestoreList: 'ok',
+      tables,
+    })),
   };
 }
 
 /**
- * Seed a snapshot directory under `backup/` with a `feedback.dump` and (unless
- * `manifest: false`) a backup-shape `manifest.json`.
+ * Seed a snapshot directory under `backup/` with one dump per database in
+ * `tablesByDatabase` (feedback only by default) and, unless `manifest: false`, a
+ * backup-shape `manifest.json`.
  */
 function seedSnapshot(
   backupRoot: string,
   name: string,
-  options: { tables?: Record<string, number>; manifest?: boolean } = {},
+  options: { tablesByDatabase?: Record<string, Record<string, number>>; manifest?: boolean } = {},
 ): string {
   const dir = join(backupRoot, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, `${DB}.dump`), 'FAKE-SNAPSHOT-DUMP');
+  const tablesByDatabase = options.tablesByDatabase ?? { [DB]: TABLE_COUNTS };
+  for (const database of Object.keys(tablesByDatabase)) {
+    writeFileSync(join(dir, `${database}.dump`), 'FAKE-SNAPSHOT-DUMP');
+  }
   if (options.manifest !== false) {
     writeFileSync(
       join(dir, 'manifest.json'),
-      `${JSON.stringify(makeSnapshotManifest(options.tables ?? TABLE_COUNTS), null, 2)}\n`,
+      `${JSON.stringify(makeSnapshotManifest(tablesByDatabase), null, 2)}\n`,
     );
   }
   return dir;
@@ -372,8 +389,8 @@ describe('runRestorePg ordering and post-write verification', () => {
   it('a row-count mismatch exits 1 and names the pre-restore recovery path', async () => {
     const fx = makeFixture();
     dirs.push(fx.root);
-    seedSnapshot(fx.backupRoot, SNAPSHOT_NAME, { tables: { notes: 5 } });
-    const runner = makeRunner({ counts: { events: 3, notes: 4 } });
+    seedSnapshot(fx.backupRoot, SNAPSHOT_NAME, { tablesByDatabase: { [DB]: { notes: 5 } } });
+    const runner = makeRunner({ tablesByDatabase: { [DB]: { events: 3, notes: 4 } } });
 
     const { code, err } = await runCli(
       ['--from', `backup/${SNAPSHOT_NAME}`],
@@ -397,10 +414,30 @@ describe('runRestorePg ordering and post-write verification', () => {
     const { code } = await runCli(
       ['--from', `backup/${SNAPSHOT_NAME}`],
       fx.env,
-      makeRunner({ counts: { events: 0, notes: 0 } }),
+      makeRunner({ tablesByDatabase: { [DB]: { events: 0, notes: 0 } } }),
       () => 'down',
     );
 
     expect(code).toBe(0);
+  });
+});
+
+describe('runRestorePg Postgres database set', () => {
+  it('--only focus exits 1 before any write: focus lives in SQLite, not Postgres', async () => {
+    const fx = makeFixture();
+    dirs.push(fx.root);
+    seedSnapshot(fx.backupRoot, SNAPSHOT_NAME);
+    const runner = makeRunner();
+
+    const { code, err } = await runCli(
+      ['--from', `backup/${SNAPSHOT_NAME}`, '--only', 'focus'],
+      fx.env,
+      runner,
+      () => 'down',
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain('unknown database name: focus');
+    expect(runner.calls).toEqual([]);
   });
 });

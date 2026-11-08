@@ -7,12 +7,18 @@ import type { Nutrient, NutrientVector } from '@life/nutrition';
 import {
   AlertBanner,
   Button,
+  Card,
   Dialog,
   EditorChrome,
   EmptyState,
+  Facts,
+  FactsRow,
   FilePicker,
+  formatDayMonth,
+  formatWeekday,
   IconButton,
   Input,
+  Kpi,
   List,
   ListItem,
   Section,
@@ -134,14 +140,24 @@ export interface EditorItem {
 }
 
 /**
- * The run total's display string — the server's formatter rule (whole number +
- * space + unit for a known value; the unknown em dash for a non-finite/negative
- * one), reproduced here from props so the client carries no `@life/nutrition`.
+ * The run total as `Kpi`'s two slots — the figure alone and the unit the server
+ * passed. The number follows the server's formatter rule (whole kcal); a
+ * non-finite/negative sum renders the unknown em dash, never a fabricated `0`.
  */
-function totalDisplay(value: number, unit: string, unknown: string): string {
-  if (!Number.isFinite(value) || value < 0) return unknown;
-  return `${value.toFixed(0)} ${unit}`;
+function totalDisplay(
+  value: number,
+  unit: string,
+  unknown: string,
+): { value: string; unit: string } {
+  if (!Number.isFinite(value) || value < 0) return { value: unknown, unit };
+  return { value: value.toFixed(0), unit };
 }
+
+/**
+ * The macro facts the reference draws once for the meal, in its order. Keys
+ * absent from the headline field list are skipped, so this never invents a row.
+ */
+const FACT_KEYS: readonly Nutrient[] = ['protein', 'carbohydrates', 'fat'];
 
 /** A portion change rescales an effective vector by `factor` (the model's linear rule: non-positive factors collapse to the absent-data zero). */
 function scaleVector(vector: NutrientVector, factor: number): NutrientVector {
@@ -491,6 +507,26 @@ export function MealEditor({
   }
 
   /**
+   * The meal card's macro totals: the reference draws one `Protein / Carbs / Fat`
+   * table for the whole meal, not per item. A key reads as a number only when
+   * every item confirmed it — the same rule `caloriesKnown` uses, because a
+   * partial sum would present itself as the meal's real macro. Any unconfirmed
+   * key keeps the em dash, never a fabricated `0`.
+   */
+  function mealFacts(items: readonly EditorItem[]) {
+    return FACT_KEYS.flatMap((key) => {
+      const fact = nutrition.fields.find((field) => field.key === key);
+      if (!fact) return [];
+      const known = items.length > 0 && items.every((item) => item.known.includes(key));
+      const sum = items.reduce((acc, item) => acc + item.nutrients[key], 0);
+      const value = known ? `${round2(sum)} ${fact.unit}` : nutrition.unknown;
+      return [
+        <FactsRow key={key} label={inlineLabel(fact.label)} value={value} />,
+      ];
+    });
+  }
+
+  /**
    * One item's form. Returned as JSX (not a nested component) so the item's
    * controls stay in this render's element tree, where the harness reaches them.
    */
@@ -555,7 +591,7 @@ export function MealEditor({
           open={openNutrients === index}
           onOpenChange={(open) => { if (!open) setOpenNutrients(null); }}
           title="All nutrients"
-          size="full"
+          size="sheet"
         >
           {nutrientRows(item, index, subject)}
         </Dialog>
@@ -565,11 +601,14 @@ export function MealEditor({
 
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+      // Framed: a screen with a real border, like every other editor back control.
+      back={{ label: 'Back', variant: 'framed', onBack: () => router.back() }}
       title={entry ? 'Review meal' : 'Log meal'}
+      sub={`${formatWeekday(date)}, ${formatDayMonth(date)}`}
       actions={
         <IconButton
           label="Save meal"
+          variant="framed"
           onClick={save}
           disabled={!canSave || saving}
         >
@@ -583,7 +622,7 @@ export function MealEditor({
       }
     >
       {door !== 'food' && (
-        <Section label="Add from photo — optional steering hint, never a correction">
+        <Section label="Photo">
           <FilePicker label="Choose a photo" accept="image/*" onFiles={onPhoto}>
             <Camera size={20} aria-hidden />
           </FilePicker>
@@ -608,7 +647,16 @@ export function MealEditor({
 
       {manual && <FoodSearch foods={foods} onPick={confirmFood} />}
 
-      <Section label="Items" actions={<Button size="bare" onClick={addItem}>Add item</Button>}>
+      <Card>
+        <Kpi value={total.value} unit={total.unit} />
+        <Facts>{mealFacts(items)}</Facts>
+      </Card>
+
+      <Section
+        label="Items"
+        count={items.length}
+        actions={<Button size="bare" onClick={addItem}>Add item</Button>}
+      >
         <StatusText>Grams scale the numbers below; a blank value means unknown, not zero.</StatusText>
         {items.length === 0 ? (
           <EmptyState
@@ -623,10 +671,6 @@ export function MealEditor({
         )}
       </Section>
 
-      <Section label="Total">
-        <StatusText>{total}</StatusText>
-      </Section>
-
       <Section label="Save as meal">
         <Input
           aria-label="Meal name"
@@ -634,7 +678,7 @@ export function MealEditor({
           value={mealName}
           onChange={(event) => setMealName(event.target.value)}
         />
-        <Button onClick={saveAsMeal} disabled={!canSave || savingMeal}>
+        <Button variant="ghost" onClick={saveAsMeal} disabled={!canSave || savingMeal}>
           Save as meal
         </Button>
       </Section>

@@ -13,6 +13,10 @@ import { EntriesService } from './entries.service';
  *
  * `GET /api/entries?date=` takes the client's resolved day: this service never
  * derives a day from its own clock (lesson 0019).
+ *
+ * `GET /api/entries` returns one page (`EntryPage`) rather than a bare array.
+ * The bound is structural — the required `date` is the fetch identity — so the
+ * cursor is a uniform list surface, not a performance claim.
  */
 @Controller('api/entries')
 export class EntriesController {
@@ -23,10 +27,11 @@ export class EntriesController {
     return this.entries.create(principal.sub, dto);
   }
 
-  /** The owner's entries for `date`; `meal` filters decrypted rows in memory. */
+  /** One page of the owner's entries for `date`; `meal` filters decrypted rows
+   * in memory, and the paging window is applied after the cache hit. */
   @Get()
   findAll(@Principal() principal: Principal, @Query() query: ListEntriesQuery) {
-    return this.entries.findAll(principal.sub, query.date, query.meal);
+    return this.entries.findAll(principal.sub, query);
   }
 
   @Get(':id')

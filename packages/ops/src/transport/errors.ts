@@ -60,14 +60,59 @@ export function deadlineExceededError(operation: string, deadlineMs: number): Op
   });
 }
 
+/** What a refused or unreachable rotation reads as. */
+export const REFRESH_REJECTED_DETAIL = 'credentials expired and the refresh was rejected';
+
 /** The 401-shaped local failure: no token, so the user must log in first. */
 export function missingTokenError(operation: string): OpsError {
   return new OpsError({
     operation,
     code: 'unauthenticated',
     status: 401,
-    detail: 'no token found, run `life-ops login` first',
+    detail: 'no token found, run `npm run ops -- login` first',
   });
+}
+
+/**
+ * What the token provider raises when rotation is needed and cannot deliver: the store
+ * held credentials whose access token had expired, so this is a dead credential, never a
+ * forgotten login. Only the executor knows which operation asked for the token.
+ */
+export class RefreshRejected extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'RefreshRejected';
+  }
+}
+
+/** The 401-shaped local failure a rejected rotation becomes once its operation is known. */
+export function expiredCredentialsError(operation: string, detail: string): OpsError {
+  return new OpsError({
+    operation,
+    code: 'unauthenticated',
+    status: 401,
+    detail: `${detail}, run \`npm run ops -- login\``,
+  });
+}
+
+/** The service was never reached, so there is no HTTP status to report — only where it lives. */
+export function transportFailureError(
+  operation: string,
+  endpoint: string,
+  cause: unknown,
+): OpsError {
+  const reason = messageOf(cause);
+  return new OpsError({
+    operation,
+    code: 'requestFailed',
+    detail: reason === undefined ? `cannot reach ${endpoint}` : `cannot reach ${endpoint}: ${reason}`,
+  });
+}
+
+/** A cause's own words, or nothing — never `String()` of an unknown, which prints `[object Object]`. */
+function messageOf(cause: unknown): string | undefined {
+  const message = cause instanceof Error ? cause.message : undefined;
+  return message === undefined || message === '' ? undefined : message;
 }
 
 /** Map an HTTP failure to the typed OpsError adapters render. */
@@ -76,11 +121,12 @@ export async function failureFromResponse(
   response: Response,
 ): Promise<OpsError> {
   const body = await response.text();
+  const code = codeForStatus(response.status);
   return new OpsError({
     operation,
-    code: codeForStatus(response.status),
+    code,
     status: response.status,
-    detail: detailFromBody(body, response),
+    detail: detailFromBody(body, response, code),
   });
 }
 
@@ -95,8 +141,18 @@ function codeForStatus(status: number): OpsErrorCode {
   return 'requestFailed';
 }
 
-function detailFromBody(body: string, response: Response): string {
-  return serviceMessage(body) ?? `${response.status} ${response.statusText}`;
+function detailFromBody(body: string, response: Response, code: OpsErrorCode): string {
+  const statusLine = statusLineFor(response);
+  const prose = serviceMessage(body);
+  if (prose === undefined) return statusLine;
+  // 401/404/409 already name themselves through the code; `requestFailed` is the catch-all,
+  // so there the number is the only thing telling a caller's mistake from a service fault.
+  return code === 'requestFailed' ? `${statusLine}: ${prose}` : prose;
+}
+
+/** `statusText` is empty over HTTP/2, so the number never trails a stray space. */
+function statusLineFor(response: Response): string {
+  return `${response.status} ${response.statusText}`.trim();
 }
 
 function serviceMessage(body: string): string | undefined {

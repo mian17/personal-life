@@ -4,8 +4,10 @@ import type {
   Note,
   NotePage,
   TagUsage,
+  TagUsagePage,
   UpdateNoteInput,
 } from '@life/shared';
+import { withQuery } from '@life/app-kit';
 import { callService } from './client';
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
@@ -17,15 +19,17 @@ function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * `GET /api/notes` — filter by registry tag id (TagRef) and/or a content query.
+ * `GET /api/notes` — filter by registry tag id (TagRef) and/or a content query, and
+ * continue from `cursor`. Filters and pagination both stay out of the cache key
+ * (Contract 2 Rule 3): the service filters after the hit and pages in memory, so one
+ * cached entry serves every page of every filter.
  */
-export function listNotes(tagId?: number, q?: string): Promise<NotePage> {
+export function listNotes(tagId?: number, q?: string, cursor?: string): Promise<NotePage> {
   const params = new URLSearchParams();
   if (tagId !== undefined) params.set('tagId', String(tagId));
   if (q) params.set('q', q);
-  const qs = params.toString();
-  const query = qs ? `?${qs}` : '';
-  return call<NotePage>(`/api/notes${query}`);
+  if (cursor) params.set('cursor', cursor);
+  return call<NotePage>(withQuery('/api/notes', params));
 }
 
 export function getNote(id: string): Promise<Note> {
@@ -33,12 +37,36 @@ export function getNote(id: string): Promise<Note> {
 }
 
 /**
- * `GET /api/tags` on note-service — the owner's tag usage surface
- * (`[{tagId, count}]`, `SPEC-tags-extraction`). Ids + counts only; names are
- * resolved through `tags-service` (`lib/tags-api.ts`, MAP M4).
+ * `GET /api/tags?limit=&cursor=` on note-service — one page of the owner's tag
+ * usage surface (`TagUsagePage`, `SPEC-tags-extraction`). Ids + counts only;
+ * names are resolved through `tags-service` (`lib/tags-api.ts`, MAP M4).
  */
-export function listNoteTagUsage(): Promise<TagUsage[]> {
-  return call<TagUsage[]>('/api/tags');
+export function fetchNoteTagUsagePage(
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<TagUsagePage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
+  return call<TagUsagePage>(withQuery('/api/tags', params));
+}
+
+/**
+ * The owner's **whole** tag usage surface, walked page by page.
+ *
+ * The filter row renders every used tag and the settings screen names every one of
+ * them; a single page would hide the tags past the boundary, so the filter row
+ * would silently drop a chip. Tag usage is bounded by the vocabulary, so the walk
+ * is one request in practice; the loop is what keeps it correct either way.
+ */
+export async function listNoteTagUsage(maxItems = 1000): Promise<TagUsage[]> {
+  const collected: TagUsage[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchNoteTagUsagePage({ cursor });
+    collected.push(...page.tagUsages);
+    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
+    cursor = page.nextCursor;
+  }
 }
 
 export function createNote(input: CreateNoteInput): Promise<Note> {

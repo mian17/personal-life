@@ -36,6 +36,24 @@ describe('Button', () => {
     expect(button.classList.contains('ui-btn--default')).toBe(false);
   });
 
+  /**
+   * Regression (visual defect M3): `bare` used to carry `min-h-0`, which dropped the tap floor
+   * and rendered section-header actions 34–36px tall. The quiet look is the paint; the box is
+   * still the touch minimum, so `--tap` (48px) is the floor and no negative min-height joins it.
+   */
+  it('keeps the tap floor on size="bare" instead of dropping it', () => {
+    render(
+      <Button size="bare">
+        x
+      </Button>,
+    );
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('min-h-[var(--tap)]');
+    expect(classes).not.toContain('min-h-0');
+    // The quiet rhythm is unchanged: the horizontal inset still fits the label.
+    expect(classes).toContain('px-[var(--s3)]');
+  });
+
   it.each<ButtonSize>(['default', 'bare', 'icon'])(
     'maps size="%s" to its modifier class',
     (size) => {
@@ -64,10 +82,22 @@ describe('Button', () => {
     const classes = classesOf(screen.getByRole('button'));
     // Borderless: the panel behind the button is the surface.
     expect(classes).not.toContain('border');
-    expect(classes).not.toContain('border-border');
-    expect(classes).not.toContain('bg-panel');
-    expect(classes).toContain('size-12');
+    expect(classes).not.toContain('border-line-strong');
+    expect(classes).not.toContain('bg-surface');
+    expect(classes).toContain('size-[var(--tap)]');
     expect(classes).toContain('text-danger');
+  });
+
+  it('fills the primary variant with the scoped accent and draws the word on it', () => {
+    render(<Button>Save</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('bg-max');
+    expect(classes).toContain('text-on-max');
+    expect(classes).toContain('border-max');
+    expect(classes).toContain('active:bg-max-press');
+    // The retired vocabulary: a fill that resolves against a root alias instead of the app scope.
+    expect(classes).not.toContain('bg-accent');
+    expect(classes).not.toContain('text-on-accent');
   });
 
   it('carries the disabled treatment on the rendered element', () => {

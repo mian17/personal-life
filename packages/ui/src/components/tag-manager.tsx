@@ -1,8 +1,9 @@
 'use client';
 
 import type { ComponentPropsWithRef } from 'react';
+import { cx } from '../lib/cx';
 import { ManagerSurface } from './manager-surface';
-import type { TagOption } from './tag-picker';
+import type { TagOption } from './tag-combobox';
 
 export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
   tags: TagOption[];
@@ -14,6 +15,14 @@ export interface TagManagerProps extends ComponentPropsWithRef<'div'> {
   placeholder?: string;
   createLabel?: string;
 }
+
+/**
+ * §8's `.group` meets its rows flush and draws one `--line` hairline between them. The
+ * shared `ManagerSurface` spaces its rows with a `--s1` gap, which would leave that rule
+ * floating inside the gap, so the tag manager closes the gap on the list it owns and lets
+ * the rows meet at the hairline the way the reference does.
+ */
+const groupRows = '[&>ul]:gap-0 [&>ul>*+*]:border-t [&>ul>*+*]:border-line';
 
 /** Tag registry manager: `ManagerSurface` with the tag noun and numeric ids. */
 export function TagManager({
@@ -40,7 +49,7 @@ export function TagManager({
       onCreate={onCreate}
       onRename={onRename}
       onDelete={onDelete}
-      className={className}
+      className={cx(groupRows, className)}
       {...rest}
     />
   );

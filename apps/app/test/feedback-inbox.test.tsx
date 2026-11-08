@@ -18,12 +18,13 @@ jest.mock('@/lib/feedback-api', () => ({
 }));
 
 import type { CreateFeedbackInput, FeedbackDto, FeedbackSubmitResult } from '@life/shared';
-import { AlertBanner, FeedbackNavItem, Select } from '@life/ui';
+import { AlertBanner, Select, SettingsLink } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { revalidatePath } from 'next/cache';
 import { createFeedback, updateFeedbackStatus } from '@/lib/feedback-api';
 import { setFeedbackStatusAction, submitFeedbackAction } from '../app/feedback-actions';
 import { FeedbackInbox } from '../app/feedback-inbox';
+import { FeedbackInboxBody } from '../app/feedback-inbox-body';
 
 const mockedCreateFeedback = createFeedback as jest.MockedFunction<typeof createFeedback>;
 const mockedUpdateFeedbackStatus = updateFeedbackStatus as jest.MockedFunction<
@@ -43,6 +44,16 @@ const noopStatusAction = async (
 
 const STATUS_FAILURE = "Couldn't update status. Try again.";
 
+/** A page the row tests never request: they seed no cursor, so the control never renders. */
+const noopLoadPage = async () => ({ feedback: [], nextCursor: null, total: 0 });
+
+/**
+ * The hook slot the first row starts at: the body makes three `useState` calls
+ * (appended entries, cursor, failure) before any row renders, so a re-render of that
+ * row must start past them.
+ */
+const ROW_HOOK_BASE = 3;
+
 /** The settings path the inbox builds itself through `settingsHref('/feedback')`. */
 const SETTINGS_HREF = '/feedback/settings';
 
@@ -59,9 +70,13 @@ function headings(html: string, level: 'h2' | 'h3'): string[] {
   );
 }
 
+/**
+ * The row's title text. A title line that carries an action wraps the text in its own
+ * span (the row primitive's H3 fix), so the read tolerates that one optional wrapper.
+ */
 function rowTitles(html: string): string[] {
   return [
-    ...html.matchAll(/class="ui-list-item__title(?: |")[^"]*"[^>]*>([^<]*)</g),
+    ...html.matchAll(/class="ui-list-item__title(?: |")[^"]*"[^>]*>(?:<span[^>]*>)?([^<]*)</g),
   ].map((m) => m[1]);
 }
 
@@ -69,9 +84,23 @@ function rowSnippets(html: string): string[] {
   return [...html.matchAll(/ui-list-item__snippet[^"]*">([^<]*)</g)].map((m) => m[1]);
 }
 
+/** The status filter row: the `TagFilterNav` markup, up to the first body section. */
+function filterRow(html: string): string {
+  const start = html.indexOf('ui-tag-filter-nav');
+  const end = html.indexOf('ui-section', start);
+  return html.slice(start, end === -1 ? undefined : end);
+}
+
+/** Every chip in the filter row, in render order. */
+function filterChipLabels(html: string): string[] {
+  return [...filterRow(html).matchAll(/<a[^>]*>([^<]*)<\/a>/g)].map((m) => m[1] ?? '');
+}
+
 /**
  * The inbox render under a preset `status` — the same validated prop the server
- * page hands down after reading `?status=` (`render(entries)` is All).
+ * page hands down after reading `?status=` (`render(entries)` is All). The entries
+ * are page 1 and no cursor is passed, so the body renders the list and nothing to
+ * load: the paging cases below seed a cursor themselves.
  */
 function render(entries: FeedbackDto[], status?: FeedbackDto['status']): string {
   return renderToStaticMarkup(
@@ -117,6 +146,16 @@ const ENTRIES: FeedbackDto[] = [
 ];
 
 describe('FeedbackInbox grouping', () => {
+  it("reads the inbox sub-line and each app group's entry count", () => {
+    const plural = render(ENTRIES);
+    expect(plural).toContain('Across all five modules');
+    // Three apps, two entries each: §8's `.slabel__count` is plural on every group.
+    expect(plural.match(/>2 entries</g)).toHaveLength(3);
+
+    const singular = render([ENTRIES[0]]);
+    expect(singular).toContain('>1 entry<');
+  });
+
   it('nests app then type, in canonical order, preserving newest-first inside groups', () => {
     const html = render(ENTRIES);
 
@@ -170,12 +209,17 @@ describe('FeedbackInbox grouping', () => {
     expect(headings(html, 'h3')).toEqual(['question']);
   });
 
-  it('renders one EmptyState and no list when there are zero entries', () => {
+  it('renders one EmptyState, in a section step, and no list when there are zero entries', () => {
     const html = render([]);
 
     expect(html).toContain('No feedback yet.');
-    expect(html).toContain('Use the feedback button in the toolbar to send the first one.');
+    // The copy names the door that exists: the Settings screen's `Send feedback`
+    // row in its Support group — the toolbar control it used to name is gone.
+    expect(html).toContain('Open Settings → Send feedback to write the first one.');
     expect(html).not.toContain('<ul');
+    // The body opens with the group step (a label-less `Section`), not the raw box.
+    expect(html.indexOf('ui-section')).toBeGreaterThan(-1);
+    expect(html.indexOf('ui-section')).toBeLessThan(html.indexOf('ui-empty'));
   });
 
   it('never renders an empty List', () => {
@@ -185,27 +229,72 @@ describe('FeedbackInbox grouping', () => {
     expect(rowTitles(html).length).toBeGreaterThan(0);
   });
 
-  it('mounts the feedback toolbar item for this app on the empty inbox', () => {
+  it('carries only the Settings control in the toolbar', () => {
     // `FeedbackInbox` is a server component (no hooks), so the direct call is
     // safe: it builds the `FeedbackRow` elements without rendering them.
     const el = FeedbackInbox({
       entries: [],
       submitFeedbackAction: noopAction,
       setFeedbackStatusAction: noopStatusAction,
-    }) as unknown as { props: { navTrailing: { props: { children: unknown } } } };
+    }) as unknown as { props: { navTrailing: { type?: unknown; props: { href?: unknown } } } };
 
-    // The gear joins this app's own toolbar item inside one fragment (the
-    // meals-nav shape): feedback first, Settings trailing.
-    type NavChild = { type?: unknown; props: { app?: unknown; label?: unknown; href?: unknown } };
-    const kids = el.props.navTrailing.props.children as NavChild[];
-
-    const feedback = kids.find((kid) => kid.type === FeedbackNavItem);
-    expect(feedback?.props.app).toBe('feedback');
-
-    const gear = kids[kids.length - 1];
-    expect(gear?.props.label).toBe('Settings');
-    expect(gear?.props.href).toBe(SETTINGS_HREF);
+    // The header's feedback entry is gone: the bare Settings control is the whole slot.
+    const trailing = el.props.navTrailing;
+    expect(trailing.type).toBe(SettingsLink);
+    expect(trailing.props.href).toBe(SETTINGS_HREF);
   });
+
+  it('renders no feedback entry of its own, so nothing opens a dialog from this page', () => {
+    const html = render(ENTRIES);
+
+    expect(html).not.toContain('Send feedback');
+  });
+});
+
+describe('FeedbackInbox paging', () => {
+  /** The inbox with a cursor, i.e. the service reported another page. */
+  function renderWithCursor(entries: FeedbackDto[], nextCursor: string | null): string {
+    return renderToStaticMarkup(
+      <FeedbackInbox
+        entries={entries}
+        nextCursor={nextCursor}
+        submitFeedbackAction={noopAction}
+        setFeedbackStatusAction={noopStatusAction}
+      />,
+    );
+  }
+
+  it('server-renders page 1 unchanged', () => {
+    const html = renderWithCursor(ENTRIES, 'cursor-2');
+
+    // The same rows, groups and counts page 1 always produced: the control is additive.
+    expect(rowTitles(html)).toEqual([
+      'notes feat title',
+      'notes bug title',
+      'todos feat title',
+      'todos bug title',
+      'fb feat title',
+      'fb feat old title',
+    ]);
+    expect(headings(html, 'h2')).toEqual(['Notes', 'Todos', 'Feedback']);
+  });
+
+  it('offers one load-more control while a next cursor exists', () => {
+    const html = renderWithCursor(ENTRIES, 'cursor-2');
+
+    expect(html.match(/>Load more</g)).toHaveLength(1);
+    // A real `Button` primitive: the focusable atom, not a div with a click handler.
+    expect(html).toContain('ui-btn--ghost');
+  });
+
+  it('renders no load-more control once the list is exhausted', () => {
+    const html = renderWithCursor(ENTRIES, null);
+
+    expect(html).not.toContain('Load more');
+    // An intentionally cursor-less inbox (the default) is the same exhausted state.
+    expect(render(ENTRIES)).not.toContain('Load more');
+  });
+
 });
 
 describe('FeedbackInbox rows', () => {
@@ -399,20 +488,26 @@ function slotSpy(first: unknown): { mockRestore(): void; setIndex(at: number): v
 }
 
 describe('FeedbackInbox filtering', () => {
-  it('renders the All + per-status pill bar as links, All active by default', () => {
+  it('renders the All + per-status filter as one row of links, All active by default', () => {
     const html = render(ENTRIES);
+    const row = filterRow(html);
 
-    const bar = html.slice(html.indexOf('ui-pill-group'), html.indexOf('ui-section'));
-    expect(bar).toContain('>All</a>');
-    expect(bar).toContain('>Open</a>');
-    expect(bar).toContain('>In Progress</a>');
-    expect(bar).toContain('>Done</a>');
-    expect(bar).toContain('>Won&#x27;t Do</a>');
+    // The notes index's `TagFilterNav`: one chip row, named `Status`.
+    expect(row).toContain('aria-label="Status"');
+    expect(filterChipLabels(html)).toEqual([
+      'All',
+      'Open',
+      'In Progress',
+      'Done',
+      'Won&#x27;t Do',
+    ]);
     // The filter is a navigation: All drops the param, each status carries it.
-    expect(bar).toContain('href="/feedback"');
-    expect(bar).toContain('href="/feedback?status=done"');
-    const active = bar.match(/class="ui-pill ui-pill--filter ui-pill--active\b/g) ?? [];
+    expect(row).toContain('href="/feedback"');
+    expect(row).toContain('href="/feedback?status=done"');
+    const active = row.match(/class="ui-pill ui-pill--filter ui-pill--active\b/g) ?? [];
     expect(active).toHaveLength(1);
+    // The old `PillGroup` row drew a hairline above it; the chip row draws none.
+    expect(row).not.toContain('border-t');
   });
 
   it('shows only the Done rows under the Done filter, same grouping and order', () => {
@@ -459,6 +554,8 @@ describe('FeedbackInbox filtering', () => {
     expect(html).toContain('No Done feedback.');
     expect(html).not.toContain('No feedback yet.');
     expect(html).not.toContain('<ul');
+    // Same section step as the frozen empty state, so both sit under the filter row.
+    expect(html.indexOf('ui-section')).toBeLessThan(html.indexOf('ui-empty'));
   });
 
   it('keeps the frozen empty state for a genuinely empty inbox under a filter', () => {
@@ -477,17 +574,19 @@ describe('FeedbackInbox filtering', () => {
       calls.push({ id, status });
       return { ok: true, id };
     };
-    const { mockRestore, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy([]);
     try {
-      const el = FeedbackInbox({
+      // The rows live in the body's tree now, so the island is called directly: the
+      // hook slots below stand in for the three `useState` calls it makes.
+      const el = FeedbackInboxBody({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'wire me', description: 'w', status: 'open' })],
-        submitFeedbackAction: noopAction,
+        nextCursor: null,
+        loadPage: noopLoadPage,
         setFeedbackStatusAction: wiredAction,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      setIndex(0);
       const selects = findSelects(rows[0]!.render(rows[0]!.props));
       expect(selects).toHaveLength(1);
       expect(selects[0]?.value).toBe('open');
@@ -509,17 +608,17 @@ describe('FeedbackInbox filtering', () => {
   it('renders the seam failure message in the row when a write fails.', async () => {
     const action = jest
       .fn(async (): Promise<FeedbackSubmitResult> => ({ ok: false, message: STATUS_FAILURE }));
-    const { mockRestore, setIndex } = slotSpy(null);
+    const { mockRestore, setIndex } = slotSpy([]);
     try {
-      const el = FeedbackInbox({
+      const el = FeedbackInboxBody({
         entries: [fb({ id: 'f1', app: 'notes', type: 'bug_report', title: 'fail me', description: 'w', status: 'open' })],
-        submitFeedbackAction: noopAction,
+        nextCursor: null,
+        loadPage: noopLoadPage,
         setFeedbackStatusAction: action,
       });
       const rows = findFeedbackRowElements(el);
       expect(rows).toHaveLength(1);
 
-      setIndex(0);
       const first = rows[0]!.render(rows[0]!.props);
       findSelects(first)[0]!.onChange({ target: { value: 'done' } });
       await flushMicrotasks();
@@ -527,7 +626,7 @@ describe('FeedbackInbox filtering', () => {
       // Re-render the same row off the settled slots: the failure message the
       // seam documents is now rendered, and the dropdown falls back to the
       // server's status (the pill's value) instead of diverging from it.
-      const second = renderRow(rows[0]!, 0, { setIndex });
+      const second = renderRow(rows[0]!, ROW_HOOK_BASE, { setIndex });
       expect(collectBannerTexts(second)).toContain(STATUS_FAILURE);
       expect(findSelects(second)[0]!.value).toBe('open');
     } finally {

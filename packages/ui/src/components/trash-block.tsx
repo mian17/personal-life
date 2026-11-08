@@ -12,6 +12,13 @@ import { PageActions } from './page-actions';
 import { PageShell } from './page-shell';
 import { PageTitle } from './page-title';
 
+/**
+ * §8's `.empty` sits on the page ground but keeps its `--line` hairline. `EmptyState`
+ * inherits `Card`'s raised surface fill, so the trash screen clears only that; the
+ * hairline, copy, padding and radius stay the empty state's own.
+ */
+const emptyStateStyles = 'bg-transparent!';
+
 export interface TrashBlockItem {
   /** Stable React key + the id passed to the bound action mappers. */
   id: string;
@@ -80,7 +87,7 @@ export function TrashBlock({
       <PageTitle>{title}</PageTitle>
 
       {items.length === 0 ? (
-        <EmptyState body={emptyMessage} />
+        <EmptyState body={emptyMessage} className={emptyStateStyles} />
       ) : (
         <>
           <List>

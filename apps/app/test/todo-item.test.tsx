@@ -279,11 +279,8 @@ describe('TodoItem sizes', () => {
     expect(html).not.toContain('ui-list-item--dense');
   });
 
-  it('default: keeps the delete action, list name and note snippet', () => {
+  it('default: keeps the list name and note snippet', () => {
     const html = markup();
-    expect(html).toContain('<form');
-    expect(html).toMatch(/ui-btn ui-btn--danger/);
-    expect(html).toContain('aria-label="Delete Buy milk"');
     expect(html).toContain('Groceries');
     expect(html).toContain('ui-list-item__snippet');
     expect(html).toContain('a note snippet');
@@ -299,6 +296,22 @@ describe('TodoItem sizes', () => {
   it('done: true marks the row struck/muted with ui-list-item--done', () => {
     const html = markup(undefined, { done: true });
     expect(html).toContain('ui-list-item--done');
+  });
+
+  it('a done default row renders no delete control', () => {
+    const html = markup(undefined, { done: true });
+    // Deleting moved to the todo's own screen, so the slot and its `invisible` gate are gone
+    // with it: neither state of the row paints a trash form at all.
+    expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('ui-btn--danger');
+    expect(html).not.toContain('<form');
+  });
+
+  it('an open default row renders no delete control either', () => {
+    const html = markup();
+    expect(html).not.toContain('aria-label="Delete');
+    expect(html).not.toContain('ui-btn--danger');
+    expect(html).not.toContain('<form');
   });
 
   it('a not-yet-done row renders neither --done nor --collapsing initially', () => {
@@ -326,6 +339,14 @@ describe('TodoItem timed and repeat meta', () => {
   it('renders no repeat text for a non-recurring todo', () => {
     expect(markup()).not.toContain('>Daily<');
     expect(markup()).not.toContain('>Weekly (Thursday)<');
+  });
+
+  it('drops the repeat label on a dense row, where the lens is name + due date only', () => {
+    // The contract in this component's doc comment: a dense row is the minimal lens. On a ~180px
+    // quadrant the repeat string was the noisiest thing in the row, wrapping mid-label.
+    expect(markup('dense', { repeat: 'weekly' })).not.toContain('>Weekly (Thursday)<');
+    // The default row keeps it: same todo, same label.
+    expect(markup('default', { repeat: 'weekly' })).toContain('>Weekly (Thursday)<');
   });
 });
 
@@ -438,6 +459,42 @@ describe('TodoItem tick keeps the row visible', () => {
     }
   });
 
+  it('renders no delete control — deletion lives on the todo detail page', () => {
+    const harness = snackbarHarness();
+    updateMock.mockClear();
+    completeMock.mockClear();
+    try {
+      // Both durable states, and both optimistic windows on top of them: the row must never
+      // paint a trash affordance, because the only delete path is the editor at /todos/[id]/edit.
+      const open = { done: false, repeat: 'daily' } as const;
+      const done = { done: true, repeat: 'daily' } as const;
+
+      const openRow = harness.renderMarkup(harness.renderTree({ overrides: open }));
+      expect(openRow).not.toContain('aria-label="Delete');
+      expect(openRow).not.toContain('ui-btn--danger');
+      expect(openRow).not.toContain('<form');
+
+      doneToggle(harness.renderTree({ overrides: open })).props.onCheckedChange();
+      const tickedRow = harness.renderMarkup(harness.renderTree({ overrides: open }));
+      expect(tickedRow).not.toContain('aria-label="Delete');
+      expect(tickedRow).not.toContain('ui-btn--danger');
+      expect(tickedRow).not.toContain('<form');
+
+      const doneRow = harness.renderMarkup(harness.renderTree({ overrides: done }));
+      expect(doneRow).not.toContain('aria-label="Delete');
+      expect(doneRow).not.toContain('ui-btn--danger');
+      expect(doneRow).not.toContain('<form');
+
+      doneToggle(harness.renderTree({ overrides: done })).props.onCheckedChange();
+      const untickedRow = harness.renderMarkup(harness.renderTree({ overrides: done }));
+      expect(untickedRow).not.toContain('aria-label="Delete');
+      expect(untickedRow).not.toContain('ui-btn--danger');
+      expect(untickedRow).not.toContain('<form');
+    } finally {
+      harness.restore();
+    }
+  });
+
   it('does not show a snackbar when clicking an already-done repeating row (the click undoes)', () => {
     const harness = snackbarHarness();
     updateMock.mockClear();
@@ -523,6 +580,93 @@ describe('TodoItem tick keeps the row visible', () => {
 
       expect(completeMock).toHaveBeenCalledTimes(1);
       expect(completeMock).toHaveBeenCalledWith('t1', 0);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe('TodoItem write failure', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  /** Drain the microtask chain that a fire-and-forget write's `catch` rides on. */
+  async function settled() {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  it('a rejected write drops the optimistic value so the row falls back to server truth', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    updateMock.mockRejectedValue(new Error('409 version conflict'));
+    try {
+      const optimistic = harness.renderTree({ overrides: { done: true } });
+      doneToggle(optimistic).props.onCheckedChange();
+      // The click un-ticks the row optimistically; the server row is still done.
+      expect(harness.intent).toEqual({ version: 0, done: false });
+      const optimisticRow = harness.renderTree({ overrides: { done: true } });
+      expect(doneToggle(optimisticRow).props.checked).toBe(false);
+
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      expect(updateMock).toHaveBeenCalledWith('t1', { done: false }, 0);
+
+      await settled();
+
+      expect(harness.intent).toBeNull();
+      // The durable prop wins again: a done row renders struck.
+      const row = harness.renderTree({ overrides: { done: true } });
+      expect(doneToggle(row).props.checked).toBe(true);
+      expect(harness.renderMarkup(row)).toContain('ui-list-item--done');
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a rejected write surfaces the failure through the row snackbar', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    // A non-Error rejection is still surfaced: nothing may go silent.
+    updateMock.mockRejectedValue('boom');
+    try {
+      doneToggle(harness.renderTree({ overrides: { done: true } })).props.onCheckedChange();
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      expect(harness.showSnackbar).not.toHaveBeenCalled();
+
+      await settled();
+
+      expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
+      expect(harness.showSnackbar.mock.calls[0][0]).toEqual({
+        message: "Couldn't save that change.",
+      });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('a successful write shows no failure message and keeps the Undo behaviour', async () => {
+    const harness = snackbarHarness();
+    updateMock.mockReset();
+    completeMock.mockReset();
+    updateMock.mockResolvedValue(undefined);
+    completeMock.mockResolvedValue(undefined);
+    try {
+      doneToggle(harness.renderTree()).props.onCheckedChange();
+      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+      await settled();
+
+      // One message only — the completion snackbar, untouched by the failure path.
+      expect(harness.showSnackbar).toHaveBeenCalledTimes(1);
+      const snackbar = harness.showSnackbar.mock.calls[0][0];
+      expect(snackbar.message).toBe('Task completed');
+      expect(snackbar.actionLabel).toBe('Undo');
+      expect(snackbar.onAction).toBeInstanceOf(Function);
+
+      snackbar.onAction();
+      expect(harness.intent).toBeNull();
+      expect(updateMock).toHaveBeenCalledWith('t1', { done: false });
     } finally {
       harness.restore();
     }

@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Calm palette — light and dark preview</title>
+<script>
+  /* Applied before first paint so the page never flashes the wrong ground. */
+  try {
+    var saved = localStorage.getItem('calm-theme');
+    if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+    else delete document.documentElement.dataset.theme;
+  } catch (e) {}
+</script>
+<style>
+/* ============================================================
+   TOKENS
+   Two derivations of one palette. Same hue family, inverted
+   surfaces, accents lifted for dark screens. No pure black,
+   no pure white text, no neon.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+
+  /* ground + surfaces */
+  --page:      #F4F4F1;
+  --surface:   #FFFFFF;
+  --sunken:    #F7F7F4;
+  --press:     #ECECE9;
+
+  /* ink */
+  --ink:       #1B1B1F;
+  --ink-2:     #58585E;
+  --ink-3:     #63636A;
+
+  /* lines */
+  --line:      rgba(0, 0, 0, 0.08);
+  --boundary:  #8A8A8A;
+  --focus:     #2A5D8F;
+
+  /* accents — text + soft fill */
+  --sage:      #4F6B52;  --sage-soft:  #EAF0E9;
+  --terra:     #8B5A45;  --terra-soft: #F5EDE8;
+  --lav:       #5A5285;  --lav-soft:   #EFEDF6;
+  --teal:      #2F5F61;  --teal-soft:  #E7EFEF;
+  --danger:    #8A3B3B;  --danger-soft:#F6E9E9;
+
+  /* solid fills */
+  --solid:     #1B1B1F;
+  --on-solid:  #FFFFFF;
+
+  /* depth — ambient, never harsh */
+  --shadow-1:  0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2:  0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.05);
+
+  /* geometry */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* 8pt grid */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s12: 48px;
+
+  --tap: 48px;
+  --line-w: 1px;
+
+  /* motion */
+  --ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --d-fast: 200ms;
+  --d-base: 260ms;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page:      #16171A;
+  --surface:   #1E2024;
+  --sunken:    #24262B;
+  --press:     #2C2F35;
+
+  --ink:       #E9E7E2;
+  --ink-2:     #A9A79F;
+  --ink-3:     #96948D;
+
+  --line:      rgba(255, 255, 255, 0.07);
+  --boundary:  #767B84;
+  --focus:     #8FBCE8;
+
+  --sage:      #9FC0A3;  --sage-soft:  #202A21;
+  --terra:     #DCA489;  --terra-soft: #2B2220;
+  --lav:       #B6AEDC;  --lav-soft:   #252231;
+  --teal:      #82B5B6;  --teal-soft:  #1D2829;
+  --danger:    #D98C86;  --danger-soft:#2C1F1F;
+
+  --solid:     #E9E7E2;
+  --on-solid:  #16171A;
+
+  --shadow-1:  0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-2:  0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+}
+
+/* Follow the OS when the visitor has not chosen. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page:      #16171A;
+    --surface:   #1E2024;
+    --sunken:    #24262B;
+    --press:     #2C2F35;
+    --ink:       #E9E7E2;
+    --ink-2:     #A9A79F;
+    --ink-3:     #96948D;
+    --line:      rgba(255, 255, 255, 0.07);
+    --boundary:  #767B84;
+    --focus:     #8FBCE8;
+    --sage:      #9FC0A3;  --sage-soft:  #202A21;
+    --terra:     #DCA489;  --terra-soft: #2B2220;
+    --lav:       #B6AEDC;  --lav-soft:   #252231;
+    --teal:      #82B5B6;  --teal-soft:  #1D2829;
+    --danger:    #D98C86;  --danger-soft:#2C1F1F;
+    --solid:     #E9E7E2;
+    --on-solid:  #16171A;
+    --shadow-1:  0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-2:  0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 20px rgba(0, 0, 0, 0.36);
+  }
+}
+
+/* ============================================================
+   PAGE CHROME
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* Warm off-white ground — the same one a screen paints. Groups, cards and
+     swatches sit above it on --surface. */
+  background: var(--page);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p, figure { margin: 0; }
+[hidden] { display: none !important; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button, input { font: inherit; color: inherit; }
+svg { display: block; }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--s5) var(--s12);
+}
+
+/* sticky command bar */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s3) var(--s5);
+  padding-top: calc(var(--s3) + env(safe-area-inset-top));
+  background: var(--surface);
+  border-bottom: var(--line-w) solid var(--line);
+}
+.bar__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar__name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.bar__note {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* segmented control — the same component every app's Appearance section uses */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--sunken);
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-pill);
+}
+
+.seg__btn {
+  min-height: 36px;
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.seg__btn[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.seg__btn:active { background: var(--press); }
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+
+.section { margin-top: var(--s10); }
+
+.section__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-bottom: var(--s5);
+}
+
+.section__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.section__sub {
+  font-size: 14px;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+
+/* ---------- two panes, one per theme ---------- */
+.panes {
+  display: grid;
+  gap: var(--s5);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 860px) {
+  .panes { grid-template-columns: 1fr 1fr; }
+}
+
+.pane {
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  /* each pane paints the screen ground of its own scheme */
+  background: var(--page);
+}
+
+.pane__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s2) var(--s4);
+  border-bottom: var(--line-w) solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.pane__body { padding: var(--s4); }
+
+/* ============================================================
+   APP SPECIMEN — the real vocabulary, sized for a phone
+   ============================================================ */
+
+.app {
+  max-width: 380px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  color: var(--ink);
+}
+
+.phead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-top: var(--s2);
+}
+
+.h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.sub {
+  margin-top: var(--s1);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.iconbtn {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.iconbtn:active { background: var(--press); }
+.icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* section label above a grouped list */
+.group__label {
+  padding: 0 var(--s1) var(--s2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.group {
+  background: var(--surface);
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s3) var(--s4);
+  border: 0;
+  border-bottom: var(--line-w) solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:last-child { border-bottom: 0; }
+.row:active { background: var(--press); }
+
+.row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.row__title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__meta {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.row__chev { flex: none; width: 18px; height: 18px; color: var(--ink-3); }
+.row__chev svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* checkbox — 44pt hit area, 22pt mark */
+.check {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin: calc(var(--s3) * -1) 0 calc(var(--s3) * -1) calc(var(--s4) * -1);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.check__box {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--boundary);
+  border-radius: var(--r-sm);
+  background: transparent;
+}
+
+.check__box svg { width: 14px; height: 14px; fill: none; stroke: var(--on-solid); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+
+.check[aria-checked="true"] .check__box {
+  background: var(--sage);
+  border-color: var(--sage);
+}
+
+.check[aria-checked="true"] .check__box svg { opacity: 1; }
+
+.check[aria-checked="true"] + .row__text .row__title {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* chips — soft fill, never a saturated block */
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 24px;
+  padding: 0 var(--s2);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.chip--sage  { background: var(--sage-soft);  color: var(--sage); }
+.chip--terra { background: var(--terra-soft); color: var(--terra); }
+.chip--lav   { background: var(--lav-soft);   color: var(--lav); }
+.chip--teal  { background: var(--teal-soft);  color: var(--teal); }
+.chip--danger{ background: var(--danger-soft);color: var(--danger); }
+
+.chip__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* card */
+.card {
+  padding: var(--s4);
+  background: var(--surface);
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+}
+
+.card__title { font-size: 15px; font-weight: 600; }
+.card__num { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* macro bars */
+.macros { display: flex; flex-direction: column; gap: var(--s3); }
+
+.macro { display: flex; align-items: center; gap: var(--s3); }
+
+.macro__name {
+  flex: none;
+  width: 68px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.macro__track {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  overflow: hidden;
+}
+
+.macro__fill { height: 100%; border-radius: var(--r-pill); }
+.macro__fill--p { background: var(--sage); }
+.macro__fill--c { background: var(--teal); }
+.macro__fill--f { background: var(--lav); }
+
+.macro__val {
+  flex: none;
+  width: 44px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* bar chart — flat, no gradients, no animation */
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 96px;
+  padding-top: var(--s3);
+}
+
+.chart__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--s1);
+  height: 100%;
+}
+
+.chart__bar {
+  border-radius: 4px;
+  background: var(--teal-soft);
+  min-height: 3px;
+}
+
+.chart__bar--on { background: var(--teal); }
+
+.chart__day {
+  text-align: center;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+
+/* focus readout — no pulsing, no breathing ring */
+.focus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+  background: var(--surface);
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.focus__time {
+  font-size: 44px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.focus__label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.focus__track {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  overflow: hidden;
+}
+
+.focus__fill { height: 100%; background: var(--teal); border-radius: var(--r-pill); }
+
+/* buttons */
+.btns { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+.btn {
+  min-height: var(--tap);
+  padding: 0 var(--s5);
+  border-radius: var(--r-md);
+  border: var(--line-w) solid transparent;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn--primary   { background: var(--solid); color: var(--on-solid); }
+.btn--secondary { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-1); }
+.btn--danger    { background: var(--danger-soft); color: var(--danger); }
+.btn:active     { opacity: 0.86; }
+
+/* field */
+.field { display: flex; flex-direction: column; gap: var(--s2); }
+
+.field__label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+.field__input {
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  width: 100%;
+  background: var(--surface);
+  border: var(--line-w) solid var(--boundary);
+  border-radius: var(--r-md);
+  color: var(--ink);
+}
+
+.field__input::placeholder { color: var(--ink-3); }
+
+/* ============================================================
+   SWATCHES
+   ============================================================ */
+
+.swatches {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.sw {
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.sw__chip {
+  height: 56px;
+  border-bottom: var(--line-w) solid var(--line);
+  /* a white chip on a white card needs a visible edge, so a boundary not a hairline */
+  outline: var(--line-w) solid var(--boundary);
+  outline-offset: calc(-1 * var(--line-w));
+}
+
+.sw__info { padding: var(--s2) var(--s3) var(--s3); }
+
+.sw__name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sw__hex {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.sw__ratio {
+  display: block;
+  margin-top: var(--s1);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+
+.table-wrap {
+  overflow-x: auto;
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+th, td {
+  padding: var(--s2) var(--s3);
+  text-align: left;
+  border-bottom: var(--line-w) solid var(--line);
+  white-space: nowrap;
+}
+
+th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+tr:last-child td { border-bottom: 0; }
+
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+td.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+.pass { color: var(--sage); font-weight: 600; }
+
+/* token source */
+details {
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+summary {
+  padding: var(--s3) var(--s4);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+}
+
+pre {
+  margin: 0;
+  padding: var(--s4);
+  border-top: var(--line-w) solid var(--line);
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  background: var(--sunken);
+}
+
+/* ============================================================
+   MOTION — only when the OS allows it
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  .seg__btn,
+  .row,
+  .check__box,
+  .btn,
+  .pane {
+    transition:
+      background-color var(--d-fast) var(--ease),
+      border-color var(--d-fast) var(--ease),
+      color var(--d-fast) var(--ease),
+      opacity var(--d-fast) var(--ease);
+  }
+
+  .check__box svg { transition: opacity var(--d-fast) var(--ease); }
+  .macro__fill, .chart__bar, .focus__fill { transition: width var(--d-base) var(--ease), height var(--d-base) var(--ease); }
+  .row__title { transition: color var(--d-fast) var(--ease); }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HTML
+     ============================================================ -->
+
+<header class="bar">
+  <div class="bar__title">
+    <span class="bar__name">Calm palette</span>
+    <span class="bar__note">Light and dark, one system — preview</span>
+  </div>
+  <div class="seg" role="group" aria-label="Theme">
+    <button class="seg__btn" type="button" data-theme-set="light" aria-pressed="true">Light</button>
+    <button class="seg__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+    <button class="seg__btn" type="button" data-theme-set="system" aria-pressed="false">System</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ---------- specimen ---------- -->
+  <section class="section">
+    <div class="section__head">
+      <h2 class="section__title">The same screen, both themes</h2>
+      <p class="section__sub">
+        Grouped lists, chips, macro bars and a focus readout, drawn from the shared tokens.
+        Cards sit on the screen surface and take their edge from the hairline,
+        not from a shadow — the same rule as the five app files.
+      </p>
+    </div>
+
+    <div class="panes">
+
+      <!-- light pane -->
+      <div class="pane" data-theme="light">
+        <div class="pane__label"><span>Light</span><span>#F4F4F1</span></div>
+        <div class="pane__body">
+          <div class="app">
+            <div class="phead">
+              <div>
+                <h1 class="h1">Todos</h1>
+                <p class="sub">Thursday, 30 October</p>
+              </div>
+              <button class="iconbtn" type="button" aria-label="Todos settings">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>
+              </button>
+            </div>
+
+            <div>
+              <p class="group__label">Today</p>
+              <div class="group">
+                <div class="row">
+                  <button class="check" type="button" role="checkbox" aria-checked="true" aria-label="Send meter reading">
+                    <span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+                  </button>
+                  <span class="row__text">
+                    <span class="row__title">Send meter reading</span>
+                    <span class="row__meta">Home · repeats monthly</span>
+                  </span>
+                  <span class="chip chip--sage"><span class="chip__dot"></span>Done</span>
+                </div>
+
+                <button class="row" type="button">
+                  <span class="check" aria-hidden="true">
+                    <span class="check__box"></span>
+                  </span>
+                  <span class="row__text">
+                    <span class="row__title">Refill prescription</span>
+                    <span class="row__meta">Errands · 17:00</span>
+                  </span>
+                  <span class="chip chip--terra">Due today</span>
+                </button>
+
+                <button class="row" type="button">
+                  <span class="row__text">
+                    <span class="row__title">Write two lines of the report</span>
+                    <span class="row__meta">Work · no time set</span>
+                  </span>
+                  <span class="row__chev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5l7 7-7 7"/></svg></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__head">
+                <span class="card__title">Today so far</span>
+                <span class="card__num">1 180 kcal</span>
+              </div>
+              <div class="macros">
+                <div class="macro">
+                  <span class="macro__name">Protein</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--p" style="width:72%"></span></span>
+                  <span class="macro__val">72 g</span>
+                </div>
+                <div class="macro">
+                  <span class="macro__name">Carbs</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--c" style="width:88%"></span></span>
+                  <span class="macro__val">154 g</span>
+                </div>
+                <div class="macro">
+                  <span class="macro__name">Fat</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--f" style="width:46%"></span></span>
+                  <span class="macro__val">34 g</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="focus">
+              <span class="focus__time">24:18</span>
+              <span class="focus__label">Writing, 25 minutes</span>
+              <span class="focus__track"><span class="focus__fill" style="width:38%"></span></span>
+              <div class="btns">
+                <button class="btn btn--primary" type="button">Pause</button>
+                <button class="btn btn--secondary" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__head">
+                <span class="card__title">Focus, last 14 days</span>
+                <span class="card__num">7 h 5 m</span>
+              </div>
+              <div class="chart">
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">17</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">18</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:62%"></span><span class="chart__day">19</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">20</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:38%"></span><span class="chart__day">21</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:78%"></span><span class="chart__day">22</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">23</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:50%"></span><span class="chart__day">24</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:90%"></span><span class="chart__day">25</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">26</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:44%"></span><span class="chart__day">27</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:30%"></span><span class="chart__day">28</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:66%"></span><span class="chart__day">29</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:72%"></span><span class="chart__day">30</span></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="in-light">New list name</label>
+              <input class="field__input" id="in-light" type="text" placeholder="Errands">
+            </div>
+
+            <div class="btns">
+              <button class="btn btn--primary" type="button">Save</button>
+              <button class="btn btn--secondary" type="button">Cancel</button>
+              <button class="btn btn--danger" type="button">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- dark pane -->
+      <div class="pane" data-theme="dark">
+        <div class="pane__label"><span>Dark</span><span>#16171A</span></div>
+        <div class="pane__body">
+          <div class="app">
+            <div class="phead">
+              <div>
+                <h1 class="h1">Todos</h1>
+                <p class="sub">Thursday, 30 October</p>
+              </div>
+              <button class="iconbtn" type="button" aria-label="Todos settings">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>
+              </button>
+            </div>
+
+            <div>
+              <p class="group__label">Today</p>
+              <div class="group">
+                <div class="row">
+                  <button class="check" type="button" role="checkbox" aria-checked="true" aria-label="Send meter reading">
+                    <span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+                  </button>
+                  <span class="row__text">
+                    <span class="row__title">Send meter reading</span>
+                    <span class="row__meta">Home · repeats monthly</span>
+                  </span>
+                  <span class="chip chip--sage"><span class="chip__dot"></span>Done</span>
+                </div>
+
+                <button class="row" type="button">
+                  <span class="check" aria-hidden="true">
+                    <span class="check__box"></span>
+                  </span>
+                  <span class="row__text">
+                    <span class="row__title">Refill prescription</span>
+                    <span class="row__meta">Errands · 17:00</span>
+                  </span>
+                  <span class="chip chip--terra">Due today</span>
+                </button>
+
+                <button class="row" type="button">
+                  <span class="row__text">
+                    <span class="row__title">Write two lines of the report</span>
+                    <span class="row__meta">Work · no time set</span>
+                  </span>
+                  <span class="row__chev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5l7 7-7 7"/></svg></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__head">
+                <span class="card__title">Today so far</span>
+                <span class="card__num">1 180 kcal</span>
+              </div>
+              <div class="macros">
+                <div class="macro">
+                  <span class="macro__name">Protein</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--p" style="width:72%"></span></span>
+                  <span class="macro__val">72 g</span>
+                </div>
+                <div class="macro">
+                  <span class="macro__name">Carbs</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--c" style="width:88%"></span></span>
+                  <span class="macro__val">154 g</span>
+                </div>
+                <div class="macro">
+                  <span class="macro__name">Fat</span>
+                  <span class="macro__track"><span class="macro__fill macro__fill--f" style="width:46%"></span></span>
+                  <span class="macro__val">34 g</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="focus">
+              <span class="focus__time">24:18</span>
+              <span class="focus__label">Writing, 25 minutes</span>
+              <span class="focus__track"><span class="focus__fill" style="width:38%"></span></span>
+              <div class="btns">
+                <button class="btn btn--primary" type="button">Pause</button>
+                <button class="btn btn--secondary" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__head">
+                <span class="card__title">Focus, last 14 days</span>
+                <span class="card__num">7 h 5 m</span>
+              </div>
+              <div class="chart">
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">17</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">18</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:62%"></span><span class="chart__day">19</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">20</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:38%"></span><span class="chart__day">21</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:78%"></span><span class="chart__day">22</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">23</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:50%"></span><span class="chart__day">24</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:90%"></span><span class="chart__day">25</span></div>
+                <div class="chart__col"><span class="chart__bar" style="height:0"></span><span class="chart__day">26</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:44%"></span><span class="chart__day">27</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:30%"></span><span class="chart__day">28</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:66%"></span><span class="chart__day">29</span></div>
+                <div class="chart__col"><span class="chart__bar chart__bar--on" style="height:72%"></span><span class="chart__day">30</span></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="in-dark">New list name</label>
+              <input class="field__input" id="in-dark" type="text" placeholder="Errands">
+            </div>
+
+            <div class="btns">
+              <button class="btn btn--primary" type="button">Save</button>
+              <button class="btn btn--secondary" type="button">Cancel</button>
+              <button class="btn btn--danger" type="button">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ---------- swatches ---------- -->
+  <section class="section">
+    <div class="section__head">
+      <h2 class="section__title">Palette</h2>
+      <p class="section__sub">
+        Ratios are measured against the card surface of the same theme. Text pairs clear
+        4.5:1; control boundaries clear 3:1. The hairline is decorative and carries no
+        meaning on its own, so it is held to no ratio.
+      </p>
+      <p class="section__sub">
+        The screen ground is <strong>Page</strong>: warm off-white in light, soft charcoal in dark, painted edge to edge
+        at 414px. Groups, cards and swatches sit above it on <strong>Surface</strong>, so the ground shows through the
+        gaps between them.
+      </p>
+    </div>
+
+    <div class="panes">
+
+      <div class="pane" data-theme="light">
+        <div class="pane__label"><span>Light</span></div>
+        <div class="pane__body">
+          <div class="swatches">
+            <div class="sw"><div class="sw__chip" style="background:#F4F4F1"></div><div class="sw__info"><span class="sw__name">Page</span><span class="sw__hex">#F4F4F1</span><span class="sw__ratio">the screen ground — every view sits on it</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#FFFFFF"></div><div class="sw__info"><span class="sw__name">Surface</span><span class="sw__hex">#FFFFFF</span><span class="sw__ratio">a group or card raised above the ground</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#F7F7F4"></div><div class="sw__info"><span class="sw__name">Sunken</span><span class="sw__hex">#F7F7F4</span><span class="sw__ratio">track, segment trough</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#ECECE9"></div><div class="sw__info"><span class="sw__name">Pressed</span><span class="sw__hex">#ECECE9</span><span class="sw__ratio">ink 14.50</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#1B1B1F"></div><div class="sw__info"><span class="sw__name">Ink</span><span class="sw__hex">#1B1B1F</span><span class="sw__ratio">17.17</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#58585E"></div><div class="sw__info"><span class="sw__name">Ink 2</span><span class="sw__hex">#58585E</span><span class="sw__ratio">7.06</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#63636A"></div><div class="sw__info"><span class="sw__name">Ink 3</span><span class="sw__hex">#63636A</span><span class="sw__ratio">5.96</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#8A8A8A"></div><div class="sw__info"><span class="sw__name">Boundary</span><span class="sw__hex">#8A8A8A</span><span class="sw__ratio">3.45 · non-text</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#4F6B52"></div><div class="sw__info"><span class="sw__name">Sage</span><span class="sw__hex">#4F6B52</span><span class="sw__ratio">5.10 · done</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#8B5A45"></div><div class="sw__info"><span class="sw__name">Terracotta</span><span class="sw__hex">#8B5A45</span><span class="sw__ratio">4.98 · due</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#5A5285"></div><div class="sw__info"><span class="sw__name">Lavender</span><span class="sw__hex">#5A5285</span><span class="sw__ratio">6.08 · tags</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#2F5F61"></div><div class="sw__info"><span class="sw__name">Teal</span><span class="sw__hex">#2F5F61</span><span class="sw__ratio">6.14 · focus</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#8A3B3B"></div><div class="sw__info"><span class="sw__name">Danger</span><span class="sw__hex">#8A3B3B</span><span class="sw__ratio">6.41 · destructive</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#2A5D8F"></div><div class="sw__info"><span class="sw__name">Focus ring</span><span class="sw__hex">#2A5D8F</span><span class="sw__ratio">6.86 · ring only</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-theme="dark">
+        <div class="pane__label"><span>Dark</span></div>
+        <div class="pane__body">
+          <div class="swatches">
+            <div class="sw"><div class="sw__chip" style="background:#16171A"></div><div class="sw__info"><span class="sw__name">Page</span><span class="sw__hex">#16171A</span><span class="sw__ratio">the screen ground — every view sits on it</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#1E2024"></div><div class="sw__info"><span class="sw__name">Surface</span><span class="sw__hex">#1E2024</span><span class="sw__ratio">a group or card raised above the ground</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#24262B"></div><div class="sw__info"><span class="sw__name">Sunken</span><span class="sw__hex">#24262B</span><span class="sw__ratio">track, segment trough</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#2C2F35"></div><div class="sw__info"><span class="sw__name">Pressed</span><span class="sw__hex">#2C2F35</span><span class="sw__ratio">ink 10.86</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#E9E7E2"></div><div class="sw__info"><span class="sw__name">Ink</span><span class="sw__hex">#E9E7E2</span><span class="sw__ratio">13.20</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#A9A79F"></div><div class="sw__info"><span class="sw__name">Ink 2</span><span class="sw__hex">#A9A79F</span><span class="sw__ratio">6.77</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#96948D"></div><div class="sw__info"><span class="sw__name">Ink 3</span><span class="sw__hex">#96948D</span><span class="sw__ratio">5.37</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#767B84"></div><div class="sw__info"><span class="sw__name">Boundary</span><span class="sw__hex">#767B84</span><span class="sw__ratio">3.83 · non-text</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#9FC0A3"></div><div class="sw__info"><span class="sw__name">Sage</span><span class="sw__hex">#9FC0A3</span><span class="sw__ratio">7.45 · done</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#DCA489"></div><div class="sw__info"><span class="sw__name">Terracotta</span><span class="sw__hex">#DCA489</span><span class="sw__ratio">7.18 · due</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#B6AEDC"></div><div class="sw__info"><span class="sw__name">Lavender</span><span class="sw__hex">#B6AEDC</span><span class="sw__ratio">7.45 · tags</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#82B5B6"></div><div class="sw__info"><span class="sw__name">Teal</span><span class="sw__hex">#82B5B6</span><span class="sw__ratio">6.65 · focus</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#D98C86"></div><div class="sw__info"><span class="sw__name">Danger</span><span class="sw__hex">#D98C86</span><span class="sw__ratio">6.08 · destructive</span></div></div>
+            <div class="sw"><div class="sw__chip" style="background:#8FBCE8"></div><div class="sw__info"><span class="sw__name">Focus ring</span><span class="sw__hex">#8FBCE8</span><span class="sw__ratio">8.18 · ring only</span></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ---------- contrast ---------- -->
+  <section class="section">
+    <div class="section__head">
+      <h2 class="section__title">Contrast check</h2>
+      <p class="section__sub">WCAG 2.1 relative luminance. AA needs 4.5:1 for body text and 3:1 for large text and control boundaries.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Pair</th><th style="text-align:right">Light</th><th style="text-align:right">Dark</th><th>AA</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Body on page ground</td><td class="num">15.58</td><td class="num">14.50</td><td class="pass">Pass</td></tr>
+          <tr><td>Body on surface</td><td class="num">17.17</td><td class="num">13.20</td><td class="pass">Pass</td></tr>
+          <tr><td>Body on sunken</td><td class="num">16.00</td><td class="num">12.25</td><td class="pass">Pass</td></tr>
+          <tr><td>Body on pressed</td><td class="num">14.50</td><td class="num">10.86</td><td class="pass">Pass</td></tr>
+          <tr><td>Secondary on surface</td><td class="num">7.06</td><td class="num">6.77</td><td class="pass">Pass</td></tr>
+          <tr><td>Secondary on page ground</td><td class="num">6.41</td><td class="num">7.44</td><td class="pass">Pass</td></tr>
+          <tr><td>Tertiary on surface</td><td class="num">5.96</td><td class="num">5.37</td><td class="pass">Pass</td></tr>
+          <tr><td>Tertiary on page ground</td><td class="num">5.41</td><td class="num">5.90</td><td class="pass">Pass</td></tr>
+          <tr><td>Boundary on page ground <em>(non-text)</em></td><td class="num">3.13</td><td class="num">4.21</td><td class="pass">Pass</td></tr>
+          <tr><td>Focus ring on page ground</td><td class="num">6.23</td><td class="num">8.98</td><td class="pass">Pass</td></tr>
+          <tr><td>Sage on sage-soft</td><td class="num">5.10</td><td class="num">7.45</td><td class="pass">Pass</td></tr>
+          <tr><td>Terracotta on terracotta-soft</td><td class="num">4.98</td><td class="num">7.18</td><td class="pass">Pass</td></tr>
+          <tr><td>Lavender on lavender-soft</td><td class="num">6.08</td><td class="num">7.45</td><td class="pass">Pass</td></tr>
+          <tr><td>Teal on teal-soft</td><td class="num">6.14</td><td class="num">6.65</td><td class="pass">Pass</td></tr>
+          <tr><td>Danger on danger-soft</td><td class="num">6.41</td><td class="num">6.08</td><td class="pass">Pass</td></tr>
+          <tr><td>Surface vs page ground</td><td class="num">1.10</td><td class="num">1.10</td><td>Bordered, not shadowed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ---------- token source ---------- -->
+  <section class="section">
+    <details>
+      <summary>Token source — paste into any app</summary>
+      <p class="section__sub" style="margin-bottom:8px">
+        <code>--page</code> is the ground a screen paints; <code>--surface</code> is the card or group that sits
+        above it. Keep the two steps apart — a screen is never flat surface.
+      </p>
+      <pre>:root, [data-theme="light"] {
+  --page: #F4F4F1;  --surface: #FFFFFF;  --sunken: #F7F7F4;  --press: #ECECE9;
+  --ink: #1B1B1F;   --ink-2: #58585E;    --ink-3: #63636A;
+  --line: rgba(0,0,0,0.08);  --boundary: #8A8A8A;  --focus: #2A5D8F;
+  --sage: #4F6B52;  --sage-soft: #EAF0E9;
+  --terra: #8B5A45; --terra-soft: #F5EDE8;
+  --lav: #5A5285;   --lav-soft: #EFEDF6;
+  --teal: #2F5F61;  --teal-soft: #E7EFEF;
+  --danger: #8A3B3B; --danger-soft: #F6E9E9;
+  --solid: #1B1B1F; --on-solid: #FFFFFF;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+  --tap: 48px;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1); --d-fast: 200ms; --d-base: 260ms;
+}
+
+[data-theme="dark"] {
+  --page: #16171A;  --surface: #1E2024;  --sunken: #24262B;  --press: #2C2F35;
+  --ink: #E9E7E2;   --ink-2: #A9A79F;    --ink-3: #96948D;
+  --line: rgba(255,255,255,0.07);  --boundary: #767B84;  --focus: #8FBCE8;
+  --sage: #9FC0A3;  --sage-soft: #202A21;
+  --terra: #DCA489; --terra-soft: #2B2220;
+  --lav: #B6AEDC;   --lav-soft: #252231;
+  --teal: #82B5B6;  --teal-soft: #1D2829;
+  --danger: #D98C86; --danger-soft: #2C1F1F;
+  --solid: #E9E7E2; --on-solid: #16171A;
+}</pre>
+    </details>
+  </section>
+
+</div>
+
+<!-- ============================================================
+     JS
+     ============================================================ -->
+
+<script>
+(function () {
+  'use strict';
+
+  var root = document.documentElement;
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-theme-set]'));
+
+  function current() {
+    return root.dataset.theme || 'system';
+  }
+
+  function paint() {
+    var value = current();
+    buttons.forEach(function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.themeSet === value));
+    });
+  }
+
+  function apply(value) {
+    if (value === 'system') delete root.dataset.theme;
+    else root.dataset.theme = value;
+    try {
+      if (value === 'system') localStorage.removeItem('calm-theme');
+      else localStorage.setItem('calm-theme', value);
+    } catch (e) {}
+    paint();
+  }
+
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () { apply(button.dataset.themeSet); });
+  });
+
+  /* Keep the System button honest when the OS flips while the page is open. */
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  var onSystemChange = function () { if (!root.dataset.theme) paint(); };
+  if (media.addEventListener) media.addEventListener('change', onSystemChange);
+  else if (media.addListener) media.addListener(onSystemChange);
+
+  paint();
+})();
+</script>
+
+</body>
+</html>

@@ -2,7 +2,6 @@
 
 import type { List, Todo } from '@life/shared';
 import {
-  Button,
   Checkbox,
   DueDate,
   ListItem,
@@ -10,11 +9,13 @@ import {
   type TagOption,
   useSnackbar,
 } from '@life/ui';
-import { Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { completeTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
+import { completeTodoAction, updateTodoAction } from './todo-actions';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-callback';
+
+/** Shown when a toggle write rejects: the row falls back to server truth and says why. */
+const WRITE_FAILED_MESSAGE = "Couldn't save that change.";
 
 /**
  * One todo row at two sizes, from one `ListItem variant="todo"`: a borderless
@@ -22,13 +23,16 @@ import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-ca
  * clamped to two lines, with the signal due date. The row links to its edit
  * screen (`/todos/[id]/edit`, the same editor as create, in edit mode).
  *
- * `size="default"` (the `/todos` List) keeps the extras: list name, note
- * snippet and the trash delete action, at the base type scale (`--checkbox-size`
- * 1.25rem). `size="dense"` (the Eisenhower matrix) is the minimal lens — name +
- * signal due date only, compact type, and the same anatomy at 0.75rem. `tone`
- * tints the leading checkbox for a coloured matrix quadrant; the matrix passes
+ * `size="default"` (the `/todos` List) keeps the extras: list name and note
+ * snippet, at the base type scale (`--checkbox-size` 1.25rem). `size="dense"`
+ * (the Eisenhower matrix) is the minimal lens — name + signal due date only,
+ * compact type, and the same anatomy at 0.75rem. `tone` tints the leading
+ * checkbox for a coloured matrix quadrant; the matrix passes
  * `DueDate tone="signal"` (overdue deep red, any future lighter red) and the
  * List row uses it too, so the two views of one todo agree.
+ *
+ * Deleting is not a row affordance: a row is an index entry, and the trash
+ * control lives on the todo's own screen (`/todos/[id]/edit`, "Move to trash").
  */
 export function TodoItem({
   todo,
@@ -62,6 +66,36 @@ export function TodoItem({
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
 
+  /**
+   * A rejected write must not leave the row looking saved. Drop the optimistic value so the
+   * row follows `todo.done` again, rewind the baseline to the server state this window started
+   * from (a baseline the server never accepted would turn the user's next press into a no-op),
+   * and say the change did not stick through the same snackbar the row already owns.
+   */
+  function reportWriteFailure(
+    attempted: { version: number; done: boolean },
+    serverState: { version: number; done: boolean },
+  ) {
+    // A newer press may already own the baseline; only rewind the one this write set.
+    // ponytail: a failure landing after a retick still drops the newer optimistic value —
+    // the row shows server truth, which is the honest state. Add a per-press write id if a
+    // flicker on that race ever gets reported.
+    if (baseline.current.version === attempted.version && baseline.current.done === attempted.done) {
+      baseline.current = serverState;
+    }
+    setIntent(null);
+    showSnackbar({ message: WRITE_FAILED_MESSAGE });
+  }
+
+  /** Fire a write without awaiting it, but never let its rejection go silent. */
+  function writeTodo(
+    write: Promise<unknown>,
+    attempted: { version: number; done: boolean },
+    serverState: { version: number; done: boolean },
+  ) {
+    void Promise.resolve(write).catch(() => reportWriteFailure(attempted, serverState));
+  }
+
   function flush(next: boolean, id: string, version: number, serverDone: boolean) {
     // A new server version starts a fresh baseline: the row the server returned.
     if (baseline.current.version !== version) {
@@ -72,8 +106,10 @@ export function TodoItem({
       return;
     }
     baseline.current = { version, done: next };
+    const attempted = { version, done: next };
+    const serverState = { version, done: serverDone };
     if (next) {
-      void completeTodoAction(id, version);
+      writeTodo(completeTodoAction(id, version), attempted, serverState);
       showSnackbar({
         message: 'Task completed',
         actionLabel: 'Undo',
@@ -86,7 +122,7 @@ export function TodoItem({
         },
       });
     } else {
-      void updateTodoAction(id, { done: false }, version);
+      writeTodo(updateTodoAction(id, { done: false }, version), attempted, serverState);
     }
   }
 
@@ -113,7 +149,7 @@ export function TodoItem({
       meta={
         <>
           <DueDate dueDate={todo.dueDate} today={today} tone="signal" />
-          {repeat && <span>{repeat}</span>}
+          {isDefault && repeat && <span>{repeat}</span>}
           {isDefault && list && <span>{list.name}</span>}
         </>
       }
@@ -123,21 +159,6 @@ export function TodoItem({
       variant="todo"
       size={size}
       tone={tone}
-      deleteAction={
-        isDefault && !done ? (
-          <form action={deleteTodoAction.bind(null, todo.id)}>
-            <Button
-              type="submit"
-              variant="danger"
-              size="icon"
-              aria-label={`Delete ${todo.title}`}
-            >
-              <Trash2 size={18} aria-hidden />
-            </Button>
-          </form>
-        ) : undefined
-      }
-    >
-    </ListItem>
+    />
   );
 }

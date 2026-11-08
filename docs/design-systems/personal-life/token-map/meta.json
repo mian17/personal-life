@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-10-29T12:16:04.939Z",
+  "git": {
+    "sha": "1b7b4c52e2a512ee84a6cb6d11842a67797d96c0",
+    "branch": "pi/ds/personal-life-base",
+    "baseCommit": "1b7b4c5"
+  },
+  "source": "packages/ui/src/styles/tokens.css",
+  "files": {
+    "colors.json": "color family + both themes + measured contrast pairs",
+    "typography.json": "font family, base size, leading, and the spacing tokens that carry text sizes",
+    "spacing.json": "the 19-step spacing scale plus the fixed layout measures",
+    "radius.json": "declared radii plus radius values written elsewhere",
+    "shadow.json": "the single elevation token and the implicit flat default",
+    "motion.json": "durations and easing, including the snackbar exit constant",
+    "unmatched.json": "target concepts the repo lacks, with consequence for agents"
+  },
+  "counts": {
+    "colors": 11,
+    "typography": 12,
+    "spacing": 25,
+    "radius": 5,
+    "shadow": 2,
+    "motion": 4,
+    "unmatched": 11
+  },
+  "fileSeparation": "one file per target token family so --ds-color-*, --ds-font-*, --ds-space-*, --ds-radius-*, --ds-shadow-* and --ds-motion-* each have exactly one crosswalk owner"
+}

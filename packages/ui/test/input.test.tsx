@@ -57,4 +57,44 @@ describe('Input', () => {
     expect(input.classList.contains('focus-visible:outline-solid')).toBe(true);
     expect(input.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
   });
+
+  /**
+   * Regression: a `date`/`time` value is UA shadow content — nowrap with its own intrinsic
+   * width — so it paints past the padding box instead of shrinking with the control. The
+   * primitive contains it on the control's own box and leaves every other type alone.
+   */
+  it('contains the UA shadow content of a date/time field and only those types', () => {
+    const { container } = render(
+      <>
+        <Input aria-label="date" type="date" />
+        <Input aria-label="time" type="time" />
+        <Input aria-label="text" type="text" />
+      </>,
+    );
+    const classes = (label: string): DOMTokenList =>
+      container.querySelector(`[aria-label="${label}"]`)!.classList;
+
+    const containment = [
+      'appearance-none',
+      'max-w-full',
+      'overflow-hidden',
+      'pe-[var(--s2)]!',
+      '[&::-webkit-datetime-edit]:min-w-0',
+      '[&::-webkit-calendar-picker-indicator]:shrink-0',
+    ];
+    for (const label of ['date', 'time']) {
+      for (const cls of containment) expect(classes(label).contains(cls)).toBe(true);
+      // The shell it must keep looking like: height, radius, border, focus ring.
+      expect(classes(label).contains('h-[var(--tap)]')).toBe(true);
+      expect(classes(label).contains('rounded-[var(--r-md)]')).toBe(true);
+      expect(classes(label).contains('focus-visible:outline-solid')).toBe(true);
+    }
+
+    for (const cls of containment) expect(classes('text').contains(cls)).toBe(false);
+  });
+
+  it('leaves the bare variant free of the date/time containment', () => {
+    render(<Input aria-label="bare date" variant="bare" type="date" />);
+    expect(screen.getByLabelText('bare date').classList.contains('appearance-none')).toBe(false);
+  });
 });

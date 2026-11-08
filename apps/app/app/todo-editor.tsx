@@ -11,10 +11,13 @@ import {
   type UpdateTodoInput,
 } from '@life/shared';
 import {
+  Button,
   EditorChrome,
+  Field,
   IconButton,
   Input,
-  PillGroup,
+  Menu,
+  MenuItem,
   Select,
   Switch,
   Textarea,
@@ -22,8 +25,8 @@ import {
   localTimePart,
   type TagOption,
 } from '@life/ui';
-import { Check } from 'lucide-react';
-import { createTodoAction, updateTodoAction } from './todo-actions';
+import { Check, MoreHorizontal } from 'lucide-react';
+import { createTodoAction, deleteTodoAction, updateTodoAction } from './todo-actions';
 import { RecurrenceDialog } from './recurrence-dialog';
 import { repeatLabel } from '@/lib/todo-repeat-label';
 
@@ -46,8 +49,9 @@ function customDays(repeat: TodoRepeat | null, repeatDays: number[]): number[] |
 /**
  * The todo editor screen, shared by create (`/todos/new`) and edit
  * (`/todos/[id]/edit`). One component, two modes — the same fields and layout;
- * only the initial values and the save action differ. All visuals come from
- * `@life/ui`; the fields stack through `EditorStack`.
+ * only the initial values, the save action and the actions menu differ. All
+ * visuals come from `@life/ui`; the fields stack through `EditorStack`, each a
+ * `Field` caption over its control.
  */
 export function TodoEditor({
   todo,
@@ -75,6 +79,7 @@ export function TodoEditor({
   const [listId, setListId] = useState<string | null>(todo?.listId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(todo?.tagIds ?? []);
   const [saving, setSaving] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   // The user's explicit override; `undefined` = untouched (inherit). Not a hook:
   // the seed is derived from the current list so create mode follows its default.
   const [importantOverride, setImportantOverride] = useState<boolean | undefined>(undefined);
@@ -116,6 +121,18 @@ export function TodoEditor({
     }
   }
 
+  /**
+   * Moves the todo to the trash and leaves the screen. Deleting is immediate —
+   * the trash is the recovery path — and no confirmation stands between the press
+   * and the write, matching the note editor and the list row's trash control.
+   */
+  async function moveToTrash() {
+    if (todo == null) return;
+    setMenuOpen(false);
+    await deleteTodoAction(todo.id);
+    router.back();
+  }
+
   /** The edit PATCH: only a touched override is sent, so an untouched one inherits. */
   function updateInput(): UpdateTodoInput {
     return {
@@ -147,16 +164,35 @@ export function TodoEditor({
 
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => router.back() }}
+      back={{ label: 'Back', onBack: () => router.back(), variant: 'framed' }}
       title={editing ? 'Edit Todo' : 'New Todo'}
       actions={
-        <IconButton
-          label={editing ? 'Save todo' : 'Add todo'}
-          onClick={save}
-          disabled={!canSave || saving}
-        >
-          <Check size={20} aria-hidden />
-        </IconButton>
+        <>
+          <IconButton
+            label={editing ? 'Save todo' : 'Add todo'}
+            variant="framed"
+            onClick={save}
+            disabled={!canSave || saving}
+          >
+            <Check size={20} aria-hidden />
+          </IconButton>
+          {/* Create mode has no row to remove, so the menu only exists while editing. */}
+          {editing && (
+            <Menu
+              label="Task actions"
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              triggerVariant="framed"
+              triggerIcon={<MoreHorizontal size={16} aria-hidden />}
+            >
+              <MenuItem>
+                <Button variant="danger" size="bare" disabled={saving} onClick={() => void moveToTrash()}>
+                  Move to trash
+                </Button>
+              </MenuItem>
+            </Menu>
+          )}
+        </>
       }
       gap="lg"
       tagPicker={{
@@ -167,44 +203,48 @@ export function TodoEditor({
         label: 'Tags',
       }}
     >
-      <Input
-        type="text"
-        aria-label="Todo title"
-        placeholder="What needs doing?"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        autoFocus={!editing}
-      />
+      <Field label="Title">
+        <Input
+          type="text"
+          aria-label="Todo title"
+          placeholder="What needs doing?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus={!editing}
+        />
+      </Field>
 
-      <Textarea
-        aria-label="Todo note"
-        placeholder="Details (optional)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
+      <Field label="Note">
+        <Textarea
+          aria-label="Todo note"
+          placeholder="Details (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </Field>
 
-      <PillGroup label="Due" aria-label="Due">
+      <Field label="Due date">
         <Input
           type="date"
           aria-label="Due date"
           value={dueDate}
           onChange={(e) => onDueDateChange(e.target.value)}
         />
-      </PillGroup>
+      </Field>
 
       {dueDate !== '' && (
-        <PillGroup label="Time" aria-label="Time">
+        <Field label="Time">
           <Input
             type="time"
             aria-label="Due time"
             value={dueTime}
             onChange={(e) => setDueTime(e.target.value)}
           />
-        </PillGroup>
+        </Field>
       )}
 
       {dueDate !== '' && (
-        <PillGroup label="Repeat" aria-label="Repeat">
+        <Field label="Repeat">
           <Select
             aria-label="Repeat"
             value={repeat ?? ''}
@@ -229,7 +269,7 @@ export function TodoEditor({
               },
             ]}
           />
-        </PillGroup>
+        </Field>
       )}
 
       <RecurrenceDialog
@@ -244,7 +284,7 @@ export function TodoEditor({
       />
 
       {lists.length > 0 && (
-        <PillGroup label="List" aria-label="List">
+        <Field label="List">
           <Select
             aria-label="List"
             value={listId ?? ''}
@@ -254,12 +294,12 @@ export function TodoEditor({
               ...lists.map((list) => ({ value: list.id, label: list.name })),
             ]}
           />
-        </PillGroup>
+        </Field>
       )}
 
-      <PillGroup label="Important" aria-label="Important">
+      <Field label="Important">
         <Switch label="Important" checked={important} onCheckedChange={setImportantOverride} />
-      </PillGroup>
+      </Field>
     </EditorChrome>
   );
 }

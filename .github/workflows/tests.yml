@@ -1,0 +1,77 @@
+# Gates pull requests into `dev`. The SonarQube workflow is the other half of the
+# split: it analyses `dev` *after* merge (push trigger) and is not run here, so a
+# PR is verified without needing the SonarQube container to be up.
+name: Tests
+
+on:
+  pull_request:
+    branches: [dev]
+  # Manual run for reproducing a failure without pushing a commit.
+  workflow_dispatch:
+
+# One run per PR: a new push supersedes the previous one, which is pointless to
+# finish. The group is keyed to the PR so runs for different PRs still queue
+# independently. It deliberately does not reuse `group: sonarqube` — that group
+# serialises dev scans, and sharing it would park PR runs behind them on the
+# single runner.
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Self-hosted runner label the repo has — it is the only one available.
+    # Same host as the SonarQube container, but this job needs none of it.
+    runs-on: [self-hosted, sonarqube]
+    # Estimate, not a measurement: a full `npm run test:coverage` across every
+    # workspace, plus `npm ci` and the workspace build. Generous so a slow run is
+    # not killed, tight enough that a hung suite cannot hold the only runner for
+    # the six-hour default.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `--ignore-scripts` on purpose: Sonar rule S6505 flags installing with
+      # package-manager scripts enabled (githubactions:S6505, MAJOR), which is
+      # exactly what `npm ci` alone does. Only three dependencies carry install
+      # scripts, and only the two native ones matter here: `better-sqlite3`
+      # (sqlite suites) and `argon2` (idp). Rebuild those explicitly; `fsevents`
+      # is macOS-only and optional.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build native dependencies
+        run: npm rebuild better-sqlite3 argon2
+
+      # Workspace `@life/*` types only exist after a build: a fresh clone has no
+      # `dist/`, so every suite importing another workspace fails with TS2307.
+      - name: Build workspaces
+        run: npm run build
+
+      # Suites that boot a sqlite service need a writable data directory, and
+      # those directories are gitignored, so a fresh checkout has none.
+      - name: Prepare test data directories
+        run: mkdir -p apps/{idp,meal-service,note-service,tags-service,todo-service}/data
+
+      # The pg integration suite runs against a throwaway `postgres:17-alpine`
+      # container. Pulling the image here keeps the registry fetch out of the
+      # jest hook: a cold pull inside it would park the event loop under the
+      # suite's own timeout and surface as a silent hook timeout, not a fetch
+      # error.
+      - name: Pull Postgres test image
+        timeout-minutes: 10
+        run: docker pull postgres:17-alpine
+
+      # The repo's single coverage engine: `scripts/coverage.mjs` fans out over
+      # every workspace and writes `.coverage/lcov.info`. Invoked through the
+      # script, never re-spelled here, so PR and dev-push runs share one runner
+      # of truth. A failing suite fails the job, which is the entire point.
+      - name: Test with coverage
+        run: npm run test:coverage

@@ -2,7 +2,14 @@ import { render, screen } from '@testing-library/react';
 import { ListShell } from '../src/components/list-shell';
 
 const FILL_PAGE_UTILITIES = ['flex', 'flex-col', 'h-[100dvh]', 'overflow-hidden'];
-const FILL_BODY_UTILITIES = ['flex-1', 'min-h-0', 'grid', '[grid-template-rows:minmax(0,1fr)]'];
+const FILL_BODY_UTILITIES = [
+  'flex-1',
+  'min-h-0',
+  'grid',
+  // The section step (`--s6`): a filled body opens below the tabs like a labelled section.
+  'pt-[var(--s6)]',
+  '[grid-template-rows:minmax(0,1fr)]',
+];
 
 function order(root: Element): string[] {
   return Array.from(root.children).map((child) =>
@@ -11,7 +18,7 @@ function order(root: Element): string[] {
 }
 
 describe('ListShell', () => {
-  it('renders the fixed slot order: nav → title → tabs → search → filters → body → fab', () => {
+  it('renders the fixed slot order: header → tabs → search → filters → body → fab', () => {
     render(
       <ListShell
         title="Notes"
@@ -29,13 +36,51 @@ describe('ListShell', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Notes' })).toBeTruthy();
     expect(order(document.querySelector('.ui-page')!)).toEqual([
       'nav',
-      'h1',
       'tabs',
       'search',
       'filters',
       'body',
       'a',
     ]);
+  });
+
+  it('renders the title block as the header\'s leading slot, one row with the trailing controls', () => {
+    const { container } = render(
+      <ListShell
+        title="Notes"
+        subtitle="Thursday, 30 October"
+        navTrailing={<span data-testid="nav-trailing" />}
+        body={<span data-testid="body" />}
+      />,
+    );
+
+    const nav = container.querySelector('.ui-nav-bar')!;
+    const leading = nav.firstElementChild!;
+    expect(leading.contains(screen.getByRole('heading', { level: 1, name: 'Notes' }))).toBe(true);
+    expect(nav.contains(screen.getByTestId('nav-trailing'))).toBe(true);
+  });
+
+  it('renders the sub-line inside the nav bar, under the title', () => {
+    const { container } = render(
+      <ListShell
+        title="Feedback"
+        subtitle="Across all five modules"
+        tabs={<span data-testid="tabs" />}
+        body={<span data-testid="body" />}
+      />,
+    );
+
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'tabs', 'body']);
+    const subtitle = container.querySelector('.ui-nav-bar .ui-list-shell__sub')!;
+    expect(subtitle.textContent).toBe('Across all five modules');
+    expect(subtitle.previousElementSibling!.tagName).toBe('H1');
+  });
+
+  it('renders no sub-line when the slot is omitted', () => {
+    const { container } = render(<ListShell title="Feedback" body={<span data-testid="body" />} />);
+
+    expect(container.querySelector('.ui-list-shell__sub')).toBeNull();
+    expect(container.querySelector('.ui-page p')).toBeNull();
   });
 
   it('renders nothing for omitted optional slots (no empty wrapper)', () => {
@@ -54,12 +99,7 @@ describe('ListShell', () => {
     expect(screen.queryByTestId('search')).toBeNull();
     expect(screen.queryByTestId('filters')).toBeNull();
     expect(container.querySelector('.ui-nav-bar__actions')).toBeNull();
-    expect(order(container.querySelector('.ui-page')!)).toEqual([
-      'nav',
-      'h1',
-      'body',
-      'a',
-    ]);
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'body', 'a']);
   });
 
   it('renders the title as the page h1', () => {
@@ -82,7 +122,7 @@ describe('ListShell', () => {
 
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.querySelector('.ui-fab-link')).toBeNull();
-    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'h1', 'body']);
+    expect(order(container.querySelector('.ui-page')!)).toEqual(['nav', 'body']);
   });
 
   it('passes fabLabel/fabHref to the FabLink aria-label and href', () => {
@@ -148,6 +188,52 @@ describe('ListShell', () => {
     const wrapper = container.querySelector('.ui-list-shell__body')!;
     expect(wrapper).not.toBeNull();
     expect(wrapper.querySelector('[data-testid="body"]')!.textContent).toBe('nothing here yet');
+  });
+
+  it('drops the fab clearance when no fab renders, so the page reaches the safe area', () => {
+    const { container } = render(<ListShell title="Pomodoro" body={<span />} fill />);
+
+    const page = container.querySelector('.ui-page')!;
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
+      true,
+    );
+  });
+
+  it('reserves the fab band with fabBand when the fab is the page\'s own control', () => {
+    const { container } = render(<ListShell title="Meals" body={<span />} fabBand />);
+
+    const page = container.querySelector('.ui-page')!;
+    expect(
+      page.classList.contains(
+        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]!',
+      ),
+    ).toBe(true);
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
+      false,
+    );
+  });
+
+  it('keeps the fab clearance while a fab renders', () => {
+    const { container } = render(
+      <ListShell
+        title="Matrix"
+        body={<span />}
+        fabHref="/todos/new"
+        fabLabel="New todo"
+        fabIcon={<span />}
+        fill
+      />,
+    );
+
+    const page = container.querySelector('.ui-page')!;
+    expect(
+      page.classList.contains(
+        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]',
+      ),
+    ).toBe(true);
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
+      false,
+    );
   });
 
   it('the fill utilities make the page a full-height column and the body grow', () => {

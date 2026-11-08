@@ -10,26 +10,23 @@ export interface EmptyStateProps extends ComponentPropsWithRef<'div'> {
 }
 
 /**
- * The panel surface Card paints would read as a filled box behind centred copy,
- * so the layout cancels the fill and its border and keeps only the block's own
- * breathing room. Padding is split into inline/block utilities so it replaces
- * Card's `p-…` instead of competing with it.
+ * §8's `.empty`: the panel keeps Card's surface and hairline — an empty state is still a box
+ * on the page — and takes the reference's taller block inset. Padding is split into
+ * inline/block utilities so it replaces Card's `p-…` instead of competing with it.
  */
-const layoutStyles =
-  'border-0 bg-transparent px-[var(--space-1)] py-[var(--space-3)] text-center';
+const layoutStyles = 'px-[var(--s4)] py-[var(--s8)] text-center';
 
-/**
- * Muted copy with the tight margin the block always had. The colour rides the
- * paragraphs rather than the box: Card already sets a text colour on the box,
- * and a second one there would race it.
- */
-const paragraphStyles = 'm-[var(--space-0-25)_0] text-muted';
+/** §8's `.empty__title`: the row-title size and weight, on the primary ink. */
+const headingStyles = 'm-0 text-[length:var(--fs-row-title)] font-semibold text-ink';
+
+/** §8's `.empty__body`: one step down, muted, tucked under the heading. */
+const bodyStyles = 'm-0 mt-[var(--s1)] text-[length:var(--fs-chip)] text-ink-2';
 
 export function EmptyState({ heading, body, className, ...rest }: Readonly<EmptyStateProps>) {
   return (
     <Card className={cx('ui-empty', layoutStyles, className)} {...rest}>
-      {heading != null && <p className={paragraphStyles}>{heading}</p>}
-      <p className={paragraphStyles}>{body}</p>
+      {heading != null && <p className={headingStyles}>{heading}</p>}
+      <p className={bodyStyles}>{body}</p>
     </Card>
   );
 }

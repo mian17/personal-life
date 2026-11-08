@@ -58,6 +58,7 @@ TAGS_API_URL=http://127.0.0.1:3104
 TODO_API_URL=http://127.0.0.1:3105
 FEEDBACK_API_URL=http://127.0.0.1:3108
 MEAL_API_URL=http://127.0.0.1:3106
+FOCUS_API_URL=http://127.0.0.1:3107
 
 # --- content-encryption master keys (per-service custody) -------------------
 NOTE_MASTER_KEY=$(secret_or_gen NOTE_MASTER_KEY)
@@ -65,6 +66,7 @@ TAGS_MASTER_KEY=$(secret_or_gen TAGS_MASTER_KEY)
 TODO_MASTER_KEY=$(secret_or_gen TODO_MASTER_KEY)
 MEAL_MASTER_KEY=$(secret_or_gen MEAL_MASTER_KEY)
 FEEDBACK_MASTER_KEY=$(secret_or_gen FEEDBACK_MASTER_KEY)
+FOCUS_MASTER_KEY=$(secret_or_gen FOCUS_MASTER_KEY)
 
 # --- feedback service: throwaway pair from scripts/dev-infra.sh
 # 5433/5673, never the compose pair on 5432/5672: production owns those ports.
@@ -74,6 +76,8 @@ FEEDBACK_DB_PASSWORD=${FB_DB_PW}
 FEEDBACK_RABBITMQ_PASSWORD=${FB_MQ_PW}
 FEEDBACK_DB_URL=postgresql://feedback:${FB_DB_PW}@127.0.0.1:5433/feedback
 RABBITMQ_URL=amqp://feedback:${FB_MQ_PW}@127.0.0.1:5673
+# --- focus-service: SQLite beside the other file-backed services
+FOCUS_DB_PATH=data/focus.db
 
 # --- todo-service -----------------------------------------------------------
 TODO_TIMEZONE=Asia/Ho_Chi_Minh
@@ -96,7 +100,33 @@ OIDC_APP_CLIENT_SECRET=dev-secret-not-a-real-secret
 OIDC_APP_REDIRECT_URI=http://127.0.0.1:3100/auth/callback
 OIDC_APP_REDIRECT_URIS=http://localhost:3100/auth/callback,http://127.0.0.1:3100/auth/callback
 OIDC_DEFAULT_RESOURCE=https://note-service
-OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api
+OIDC_AUDIENCE_MAP=https://note-service=life-api,https://tags-service=life-api,https://todo-service=life-api,https://meal-service=life-api,https://life-ops=life-api
+
+# --- @life/ops CLI + MCP (packages/ops) -------------------------------------
+# LIFE_OPS_SERVICE is the list of bare module names the CLI loads, comma-separated,
+# so one process drives all six dev services.
+# LIFE_OPS_API_BASE_<NAME> is each service's own address on this host
+# (ports 3100-3108). A lone service also accepts the shared LIFE_OPS_API_BASE
+# below; several services never share one base.
+# LIFE_OPS_CLIENT_ID is the seeded public PKCE client (dev), one token per process.
+# LIFE_OPS_RESOURCE is never dialled: the IdP maps it via OIDC_AUDIENCE_MAP to
+# the life-api audience every service verifies. Must be absolute; node-oidc-provider rejects else.
+LIFE_OPS_SERVICE=notes,todo,meal,tags,focus,feedback
+LIFE_OPS_API_BASE_NOTES=http://127.0.0.1:3101
+LIFE_OPS_API_BASE_TAGS=http://127.0.0.1:3104
+LIFE_OPS_API_BASE_TODO=http://127.0.0.1:3105
+LIFE_OPS_API_BASE_MEAL=http://127.0.0.1:3106
+LIFE_OPS_API_BASE_FOCUS=http://127.0.0.1:3107
+LIFE_OPS_API_BASE_FEEDBACK=http://127.0.0.1:3108
+LIFE_OPS_API_BASE=http://127.0.0.1:3101
+LIFE_OPS_CLIENT_ID=dev
+LIFE_OPS_RESOURCE=https://life-ops
+# Run from the arc root after \`npm run build\` (\`npm run ops\` reads this file; omit
+# --limit to page further):
+#   npm run ops -- notes list --limit 5
+# MCP server, same wrapper (JSON-RPC on stdio):
+#   npm run ops:mcp
+# CLI sequence, MCP client config and the \`login\` prerequisite: docs/runbooks/ops-cli-mcp.md
 
 # --- meal-service photo pipeline (optional; each degrades gracefully) -------
 # GEMINI_API_KEY=        # photo estimate off until set

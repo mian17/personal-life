@@ -10,12 +10,26 @@
  * resolution runs in a child `node --input-type=module` process seeded with a
  * temp directory whose `node_modules/@life/ops` links this package — the layout
  * npm workspaces already produce.
+ *
+ * The last block names what a resource module needs to opt in to bulk
+ * (SPEC-bulk-ops §2.9): the kinds, their `bulkSourceKind` lookup, and the cap
+ * resolver, all reached through the entry point rather than a deep import.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assembleBulkEnvelope,
+  BULK_KINDS,
+  bulkItemInput,
+  bulkSourceKind,
+  DEFAULT_BULK_LIMIT,
+  isBulkKind,
+  resolveBulkLimit,
+} from '../src/index';
+import type { BulkEnvelope, BulkKind } from '../src/index';
 
 const packageDirectory = realpathSync(resolve(__dirname, '..'));
 const distDirectory = join(packageDirectory, 'dist');
@@ -196,5 +210,52 @@ describe('a consumer outside the package', () => {
 
   it('builds no dist while resolving', () => {
     expect(existsSync(distDirectory)).toBe(distExistedBeforeSuite);
+  });
+});
+
+describe('the entry point a resource module imports', () => {
+  it('names the bulk vocabulary a `bulk: true` resource opts in through', () => {
+    const bulkKinds: BulkKind[] = ['getMany', 'createMany', 'updateMany', 'deleteMany'];
+
+    expect(BULK_KINDS).toEqual(bulkKinds);
+    expect(bulkKinds.map(bulkSourceKind)).toEqual(['get', 'create', 'update', 'delete']);
+  });
+
+  it('recognizes a bulk kind and lets a single-row kind pass', () => {
+    expect(BULK_KINDS.every(isBulkKind)).toBe(true);
+    expect(isBulkKind('get')).toBe(false);
+  });
+
+  it('derives one item input: a bare id wrapped, a payload object passed through', () => {
+    expect(bulkItemInput('getMany', 'journal-a')).toEqual({ id: 'journal-a' });
+    expect(bulkItemInput('createMany', { title: 'Morning pages' })).toEqual({
+      title: 'Morning pages',
+    });
+  });
+
+  it('assembles the empty envelope of a batch that ran nothing', () => {
+    const emptyEnvelope: BulkEnvelope = assembleBulkEnvelope([]);
+
+    expect(emptyEnvelope).toEqual({ total: 0, succeeded: 0, failed: 0, results: [] });
+  });
+
+  it('resolves the bulk cap the environment asks for, and the default it falls back to', () => {
+    expect(resolveBulkLimit({})).toBe(DEFAULT_BULK_LIMIT);
+    expect(resolveBulkLimit({ LIFE_OPS_BULK_LIMIT: '25' })).toBe(25);
+  });
+
+  // §2.4: `0` is not "unlimited" — a value the reader cannot use falls back, never uncaps.
+  it.each([
+    ['unset', undefined],
+    ['empty', ''],
+    ['blank', '   '],
+    ['non-numeric', 'twenty'],
+    ['fractional', '2.5'],
+    ['zero', '0'],
+    ['negative', '-3'],
+  ])('falls back to the default when the cap is %s', (_case, configured) => {
+    const env = configured === undefined ? {} : { LIFE_OPS_BULK_LIMIT: configured };
+
+    expect(resolveBulkLimit(env)).toBe(DEFAULT_BULK_LIMIT);
   });
 });

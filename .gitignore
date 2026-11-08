@@ -14,6 +14,14 @@ backup/
 .worktrees/
 # pi's own worktrees and handoff files
 .pi/worktrees/
+# Run scratch — never committed: intent, specs, reports, task plans
+docs/intent/
+docs/specs/
+docs/reports/
+tasks/
+docs/design-systems/personal-life/screens/*.png
+# Per-commit capture folders: PNGs are run output, `<folder>/manifest.json` stays tracked
+docs/design-systems/personal-life/screens-applied/**/*.png
 # security scan artifacts (generated)
 vbsec-reports/
 __pycache__/

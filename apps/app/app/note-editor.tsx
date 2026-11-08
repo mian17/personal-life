@@ -2,17 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import type { Note } from '@life/shared';
 import {
   AlertBanner,
   Button,
   EditorChrome,
-  IconButton,
+  Menu,
+  MenuItem,
   StatusText,
   Textarea,
   type TagOption,
 } from '@life/ui';
+import { deleteNoteAction } from './actions';
 import { hasUncommittedTrailingTag, parseInlineTags } from '@/lib/inline-tags';
 
 type Status = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
@@ -205,6 +207,7 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
   const [selectedIds, setSelectedIds] = useState<number[]>(note?.tagIds ?? []);
   const [status, setStatus] = useState<Status>('idle');
   const [conflictNote, setConflictNote] = useState<Note | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
@@ -460,17 +463,51 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
     };
   }, [flushKeepalive]);
 
+  // Deleting supersedes any pending autosave, so the pending debounce is dropped and
+  // the editor returns to the index without a flush: a write racing the delete would
+  // only resurrect the row.
+  const removeNote = useCallback(async () => {
+    if (note == null) return;
+    setMenuOpen(false);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    dirtyRef.current = false;
+    await deleteNoteAction(note.id);
+    router.push('/notes');
+  }, [note, router]);
+
   // Render every registry tag in the picker (the attach/detach surface). Inline
   // `#tag` names not yet in the registry are created by the flush route's
   // create-or-get, so the picker never needs a create affordance here.
   return (
     <EditorChrome
-      back={{ label: 'Back', onBack: () => void leave() }}
-      status={<StatusText>{STATUS_TEXT[status]}</StatusText>}
+      back={{ label: 'Back', onBack: () => void leave(), variant: 'framed' }}
+      // The toolbar renders this as the screen's only `<h1>`, but the heading is not shown: an
+      // editor screen needs a name for assistive tech, not a label over a field body the user
+      // already recognises. `sr-only` keeps the `<h1>` and its accessible name and drops the
+      // visible text, so the save read-out below stays the toolbar's only visible line.
+      title={<span className="sr-only">{note == null ? 'New note' : 'Edit note'}</span>}
+      // A title replaces the status slot in the toolbar, so the save read-out moves
+      // to the sub-line — same `StatusText`, so it keeps its live region.
+      sub={<StatusText>{STATUS_TEXT[status]}</StatusText>}
       actions={
-        <IconButton label="Save" onClick={() => void leave()}>
-          <Check size={20} aria-hidden />
-        </IconButton>
+        note != null && (
+          <Menu
+            label="Note actions"
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            triggerVariant="framed"
+            triggerIcon={<MoreHorizontal size={16} aria-hidden />}
+          >
+            <MenuItem>
+              <Button variant="danger" size="bare" onClick={() => void removeNote()}>
+                Delete note
+              </Button>
+            </MenuItem>
+          </Menu>
+        )
       }
       banner={
         conflictNote && (
@@ -478,20 +515,10 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
             role="alert"
             actions={
               <>
-                <Button
-                  variant="primary"
-                  size="bare"
-                  className="editor-conflict-load"
-                  onClick={loadLatest}
-                >
+                <Button variant="primary" size="bare" onClick={loadLatest}>
                   Load latest
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="bare"
-                  className="editor-conflict-overwrite"
-                  onClick={keepMine}
-                >
+                <Button variant="ghost" size="bare" onClick={keepMine}>
                   Keep mine (overwrite)
                 </Button>
               </>

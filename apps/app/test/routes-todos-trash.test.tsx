@@ -61,6 +61,7 @@ describe('/todos/trash page wiring', () => {
         }),
       ],
       nextCursor: null,
+      total: 2,
     });
   });
 
@@ -69,7 +70,7 @@ describe('/todos/trash page wiring', () => {
 
     expect(el.type).toBe(TrashBlock);
     expect(el.props.title).toBe('Trash');
-    expect(el.props.backHref).toBe('/todos');
+    expect(el.props.backHref).toBe('/todos/settings');
     expect(el.props.emptyMessage).toBe('Trash is empty.');
     expect(el.props.emptyTrashMessage).toBe(
       'Permanently delete all todos in trash? This cannot be undone.',
