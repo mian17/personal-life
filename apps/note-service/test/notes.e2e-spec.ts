@@ -73,7 +73,7 @@ describe('Notes API (e2e)', () => {
 
     const withNote = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
     // `{ tagUsages, nextCursor }` — the bare array this route used to answer with is gone.
-    expect(Object.keys(withNote.body).sort()).toEqual(['nextCursor', 'tagUsages']);
+    expect(Object.keys(withNote.body).sort()).toEqual(['nextCursor', 'tagUsages', 'total']);
     expect(withNote.body.tagUsages.map((t: { tagId: number }) => t.tagId)).toContain(77);
 
     await auth(request(app.getHttpServer()).delete(`/api/notes/${created.body.id}`)).expect(200);
@@ -98,7 +98,7 @@ describe('Notes API (e2e)', () => {
       const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
       const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query)).expect(200);
       const page = res.body as { tagUsages: Array<{ tagId: number }>; nextCursor: string | null };
-      expect(Object.keys(res.body).sort()).toEqual(['nextCursor', 'tagUsages']);
+      expect(Object.keys(res.body).sort()).toEqual(['nextCursor', 'tagUsages', 'total']);
       expect(page.tagUsages.length).toBeLessThanOrEqual(2);
       seen.push(...page.tagUsages.map((row) => row.tagId));
       cursor = page.nextCursor;

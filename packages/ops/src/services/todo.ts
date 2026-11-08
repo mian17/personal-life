@@ -116,7 +116,16 @@ export const resources: ResourceRegistry[] = [
     ops: [
       { kind: 'create', fields: listDetails() },
 
-      { kind: 'list', fields: pageWindow() },
+      {
+        kind: 'list',
+        fields: {
+          q: {
+            type: 'string',
+            description: 'Only lists whose name matches this search, at most 200 characters',
+          },
+          ...pageWindow(),
+        },
+      },
 
       {
         kind: 'update',

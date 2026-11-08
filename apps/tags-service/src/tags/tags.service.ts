@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
+import { likeMatch } from '@life/shared';
 import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
 import { Tag } from './tag.entity';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
@@ -31,6 +32,8 @@ export interface TagDto {
 export interface TagPage {
   tags: TagDto[];
   nextCursor: string | null;
+  /** How many tags the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** The single cached shape: the owner's serialized **ciphertext** tag rows. */
@@ -58,6 +61,16 @@ function toCachedRow(tag: Tag): CachedTagRow {
     version: tag.version,
     createdAt: tag.createdAt.toISOString(),
   };
+}
+
+/**
+ * True when a decrypted tag name passes the list's `q` filter. Matching is the
+ * shared `LIKE` parity comparator, so the service and the app agree character
+ * for character; a blank `q` is "no filter", never "match nothing".
+ */
+function matchesQuery(name: string, q: string | undefined): boolean {
+  const wanted = q?.trim();
+  return !wanted || likeMatch(name, `%${wanted}%`);
 }
 
 /** True when the stored name is an `enc.v1.` envelope (M5: the store starts encrypted). */
@@ -212,9 +225,10 @@ export class TagsService {
   }
 
   /**
-   * `GET /api/tags?limit=&cursor=` — one page of that same order on the shared
-   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor` never enter
-   * the `tags:<sub>:v<gen>:all` key, so one entry serves every page.
+   * `GET /api/tags?q=&limit=&cursor=` — one page of that same order on the shared
+   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor`/`q` never
+   * enter the `tags:<sub>:v<gen>:all` key, so one entry serves every page and
+   * every search variant.
    *
    * The vocabulary is hand-curated and small, so the window is the shared list
    * contract, not a bounded scan; the app still needs every tag (the picker offers
@@ -222,9 +236,9 @@ export class TagsService {
    */
   async page(
     sub: string,
-    opts: { limit?: number; cursor?: string } = {},
+    opts: { q?: string; limit?: number; cursor?: string } = {},
   ): Promise<TagPage> {
-    const ordered = await this.list(sub);
+    const ordered = (await this.list(sub)).filter((tag) => matchesQuery(tag.name, opts.q));
     const page = paginate(ordered, {
       limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
       cursor: opts.cursor,
@@ -233,7 +247,7 @@ export class TagsService {
       keyOf: (tag) => [tag.name.toLowerCase(), String(tag.id)],
       after: TagsService.afterName,
     });
-    return { tags: page.rows, nextCursor: page.nextCursor };
+    return { tags: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

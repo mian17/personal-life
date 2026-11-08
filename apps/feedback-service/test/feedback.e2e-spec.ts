@@ -171,7 +171,7 @@ describeDb('Feedback API (e2e)', () => {
       const mineRes = await get(app, token).expect(200);
       // `{ feedback, nextCursor }` — the envelope key is the mass noun, and the
       // bare array this route used to answer with is gone.
-      expect(Object.keys(mineRes.body).sort()).toEqual(['feedback', 'nextCursor']);
+      expect(Object.keys(mineRes.body).sort()).toEqual(['feedback', 'nextCursor', 'total']);
       const list = (mineRes.body as FeedbackPage).feedback;
       expect(Array.isArray(list)).toBe(true);
       expect((mineRes.body as FeedbackPage).nextCursor).toBeNull();
@@ -230,7 +230,7 @@ describeDb('Feedback API (e2e)', () => {
         const query = cursor === null ? { limit: 2 } : { limit: 2, cursor };
         const res = await get(app, token).query(query).expect(200);
         const page = res.body as FeedbackPage;
-        expect(Object.keys(res.body).sort()).toEqual(['feedback', 'nextCursor']);
+        expect(Object.keys(res.body).sort()).toEqual(['feedback', 'nextCursor', 'total']);
         expect(page.feedback.length).toBeLessThanOrEqual(2);
         seen.push(...page.feedback.map((entry) => entry.id));
         cursor = page.nextCursor;

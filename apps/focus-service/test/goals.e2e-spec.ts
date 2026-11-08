@@ -80,6 +80,7 @@ describe('Daily focus goal (e2e)', () => {
         { validFrom: SECOND_DAY, minutes: 50 },
       ],
       nextCursor: null,
+      total: 2,
     });
   });
 
@@ -128,6 +129,7 @@ describe('Daily focus goal (e2e)', () => {
         { validFrom: SECOND_DAY, minutes: 90 },
       ],
       nextCursor: null,
+      total: 2,
     });
   });
 
@@ -152,6 +154,7 @@ describe('Daily focus goal (e2e)', () => {
     expect((await getGoals(ownerToken).expect(200)).body).toEqual({
       goals: [],
       nextCursor: null,
+      total: 0,
     });
   });
 
@@ -162,10 +165,12 @@ describe('Daily focus goal (e2e)', () => {
     expect((await getGoals(ownerToken).expect(200)).body).toEqual({
       goals: [{ validFrom: FIRST_DAY, minutes: 25 }],
       nextCursor: null,
+      total: 1,
     });
     expect((await getGoals(otherOwnerToken).expect(200)).body).toEqual({
       goals: [{ validFrom: THIRD_DAY, minutes: 60 }],
       nextCursor: null,
+      total: 1,
     });
   });
 });

@@ -199,7 +199,7 @@ export class FeedbackService {
       },
       { decode: decodeCiphertextList, cacheable: (value) => value.every(isCiphertextRow) },
     );
-    if (rows.length === 0) return { feedback: [], nextCursor: null };
+    if (rows.length === 0) return { feedback: [], nextCursor: null, total: 0 };
     const dek = await this.keys.getDekForRead(sub);
     const ordered = rows.map((row) => this.toDto(row, sub, dek)).sort(newestFirst);
     const page = paginate(ordered, {
@@ -208,7 +208,7 @@ export class FeedbackService {
       keyOf: (row) => [row.createdAt, row.id],
       after: afterNewestFirst,
     });
-    return { feedback: page.rows, nextCursor: page.nextCursor };
+    return { feedback: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

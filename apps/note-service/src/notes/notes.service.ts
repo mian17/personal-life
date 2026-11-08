@@ -390,13 +390,13 @@ export class NotesService {
       .filter(({ note }) => matchesListRequest(note, opts))
       .sort(newestContentFirst);
 
-    const { rows: page, nextCursor } = paginate(matching, {
+    const { rows: page, nextCursor, total } = paginate(matching, {
       limit,
       cursor: opts.cursor,
       keyOf: (entry) => [entry.listTimestamp, entry.id],
       after: afterListPosition,
     });
-    return { notes: page.map((entry) => entry.note), nextCursor };
+    return { notes: page.map((entry) => entry.note), nextCursor, total };
   }
 
   async findTrash(
@@ -435,13 +435,13 @@ export class NotesService {
       listTimestamp: note.deletedAt!,
       note,
     }));
-    const { rows: page, nextCursor } = paginate(positioned, {
+    const { rows: page, nextCursor, total } = paginate(positioned, {
       limit,
       cursor: opts.cursor,
       keyOf: (entry) => [entry.listTimestamp, entry.id],
       after: afterListPosition,
     });
-    return { notes: page.map((entry) => entry.note), nextCursor };
+    return { notes: page.map((entry) => entry.note), nextCursor, total };
   }
 
   async findOne(sub: string, id: string): Promise<NoteDto> {
@@ -663,6 +663,6 @@ export class NotesService {
       keyOf: (row) => [String(row.tagId)],
       after: afterTagUsagePosition,
     });
-    return { tagUsages: page.rows, nextCursor: page.nextCursor };
+    return { tagUsages: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 }

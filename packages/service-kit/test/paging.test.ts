@@ -93,6 +93,7 @@ describe('paginate', () => {
     expect(pageOf(rows, 1)).toEqual({
       rows: [rows[0]],
       nextCursor: encodeCursor([rows[0].at, rows[0].id]),
+      total: 2,
     });
   });
 
@@ -109,7 +110,33 @@ describe('paginate', () => {
   it('returns a null nextCursor on the last page', () => {
     const rows = newestFirst([ranked('b', '2026-01-02'), ranked('a', '2026-01-01')]);
     const first = pageOf(rows, 1);
-    expect(pageOf(rows, 1, first.nextCursor!)).toEqual({ rows: [rows[1]], nextCursor: null });
+    expect(pageOf(rows, 1, first.nextCursor!)).toEqual({
+      rows: [rows[1]],
+      nextCursor: null,
+      total: 2,
+    });
+  });
+
+  it('reports the whole ordered set size on every page, not the page length', () => {
+    const rows = newestFirst(
+      ['e', 'd', 'c', 'b', 'a'].map((id, i) => ranked(id, `2026-01-0${i + 1}`)),
+    );
+    const first = pageOf(rows, 2);
+    const second = pageOf(rows, 2, first.nextCursor!);
+    expect(first.rows).toHaveLength(2);
+    expect(second.rows).toHaveLength(2);
+    expect(first.total).toBe(5);
+    expect(second.total).toBe(5);
+  });
+
+  it('reports the filtered set size when the caller pre-filters', () => {
+    // `paginate` counts what it was handed, so filtering before the page is the
+    // only way a total can disagree with the rows — and it must not.
+    const rows = newestFirst(
+      ['e', 'd', 'c', 'b', 'a'].map((id, i) => ranked(id, `2026-01-0${i + 1}`)),
+    );
+    const kept = rows.filter((row) => row.id > 'c');
+    expect(pageOf(kept, 1).total).toBe(2);
   });
 
   it('neither repeats nor skips a row across pages, including a full tie', () => {

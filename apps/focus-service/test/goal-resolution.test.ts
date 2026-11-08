@@ -107,6 +107,7 @@ describe('GoalsService', () => {
         { validFrom: A_DAY, minutes: 40 },
       ],
       nextCursor: null,
+      total: 2,
     });
   });
 
@@ -114,6 +115,7 @@ describe('GoalsService', () => {
     await expect(createService().findAll('fresh-owner')).resolves.toEqual({
       goals: [],
       nextCursor: null,
+      total: 0,
     });
   });
 
@@ -121,6 +123,6 @@ describe('GoalsService', () => {
     const goals = createService();
     await goals.setGoal(OWNER, { date: A_DAY, minutes: 40 });
 
-    await expect(goals.findAll('fresh-owner')).resolves.toEqual({ goals: [], nextCursor: null });
+    await expect(goals.findAll('fresh-owner')).resolves.toEqual({ goals: [], nextCursor: null, total: 0 });
   });
 });

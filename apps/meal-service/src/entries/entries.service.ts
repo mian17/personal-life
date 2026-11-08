@@ -48,6 +48,8 @@ export interface EntryDto {
 export interface EntryPage {
   entries: EntryDto[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** What one day read is narrowed by; `limit`/`cursor` page it, the rest filter it. */
@@ -217,7 +219,7 @@ export class EntriesService {
       keyOf: (entry) => [entry.updatedAt, entry.id],
       after: afterDayPosition,
     });
-    return { entries: page.rows, nextCursor: page.nextCursor };
+    return { entries: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

@@ -61,6 +61,7 @@ describe('/todos/trash page wiring', () => {
         }),
       ],
       nextCursor: null,
+      total: 2,
     });
   });
 

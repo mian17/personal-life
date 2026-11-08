@@ -31,6 +31,12 @@ export interface Page<T> {
   rows: T[];
   /** The key of the page's last row, or `null` when this page ends the list. */
   nextCursor: string | null;
+  /**
+   * How many rows the whole ordered, filtered set holds — the set this page was
+   * sliced from, never the page's own length. A screen renders "loaded of
+   * total", so the number has to describe the list, not the window.
+   */
+  total: number;
 }
 
 /**
@@ -127,6 +133,9 @@ export function paginate<T>(
   return {
     rows,
     nextCursor: hasMore && last !== undefined ? encodeCursor(opts.keyOf(last)) : null,
+    // The count of the ordered set the caller handed in, so it matches the rows
+    // exactly — a second count query could disagree with them.
+    total: ordered.length,
   };
 }
 

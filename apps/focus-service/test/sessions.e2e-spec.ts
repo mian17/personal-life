@@ -80,7 +80,7 @@ describe('Focus sessions (e2e)', () => {
     const created = await recordSession(ownerToken, { date: DAY, minutes: 25 });
 
     const served = await listSessions(ownerToken, DAY, DAY).expect(200);
-    const envelope = { sessions: [created.body], nextCursor: null };
+    const envelope = { sessions: [created.body], nextCursor: null, total: 1 };
     expect(served.body).toEqual(envelope);
     expect(redis.setCalls).toContain(`focus:user-a:v1:sessions:${DAY}:${DAY}`);
 
@@ -147,19 +147,21 @@ describe('Focus sessions (e2e)', () => {
     const theirs = await recordSession(otherOwnerToken, { date: NEXT_DAY, minutes: 50 });
 
     const myRange = await listSessions(ownerToken, DAY, NEXT_DAY).expect(200);
-    expect(myRange.body).toEqual({ sessions: [mine.body], nextCursor: null });
+    expect(myRange.body).toEqual({ sessions: [mine.body], nextCursor: null, total: 1 });
 
     const theirRange = await listSessions(otherOwnerToken, DAY, NEXT_DAY).expect(200);
-    expect(theirRange.body).toEqual({ sessions: [theirs.body], nextCursor: null });
+    expect(theirRange.body).toEqual({ sessions: [theirs.body], nextCursor: null, total: 1 });
 
     // The same day, asked by the other owner, is not a shared answer.
     expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual({
       sessions: [],
       nextCursor: null,
+      total: 0,
     });
     expect((await listSessions(ownerToken, NEXT_DAY, NEXT_DAY).expect(200)).body).toEqual({
       sessions: [],
       nextCursor: null,
+      total: 0,
     });
   });
 
@@ -173,6 +175,7 @@ describe('Focus sessions (e2e)', () => {
     expect((await listSessions(otherOwnerToken, DAY, DAY).expect(200)).body).toEqual({
       sessions: [],
       nextCursor: null,
+      total: 0,
     });
   });
 });

@@ -5,6 +5,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
 import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
+import { likeMatch } from '@life/shared';
 import type { ListPage } from '@life/shared';
 import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 
@@ -24,6 +25,16 @@ interface CachedListRow {
   importantDefault: boolean | null;
   version: number;
   createdAt: string;
+}
+
+/**
+ * True when a decrypted list name passes the list's `q` filter. Matching is the
+ * shared `LIKE` parity comparator; a blank `q` is "no filter", never "match
+ * nothing".
+ */
+function matchesQuery(name: string, q: string | undefined): boolean {
+  const wanted = q?.trim();
+  return !wanted || likeMatch(name, `%${wanted}%`);
 }
 
 /** A rename as `PATCH /api/lists/:id` (and one `:batchUpdate` item) carries it. */
@@ -205,18 +216,19 @@ export class ListsService {
   }
 
   /**
-   * `GET /api/lists?limit=&cursor=` — one page of the same order, on the shared
-   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor` never enter
-   * the `todo:<sub>:v<gen>:lists` key, so one entry serves every page.
+   * `GET /api/lists?q=&limit=&cursor=` — one page of the same order, on the shared
+   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor`/`q` never
+   * enter the `todo:<sub>:v<gen>:lists` key, so one entry serves every page and
+   * every search variant.
    *
    * The window is the shared list contract, not a performance fix — lists are
    * naturally small, and the whole-set read above stays the screen's read.
    */
   async page(
     sub: string,
-    opts: { limit?: number; cursor?: string } = {},
+    opts: { q?: string; limit?: number; cursor?: string } = {},
   ): Promise<ListPage> {
-    const ordered = await this.list(sub);
+    const ordered = (await this.list(sub)).filter((list) => matchesQuery(list.name, opts.q));
     const page = paginate(ordered, {
       limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
       cursor: opts.cursor,
@@ -225,7 +237,7 @@ export class ListsService {
       keyOf: (list) => [list.name.toLowerCase(), list.id],
       after: ListsService.afterName,
     });
-    return { lists: page.rows, nextCursor: page.nextCursor };
+    return { lists: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

@@ -56,6 +56,8 @@ export interface SavedMealDto {
 export interface SavedMealPage {
   savedMeals: SavedMealDto[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /**
@@ -213,7 +215,7 @@ export class SavedMealsService {
       keyOf: (meal) => [meal.updatedAt, meal.id],
       after: afterSavedMealPosition,
     });
-    return { savedMeals: page.rows, nextCursor: page.nextCursor };
+    return { savedMeals: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

@@ -708,7 +708,7 @@ export class TodosService {
     }));
     ordered.sort(compareTodos);
 
-    const { rows: page, nextCursor } = paginate(ordered, {
+    const { rows: page, nextCursor, total } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       // `due` is the local `dueSortKey` (`~` = undated) and the first key part, so
@@ -716,7 +716,7 @@ export class TodosService {
       keyOf: (item) => [item.due, item.dto.createdAt, item.dto.id],
       after: afterCursor,
     });
-    return { todos: page.map((item) => item.dto), nextCursor };
+    return { todos: page.map((item) => item.dto), nextCursor, total };
   }
 
   /**
@@ -765,13 +765,13 @@ export class TodosService {
       (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
     );
 
-    const { rows: page, nextCursor } = paginate(ordered, {
+    const { rows: page, nextCursor, total } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       keyOf: (item) => [item.deletedAt, item.id],
       after: afterTrashCursor,
     });
-    return { todos: page, nextCursor };
+    return { todos: page, nextCursor, total };
   }
 
   /**
@@ -816,7 +816,7 @@ export class TodosService {
     const ordered = [...joined].sort(
       (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
     );
-    const { rows: page, nextCursor } = paginate(ordered, {
+    const { rows: page, nextCursor, total } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       keyOf: (row) => [row.completedAt, row.id],
@@ -846,7 +846,7 @@ export class TodosService {
         listName: todo.listId !== null ? names.get(todo.listId) ?? null : null,
       };
     });
-    return { completions, nextCursor };
+    return { completions, nextCursor, total };
   }
 
   /**

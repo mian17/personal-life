@@ -43,6 +43,8 @@ export interface TagUsage {
 export interface TagUsagePage {
   tagUsages: TagUsage[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
@@ -71,6 +73,8 @@ export interface UpdateNoteInput {
 export interface NotePage {
   notes: Note[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export const NOTE_BODY_MAX = 20000;
@@ -162,6 +166,8 @@ export interface UpdateTodoInput {
 export interface TodoPage {
   todos: Todo[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** One appended completion occurrence (`SPEC-todo-completion-history`, C2/C6/C7). */
@@ -178,6 +184,8 @@ export interface TodoCompletion {
 export interface TodoCompletionPage {
   completions: TodoCompletion[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /**
@@ -201,6 +209,8 @@ export interface List {
 export interface ListPage {
   lists: List[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export const TODO_TITLE_MAX = 500;
@@ -245,6 +255,8 @@ export interface FeedbackDto {
 export interface FeedbackPage {
   feedback: FeedbackDto[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export interface CreateFeedbackInput {
