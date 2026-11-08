@@ -117,7 +117,7 @@ describe('the todo registry', () => {
   it('addresses the lists listing with the two paging fields, in order', () => {
     const list = findOp(registryOf('lists'), 'list');
 
-    expect(Object.keys(list.fields)).toEqual(['limit', 'cursor']);
+    expect(Object.keys(list.fields)).toEqual(['q', 'limit', 'cursor']);
     expect(list.fields['limit'].description).toContain('1 to 200');
     expect(list.fields['cursor'].description).toContain('passed back untouched');
   });

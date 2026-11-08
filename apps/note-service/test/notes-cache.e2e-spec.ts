@@ -325,15 +325,19 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       ];
 
       const seen: number[] = [];
+      const totals: number[] = [];
       let cursor: string | undefined;
       for (;;) {
         const page = await h.service.tagUsagePage(SUB, { limit: 2, cursor });
         seen.push(...page.tagUsages.map((row) => row.tagId));
+        totals.push(page.total);
         if (!page.nextCursor) break;
         cursor = page.nextCursor;
       }
 
       expect(seen).toEqual([1, 9, 10, 11]);
+      // `total` is the whole set, not the two-row window a page returns.
+      expect(totals).toEqual([4, 4]);
       // Both pages came from the one `note:tags` entry: `limit`/`cursor` never
       // enter the key, so the loader ran once.
       expect(h.noteTags.createQueryBuilder).toHaveBeenCalledTimes(1);

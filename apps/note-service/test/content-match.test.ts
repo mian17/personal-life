@@ -271,7 +271,7 @@ describe('notes-at-rest T4: decrypt-then-match service', () => {
     do {
       const res = await h.service.findAll(SUB, { q: 'match', limit: 2, cursor });
       // Pre-change contract: `{ notes, nextCursor }` and the shared Note DTO keys.
-      expect(Object.keys(res).sort()).toEqual(['nextCursor', 'notes']);
+      expect(Object.keys(res).sort()).toEqual(['nextCursor', 'notes', 'total']);
       for (const note of res.notes) {
         expect(Object.keys(note).sort()).toEqual([
           'body',

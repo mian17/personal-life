@@ -25,6 +25,8 @@ export interface GoalRow {
 export interface GoalPage {
   goals: GoalRow[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /**
@@ -124,7 +126,7 @@ export class GoalsService {
       keyOf: (row) => [row.validFrom],
       after: afterListPosition,
     });
-    return { goals: page.rows, nextCursor: page.nextCursor };
+    return { goals: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /** Whole-list load, owner-scoped; lives inside the cache's loader and nowhere else. */

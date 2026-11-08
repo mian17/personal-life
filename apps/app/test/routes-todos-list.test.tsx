@@ -78,6 +78,7 @@ describe('/todos list page wiring', () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })],
       nextCursor: null,
+      total: 1,
     });
     mockedListLists.mockResolvedValue([
       {
@@ -91,7 +92,7 @@ describe('/todos list page wiring', () => {
     mockedListTags.mockResolvedValue([
       { id: 1, name: 'errand', version: 0, createdAt: '2026-09-01T00:00:00.000Z' },
     ]);
-    mockedListTodoCompletions.mockResolvedValue({ completions: [], nextCursor: null });
+    mockedListTodoCompletions.mockResolvedValue({ completions: [], nextCursor: null, total: 0 });
     mockedReadPref.mockResolvedValue(false);
     mockedGetToday.mockResolvedValue(todayIso());
   });
@@ -123,11 +124,13 @@ describe('/todos list page wiring', () => {
         todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: TODAY }),
       ],
       nextCursor: null,
+      total: 4,
     });
     // The repeating todo's ticked occurrence is a done row with no `Todo` row of its own.
     mockedListTodoCompletions.mockResolvedValue({
       completions: [completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' })],
       nextCursor: null,
+      total: 1,
     });
 
     const el = await TodosPage();
@@ -194,7 +197,7 @@ describe('/todos list page wiring', () => {
   });
 
   it('opens a zero-row body one section step down, wrapping the empty state in a section', async () => {
-    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null });
+    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null, total: 0 });
     const el = await TodosPage();
     const html = renderToStaticMarkup(el.props.body);
 
@@ -210,6 +213,7 @@ describe('/todos list page wiring', () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'd1', title: 'Pay rent', done: true })],
       nextCursor: null,
+      total: 1,
     });
     const el = await TodosPage();
 
@@ -229,12 +233,14 @@ describe('/todos list page wiring', () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: '2026-01-01' })],
       nextCursor: null,
+      total: 1,
     });
     mockedListTodoCompletions.mockResolvedValue({
       completions: [
         completion({ id: 'c1', todoId: 'rep', title: 'Water plants', occurrence, completedAt }),
       ],
       nextCursor: null,
+      total: 1,
     });
 
     const el = await TodosPage();
@@ -274,6 +280,7 @@ describe('/todos list row tint', () => {
         todo({ id: 'dn', title: 'Done neither', dueDate: null, effectiveImportant: false, done: true }),
       ],
       nextCursor: null,
+      total: 4,
     });
 
     const el = await TodosPage();

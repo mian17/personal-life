@@ -60,6 +60,8 @@ export interface FoodDto {
 export interface FoodPage {
   foods: FoodDto[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** What one catalog read is narrowed by; `limit`/`cursor` page it, the rest filter it. */
@@ -300,7 +302,7 @@ export class FoodsService {
       keyOf: (food) => [food.createdAt, food.id],
       after: afterCatalogPosition,
     });
-    return { foods: page.rows, nextCursor: page.nextCursor };
+    return { foods: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

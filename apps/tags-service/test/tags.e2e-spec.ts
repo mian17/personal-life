@@ -107,6 +107,7 @@ describe('Tags API (e2e)', () => {
       expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
         'nextCursor',
         'tags',
+        'total',
       ]);
       expect(res.body.nextCursor).toBeNull();
       const tags = res.body.tags as Array<{ id: number; name: string; version: number; createdAt: string }>;
@@ -153,6 +154,7 @@ describe('Tags API (e2e)', () => {
         expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
           'nextCursor',
           'tags',
+          'total',
         ]);
         expect(page.tags.length).toBeLessThanOrEqual(2);
         seen.push(...page.tags.map((t) => t.name));
@@ -166,6 +168,40 @@ describe('Tags API (e2e)', () => {
       // No gap, no duplicate: the pages reassemble the one stable order exactly.
       expect(seen).toEqual(expected);
       expect(new Set(seen).size).toBe(expected.length);
+    });
+
+    it('narrows by a case-insensitive name substring and reports the narrowed total', async () => {
+      const pageToken = await harness.sign({ subject: 'user-q', expiresIn: 3600 });
+      for (const name of ['Work', 'workout', 'errand', 'home']) {
+        await create(name, pageToken).expect(201);
+      }
+
+      // limit=1 keeps the page shorter than the total on purpose: a `total` that
+      // was really the page length would read 1 here.
+      const res = await auth(
+        request(app.getHttpServer()).get('/api/tags').query({ q: 'WOR', limit: '1' }),
+        pageToken,
+      ).expect(200);
+      expect(res.body.tags.map((t: { name: string }) => t.name)).toEqual(['Work']);
+      expect(res.body.nextCursor).toEqual(expect.any(String));
+      expect(res.body.total).toBe(2);
+
+      const second = await auth(
+        request(app.getHttpServer())
+          .get('/api/tags')
+          .query({ q: 'WOR', limit: '1', cursor: res.body.nextCursor }),
+        pageToken,
+      ).expect(200);
+      expect(second.body.tags.map((t: { name: string }) => t.name)).toEqual(['workout']);
+      expect(second.body.nextCursor).toBeNull();
+      expect(second.body.total).toBe(2);
+
+      // A blank `q` is "no filter", not "match nothing".
+      const blank = await auth(
+        request(app.getHttpServer()).get('/api/tags').query({ q: '   ', limit: '200' }),
+        pageToken,
+      ).expect(200);
+      expect(blank.body.total).toBe(4);
     });
 
     it('walks past names holding the old cursor separator with no repeat and no 400', async () => {

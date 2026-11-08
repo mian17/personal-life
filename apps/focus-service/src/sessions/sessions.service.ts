@@ -28,6 +28,8 @@ export interface SessionRow {
 export interface SessionPage {
   sessions: SessionRow[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /**
@@ -110,7 +112,7 @@ export class SessionsService {
       keyOf: (row) => [row.date, row.createdAt, row.id],
       after: afterListPosition,
     });
-    return { sessions: page.rows, nextCursor: page.nextCursor };
+    return { sessions: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /** Range load, owner-scoped; days are text so `YYYY-MM-DD` compares lexically. */

@@ -63,6 +63,7 @@ describe('/todos/matrix page wiring', () => {
         todo({ id: 'nn-1', title: 'Neither', dueDate: null, effectiveImportant: false }),
       ],
       nextCursor: null,
+      total: 4,
     });
     mockedListLists.mockResolvedValue([
       {
@@ -149,6 +150,7 @@ describe('/todos/matrix page wiring', () => {
     mockedListTodos.mockResolvedValue({
       todos: [todo({ id: 'nn-1', dueDate: null, effectiveImportant: false })],
       nextCursor: null,
+      total: 1,
     });
 
     const el = await TodosMatrixPage();
@@ -169,6 +171,7 @@ describe('/todos/matrix page wiring', () => {
         todo({ id: 'done-1', title: 'Done task', done: true, dueDate: TODAY, effectiveImportant: true }),
       ],
       nextCursor: null,
+      total: 2,
     });
 
     const el = await TodosMatrixPage();
@@ -207,6 +210,7 @@ describe('/todos/matrix page wiring', () => {
         todo({ id: 'done-2', dueDate: null, effectiveImportant: false, done: true }),
       ],
       nextCursor: null,
+      total: 5,
     });
 
     const el = await TodosMatrixPage();
@@ -220,7 +224,7 @@ describe('/todos/matrix page wiring', () => {
   });
 
   it('subtitles an empty matrix 0 open \u00b7 0 done', async () => {
-    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null });
+    mockedListTodos.mockResolvedValue({ todos: [], nextCursor: null, total: 0 });
 
     const el = await TodosMatrixPage();
 

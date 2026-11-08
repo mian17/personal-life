@@ -45,7 +45,7 @@ const noopStatusAction = async (
 const STATUS_FAILURE = "Couldn't update status. Try again.";
 
 /** A page the row tests never request: they seed no cursor, so the control never renders. */
-const noopLoadPage = async () => ({ feedback: [], nextCursor: null });
+const noopLoadPage = async () => ({ feedback: [], nextCursor: null, total: 0 });
 
 /**
  * The hook slot the first row starts at: the body makes three `useState` calls

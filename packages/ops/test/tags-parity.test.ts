@@ -135,7 +135,7 @@ describe('the tags registry', () => {
   it('addresses the listing with the two paging fields, in order', () => {
     const list = findOp(registryOf('tags'), 'list');
 
-    expect(Object.keys(list.fields)).toEqual(['limit', 'cursor']);
+    expect(Object.keys(list.fields)).toEqual(['q', 'limit', 'cursor']);
     expect(list.fields['limit'].type).toBe('number');
     expect(list.fields['limit'].description).toContain('1 to 200');
     expect(list.fields['cursor'].description).toContain('passed back untouched');
