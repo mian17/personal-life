@@ -9,7 +9,7 @@
     "./preference-action": "./src/preference-action.ts"
   },
   "scripts": {
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:unit": "jest"

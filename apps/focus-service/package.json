@@ -7,7 +7,7 @@
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3107} node dist/main.js",
     "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest"
   },

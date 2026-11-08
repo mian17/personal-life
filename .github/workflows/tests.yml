@@ -54,6 +54,23 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # Blocking on purpose, and straight after install: the gate reads the
+      # lockfile and node_modules, nothing built. A plain `npm audit
+      # --audit-level=high` cannot be this step — the tree already carries known
+      # production advisories pending upgrades, so it would be red from day one.
+      # `scripts/audit-gate.mjs` fails on a high/critical advisory that is not on
+      # the checked-in allowlist, on an allowlist entry audit no longer reports
+      # (delete the exception), and on a critical entry past its `reviewBy` date.
+      - name: Audit production dependencies
+        run: npm run audit:gate
+
+      # Lint is the cheapest gate in the job and needs no compiled output and no
+      # native modules, so it runs straight after install: a style error fails the
+      # job in seconds instead of after a multi-minute native rebuild and
+      # workspace build.
+      - name: Lint
+        run: npm run lint
+
       # Prettier ratchet. The tree was never formatted — 408 of 1067 tracked
       # files fail `npm run format:check` on dev, and no printWidth fixes that
       # (80 -> 710, 120 -> 518), so a whole-tree gate would fail every PR and a

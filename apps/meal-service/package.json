@@ -7,7 +7,7 @@
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3106} node dist/main.js",
     "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest",
     "eval:pass1": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass1 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand",
