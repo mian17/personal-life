@@ -1,4 +1,5 @@
 import { rmSync } from 'fs';
+import { encodeCursor } from '@life/service-kit';
 import {
   generationKey,
   TODO_COMPLETIONS,
@@ -73,9 +74,17 @@ describe('Completion log cache (read-through + generation invalidation)', () => 
     client.sets.length = 0;
     cache.calls.length = 0;
 
-    await h.todos.findCompletions(SUB, {});
-    const full = await h.todos.findCompletions(SUB, { limit: 5, cursor: 'x' });
-    void full;
+    const firstPage = await h.todos.findCompletions(SUB, {});
+    // Mint the cursor through the seam from the real row just read, so a codec
+    // change (the JSON envelope replaced the `|`-joined format) cannot make this
+    // fixture a 400 — a literal would rot the same way twice.
+    const cursor = encodeCursor([
+      firstPage.completions[0].completedAt,
+      firstPage.completions[0].id,
+    ]);
+    // Two page variants: a different `limit`, then that limit with a cursor.
+    await h.todos.findCompletions(SUB, { limit: 5 });
+    await h.todos.findCompletions(SUB, { limit: 5, cursor });
 
     expect(loaderCalls()).toBe(1);
     expect(client.setCalls).toContain(key);
