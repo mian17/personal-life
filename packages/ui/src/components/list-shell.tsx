@@ -56,17 +56,23 @@ const fillPageStyles = 'flex flex-col h-[100dvh] overflow-hidden';
  */
 const fillBodyStyles = 'flex-1 min-h-0 grid pt-[var(--s6)] [grid-template-rows:minmax(0,1fr)]';
 
-/** §8's `.phead__sub`: one step under the meta tier, in the second ink tier, right under the title. */
+/**
+ * §8's `.phead__sub`: one step under the meta tier, in the second ink tier, under the title.
+ * The `--s2` step (`--s1` before) is the whole title → sub-line gap. A 28px bold title followed by
+ * only 4px read as the date crowding the heading, so the gap takes the next spacing step up; 8px
+ * keeps the date attached to its title as one header block rather than floating it free.
+ */
 const subtitleStyles = cx(
   'ui-list-shell__sub',
-  'mt-[var(--s1)] text-[length:var(--fs-meta)] leading-[var(--lh-meta)] text-ink-2',
+  'mt-[var(--s2)] text-[length:var(--fs-meta)] leading-[var(--lh-meta)] text-ink-2',
 );
 
 /**
  * §8's `.phead` puts the title block and the trailing controls on one flex line; `NavBar`'s own
  * `pt-[var(--s2)]` is that line's top inset, so the title drops its own top margin (`mt-0`). The
- * heading's own bottom step is dropped too (`mb-0`), leaving `subtitleStyles`' `--s1` as the whole
- * title → sub-line gap — `.phead__sub`'s `margin-top: var(--s1)`, not the two steps compounded.
+ * heading's own bottom step is dropped too (`mb-0`), leaving `subtitleStyles`' `--s2` as the whole
+ * title → sub-line gap — the sub-line's own step, not the two steps compounded. Dropping the
+ * heading's margin is deliberate: one step owns the gap, so it is tuned in one place.
  */
 const titleBlockStyles = 'mt-0 mb-0';
 
