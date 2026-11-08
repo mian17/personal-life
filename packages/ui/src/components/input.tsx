@@ -40,14 +40,34 @@ const inputVariants = cva(
   },
 );
 
-export function Input({ variant = 'default', className, ...rest }: Readonly<InputProps>) {
+/**
+ * The control types whose value is drawn by a UA shadow tree — the locale date/time text plus
+ * the calendar/clock picker indicator. That content carries its own intrinsic width and stays
+ * nowrap, so it never shrinks with the control's box the way a text input's value does: `min-w-0`
+ * lets the box shrink and the shadow content then paints past the padding box. These types get
+ * the control's own reset — no UA appearance, the shadow parts told to shrink, and an end inset
+ * one step tighter so the indicator has room — so the field keeps the sibling width and contains
+ * its content. Every other type keeps the shared shell untouched.
+ */
+const dateTimeTypes = new Set(['date', 'time', 'datetime-local', 'month', 'week']);
+
+/** `!` on the end inset because `cx` joins and never merges: only `!` beats the shell's `px-`.
+ *  The start inset stays `--s4`, so the date text keeps the same left edge as its siblings. */
+const dateTimeStyles = cx(
+  'max-w-full appearance-none overflow-hidden pe-[var(--s2)]!',
+  '[&::-webkit-datetime-edit]:min-w-0 [&::-webkit-calendar-picker-indicator]:shrink-0',
+);
+
+export function Input({ type, variant = 'default', className, ...rest }: Readonly<InputProps>) {
   return (
     <input
+      type={type}
       data-slot="input"
       className={cx(
         'ui-input',
         variant !== 'default' && `ui-input--${variant}`,
         inputVariants({ variant }),
+        variant === 'default' && dateTimeTypes.has(type ?? '') && dateTimeStyles,
         className,
       )}
       {...rest}

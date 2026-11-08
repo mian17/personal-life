@@ -484,9 +484,11 @@ export function NoteEditor({ note, availableTags }: Readonly<{ note?: Note; avai
   return (
     <EditorChrome
       back={{ label: 'Back', onBack: () => void leave(), variant: 'framed' }}
-      // The toolbar owns the screen's `<h1>`; without a title these two screens were
-      // headed-less. "New note" is the wording the index FAB already uses.
-      title={note == null ? 'New note' : 'Edit note'}
+      // The toolbar renders this as the screen's only `<h1>`, but the heading is not shown: an
+      // editor screen needs a name for assistive tech, not a label over a field body the user
+      // already recognises. `sr-only` keeps the `<h1>` and its accessible name and drops the
+      // visible text, so the save read-out below stays the toolbar's only visible line.
+      title={<span className="sr-only">{note == null ? 'New note' : 'Edit note'}</span>}
       // A title replaces the status slot in the toolbar, so the save read-out moves
       // to the sub-line — same `StatusText`, so it keeps its live region.
       sub={<StatusText>{STATUS_TEXT[status]}</StatusText>}

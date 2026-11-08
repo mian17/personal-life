@@ -171,18 +171,22 @@ describe('NoteEditor heading', () => {
   const render = (props: Readonly<{ note?: Note }>) =>
     renderToStaticMarkup(createElement(NoteEditor, { ...props, availableTags: [] }));
 
-  it('heads the create screen with exactly one h1 reading "New note"', () => {
+  it('heads the create screen with exactly one h1 naming it "New note" for assistive tech', () => {
     const html = render({});
 
     expect(html).toContain('<h1 class="ui-editor-toolbar__title');
-    expect(html).toContain('>New note</h1>');
+    // The name is the heading's content but visually hidden, so the screen keeps an
+    // accessible name without a visible label over the field body.
+    expect(html).toContain('<span class="sr-only">New note</span></h1>');
+    expect(html).not.toContain('>New note</h1>');
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
-  it('heads the existing-note screen with "Edit note"', () => {
+  it('heads the existing-note screen "Edit note", visually hidden', () => {
     const html = render({ note: note() });
 
-    expect(html).toContain('>Edit note</h1>');
+    expect(html).toContain('<span class="sr-only">Edit note</span></h1>');
+    expect(html).not.toContain('>Edit note</h1>');
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
