@@ -30,9 +30,18 @@ function call<T>(path: string, init?: RequestInit): Promise<T> {
   return callService<T>(TAGS_API_URL, path, init);
 }
 
-/** `GET /api/tags?limit=&cursor=` — one page of the owner's vocabulary, name-sorted. */
-export function fetchTagPage(opts: { limit?: number; cursor?: string } = {}): Promise<RegistryTagPage> {
+/**
+ * `GET /api/tags?q=&limit=&cursor=` — one page of the owner's vocabulary,
+ * name-sorted, narrowed by an optional name substring.
+ *
+ * `q` is filtered by the service **after** the cache hit, so it never enters the
+ * cache key: one cached entry serves every search variant (Contract 2 Rule 3).
+ */
+export function fetchTagPage(
+  opts: { q?: string; limit?: number; cursor?: string } = {},
+): Promise<RegistryTagPage> {
   const params = new URLSearchParams();
+  if (opts.q) params.set('q', opts.q);
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
   const qs = params.toString();

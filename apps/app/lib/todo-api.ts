@@ -99,11 +99,17 @@ export function emptyTodoTrash(): Promise<{ ok: true; count: number }> {
 }
 
 /**
- * `GET /api/lists?limit=&cursor=` — one page of the owner's todo-local lists,
- * name-sorted.
+ * `GET /api/lists?q=&limit=&cursor=` — one page of the owner's todo-local lists,
+ * name-sorted, narrowed by an optional name substring.
+ *
+ * `q` is filtered by the service **after** the cache hit, so it never enters the
+ * cache key: one cached entry serves every search variant (Contract 2 Rule 3).
  */
-export function fetchListPage(opts: { limit?: number; cursor?: string } = {}): Promise<ListPage> {
+export function fetchListPage(
+  opts: { q?: string; limit?: number; cursor?: string } = {},
+): Promise<ListPage> {
   const params = new URLSearchParams();
+  if (opts.q) params.set('q', opts.q);
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
   const qs = params.toString();
