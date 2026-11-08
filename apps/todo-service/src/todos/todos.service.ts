@@ -29,7 +29,7 @@ import {
   nextOccurrence,
   parseRepeatDays,
 } from './recurrence';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { ListsService } from '../lists/lists.service';
 import {
   TODO_ALL,
@@ -249,88 +249,58 @@ function compareTodos(a: OrderedTodo, b: OrderedTodo): number {
   return a.dto.id > b.dto.id ? -1 : 1;
 }
 
-/** Decode the `base64(<dueDate-or-~>|<createdAt>|<id>)` cursor (kernel clause). */
-function decodeCursor(cursor: string): { due: string; createdAt: string; id: string } {
-  const [due, createdAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { due, createdAt, id };
-}
-
-function encodeCursor(item: OrderedTodo): string {
-  return Buffer.from(`${item.due}|${item.dto.createdAt}|${item.dto.id}`).toString('base64');
-}
-
-/** True when `item` falls strictly after the cursor in the domain order. */
-function afterCursor(item: OrderedTodo, cursor: { due: string; createdAt: string; id: string }): boolean {
+/**
+ * True when `item` falls strictly after the cursor in the domain order. The
+ * cursor's parts are this list's own key, `[due, createdAt, id]`.
+ */
+function afterCursor(item: OrderedTodo, at: string[]): boolean {
+  const [cursorDue, cursorCreatedAt, cursorId] = at;
   const { dto, due } = item;
-  if (cursor.due === '~') {
+  if (cursorDue === '~') {
     // Cursor is in the undated group: only undated rows can follow.
     if (due !== '~') return false;
     return (
-      dto.createdAt < cursor.createdAt ||
-      (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
+      dto.createdAt < cursorCreatedAt ||
+      (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
     );
   }
   // Cursor is dated: undated rows always follow.
   if (due === '~') return true;
-  if (due > cursor.due) return true;
-  if (due < cursor.due) return false;
+  if (due > cursorDue) return true;
+  if (due < cursorDue) return false;
   return (
-    dto.createdAt < cursor.createdAt ||
-    (dto.createdAt === cursor.createdAt && dto.id < cursor.id)
+    dto.createdAt < cursorCreatedAt ||
+    (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
   );
 }
 
 /**
- * Trash keyset cursor, `base64(<deletedAt>|<id>)`. Trash order is
- * `deletedAt DESC, id DESC`, so the pair is the stable boundary key.
- */
-function encodeTrashCursor(item: { deletedAt: string; id: string }): string {
-  return Buffer.from(`${item.deletedAt}|${item.id}`).toString('base64');
-}
-
-function decodeTrashCursor(cursor: string): { deletedAt: string; id: string } {
-  const [deletedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { deletedAt, id };
-}
-
-/**
- * True when `item` falls strictly after the cursor in `deletedAt DESC, id DESC`
- * order, so a page boundary can neither repeat nor skip a row.
+ * True when a trash row falls strictly after the cursor in `deletedAt DESC, id
+ * DESC` order, so a page boundary can neither repeat nor skip a row.
  */
 function afterTrashCursor(
   item: { deletedAt: string; id: string },
-  cursor: { deletedAt: string; id: string },
+  at: string[],
 ): boolean {
+  const [deletedAt, id] = at;
   return (
-    item.deletedAt < cursor.deletedAt ||
-    (item.deletedAt === cursor.deletedAt && item.id < cursor.id)
+    item.deletedAt < deletedAt ||
+    (item.deletedAt === deletedAt && item.id < id)
   );
 }
 
 /**
- * Completion keyset cursor, `base64(<completedAt>|<id>)`. Completion order is
- * `completedAt DESC, id DESC`, so the pair is the stable boundary key.
- */
-function encodeCompletionCursor(item: { completedAt: string; id: string }): string {
-  return Buffer.from(`${item.completedAt}|${item.id}`).toString('base64');
-}
-
-function decodeCompletionCursor(cursor: string): { completedAt: string; id: string } {
-  const [completedAt, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { completedAt, id };
-}
-
-/**
- * True when `item` falls strictly after the cursor in `completedAt DESC, id
- * DESC` order, so a page boundary can neither repeat nor skip a row.
+ * True when a completion row falls strictly after the cursor in `completedAt
+ * DESC, id DESC` order, so a page boundary can neither repeat nor skip a row.
  */
 function afterCompletionCursor(
   item: { completedAt: string; id: string },
-  cursor: { completedAt: string; id: string },
+  at: string[],
 ): boolean {
+  const [completedAt, id] = at;
   return (
-    item.completedAt < cursor.completedAt ||
-    (item.completedAt === cursor.completedAt && item.id < cursor.id)
+    item.completedAt < completedAt ||
+    (item.completedAt === completedAt && item.id < id)
   );
 }
 
@@ -720,7 +690,7 @@ export class TodosService {
       cursor?: string;
     },
   ): Promise<TodoPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.rawRows(sub);
     const dek = await this.readDek(sub, rows);
     // One join against the owner's cached `todo:lists` row-set serves the whole
@@ -738,15 +708,15 @@ export class TodosService {
     }));
     ordered.sort(compareTodos);
 
-    const after = opts.cursor
-      ? ordered.filter((item) => afterCursor(item, decodeCursor(opts.cursor!)))
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor = hasMore && last ? encodeCursor(last) : null;
-    return { todos: page.map((item) => item.dto), nextCursor };
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      // `due` is the local `dueSortKey` (`~` = undated) and the first key part, so
+      // the cursor carries the domain order the rows were sorted into.
+      keyOf: (item) => [item.due, item.dto.createdAt, item.dto.id],
+      after: afterCursor,
+    });
+    return { todos: page.map((item) => item.dto), nextCursor, total };
   }
 
   /**
@@ -757,7 +727,7 @@ export class TodosService {
    * after the hit. The loader lives inside `getThrough` (Contract 2 Rule 1).
    */
   async findTrash(sub: string, opts: { limit?: number; cursor?: string }): Promise<TodoPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.cache.getThrough(
       sub,
       TODO_TRASH,
@@ -795,18 +765,13 @@ export class TodosService {
       (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
     );
 
-    const after = opts.cursor
-      ? ordered.filter((item) =>
-          afterTrashCursor({ deletedAt: item.deletedAt, id: item.id }, decodeTrashCursor(opts.cursor!)),
-        )
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor =
-      hasMore && last ? encodeTrashCursor({ deletedAt: last.deletedAt, id: last.id }) : null;
-    return { todos: page, nextCursor };
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (item) => [item.deletedAt, item.id],
+      after: afterTrashCursor,
+    });
+    return { todos: page, nextCursor, total };
   }
 
   /**
@@ -822,7 +787,7 @@ export class TodosService {
     sub: string,
     opts: { limit?: number; cursor?: string },
   ): Promise<TodoCompletionPage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.cache.getThrough(
       sub,
       TODO_COMPLETIONS,
@@ -851,16 +816,12 @@ export class TodosService {
     const ordered = [...joined].sort(
       (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
     );
-    const after = opts.cursor
-      ? ordered.filter((item) =>
-          afterCompletionCursor(item, decodeCompletionCursor(opts.cursor!)),
-        )
-      : ordered;
-
-    const hasMore = after.length > limit;
-    const page = hasMore ? after.slice(0, limit) : after;
-    const last = page.at(-1);
-    const nextCursor = hasMore && last ? encodeCompletionCursor(last) : null;
+    const { rows: page, nextCursor, total } = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (row) => [row.completedAt, row.id],
+      after: afterCompletionCursor,
+    });
 
     // Resolve list names only when a page row is actually listed.
     const listedIds = new Set(
@@ -885,7 +846,7 @@ export class TodosService {
         listName: todo.listId !== null ? names.get(todo.listId) ?? null : null,
       };
     });
-    return { completions, nextCursor };
+    return { completions, nextCursor, total };
   }
 
   /**

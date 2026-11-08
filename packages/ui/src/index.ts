@@ -86,6 +86,9 @@ export type { EmptyStateProps } from './components/empty-state';
 export { List } from './components/list';
 export type { ListProps } from './components/list';
 
+export { LoadMore } from './components/load-more';
+export type { LoadMoreProps } from './components/load-more';
+
 export { ListItem } from './components/list-item';
 export type {
   ListItemProps,

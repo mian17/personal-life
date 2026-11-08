@@ -498,7 +498,7 @@ describe('Meal-service batch API (e2e)', () => {
       .get(`/api/entries?date=${DAY}`)
       .set('Authorization', `Bearer ${bearer}`)
       .expect(200);
-    return listed.body.map((entry: { id: string }) => entry.id);
+    return listed.body.entries.map((entry: { id: string }) => entry.id);
   }
 
   async function createdEntryIds(count: number): Promise<string[]> {
@@ -513,7 +513,7 @@ describe('Meal-service batch API (e2e)', () => {
 
   async function listedFoodNames(): Promise<string[]> {
     const listed = await apiGet('/api/foods').expect(200);
-    return listed.body.map((food: { name: string }) => food.name);
+    return listed.body.foods.map((food: { name: string }) => food.name);
   }
 
   async function listedFoodIds(): Promise<string[]> {
@@ -525,7 +525,7 @@ describe('Meal-service batch API (e2e)', () => {
       .get('/api/foods')
       .set('Authorization', `Bearer ${bearer}`)
       .expect(200);
-    return listed.body.map((food: { id: string }) => food.id);
+    return listed.body.foods.map((food: { id: string }) => food.id);
   }
 
   async function createdFoodIds(count: number): Promise<string[]> {
@@ -540,7 +540,7 @@ describe('Meal-service batch API (e2e)', () => {
 
   async function listedSavedMealIds(): Promise<string[]> {
     const listed = await apiGet('/api/saved-meals').expect(200);
-    return listed.body.map((meal: { id: string }) => meal.id);
+    return listed.body.savedMeals.map((meal: { id: string }) => meal.id);
   }
 
   async function createdSavedMealIds(count: number): Promise<string[]> {

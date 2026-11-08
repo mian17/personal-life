@@ -6,11 +6,11 @@ import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { Note } from './note.entity';
 import { NoteTag } from './note-tag.entity';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { NOTES_CACHE, NotesCache } from './notes-cache';
 import { likeMatch } from './content-match';
 import { decodeTagUsage, normalizeTagIds } from '@life/shared';
-import type { Note as NoteDto, NotePage, TagUsage } from '@life/shared';
+import type { Note as NoteDto, NotePage, TagUsage, TagUsagePage } from '@life/shared';
 
 /** A note as a write carries it — the shape a batch item holds, per item. */
 type NoteDraft = { body: string; tagIds?: number[] };
@@ -125,15 +125,6 @@ function decodeCachedNoteRow(
 type OpenField = (stored: string, dek: Buffer | null, aad: string, id: string) => string;
 
 /**
- * Decode today's keyset cursor, `base64(<isoTimestamp>|<id>)`. The wire format is
- * unchanged; only the comparison moved in memory (see `paginate`).
- */
-function decodeCursor(cursor: string): { ts: string; id: string } {
-  const [ts, id] = Buffer.from(cursor, 'base64').toString().split('|');
-  return { ts, id };
-}
-
-/**
  * A decoded note beside the timestamp that ranks it in the list. The wire DTO is
  * frozen, so the ranking key travels outside it rather than on it; `id` is
  * repeated here because the keyset cursor keys on it.
@@ -158,49 +149,33 @@ function newestContentFirst(a: RankedNote, b: RankedNote): number {
   return b.listTimestamp.localeCompare(a.listTimestamp) || b.id.localeCompare(a.id);
 }
 
+/**
+ * The list's strictly-after test: `timestamp DESC, id DESC`, compared on the
+ * hydrated ISO timestamp. sqlite stores `YYYY-MM-DD HH:MM:SS.mmm` while the
+ * cursor is ISO `...T...Z`; the old SQL predicate compared the two directly and
+ * re-emitted the cursor row at a tie. Comparing in memory on one clock is what
+ * makes the boundary exact.
+ */
+function afterListPosition(row: RankedNote, at: string[]): boolean {
+  const [timestamp, id] = at;
+  return row.listTimestamp < timestamp || (row.listTimestamp === timestamp && row.id < id);
+}
+
+/**
+ * The tag-usage list's strictly-after test: `tagId ASC`, the order the loader's
+ * `GROUP BY tagId … ORDER BY tagId ASC` produces. `tagId` is numeric, so the
+ * cursor's text component is read back as a number — comparing the strings would
+ * put `10` before `9` and skip rows at that boundary.
+ */
+function afterTagUsagePosition(row: TagUsage, at: string[]): boolean {
+  return row.tagId > Number(at[0]);
+}
+
 /** True when a note passes the list's tag and text filters. */
 function matchesListRequest(note: NoteDto, filters: { tagId?: number; q?: string }): boolean {
   if (filters.tagId !== undefined && !note.tagIds.includes(filters.tagId)) return false;
   if (filters.q && !likeMatch(note.body, `%${filters.q}%`)) return false;
   return true;
-}
-
-/**
- * In-memory keyset pagination over a candidate list already ordered by
- * (`timestamp DESC`, `id DESC`) — the list's exact order. Rows are kept only when
- * they fall strictly after the cursor
- * (`timestamp < cursor.ts OR (timestamp = cursor.ts AND id < cursor.id)`), so a
- * page boundary can neither repeat nor skip a row.
- *
- * The comparison runs on the hydrated ISO timestamp, not raw sqlite text: sqlite
- * stores `YYYY-MM-DD HH:MM:SS.mmm` while the cursor is ISO `...T...Z`, and the
- * old SQL predicate compared the two directly — at a tie it re-emitted the
- * cursor row. Moving pagination in memory (the filter now runs post-decrypt)
- * fixes that, which the no-duplicates/no-skips contract requires.
- *
- * Cursor wire format (`base64(<isoTimestamp>|<id>)`) and the page shape are
- * unchanged from the SQL path.
- */
-function paginate<T extends { id: string }>(
-  ordered: T[],
-  limit: number,
-  cursor: string | undefined,
-  timestampOf: (item: T) => string,
-): { page: T[]; nextCursor: string | null } {
-  let items = ordered;
-  if (cursor) {
-    const { ts, id } = decodeCursor(cursor);
-    items = ordered.filter((item) => {
-      const itemTs = timestampOf(item);
-      return itemTs < ts || (itemTs === ts && item.id < id);
-    });
-  }
-  const hasMore = items.length > limit;
-  const page = hasMore ? items.slice(0, limit) : items;
-  const last = page.at(-1);
-  const nextCursor =
-    hasMore && last ? Buffer.from(`${timestampOf(last)}|${last.id}`).toString('base64') : null;
-  return { page, nextCursor };
 }
 
 @Injectable()
@@ -378,7 +353,7 @@ export class NotesService {
       cursor?: string;
     },
   ): Promise<NotePage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     // Key: `note:<sub>:v<gen>:list` — no q/tagId/limit/cursor. The cached value
     // is the whole non-trashed ciphertext row set; every filter variant shares it.
     const rows = await this.cache.getThrough(
@@ -415,20 +390,20 @@ export class NotesService {
       .filter(({ note }) => matchesListRequest(note, opts))
       .sort(newestContentFirst);
 
-    const { page, nextCursor } = paginate(
-      matching,
+    const { rows: page, nextCursor, total } = paginate(matching, {
       limit,
-      opts.cursor,
-      (entry) => entry.listTimestamp,
-    );
-    return { notes: page.map((entry) => entry.note), nextCursor };
+      cursor: opts.cursor,
+      keyOf: (entry) => [entry.listTimestamp, entry.id],
+      after: afterListPosition,
+    });
+    return { notes: page.map((entry) => entry.note), nextCursor, total };
   }
 
   async findTrash(
     sub: string,
     opts: { limit?: number; cursor?: string },
   ): Promise<NotePage> {
-    const limit = opts.limit ?? 50;
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     // Key: `note:<sub>:v<gen>:trash` — pagination is in memory, so limit/cursor
     // are not part of the key and one entry serves every trash page request.
     const rows = await this.cache.getThrough(
@@ -453,8 +428,20 @@ export class NotesService {
 
     const dek = await this.readDek(sub, rows);
     const decoded = rows.map((row) => decodeCachedNoteRow(row, sub, dek, this.openFieldCb));
-    const { page, nextCursor } = paginate(decoded, limit, opts.cursor, (n) => n.deletedAt!);
-    return { notes: page, nextCursor };
+    // Trash shares the list's ranking shape, `deletedAt DESC, id DESC`; ranking on
+    // the hydrated timestamp is what keeps a same-instant tie off the boundary.
+    const positioned = decoded.map((note) => ({
+      id: note.id,
+      listTimestamp: note.deletedAt!,
+      note,
+    }));
+    const { rows: page, nextCursor, total } = paginate(positioned, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (entry) => [entry.listTimestamp, entry.id],
+      after: afterListPosition,
+    });
+    return { notes: page.map((entry) => entry.note), nextCursor, total };
   }
 
   async findOne(sub: string, id: string): Promise<NoteDto> {
@@ -630,14 +617,15 @@ export class NotesService {
   }
 
   /**
-   * The owner's tag usage surface (kernel `GET …/tags → [{tagId, count}]`):
-   * association ids + how many non-trashed notes carry each. Ids and counts only
-   * — names live in `tags-service` (resolved by the BFF), so nothing here is
-   * content and the `note:tags` cache is metadata-only by design.
+   * The owner's whole tag-usage surface (kernel `GET …/tags → [{tagId, count}]`):
+   * association ids + how many non-trashed notes carry each, `tagId ASC`. Ids and
+   * counts only — names live in `tags-service` (resolved by the BFF), so nothing
+   * here is content and the `note:tags` cache is metadata-only by design.
    */
   async listTagUsage(sub: string): Promise<TagUsage[]> {
-    // Key: `note:<sub>:v<gen>:tags` — the owner's used-id+count rows.
-    const rows = await this.cache.getThrough(
+    // Key: `note:<sub>:v<gen>:tags` — the owner's used-id+count rows. Paging is a
+    // projection after the hit, so neither limit nor cursor enters the key.
+    return this.cache.getThrough(
       sub,
       'note:tags',
       async () => {
@@ -657,6 +645,24 @@ export class NotesService {
       },
       { decode: decodeTagUsage },
     );
-    return rows;
+  }
+
+  /**
+   * `GET /api/tags?limit=&cursor=` — one page of the same surface on the shared
+   * cursor seam. The set is bounded by the owner's tag vocabulary, so the window
+   * is the shared list contract rather than a smaller read.
+   */
+  async tagUsagePage(
+    sub: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<TagUsagePage> {
+    const ordered = await this.listTagUsage(sub);
+    const page = paginate(ordered, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (row) => [String(row.tagId)],
+      after: afterTagUsagePosition,
+    });
+    return { tagUsages: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 }

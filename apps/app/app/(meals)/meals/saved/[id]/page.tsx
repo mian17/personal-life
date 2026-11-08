@@ -10,7 +10,7 @@ import {
   Section,
 } from '@life/ui';
 import { loadOrNotFound } from '@life/app-kit';
-import { getSavedMeal, listMealFoodsIncludingDeleted, restoredFoodName } from '@/lib/meal-api';
+import { collectMealFoodsIncludingDeleted, getSavedMeal, restoredFoodName } from '@/lib/meal-api';
 import { relogMealAction } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,7 @@ export default async function SavedMealPage({ params }: Readonly<{ params: Promi
   const meal = await loadOrNotFound(() => getSavedMeal(id));
   // Name resolution reads the whole catalog (soft-deleted rows included): the
   // item's dish name must survive the food being deleted (AC5).
-  const catalog = await listMealFoodsIncludingDeleted();
+  const catalog = await collectMealFoodsIncludingDeleted();
   const total = format('calories', sum(meal.items.map((item) => item.nutrients)).calories);
 
   return (

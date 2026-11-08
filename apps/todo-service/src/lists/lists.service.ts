@@ -4,7 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { EntityManager, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { List } from './list.entity';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
+import { likeMatch } from '@life/shared';
+import type { ListPage } from '@life/shared';
 import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
 
 /** The list DTO (`SPEC-todo-service` API): `version` is the OCC counter. */
@@ -23,6 +25,16 @@ interface CachedListRow {
   importantDefault: boolean | null;
   version: number;
   createdAt: string;
+}
+
+/**
+ * True when a decrypted list name passes the list's `q` filter. Matching is the
+ * shared `LIKE` parity comparator; a blank `q` is "no filter", never "match
+ * nothing".
+ */
+function matchesQuery(name: string, q: string | undefined): boolean {
+  const wanted = q?.trim();
+  return !wanted || likeMatch(name, `%${wanted}%`);
 }
 
 /** A rename as `PATCH /api/lists/:id` (and one `:batchUpdate` item) carries it. */
@@ -175,11 +187,57 @@ export class ListsService {
     return a.id < b.id ? -1 : 1;
   }
 
-  /** `GET /api/lists` — decrypted, name-sorted (case-insensitive). */
+  /**
+   * `byName`'s strictly-after test, in that same order: a row comes after the
+   * cursor when its **lower-cased** name sorts later, or when the names tie and
+   * its `id` sorts later (`id`s are uuids, compared as text). Folding case exactly
+   * as the sort does keeps a page boundary from repeating or skipping a row.
+   */
+  private static afterName(row: ListDto, at: string[]): boolean {
+    const [name, id] = at;
+    const lowered = row.name.toLowerCase();
+    if (lowered !== name) return lowered > name;
+    return row.id > id;
+  }
+
+  /**
+   * The owner's whole list vocabulary, name-sorted (case-insensitive) — what a
+   * screen, a picker, or an in-memory join needs.
+   *
+   * Named lists are a hand-curated vocabulary of tens, and `TodosService` resolves
+   * the completion log's names from this set: handed one page it would name the
+   * lists past the boundary `null`. The wire keeps that whole-set read too — no
+   * screen wants a partial vocabulary.
+   */
   async list(sub: string): Promise<ListDto[]> {
     const rows = await this.rawRows(sub);
     const decoded = await this.decodeRows(sub, rows);
     return decoded.sort(ListsService.byName);
+  }
+
+  /**
+   * `GET /api/lists?q=&limit=&cursor=` — one page of the same order, on the shared
+   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor`/`q` never
+   * enter the `todo:<sub>:v<gen>:lists` key, so one entry serves every page and
+   * every search variant.
+   *
+   * The window is the shared list contract, not a performance fix — lists are
+   * naturally small, and the whole-set read above stays the screen's read.
+   */
+  async page(
+    sub: string,
+    opts: { q?: string; limit?: number; cursor?: string } = {},
+  ): Promise<ListPage> {
+    const ordered = (await this.list(sub)).filter((list) => matchesQuery(list.name, opts.q));
+    const page = paginate(ordered, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      // The cursor carries the lower-cased name the sort compared; `id` last
+      // keeps the key unique per row.
+      keyOf: (list) => [list.name.toLowerCase(), list.id],
+      after: ListsService.afterName,
+    });
+    return { lists: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

@@ -1,8 +1,10 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { DEFAULT_PAGE_LIMIT, paginate } from '@life/service-kit';
 import { FOCUS_CACHE, type FocusCache } from '../cache/focus-cache';
 import { DATE_ONLY } from '../sessions/dto/session-rules';
+import type { ListGoalsQuery } from './dto/list-goals.query';
 import type { SetGoalDto } from './dto/set-goal.dto';
 import { Goal } from './goal.entity';
 
@@ -14,6 +16,31 @@ import { Goal } from './goal.entity';
 export interface GoalRow {
   validFrom: string;
   minutes: number;
+}
+
+/**
+ * One page of the owner's goal history plus the cursor that continues it
+ * (`SPEC-pagination-seam` §4: plural entity key, `GoalRow` → `goals`).
+ */
+export interface GoalPage {
+  goals: GoalRow[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
+/**
+ * The list's strictly-after test: `validFrom ASC`, the order `loadAll` reads in and
+ * the order `resolveGoal` requires. `validFrom` is unique per owner (the table's
+ * unique index), so the day alone is a complete key — no tie-breaker is needed and
+ * the caret below proofs that nothing is skipped.
+ *
+ * Rows arrive oldest first, and lexically comparable `YYYY-MM-DD` days make the
+ * comparison exactly calendar order.
+ */
+function afterListPosition(row: GoalRow, at: string[]): boolean {
+  const [validFrom] = at;
+  return row.validFrom > validFrom;
 }
 
 /**
@@ -83,9 +110,23 @@ export class GoalsService {
     return goal;
   }
 
-  /** Every goal row the owner has, oldest first, through the read-through cache. */
-  findAll(sub: string): Promise<GoalRow[]> {
-    return this.cache.getThrough(sub, 'focus:goal', () => this.loadAll(sub));
+  /**
+   * One page of the owner's goal history, oldest first, through the read-through
+   * cache under the one per-owner `goal` key — the whole list, because it is tiny
+   * and carries no fetch parameters of its own. `limit`/`cursor` stay out of the key:
+   * paging is a projection over the whole cached history, so one entry serves every
+   * page of it (Contract 2 Rule 3).
+   */
+  async findAll(sub: string, query: ListGoalsQuery = {}): Promise<GoalPage> {
+    const rows = await this.cache.getThrough(sub, 'focus:goal', () => this.loadAll(sub));
+
+    const page = paginate(rows, {
+      limit: query.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: query.cursor,
+      keyOf: (row) => [row.validFrom],
+      after: afterListPosition,
+    });
+    return { goals: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /** Whole-list load, owner-scoped; lives inside the cache's loader and nowhere else. */

@@ -110,9 +110,23 @@ describe('the focus registry', () => {
 
   it('requires both range bounds to list sessions', () => {
     const list = findOp(registryOf('sessions'), 'list');
-    expect(Object.keys(list.fields)).toEqual(['from', 'to']);
+    expect(Object.keys(list.fields)).toEqual(['from', 'to', 'limit', 'cursor']);
     expect(list.fields['from'].required).toBe(true);
     expect(list.fields['to'].required).toBe(true);
+  });
+
+  it('offers the shared page window on both listings, with the seam\'s cap in the description', () => {
+    // `@life/ops` takes no dependency on `@life/service-kit`, so the number is copied
+    // here and pinned here: a drifted cap fails parity instead of production.
+    for (const resourceName of ['goal', 'sessions']) {
+      const list = findOp(registryOf(resourceName), 'list');
+      expect(list.fields['limit'].type).toBe('number');
+      expect(list.fields['limit'].description).toContain('1 to 200');
+      expect(list.fields['limit'].required).toBe(false);
+      expect(list.fields['cursor'].type).toBe('string');
+      expect(list.fields['cursor'].description).toContain('Opaque cursor');
+      expect(list.fields['cursor'].required).toBe(false);
+    }
   });
 
   it('sends a session as a day and whole minutes, with no local bound', () => {
@@ -169,6 +183,50 @@ describe('focus operation parity', () => {
     expect(pair.cliWire?.method).toBe('GET');
     expect(pair.cliWire?.path).toBe('/api/sessions');
     expect(pair.cliWire?.query).toEqual({ from: '2026-10-01', to: '2026-10-14' });
+    expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
+  it('sends the same page window and renders the same goal page', async () => {
+    const pair = await runBoth({
+      resource: 'goal',
+      argv: ['goal', 'list', '--limit', '20', '--cursor', 'page-2'],
+      tool: 'goal_list',
+      args: { limit: 20, cursor: 'page-2' },
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.method).toBe('GET');
+    expect(pair.cliWire?.path).toBe('/api/goal');
+    expect(pair.cliWire?.query).toEqual({ limit: '20', cursor: 'page-2' });
+    expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
+  it('sends the same page window and renders the same session page', async () => {
+    const pair = await runBoth({
+      resource: 'sessions',
+      argv: [
+        'sessions',
+        'list',
+        '--from',
+        '2026-10-01',
+        '--to',
+        '2026-10-14',
+        '--limit',
+        '20',
+        '--cursor',
+        'page-2',
+      ],
+      tool: 'sessions_list',
+      args: { from: '2026-10-01', to: '2026-10-14', limit: 20, cursor: 'page-2' },
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.query).toEqual({
+      from: '2026-10-01',
+      to: '2026-10-14',
+      limit: '20',
+      cursor: 'page-2',
+    });
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 });

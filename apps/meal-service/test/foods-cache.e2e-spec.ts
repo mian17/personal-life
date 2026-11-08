@@ -199,7 +199,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
 
       const page = await h.service.findAll(SUB);
 
-      expect(page[0].nutrients.calories).toBe(111);
+      expect(page.foods[0].nutrients.calories).toBe(111);
       // The loader's result is returned, but nothing was written to Redis.
       expect(client.values).toHaveLength(0);
       expect(client.setCalls).toHaveLength(0);
@@ -213,7 +213,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       const created = await h.service.create(SUB, body());
 
       const active = await h.service.findAll(SUB);
-      expect(active.map((food) => food.id)).toEqual([created.id]);
+      expect(active.foods.map((food) => food.id)).toEqual([created.id]);
 
       await h.service.remove(SUB, created.id);
 
@@ -225,10 +225,10 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       const loaderCallsBefore = h.foods.find.mock.calls.length;
       const defaultList = await h.service.findAll(SUB);
       const loaderCallsAfterFirst = h.foods.find.mock.calls.length;
-      const withDeleted = await h.service.findAll(SUB, undefined, true);
+      const withDeleted = await h.service.findAll(SUB, { includeDeleted: true });
 
-      expect(defaultList).toEqual([]);
-      expect(withDeleted.map((food) => food.name)).toEqual(['Milk, Brand X']);
+      expect(defaultList.foods).toEqual([]);
+      expect(withDeleted.foods.map((food) => food.name)).toEqual(['Milk, Brand X']);
       expect(loaderCallsAfterFirst).toBe(loaderCallsBefore + 1);
       expect(h.foods.find.mock.calls).toHaveLength(loaderCallsAfterFirst);
 
@@ -245,7 +245,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       const h = makeHarness(client);
       await h.service.create(SUB, body());
 
-      expect(await h.service.findAll('someone-else', undefined, true)).toEqual([]);
+      expect(await h.service.findMatching('someone-else', undefined, true)).toEqual([]);
     });
   });
 
@@ -261,11 +261,11 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
 
       // The API output is byte-identical across a miss and a hit.
       expect(JSON.stringify(first)).toBe(JSON.stringify(second));
-      expect(second[0].unit).toBe('ml');
-      expect(second[0].name).toBe('Milk, Brand X');
-      expect(second[0].servings[0].amount).toBe(1000);
+      expect(second.foods[0].unit).toBe('ml');
+      expect(second.foods[0].name).toBe('Milk, Brand X');
+      expect(second.foods[0].servings[0].amount).toBe(1000);
       // `scale(base, amount / servingGrams)`: 1000 ml of a 100 ml base = ×10.
-      expect(second[0].servings[0].nutrients.calories).toBe(600);
+      expect(second.foods[0].servings[0].nutrients.calories).toBe(600);
       // The second read did not run the loader again.
       expect(h.foods.find.mock.calls).toHaveLength(loaderCallsOnHit);
     });

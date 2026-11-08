@@ -654,7 +654,9 @@ describe('MealEditor save persists corrected values', () => {
     // create returns the id the entry POST carries.
     const createdFood = { id: 'created-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      if (path === '/api/foods') {
+        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
+      }
       return Promise.resolve({});
     });
     try {
@@ -694,7 +696,9 @@ describe('MealEditor log-time catalog', () => {
     const harness = stateHarness();
     const createdFood = { id: 'new-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      if (path === '/api/foods') {
+        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
+      }
       return Promise.resolve({});
     });
     try {
@@ -737,7 +741,7 @@ describe('MealEditor log-time catalog', () => {
     // create — the food and entry POSTs carry that reused id.
     const harness = stateHarness();
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve([]);
+      if (path === '/api/foods') return Promise.resolve({ foods: [], nextCursor: null });
       if (path === '/api/entries') return Promise.resolve({});
       return Promise.resolve({
         readable: true,
@@ -773,7 +777,11 @@ describe('MealEditor log-time catalog', () => {
     const typedDish = '  chicken   breast  ';
     const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
+      if (path === '/api/foods') {
+        return Promise.resolve(
+          init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
+        );
+      }
       return Promise.resolve({});
     });
     try {
@@ -807,7 +815,11 @@ describe('MealEditor log-time catalog', () => {
     // fixture that discriminates normalization is not the one that does not.
     const existing = { id: 'chicken-id', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? existing : [existing]);
+      if (path === '/api/foods') {
+        return Promise.resolve(
+          init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
+        );
+      }
       return Promise.resolve({});
     });
     try {
@@ -843,7 +855,9 @@ describe('MealEditor log-time catalog', () => {
     const secondDish = '  chicken  ';
     const createdFood = { id: 'created-chicken', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
     mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve(init?.method === 'POST' ? createdFood : []);
+      if (path === '/api/foods') {
+        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
+      }
       return Promise.resolve({});
     });
     try {

@@ -320,9 +320,14 @@ async function expectTitleFlashing(page: Page, nextTitle: string): Promise<void>
   expect(reads[2]).toBe(reads[0]);
 }
 
-/** The phase line: the only text on the page that is a phase name on its own. */
+/**
+ * The phase line: the card's own status read-out, which is the only status line that is
+ * a phase name on its own. The `ui-status-text` hook (`packages/ui`'s `StatusText`) is
+ * what excludes the shell's `<h1>` — it reads `Focus` too, because the nav calls this
+ * route Focus, but it is a heading and not a phase.
+ */
 function phaseLine(page: Page): Locator {
-  return page.getByText(/^(Focus|Short break|Long break)$/);
+  return page.locator('.ui-status-text', { hasText: /^(Focus|Short break|Long break)$/ });
 }
 
 /** The countdown digits: the only text on the page shaped like `mm:ss`. */

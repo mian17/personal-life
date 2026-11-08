@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import { completeVector, readStoredVector } from '../foods/content';
 import type { MealGroup } from '../entries/dto/create-entry.dto';
@@ -47,6 +47,27 @@ export interface SavedMealDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One page of the owner's saved meals plus the cursor that continues it. The
+ * envelope key is the entity plural (`SPEC-pagination-seam` §4).
+ */
+export interface SavedMealPage {
+  savedMeals: SavedMealDto[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
+/**
+ * The list's strictly-after test: `updatedAt DESC, id ASC` (the loader's order —
+ * edits surface first). `id` breaks an `updatedAt` tie, so the boundary can
+ * neither repeat nor skip a row (`SPEC-pagination-seam` §3).
+ */
+function afterSavedMealPosition(meal: SavedMealDto, at: string[]): boolean {
+  const [updatedAt, id] = at;
+  return meal.updatedAt < updatedAt || (meal.updatedAt === updatedAt && meal.id > id);
 }
 
 /**
@@ -177,13 +198,24 @@ export class SavedMealsService {
   }
 
   /**
-   * The owner's non-trashed saved meals, newest-first.
-   * Key `meal:<sub>:v<gen>:saved:list` — one entry serves every list read.
+   * One page of the owner's non-trashed saved meals, newest-first.
+   * Key `meal:<sub>:v<gen>:saved:list` — one entry serves every list read, and
+   * `limit`/`cursor` page it post-hit so neither ever enters the key.
    */
-  async findAll(sub: string): Promise<SavedMealDto[]> {
+  async findAll(
+    sub: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<SavedMealPage> {
     const rows = await this.cache.list(sub, () => this.loadAll(sub));
     const dek = await this.readDek(sub, rows);
-    return rows.map((row) => this.toDto(row, sub, dek));
+    const decoded = rows.map((row) => this.toDto(row, sub, dek));
+    const page = paginate(decoded, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (meal) => [meal.updatedAt, meal.id],
+      after: afterSavedMealPosition,
+    });
+    return { savedMeals: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

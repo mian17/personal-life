@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import { completeVector, readStoredVector } from '../foods/content';
 import { Entry } from './entry.entity';
@@ -39,6 +39,37 @@ export interface EntryDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One page of one day's entries plus the cursor that continues it. The envelope
+ * key is the entity plural (`SPEC-pagination-seam` §4).
+ */
+export interface EntryPage {
+  entries: EntryDto[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
+/** What one day read is narrowed by; `limit`/`cursor` page it, the rest filter it. */
+export interface ListEntriesOptions {
+  /** Client-local `YYYY-MM-DD`; required, and always the client's own day. */
+  date: string;
+  /** Meal-group filter, applied after the cache hit. */
+  meal?: MealGroup;
+  limit?: number;
+  cursor?: string;
+}
+
+/**
+ * The day's strictly-after test: `updatedAt ASC, id ASC` (the loader's order —
+ * a corrected entry moves to the end). `id` breaks an `updatedAt` tie, so the
+ * boundary can neither repeat nor skip a row (`SPEC-pagination-seam` §3).
+ */
+function afterDayPosition(entry: EntryDto, at: string[]): boolean {
+  const [updatedAt, id] = at;
+  return entry.updatedAt > updatedAt || (entry.updatedAt === updatedAt && entry.id > id);
 }
 
 /**
@@ -160,21 +191,35 @@ export class EntriesService {
   }
 
   /**
-   * The owner's non-trashed entries for a date, optionally narrowed to one meal
-   * group. Key `meal:<sub>:v<gen>:entries:<date>`.
+   * One page of the owner's non-trashed entries for a date, optionally narrowed
+   * to one meal group. Key `meal:<sub>:v<gen>:entries:<date>`.
    *
    * The date is part of the fetch identity (one entry set per day per owner),
    * so it is in the key; the meal-group filter is applied **post-hit, in
    * memory, after decrypt** (`SPEC-meal-service` Cache Rules) and never enters
    * the key. Freshness is the request's UTC instants, `updatedAt ASC` with an
    * `id` tie-break, so the order can never depend on the host clock.
+   *
+   * The pagination here is a **uniform surface, not a performance fix**: a day
+   * is already bounded structurally by the required `date` (`entries.controller`
+   * — one day holds a handful of logged items), and this read still refuses to
+   * work without one. Every meal list pages through the same seam so clients and
+   * adapters have one list contract; do not read the cursor here as a claim that
+   * an unbounded scan needed bounding.
    */
-  async findAll(sub: string, date: string, meal?: MealGroup): Promise<EntryDto[]> {
+  async findAll(sub: string, opts: ListEntriesOptions): Promise<EntryPage> {
+    const { date, meal } = opts;
     const rows = await this.cache.day(sub, date, () => this.loadDay(sub, date));
     const dek = await this.readDek(sub, rows);
     const decoded = rows.map((row) => this.toDto(row, sub, dek));
-    if (!meal) return decoded;
-    return decoded.filter((entry) => entry.mealGroup === meal);
+    const matching = meal ? decoded.filter((entry) => entry.mealGroup === meal) : decoded;
+    const page = paginate(matching, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (entry) => [entry.updatedAt, entry.id],
+      after: afterDayPosition,
+    });
+    return { entries: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

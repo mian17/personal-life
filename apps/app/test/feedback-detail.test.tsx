@@ -2,8 +2,9 @@ import type { FeedbackDto } from '@life/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 // The detail route is a thin server shell over two seams, the `routes-feedback-list`
-// pattern: it reads the owner's list and picks the entry this URL names.
-jest.mock('@/lib/feedback-api', () => ({ listFeedback: jest.fn() }));
+// pattern: it reads the owner's whole list and picks the entry this URL names. The
+// wire layer is what gets mocked, so the real cursor walk runs.
+jest.mock('@/lib/client', () => ({ callService: jest.fn() }));
 jest.mock('next/navigation', () => ({
   // Faithful to Next's helper: it throws a value Next turns into the 404 page. The
   // marker is what a test can read, so the assertion proves the route 404s rather
@@ -13,10 +14,15 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
-import { listFeedback } from '@/lib/feedback-api';
+import { callService } from '@/lib/client';
 import FeedbackDetailPage from '@/app/feedback/[id]/page';
 
-const mockedListFeedback = listFeedback as jest.MockedFunction<typeof listFeedback>;
+const mockCallService = callService as unknown as jest.Mock;
+
+/** The `{ feedback, nextCursor }` envelope a `GET /api/feedback` answers with. */
+function page(feedback: FeedbackDto[], nextCursor: string | null = null) {
+  return { feedback, nextCursor };
+}
 
 function entry(overrides: Partial<FeedbackDto>): FeedbackDto {
   return {
@@ -50,12 +56,12 @@ function descriptionCard(html: string): string {
 describe('/feedback/[id] page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListFeedback.mockResolvedValue([entry({})]);
+    mockCallService.mockResolvedValue(page([entry({})]));
   });
 
   it('picks the entry this URL names, not the first row of the list', async () => {
     const other = entry({ id: 'entry-2', title: 'Other', description: 'A different description' });
-    mockedListFeedback.mockResolvedValue([other, entry({})]);
+    mockCallService.mockResolvedValue(page([other, entry({})]));
 
     const html = await markupFor('entry-1');
 

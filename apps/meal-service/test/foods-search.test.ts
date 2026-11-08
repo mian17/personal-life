@@ -7,7 +7,7 @@ import { NUTRIENTS } from '@life/nutrition';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
 
 /**
- * `q` search (`foods.findAll(sub, q)`): owner-scoped, matching only the decrypted
+ * `q` search (`foods.findMatching(sub, q)`): owner-scoped, matching only the decrypted
  * name as a case-insensitive substring (`likeMatch` in memory — never `LIKE`
  * over the encrypted column, `SPEC-meal-service` Cache Rules).
  *
@@ -85,13 +85,14 @@ describe('Foods search `q` (e2e)', () => {
     await post({ name: 'Brown Rice', servingGrams: 150 }, tokenA).expect(201);
 
     const search = await list(tokenA, 'oats').expect(200);
-    expect(search.body.map((f: { name: string }) => f.name)).toEqual(['Steel Cut OATS']);
+    expect(search.body.foods.map((f: { name: string }) => f.name)).toEqual(['Steel Cut OATS']);
 
     const upper = await list(tokenA, 'STEEL').expect(200);
-    expect(upper.body.map((f: { name: string }) => f.name)).toEqual(['Steel Cut OATS']);
+    expect(upper.body.foods.map((f: { name: string }) => f.name)).toEqual(['Steel Cut OATS']);
 
     const noMatch = await list(tokenA, 'quinoa').expect(200);
-    expect(noMatch.body).toEqual([]);
+    expect(noMatch.body.foods).toEqual([]);
+    expect(noMatch.body.nextCursor).toBeNull();
 
     // The rows the search ran over are sealed envelopes, not plaintext: the
     // match ran over decrypted names in memory, never against the stored string.
@@ -105,15 +106,52 @@ describe('Foods search `q` (e2e)', () => {
     }
   });
 
+  it('pages the catalog with no gap and no duplicate across the boundary', async () => {
+    const names = ['page alpha', 'page beta', 'page gamma'];
+    const created: string[] = [];
+    for (const name of names) {
+      const food = await post({ name, servingGrams: 100 }, tokenA).expect(201);
+      created.push(food.body.id);
+    }
+
+    // Three rows, two pages: the second page is reached only by the cursor the
+    // first returns, so a boundary that repeated or skipped a row would show up
+    // as a size mismatch or a repeated id.
+    const first = await list(tokenA, 'page ').expect(200);
+    expect(first.body.foods).toHaveLength(3);
+    expect(first.body.nextCursor).toBeNull();
+
+    const paged = await auth(
+      request(app.getHttpServer()).get('/api/foods?q=page%20&limit=2'),
+      tokenA,
+    ).expect(200);
+    expect(paged.body.foods).toHaveLength(2);
+    expect(paged.body.nextCursor).toEqual(expect.any(String));
+
+    const second = await auth(
+      request(app.getHttpServer()).get(
+        `/api/foods?q=page%20&limit=2&cursor=${encodeURIComponent(paged.body.nextCursor)}`,
+      ),
+      tokenA,
+    ).expect(200);
+    expect(second.body.foods).toHaveLength(1);
+    expect(second.body.nextCursor).toBeNull();
+
+    const ids = [...paged.body.foods, ...second.body.foods].map((food: { id: string }) => food.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(created.length);
+    expect([...ids].sort()).toEqual([...created].sort());
+  });
+
   it('returns only the caller\'s matches (owner scoping survives the filter)', async () => {
     await post({ name: 'shared-token-A', servingGrams: 100 }, tokenA).expect(201);
     await post({ name: 'shared-token-B', servingGrams: 100 }, tokenB).expect(201);
 
     const aSearch = await list(tokenA, 'shared-token').expect(200);
-    expect(aSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-A']);
+    expect(aSearch.body.foods.map((f: { name: string }) => f.name)).toEqual(['shared-token-A']);
 
     const bSearch = await list(tokenB, 'shared-token').expect(200);
-    expect(bSearch.body.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
+    expect(bSearch.body.foods.map((f: { name: string }) => f.name)).toEqual(['shared-token-B']);
   });
 
   it('a name-only PATCH leaves the stored base vector untouched', async () => {

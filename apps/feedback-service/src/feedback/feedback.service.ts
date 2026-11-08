@@ -2,11 +2,11 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import type { CreateFeedbackInput, FeedbackDto, FeedbackStatus } from '@life/shared';
+import type { CreateFeedbackInput, FeedbackDto, FeedbackPage, FeedbackStatus } from '@life/shared';
 import { Feedback } from './feedback.entity';
 import { FeedbackEvent } from './feedback-event.entity';
 import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
-import { KeysService } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate } from '@life/service-kit';
 
 /**
  * AAD for a feedback title (`SPEC-feedback-service` Data model). Byte-exact:
@@ -78,6 +78,18 @@ function newestFirst(a: FeedbackDto, b: FeedbackDto): number {
   if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
   if (a.id === b.id) return 0;
   return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * `newestFirst`'s strictly-after test, in the same descending order: a row comes
+ * after the cursor when its `createdAt` sorts earlier, or when the timestamps tie
+ * and its `id` sorts earlier. Comparing the hydrated ISO strings (not the stored
+ * rows) is what lets a page boundary sit on a timestamp tie without repeating or
+ * skipping the row the cursor names.
+ */
+function afterNewestFirst(row: FeedbackDto, at: string[]): boolean {
+  const [createdAt, id] = at;
+  return row.createdAt < createdAt || (row.createdAt === createdAt && row.id < id);
 }
 
 /**
@@ -164,15 +176,17 @@ export class FeedbackService {
   }
 
   /**
-   * `GET /api/feedback` — the owner's rows newest-first through the read-through
-   * cache. Key `feedback:<sub>:v<gen>:list` holds the whole ciphertext row set
-   * (`SPEC-feedback-service` Cache Rules): filters and pagination never enter
-   * the key, so one entry serves every read. Decrypt, DTO assembly, and the
-   * `createdAt DESC, id DESC` ordering all run **after** the hit, so plaintext
-   * never exists outside the request path. The wire shape is a bare array — the
-   * UI groups by app then type itself.
+   * `GET /api/feedback` — one cursor page of the owner's rows newest-first, read
+   * through the read-through cache. Key `feedback:<sub>:v<gen>:list` holds the
+   * whole ciphertext row set (`SPEC-feedback-service` Cache Rules): filters and
+   * pagination never enter the key, so one entry serves every page of every read.
+   * Decrypt, DTO assembly, and the `createdAt DESC, id DESC` ordering all run
+   * **after** the hit, so plaintext never exists outside the request path; paging
+   * is then a post-hit projection through the shared seam
+   * (`SPEC-pagination-seam` §6), which is why an in-memory slice is enough.
    */
-  async findAll(sub: string): Promise<FeedbackDto[]> {
+  async findAll(sub: string, opts: { limit?: number; cursor?: string }): Promise<FeedbackPage> {
+    const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     const rows = await this.cache.getThrough(
       sub,
       'list',
@@ -185,9 +199,16 @@ export class FeedbackService {
       },
       { decode: decodeCiphertextList, cacheable: (value) => value.every(isCiphertextRow) },
     );
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return { feedback: [], nextCursor: null, total: 0 };
     const dek = await this.keys.getDekForRead(sub);
-    return rows.map((row) => this.toDto(row, sub, dek)).sort(newestFirst);
+    const ordered = rows.map((row) => this.toDto(row, sub, dek)).sort(newestFirst);
+    const page = paginate(ordered, {
+      limit,
+      cursor: opts.cursor,
+      keyOf: (row) => [row.createdAt, row.id],
+      after: afterNewestFirst,
+    });
+    return { feedback: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

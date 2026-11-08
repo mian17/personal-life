@@ -72,12 +72,45 @@ describe('Notes API (e2e)', () => {
     ).expect(201);
 
     const withNote = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
-    expect(withNote.body.map((t: { tagId: number }) => t.tagId)).toContain(77);
+    // `{ tagUsages, nextCursor }` — the bare array this route used to answer with is gone.
+    expect(Object.keys(withNote.body).sort()).toEqual(['nextCursor', 'tagUsages', 'total']);
+    expect(withNote.body.tagUsages.map((t: { tagId: number }) => t.tagId)).toContain(77);
 
     await auth(request(app.getHttpServer()).delete(`/api/notes/${created.body.id}`)).expect(200);
 
     const afterDelete = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
-    expect(afterDelete.body.map((t: { tagId: number }) => t.tagId)).not.toContain(77);
+    expect(afterDelete.body.tagUsages.map((t: { tagId: number }) => t.tagId)).not.toContain(77);
+  });
+
+  it('pages the tag usage surface with no gap and no duplicate', async () => {
+    // Five fresh ids, so this owner's usage surface has more rows than one page.
+    for (const tagId of [10, 20, 30, 40, 50]) {
+      await auth(request(app.getHttpServer()).post('/api/notes').send({ body: `u${tagId}`, tagIds: [tagId] })).expect(201);
+    }
+
+    const whole = await auth(request(app.getHttpServer()).get('/api/tags?limit=200')).expect(200);
+    const expectedIds = (whole.body.tagUsages as Array<{ tagId: number }>).map((row) => row.tagId);
+
+    const seen: number[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
+      const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query)).expect(200);
+      const page = res.body as { tagUsages: Array<{ tagId: number }>; nextCursor: string | null };
+      expect(Object.keys(res.body).sort()).toEqual(['nextCursor', 'tagUsages', 'total']);
+      expect(page.tagUsages.length).toBeLessThanOrEqual(2);
+      seen.push(...page.tagUsages.map((row) => row.tagId));
+      cursor = page.nextCursor;
+      pages += 1;
+    } while (cursor !== null && pages < 20);
+
+    // The walk ended because the service said so, not because the guard tripped.
+    expect(cursor).toBeNull();
+    expect(pages).toBeGreaterThan(1);
+    // `tagId ASC` across the whole surface, each id exactly once.
+    expect(seen).toEqual(expectedIds);
+    expect(new Set(seen).size).toBe(expectedIds.length);
   });
 
   it('supports the full note lifecycle with tagId filtering', async () => {

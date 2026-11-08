@@ -39,7 +39,20 @@ export const resources: ResourceRegistry[] = [
         },
       },
 
-      { kind: 'list', fields: {} },
+      {
+        kind: 'list',
+        fields: {
+          q: {
+            type: 'string',
+            description: 'Only tags whose name matches this search, at most 200 characters',
+          },
+          limit: { type: 'number', description: 'Page size, 1 to 200 tags' },
+          cursor: {
+            type: 'string',
+            description: 'Opaque cursor the previous page returned; passed back untouched',
+          },
+        },
+      },
 
       {
         kind: 'update',

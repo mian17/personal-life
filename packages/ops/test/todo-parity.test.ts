@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { main as runCli } from '../src/cli/run';
 import { createMcpServer } from '../src/mcp/server';
+import { findOp } from '../src/core/registry';
 import type { ResourceRegistry } from '../src/core/types';
 import { resources } from '../src/services/todo';
 import { storeTokens } from '../src/auth/token-store';
@@ -111,6 +112,14 @@ describe('the todo registry', () => {
 
   it('declares twelve ops across the five resources', () => {
     expect(opNames()).toHaveLength(12);
+  });
+
+  it('addresses the lists listing with the two paging fields, in order', () => {
+    const list = findOp(registryOf('lists'), 'list');
+
+    expect(Object.keys(list.fields)).toEqual(['q', 'limit', 'cursor']);
+    expect(list.fields['limit'].description).toContain('1 to 200');
+    expect(list.fields['cursor'].description).toContain('passed back untouched');
   });
 
   it('declares no push resource and no list delete, the two policy cuts', () => {
@@ -343,6 +352,24 @@ describe('todo operation parity', () => {
     });
 
     expectSuccessful(pair);
+    expect(pair.mcp.text).toBe(pair.cli.text);
+  });
+
+  it('sends the same paged listing and passes the cursor through untouched', async () => {
+    const cursor = Buffer.from('list-a', 'utf8').toString('base64url');
+    const pair = await runBoth({
+      resource: 'lists',
+      argv: ['lists', 'list', '--limit', '20', '--cursor', cursor],
+      tool: 'lists_list',
+      args: { limit: 20, cursor },
+      seed: seededLists,
+    });
+
+    expectSuccessful(pair);
+    expect(pair.cliWire?.method).toBe('GET');
+    expect(pair.cliWire?.path).toBe('/api/lists');
+    expect(pair.cliWire?.query).toEqual({ limit: '20', cursor });
+    expect(pair.mcpWire?.query).toEqual(pair.cliWire?.query);
     expect(pair.mcp.text).toBe(pair.cli.text);
   });
 

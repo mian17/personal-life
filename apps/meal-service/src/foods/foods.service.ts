@@ -12,7 +12,7 @@ import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
 import {
   completeVector,
@@ -51,6 +51,38 @@ export interface FoodDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One page of the owner's catalog plus the cursor that continues it. The
+ * envelope key is the entity plural (`SPEC-pagination-seam` §4).
+ */
+export interface FoodPage {
+  foods: FoodDto[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
+/** What one catalog read is narrowed by; `limit`/`cursor` page it, the rest filter it. */
+export interface ListFoodsOptions {
+  /** Substring match over the **decrypted** name, applied after the cache hit. */
+  q?: string;
+  /** Include the soft-deleted rows a past entry or saved meal still names. */
+  includeDeleted?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+/**
+ * The catalog's strictly-after test: `createdAt ASC, id ASC` (the loader's
+ * order). `createdAt` is tie-prone — a batch create saves several foods in the
+ * same millisecond — so `id` breaks the tie and the boundary can neither repeat
+ * nor skip a row (`SPEC-pagination-seam` §3).
+ */
+function afterCatalogPosition(food: FoodDto, at: string[]): boolean {
+  const [createdAt, id] = at;
+  return food.createdAt > createdAt || (food.createdAt === createdAt && food.id > id);
 }
 
 /**
@@ -229,8 +261,8 @@ export class FoodsService {
   }
 
   /**
-   * The owner's foods, optionally filtered by `q`, optionally including the
-   * soft-deleted rows.
+   * The owner's whole catalog matching `q`, optionally including the soft-deleted
+   * rows — the single ordered read both list callers build on.
    *
    * Key `meal:<sub>:v<gen>:food:list`. The cached value is the whole ciphertext
    * row set — trashed rows included — so neither `q` nor the active-vs-all
@@ -241,14 +273,36 @@ export class FoodsService {
    * `includeDeleted` exists because a soft-deleted food still names the past
    * entries and saved-meal items that logged it (`SPEC-food-catalog-ui` AC5):
    * the id-only join has nowhere else to read the name from.
+   *
+   * This is the whole set, not a page: the photo tool loop ranks every match
+   * (`photo.service.ts` `searchFood`), so narrowing it to one page would silently
+   * make the model see a subset of the catalog. `findAll` pages over the same
+   * result, which is what keeps the two readers one query path.
    */
-  async findAll(sub: string, q?: string, includeDeleted = false): Promise<FoodDto[]> {
+  async findMatching(sub: string, q?: string, includeDeleted = false): Promise<FoodDto[]> {
     const rows = await this.cache.list(sub, () => this.loadRows(sub));
     const selected = includeDeleted ? rows : rows.filter((row) => row.deletedAt === null);
     const dek = await this.readDek(sub, selected);
     const decoded = selected.map((row) => this.toDto(row, sub, dek));
     if (!q) return decoded;
     return decoded.filter((food) => likeMatch(food.name, '%' + q + '%'));
+  }
+
+  /**
+   * One page of `GET /api/foods`, in the catalog's order (`createdAt ASC,
+   * id ASC`). The page is a projection of `findMatching`'s whole filtered set,
+   * so `limit`/`cursor` never reach the cache key and one entry serves every page
+   * of every search variant (`SPEC-pagination-seam` §6).
+   */
+  async findAll(sub: string, opts: ListFoodsOptions = {}): Promise<FoodPage> {
+    const matching = await this.findMatching(sub, opts.q, opts.includeDeleted);
+    const page = paginate(matching, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      keyOf: (food) => [food.createdAt, food.id],
+      after: afterCatalogPosition,
+    });
+    return { foods: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

@@ -33,6 +33,12 @@ test.describe('stats', () => {
     await page.clock.install();
     await logIn(page);
 
+    // Today is the whole suite's day, not this spec's: the timer specs record their own
+    // blocks into the same owner before this one runs, so the block below is measured as
+    // the minutes it adds to what today already holds rather than as today's total.
+    await saveGoal(page, FIRST_GOAL);
+    const minutesBefore = await readTodayMinutes(page);
+
     await recordFocusBlock(page);
 
     // The timer's toolbar is the only page that carries the approved nav order,
@@ -43,11 +49,9 @@ test.describe('stats', () => {
 
     // FIRST_GOAL lands on a day that already holds the block, so today measures
     // against it. Snapshotting that window is what lets the second write prove it
-    // moves today's bar alone; the write itself leaves the owner on settings, so the
-    // surface is re-opened by its URL before it is read.
-    await saveGoal(page, FIRST_GOAL);
-    await page.goto('/pomodoro/stats');
-    await expectTodayFill(page, { minutes: FOCUS_MINUTES, goal: FIRST_GOAL, percent: 83 });
+    // moves today's bar alone.
+    const recordedMinutes = minutesBefore + FOCUS_MINUTES;
+    await expectTodayFill(page, { minutes: recordedMinutes, goal: FIRST_GOAL });
     const firstGoalWindow = await barTexts(page);
     await expectBarCount(page, PERIODS[0].barCount);
     await expectNoHorizontalOverflow(page);
@@ -55,9 +59,10 @@ test.describe('stats', () => {
 
     for (const period of PERIODS) await expectPeriodWalksBack(page, period);
 
+    // The second write happens on settings, so the surface is re-opened by its URL.
     await saveGoal(page, SECOND_GOAL);
     await page.goto('/pomodoro/stats');
-    await expectTodayFill(page, { minutes: FOCUS_MINUTES, goal: SECOND_GOAL, percent: 50 });
+    await expectTodayFill(page, { minutes: recordedMinutes, goal: SECOND_GOAL });
 
     // Only today's goal moved: every day before it keeps the goal its own row gave
     // it, while today's bar is the one the second write re-measures.
@@ -108,16 +113,36 @@ async function openStats(page: Page): Promise<void> {
   await page.waitForURL(/\/pomodoro\/stats$/);
 }
 
-/** Today's fill, named by the minutes and goal it claims, reporting the percent it measured. */
+/**
+ * The minutes today already holds, as the surface itself names them. Read through the
+ * bar's accessible name, the same text the assertion below pins.
+ */
+async function readTodayMinutes(page: Page): Promise<number> {
+  await page.goto('/pomodoro/stats');
+  const name = await page.getByRole('progressbar').getAttribute('aria-label');
+  const minutes = /^Today: (\d+) of \d+ minutes$/.exec(name ?? '')?.[1];
+  if (minutes === undefined) throw new Error(`unexpected today bar name: ${name}`);
+  return Number(minutes);
+}
+
+/**
+ * Today's fill, named by the minutes and goal it claims, reporting the percent it
+ * measured. The percent is the bar's own rule — minutes over goal, held to 0-100 and
+ * rounded — so a day that overshoots its goal reads the clamped fill it draws.
+ */
 async function expectTodayFill(
   page: Page,
-  today: { minutes: number; goal: number; percent: number },
+  today: { minutes: number; goal: number },
 ): Promise<void> {
   const bar = page.getByRole('progressbar', {
     name: `Today: ${today.minutes} of ${today.goal} minutes`,
   });
 
-  await expect(bar).toHaveAttribute('aria-valuenow', String(today.percent));
+  await expect(bar).toHaveAttribute('aria-valuenow', String(percentOf(today.minutes, today.goal)));
+}
+
+function percentOf(minutes: number, goal: number): number {
+  return Math.round(Math.min(100, Math.max(0, (minutes / goal) * 100)));
 }
 
 /** Every bar as the chart states it, in window order. */

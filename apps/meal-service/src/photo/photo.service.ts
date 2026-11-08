@@ -238,7 +238,9 @@ export class PhotoService {
   }
 
   private async searchFood(sub: string, query: string): Promise<SearchFoodResult> {
-    const catalog = await this.foods.findAll(sub, query);
+    // `findMatching`, not `findAll`: the resolve ranks every catalog match, so a
+    // single page would narrow the model's search silently.
+    const catalog = await this.foods.findMatching(sub, query);
     if (catalog.length > 0) {
       return { catalog: catalog.map(toCatalogHit), usda: [] };
     }

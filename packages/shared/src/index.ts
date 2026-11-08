@@ -35,6 +35,18 @@ export interface TagUsage {
   count: number;
 }
 
+/**
+ * One cursor page of a domain's tag-usage surface (`SPEC-pagination-seam` §4),
+ * shaped like `NotePage`. The usage list is bounded by the tag vocabulary, so the
+ * envelope buys one uniform list contract rather than a smaller read.
+ */
+export interface TagUsagePage {
+  tagUsages: TagUsage[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
+}
+
 export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
 
 export interface Note {
@@ -61,6 +73,8 @@ export interface UpdateNoteInput {
 export interface NotePage {
   notes: Note[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export const NOTE_BODY_MAX = 20000;
@@ -152,6 +166,8 @@ export interface UpdateTodoInput {
 export interface TodoPage {
   todos: Todo[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** One appended completion occurrence (`SPEC-todo-completion-history`, C2/C6/C7). */
@@ -168,6 +184,8 @@ export interface TodoCompletion {
 export interface TodoCompletionPage {
   completions: TodoCompletion[];
   nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /**
@@ -181,6 +199,18 @@ export interface List {
   importantDefault: boolean | null;
   version: number;
   createdAt: string;
+}
+
+/**
+ * One cursor page of the owner's todo lists (`SPEC-pagination-seam` §4), shaped
+ * like `NotePage`. Lists are a named vocabulary (tens), so the envelope is
+ * contract uniformity, not a performance fix.
+ */
+export interface ListPage {
+  lists: List[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export const TODO_TITLE_MAX = 500;
@@ -215,6 +245,18 @@ export interface FeedbackDto {
   title: string;
   description: string;
   createdAt: string;
+}
+
+/**
+ * One cursor page of an owner's feedback (`SPEC-pagination-seam` §4), shaped like
+ * `NotePage`/`TodoPage`. The envelope key is `feedback`, the mass noun: the entity
+ * has no plural, so `feedbacks` would not be English.
+ */
+export interface FeedbackPage {
+  feedback: FeedbackDto[];
+  nextCursor: string | null;
+  /** How many rows the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 export interface CreateFeedbackInput {

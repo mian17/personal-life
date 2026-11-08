@@ -10,6 +10,11 @@ function upstreamReturned(value: unknown): void {
   mockCallService.mockResolvedValueOnce(value);
 }
 
+/** One session row keyed by id, for the paging cases. */
+function sessionOn(id: string, date: string): SessionRow {
+  return { id, ownerSub: 'owner-1', date, minutes: 25, createdAt: `${date}T09:00:00.000Z` };
+}
+
 function lastCall(): [string, string, RequestInit | undefined] {
   return mockCallService.mock.calls[0] as [string, string, RequestInit | undefined];
 }
@@ -20,7 +25,7 @@ beforeEach(() => {
 
 describe('listSessions', () => {
   it('encodes both client days as query parameters, not path segments', async () => {
-    upstreamReturned([]);
+    upstreamReturned({ sessions: [], nextCursor: null });
 
     await listSessions('2026-10-01', '2026-10-07');
 
@@ -37,9 +42,22 @@ describe('listSessions', () => {
       minutes: 25,
       createdAt: '2026-10-02T09:00:00.000Z',
     };
-    upstreamReturned([row]);
+    upstreamReturned({ sessions: [row], nextCursor: null });
 
     await expect(listSessions('2026-10-01', '2026-10-07')).resolves.toEqual([row]);
+  });
+
+  it('walks every page, so a window past the first page is not silently truncated', async () => {
+    // The stats screen buckets every row in the window; one page would under-count.
+    const one = sessionOn('s1', '2026-10-02');
+    const two = sessionOn('s2', '2026-10-03');
+    upstreamReturned({ sessions: [one], nextCursor: 'page-2' });
+    upstreamReturned({ sessions: [two], nextCursor: null });
+
+    await expect(listSessions('2026-10-01', '2026-10-07')).resolves.toEqual([one, two]);
+
+    const [, secondPath] = mockCallService.mock.calls[1] as [string, string];
+    expect(secondPath).toBe('/api/sessions?from=2026-10-01&to=2026-10-07&cursor=page-2');
   });
 
   it('types the owner as nullable, matching the service DTO', async () => {
@@ -53,7 +71,7 @@ describe('listSessions', () => {
       minutes: 50,
       createdAt: '2026-10-03T09:00:00.000Z',
     };
-    upstreamReturned([legacyRow]);
+    upstreamReturned({ sessions: [legacyRow], nextCursor: null });
 
     await expect(listSessions('2026-10-01', '2026-10-07')).resolves.toEqual([legacyRow]);
   });
@@ -85,13 +103,27 @@ describe('listGoals', () => {
       { validFrom: '2026-09-01', minutes: 60 },
       { validFrom: '2026-10-01', minutes: 90 },
     ];
-    upstreamReturned(goals);
+    upstreamReturned({ goals, nextCursor: null });
 
     await expect(listGoals()).resolves.toEqual(goals);
 
     const [, path, init] = lastCall();
     expect(path).toBe('/api/goal');
     expect(init).toBeUndefined();
+  });
+
+  it('walks every page, so day → goal never resolves against a partial history', async () => {
+    // `resolveGoal` answers the newest row at or before a day; a single page would
+    // silently pick an older row for any day whose governing row fell past it.
+    const older = { validFrom: '2026-09-01', minutes: 60 };
+    const newer = { validFrom: '2026-10-01', minutes: 90 };
+    upstreamReturned({ goals: [older], nextCursor: 'page-2' });
+    upstreamReturned({ goals: [newer], nextCursor: null });
+
+    await expect(listGoals()).resolves.toEqual([older, newer]);
+
+    const [, secondPath] = mockCallService.mock.calls[1] as [string, string];
+    expect(secondPath).toBe('/api/goal?cursor=page-2');
   });
 });
 

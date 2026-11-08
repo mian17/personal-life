@@ -113,6 +113,27 @@ describe('TagsCache (read-through + generation invalidation)', () => {
     ]);
   });
 
+  it('every page of a paged listing is served from the one all entry', async () => {
+    const client = new CapturingRedisClient();
+    h = await makeHarness(new TagsCache(client));
+    for (const name of ['apple', 'Banana', 'cherry']) await h.service.create(SUB, name);
+    const gen = currentGen(client, SUB);
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await h.service.page(SUB, { limit: 1, cursor });
+      seen.push(...page.tags.map((tag) => tag.name));
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+
+    expect(seen).toEqual(['apple', 'Banana', 'cherry']);
+    // One populate for every page: `limit`/`cursor` are projections after the hit,
+    // so neither can reach the key.
+    expect(client.setCalls).toEqual([`tags:${SUB}:v${gen}:all`]);
+  });
+
   it('no request parameter enters the key: list and resolve never add a second key', async () => {
     const client = new CapturingRedisClient();
     h = await makeHarness(new TagsCache(client));

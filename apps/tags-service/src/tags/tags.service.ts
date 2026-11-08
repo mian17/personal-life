@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { KeysService, runAtomicBatch } from '@life/service-kit';
+import { likeMatch } from '@life/shared';
+import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
 import { Tag } from './tag.entity';
 import { TAGS_CACHE, TagsCache } from './tags-cache';
 import type { CreateTagDto } from './dto/create-tag.dto';
@@ -21,6 +22,18 @@ export interface TagDto {
   name: string;
   version: number;
   createdAt: string;
+}
+
+/**
+ * One page of the owner's vocabulary (`SPEC-pagination-seam` §4: plural key,
+ * `Tag` → `tags`). The set is hand-curated and naturally small, so the envelope
+ * is one uniform list contract, not a bounded scan.
+ */
+export interface TagPage {
+  tags: TagDto[];
+  nextCursor: string | null;
+  /** How many tags the whole filtered set holds — never this page's length. */
+  total: number;
 }
 
 /** The single cached shape: the owner's serialized **ciphertext** tag rows. */
@@ -48,6 +61,16 @@ function toCachedRow(tag: Tag): CachedTagRow {
     version: tag.version,
     createdAt: tag.createdAt.toISOString(),
   };
+}
+
+/**
+ * True when a decrypted tag name passes the list's `q` filter. Matching is the
+ * shared `LIKE` parity comparator, so the service and the app agree character
+ * for character; a blank `q` is "no filter", never "match nothing".
+ */
+function matchesQuery(name: string, q: string | undefined): boolean {
+  const wanted = q?.trim();
+  return !wanted || likeMatch(name, `%${wanted}%`);
 }
 
 /** True when the stored name is an `enc.v1.` envelope (M5: the store starts encrypted). */
@@ -180,11 +203,51 @@ export class TagsService {
     return a.id - b.id;
   }
 
-  /** `GET /api/tags` — decrypted, name-sorted (case-insensitive). */
+  /**
+   * `byName`'s strictly-after test, in that same order: a row comes after the
+   * cursor when its **lower-cased** name sorts later, or when the names tie and
+   * its numeric `id` is larger. Folding case exactly as the sort does is what
+   * keeps the boundary honest — comparing raw names here would let `Zebra` sort
+   * before `apple` and repeat or skip a row at a page edge.
+   */
+  private static afterName(row: TagDto, at: string[]): boolean {
+    const [name, id] = at;
+    const lowered = row.name.toLowerCase();
+    if (lowered !== name) return lowered > name;
+    return row.id > Number(id);
+  }
+
+  /** `GET /api/tags` — decrypted, name-sorted (case-insensitive): the whole set. */
   async list(sub: string): Promise<TagDto[]> {
     const rows = await this.rawRows(sub);
     const decoded = await this.decodeRows(sub, rows);
     return decoded.sort(TagsService.byName);
+  }
+
+  /**
+   * `GET /api/tags?q=&limit=&cursor=` — one page of that same order on the shared
+   * cursor seam. Pagination is a post-hit projection: `limit`/`cursor`/`q` never
+   * enter the `tags:<sub>:v<gen>:all` key, so one entry serves every page and
+   * every search variant.
+   *
+   * The vocabulary is hand-curated and small, so the window is the shared list
+   * contract, not a bounded scan; the app still needs every tag (the picker offers
+   * all of them), so it walks this envelope to exhaustion.
+   */
+  async page(
+    sub: string,
+    opts: { q?: string; limit?: number; cursor?: string } = {},
+  ): Promise<TagPage> {
+    const ordered = (await this.list(sub)).filter((tag) => matchesQuery(tag.name, opts.q));
+    const page = paginate(ordered, {
+      limit: opts.limit ?? DEFAULT_PAGE_LIMIT,
+      cursor: opts.cursor,
+      // The cursor carries the *lower-cased* name, matching the sort key and
+      // `afterName`; `id` last keeps it unique per row.
+      keyOf: (tag) => [tag.name.toLowerCase(), String(tag.id)],
+      after: TagsService.afterName,
+    });
+    return { tags: page.rows, nextCursor: page.nextCursor, total: page.total };
   }
 
   /**

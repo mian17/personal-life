@@ -112,7 +112,11 @@ export function journeyChecklist(options: JourneyOptions): JourneyTest[] {
       await expect(page.getByText(tagged, { exact: false })).toBeVisible();
       await restoreNote(page, tagged);
 
-      // Trash it again, then permanently delete it.
+      // Trash it again, then permanently delete it. The trash screen's Back leads to
+      // Settings, which is where this journey reached it from, so the second Back is the
+      // one that lands on the notes index.
+      await page.getByLabel('Back').click();
+      await page.waitForURL(/\/notes\/settings$/, { timeout: 15_000 });
       await page.getByLabel('Back').click();
       await page.waitForURL(/\/notes$/, { timeout: 15_000 });
       await trashNote(page, tagged);
