@@ -1,4 +1,5 @@
 import 'server-only';
+import { withQuery } from '@life/app-kit';
 import { callService } from './client';
 
 const TAGS_API_URL = process.env.TAGS_API_URL ?? 'http://127.0.0.1:3004';
@@ -44,8 +45,7 @@ export function fetchTagPage(
   if (opts.q) params.set('q', opts.q);
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
-  const qs = params.toString();
-  return call<RegistryTagPage>(`/api/tags${qs ? `?${qs}` : ''}`);
+  return call<RegistryTagPage>(withQuery('/api/tags', params));
 }
 
 /**

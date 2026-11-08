@@ -7,6 +7,7 @@ import type {
   TagUsagePage,
   UpdateNoteInput,
 } from '@life/shared';
+import { withQuery } from '@life/app-kit';
 import { callService } from './client';
 
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:3001';
@@ -28,9 +29,7 @@ export function listNotes(tagId?: number, q?: string, cursor?: string): Promise<
   if (tagId !== undefined) params.set('tagId', String(tagId));
   if (q) params.set('q', q);
   if (cursor) params.set('cursor', cursor);
-  const qs = params.toString();
-  const query = qs ? `?${qs}` : '';
-  return call<NotePage>(`/api/notes${query}`);
+  return call<NotePage>(withQuery('/api/notes', params));
 }
 
 export function getNote(id: string): Promise<Note> {
@@ -48,8 +47,7 @@ export function fetchNoteTagUsagePage(
   const params = new URLSearchParams();
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
-  const qs = params.toString();
-  return call<TagUsagePage>(`/api/tags${qs ? `?${qs}` : ''}`);
+  return call<TagUsagePage>(withQuery('/api/tags', params));
 }
 
 /**

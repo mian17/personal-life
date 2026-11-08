@@ -11,6 +11,19 @@ import { TodosScroll } from './todos-scroll';
 export const dynamic = 'force-dynamic';
 
 /**
+ * The page after `cursor`, todos as the service returned them. A server action, so the
+ * owner's token never leaves the server; the completion lookup is not re-read here
+ * because it is already complete and the browser holds it for the whole scroll.
+ *
+ * Module scope because the render supplies nothing to it — `listTodos` is the whole
+ * fetch, and `cursor` is the only input.
+ */
+async function loadTodoPage(cursor: string): Promise<TodoPage> {
+  'use server';
+  return listTodos({ cursor });
+}
+
+/**
  * The `/todos` screen: it frames and names the view and reads page 1, never more. The rows, the
  * header count and the load-more control belong to `TodosScroll`, the one client island here,
  * because appending a page and re-counting it both happen after first paint.
@@ -34,16 +47,6 @@ export default async function TodosPage() {
   const availableTags = registry.map((t) => ({ id: t.id, name: t.name }));
   const matrixEnabled = await readPref('matrix');
 
-  /**
-   * The page after `cursor`, todos as the service returned them. A server action, so the
-   * owner's token never leaves the server; the completion lookup is not re-read here because
-   * it is already complete and the browser holds it for the whole scroll.
-   */
-  async function loadPage(cursor: string): Promise<TodoPage> {
-    'use server';
-    return listTodos({ cursor });
-  }
-
   return (
     <TodosScroll
       todos={page.todos}
@@ -64,7 +67,7 @@ export default async function TodosPage() {
           </TabBar>
         ) : undefined
       }
-      loadPage={loadPage}
+      loadPage={loadTodoPage}
     />
   );
 }

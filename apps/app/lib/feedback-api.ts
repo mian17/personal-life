@@ -1,5 +1,6 @@
 import 'server-only';
 import type { CreateFeedbackInput, FeedbackDto, FeedbackPage, FeedbackStatus } from '@life/shared';
+import { withQuery } from '@life/app-kit';
 import { callService } from './client';
 
 const FEEDBACK_API_URL = process.env.FEEDBACK_API_URL ?? 'http://127.0.0.1:3008';
@@ -19,8 +20,7 @@ export function listFeedbackPage(opts: { limit?: number; cursor?: string } = {})
   const params = new URLSearchParams();
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
-  const qs = params.toString();
-  return call<FeedbackPage>(`/api/feedback${qs ? `?${qs}` : ''}`);
+  return call<FeedbackPage>(withQuery('/api/feedback', params));
 }
 
 /**

@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { MAX_PAGE_LIMIT } from '@life/service-kit';
 import { FakeRedisClient } from './fake-redis';
 import { JwtTestHarness } from './jwt-harness';
 import {
@@ -139,10 +140,14 @@ describe('Daily focus goal (e2e)', () => {
       .get('/api/goal?limit=0')
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(400);
-    await request(running.app.getHttpServer())
+    const tooLarge = await request(running.app.getHttpServer())
       .get('/api/goal?limit=201')
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(400);
+
+    // One past the imported cap, so the rejection has to name that cap: a clamp would
+    // answer 200 with a quietly shortened page instead.
+    expect(tooLarge.body.message).toEqual([`limit must not be greater than ${MAX_PAGE_LIMIT}`]);
   });
 
   it('refuses a missing or impossible day rather than defaulting to one', async () => {
