@@ -2,6 +2,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PomodoroPage } from '../src/pomodoro-page';
 import { DEFAULT_DURATIONS, MINUTE_MS, SESSIONS_PER_CYCLE } from '../src/timer';
 
+/** The three chips the card draws, by their visible label. */
+const FOCUS_PRESET_LABELS = ['15 min', '25 min', '50 min'] as const;
+
 /** The mode the hook writes back on every settle, which is also what a reload restores. */
 function storeMode(mode: {
   phase: string;
@@ -197,6 +200,31 @@ describe('PomodoroPage', () => {
     expect(pressed.map((chip) => chip.textContent)).toEqual(['50 min']);
   });
 
+  it('reports and starts a focus length a chip was tapped for', () => {
+    const onFocusLengthChange = jest.fn();
+    render(
+      <PomodoroPage durations={DEFAULT_DURATIONS} onFocusLengthChange={onFocusLengthChange} />,
+    );
+
+    expect(digits()).toBe('25:00');
+
+    fireEvent.click(screen.getByRole('button', { name: '50 min' }));
+
+    expect(onFocusLengthChange).toHaveBeenCalledWith(50);
+    expect(pressedChips()).toEqual(['50 min']);
+    // The timer re-seeded from the choice, not from the prop it mounted with.
+    expect(digits()).toBe('50:00');
+    expect(progress()).toBe('0');
+  });
+
+  it('draws the chips as disabled buttons when there is nowhere to report a choice', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    const chips = FOCUS_PRESET_LABELS.map((name) => screen.getByRole('button', { name }));
+
+    expect(chips.map((chip) => chip.hasAttribute('disabled'))).toEqual([true, true, true]);
+  });
+
   it('names the cycle position in the Today count', () => {
     render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
 
@@ -218,6 +246,19 @@ describe('PomodoroPage', () => {
     expect(screen.queryByText('Focus minutes')).toBeNull();
     expect(screen.queryByText('Daily goal')).toBeNull();
   });
+
+  /** The digits' own read-out, as the owner reads them. */
+  function digits(): string {
+    return screen.getByRole('timer').textContent ?? '';
+  }
+
+  /** The labels of the chips carrying the pressed treatment, in the order they are drawn. */
+  function pressedChips(): string[] {
+    return screen
+      .getAllByText(/^\d+ min$/u)
+      .filter((chip) => chip.closest('.ui-pill--active') != null)
+      .map((chip) => chip.textContent ?? '');
+  }
 
   /** The track's own read-out: `<progress>` exposes its value as the element's `value`. */
   function progress(): string {

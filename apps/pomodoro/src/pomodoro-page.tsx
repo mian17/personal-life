@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -27,9 +28,11 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 /**
- * The three focus lengths the reference draws as chips, in minutes. The chosen length
- * is set on `/pomodoro/settings`, so this row reads the current choice instead of
- * setting it — a chip that looks pressable but changes nothing would be a lie.
+ * The three focus lengths the reference draws as chips, in minutes. The row is a
+ * quick-pick: a chip both sets the length and reports it upward for persistence, so it
+ * stays in sync with the same preference `/pomodoro/settings` edits. A chip is a button
+ * and not a label because it changes the timer; with no one to report to, it is a
+ * disabled button instead — a label that looks pressable would be a lie either way.
  */
 const FOCUS_PRESETS = [15, 25, 50] as const;
 
@@ -61,6 +64,8 @@ const actionsStyles = 'mt-[var(--s2)]';
 
 export interface PomodoroPageProps {
   durations: Durations;
+  /** Told the focus length a chip picked, so the choice survives a reload. */
+  onFocusLengthChange?: (minutes: number) => void;
   /** Told the minutes of every focus block that ends, so the owner's day keeps them. */
   onFocusBlockEnd?: (minutes: number) => void;
   /** Minutes recorded today; absent, the Today group has no first row to draw. */
@@ -71,18 +76,33 @@ export interface PomodoroPageProps {
 
 export function PomodoroPage({
   durations,
+  onFocusLengthChange,
   onFocusBlockEnd,
   todayMinutes,
   todayGoalMinutes,
 }: Readonly<PomodoroPageProps>) {
-  const timer = useTimer(durations);
+  // The chip choice starts as the stored one and then leads, so a tap re-seeds the timer
+  // without waiting for the write to come back as a new prop. Memoised on the three
+  // minutes, not on the object: `useDurationsApplied` re-seeds the timer whenever the
+  // identity changes, and a fresh object per render would do that on every render.
+  const [focusMinutes, setFocusMinutes] = useState(durations.focus);
+  const chosen = useMemo(
+    () => ({ focus: focusMinutes, short: durations.short, long: durations.long }),
+    [focusMinutes, durations.short, durations.long],
+  );
+  const timer = useTimer(chosen);
   const canReset = resetAllowed(timer.status);
   const finishedBlocks = completedFocuses(timer.phase, timer.status, timer.session);
 
   useFocusRecorded(
-    { phase: timer.phase, durations, remainingMs: timer.remainingMs, status: timer.status },
+    { phase: timer.phase, durations: chosen, remainingMs: timer.remainingMs, status: timer.status },
     onFocusBlockEnd,
   );
+
+  function pickFocusLength(minutes: number): void {
+    setFocusMinutes(minutes);
+    onFocusLengthChange?.(minutes);
+  }
 
   return (
     <>
@@ -97,12 +117,19 @@ export function PomodoroPage({
             {timer.titles.next}
           </StatusText>
           <ProgressBar
-            value={percentSpent(timer.remainingMs, timer.phase, durations)}
+            value={percentSpent(timer.remainingMs, timer.phase, chosen)}
             label="Session progress"
           />
           <Row className={presetsStyles} role="group" aria-label="Focus length">
             {FOCUS_PRESETS.map((minutes) => (
-              <Pill key={minutes} size="filter" active={minutes === durations.focus}>
+              <Pill
+                key={minutes}
+                as="button"
+                size="filter"
+                active={minutes === focusMinutes}
+                onClick={() => pickFocusLength(minutes)}
+                disabled={onFocusLengthChange == null}
+              >
                 {`${minutes} min`}
               </Pill>
             ))}
