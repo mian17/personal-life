@@ -432,22 +432,6 @@ export function listSavedMeals(cursor?: string): Promise<SavedMealPage> {
   return call<SavedMealPage>(`/api/saved-meals${query}`);
 }
 
-/**
- * Every saved meal, walked cursor by cursor — the saved-meals screen renders the
- * whole browsable history, so a single page would hide rows behind a control
- * that does not exist yet.
- */
-export async function collectSavedMeals(maxItems = 1000): Promise<SavedMeal[]> {
-  const collected: SavedMeal[] = [];
-  let cursor: string | undefined;
-  for (;;) {
-    const page = await listSavedMeals(cursor);
-    collected.push(...page.savedMeals);
-    if (collected.length >= maxItems || !page.nextCursor) return collected.slice(0, maxItems);
-    cursor = page.nextCursor;
-  }
-}
-
 /** `GET /api/saved-meals/:id` — one frozen meal by id (a foreign id is a 404). */
 export function getSavedMeal(id: string): Promise<SavedMeal> {
   return call<SavedMeal>(`/api/saved-meals/${id}`);

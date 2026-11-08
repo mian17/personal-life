@@ -18,12 +18,16 @@ function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * `GET /api/notes` — filter by registry tag id (TagRef) and/or a content query.
+ * `GET /api/notes` — filter by registry tag id (TagRef) and/or a content query, and
+ * continue from `cursor`. Filters and pagination both stay out of the cache key
+ * (Contract 2 Rule 3): the service filters after the hit and pages in memory, so one
+ * cached entry serves every page of every filter.
  */
-export function listNotes(tagId?: number, q?: string): Promise<NotePage> {
+export function listNotes(tagId?: number, q?: string, cursor?: string): Promise<NotePage> {
   const params = new URLSearchParams();
   if (tagId !== undefined) params.set('tagId', String(tagId));
   if (q) params.set('q', q);
+  if (cursor) params.set('cursor', cursor);
   const qs = params.toString();
   const query = qs ? `?${qs}` : '';
   return call<NotePage>(`/api/notes${query}`);

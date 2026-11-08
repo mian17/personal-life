@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NUTRIENTS, format, type NutrientVector } from '@life/nutrition';
-import { Button, EmptyState, List, ListItem, ManagerBlock } from '@life/ui';
+import { Button, ListItem, ManagerBlock } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 
 const mockEstimatePhoto = jest.fn();
@@ -9,7 +9,7 @@ const mockEstimatePhoto = jest.fn();
 // The only meal-service read/write surface the re-log may touch: no photo/estimate
 // path is exported here, so a re-log that reached for Gemini would fail loudly.
 jest.mock('@/lib/meal-api', () => ({
-  collectSavedMeals: jest.fn(),
+  listSavedMeals: jest.fn(),
   getSavedMeal: jest.fn(),
   collectMealFoods: jest.fn(),
   collectMealFoodsIncludingDeleted: jest.fn(),
@@ -36,7 +36,7 @@ import {
   getSavedMeal,
   collectMealFoods,
   collectMealFoodsIncludingDeleted,
-  collectSavedMeals,
+  listSavedMeals,
   type MealFood,
   type SavedMeal,
 } from '@/lib/meal-api';
@@ -44,10 +44,15 @@ import { getToday } from '@/lib/today';
 import { notFound } from 'next/navigation';
 import SavedMealPage from '@/app/(meals)/meals/saved/[id]/page';
 import SavedMealsPage from '@/app/(meals)/meals/saved/page';
+import {
+  savedMealsBody,
+  SavedMealsScroll,
+  type SavedMealRow,
+} from '@/app/(meals)/meals/saved/saved-meals-scroll';
 import { relogMealAction } from '@/app/(meals)/meals/actions';
 import { deleteSavedMealAction } from '@/app/(meals)/meals/saved/actions';
 
-const mockedCollectSavedMeals = collectSavedMeals as jest.MockedFunction<typeof collectSavedMeals>;
+const mockedListSavedMeals = listSavedMeals as jest.MockedFunction<typeof listSavedMeals>;
 const mockedGetSavedMeal = getSavedMeal as jest.MockedFunction<typeof getSavedMeal>;
 const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
 const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
@@ -63,6 +68,11 @@ function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
     ...(Object.fromEntries(NUTRIENTS.map((n) => [n.key, 0])) as NutrientVector),
     ...overrides,
   };
+}
+
+/** One page of the `{ savedMeals, nextCursor }` envelope the service returns. */
+function savedPage(savedMeals: SavedMeal[], nextCursor: string | null = null) {
+  return { savedMeals, nextCursor };
 }
 
 function savedMeal(overrides: Partial<SavedMeal> = {}): SavedMeal {
@@ -130,38 +140,38 @@ describe('saved meals list', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('renders the empty state when the owner has saved nothing', async () => {
-    mockedCollectSavedMeals.mockResolvedValue([]);
+    mockedListSavedMeals.mockResolvedValue(savedPage([]));
 
     const el = await SavedMealsPage();
+    const html = renderToStaticMarkup(el);
 
     expect(el.type).toBe(ManagerBlock);
-    expect(find(el, EmptyState)).toBeDefined();
-    const html = renderToStaticMarkup(el);
     expect(html).toContain('No saved meals yet');
     // The frame each page returns is `ManagerBlock`; pin what it actually renders.
     expect(html).toContain('aria-label="Back"');
     expect(html).toContain('href="/meals/settings"');
-    expect(find(el, List)).toBeUndefined();
+    expect(html).not.toContain('ui-list');
   });
 
   it('renders one row per saved meal linking to its detail route, summed from stored vectors', async () => {
-    mockedCollectSavedMeals.mockResolvedValue([
-      savedMeal({ id: 's1' }),
-      savedMeal({
-        id: 's2',
-        name: 'Chicken salad',
-        items: [
-          { id: 'i2', foodId: 'chicken', quantity: 2, nutrients: vector({ calories: 200 }) },
-          { id: 'i3', foodId: null, quantity: 1, nutrients: vector({ calories: 150 }) },
-        ],
-      }),
-    ]);
+    mockedListSavedMeals.mockResolvedValue(
+      savedPage([
+        savedMeal({ id: 's1' }),
+        savedMeal({
+          id: 's2',
+          name: 'Chicken salad',
+          items: [
+            { id: 'i2', foodId: 'chicken', quantity: 2, nutrients: vector({ calories: 200 }) },
+            { id: 'i3', foodId: null, quantity: 1, nutrients: vector({ calories: 150 }) },
+          ],
+        }),
+      ]),
+    );
 
     const el = await SavedMealsPage();
     const html = renderToStaticMarkup(el);
 
-    expect(find(el, List)).toBeDefined();
-    expect(find(el, EmptyState)).toBeUndefined();
+    expect(html).toContain('ui-list');
     expect(html).toContain('href="/meals/saved/s1"');
     expect(html).toContain('href="/meals/saved/s2"');
     expect(html).toContain('Overnight oats');
@@ -172,7 +182,7 @@ describe('saved meals list', () => {
   });
 
   it('leads with a back control to /meals/settings and carries no nav actions', async () => {
-    mockedCollectSavedMeals.mockResolvedValue([savedMeal()]);
+    mockedListSavedMeals.mockResolvedValue(savedPage([savedMeal()]));
 
     const el = await SavedMealsPage();
     const html = renderToStaticMarkup(el);
@@ -184,10 +194,12 @@ describe('saved meals list', () => {
   });
 
   it('gives each row a delete control wired to the server action', async () => {
-    mockedCollectSavedMeals.mockResolvedValue([
-      savedMeal({ id: 's1', name: 'Overnight oats' }),
-      savedMeal({ id: 's2', name: 'Chicken salad' }),
-    ]);
+    mockedListSavedMeals.mockResolvedValue(
+      savedPage([
+        savedMeal({ id: 's1', name: 'Overnight oats' }),
+        savedMeal({ id: 's2', name: 'Chicken salad' }),
+      ]),
+    );
 
     const el = await SavedMealsPage();
     const html = renderToStaticMarkup(el);
@@ -195,8 +207,11 @@ describe('saved meals list', () => {
     expect(html).toContain('aria-label="Delete Overnight oats"');
     expect(html).toContain('aria-label="Delete Chicken salad"');
 
+    // The rows the page formatted for the island, rendered through the body branch a row
+    // takes — the island itself holds state, so its tree is read one level in.
+    const rows = find(el, SavedMealsScroll)!.props.rows as SavedMealRow[];
     const deleteButton = find(
-      el,
+      savedMealsBody(rows),
       Button,
       (b) => b.props['aria-label'] === 'Delete Overnight oats',
     );
@@ -204,13 +219,36 @@ describe('saved meals list', () => {
 
     // The wrapping form's action deletes THIS row's id, then refreshes the list.
     const form = find(
-      el,
+      savedMealsBody(rows),
       'form',
       (f) => typeof f.props.action === 'function',
     );
     expect(form).toBeDefined();
     await (form!.props.action as () => Promise<void>)();
     expect(mockedDeleteSavedMeal).toHaveBeenCalledWith('s1');
+  });
+
+  it('reads page 1 on the server, uncursored', async () => {
+    await SavedMealsPage();
+
+    expect(mockedListSavedMeals).toHaveBeenCalledWith();
+  });
+
+  it('offers one load-more control while a next cursor exists', async () => {
+    mockedListSavedMeals.mockResolvedValue(savedPage([savedMeal()], 'cursor-2'));
+
+    const html = renderToStaticMarkup(await SavedMealsPage());
+
+    expect(html.match(/>Load more</g)).toHaveLength(1);
+    expect(html).toContain('ui-btn--ghost');
+  });
+
+  it('renders no load-more control once the history is exhausted', async () => {
+    mockedListSavedMeals.mockResolvedValue(savedPage([savedMeal()]));
+
+    const html = renderToStaticMarkup(await SavedMealsPage());
+
+    expect(html).not.toContain('Load more');
   });
 });
 
