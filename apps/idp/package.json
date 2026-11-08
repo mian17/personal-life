@@ -9,7 +9,7 @@
     "seed": "ts-node scripts/seed-user.ts",
     "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

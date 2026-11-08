@@ -75,7 +75,6 @@ export function validateAuthEnv(auth: AuthEnv, env: AuthEnvSource = process.env)
 
   const isLoopback = redirect.hostname === 'localhost' || redirect.hostname === '127.0.0.1';
   if (isProduction && redirect.protocol !== 'https:' && !isLoopback) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[auth] OIDC_APP_REDIRECT_URI is not https in production: "${auth.redirectUri}". ` +
         'Tailscale Serve terminates TLS; register the https URL instead.',

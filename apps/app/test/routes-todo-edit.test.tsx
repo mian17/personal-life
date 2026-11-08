@@ -139,9 +139,9 @@ describe('/todos/[id]/edit page wiring', () => {
   it('routes a 404-shaped loader failure through notFound()', async () => {
     mockedGetTodo.mockRejectedValue({ status: 404, message: 'gone' });
 
-    await expect(
-      EditTodoPage({ params: Promise.resolve({ id: 'missing' }) }),
-    ).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(EditTodoPage({ params: Promise.resolve({ id: 'missing' }) })).rejects.toThrow(
+      'NEXT_NOT_FOUND',
+    );
 
     expect(mockedNotFound).toHaveBeenCalled();
     expect(mockedListLists).not.toHaveBeenCalled();
@@ -150,9 +150,10 @@ describe('/todos/[id]/edit page wiring', () => {
   it('rethrows a non-404 failure without calling notFound()', async () => {
     mockedGetTodo.mockRejectedValue({ status: 500, message: 'boom' });
 
-    await expect(
-      EditTodoPage({ params: Promise.resolve({ id: 't1' }) }),
-    ).rejects.toEqual({ status: 500, message: 'boom' });
+    await expect(EditTodoPage({ params: Promise.resolve({ id: 't1' }) })).rejects.toEqual({
+      status: 500,
+      message: 'boom',
+    });
 
     expect(mockedNotFound).not.toHaveBeenCalled();
   });
@@ -187,9 +188,8 @@ const realUseState = ReactModule.useState;
 function withRealUseState<T>(run: () => T): T {
   const spy = jest
     .spyOn(ReactModule, 'useState')
-    .mockImplementation(
-      ((initial: unknown) => realUseState(initial as never)) as unknown as typeof realUseState,
-    );
+    .mockImplementation(((initial: unknown) =>
+      realUseState(initial as never)) as unknown as typeof realUseState);
   try {
     return run();
   } finally {
@@ -223,7 +223,7 @@ interface EditorField extends ReactElement {
  * previous tree — which is how "toggle the Switch, then Save" is exercised.
  */
 function stateHarness() {
-  let store: unknown[] = [];
+  const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
 
   function renderTree(todo?: Todo): EditorTree {
@@ -231,8 +231,7 @@ function stateHarness() {
     spy.mockImplementation(((initial: unknown) => {
       const i = index++;
       if (i >= store.length) {
-        store[i] =
-          typeof initial === 'function' ? (initial as () => unknown)() : initial;
+        store[i] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       }
       const set = (next: unknown) => {
         store[i] =
@@ -276,30 +275,28 @@ function field(tree: EditorTree, label: string): ReactElement<Record<string, unk
 }
 
 /** The toolbar's save control (the check `IconButton`), whatever rides beside it. */
-function saveButton(tree: EditorTree): ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }> {
+function saveButton(
+  tree: EditorTree,
+): ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }> {
   const found = findByType(tree.props.actions, IconButton);
   if (!found) throw new Error('no save IconButton in the todo editor toolbar');
-  return found as unknown as ReactElement<{ onClick: () => void | Promise<void>; label?: string; disabled?: boolean }>;
+  return found as unknown as ReactElement<{
+    onClick: () => void | Promise<void>;
+    label?: string;
+    disabled?: boolean;
+  }>;
 }
 
 /** The field (`Input`) selected by its accessible name. */
 function inputByLabel(tree: EditorTree, label: string): EditorField {
-  const found = findByType(
-    tree.props.children,
-    Input,
-    (el) => el.props['aria-label'] === label,
-  );
+  const found = findByType(tree.props.children, Input, (el) => el.props['aria-label'] === label);
   if (!found) throw new Error(`no Input labelled ${label}`);
   return found as unknown as EditorField;
 }
 
 /** The field (`Select`) selected by its accessible name. */
 function selectByLabel(tree: EditorTree, label: string): EditorField {
-  const found = findByType(
-    tree.props.children,
-    Select,
-    (el) => el.props['aria-label'] === label,
-  );
+  const found = findByType(tree.props.children, Select, (el) => el.props['aria-label'] === label);
   if (!found) throw new Error(`no Select labelled ${label}`);
   return found as unknown as EditorField;
 }
@@ -387,7 +384,11 @@ describe('TodoEditor important Switch', () => {
       ['stored override true wins', { important: true, effectiveImportant: false }, true],
       ['stored override false wins', { important: false, effectiveImportant: true }, false],
       ['null + effective true inherits true', { important: null, effectiveImportant: true }, true],
-      ['null + effective false inherits false', { important: null, effectiveImportant: false }, false],
+      [
+        'null + effective false inherits false',
+        { important: null, effectiveImportant: false },
+        false,
+      ],
     ])('%s', (_name, overrides, expected) => {
       const harness = stateHarness();
       try {
@@ -740,7 +741,11 @@ describe('TodoEditor custom repeat', () => {
       const first = harness.renderTree(fixture);
       selectByLabel(first, 'Repeat').props.onChange!({ target: { value: 'custom' } });
       const opened = harness.renderTree(fixture);
-      (findByType(opened.props.children, RecurrenceDialog)!.props.onConfirm as (days: number[]) => void)([4, 5]);
+      (
+        findByType(opened.props.children, RecurrenceDialog)!.props.onConfirm as (
+          days: number[],
+        ) => void
+      )([4, 5]);
 
       const confirmed = harness.renderTree(fixture);
       expect(selectByLabel(confirmed, 'Repeat').props.value).toBe('custom');
@@ -762,7 +767,12 @@ describe('TodoEditor custom repeat', () => {
   });
 
   it('seeds repeatDays from a saved custom todo', () => {
-    const fixture = todo({ dueDate: '2026-10-01', repeat: 'custom', repeatDays: [4, 5], version: 3 });
+    const fixture = todo({
+      dueDate: '2026-10-01',
+      repeat: 'custom',
+      repeatDays: [4, 5],
+      version: 3,
+    });
     const harness = stateHarness();
     try {
       const tree = harness.renderTree(fixture);

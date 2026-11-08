@@ -11,7 +11,7 @@
     "backfill-content-updated-at": "ts-node scripts/backfill-content-updated-at.ts",
     "rotate-master-key": "ts-node scripts/rotate-master-key.ts",
     "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest"
   },
