@@ -143,6 +143,40 @@ describe('Lists API (e2e)', () => {
       expect(seen).toEqual(expected);
       expect(new Set(seen).size).toBe(expected.length);
     });
+
+    it('walks past names holding the old cursor separator with no repeat and no 400', async () => {
+      // The same defect as tags' walk, over the lists order: the cursor key is the
+      // lower-cased name, and `|` is legal input. `a|b` split into an extra key
+      // part (an endless repeat of one page) and `ends|` minted an empty one (a
+      // 400 on a cursor the service itself issued). limit=1 puts the boundary on
+      // each in turn.
+      const pageToken = await harness.sign({ subject: 'user-pipe', expiresIn: 3600 });
+      for (const name of ['a|b', 'ends|', 'plain', 'z|z']) {
+        await createList(name, pageToken).expect(201);
+      }
+
+      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(200);
+      const expected = (whole.body.lists as Array<{ name: string }>).map((l) => l.name);
+      expect(expected).toEqual(['a|b', 'ends|', 'plain', 'z|z']);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor === null ? { limit: '1' } : { limit: '1', cursor };
+        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(200);
+        const page = res.body as { lists: Array<{ name: string }>; nextCursor: string | null };
+        seen.push(...page.lists.map((l) => l.name));
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 20);
+
+      // Terminated because the service said so, having returned each row exactly once.
+      expect(cursor).toBeNull();
+      expect(pages).toBe(expected.length);
+      expect(seen).toEqual(expected);
+      expect(new Set(seen).size).toBe(expected.length);
+    });
   });
 
   describe('POST /api/lists', () => {

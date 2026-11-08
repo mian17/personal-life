@@ -167,6 +167,44 @@ describe('Tags API (e2e)', () => {
       expect(seen).toEqual(expected);
       expect(new Set(seen).size).toBe(expected.length);
     });
+
+    it('walks past names holding the old cursor separator with no repeat and no 400', async () => {
+      // `|` is legal name input (`@IsString()` + `@MaxLength` only), and the cursor
+      // key is the name — names are encrypted, so the codec must carry any
+      // character without splitting the key. `a|b` split into an extra part and
+      // `ends|` minted an empty one; both used to break the walk (respectively an
+      // endless repeat and a 400 on a cursor the service itself issued). limit=1
+      // puts the page boundary on each of them.
+      const pageToken = await harness.sign({ subject: 'user-pipe', expiresIn: 3600 });
+      for (const name of ['a|b', 'ends|', 'plain', 'z|z']) {
+        await create(name, pageToken).expect(201);
+      }
+
+      const whole = await auth(
+        request(app.getHttpServer()).get('/api/tags?limit=200'),
+        pageToken,
+      ).expect(200);
+      const expected = (whole.body.tags as Array<{ name: string }>).map((t) => t.name);
+      expect(expected).toEqual(['a|b', 'ends|', 'plain', 'z|z']);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor === null ? { limit: '1' } : { limit: '1', cursor };
+        const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query), pageToken).expect(200);
+        const page = res.body as { tags: Array<{ name: string }>; nextCursor: string | null };
+        seen.push(...page.tags.map((t) => t.name));
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 20);
+
+      // Terminated because the service said so, having returned each row exactly once.
+      expect(cursor).toBeNull();
+      expect(pages).toBe(expected.length);
+      expect(seen).toEqual(expected);
+      expect(new Set(seen).size).toBe(expected.length);
+    });
   });
 
   describe('POST /api/tags (create-or-get, case-insensitive)', () => {
