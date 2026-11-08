@@ -7,6 +7,11 @@
 # absolute path into the main checkout, so worktrees on old commits still run
 # it). The gate lives beside this file, so that copy wins; `$root` is only the
 # fallback for a checkout that has its own complete `.pi/kendex/hooks`.
+# Staged TypeScript is linted (with fixes re-staged) before the gate runs, so
+# the gate judges the bytes that will be committed rather than the ones that
+# were staged. Staged files only: a typecheck or a test run here would make
+# `--no-verify` the habit, and then the gate is gone too.
+#
 # `--no-verify` and `-n` skip this; the SonarQube CI job on `dev` is the backstop.
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [[ -f "$root/sonar-project.properties" ]] || exit 0
@@ -14,4 +19,13 @@ here="$(dirname "${BASH_SOURCE[0]}")"
 gate="$here/sonar-check.mjs"
 [[ -f "$gate" ]] || gate="$root/.pi/kendex/hooks/sonar-check.mjs"
 [[ -f "$gate" ]] || exit 0
+
+# `root` is this worktree, so a worktree on an old commit (no lint config) or an
+# uninstalled tree skips the lint step instead of blocking every commit — the
+# hooks directory is shared, the toolchain is not. The gate below still runs.
+if [[ -f "$root/eslint.config.mjs" && -x "$root/node_modules/.bin/lint-staged" ]]; then
+	cd "$root" || exit 1
+	"$root/node_modules/.bin/lint-staged" || exit 1
+fi
+
 exec node "$gate" --staged
