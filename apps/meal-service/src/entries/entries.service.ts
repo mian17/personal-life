@@ -13,6 +13,7 @@ import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypt
 import type { NutrientVector } from '@life/nutrition';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
+import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
 import { completeVector, readStoredVector } from '../foods/content';
 import { Entry } from './entry.entity';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto';
@@ -370,7 +371,7 @@ export class EntriesService {
 
   /** `DELETE /api/entries/:id` — soft delete; the row leaves every read. */
   async remove(sub: string, id: string): Promise<void> {
-    await this.softDeleteOne(this.entries.manager, sub, id);
+    await softDeleteOne(this.trashable, this.entries.manager, sub, id);
     await this.cache.bump(sub);
   }
 
@@ -379,35 +380,24 @@ export class EntriesService {
    * the singular route's soft-delete meaning. A foreign id is a 404 and rolls
    * the whole batch back, leaving every row live.
    */
-  async removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
-    const deleted = await runAtomicBatch({
+  removeMany(sub: string, items: { id: string }[]): Promise<{ deleted: string[] }> {
+    return softDeleteBatch(this.trashable, {
       items,
       sub,
       dataSource: this.writeDataSource,
       cache: this.requireMealCache(),
-      runItem: async (item, manager) => {
-        await this.softDeleteOne(manager, sub, item.id);
-        return item.id;
-      },
     });
-    return { deleted };
   }
 
   /**
-   * One entry's move out of the reads, through the manager the caller supplies,
-   * and with no bump. Soft by definition, mirroring the singular delete.
+   * What the shared soft delete needs to know about an entry, stated once for
+   * both the singular and the batch path: where an entry lives, and what a
+   * missing one is called.
    */
-  private async softDeleteOne(
-    manager: EntityManager | undefined,
-    sub: string,
-    id: string,
-  ): Promise<void> {
-    const entries = this.entriesFor(manager);
-    const entry = await entries.findOne({ where: { id, ownerSub: sub, deletedAt: IsNull() } });
-    if (!entry) throw new NotFoundException('Entry not found');
-    entry.deletedAt = new Date();
-    await entries.save(entry);
-  }
+  private readonly trashable: SoftDeleteTarget<Entry> = {
+    repositoryFor: (manager) => this.entriesFor(manager),
+    notFound: 'Entry not found',
+  };
 
   /**
    * The entry repository a write runs against. A manager means "inside this
