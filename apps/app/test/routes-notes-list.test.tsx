@@ -31,9 +31,13 @@ function note(overrides: Partial<Note> = {}): Note {
   };
 }
 
-/** One page of the `{ notes, nextCursor }` envelope the service returns. */
-function page(notes: Note[], nextCursor: string | null = null) {
-  return { notes, nextCursor };
+/**
+ * One page of the `{ notes, nextCursor, total }` envelope the service returns. `total`
+ * is the whole set the page was sliced from, so it stays the note count even when the
+ * cursor says more pages follow.
+ */
+function page(notes: Note[], nextCursor: string | null = null, total = notes.length) {
+  return { notes, nextCursor, total };
 }
 
 function loadNotesPage(searchParams: { tag?: string; q?: string } = {}) {
