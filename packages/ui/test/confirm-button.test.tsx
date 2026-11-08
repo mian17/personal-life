@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ConfirmButton } from '../src/components/confirm-button';
 
 function classesOf(el: Element): string[] {
@@ -78,5 +78,54 @@ describe('ConfirmButton', () => {
     expect(window.confirm).toHaveBeenCalledWith('Delete?');
     expect(onSubmit).not.toHaveBeenCalled();
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('a second tap while the onClick write is pending fires it once, and disables the button', async () => {
+    const onClick = jest.fn(() => new Promise<void>(() => {}));
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<ConfirmButton message="Delete?" onClick={onClick}>Delete</ConfirmButton>);
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    // Both taps land before React renders the disabled state — the only shape a
+    // `disabled` attribute cannot catch, and the one the ref guard exists for.
+    act(() => {
+      button.click();
+      button.click();
+    });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(button.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('is disabled while a form action of its own form is in flight', async () => {
+    const action = jest.fn(() => new Promise<void>(() => {}));
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <form action={action}>
+        <ConfirmButton message="Delete?">Delete</ConfirmButton>
+      </form>,
+    );
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(button.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('respects a caller-supplied disabled', () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <ConfirmButton message="Delete?" disabled>
+        Delete
+      </ConfirmButton>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Delete' }).hasAttribute('disabled')).toBe(true);
   });
 });

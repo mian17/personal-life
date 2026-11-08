@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { NUTRIENTS, format, sum, type NutrientVector } from '@life/nutrition';
-import { Button, ConfirmButton, IconButton, Input, ManagerBlock, Row, Select, SettingsRow, StatusText } from '@life/ui';
+import { Button, ConfirmButton, IconButton, Input, ManagerBlock, Row, Select, SettingsRow, StatusText, runConfirmed } from '@life/ui';
+import type { PendingGate } from '@life/ui';
 import { ApiError } from '@/lib/api-error';
 
 // The whole meal-service surface this test may touch. No photo/estimate export:
@@ -304,6 +305,11 @@ function control(
   return found;
 }
 
+/** A gate that is never pending: the confirm cases prove the gate, not the re-entry guard. */
+function idleGate(): PendingGate {
+  return { isPending: () => false, setPending: () => {} };
+}
+
 /**
  * Direct-call harness for `FoodForm`. State is position-keyed and persists across
  * `renderTree` calls so a handler's `setState` is visible on the next render;
@@ -505,18 +511,17 @@ describe('food form behaviour', () => {
       const confirm = find(tree, ConfirmButton);
       if (!confirm) throw new Error('no delete control');
 
-      // The click goes through the real atom's guarded handler — the same code
-      // the DOM runs — so the confirm decision is what reaches the delete.
-      const button = ConfirmButton(
-        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
-      );
+      // The click goes through `runConfirmed` — the same production function the
+      // atom's handler calls — so the confirm decision is what reaches the delete.
       const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => true };
       try {
-        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
-        // The atom's guarded handler returns void, so the delete's own await
-        // chain is settled by a macrotask flush before the assertions.
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await runConfirmed(
+          { preventDefault: jest.fn() },
+          confirm.props.message as string,
+          confirm.props.onClick as never,
+          idleGate(),
+        );
       } finally {
         (globalThis as { window?: unknown }).window = previousWindow;
       }
@@ -536,14 +541,15 @@ describe('food form behaviour', () => {
       const confirm = find(tree, ConfirmButton);
       if (!confirm) throw new Error('no delete control');
 
-      const button = ConfirmButton(
-        confirm.props as unknown as Parameters<typeof ConfirmButton>[0],
-      );
       const previousWindow = (globalThis as { window?: unknown }).window;
       (globalThis as { window?: unknown }).window = { confirm: () => false };
       try {
-        (button.props.onClick as (e: unknown) => void)({ preventDefault: jest.fn() });
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await runConfirmed(
+          { preventDefault: jest.fn() },
+          confirm.props.message as string,
+          confirm.props.onClick as never,
+          idleGate(),
+        );
       } finally {
         (globalThis as { window?: unknown }).window = previousWindow;
       }
