@@ -470,7 +470,12 @@ function publishedPort(recipe: ContainerRecipe): number {
 
 function forceRemoveContainer(name: string): void {
   try {
-    runDocker(['rm', '-f', name]);
+    // `-v` is load-bearing: these images declare `VOLUME`, and `--rm` only
+    // auto-removes volumes on a container's natural exit. An explicit `rm -f`
+    // without `-v` strands the anonymous volume, so a failed e2e run leaks one
+    // per throwaway postgres — the same path that left 657 volumes / 25 GB on
+    // the owner's host.
+    runDocker(['rm', '-f', '-v', name]);
   } catch {
     // Already gone, or Docker unavailable at teardown.
   }
