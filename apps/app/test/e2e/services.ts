@@ -95,7 +95,11 @@ export async function spawnService(options: SpawnOptions): Promise<SpawnedServic
  * disk (ChunkLoadError on the page — never a product bug). Failing here keeps
  * that failure loud and at setup, where it belongs.
  */
-export async function ensurePortFree(port: number, name: string, host = '127.0.0.1'): Promise<void> {
+export async function ensurePortFree(
+  port: number,
+  name: string,
+  host = '127.0.0.1',
+): Promise<void> {
   const taken = await new Promise<boolean>((resolve) => {
     const probe = createServer();
     probe.once('error', () => resolve(true));

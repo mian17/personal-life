@@ -53,21 +53,28 @@ const live = process.env.PROMPT_EVAL === '1';
 
     samplesPerFixture = Number(process.env.PROMPT_EVAL_SAMPLES ?? 20);
     if (!Number.isInteger(samplesPerFixture) || samplesPerFixture <= 0) {
-      throw new Error(`PROMPT_EVAL_SAMPLES must be a positive integer, got "${process.env.PROMPT_EVAL_SAMPLES}"`);
+      throw new Error(
+        `PROMPT_EVAL_SAMPLES must be a positive integer, got "${process.env.PROMPT_EVAL_SAMPLES}"`,
+      );
     }
 
     fixtureDirs = fixtureNames();
-    if (fixtureDirs.length === 0) throw new Error('prompt eval needs at least one fixture under test/eval/fixtures');
+    if (fixtureDirs.length === 0)
+      throw new Error('prompt eval needs at least one fixture under test/eval/fixtures');
   });
 
-  it('samples each fixture and reports pass@1 / pass@5', async () => {
-    for (const fixtureId of fixtureDirs) {
-      const outcomes = await sampleFixture(fixtureId, samplesPerFixture, coordinates);
-      // A fixture with no sample is a harness bug, not a model failure: the run
-      // must cover every fixture the configured sample count asks for.
-      expect(outcomes).toHaveLength(samplesPerFixture);
-    }
-  }, 30 * 60_000);
+  it(
+    'samples each fixture and reports pass@1 / pass@5',
+    async () => {
+      for (const fixtureId of fixtureDirs) {
+        const outcomes = await sampleFixture(fixtureId, samplesPerFixture, coordinates);
+        // A fixture with no sample is a harness bug, not a model failure: the run
+        // must cover every fixture the configured sample count asks for.
+        expect(outcomes).toHaveLength(samplesPerFixture);
+      }
+    },
+    30 * 60_000,
+  );
 });
 
 /** Every directory under `test/eval/fixtures` is a fixture. */
@@ -151,7 +158,15 @@ async function takeSample(
     (query: string) => stub.answer(query),
   );
   if (!answer.readable) {
-    return { sample, readable: false, pass: false, matchedFoods: 0, granularity: '—', failures: ['unreadable'], itemCount: 0 };
+    return {
+      sample,
+      readable: false,
+      pass: false,
+      matchedFoods: 0,
+      granularity: '—',
+      failures: ['unreadable'],
+      itemCount: 0,
+    };
   }
   const items: PhotoFoodSuggestion[] = answer.items;
   const verdict = gradeRead({
@@ -185,7 +200,9 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
   const merged = outcomes.filter((outcome) => outcome.granularity === 'merged').length;
   const split = outcomes.filter((outcome) => outcome.granularity === 'split').length;
   const idBindingFailures = outcomes.filter((outcome) =>
-    outcome.failures.some((failure) => failure.includes('fdcId') || failure.includes('searchQuery')),
+    outcome.failures.some(
+      (failure) => failure.includes('fdcId') || failure.includes('searchQuery'),
+    ),
   ).length;
 
   console.log(
@@ -194,7 +211,12 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
       `item pass@1=${itemPass1.toFixed(3)} pass@5=${itemPass5.toFixed(3)} ` +
       `merged=${merged} split=${split} id-binding-failures=${idBindingFailures}`,
   );
-  printHeadlinedMetric({ id: expected.id, sampleCount: outcomes.length, pass1: photoPass1, pass5: photoPass5 });
+  printHeadlinedMetric({
+    id: expected.id,
+    sampleCount: outcomes.length,
+    pass1: photoPass1,
+    pass5: photoPass5,
+  });
   for (const [failure, count] of failureCounts(outcomes)) {
     console.log(`[prompt-eval]   ${count}x ${failure}`);
   }
@@ -203,7 +225,9 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
 /** Print the one line for the metric `PROMPT_EVAL_METRIC` selected, or nothing when none was selected. */
 function printHeadlinedMetric(score: PhotoScore): void {
   if (headlinedMetric === null) return;
-  console.log(`[prompt-eval] ${score.id}: ${headlinedMetric}=${score[headlinedMetric].toFixed(3)} (n=${score.sampleCount})`);
+  console.log(
+    `[prompt-eval] ${score.id}: ${headlinedMetric}=${score[headlinedMetric].toFixed(3)} (n=${score.sampleCount})`,
+  );
 }
 
 function failureCounts(outcomes: SampleOutcome[]): [string, number][] {
@@ -219,7 +243,9 @@ function failureCounts(outcomes: SampleOutcome[]): [string, number][] {
 /** Fail loudly when a Gemini coordinate is missing; the suite must never silently run unconfigured. */
 function requireEnvCoordinate(name: string): void {
   if (process.env[name]) return;
-  throw new Error(`${name} is not set — load .env.development first (set -a; . ./.env.development; set +a)`);
+  throw new Error(
+    `${name} is not set — load .env.development first (set -a; . ./.env.development; set +a)`,
+  );
 }
 
 /**
