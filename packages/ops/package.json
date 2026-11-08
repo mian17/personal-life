@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "main": "dist/index.js",
-  "bin": { "life-ops": "dist/cli/run.js" },
+  "bin": {
+    "life-ops": "dist/cli/run.js"
+  },
   "types": "dist/index.d.ts",
   "exports": {
     ".": {

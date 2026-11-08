@@ -26,11 +26,9 @@ function renderPushToggle(): { tree: any; restore: () => void } {
   const store: unknown[] = [];
   const stateSpy = jest.spyOn(ReactModule, 'useState');
   const effects: Array<() => void> = [];
-  const effectSpy = jest
-    .spyOn(ReactModule, 'useEffect')
-    .mockImplementation(((fn: () => void) => {
-      effects.push(fn);
-    }) as typeof ReactModule.useEffect);
+  const effectSpy = jest.spyOn(ReactModule, 'useEffect').mockImplementation(((fn: () => void) => {
+    effects.push(fn);
+  }) as typeof ReactModule.useEffect);
 
   const render = () => {
     let index = 0;
@@ -40,7 +38,8 @@ function renderPushToggle(): { tree: any; restore: () => void } {
         store[i] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       }
       const set = (next: unknown) => {
-        store[i] = typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
+        store[i] =
+          typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
       };
       return [store[i], set];
     }) as typeof realUseState);
@@ -61,10 +60,7 @@ function renderPushToggle(): { tree: any; restore: () => void } {
   };
 }
 
-function findNode(
-  node: unknown,
-  type: unknown,
-): ReactElement<Record<string, unknown>> | undefined {
+function findNode(node: unknown, type: unknown): ReactElement<Record<string, unknown>> | undefined {
   if (Array.isArray(node)) {
     for (const child of node) {
       const hit = findNode(child, type);

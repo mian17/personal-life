@@ -11,7 +11,14 @@
  * its child `PATH` once, at module load.
  */
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { createHmac } from 'node:crypto';
@@ -58,7 +65,17 @@ git -c user.name=fake -c user.email=fake@example.com commit -qm "fix: fake agent
 mkdirSync(REPO, { recursive: true });
 git(['init', '-q', '--bare', ORIGIN], ROOT);
 git(['init', '-q', '-b', 'dev']);
-git(['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-q', '--allow-empty', '-m', 'baseline']);
+git([
+  '-c',
+  'user.name=test',
+  '-c',
+  'user.email=test@example.com',
+  'commit',
+  '-q',
+  '--allow-empty',
+  '-m',
+  'baseline',
+]);
 git(['remote', 'add', 'origin', ORIGIN]);
 git(['push', '-q', '-u', 'origin', 'dev']);
 
@@ -104,8 +121,19 @@ const gateFailure = {
 const ISSUES = {
   total: 2,
   issues: [
-    { rule: 'typescript:S2871', severity: 'CRITICAL', message: 'bad sort', component: 'personal-life:scripts/a.mjs', line: 1 },
-    { rule: 'typescript:S7727', severity: 'MINOR', message: 'no line', component: 'personal-life:apps/b.ts' },
+    {
+      rule: 'typescript:S2871',
+      severity: 'CRITICAL',
+      message: 'bad sort',
+      component: 'personal-life:scripts/a.mjs',
+      line: 1,
+    },
+    {
+      rule: 'typescript:S7727',
+      severity: 'MINOR',
+      message: 'no line',
+      component: 'personal-life:apps/b.ts',
+    },
   ],
 };
 
@@ -203,7 +231,10 @@ test('a base checkout on another branch is reported, not force-pulled', async ()
 
 /** A request-shaped async iterable, as `for await (const chunk of request)` reads it. */
 function fakeRequest(body, { signature, method = 'POST', url = '/sonar' } = {}) {
-  const headers = { 'x-sonar-webhook-hmac-sha256': signature ?? createHmac('sha256', SECRET).update(body).digest('hex') };
+  const headers = {
+    'x-sonar-webhook-hmac-sha256':
+      signature ?? createHmac('sha256', SECRET).update(body).digest('hex'),
+  };
   return {
     method,
     url,
@@ -235,7 +266,10 @@ test('webhook: a signed failure is accepted, an unsigned one is not', async () =
   const receiver = createReceiver(config({ stateDir: join(ROOT, 'state-hook') }));
 
   const unsigned = fakeResponse();
-  await receiver.handleWebhook(fakeRequest('{"status":"SUCCESS"}', { signature: 'nope' }), unsigned);
+  await receiver.handleWebhook(
+    fakeRequest('{"status":"SUCCESS"}', { signature: 'nope' }),
+    unsigned,
+  );
   assert.equal(unsigned.state.status, 401);
 
   const signed = fakeResponse();
@@ -276,8 +310,14 @@ test('webhook: malformed json, a passing gate, and an in-flight run are each ans
 });
 
 test('start refuses to run without a secret and serves only signed posts', async () => {
-  await assert.rejects(start(config({ webhookSecret: '' })), /SONAR_WEBHOOK_SECRET and SONAR_TOKEN are required/);
-  await assert.rejects(start(config({ sonarToken: '' })), /SONAR_WEBHOOK_SECRET and SONAR_TOKEN are required/);
+  await assert.rejects(
+    start(config({ webhookSecret: '' })),
+    /SONAR_WEBHOOK_SECRET and SONAR_TOKEN are required/,
+  );
+  await assert.rejects(
+    start(config({ sonarToken: '' })),
+    /SONAR_WEBHOOK_SECRET and SONAR_TOKEN are required/,
+  );
 
   stubFetch(() => issueReply({ total: 0, issues: [] }));
   const server = await start(config({ stateDir: join(ROOT, 'state-start') }));
