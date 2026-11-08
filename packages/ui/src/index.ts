@@ -41,8 +41,8 @@ export type { StatusTextProps } from './components/status-text';
 export { LocalTime } from './components/local-time';
 export type { LocalTimeProps } from './components/local-time';
 
-export { ConfirmButton } from './components/confirm-button';
-export type { ConfirmButtonProps } from './components/confirm-button';
+export { ConfirmButton, runConfirmed } from './components/confirm-button';
+export type { ConfirmButtonProps, PendingGate } from './components/confirm-button';
 
 export { ThemeToggle } from './components/theme-toggle';
 export type { ThemeToggleProps } from './components/theme-toggle';
