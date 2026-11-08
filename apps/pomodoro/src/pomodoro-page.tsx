@@ -126,6 +126,7 @@ export function PomodoroPage({
   const finishedBlocks = completedFocuses(timer.phase, timer.status, timer.session);
   const breakPhase = breakPhaseAt(timer.status, timer.nextPhase);
   const breakMinutes = breakPhase === 'short' ? shortMinutes : longMinutes;
+  const focusPresetsHidden = hidesFocusPresets(timer.status);
 
   useFocusRecorded(
     {
@@ -164,7 +165,13 @@ export function PomodoroPage({
             value={percentSpent(timer.remainingMs, timer.phase, chosen)}
             label="Session progress"
           />
-          <Row className={presetsStyles} role="group" aria-label="Focus length">
+          {/* The row is hidden, never unmounted: `visibility: hidden` keeps the box so the
+              rows below it do not step up when a phase starts (the `StatusText` rule). */}
+          <Row
+            className={cx(presetsStyles, focusPresetsHidden && 'ui-invisible invisible')}
+            role="group"
+            aria-label="Focus length"
+          >
             {FOCUS_PRESETS.map((minutes) => (
               <Pill
                 key={minutes}
@@ -257,6 +264,17 @@ function percentSpent(remainingMs: number, phase: Phase, durations: Durations): 
   const phaseMs = durations[phase] * MINUTE_MS;
   if (phaseMs <= 0) return 0;
   return ((phaseMs - remainingMs) / phaseMs) * 100;
+}
+
+/**
+ * Whether the focus-length chips are out of the way. They are configuration — how long a
+ * phase *will* run — and never a measure of the one in flight, so a phase counting down
+ * (`running`) or frozen mid-count (`paused`) hides them: the card would otherwise read as
+ * if the lengths were part of the session. A phase that has not begun (`idle`) and one
+ * that just ended (`boundary`) are the two moments the owner retunes, so there they show.
+ */
+function hidesFocusPresets(status: Status): boolean {
+  return status === 'running' || status === 'paused';
 }
 
 /**

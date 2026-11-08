@@ -225,6 +225,47 @@ describe('PomodoroPage', () => {
     expect(chips.map((chip) => chip.hasAttribute('disabled'))).toEqual([true, true, true]);
   });
 
+  it('hides the focus-length chips while a phase counts down', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    const row = focusRow();
+    expect(row.classList.contains('ui-invisible')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+
+    // Configuration for the next phase, never part of this one: the row stops being
+    // painted but keeps its box, so the rows under it do not step up.
+    expect(row.classList.contains('ui-invisible')).toBe(true);
+    expect(row.classList.contains('invisible')).toBe(true);
+    expect(row.isConnected).toBe(true);
+    expect(focusRow()).toBe(row);
+  });
+
+  it('hides the focus-length chips while a phase is paused', () => {
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
+    expect(focusRow().classList.contains('ui-invisible')).toBe(true);
+    expect(focusRow().classList.contains('invisible')).toBe(true);
+  });
+
+  it('shows the focus-length chips at the untouched start and at a boundary', () => {
+    const { unmount } = render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    // `idle`: nothing has begun, which is when a length is configured.
+    expect(focusRow().classList.contains('ui-invisible')).toBe(false);
+    unmount();
+
+    // `boundary`: the phase is over, which is the other moment the owner retunes.
+    storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
+    render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+
+    expect(screen.getByRole('button', { name: 'Start break' })).toBeTruthy();
+    expect(focusRow().classList.contains('ui-invisible')).toBe(false);
+  });
+
   it('offers the short break lengths at every boundary inside the cycle', () => {
     for (const session of [1, 2, SESSIONS_PER_CYCLE - 1]) {
       const { unmount } = renderBreakBoundary(session);
@@ -285,7 +326,7 @@ describe('PomodoroPage', () => {
     expect(digits()).toBe('05:00');
   });
 
-  it('never restretches a running break, even when the lengths it holds arrive again', () => {
+  it('hides the focus chips mid-break, so a running break keeps the deadline it was started with', () => {
     storeMode({ phase: 'focus', session: 1, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
 
     const { rerender } = render(
@@ -299,9 +340,12 @@ describe('PomodoroPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start break' }));
     expect(digits()).toBe('15:00');
 
-    // Two ways the durations in hand change mid-break: the write revalidates the app and a
-    // fresh object arrives, and the focus chips stay pressable throughout. Both run
-    // `applyDurations`; neither may move a deadline that was fixed at the press.
+    // A length is configuration for the phase that will run, so the chips are out of reach
+    // while this one runs. Both paths that reach `applyDurations` still must not move a fixed
+    // deadline: the fresh object the write revalidates in, and a press on a chip that is no
+    // longer paintable (`timer.test.ts` pins the same rule on the machine itself).
+    expect(focusRow().classList.contains('ui-invisible')).toBe(true);
+
     rerender(
       <PomodoroPage
         durations={{ ...DEFAULT_DURATIONS, short: 5, long: 30 }}
@@ -392,6 +436,11 @@ describe('PomodoroPage', () => {
     storeMode({ phase: 'focus', session, status: 'boundary', remainingMs: 0, endsAt: 1_000 });
 
     return render(<PomodoroPage durations={DEFAULT_DURATIONS} />);
+  }
+
+  /** The focus-length row, which is hidden — never unmounted — while a phase is in flight. */
+  function focusRow(): HTMLElement {
+    return screen.getByRole('group', { name: 'Focus length' });
   }
 
   /** The break row's chips; empty when the row is absent, which is most of the cycle. */
