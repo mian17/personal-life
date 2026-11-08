@@ -65,6 +65,18 @@ jobs:
       # explicitly listed files too, so a path it ignores (package-lock.json,
       # docs/**, dist/, …) is dropped from the list instead of being checked.
       # Cheap and build-free, hence above `Build workspaces`.
+      #
+      # The diff is three-dot — `BASE_SHA...HEAD` — so it compares against the
+      # MERGE BASE, not against the base branch tip. `pull_request.base.sha` is
+      # the tip of `dev` at the time of the event, so on a branch that has not
+      # merged `dev` back in (every Dependabot branch) a two-dot diff also
+      # contains `dev`'s own newer commits, reversed: measured on
+      # `dependabot/npm_and_yarn/npm-minor-patch-4e81ebb20d`, two-dot listed 22
+      # files under this filter (24 unfiltered) including
+      # `.github/workflows/tests.yml` and the root `package.json`, which that PR
+      # never touched, while three-dot lists the 20 it does change. Blaming a PR
+      # for files it never touched is a failure it cannot fix — a bot cannot run
+      # prettier on `dev`.
       - name: Check formatting (changed files only)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -74,7 +86,7 @@ jobs:
             echo "Not a pull request run; skipping the changed-file format check."
             exit 0
           fi
-          files=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD \
+          files=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA"...HEAD \
             | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json|css|md|ya?ml)$' || true)
           if [ -z "$files" ]; then
             echo "No prettier-owned files changed; nothing to check."
