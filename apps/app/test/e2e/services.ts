@@ -60,7 +60,6 @@ export async function spawnService(options: SpawnOptions): Promise<SpawnedServic
   child.on('exit', (code) => {
     if (code !== 0 && code !== null) {
       // Surface the tail; e2e failures are otherwise opaque.
-      // eslint-disable-next-line no-console
       console.error(`[${options.name}] exited with code ${code}\n${logs.join('')}`);
     }
   });

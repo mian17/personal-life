@@ -188,7 +188,6 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
     outcome.failures.some((failure) => failure.includes('fdcId') || failure.includes('searchQuery')),
   ).length;
 
-  // eslint-disable-next-line no-console
   console.log(
     `[prompt-eval] ${expected.id}: n=${outcomes.length} readable=${readable}/${outcomes.length} ` +
       `photo pass@1=${photoPass1.toFixed(3)} pass@5=${photoPass5.toFixed(3)} ` +
@@ -197,7 +196,6 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
   );
   printHeadlinedMetric({ id: expected.id, sampleCount: outcomes.length, pass1: photoPass1, pass5: photoPass5 });
   for (const [failure, count] of failureCounts(outcomes)) {
-    // eslint-disable-next-line no-console
     console.log(`[prompt-eval]   ${count}x ${failure}`);
   }
 }
@@ -205,7 +203,6 @@ function printFixtureReport(expected: ExpectedMeal, outcomes: SampleOutcome[]): 
 /** Print the one line for the metric `PROMPT_EVAL_METRIC` selected, or nothing when none was selected. */
 function printHeadlinedMetric(score: PhotoScore): void {
   if (headlinedMetric === null) return;
-  // eslint-disable-next-line no-console
   console.log(`[prompt-eval] ${score.id}: ${headlinedMetric}=${score[headlinedMetric].toFixed(3)} (n=${score.sampleCount})`);
 }
 

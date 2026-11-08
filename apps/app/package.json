@@ -12,7 +12,7 @@
     "test:e2e:prod-build": "playwright test --config playwright.config.ts",
     "test:e2e:dev-server": "playwright test --config playwright.dev.config.ts",
     "screens": "node test/screens/capture.mjs && node test/screens/gallery.mjs",
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json --noEmit"
   },
   "dependencies": {

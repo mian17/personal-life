@@ -223,7 +223,7 @@ interface EditorField extends ReactElement {
  * previous tree — which is how "toggle the Switch, then Save" is exercised.
  */
 function stateHarness() {
-  let store: unknown[] = [];
+  const store: unknown[] = [];
   const spy = jest.spyOn(ReactModule, 'useState');
 
   function renderTree(todo?: Todo): EditorTree {

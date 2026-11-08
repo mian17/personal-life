@@ -47,6 +47,13 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # Lint is the cheapest gate in the job and needs no compiled output and no
+      # native modules, so it runs straight after install: a style error fails the
+      # job in seconds instead of after a multi-minute native rebuild and
+      # workspace build.
+      - name: Lint
+        run: npm run lint
+
       - name: Build native dependencies
         run: npm rebuild better-sqlite3 argon2
 

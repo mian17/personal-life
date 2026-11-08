@@ -23,7 +23,7 @@ const ReactModule = jest.requireActual<typeof import('react')>('react');
 const realUseState = ReactModule.useState;
 
 function renderPushToggle(): { tree: any; restore: () => void } {
-  let store: unknown[] = [];
+  const store: unknown[] = [];
   const stateSpy = jest.spyOn(ReactModule, 'useState');
   const effects: Array<() => void> = [];
   const effectSpy = jest
