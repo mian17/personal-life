@@ -219,11 +219,29 @@ describe('applyDurations', () => {
     expect(remainingMs(afterBoundary, updated.endsAt)).toBe(chosen.short * MINUTE_MS);
   });
 
+  it('leaves a running phase on the length it was started with, so its progress keeps one base', () => {
+    const chosen: Durations = { focus: 40, short: 8, long: 20 };
+    const running = startedTimer();
+
+    const updated = applyDurations(running, chosen);
+
+    expect(updated.startedPhaseMs).toBe(FOCUS_MS);
+    expect(remainingMs(updated, START + 3 * MINUTE_MS)).toBe(FOCUS_MS - 3 * MINUTE_MS);
+  });
+
+  it('leaves a paused phase on the length it was started with too', () => {
+    const chosen: Durations = { focus: 40, short: 8, long: 20 };
+    const paused = pause(startedTimer(), START + 3 * MINUTE_MS);
+
+    expect(applyDurations(paused, chosen).startedPhaseMs).toBe(FOCUS_MS);
+  });
+
   it('sizes an idle phase from the new durations', () => {
     const chosen: Durations = { focus: 40, short: 8, long: 20 };
     const updated = applyDurations(initialState(durations), chosen);
 
     expect(remainingMs(updated, START)).toBe(chosen.focus * MINUTE_MS);
+    expect(updated.startedPhaseMs).toBe(chosen.focus * MINUTE_MS);
   });
 });
 
@@ -260,9 +278,23 @@ describe('mode codec', () => {
         remainingMs: FOCUS_MS - 2 * MINUTE_MS,
         endsAt: START + FOCUS_MS,
         heldMs: 0,
+        startedPhaseMs: FOCUS_MS,
       }),
     );
     expect(parseMode(stored, { durations, now: START + 3 * MINUTE_MS })).toEqual(running);
+  });
+
+  it('restores the length a retuned phase was started with, not the length now chosen', () => {
+    const retuned: Durations = { focus: 50, short: 5, long: 15 };
+    const stored = serializeMode(
+      applyDurations(startedTimer(), retuned),
+      START + 3 * MINUTE_MS,
+    );
+
+    const restored = parseMode(stored, { durations: retuned, now: START + 3 * MINUTE_MS });
+
+    expect(restored.startedPhaseMs).toBe(FOCUS_MS);
+    expect(remainingMs(restored, START + 3 * MINUTE_MS)).toBe(FOCUS_MS - 3 * MINUTE_MS);
   });
 
   it('round-trips a boundary left as it was', () => {

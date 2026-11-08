@@ -52,7 +52,7 @@ describe('focusBlockMinutes', () => {
     expect(
       focusBlockMinutes({
         phase: 'focus',
-        durations: DEFAULT_DURATIONS,
+        startedPhaseMs: DEFAULT_DURATIONS.focus * MINUTE_MS,
         remainingMs: focusRemaining,
       }),
     ).toBe(1);
@@ -64,19 +64,17 @@ describe('focusBlockMinutes', () => {
     expect(
       focusBlockMinutes({
         phase: 'focus',
-        durations: DEFAULT_DURATIONS,
+        startedPhaseMs: DEFAULT_DURATIONS.focus * MINUTE_MS,
         remainingMs: focusRemaining,
       }),
     ).toBe(0);
   });
 
   it('never counts a break, however long it has run', () => {
-    const breakDurations = DEFAULT_DURATIONS;
+    const startedPhaseMs = DEFAULT_DURATIONS.focus * MINUTE_MS;
 
-    expect(
-      focusBlockMinutes({ phase: 'short', durations: breakDurations, remainingMs: 0 }),
-    ).toBe(0);
-    expect(focusBlockMinutes({ phase: 'long', durations: breakDurations, remainingMs: 0 })).toBe(0);
+    expect(focusBlockMinutes({ phase: 'short', startedPhaseMs, remainingMs: 0 })).toBe(0);
+    expect(focusBlockMinutes({ phase: 'long', startedPhaseMs, remainingMs: 0 })).toBe(0);
   });
 });
 
@@ -197,6 +195,92 @@ describe('useFocusRecorded through the page', () => {
     } finally {
       confirm.mockRestore();
     }
+  });
+
+  it('records the time a phase ran, not the length a chip put in its place', () => {
+    // The reported defect: run three minutes of a 25 minute focus, retune the length to 50,
+    // then stop and reset. Reading the block against two lengths turns three real minutes
+    // into twenty-eight the owner never focused.
+    const onFocusBlockEnd = jest.fn();
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      render(
+        <PomodoroPage
+          durations={DEFAULT_DURATIONS}
+          onFocusLengthChange={jest.fn()}
+          onFocusBlockEnd={onFocusBlockEnd}
+        />,
+      );
+
+      startFocus();
+      wait(3 * MINUTE_MS);
+      fireEvent.click(screen.getByRole('button', { name: '50 min' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+      clickReset();
+
+      expect(onFocusBlockEnd).toHaveBeenCalledTimes(1);
+      expect(onFocusBlockEnd).toHaveBeenCalledWith(3);
+    } finally {
+      confirm.mockRestore();
+    }
+  });
+
+  it('records a block that ran its own length however often a chip retuned the next one', () => {
+    const onFocusBlockEnd = jest.fn();
+
+    render(
+      <PomodoroPage
+        durations={DEFAULT_DURATIONS}
+        onFocusLengthChange={jest.fn()}
+        onFocusBlockEnd={onFocusBlockEnd}
+      />,
+    );
+
+    startFocus();
+    wait(2 * MINUTE_MS);
+    fireEvent.click(screen.getByRole('button', { name: '15 min' }));
+    wait(DEFAULT_DURATIONS.focus * MINUTE_MS);
+
+    expect(onFocusBlockEnd).toHaveBeenCalledTimes(1);
+    expect(onFocusBlockEnd).toHaveBeenCalledWith(DEFAULT_DURATIONS.focus);
+  });
+
+  it('records nothing for a run of chip taps, because a length is not progress', () => {
+    const onFocusBlockEnd = jest.fn();
+
+    render(
+      <PomodoroPage
+        durations={DEFAULT_DURATIONS}
+        onFocusLengthChange={jest.fn()}
+        onFocusBlockEnd={onFocusBlockEnd}
+      />,
+    );
+
+    for (const label of ['50 min', '15 min', '50 min', '25 min']) {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+    }
+
+    expect(onFocusBlockEnd).not.toHaveBeenCalled();
+  });
+
+  it('records nothing for chip taps made while a phase counts down or holds', () => {
+    const onFocusBlockEnd = jest.fn();
+
+    render(
+      <PomodoroPage
+        durations={DEFAULT_DURATIONS}
+        onFocusLengthChange={jest.fn()}
+        onFocusBlockEnd={onFocusBlockEnd}
+      />,
+    );
+
+    startFocus();
+    wait(2 * MINUTE_MS);
+    fireEvent.click(screen.getByRole('button', { name: '50 min' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    fireEvent.click(screen.getByRole('button', { name: '15 min' }));
+
+    expect(onFocusBlockEnd).not.toHaveBeenCalled();
   });
 
   it('records nothing without a listener, so the page still mounts alone', () => {

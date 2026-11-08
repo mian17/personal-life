@@ -58,6 +58,8 @@ export interface Timer {
   session: number;
   nextPhase: Phase;
   remainingMs: number;
+  /** The length the phase in hand was started with, the one base its progress is read against. */
+  startedPhaseMs: number;
   titles: TimerTitles;
   /** Start, pause or resume — whichever the current status makes the one useful control. */
   primaryAction(): void;
@@ -92,6 +94,7 @@ export function useTimer(durations: Durations): Timer {
     session: state.session,
     nextPhase,
     remainingMs: remainingMs(state, Date.now()),
+    startedPhaseMs: state.startedPhaseMs,
     titles,
     // The Start gesture unlocks the beep; a resume inside it needs nothing.
     primaryAction: () => {

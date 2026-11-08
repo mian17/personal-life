@@ -128,7 +128,12 @@ export function PomodoroPage({
   const breakMinutes = breakPhase === 'short' ? shortMinutes : longMinutes;
 
   useFocusRecorded(
-    { phase: timer.phase, durations: chosen, remainingMs: timer.remainingMs, status: timer.status },
+    {
+      phase: timer.phase,
+      startedPhaseMs: timer.startedPhaseMs,
+      remainingMs: timer.remainingMs,
+      status: timer.status,
+    },
     onFocusBlockEnd,
   );
 
