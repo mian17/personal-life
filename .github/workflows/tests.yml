@@ -5,28 +5,35 @@ name: Tests
 
 on:
   pull_request:
-    branches: [dev]
+    # Both lines are listed because a `dev -> main` promotion is a real PR carrying
+    # the same diff to the release line: listing only `dev` leaves that one PR — the
+    # only one that reaches production — running zero checks. Verifying it here is
+    # what makes the release line as tested as the integration line.
+    branches: [dev, main]
   # Manual run for reproducing a failure without pushing a commit.
   workflow_dispatch:
 
 # One run per PR: a new push supersedes the previous one, which is pointless to
-# finish. The group is keyed to the PR so runs for different PRs still queue
-# independently. It deliberately does not reuse `group: sonarqube` — that group
-# serialises dev scans, and sharing it would park PR runs behind them on the
-# single runner.
+# finish. The group is keyed to the PR so runs for different PRs are independent
+# of each other — on hosted runners there is no shared queue to contend for, and
+# the per-PR group is what stops `cancel-in-progress` from killing another PR's
+# run. It deliberately does not reuse `group: sonarqube`: that group serialises
+# dev scans, so sharing it would let a dev-push scan cancel a PR run (and the
+# reverse), burning both for no gain.
 concurrency:
   group: tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    # Self-hosted runner label the repo has — it is the only one available.
-    # Same host as the SonarQube container, but this job needs none of it.
-    runs-on: [self-hosted, sonarqube]
+    # GitHub-hosted runner: this job needs no SonarQube, no host-mounted service
+    # and no self-hosted state. Docker — for the pg image pull below — is
+    # preinstalled on `ubuntu-latest`.
+    runs-on: ubuntu-latest
     # Estimate, not a measurement: a full `npm run test:coverage` across every
     # workspace, plus `npm ci` and the workspace build. Generous so a slow run is
-    # not killed, tight enough that a hung suite cannot hold the only runner for
-    # the six-hour default.
+    # not killed, tight enough that a hung suite cannot bill a full hour of
+    # runner minutes.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -54,6 +61,35 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Prettier ratchet. The tree was never formatted — 408 of 1067 tracked
+      # files fail `npm run format:check` on dev, and no printWidth fixes that
+      # (80 -> 710, 120 -> 518), so a whole-tree gate would fail every PR and a
+      # one-off reformat would bury `git log --follow` across a third of the
+      # repo. Only the files this PR changes are checked: new drift is stopped,
+      # the existing drift is left untouched.
+      #
+      # `.prettierignore` is not re-implemented here: prettier applies it to
+      # explicitly listed files too, so a path it ignores (package-lock.json,
+      # docs/**, dist/, …) is dropped from the list instead of being checked.
+      # Cheap and build-free, hence above `Build workspaces`.
+      - name: Check formatting (changed files only)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "Not a pull request run; skipping the changed-file format check."
+            exit 0
+          fi
+          files=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD \
+            | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json|css|md|ya?ml)$' || true)
+          if [ -z "$files" ]; then
+            echo "No prettier-owned files changed; nothing to check."
+            exit 0
+          fi
+          echo "$files"
+          npx prettier --check $files
+
       - name: Build native dependencies
         run: npm rebuild better-sqlite3 argon2
 
@@ -61,6 +97,14 @@ jobs:
       # `dist/`, so every suite importing another workspace fails with TS2307.
       - name: Build workspaces
         run: npm run build
+
+      # Typecheck sits here on purpose, on both sides. After `Build workspaces`
+      # because `@life/*` types only exist once `dist/` is built — run on a fresh
+      # clone it fails with TS2307, not with a real type error. Before the test
+      # suite because a type error should fail in seconds, not after a full
+      # coverage run.
+      - name: Typecheck
+        run: npm run typecheck
 
       # Suites that boot a sqlite service need a writable data directory, and
       # those directories are gitignored, so a fresh checkout has none.
