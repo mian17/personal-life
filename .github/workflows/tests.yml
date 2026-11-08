@@ -10,23 +10,26 @@ on:
   workflow_dispatch:
 
 # One run per PR: a new push supersedes the previous one, which is pointless to
-# finish. The group is keyed to the PR so runs for different PRs still queue
-# independently. It deliberately does not reuse `group: sonarqube` — that group
-# serialises dev scans, and sharing it would park PR runs behind them on the
-# single runner.
+# finish. The group is keyed to the PR so runs for different PRs are independent
+# of each other — on hosted runners there is no shared queue to contend for, and
+# the per-PR group is what stops `cancel-in-progress` from killing another PR's
+# run. It deliberately does not reuse `group: sonarqube`: that group serialises
+# dev scans, so sharing it would let a dev-push scan cancel a PR run (and the
+# reverse), burning both for no gain.
 concurrency:
   group: tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    # Self-hosted runner label the repo has — it is the only one available.
-    # Same host as the SonarQube container, but this job needs none of it.
-    runs-on: [self-hosted, sonarqube]
+    # GitHub-hosted runner: this job needs no SonarQube, no host-mounted service
+    # and no self-hosted state. Docker — for the pg image pull below — is
+    # preinstalled on `ubuntu-latest`.
+    runs-on: ubuntu-latest
     # Estimate, not a measurement: a full `npm run test:coverage` across every
     # workspace, plus `npm ci` and the workspace build. Generous so a slow run is
-    # not killed, tight enough that a hung suite cannot hold the only runner for
-    # the six-hour default.
+    # not killed, tight enough that a hung suite cannot bill a full hour of
+    # runner minutes.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
