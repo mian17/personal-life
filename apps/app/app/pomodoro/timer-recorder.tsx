@@ -1,7 +1,7 @@
 'use client';
 
 import { PomodoroPage, type Durations } from '@life/pomodoro';
-import { recordFocusSession } from './actions';
+import { recordFocusSession, setPomodoroFocusMinutes } from './actions';
 
 export interface TimerRecorderProps {
   durations: Durations;
@@ -20,6 +20,7 @@ export function TimerRecorder({
   return (
     <PomodoroPage
       durations={durations}
+      onFocusLengthChange={setPomodoroFocusMinutes}
       onFocusBlockEnd={recordFocusSession}
       todayMinutes={todayMinutes}
       todayGoalMinutes={todayGoalMinutes}

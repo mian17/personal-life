@@ -32,6 +32,15 @@ export async function setPomodoroDurations(formData: FormData): Promise<void> {
 }
 
 /**
+ * Set the focus length without touching the two breaks, so a quick-pick chip persists the
+ * same `pomodoro_focus` the settings form writes (SPEC-pomodoro §4, State storage). The
+ * cookie write revalidates the app, so the `/pomodoro` subtitle is rendered from it too.
+ */
+export async function setPomodoroFocusMinutes(minutes: number): Promise<void> {
+  await setPrefNumbers([['pomodoro_focus', clampMinutes(minutes)]]);
+}
+
+/**
  * Set today's goal (`PUT /api/goal`). The day is the shared `getToday()` owner,
  * so only today re-measures: a past day keeps the goal its own dated row gave it
  * (`SPEC-focus-service` §1).
