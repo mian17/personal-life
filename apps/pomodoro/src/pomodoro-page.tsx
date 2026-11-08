@@ -37,6 +37,29 @@ const PHASE_LABELS: Record<Phase, string> = {
 const FOCUS_PRESETS = [15, 25, 50] as const;
 
 /**
+ * The break lengths offered at a boundary, where the owner still owns the next phase: the
+ * break is chosen just before it starts, so these three are the quick-pick for the break the
+ * Start button is about to begin. Same chip, same rule as the focus row — it sets the length
+ * for the break in hand and reports it upward, or is a disabled button when nobody listens.
+ */
+const SHORT_BREAK_PRESETS = [5, 10, 15] as const;
+
+/**
+ * A long break is the cycle's real rest — it closes four focus blocks — so its row offers
+ * three longer lengths, the shortest of them already the default short break's longest.
+ */
+const LONG_BREAK_PRESETS = [15, 25, 30] as const;
+
+/** The two phases a focus block can lead to, which are the only phases with a break length. */
+type BreakPhase = Exclude<Phase, 'focus'>;
+
+/** Which row a boundary draws: the step it is about to start names its own presets. */
+const BREAK_PRESETS: Record<BreakPhase, readonly number[]> = {
+  short: SHORT_BREAK_PRESETS,
+  long: LONG_BREAK_PRESETS,
+};
+
+/**
  * §8's `.timer__phase`: the small-caps label over the digits. The section-label row of
  * §4's scale is that treatment — 13px, 650, wide tracking — and the uppercase is the
  * reference's own; the text itself stays untouched, so locators still read `Focus`.
@@ -66,6 +89,8 @@ export interface PomodoroPageProps {
   durations: Durations;
   /** Told the focus length a chip picked, so the choice survives a reload. */
   onFocusLengthChange?: (minutes: number) => void;
+  /** Told the break length a boundary chip picked, for the break that is about to start. */
+  onBreakLengthChange?: (phase: BreakPhase, minutes: number) => void;
   /** Told the minutes of every focus block that ends, so the owner's day keeps them. */
   onFocusBlockEnd?: (minutes: number) => void;
   /** Minutes recorded today; absent, the Today group has no first row to draw. */
@@ -77,6 +102,7 @@ export interface PomodoroPageProps {
 export function PomodoroPage({
   durations,
   onFocusLengthChange,
+  onBreakLengthChange,
   onFocusBlockEnd,
   todayMinutes,
   todayGoalMinutes,
@@ -85,14 +111,21 @@ export function PomodoroPage({
   // without waiting for the write to come back as a new prop. Memoised on the three
   // minutes, not on the object: `useDurationsApplied` re-seeds the timer whenever the
   // identity changes, and a fresh object per render would do that on every render.
+  //
+  // The two breaks keep a field each, because they are two lengths and not one: a pick made
+  // for the short break must not become the long break's length an hour later.
   const [focusMinutes, setFocusMinutes] = useState(durations.focus);
+  const [shortMinutes, setShortMinutes] = useState(durations.short);
+  const [longMinutes, setLongMinutes] = useState(durations.long);
   const chosen = useMemo(
-    () => ({ focus: focusMinutes, short: durations.short, long: durations.long }),
-    [focusMinutes, durations.short, durations.long],
+    () => ({ focus: focusMinutes, short: shortMinutes, long: longMinutes }),
+    [focusMinutes, shortMinutes, longMinutes],
   );
   const timer = useTimer(chosen);
   const canReset = resetAllowed(timer.status);
   const finishedBlocks = completedFocuses(timer.phase, timer.status, timer.session);
+  const breakPhase = breakPhaseAt(timer.status, timer.nextPhase);
+  const breakMinutes = breakPhase === 'short' ? shortMinutes : longMinutes;
 
   useFocusRecorded(
     { phase: timer.phase, durations: chosen, remainingMs: timer.remainingMs, status: timer.status },
@@ -102,6 +135,12 @@ export function PomodoroPage({
   function pickFocusLength(minutes: number): void {
     setFocusMinutes(minutes);
     onFocusLengthChange?.(minutes);
+  }
+
+  function pickBreakLength(phase: BreakPhase, minutes: number): void {
+    if (phase === 'short') setShortMinutes(minutes);
+    else setLongMinutes(minutes);
+    onBreakLengthChange?.(phase, minutes);
   }
 
   return (
@@ -134,6 +173,27 @@ export function PomodoroPage({
               </Pill>
             ))}
           </Row>
+          {/* Boundary-only, and only a boundary that leads to a break: a break is chosen just
+              before it starts, and `start()` sizes the phase from the durations in hand at that
+              press, so a pick made here lands on the break the button offers. Every other
+              moment draws nothing at all — no wrapper, no reserved row — because a length
+              chosen mid-phase could not be honoured and a row of dead chips is a lie. */}
+          {breakPhase != null && (
+            <Row className={presetsStyles} role="group" aria-label="Break length">
+              {BREAK_PRESETS[breakPhase].map((minutes) => (
+                <Pill
+                  key={minutes}
+                  as="button"
+                  size="filter"
+                  active={minutes === breakMinutes}
+                  onClick={() => pickBreakLength(breakPhase, minutes)}
+                  disabled={onBreakLengthChange == null}
+                >
+                  {`${minutes} min`}
+                </Pill>
+              ))}
+            </Row>
+          )}
           <SessionPills
             phase={timer.phase}
             status={timer.status}
@@ -192,6 +252,16 @@ function percentSpent(remainingMs: number, phase: Phase, durations: Durations): 
   const phaseMs = durations[phase] * MINUTE_MS;
   if (phaseMs <= 0) return 0;
   return ((phaseMs - remainingMs) / phaseMs) * 100;
+}
+
+/**
+ * The break a boundary is about to begin, or `null` whenever no break is imminent: a phase
+ * counting down, a paused one, and the untouched start all answer `null`. A break boundary
+ * answers `null` too — the phase it ended is a break, and what follows is another focus.
+ */
+function breakPhaseAt(status: Status, nextPhase: Phase): BreakPhase | null {
+  if (status !== 'boundary' || nextPhase === 'focus') return null;
+  return nextPhase;
 }
 
 /**
