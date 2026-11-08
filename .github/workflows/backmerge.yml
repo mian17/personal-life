@@ -21,9 +21,10 @@ permissions:
 
 jobs:
   backmerge:
-    # Self-hosted runner on the same host as the SonarQube container — the only
-    # runner label this repo has.
-    runs-on: [self-hosted, sonarqube]
+    # GitHub-hosted runner: git plus two REST calls against the GitHub API, no
+    # SonarQube and no host-mounted service. Nothing here needs the owner's host,
+    # and the SonarQube label now belongs to the scan alone.
+    runs-on: ubuntu-latest
     # Git plus two API calls; no Node, no npm, no build. A hang must not hold
     # the runner for the six-hour default.
     timeout-minutes: 10
@@ -126,8 +127,8 @@ jobs:
           fi
 
       # Plain git push (checkout persists the token) plus one REST call to open
-      # the PR: `gh` is not guaranteed on this runner and a marketplace PR
-      # action is a dependency this repo does not need.
+      # the PR: `curl` and the runner's preinstalled `python3` cover both, where
+      # a marketplace PR action would be a dependency this repo does not need.
       - name: Push the branch and open the PR
         if: steps.noop.outputs.needed == 'true' && steps.existing.outputs.exists == 'false'
         env:
