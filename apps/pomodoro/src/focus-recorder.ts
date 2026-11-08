@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { MINUTE_MS, type Durations, type Phase, type Status } from './timer';
+import { MINUTE_MS, type Phase, type Status } from './timer';
 
-/** What a recorded block is read from: which phase, how long it runs, how much of it is left. */
+/** What a recorded block is read from: which phase, how long it was started for, how much of it is left. */
 export interface FocusBlock {
   phase: Phase;
-  durations: Durations;
+  /** The length this phase began with, which is the only base its minutes may be read against. */
+  startedPhaseMs: number;
   remainingMs: number;
 }
 
@@ -16,14 +17,17 @@ export interface FocusBlockState extends FocusBlock {
 }
 
 /**
- * Whole minutes the owner counted in this phase. `remainingMs` is the machine's
- * own remaining, so time spent paused — frozen out of it — never counts; a
- * part-minute is dropped because the day stores minutes; a break is no block.
+ * Whole minutes the owner counted in this phase. Both sides of the subtraction come from
+ * the length the phase was started with, so a length retuned mid-phase — the focus chips
+ * do exactly that — cannot turn three focused minutes into twenty-eight: a configuration
+ * change is not progress. `remainingMs` is the machine's own remaining, so time spent
+ * paused — frozen out of it — never counts; a part-minute is dropped because the day
+ * stores minutes; a break is no block.
  */
-export function focusBlockMinutes({ phase, durations, remainingMs }: FocusBlock): number {
+export function focusBlockMinutes({ phase, startedPhaseMs, remainingMs }: FocusBlock): number {
   if (phase !== 'focus') return 0;
 
-  const countedMs = durations.focus * MINUTE_MS - remainingMs;
+  const countedMs = startedPhaseMs - remainingMs;
   return Math.max(0, Math.floor(countedMs / MINUTE_MS));
 }
 
@@ -59,12 +63,12 @@ function reachedBoundary(previous: FocusBlockState, current: FocusBlockState): b
   return current.phase === 'focus' && current.status === 'boundary';
 }
 
-/** Reset drops a stopped focus phase back to the untouched start, so that phase is the block it ends. */
+/**
+ * Reset drops a focus phase that had actually begun back to the untouched start, so that
+ * phase is the block it ends. `idle` is the untouched start itself — nothing ran, so
+ * nothing is owed, however the lengths around it changed.
+ */
 function ownerResetMidFocus(previous: FocusBlockState, current: FocusBlockState): boolean {
-  return (
-    previous.phase === 'focus' &&
-    previous.status !== 'boundary' &&
-    current.phase === 'focus' &&
-    current.status === 'idle'
-  );
+  if (previous.status !== 'running' && previous.status !== 'paused') return false;
+  return current.phase === 'focus' && current.status === 'idle';
 }
