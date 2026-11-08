@@ -39,8 +39,8 @@ export function describeTodosHeader(groups: TodoGroup[], loaded: number, total: 
  * page's, handed down as slots.
  *
  * The completion log crosses complete (never paged) and is re-bucketed through `groupTodos` over
- * the merged rows on every render, so a repeating todo's done-or-open state is a function of the
- * todo itself — the same on page 1 as on page 4 — instead of depending on how far the list has
+ * the merged rows on every render, so a repeating item's done-or-open state is a function of the
+ * item itself — the same on page 1 as on page 4 — instead of depending on how far the list has
  * been scrolled. Bucket order and every empty state stay `TodoList`'s.
  */
 export function TodosScroll({

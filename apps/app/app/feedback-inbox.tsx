@@ -20,6 +20,17 @@ const INBOX_SUBTITLE = 'Across all five modules';
 export const FEEDBACK_PAGE_SIZE = 50;
 
 /**
+ * The page after `cursor`. A server action, so the browser asks for entries and the
+ * owner's token never leaves the server (the `callService` choke point). Module scope
+ * because it needs nothing from the render: the page size and the fetcher are both
+ * module-level facts.
+ */
+async function loadFeedbackPage(cursor: string): Promise<FeedbackPage> {
+  'use server';
+  return listFeedbackPage({ limit: FEEDBACK_PAGE_SIZE, cursor });
+}
+
+/**
  * The filter row: All plus one chip per status — data straight from
  * `FEEDBACK_STATUSES`, so a vocabulary change rerenders here too. It is the notes
  * index's `TagFilterNav` shape (one row of link chips, All pinned at the leading
@@ -76,15 +87,6 @@ export function FeedbackInbox({
   submitFeedbackAction: (input: CreateFeedbackInput) => Promise<FeedbackSubmitResult>;
   setFeedbackStatusAction: (id: string, status: FeedbackStatus) => Promise<FeedbackSubmitResult>;
 }>) {
-  /**
-   * The page after `cursor`. A server action, so the browser asks for entries and the
-   * owner's token never leaves the server (the `callService` choke point).
-   */
-  async function loadPage(cursor: string): Promise<FeedbackPage> {
-    'use server';
-    return listFeedbackPage({ limit: FEEDBACK_PAGE_SIZE, cursor });
-  }
-
   return (
     <ListShell
       title="Feedback"
@@ -96,7 +98,7 @@ export function FeedbackInbox({
           entries={entries}
           nextCursor={nextCursor}
           status={status}
-          loadPage={loadPage}
+          loadPage={loadFeedbackPage}
           setFeedbackStatusAction={setFeedbackStatusAction}
         />
       }
