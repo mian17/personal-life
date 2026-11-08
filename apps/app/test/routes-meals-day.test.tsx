@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/lib/meal-api', () => ({
   collectDayEntries: jest.fn(),
+  listDayEntries: jest.fn(),
   getMealTarget: jest.fn(),
   collectMealFoods: jest.fn(),
   collectMealFoodsIncludingDeleted: jest.fn(),
@@ -16,6 +17,7 @@ jest.mock('@/lib/today', () => ({
 import { ApiError } from '@/lib/api-error';
 import {
   collectDayEntries,
+  listDayEntries,
   getMealTarget,
   collectMealFoods,
   collectMealFoodsIncludingDeleted,
@@ -26,6 +28,7 @@ import { getToday } from '@/lib/today';
 import MealsPage from '@/app/(meals)/meals/page';
 
 const mockedCollectDayEntries = collectDayEntries as jest.MockedFunction<typeof collectDayEntries>;
+const mockedListDayEntries = listDayEntries as jest.MockedFunction<typeof listDayEntries>;
 const mockedGetMealTarget = getMealTarget as jest.MockedFunction<typeof getMealTarget>;
 const mockedCollectMealFoods = collectMealFoods as jest.MockedFunction<typeof collectMealFoods>;
 const mockedCollectMealFoodsIncludingDeleted = collectMealFoodsIncludingDeleted as jest.MockedFunction<
@@ -58,6 +61,12 @@ describe('/meals day route wiring', () => {
     jest.clearAllMocks();
     mockedGetToday.mockResolvedValue('2026-10-03');
     mockedCollectDayEntries.mockResolvedValue([]);
+    // The row list reads page 1 from the cursor read; these fixtures model a one-page day, so it
+    // is the same entry set the headline sums.
+    mockedListDayEntries.mockImplementation(async (date) => {
+      const entries = await mockedCollectDayEntries(date);
+      return { entries, nextCursor: null, total: entries.length };
+    });
     mockedCollectMealFoods.mockResolvedValue([]);
     mockedCollectMealFoodsIncludingDeleted.mockResolvedValue([]);
     mockedRestoredFoodName.mockImplementation((foodId: string) => foodId);

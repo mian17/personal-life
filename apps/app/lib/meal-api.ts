@@ -28,6 +28,8 @@ export interface MealEntry {
 export interface EntryPage {
   entries: MealEntry[];
   nextCursor: string | null;
+  /** How many rows the whole day holds — never this page's length. */
+  total: number;
 }
 
 /** The wire shape of a target row (`TargetService.TargetDto`). */
@@ -64,10 +66,11 @@ export function listDayEntries(date: string, cursor?: string): Promise<EntryPage
 }
 
 /**
- * Every entry of one day, walked cursor by cursor. The day view sums the whole
- * day, and a paged subset would make the totals quietly wrong — the same reason
- * `collectTodos` exists (`lib/todo-query.ts`). `maxItems` is a safety bound, not
- * an expected size.
+ * Every entry of one day, walked cursor by cursor. The day view needs the whole day even
+ * though the row list pages: the headline is a sum over every entry, and each meal's
+ * subtotal is too, so a paged subset would make those figures quietly wrong — the same
+ * reason `collectTodos` exists (`lib/todo-query.ts`). A caller that needs only the count
+ * reads page 1's `total`. `maxItems` is a safety bound, not an expected size.
  */
 export async function collectDayEntries(date: string, maxItems = 1000): Promise<MealEntry[]> {
   const collected: MealEntry[] = [];
