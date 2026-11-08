@@ -41,6 +41,9 @@ function walk(rows: Ranked[], limit: number): string[] {
 
 const ranked = (id: string, at: string): Ranked => ({ id, at });
 
+/** A cursor-shaped string over an arbitrary payload, for the foreign-input cases. */
+const base64Of = (payload: string): string => Buffer.from(payload).toString('base64');
+
 describe('cursor codec', () => {
   it('round-trips a key of any width', () => {
     for (const key of [['only'], ['a', 'b'], ['2026-01-01T00:00:00.000Z', 'id-1']]) {
@@ -48,16 +51,37 @@ describe('cursor codec', () => {
     }
   });
 
-  it('encodes to base64 over the |-joined key, so the wire format is unchanged', () => {
+  it('encodes to base64 over the JSON key array', () => {
     expect(encodeCursor(['2026-01-01T00:00:00.000Z', 'id-1'])).toBe(
-      Buffer.from('2026-01-01T00:00:00.000Z|id-1').toString('base64'),
+      Buffer.from('["2026-01-01T00:00:00.000Z","id-1"]').toString('base64'),
     );
+  });
+
+  it('round-trips a key part containing the old separator', () => {
+    const key = ['a|b', '2'];
+    expect(decodeCursor(encodeCursor(key))).toEqual(key);
+  });
+
+  it('round-trips a key part ending with the old separator', () => {
+    const key = ['ends|', '7'];
+    expect(decodeCursor(encodeCursor(key))).toEqual(key);
+  });
+
+  it('round-trips an empty key part', () => {
+    const key = ['', '7'];
+    expect(decodeCursor(encodeCursor(key))).toEqual(key);
   });
 
   it.each([
     ['junk that is not base64', 'not base64!!'],
-    ['a non-canonical re-encoding', Buffer.from('x|y').toString('base64').slice(0, -1)],
-    ['an empty part', Buffer.from('a||b').toString('base64')],
+    ['a non-canonical re-encoding', Buffer.from('["x","y"]').toString('base64').slice(0, -1)],
+    ['a payload that is not a string array', base64Of('{"a":1}')],
+    ['a payload with a non-string part', base64Of('["a",2]')],
+    ['a truncated cursor', encodeCursor(['a|b', '2']).slice(0, -4)],
+    // The pre-JSON wire format (`|`-joined). Cursors are opaque and never
+    // persisted, so retiring the old spelling is a 400 the client recovers from
+    // by restarting its walk — never a silent mis-decode.
+    ['a cursor in the retired separator format', base64Of('2026-01-01T00:00:00.000Z|id-1')],
   ])('rejects %s with a 400', (_label, cursor) => {
     expect(() => decodeCursor(cursor)).toThrow(BadRequestException);
   });
@@ -106,6 +130,50 @@ describe('paginate', () => {
     const first = pageOf(rows, 1);
     const rest = [rows[0], ...newestFirst([ranked('a', '2026-01-01')])];
     expect(pageOf(rest, 1, first.nextCursor!).rows.map((row) => row.id)).toEqual(['a']);
+  });
+
+  it('walks a name order past keys the old |-joined cursor mangled, row by row', () => {
+    // The tags order (`name.toLowerCase()` ASC, id ASC). Two of these names break
+    // the old wire format: `a|b` split into an extra part, and `ends|` minted an
+    // empty one. With limit 1 the boundary lands on each in turn, so a walk that
+    // repeats or 400s there shows up as a wrong sequence, not as a slow test.
+    type Tagish = { id: string; name: string };
+    const tagOrder = (rows: Tagish[]): Tagish[] =>
+      [...rows].sort((a, b) => {
+        const an = a.name.toLowerCase();
+        const bn = b.name.toLowerCase();
+        return an === bn ? Number(a.id) - Number(b.id) : an < bn ? -1 : 1;
+      });
+    const afterTag = (row: Tagish, at: string[]): boolean => {
+      const [name, id] = at;
+      const lowered = row.name.toLowerCase();
+      if (lowered !== name) return lowered > name;
+      return Number(row.id) > Number(id);
+    };
+    const ordered = tagOrder([
+      { id: '3', name: 'zz' },
+      { id: '2', name: 'ends|' },
+      { id: '1', name: 'a|b' },
+      { id: '4', name: 'aa' },
+    ]);
+    // `|` (0x7C) sorts after `a` (0x61), so `aa` leads — and `a|b` is therefore a
+    // page boundary, which is the case that used to loop.
+    expect(ordered.map((row) => row.name)).toEqual(['aa', 'a|b', 'ends|', 'zz']);
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = paginate(ordered, {
+        limit: 1,
+        cursor,
+        keyOf: (row) => [row.name.toLowerCase(), row.id],
+        after: afterTag,
+      });
+      seen.push(...page.rows.map((row) => row.id));
+      if (page.nextCursor === null) break;
+      cursor = page.nextCursor;
+    }
+    expect(seen).toEqual(ordered.map((row) => row.id));
   });
 
   it('holds the todos undated-last order, including across the dated boundary', () => {

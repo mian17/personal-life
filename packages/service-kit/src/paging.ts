@@ -26,9 +26,6 @@ export const DEFAULT_PAGE_LIMIT = 50;
 /** The largest page any list endpoint will serve; every query DTO caps here. */
 export const MAX_PAGE_LIMIT = 200;
 
-/** The wire separator inside a cursor. Row sort keys never contain it. */
-const PART_SEPARATOR = '|';
-
 /** One page of an ordered list plus the cursor that continues it. */
 export interface Page<T> {
   rows: T[];
@@ -40,26 +37,57 @@ export interface Page<T> {
  * Seal a row's stable sort key — id last, so unique — into the opaque cursor a
  * client passes back untouched. Opaque by contract: clients never parse it, and
  * only `decodeCursor` here knows the wire format.
+ *
+ * The payload is the key array as JSON, so each part is quoted: a key part may
+ * hold any character (the `|` a tag name carries, for one) and may be empty,
+ * and the key's width survives the round trip. A joined-string format cannot say
+ * that — any separator it picks is a character some key could contain.
  */
 export function encodeCursor(key: readonly string[]): string {
-  return Buffer.from(key.join(PART_SEPARATOR)).toString('base64');
+  return Buffer.from(JSON.stringify(key)).toString('base64');
 }
 
 /**
- * Open a cursor `encodeCursor` produced. A value that is not canonical base64 of
- * a non-empty `|`-separated key is a `400`: a cursor is either something this
- * seam issued or a client bug, and guessing at a mis-decoded key would page from
- * an arbitrary position instead of saying so.
+ * Open a cursor `encodeCursor` produced: canonical base64 over a non-empty JSON
+ * array of string key parts. Anything else is a `400` — a cursor is either
+ * something this seam issued or a client bug, and guessing at a mis-decoded key
+ * would page from an arbitrary position instead of saying so.
+ *
+ * Part *content* is never inspected: an empty part and a part holding `|` are
+ * ordinary keys, because the JSON envelope already says where each part ends.
  */
 export function decodeCursor(cursor: string): string[] {
-  const decoded = Buffer.from(cursor, 'base64');
-  const parts = decoded.toString().split(PART_SEPARATOR);
+  const bytes = Buffer.from(cursor, 'base64');
   // Re-encoding catches non-base64 input: Node decodes junk to bytes and back to
   // a *different* base64 string, so round-trip equality is the format test.
-  if (decoded.toString('base64') !== cursor || parts.some((part) => part === '')) {
-    throw new BadRequestException('cursor is not a page cursor this service issued');
+  if (bytes.toString('base64') !== cursor) throw notOurCursor();
+  return parseKeyPayload(bytes.toString());
+}
+
+/**
+ * The payload half of `decodeCursor`: a JSON key array of at least one string.
+ * A cursor minted by a different list decodes fine here — its width is the
+ * caller's `after` test to judge, not this codec's.
+ */
+function parseKeyPayload(payload: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    throw notOurCursor();
   }
-  return parts;
+  if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every(isString)) {
+    throw notOurCursor();
+  }
+  return parsed;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function notOurCursor(): BadRequestException {
+  return new BadRequestException('cursor is not a page cursor this service issued');
 }
 
 /**
