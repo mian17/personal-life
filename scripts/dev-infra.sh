@@ -75,6 +75,11 @@ up() {
   # created when interrupted. Both layers stay on purpose — each covers a window
   # the other cannot see, and removing an already-removed container is harmless
   # (`docker rm -f` fails on a missing name, and `down` ignores that).
+  # `-v` is load-bearing on every removal here: `docker run --rm` only auto-removes
+  # volumes on a container's natural exit, so an explicit `rm -f` without `-v`
+  # strands the image-declared anonymous volume. `postgres:17-alpine` declares
+  # `VOLUME /var/lib/postgresql/data`, which is how the owner's host accumulated
+  # 657 dangling volumes / 25 GB of thrown-away initdb data dirs.
   trap 'down; exit 130' INT TERM
   # Each container is checked on its own: a previous session, or an earlier
   # `dev:infra:up`, may have left one running — recreating it would wipe the
@@ -83,7 +88,7 @@ up() {
   if running "$PG"; then
     echo "dev-infra: reusing $PG"
   else
-    docker rm -f "$PG" >/dev/null 2>&1 || true
+    docker rm -f -v "$PG" >/dev/null 2>&1 || true
     docker run --rm -d --name "$PG" \
       -e POSTGRES_DB=feedback \
       -e POSTGRES_USER=feedback \
@@ -94,7 +99,7 @@ up() {
   if running "$MQ"; then
     echo "dev-infra: reusing $MQ"
   else
-    docker rm -f "$MQ" >/dev/null 2>&1 || true
+    docker rm -f -v "$MQ" >/dev/null 2>&1 || true
     # No `--rm`: a crash during boot is only diagnosable from the stopped
     # container's logs, and `up`/`down` remove it anyway.
     docker run -d --name "$MQ" \
@@ -115,7 +120,7 @@ up() {
 }
 
 down() {
-  docker rm -f "$PG" "$MQ" >/dev/null 2>&1 || true
+  docker rm -f -v "$PG" "$MQ" >/dev/null 2>&1 || true
   echo "dev-infra: removed $PG $MQ"
 }
 
