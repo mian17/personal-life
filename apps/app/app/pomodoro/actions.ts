@@ -40,6 +40,24 @@ export async function setPomodoroFocusMinutes(minutes: number): Promise<void> {
   await setPrefNumbers([['pomodoro_focus', clampMinutes(minutes)]]);
 }
 
+/** The break a boundary chip was pressed for, and the cookie that length lives in. */
+const BREAK_PREFS = {
+  short: 'pomodoro_short',
+  long: 'pomodoro_long',
+} as const;
+
+/**
+ * Set one break length without touching the focus length or the other break, so a chip at a
+ * boundary persists the same cookie the settings form writes. `clampMinutes` holds a
+ * mistyped value to the one-block default, exactly as the focus chip does.
+ */
+export async function setPomodoroBreakMinutes(
+  phase: 'short' | 'long',
+  minutes: number,
+): Promise<void> {
+  await setPrefNumbers([[BREAK_PREFS[phase], clampMinutes(minutes)]]);
+}
+
 /**
  * Set today's goal (`PUT /api/goal`). The day is the shared `getToday()` owner,
  * so only today re-measures: a past day keeps the goal its own dated row gave it
