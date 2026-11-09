@@ -60,11 +60,24 @@ function runWorkspace(dir) {
     // roughly doubles ts-jest compile cost, and on a cold cache (every CI run)
     // an e2e `beforeAll` that boots Nest + sqlite crosses 5s and fails the suite
     // spuriously — measured 2/13 note-service suites red cold vs green warm.
+    //
+    // `NODE_OPTIONS` carries the vm-modules flag because a workspace's `.mts`
+    // suites need it, and this runner spawns jest directly instead of through
+    // `npm run test:unit`, so it does not inherit the flag from the script. Jest
+    // cannot load an ESM-only package without it: its CommonJS registry rejects
+    // the import with ERR_REQUIRE_ESM.
     execFileSync(
       JEST,
-      ['--coverage', '--coverageReporters=lcov', `--coverageDirectory=${coverageDir}`, '--silent', '--testTimeout=30000'],
+      [
+        '--coverage',
+        '--coverageReporters=lcov',
+        `--coverageDirectory=${coverageDir}`,
+        '--silent',
+        '--testTimeout=30000',
+      ],
       {
         cwd: join(ROOT, dir),
+        env: { ...process.env, NODE_OPTIONS: '--experimental-vm-modules' },
         stdio: ['ignore', 'inherit', 'inherit'],
       },
     );

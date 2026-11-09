@@ -8,8 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest",
-    "test:unit": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest",
     "db:backup": "ts-node scripts/backup.ts",
     "db:restore": "ts-node scripts/restore.ts",
     "db:backup:pg": "ts-node scripts/backup-pg.ts",
@@ -33,16 +33,27 @@
     "moduleFileExtensions": [
       "js",
       "json",
-      "ts"
+      "ts",
+      "mts"
     ],
     "rootDir": ".",
-    "testRegex": "\\.test\\.ts$",
+    "testRegex": "\\.test\\.(ts|mts)$",
     "testPathIgnorePatterns": [
       "/node_modules/"
     ],
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.mts$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": "tsconfig.esm-test.json"
+        }
+      ],
+      "^.+\\.(ts|tsx|js|jsx)$": "ts-jest"
     },
+    "extensionsToTreatAsEsm": [
+      ".mts"
+    ],
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@life/shared/node$": "<rootDir>/../shared/src/node.ts"
