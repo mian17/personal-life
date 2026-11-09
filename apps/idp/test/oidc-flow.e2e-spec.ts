@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 
 import { execFile } from 'child_process';
@@ -17,11 +18,11 @@ import { UsersService } from '../src/users/users.service.js';
  * NodeNext tsconfig) is what runs them. */
 const TS_NODE_ESM_LOADER_ARGS = ['--loader', 'ts-node/esm'];
 const execFileAsync = promisify(execFile);
-const VERIFY_SCRIPT = join(__dirname, '..', 'scripts', 'verify-jwks.ts');
+const VERIFY_SCRIPT = join(import.meta.dirname, '..', 'scripts', 'verify-jwks.ts');
 
-const TEST_DB = join(__dirname, 'test-idp-flow.db');
-const TEST_KEYS = join(__dirname, 'test-idp-flow-keys.json');
-const PUBLIC_JWKS_FILE = join(__dirname, 'test-idp-flow-public.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-flow.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-flow-keys.json');
+const PUBLIC_JWKS_FILE = join(import.meta.dirname, 'test-idp-flow-public.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const REDIRECT_URI = 'http://127.0.0.1:8080/cb';
 const PASSWORD = 'fixture-password-not-a-secret';
@@ -44,7 +45,7 @@ async function runVerifier(
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       [...TS_NODE_ESM_LOADER_ARGS, VERIFY_SCRIPT, ...args],
-      { cwd: join(__dirname, '..') },
+      { cwd: join(import.meta.dirname, '..') },
     );
     return { code: 0, stdout, stderr };
   } catch (err) {
@@ -376,8 +377,8 @@ describe('Authorization code + PKCE flow (e2e)', () => {
 });
 
 describe('Storage adapter persistence across app instances (e2e)', () => {
-  const SHARED_DB = join(__dirname, 'test-idp-flow-shared.db');
-  const SHARED_KEYS = join(__dirname, 'test-idp-flow-shared-keys.json');
+  const SHARED_DB = join(import.meta.dirname, 'test-idp-flow-shared.db');
+  const SHARED_KEYS = join(import.meta.dirname, 'test-idp-flow-shared-keys.json');
 
   afterAll(() => {
     rmSync(SHARED_DB, { force: true });
@@ -388,19 +389,27 @@ describe('Storage adapter persistence across app instances (e2e)', () => {
     process.env.KEYS_PATH = TEST_KEYS;
   });
 
-  // TypeORM reads DB_PATH when app.module.ts is first evaluated, so each instance
-  // must be built from a fresh module registry (the Task 2/3 raw-DB pattern).
+  // ESM has no `resetModules`: the isolated registry is the way to re-evaluate
+  // `app.module.ts` so TypeORM reads the new DB_PATH (the Task 2/3 raw-DB pattern).
   async function startSharedApp(): Promise<{
     app: INestApplication;
     users: UsersService;
   }> {
-    jest.resetModules();
     process.env.DB_PATH = SHARED_DB;
     process.env.KEYS_PATH = SHARED_KEYS;
-    const [{ createApp }, { UsersService: FreshUsersService }] = await Promise.all([
-      import('../src/app.factory.js'),
-      import('../src/users/users.service.js'),
-    ]);
+    // Sequential, not `Promise.all`: two concurrent dynamic imports race Jest's
+    // ESM linker inside an isolated registry ("request for 'reflect-metadata' is
+    // from a module not been linked").
+    let fresh!: [
+      typeof import('../src/app.factory.js'),
+      typeof import('../src/users/users.service.js'),
+    ];
+    await jest.isolateModulesAsync(async () => {
+      const factory = await import('../src/app.factory.js');
+      const users = await import('../src/users/users.service.js');
+      fresh = [factory, users];
+    });
+    const [{ createApp }, { UsersService: FreshUsersService }] = fresh;
     const app = await createApp();
     await app.init();
     return { app, users: app.get(FreshUsersService) };

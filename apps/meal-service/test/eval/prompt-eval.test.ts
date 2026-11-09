@@ -79,7 +79,7 @@ const live = process.env.PROMPT_EVAL === '1';
 
 /** Every directory under `test/eval/fixtures` is a fixture. */
 function fixtureNames(): string[] {
-  const fixturesDir = path.join(__dirname, 'fixtures');
+  const fixturesDir = path.join(import.meta.dirname, 'fixtures');
   return fs
     .readdirSync(fixturesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -128,7 +128,9 @@ async function sampleFixture(
   coordinates: NodeJS.ProcessEnv,
 ): Promise<SampleOutcome[]> {
   const expected = readFixture(fixtureId);
-  const image = fs.readFileSync(path.join(__dirname, 'fixtures', fixtureId, expected.photo));
+  const image = fs.readFileSync(
+    path.join(import.meta.dirname, 'fixtures', fixtureId, expected.photo),
+  );
   const outcomes: SampleOutcome[] = [];
 
   for (let sample = 1; sample <= samples; sample += 1) {
@@ -140,7 +142,10 @@ async function sampleFixture(
 }
 
 function readFixture(fixtureId: string): ExpectedMeal {
-  const raw = fs.readFileSync(path.join(__dirname, 'fixtures', fixtureId, 'expected.json'), 'utf8');
+  const raw = fs.readFileSync(
+    path.join(import.meta.dirname, 'fixtures', fixtureId, 'expected.json'),
+    'utf8',
+  );
   return JSON.parse(raw) as ExpectedMeal;
 }
 

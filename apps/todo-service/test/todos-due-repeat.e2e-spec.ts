@@ -18,7 +18,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * (the hard line).
  */
 
-const TEST_DB = join(__dirname, 'test-todos-due-repeat.db');
+const TEST_DB = join(import.meta.dirname, 'test-todos-due-repeat.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

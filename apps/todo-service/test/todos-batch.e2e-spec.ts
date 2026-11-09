@@ -33,7 +33,7 @@ import { FakeRedisClient } from './fake-redis.js';
  * `apps/todo-service/data/` (the hard line).
  */
 
-const TEST_DB = join(__dirname, 'test-todos-batch.db');
+const TEST_DB = join(import.meta.dirname, 'test-todos-batch.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

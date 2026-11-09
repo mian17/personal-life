@@ -20,7 +20,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * opens `apps/todo-service/data/**` (the hard line).
  */
 
-const TEST_DB = join(__dirname, 'test-todos-custom-repeat.db');
+const TEST_DB = join(import.meta.dirname, 'test-todos-custom-repeat.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

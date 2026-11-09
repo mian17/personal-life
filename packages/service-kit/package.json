@@ -9,16 +9,16 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "jest",
-    "test:unit": "jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "peerDependencies": {
     "@life/cache": "*",
     "@life/crypto": "*",
     "@life/shared": "*",
-    "@nestjs/common": "^11.0.11",
-    "@nestjs/core": "^11.0.11",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/typeorm": "^12.0.3",
     "jose": "^6.2.15",
     "typeorm": "^0.3.20"
   },
@@ -26,10 +26,10 @@
     "@life/cache": "*",
     "@life/crypto": "*",
     "@life/shared": "*",
-    "@nestjs/common": "^11.0.11",
-    "@nestjs/core": "^11.0.11",
-    "@nestjs/testing": "^11.0.11",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/testing": "^12.4.2",
+    "@nestjs/typeorm": "^12.0.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.13.9",
     "@types/supertest": "^7.2.1",
@@ -50,6 +50,9 @@
     ],
     "rootDir": ".",
     "testRegex": "\\.test\\.ts$",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "testPathIgnorePatterns": [
       "/node_modules/"
     ],
@@ -57,10 +60,8 @@
       "^.+\\.(t|j)s$": [
         "ts-jest",
         {
-          "tsconfig": {
-            "module": "commonjs",
-            "moduleResolution": "node"
-          }
+          "useESM": true,
+          "tsconfig": "tsconfig.esm-test.json"
         }
       ]
     },
@@ -72,7 +73,7 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!(jose)/)"
+      "/node_modules/"
     ]
   }
 }

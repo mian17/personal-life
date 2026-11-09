@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { NUTRIENTS } from '@life/nutrition';
 import {
   GeminiClient,

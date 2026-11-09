@@ -16,7 +16,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * `apps/todo-service/data/` (the hard line).
  */
 
-const TEST_DB = join(__dirname, 'test-lists.db');
+const TEST_DB = join(import.meta.dirname, 'test-lists.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

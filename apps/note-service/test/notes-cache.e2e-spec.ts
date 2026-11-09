@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import {
   CACHE_TTL_SECONDS,
   createNotesCache,

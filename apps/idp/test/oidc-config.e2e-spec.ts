@@ -138,8 +138,8 @@ describe('audience mapping (env-driven)', () => {
  * chapter; this pins its absence so it cannot silently come back.
  */
 describe('enabled protocol surface (discovery + routes)', () => {
-  const TEST_DB = join(__dirname, 'test-idp-config-surface.db');
-  const TEST_KEYS = join(__dirname, 'test-idp-config-surface-keys.json');
+  const TEST_DB = join(import.meta.dirname, 'test-idp-config-surface.db');
+  const TEST_KEYS = join(import.meta.dirname, 'test-idp-config-surface-keys.json');
   let app: INestApplication;
 
   beforeAll(async () => {

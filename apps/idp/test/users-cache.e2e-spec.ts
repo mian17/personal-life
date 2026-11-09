@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -20,8 +21,8 @@ import { FakeCacheClient } from './fake-cache-client.js';
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
 
 describe('IdP users read-through cache (e2e)', () => {
-  const TEST_DB = join(__dirname, 'test-idp-users-cache.db');
-  const TEST_KEYS = join(__dirname, 'test-idp-users-cache-keys.json');
+  const TEST_DB = join(import.meta.dirname, 'test-idp-users-cache.db');
+  const TEST_KEYS = join(import.meta.dirname, 'test-idp-users-cache-keys.json');
   process.env.DB_PATH = TEST_DB;
   process.env.KEYS_PATH = TEST_KEYS;
 
@@ -277,7 +278,7 @@ describe('createUsersCache selection (unit)', () => {
  * source files — a mock here would prove nothing.
  */
 describe('OIDC payloads are never cached (module boundary, real source)', () => {
-  const srcDir = join(__dirname, '..', 'src');
+  const srcDir = join(import.meta.dirname, '..', 'src');
   const oidcDir = join(srcDir, 'oidc');
   const usersCachePath = join(srcDir, 'users', 'users-cache.ts');
 

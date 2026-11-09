@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
@@ -21,7 +22,7 @@ import { join } from 'node:path';
  */
 jest.setTimeout(60_000);
 
-const TEST_DB = join(__dirname, 'test-focus-health.db');
+const TEST_DB = join(import.meta.dirname, 'test-focus-health.db');
 const TEST_ISSUER = 'https://idp.test';
 const TEST_AUDIENCE = 'life-api';
 /** Obviously-fake key: a public test artifact, never a real secret. */

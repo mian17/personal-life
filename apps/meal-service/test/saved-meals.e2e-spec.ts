@@ -18,7 +18,7 @@ import { KeysService, MAX_PAGE_LIMIT } from '@life/service-kit';
  * Exercised through `SavedMealsService` (behavior proof, not transport).
  */
 
-const TEST_DB = join(__dirname, 'test-saved-meals.db');
+const TEST_DB = join(import.meta.dirname, 'test-saved-meals.db');
 const SUB = 'user-a';
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 

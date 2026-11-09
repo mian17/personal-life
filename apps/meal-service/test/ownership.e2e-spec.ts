@@ -19,7 +19,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * per request).
  */
 
-const TEST_DB = join(__dirname, 'test-ownership.db');
+const TEST_DB = join(import.meta.dirname, 'test-ownership.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

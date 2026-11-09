@@ -7,7 +7,7 @@ import type { Note as NoteDto } from '@life/shared';
 import { Note } from '../src/notes/note.entity.js';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
-const TEST_DB = join(__dirname, 'test-life.db');
+const TEST_DB = join(import.meta.dirname, 'test-life.db');
 process.env.DB_PATH = TEST_DB;
 
 // Every request now carries a minted JWT (Task 10); the guard is JWT-only.

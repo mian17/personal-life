@@ -17,7 +17,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * comparison cannot be running against the stored string.
  */
 
-const TEST_DB = join(__dirname, 'test-foods-search.db');
+const TEST_DB = join(import.meta.dirname, 'test-foods-search.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

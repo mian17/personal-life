@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
 import { MealCache, generationKey } from '../src/cache/meal-cache.js';

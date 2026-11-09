@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'fs';

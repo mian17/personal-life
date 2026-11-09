@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { readFileSync, rmSync } from 'fs';
@@ -21,8 +22,8 @@ function rawToken(cookie: string): string {
 }
 
 describe('Login and sessions (e2e)', () => {
-  const TEST_DB = join(__dirname, 'test-idp-login.db');
-  const TEST_KEYS = join(__dirname, 'test-idp-login-keys.json');
+  const TEST_DB = join(import.meta.dirname, 'test-idp-login.db');
+  const TEST_KEYS = join(import.meta.dirname, 'test-idp-login-keys.json');
   process.env.DB_PATH = TEST_DB;
   process.env.KEYS_PATH = TEST_KEYS;
 
@@ -163,19 +164,29 @@ describe('Login and sessions (e2e)', () => {
 });
 
 describe('Raw session storage (e2e)', () => {
-  const RAW_DB = join(__dirname, 'test-idp-login-raw.db');
+  const RAW_DB = join(import.meta.dirname, 'test-idp-login-raw.db');
 
   afterAll(() => rmSync(RAW_DB, { force: true }));
 
   it('never writes the raw session token to the database file', async () => {
-    jest.resetModules();
     rmSync(RAW_DB, { force: true });
     process.env.DB_PATH = RAW_DB;
 
-    const [{ createApp }, { UsersService: FreshUsersService }] = await Promise.all([
-      import('../src/app.factory.js'),
-      import('../src/users/users.service.js'),
-    ]);
+    // ESM has no `resetModules`: the isolated registry is the way to re-evaluate
+    // `app.module.ts` so TypeORM reads the new DB_PATH (see oidc-flow's note).
+    // Sequential, not `Promise.all`: two concurrent dynamic imports race Jest's
+    // ESM linker inside an isolated registry ("request for 'reflect-metadata' is
+    // from a module not been linked").
+    let fresh!: [
+      typeof import('../src/app.factory.js'),
+      typeof import('../src/users/users.service.js'),
+    ];
+    await jest.isolateModulesAsync(async () => {
+      const factory = await import('../src/app.factory.js');
+      const users = await import('../src/users/users.service.js');
+      fresh = [factory, users];
+    });
+    const [{ createApp }, { UsersService: FreshUsersService }] = fresh;
 
     const app = await createApp();
     await app.init();

@@ -11,10 +11,10 @@
     "backfill-encrypt": "node --loader ts-node/esm scripts/encrypt-backfill.cli.ts",
     "backfill-content-updated-at": "node --loader ts-node/esm scripts/backfill-content-updated-at.cli.ts",
     "rotate-master-key": "node --loader ts-node/esm scripts/rotate-master-key.cli.ts",
-    "test": "jest --passWithNoTests",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "jest"
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
     "@life/cache": "*",
@@ -22,10 +22,10 @@
     "@life/db": "*",
     "@life/service-kit": "*",
     "@life/shared": "*",
-    "@nestjs/common": "^11.0.11",
-    "@nestjs/core": "^11.0.11",
-    "@nestjs/platform-express": "^11.0.11",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/platform-express": "^12.4.2",
+    "@nestjs/typeorm": "^12.0.3",
     "better-sqlite3": "^12.11.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -36,9 +36,9 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.5",
-    "@nestjs/schematics": "^11.0.2",
-    "@nestjs/testing": "^11.0.11",
+    "@nestjs/cli": "^12.0.12",
+    "@nestjs/schematics": "^12.0.13",
+    "@nestjs/testing": "^12.4.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -77,16 +77,17 @@
       "^.+\\.(t|j)s$": [
         "ts-jest",
         {
-          "tsconfig": {
-            "module": "commonjs",
-            "moduleResolution": "node"
-          }
+          "useESM": true,
+          "tsconfig": "tsconfig.esm-test.json"
         }
       ]
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!(jose)/)"
+      "/node_modules/"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ]
   }
 }

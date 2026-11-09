@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
 import {
   FakeConsumer,

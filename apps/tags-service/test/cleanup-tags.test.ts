@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -524,10 +525,10 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
   });
 
   it('15. anchors the default paths at the repo root and honours env overrides', () => {
-    const repoRoot = join(__dirname, '..', '..', '..');
+    const repoRoot = join(import.meta.dirname, '..', '..', '..');
     // `defaultCleanupPaths` is what `src/tags/paths.ts` calls at CLI startup,
     // with `import.meta.dirname` in place of this literal.
-    const defaults = defaultCleanupPaths(join(__dirname, '..', 'src', 'tags'));
+    const defaults = defaultCleanupPaths(join(import.meta.dirname, '..', 'src', 'tags'));
     expect(defaults.noteDbPath).toBe(join(repoRoot, 'apps', 'note-service', 'data', 'life.db'));
     expect(defaults.todoDbPath).toBe(join(repoRoot, 'apps', 'todo-service', 'data', 'todo.db'));
     expect(defaults.tagsDbPath).toBe(join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'));

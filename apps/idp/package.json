@@ -8,17 +8,17 @@
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3003} node dist/main.js",
     "seed": "node --loader ts-node/esm scripts/seed-user.ts",
-    "test": "jest --passWithNoTests",
-    "test:unit": "jest --passWithNoTests",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@life/shared": "*",
-    "@nestjs/common": "^11.0.11",
-    "@nestjs/core": "^11.0.11",
-    "@nestjs/platform-express": "^11.0.11",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/platform-express": "^12.4.2",
+    "@nestjs/typeorm": "^12.0.3",
     "argon2": "^0.45.2",
     "better-sqlite3": "^12.11.1",
     "class-transformer": "^0.5.1",
@@ -30,9 +30,9 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.5",
-    "@nestjs/schematics": "^11.0.2",
-    "@nestjs/testing": "^11.0.11",
+    "@nestjs/cli": "^12.0.12",
+    "@nestjs/schematics": "^12.0.13",
+    "@nestjs/testing": "^12.4.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -62,19 +62,20 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+.(t|j)s$": [
+      "^.+\\.(t|j)s$": [
         "ts-jest",
         {
-          "tsconfig": {
-            "module": "commonjs",
-            "moduleResolution": "node"
-          }
+          "useESM": true,
+          "tsconfig": "tsconfig.esm-test.json"
         }
       ]
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!(oidc-provider|jose)/)"
+      "/node_modules/"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ]
   }
 }

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { rmSync } from 'fs';
 import { ENC_PREFIX } from '@life/crypto';
 import { encodeCursor } from '@life/service-kit';

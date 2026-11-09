@@ -13,7 +13,7 @@ import { configureVerifierEnv, JwtTestHarness, TEST_AUDIENCE, TEST_ISSUER } from
  * token case was deleted with the path it covered.
  */
 
-const TEST_DB = join(__dirname, 'test-auth.db');
+const TEST_DB = join(import.meta.dirname, 'test-auth.db');
 process.env.DB_PATH = TEST_DB;
 
 describe('JWT auth (e2e)', () => {

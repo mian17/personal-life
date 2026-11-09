@@ -15,10 +15,10 @@ import { resolveDbPath as rotateCliResolveDbPath } from '../scripts/rotate-maste
  * line is untouched).
  */
 
-const PACKAGE_DB = join(__dirname, '..', 'data', 'life.db');
-const REPO_ROOT = join(__dirname, '..', '..', '..');
+const PACKAGE_DB = join(import.meta.dirname, '..', 'data', 'life.db');
+const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 /** The CLI entries pass this same value in (`src/keys/db-path.ts`). */
-const PACKAGE_DIR = join(__dirname, '..');
+const PACKAGE_DIR = join(import.meta.dirname, '..');
 
 describe('note-service ops CLI DB path resolution', () => {
   it('defaults to apps/note-service/data/life.db regardless of cwd / INIT_CWD', () => {
@@ -33,7 +33,7 @@ describe('note-service ops CLI DB path resolution', () => {
   });
 
   it('an explicit NOTE_DB_PATH override wins, anchored at INIT_CWD ?? cwd', () => {
-    const root = join(__dirname, '..', 'tmp-root');
+    const root = join(import.meta.dirname, '..', 'tmp-root');
     expect(resolveDbPath({ INIT_CWD: root, NOTE_DB_PATH: 'rel/other.db' }, PACKAGE_DB)).toBe(
       join(root, 'rel', 'other.db'),
     );

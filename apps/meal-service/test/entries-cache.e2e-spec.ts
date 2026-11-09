@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { NotFoundException } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';

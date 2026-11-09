@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { rmSync } from 'fs';
@@ -31,7 +32,7 @@ import { VERIFIER_ENV } from '../src/service-config.js';
  *   photo reaches the model on every request).
  */
 
-const TEST_DB = join(__dirname, 'test-photo.db');
+const TEST_DB = join(import.meta.dirname, 'test-photo.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
