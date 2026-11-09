@@ -58,7 +58,9 @@
       "^@life/ui$": "<rootDir>/../../packages/ui/src/index.ts",
       "^@life/nutrition$": "<rootDir>/../../packages/nutrition/src/index.ts",
       "^@life/app-kit/preference-action$": "<rootDir>/../../packages/app-kit/src/preference-action.ts",
-      "^server-only$": "<rootDir>/test/stubs/server-only.ts"
+      "^server-only$": "<rootDir>/test/stubs/server-only.ts",
+      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
       "^.+\\.(t|j)sx?$": [

@@ -68,7 +68,8 @@
       "^@life/db$": "<rootDir>/../../packages/db/src/index.ts",
       "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
       "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
-      "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts"
+      "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

@@ -57,7 +57,9 @@
     "moduleNameMapper": {
       "^next/navigation$": "<rootDir>/test/stubs/next-navigation.tsx",
       "^next/headers$": "<rootDir>/test/stubs/next-headers.ts",
-      "^next/cache$": "<rootDir>/test/stubs/next-cache.ts"
+      "^next/cache$": "<rootDir>/test/stubs/next-cache.ts",
+      "^@life/shared$": "<rootDir>/../shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "testEnvironment": "jsdom"
   }
