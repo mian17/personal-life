@@ -30,31 +30,23 @@
  * The composition is `config → upstream → merge → cache`, the order the modules document: this
  * file knows JSON-RPC and nothing about how an upstream is reached.
  */
-import {
-  answerUntilStdinCloses,
-  errorAnswer,
-  idOf,
-  isRecord,
-  readMessage,
-} from '@life/shared';
+import { answerUntilStdinCloses, errorAnswer, idOf, isRecord, readMessage } from '@life/shared';
 import type { RpcRequest } from '@life/shared';
-import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from './cache';
-import type { ToolCacheLocation } from './cache';
-import { loadGatewayConfig } from './config';
-import type { GatewayConfig, UpstreamEntry } from './config';
-import { mergeToolTables } from './merge';
-import type { ForwardedTool, UpstreamSlice, UpstreamTool } from './merge';
-import { UpstreamError, callUpstreamTool, listUpstreamTools } from './upstream';
-import type { UpstreamNotices } from './upstream';
+import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from './cache.js';
+import type { ToolCacheLocation } from './cache.js';
+import { loadGatewayConfig } from './config.js';
+import type { GatewayConfig, UpstreamEntry } from './config.js';
+import { mergeToolTables } from './merge.js';
+import type { ForwardedTool, UpstreamSlice, UpstreamTool } from './merge.js';
+import { UpstreamError, callUpstreamTool, listUpstreamTools } from './upstream.js';
+import type { UpstreamNotices } from './upstream.js';
+import { DEVELOPMENT_VERSION } from './version.js';
 
 /** The `serverInfo` name a client sees; the version is the package's own. */
 const SERVER_NAME = 'mcp-gateway';
 
 /** Highest first: the first entry is what an unknown requested version falls back to. */
 const PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25', '2025-06-18'];
-
-/** `serverInfo.version`, pinned to the published package version by its own test. */
-const SERVER_VERSION: string = (require('../package.json') as { version: string }).version;
 
 /** The standard JSON-RPC codes; every other code the gateway answers with is gateway-local. */
 const PARSE_ERROR_CODE = -32700;
@@ -71,6 +63,13 @@ export interface McpServerOptions {
   env: NodeJS.ProcessEnv;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  /**
+   * `serverInfo.version`. The stdio entry (`entry.ts`) passes `package.json`'s version — the
+   * only place that file is read, because `import.meta` is illegal in this module and `require`
+   * is not defined once the package is ESM. A caller that names none is a library, not the
+   * published package, so it gets {@link DEVELOPMENT_VERSION}.
+   */
+  version?: string;
 }
 
 /**
@@ -96,15 +95,6 @@ export function createMcpServer(options: McpServerOptions): McpServer {
 /** Serve stdin until it closes, answering every JSON-RPC request. */
 export async function main(options: McpServerOptions): Promise<number> {
   return await answerLinesUntilStdinCloses({ server: createMcpServer(options), options });
-}
-
-/** The stdio entry: the environment's config, the process writers, then the loop. */
-async function serveFromEnvironment(): Promise<void> {
-  process.exitCode = await main({
-    env: process.env,
-    stdout: (line) => process.stdout.write(`${line}\n`),
-    stderr: (line) => process.stderr.write(`${line}\n`),
-  });
 }
 
 interface ServerLoop {
@@ -146,19 +136,24 @@ function notARequestAnswer(): unknown {
 
 async function answerRequest(request: RpcRequest, session: GatewaySession): Promise<unknown> {
   if (request.id === undefined) return null; // a notification gets no answer
-  if (request.method === 'initialize') return initializeAnswer(request);
+  if (request.method === 'initialize') return initializeAnswer(request, session);
   if (request.method === 'ping') return pingAnswer(request);
   if (request.method === 'tools/list') return await listAnswer(request, session);
   if (request.method === 'tools/call') return await callAnswer(request, session);
   return methodNotFoundAnswer(request);
 }
 
-function initializeAnswer(request: RpcRequest): unknown {
+function initializeAnswer(request: RpcRequest, session: GatewaySession): unknown {
   return resultAnswer(request, {
     protocolVersion: negotiateVersion(requestedVersion(request)),
     capabilities: { tools: {} },
-    serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+    serverInfo: { name: SERVER_NAME, version: serverVersionOf(session) },
   });
+}
+
+/** What this session reports as its own version; `DEVELOPMENT_VERSION` when its caller named none. */
+function serverVersionOf(session: GatewaySession): string {
+  return session.options.version ?? DEVELOPMENT_VERSION;
 }
 
 /** Echo the requested version when we speak it; otherwise name the highest we speak. */
@@ -226,6 +221,7 @@ async function callAnswer(request: RpcRequest, session: GatewaySession): Promise
       lookup.route.entry,
       lookup.route.toolName,
       toolArgumentsOf(request),
+      serverVersionOf(session),
     );
     return resultAnswer(request, result);
   } catch (error) {
@@ -241,6 +237,7 @@ async function mergedTools(session: GatewaySession): Promise<ForwardedTool[]> {
   const refreshedSlices = await refreshMissingSlices(config.entries, {
     location,
     cachedSlices,
+    clientVersion: serverVersionOf(session),
     reportUpstreamDown: session.options.stderr,
   });
   const slices = slicesInDeclaredOrder(config.entries, [...cachedSlices, ...refreshedSlices]);
@@ -255,6 +252,8 @@ function cacheLocationFor(configPath: string, configHash: string): ToolCacheLoca
 interface RefreshRequest {
   readonly location: ToolCacheLocation;
   readonly cachedSlices: readonly UpstreamSlice[];
+  /** `clientInfo.version` every re-handshake announces. */
+  readonly clientVersion: string;
   readonly reportUpstreamDown: (line: string) => void;
 }
 
@@ -274,7 +273,10 @@ async function refreshMissingSlices(
   const answered = handshaken.filter(isAnsweredSlice);
   if (answered.length === 0) return [];
 
-  writeToolSlices(request.location, answered.map((slice) => slice.slice));
+  writeToolSlices(
+    request.location,
+    answered.map((slice) => slice.slice),
+  );
   forgetAnnouncedChanges(request.location, answered);
   return answered.map((slice) => slice.slice);
 }
@@ -306,7 +308,7 @@ async function sliceFromUpstream(
 ): Promise<AnsweredSlice | undefined> {
   const notices: UpstreamNotices = { toolTableChanged: false };
   try {
-    const tools = namedTools(await listUpstreamTools(entry, notices), entry);
+    const tools = namedTools(await listUpstreamTools(entry, notices, request.clientVersion), entry);
     return {
       slice: { configKey: entry.configKey, tools },
       announcedTableChange: notices.toolTableChanged,
@@ -351,9 +353,7 @@ interface ToolRoute {
 }
 
 /** A forwarded name that resolves to one upstream, or why it resolves to none. */
-type RouteLookup =
-  | { kind: 'route'; route: ToolRoute }
-  | { kind: 'unknownTool'; reason: string };
+type RouteLookup = { kind: 'route'; route: ToolRoute } | { kind: 'unknownTool'; reason: string };
 
 function routeForTool(name: string, config: GatewayConfig): RouteLookup {
   const entry = upstreamForTool(name, config.entries);
@@ -442,8 +442,4 @@ function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
 
 function reasonFor(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-if (require.main === module) {
-  void serveFromEnvironment();
 }

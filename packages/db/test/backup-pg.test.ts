@@ -1,9 +1,17 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
-import { main, runBackupPg } from '../src/backup-pg';
-import type { PgBackupManifest, PgManifestEntry } from '../src/backup-pg';
-import type { PgRunner } from '../src/pg-client';
+import { main, runBackupPg } from '../src/backup-pg.js';
+import type { PgBackupManifest, PgManifestEntry } from '../src/backup-pg.js';
+import type { PgRunner } from '../src/pg-client.js';
 
 /**
  * `db:backup:pg` contract (`SPEC-feedback-infra.md` "Backup behavior", "Naming,

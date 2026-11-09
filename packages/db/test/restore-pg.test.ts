@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { main, runRestorePg } from '../src/restore-pg';
-import type { PgManifestEntry } from '../src/backup-pg';
-import type { PgRunner } from '../src/pg-client';
+import { main, runRestorePg } from '../src/restore-pg.js';
+import type { PgManifestEntry } from '../src/backup-pg.js';
+import type { PgRunner } from '../src/pg-client.js';
 
 /**
  * `db:restore:pg` contract (`SPEC-feedback-infra.md` "Restore behavior", "Restore safety
@@ -82,9 +82,7 @@ function makeFixture(): { root: string; backupRoot: string; env: NodeJS.ProcessE
 }
 
 /** A backup manifest holding one entry per seeded database, each with its own counts. */
-function makeSnapshotManifest(
-  tablesByDatabase: Record<string, Record<string, number>>,
-): object {
+function makeSnapshotManifest(tablesByDatabase: Record<string, Record<string, number>>): object {
   return {
     mode: 'routine',
     createdAt: '2026-10-01T00:00:00.000Z',
@@ -139,7 +137,11 @@ async function runCli(
   console.log = ((line: string) => out.push(line)) as typeof console.log;
   console.error = ((line: string) => err.push(line)) as typeof console.error;
   try {
-    return { code: await main(argv, env, runner, probe, at), out: out.join('\n'), err: err.join('\n') };
+    return {
+      code: await main(argv, env, runner, probe, at),
+      out: out.join('\n'),
+      err: err.join('\n'),
+    };
   } finally {
     console.log = originalLog;
     console.error = originalError;
@@ -148,7 +150,9 @@ async function runCli(
 
 /** Index of the first recorded `psql -c` statement containing `needle`. */
 function sqlIndex(runner: FakeRunner, needle: string): number {
-  return runner.calls.findIndex((argv) => argv.includes('-c') && (argv[argv.length - 1] ?? '').includes(needle));
+  return runner.calls.findIndex(
+    (argv) => argv.includes('-c') && (argv[argv.length - 1] ?? '').includes(needle),
+  );
 }
 
 const dirs: string[] = [];
@@ -178,7 +182,9 @@ describe('runRestorePg happy path', () => {
         to: `/tmp/db-restore-${STAMP}/${DB}.dump`,
       },
     ]);
-    expect(runner.calls.some((argv) => argv[0] === 'pg_restore' && argv[1] === '--list')).toBe(true);
+    expect(runner.calls.some((argv) => argv[0] === 'pg_restore' && argv[1] === '--list')).toBe(
+      true,
+    );
 
     // The pre-restore snapshot is pinned and manifest-tagged as pre-restore.
     expect(result.preRestoreDir).toBe(join(fx.backupRoot, `pre-restore-${STAMP}`));
@@ -217,7 +223,9 @@ describe('runRestorePg happy path', () => {
     expect(code).toBe(0);
     expect(out).toContain(`db:restore:pg ${DB} <- `);
     expect(out).toContain('pg_restore_list=ok');
-    expect(out).toContain(`pre_restore=${join(fx.backupRoot, `pre-restore-${STAMP}`, `${DB}.dump`)}`);
+    expect(out).toContain(
+      `pre_restore=${join(fx.backupRoot, `pre-restore-${STAMP}`, `${DB}.dump`)}`,
+    );
   });
 
   it('--only feedback restores the database; an unknown name exits 1 before any write', async () => {
@@ -315,12 +323,7 @@ describe('runRestorePg fail-closed preconditions (touching nothing)', () => {
     writeFileSync(join(outside, `${DB}.dump`), 'FAKE');
     const runner = makeRunner();
 
-    const { code, err } = await runCli(
-      ['--from', outside],
-      fx.env,
-      runner,
-      () => 'down',
-    );
+    const { code, err } = await runCli(['--from', outside], fx.env, runner, () => 'down');
 
     expect(code).toBe(1);
     expect(err).toContain(`must be under ${join(fx.root, 'backup')}`);
@@ -376,7 +379,8 @@ describe('runRestorePg ordering and post-write verification', () => {
 
     const dumpIndex = runner.calls.findIndex((argv) => argv[0] === 'pg_dump');
     const preListIndex = runner.calls.findIndex(
-      (argv) => argv[0] === 'pg_restore' && argv[1] === '--list' && argv[2]?.includes('db-pre-restore'),
+      (argv) =>
+        argv[0] === 'pg_restore' && argv[1] === '--list' && argv[2]?.includes('db-pre-restore'),
     );
     const dropIndex = sqlIndex(runner, 'DROP DATABASE');
     expect(dumpIndex).toBeGreaterThan(-1);
@@ -401,7 +405,9 @@ describe('runRestorePg ordering and post-write verification', () => {
 
     expect(code).toBe(1);
     expect(err).toContain('row count mismatch on notes: expected 5, got 4');
-    expect(err).toContain(`recover from ${join(fx.backupRoot, `pre-restore-${STAMP}`, `${DB}.dump`)}`);
+    expect(err).toContain(
+      `recover from ${join(fx.backupRoot, `pre-restore-${STAMP}`, `${DB}.dump`)}`,
+    );
     expect(existsSync(join(fx.backupRoot, `pre-restore-${STAMP}`, 'PINNED'))).toBe(true);
     expect(sqlIndex(runner, 'DROP DATABASE')).toBeGreaterThan(-1);
   });

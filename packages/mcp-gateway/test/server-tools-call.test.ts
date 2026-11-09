@@ -9,8 +9,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
-import { createMcpServer } from '../src/server';
-import type { McpServer, McpServerOptions } from '../src/server';
+import { createMcpServer } from '../src/server.js';
+import type { McpServer, McpServerOptions } from '../src/server.js';
 
 jest.setTimeout(20_000);
 
@@ -55,7 +55,11 @@ describe('the result travels back untouched', () => {
       { configKey: 'notes', tools: NOTES_TOOLS, results: { search: ECHO_RESULT } },
     ]);
 
-    const reply = await callReply(gateway.server, { id: 3, name: 'notes__search', args: { q: 'a' } });
+    const reply = await callReply(gateway.server, {
+      id: 3,
+      name: 'notes__search',
+      args: { q: 'a' },
+    });
 
     expect(reply.result).toEqual({
       ...ECHO_RESULT,

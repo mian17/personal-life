@@ -13,12 +13,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
-import { readToolSlices, toolCacheFileFor } from '../src/cache';
-import type { ToolCacheLocation } from '../src/cache';
-import { loadGatewayConfig } from '../src/config';
-import type { UpstreamSlice } from '../src/merge';
-import { createMcpServer } from '../src/server';
-import type { McpServer, McpServerOptions } from '../src/server';
+import { readToolSlices, toolCacheFileFor } from '../src/cache.js';
+import type { ToolCacheLocation } from '../src/cache.js';
+import { loadGatewayConfig } from '../src/config.js';
+import type { UpstreamSlice } from '../src/merge.js';
+import { createMcpServer } from '../src/server.js';
+import type { McpServer, McpServerOptions } from '../src/server.js';
 
 jest.setTimeout(20_000);
 

@@ -2,10 +2,11 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import type { DatabaseName } from '../src/index';
-import { runRestore } from '../src/index';
-import * as snapshot from '../src/snapshot';
-import { main } from '../scripts/restore';
+import type { DatabaseName } from '../src/index.js';
+import { runRestore } from '../src/index.js';
+import { defaultDatabasePaths } from '../src/paths.js';
+import * as snapshot from '../src/snapshot.js';
+import { main } from '../src/restore.js';
 
 /**
  * `db:restore` contract (`SPEC-db-backup-restore` `## Restore behavior`, `## Restore
@@ -105,6 +106,7 @@ describe('db:restore run', () => {
     seed(snapshotPath(fx, 'life'), 5);
 
     const result = await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
       from: SNAPSHOT_DIR,
       env: envFor(fx),
       probe: down,
@@ -119,7 +121,9 @@ describe('db:restore run', () => {
     expect(result.replaced[0].preRestore).toBe(expectedPre);
     expect(result.preRestoreDir).toBe(join(fx.backupRoot, `pre-restore-${STAMP}`));
     expect(countOf(expectedPre)).toBe(1);
-    const manifest = JSON.parse(readFileSync(join(result.preRestoreDir as string, 'manifest.json'), 'utf8'));
+    const manifest = JSON.parse(
+      readFileSync(join(result.preRestoreDir as string, 'manifest.json'), 'utf8'),
+    );
     expect(manifest.mode).toBe('pre-restore');
     expect(manifest.pinned).toBe(true);
     expect(manifest.databases.map((d: { name: string }) => d.name)).toEqual(['life']);
@@ -131,11 +135,18 @@ describe('db:restore run', () => {
     seed(fx.targets.life, 1);
     seed(snapshotPath(fx, 'life'), 5);
 
-    await runRestore({ from: SNAPSHOT_DIR, env: envFor(fx), probe: down, now: at });
+    await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
+      from: SNAPSHOT_DIR,
+      env: envFor(fx),
+      probe: down,
+      now: at,
+    });
     expect(countOf(fx.targets.life)).toBe(5);
 
     const undoDir = join(fx.backupRoot, `pre-restore-${STAMP}`);
     const undo = await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
       from: undoDir,
       only: ['life'],
       env: envFor(fx),
@@ -153,7 +164,13 @@ describe('db:restore run', () => {
     const fx = makeRestoreFixture();
     seed(snapshotPath(fx, 'life'), 5);
 
-    const result = await runRestore({ from: SNAPSHOT_DIR, env: envFor(fx), probe: down, now: at });
+    const result = await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
+      from: SNAPSHOT_DIR,
+      env: envFor(fx),
+      probe: down,
+      now: at,
+    });
 
     expect(result.replaced[0].preRestore).toBeNull();
     expect(result.preRestoreDir).toBeNull();
@@ -168,6 +185,7 @@ describe('db:restore run', () => {
     seed(snapshotPath(fx, 'idp'), 7);
 
     const result = await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
       from: SNAPSHOT_DIR,
       only: ['idp'],
       env: envFor(fx),
@@ -186,6 +204,7 @@ describe('db:restore run', () => {
     seed(snapshotPath(fx, 'meal'), 9);
 
     const result = await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
       from: SNAPSHOT_DIR,
       only: ['meal'],
       env: envFor(fx, ['meal']),
@@ -208,7 +227,13 @@ describe('db:restore run', () => {
     writeFileSync(`${fx.targets.life}-wal`, 'stale');
     writeFileSync(`${fx.targets.life}-shm`, 'stale');
 
-    await runRestore({ from: SNAPSHOT_DIR, env: envFor(fx), probe: down, now: at });
+    await runRestore({
+      defaults: defaultDatabasePaths(fx.root),
+      from: SNAPSHOT_DIR,
+      env: envFor(fx),
+      probe: down,
+      now: at,
+    });
 
     expect(existsSync(`${fx.targets.life}-wal`)).toBe(false);
     expect(existsSync(`${fx.targets.life}-shm`)).toBe(false);
@@ -223,7 +248,9 @@ describe('db:restore safety', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], envFor(fx), up)).toBe(2);
+      expect(
+        await main(['--from', SNAPSHOT_DIR], envFor(fx), up, defaultDatabasePaths(fx.root)),
+      ).toBe(2);
     } finally {
       err.mockRestore();
     }
@@ -239,7 +266,9 @@ describe('db:restore safety', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], envFor(fx), unknown)).toBe(2);
+      expect(
+        await main(['--from', SNAPSHOT_DIR], envFor(fx), unknown, defaultDatabasePaths(fx.root)),
+      ).toBe(2);
     } finally {
       err.mockRestore();
     }
@@ -255,7 +284,9 @@ describe('db:restore safety', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], envFor(fx), down)).toBe(1);
+      expect(
+        await main(['--from', SNAPSHOT_DIR], envFor(fx), down, defaultDatabasePaths(fx.root)),
+      ).toBe(1);
     } finally {
       err.mockRestore();
     }
@@ -273,7 +304,9 @@ describe('db:restore safety', () => {
     });
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], envFor(fx), down)).toBe(1);
+      expect(
+        await main(['--from', SNAPSHOT_DIR], envFor(fx), down, defaultDatabasePaths(fx.root)),
+      ).toBe(1);
     } finally {
       err.mockRestore();
     }
@@ -288,8 +321,10 @@ describe('db:restore safety', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main([], envFor(fx), down)).toBe(1);
-      expect(await main(['--from', 'backup/nope'], envFor(fx), down)).toBe(1);
+      expect(await main([], envFor(fx), down, defaultDatabasePaths(fx.root))).toBe(1);
+      expect(
+        await main(['--from', 'backup/nope'], envFor(fx), down, defaultDatabasePaths(fx.root)),
+      ).toBe(1);
     } finally {
       err.mockRestore();
     }
@@ -305,7 +340,9 @@ describe('db:restore safety', () => {
 
     const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], envFor(fx), down)).toBe(0);
+      expect(
+        await main(['--from', SNAPSHOT_DIR], envFor(fx), down, defaultDatabasePaths(fx.root)),
+      ).toBe(0);
     } finally {
       log.mockRestore();
     }
@@ -322,7 +359,14 @@ describe('db:restore --from containment', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', join(fx.root, 'apps', 'note-service', 'data')], envFor(fx), down)).toBe(1);
+      expect(
+        await main(
+          ['--from', join(fx.root, 'apps', 'note-service', 'data')],
+          envFor(fx),
+          down,
+          defaultDatabasePaths(fx.root),
+        ),
+      ).toBe(1);
     } finally {
       err.mockRestore();
     }
@@ -340,7 +384,12 @@ describe('db:restore --from containment', () => {
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       expect(
-        await main(['--from', 'backup/../apps/note-service/data'], envFor(fx), down),
+        await main(
+          ['--from', 'backup/../apps/note-service/data'],
+          envFor(fx),
+          down,
+          defaultDatabasePaths(fx.root),
+        ),
       ).toBe(1);
     } finally {
       err.mockRestore();
@@ -361,7 +410,9 @@ describe('db:restore --from containment', () => {
 
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      expect(await main(['--from', SNAPSHOT_DIR], env, down)).toBe(1);
+      expect(await main(['--from', SNAPSHOT_DIR], env, down, defaultDatabasePaths(fx.root))).toBe(
+        1,
+      );
     } finally {
       err.mockRestore();
     }

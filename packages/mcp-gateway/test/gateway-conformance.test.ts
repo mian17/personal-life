@@ -7,9 +7,11 @@
  * lists the merged table, calls one tool through the gateway, and sees the identical names in the
  * identical order on a second, cached list.
  *
- * The entry is TypeScript source driven through `packages/ops`'s own `transpile-require.cjs` hook,
- * the `packages/ops/test/sdk-client.test.ts` pattern: no `dist` build in between, and the SDK is
- * loaded with `require` so no `src` module ever imports it.
+ * The entry is TypeScript source — `src/entry.ts`, the same file `bin` points at once built —
+ * driven through `packages/ops`'s own `transpile-require.cjs` hook, the
+ * `packages/ops/test/sdk-client.test.ts` pattern: no `dist` build in between, and the SDK is
+ * loaded with `require` so no `src` module ever imports it. The hook picks each file's module
+ * format from the nearest `package.json`, so this child loads as an ES module.
  *
  * The SDK validates every `tools/list` reply against its own `ToolSchema`, which keeps `name`,
  * `description`, `inputSchema`, `annotations` and `_meta` and drops every other field. The
@@ -23,8 +25,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
-import { createMcpServer } from '../src/server';
-import type { McpServer, McpServerOptions } from '../src/server';
+import { createMcpServer } from '../src/server.js';
+import type { McpServer, McpServerOptions } from '../src/server.js';
 
 const { Client } = require('@modelcontextprotocol/sdk/client') as SdkModule;
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js') as SdkModule;
@@ -32,10 +34,18 @@ const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio
 jest.setTimeout(30_000);
 
 /** The gateway's stdio entry, spawned the way a client's own `mcpServers` block spawns it. */
-const SERVER_ENTRY = 'src/server.ts';
+const SERVER_ENTRY = 'src/entry.ts';
 
 /** `packages/ops`'s require hook, reused rather than forked, so the entry needs no build. */
-const TRANSPILE_HOOK = join(__dirname, '..', '..', 'ops', 'test', 'support', 'transpile-require.cjs');
+const TRANSPILE_HOOK = join(
+  __dirname,
+  '..',
+  '..',
+  'ops',
+  'test',
+  'support',
+  'transpile-require.cjs',
+);
 
 const FIXTURE_CONFIG = join(__dirname, 'support', 'fixtures', 'gateway-config.json');
 

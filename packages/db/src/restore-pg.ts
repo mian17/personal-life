@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, dirname } from 'node:path';
-import { readManifest } from './backup';
-import type { PgManifestEntry } from './backup-pg';
+import { readManifest } from './backup.js';
+import type { PgManifestEntry } from './backup-pg.js';
 import {
   createComposePgRunner,
   pgDump,
@@ -10,10 +10,10 @@ import {
   resolvePgDatabases,
   selectPgDatabases,
   tableCounts,
-} from './pg-client';
-import type { PgIdentity, PgRunner } from './pg-client';
-import { defaultProbe } from './restore';
-import type { StackProbe, StackState } from './restore';
+} from './pg-client.js';
+import type { PgIdentity, PgRunner } from './pg-client.js';
+import { defaultProbe } from './restore.js';
+import type { StackProbe, StackState } from './restore.js';
 
 /**
  * `db:restore:pg` core (`SPEC-feedback-infra.md` "Restore behavior", "Restore safety
@@ -122,10 +122,7 @@ function resolveSnapshotDir(env: NodeJS.ProcessEnv, from: string): SnapshotDirec
  * A snapshot with no archive at all is a usage error, never a silent no-op; a snapshot of
  * one database restores that one, which keeps single-database archives restorable.
  */
-function withArchiveIn(
-  databases: PgIdentity[],
-  fromDir: string,
-): RestoreTarget[] {
+function withArchiveIn(databases: PgIdentity[], fromDir: string): RestoreTarget[] {
   const archived = databases.flatMap((db) => {
     const file = `${db.database}.dump`;
     const snapshotPath = join(fromDir, file);
@@ -140,9 +137,7 @@ function withArchiveIn(
  * Probed concurrently: the ports are independent checks, and a sequential loop
  * would only add latency before the same refusal. */
 async function assertStackStopped(probe: StackProbe): Promise<void> {
-  const states = await Promise.all(
-    STACK_PORTS.map((port) => Promise.resolve(probe(port))),
-  );
+  const states = await Promise.all(STACK_PORTS.map((port) => Promise.resolve(probe(port))));
   for (const [index, state] of states.entries()) {
     const port = STACK_PORTS[index];
     if (state === 'up') throw new StackRunningError(`stack appears up on 127.0.0.1:${port}`);
@@ -252,7 +247,6 @@ function assertRowCountsMatch(
     }
   }
 }
-
 
 interface RestoreRun {
   runner: PgRunner;

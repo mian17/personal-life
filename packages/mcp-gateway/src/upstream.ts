@@ -22,7 +22,8 @@ import type { ChildProcessByStdio } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
-import type { UpstreamEntry } from './config';
+import type { UpstreamEntry } from './config.js';
+import { DEVELOPMENT_VERSION } from './version.js';
 
 /** The child the gateway talks to: stdin and stdout are pipes, stderr is discarded. */
 type UpstreamChild = ChildProcessByStdio<Writable, Readable, null>;
@@ -50,13 +51,19 @@ const TOOL_LIST_CHANGED_METHOD = 'notifications/tools/list_changed';
 const INITIALIZE_REQUEST_ID = 1;
 const REQUEST_ID = 2;
 
-const CLIENT_VERSION: string = (require('../package.json') as { version: string }).version;
-
-const INITIALIZE_PARAMS = {
-  protocolVersion: '2025-06-18',
-  capabilities: {},
-  clientInfo: { name: 'mcp-gateway', version: CLIENT_VERSION },
-};
+/**
+ * The opening handshake's `clientInfo`. The version is the gateway's own — passed in by the
+ * caller, because reading `package.json` needs either `require` (not defined once this package
+ * is ESM) or `import.meta` (illegal in this module, which the suites import under a CommonJS
+ * transform). A caller that names none is a library, not the published package.
+ */
+function initializeParams(clientVersion: string) {
+  return {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'mcp-gateway', version: clientVersion },
+  };
+}
 
 /** A structural upstream failure: `-32000`, naming the upstream it happened to. */
 export class UpstreamError extends Error {
@@ -84,12 +91,14 @@ export interface UpstreamNotices {
 export async function listUpstreamTools(
   entry: UpstreamEntry,
   notices?: UpstreamNotices,
+  clientVersion: string = DEVELOPMENT_VERSION,
 ): Promise<unknown[]> {
   const request: UpstreamRequest = {
     id: REQUEST_ID,
     method: 'tools/list',
     params: {},
     timeoutMs: HANDSHAKE_TIMEOUT_MS,
+    clientVersion,
     notices,
   };
   return toolsOf(await requestOnce(entry, request), entry);
@@ -100,12 +109,14 @@ export async function callUpstreamTool(
   entry: UpstreamEntry,
   name: string,
   args: unknown,
+  clientVersion: string = DEVELOPMENT_VERSION,
 ): Promise<unknown> {
   const request: UpstreamRequest = {
     id: REQUEST_ID,
     method: 'tools/call',
     params: { name, arguments: args },
     timeoutMs: CALL_TIMEOUT_MS,
+    clientVersion,
   };
   return await requestOnce(entry, request);
 }
@@ -116,6 +127,8 @@ interface UpstreamRequest {
   readonly method: string;
   readonly params: unknown;
   readonly timeoutMs: number;
+  /** `clientInfo.version` for this conversation's opening handshake; only the first request sets it. */
+  readonly clientVersion?: string;
   readonly notices?: UpstreamNotices;
 }
 
@@ -153,7 +166,7 @@ interface PendingReply {
 async function requestOnce(entry: UpstreamEntry, request: UpstreamRequest): Promise<unknown> {
   const upstream = startUpstream(entry, request.notices);
   try {
-    await openConversation(upstream, request.timeoutMs);
+    await openConversation(upstream, request);
     return await askUpstream(upstream, request);
   } finally {
     await stopUpstream(upstream);
@@ -165,12 +178,15 @@ async function requestOnce(entry: UpstreamEntry, request: UpstreamRequest): Prom
  * trip, then the `notifications/initialized` note. The initialize result is discarded — the
  * upstream's protocol version and capabilities are not the gateway's to interpret.
  */
-async function openConversation(upstream: UpstreamProcess, timeoutMs: number): Promise<void> {
+async function openConversation(
+  upstream: UpstreamProcess,
+  request: UpstreamRequest,
+): Promise<void> {
   await askUpstream(upstream, {
     id: INITIALIZE_REQUEST_ID,
     method: 'initialize',
-    params: INITIALIZE_PARAMS,
-    timeoutMs,
+    params: initializeParams(request.clientVersion ?? DEVELOPMENT_VERSION),
+    timeoutMs: request.timeoutMs,
   });
   writeMessage(upstream, { jsonrpc: '2.0', method: 'notifications/initialized' });
 }

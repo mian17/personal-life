@@ -3,5 +3,5 @@
  * the options it is built from. The layers it composes stay internal, so a caller cannot come to
  * depend on how an upstream is reached or where the cache lives.
  */
-export { createMcpServer, main } from './server';
-export type { McpServer, McpServerOptions } from './server';
+export { createMcpServer, main } from './server.js';
+export type { McpServer, McpServerOptions } from './server.js';
