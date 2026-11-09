@@ -2,13 +2,6 @@
   "comment": "Known production advisories, signed off with a review deadline. scripts/audit-gate.mjs fails CI on any high/critical advisory missing here, on any entry audit no longer reports, and on a critical entry past reviewBy. `reviewBy: null` means informational only (moderate/low) — no deadline, never gating.",
   "advisories": [
     {
-      "id": "GHSA-jqcg-44mw-7w3h",
-      "package": "proxy-addr",
-      "severity": "critical",
-      "reviewBy": "2026-12-08",
-      "reason": "IP spoofing via an IPv4-mapped IPv6 trust subnet. It sits under the express `trust proxy` path, so a forged X-Forwarded-For can be believed by rate limiting and audit logging; fixAvailable is a patch bump of proxy-addr itself, and that upgrade must land before anything else in the express tree."
-    },
-    {
       "id": "GHSA-wc9g-mqfw-jrwm",
       "package": "multer",
       "severity": "high",
