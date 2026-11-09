@@ -64,6 +64,7 @@ describe('Seed DB targeting (e2e)', () => {
     rmSync(SCRATCH_DEFAULT, { force: true });
   });
 
+  // Each test spawns a ts-node ESM loader child; 90s keeps that cost off the timeout.
   it('non-prod + no DB_PATH seeds the scratch DB (NODE_ENV unset)', async () => {
     rmSync(SCRATCH_DEFAULT, { force: true });
     const res = await runSeed({
@@ -74,7 +75,7 @@ describe('Seed DB targeting (e2e)', () => {
     expect(res.stdout).toContain('[seed:test] seeding test DB:');
     expect(res.stdout).toContain(join(IDP_ROOT, 'data', 'scratch.db'));
     expect(existsSync(SCRATCH_DEFAULT)).toBe(true);
-  }, 30000);
+  }, 90000);
 
   it('non-prod + DB_PATH pointing at the production DB refuses before any write', async () => {
     const before = existsSync(PROD_DB) ? statSync(PROD_DB).size : -1;
@@ -93,7 +94,7 @@ describe('Seed DB targeting (e2e)', () => {
     // The production DB is untouched: same existence and size as before.
     const after = existsSync(PROD_DB) ? statSync(PROD_DB).size : -1;
     expect(after).toBe(before);
-  }, 30000);
+  }, 90000);
 
   it('non-prod + a scratch DB_PATH seeds normally', async () => {
     const scratch = join(import.meta.dirname, 'test-seed-env-scratch.db');
@@ -111,7 +112,7 @@ describe('Seed DB targeting (e2e)', () => {
     } finally {
       rmSync(scratch, { force: true });
     }
-  }, 30000);
+  }, 90000);
 
   it('NODE_ENV=production + a scratch DB_PATH seeds and announces production mode', async () => {
     const scratch = join(import.meta.dirname, 'test-seed-env-prod.db');
@@ -129,7 +130,7 @@ describe('Seed DB targeting (e2e)', () => {
     } finally {
       rmSync(scratch, { force: true });
     }
-  }, 30000);
+  }, 90000);
 
   it('NODE_ENV=production with NO credentials set refuses (never defaults prod creds)', async () => {
     const scratch = join(import.meta.dirname, 'test-seed-env-nocreds.db');
@@ -142,7 +143,7 @@ describe('Seed DB targeting (e2e)', () => {
     } finally {
       rmSync(scratch, { force: true });
     }
-  }, 30000);
+  }, 90000);
 
   it('non-production with NO credentials seeds the default dev user', async () => {
     const scratch = join(import.meta.dirname, 'test-seed-env-devdefault.db');
@@ -155,7 +156,7 @@ describe('Seed DB targeting (e2e)', () => {
     } finally {
       rmSync(scratch, { force: true });
     }
-  }, 30000);
+  }, 90000);
 });
 
 describe('DB path resolver', () => {
