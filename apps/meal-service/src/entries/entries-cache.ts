@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import type { Entry } from './entry.entity';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import type { Entry } from './entry.entity.js';
 
 /**
  * meal-service's entries read-through cache (`SPEC-meal-service` Cache Rules).
@@ -85,7 +85,11 @@ export class EntriesCache {
    * (one entry set per day per owner); the meal-group filter is applied after
    * the hit and never enters the key, so one entry serves every filter variant.
    */
-  day(sub: string, date: string, loader: () => Promise<CachedEntryRow[]>): Promise<CachedEntryRow[]> {
+  day(
+    sub: string,
+    date: string,
+    loader: () => Promise<CachedEntryRow[]>,
+  ): Promise<CachedEntryRow[]> {
     return this.cache.getThrough(sub, `meal:entries:${date}`, loader, {
       decode: decodeCiphertextEntryList,
       cacheable: (rows) => rows.every(isCiphertextEntryRow),

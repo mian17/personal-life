@@ -6,10 +6,10 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { AuthGuard } from '@life/service-kit';
-import { MEAL_CACHE, MealCache, generationKey } from '../src/cache/meal-cache';
-import { VERIFIER_ENV } from '../src/service-config';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
-import { FakeRedisClient } from './fake-redis';
+import { MEAL_CACHE, MealCache, generationKey } from '../src/cache/meal-cache.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * The eight meal-service batch routes (`SPEC-meal-service.md` §5, map §4).
@@ -94,7 +94,7 @@ describe('Meal-service batch API (e2e)', () => {
 
   /** The app as `app.module` builds it, with the one cache adapter swapped for the recorder. */
   async function startApp(mealCache: MealCache): Promise<INestApplication> {
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(MEAL_CACHE)
       .useValue(mealCache)
@@ -118,8 +118,9 @@ describe('Meal-service batch API (e2e)', () => {
         'breakfast',
         'lunch',
       ]);
-      expect(created.body.map((entry: { nutrients: NutrientVector }) => entry.nutrients.calories))
-        .toEqual([300, 500]);
+      expect(
+        created.body.map((entry: { nutrients: NutrientVector }) => entry.nutrients.calories),
+      ).toEqual([300, 500]);
       expect(await listedEntryIds()).toEqual(
         expect.arrayContaining(created.body.map((entry: { id: string }) => entry.id)),
       );
@@ -149,8 +150,9 @@ describe('Meal-service batch API (e2e)', () => {
       const ids = await createdEntryIds(10);
       const [foreignId] = await createdEntryIdsAs(strangerToken, 1);
 
-      await apiPost('/api/entries:batchDelete', { items: [...ids.slice(1), foreignId].map(idItem) })
-        .expect(404);
+      await apiPost('/api/entries:batchDelete', {
+        items: [...ids.slice(1), foreignId].map(idItem),
+      }).expect(404);
 
       const live = await listedEntryIds();
       expect(ids.every((id) => live.includes(id))).toBe(true);
@@ -161,8 +163,9 @@ describe('Meal-service batch API (e2e)', () => {
       const ids = await createdEntryIds(10);
       const bumpsBefore = redis.incrCalls.length;
 
-      const deleted = await apiPost('/api/entries:batchDelete', { items: ids.map(idItem) })
-        .expect(200);
+      const deleted = await apiPost('/api/entries:batchDelete', { items: ids.map(idItem) }).expect(
+        200,
+      );
 
       expect(deleted.body.deleted).toEqual(ids);
       expect(await listedEntryIds()).not.toEqual(expect.arrayContaining(ids));
@@ -224,8 +227,9 @@ describe('Meal-service batch API (e2e)', () => {
       const ids = await createdFoodIds(10);
       const [foreignId] = await createdFoodIdsAs(strangerToken, 1);
 
-      await apiPost('/api/foods:batchDelete', { items: [...ids.slice(1), foreignId].map(idItem) })
-        .expect(404);
+      await apiPost('/api/foods:batchDelete', {
+        items: [...ids.slice(1), foreignId].map(idItem),
+      }).expect(404);
 
       expect(await listedFoodIds()).toEqual(expect.arrayContaining(ids));
       expect(await trashedFoodCount(ids)).toBe(0);
@@ -265,8 +269,9 @@ describe('Meal-service batch API (e2e)', () => {
       const ids = await createdSavedMealIds(10);
       const bumpsBefore = redis.incrCalls.length;
 
-      const deleted = await apiPost('/api/saved-meals:batchDelete', { items: ids.map(idItem) })
-        .expect(200);
+      const deleted = await apiPost('/api/saved-meals:batchDelete', {
+        items: ids.map(idItem),
+      }).expect(200);
 
       expect(deleted.body.deleted).toEqual(ids);
       expect(await listedSavedMealIds()).not.toEqual(expect.arrayContaining(ids));
@@ -310,8 +315,9 @@ describe('Meal-service batch API (e2e)', () => {
       const ids = await createdSavedMealIds(10);
       const [foreignId] = await createdSavedMealIdsAs(strangerToken, 1);
 
-      await apiPost('/api/saved-meals:batchDelete', { items: [...ids.slice(1), foreignId].map(idItem) })
-        .expect(404);
+      await apiPost('/api/saved-meals:batchDelete', {
+        items: [...ids.slice(1), foreignId].map(idItem),
+      }).expect(404);
 
       for (const id of ids) {
         const meal = await apiGet(`/api/saved-meals/${id}`).expect(200);
@@ -432,7 +438,10 @@ describe('Meal-service batch API (e2e)', () => {
   }
 
   function apiPostAs(bearer: string, path: string, body: unknown): request.Test {
-    return request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${bearer}`).send(body as object);
+    return request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${bearer}`)
+      .send(body as object);
   }
 
   /**
@@ -533,7 +542,9 @@ describe('Meal-service batch API (e2e)', () => {
   }
 
   async function createdFoodIdsAs(bearer: string, count: number): Promise<string[]> {
-    const items = Array.from({ length: count }, (_unused, index) => foodItem(`batch food ${index}`));
+    const items = Array.from({ length: count }, (_unused, index) =>
+      foodItem(`batch food ${index}`),
+    );
     const created = await apiPostAs(bearer, '/api/foods:batchCreate', { items }).expect(201);
     return created.body.map((food: { id: string }) => food.id);
   }
@@ -548,7 +559,9 @@ describe('Meal-service batch API (e2e)', () => {
   }
 
   async function createdSavedMealIdsAs(bearer: string, count: number): Promise<string[]> {
-    const items = Array.from({ length: count }, (_unused, index) => savedMealItem(`batch saved ${index}`));
+    const items = Array.from({ length: count }, (_unused, index) =>
+      savedMealItem(`batch saved ${index}`),
+    );
     const created = await apiPostAs(bearer, '/api/saved-meals:batchCreate', { items }).expect(201);
     return created.body.map((meal: { id: string }) => meal.id);
   }

@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { Feedback } from './feedback.entity';
-import { FeedbackController } from './feedback.controller';
-import { FEEDBACK_CACHE, createFeedbackCache } from './feedback-cache';
-import { FeedbackService } from './feedback.service';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { Feedback } from './feedback.entity.js';
+import { FeedbackController } from './feedback.controller.js';
+import { FEEDBACK_CACHE, createFeedbackCache } from './feedback-cache.js';
+import { FeedbackService } from './feedback.service.js';
 
 @Module({
   imports: [

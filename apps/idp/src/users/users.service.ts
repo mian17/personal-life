@@ -2,13 +2,13 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { User } from './user.entity.js';
 import {
   USERS_CACHE,
   USERS_CACHE_TTL_SECONDS,
   type UsersCacheLike,
   userCacheKey,
-} from './users-cache';
+} from './users-cache.js';
 
 /** A user representation safe to hand outside the service — never includes the hash. */
 export interface PublicUser {

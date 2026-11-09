@@ -1,8 +1,8 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
 import { AuthGuard, resolveVerifierConfig } from '@life/service-kit';
-import { VERIFIER_ENV } from './service-config';
+import { VERIFIER_ENV } from './service-config.js';
 
 /**
  * Build the application with the global kernel wiring. Boot fails closed

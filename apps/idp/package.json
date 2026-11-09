@@ -2,11 +2,12 @@
   "name": "@life/idp",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3003} node dist/main.js",
-    "seed": "ts-node scripts/seed-user.ts",
+    "seed": "node --loader ts-node/esm scripts/seed-user.ts",
     "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests",
     "lint": "eslint .",
@@ -61,7 +62,15 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+          }
+        }
+      ]
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(oidc-provider|jose)/)"

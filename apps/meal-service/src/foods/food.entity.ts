@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Serving } from './serving.entity';
+import { Serving } from './serving.entity.js';
 
 /**
  * The canonical unit a food's amounts are in, chosen once at creation and

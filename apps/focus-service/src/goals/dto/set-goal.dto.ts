@@ -1,5 +1,5 @@
 import { IsInt, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from '../../sessions/dto/session-rules';
+import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from '../../sessions/dto/session-rules.js';
 
 /**
  * Body of `PUT /api/goal`: a whole-minute daily goal plus the client's own day it

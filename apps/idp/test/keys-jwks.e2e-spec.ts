@@ -1,20 +1,24 @@
 import { INestApplication } from '@nestjs/common';
+
 import { execFile } from 'child_process';
 import { rmSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
 import { promisify } from 'util';
-import { loadOrCreateKeySet, rotateKeySet, signJwt } from '../src/crypto/signing-keys';
+import { loadOrCreateKeySet, rotateKeySet, signJwt } from '../src/crypto/signing-keys.js';
 import {
   ACCESS_TOKEN_TTL_S,
   accessTokenClaims,
   audienceFor,
-} from '../src/oidc/access-token.policy';
-import { OidcService, isProviderPath } from '../src/oidc/oidc.service';
+} from '../src/oidc/access-token.policy.js';
+import { OidcService, isProviderPath } from '../src/oidc/oidc.service.js';
 
+/** ts-node 10 predates Node's ESM detection, so the CJS bin cannot load these
+ * ESM scripts; the ESM loader plus a cwd of apps/idp (which selects its
+ * NodeNext tsconfig) is what runs them. */
+const TS_NODE_ESM_LOADER_ARGS = ['--loader', 'ts-node/esm'];
 const execFileAsync = promisify(execFile);
-const TS_NODE_BIN = require.resolve('ts-node/dist/bin.js');
 const VERIFY_SCRIPT = join(__dirname, '..', 'scripts', 'verify-jwks.ts');
 
 const TEST_DB = join(__dirname, 'test-idp-keys.db');
@@ -25,17 +29,19 @@ process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = ISSUER;
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;
 }
 
-async function runVerifier(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runVerifier(
+  args: string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
-      [TS_NODE_BIN, VERIFY_SCRIPT, ...args],
+      [...TS_NODE_ESM_LOADER_ARGS, VERIFY_SCRIPT, ...args],
       { cwd: join(__dirname, '..') },
     );
     return { code: 0, stdout, stderr };
@@ -82,7 +88,8 @@ describe('Signing keys and JWKS (e2e)', () => {
     const before = loadOrCreateKeySet(TEST_KEYS).keys[0].kid;
 
     const first = await startApp();
-    const firstKid = (await request(first.getHttpServer()).get('/jwks').expect(200)).body.keys[0].kid;
+    const firstKid = (await request(first.getHttpServer()).get('/jwks').expect(200)).body.keys[0]
+      .kid;
     await first.close();
 
     const second = await startApp();
@@ -175,7 +182,14 @@ describe('Offline verification against fetched JWKS (e2e)', () => {
     rmSync(TEST_DB, { force: true });
 
     const ok = await runVerifier([
-      '--token', token, '--jwks-file', keysFile, '--iss', ISSUER, '--aud', 'note-service',
+      '--token',
+      token,
+      '--jwks-file',
+      keysFile,
+      '--iss',
+      ISSUER,
+      '--aud',
+      'note-service',
     ]);
     expect(ok.code).toBe(0);
     expect(ok.stdout).toContain('verified:');
@@ -185,18 +199,31 @@ describe('Offline verification against fetched JWKS (e2e)', () => {
   it('rejects a tampered signature', async () => {
     const set = loadOrCreateKeySet(OFFLINE_KEYS);
     const now = Math.floor(Date.now() / 1000);
-    const token = signJwt({ iss: ISSUER, sub: 'me', aud: 'note-service', iat: now, exp: now + ACCESS_TOKEN_TTL_S }, set);
+    const token = signJwt(
+      { iss: ISSUER, sub: 'me', aud: 'note-service', iat: now, exp: now + ACCESS_TOKEN_TTL_S },
+      set,
+    );
     const [h, p] = token.split('.');
     const tampered = `${h}.${p}.AAAA${token.split('.')[2]?.slice(4) ?? ''}`;
 
-    const res = await runVerifier(['--token', tampered, '--jwks-file', OFFLINE_KEYS, '--iss', ISSUER]);
+    const res = await runVerifier([
+      '--token',
+      tampered,
+      '--jwks-file',
+      OFFLINE_KEYS,
+      '--iss',
+      ISSUER,
+    ]);
     expect(res.code).not.toBe(0);
   });
 
   it('rejects an expired token', async () => {
     const set = loadOrCreateKeySet(OFFLINE_KEYS);
     const now = Math.floor(Date.now() / 1000);
-    const token = signJwt({ iss: ISSUER, sub: 'me', aud: 'note-service', iat: now - 1000, exp: now - 400 }, set);
+    const token = signJwt(
+      { iss: ISSUER, sub: 'me', aud: 'note-service', iat: now - 1000, exp: now - 400 },
+      set,
+    );
 
     const res = await runVerifier(['--token', token, '--jwks-file', OFFLINE_KEYS, '--iss', ISSUER]);
     expect(res.code).not.toBe(0);
@@ -210,7 +237,12 @@ describe('Access-token policy', () => {
 
   it('produces aud-scoped claims with a 10-minute exp', () => {
     const claims = accessTokenClaims('me', 'note-service', 1_000_000);
-    expect(claims).toEqual({ sub: 'me', aud: 'note-service', iat: 1_000_000, exp: 1_000_000 + 600 });
+    expect(claims).toEqual({
+      sub: 'me',
+      aud: 'note-service',
+      iat: 1_000_000,
+      exp: 1_000_000 + 600,
+    });
     expect(ACCESS_TOKEN_TTL_S).toBe(600);
   });
 

@@ -1,12 +1,12 @@
 import { ENC_PREFIX } from '@life/crypto';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import type { CacheClient } from '@life/cache';
-import { MealCache } from '../src/cache/meal-cache';
-import { FoodsCache } from '../src/foods/foods-cache';
-import { FoodsService } from '../src/foods/foods.service';
+import { MealCache } from '../src/cache/meal-cache.js';
+import { FoodsCache } from '../src/foods/foods-cache.js';
+import { FoodsService } from '../src/foods/foods.service.js';
 import { KeysService } from '@life/service-kit';
-import type { CreateFoodDto } from '../src/foods/dto/create-food.dto';
-import { FakeRedisClient } from './fake-redis';
+import type { CreateFoodDto } from '../src/foods/dto/create-food.dto.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * Unit-level contract for the foods read-through cache. Mirrors
@@ -92,15 +92,17 @@ class FakeFoodRepo {
       .map((r) => ({ ...r, servings: this.servingsFor(r.id as string) })),
   );
 
-  findOne = jest.fn(async (opts: { where: { id: string; ownerSub: string; deletedAt?: unknown } }) => {
-    const row = this.rows.find(
-      (r) =>
-        r.id === opts.where.id &&
-        r.ownerSub === opts.where.ownerSub &&
-        (!('deletedAt' in opts.where) || r.deletedAt == null),
-    );
-    return row ? { ...row, servings: this.servingsFor(row.id as string) } : null;
-  });
+  findOne = jest.fn(
+    async (opts: { where: { id: string; ownerSub: string; deletedAt?: unknown } }) => {
+      const row = this.rows.find(
+        (r) =>
+          r.id === opts.where.id &&
+          r.ownerSub === opts.where.ownerSub &&
+          (!('deletedAt' in opts.where) || r.deletedAt == null),
+      );
+      return row ? { ...row, servings: this.servingsFor(row.id as string) } : null;
+    },
+  );
 }
 
 /** Serving repository fake: owner-scoped, replace-by-foodId. */
@@ -130,7 +132,9 @@ class FakeServingRepo {
 class FakeUserKeysRepo {
   rows = new Map<string, { sub: string; wrappedDek: string; kekVersion: number }>();
 
-  findOne = jest.fn(async (opts: { where: { sub: string } }) => this.rows.get(opts.where.sub) ?? null);
+  findOne = jest.fn(
+    async (opts: { where: { sub: string } }) => this.rows.get(opts.where.sub) ?? null,
+  );
 
   insert = jest.fn(async (row: { sub: string; wrappedDek: string }) => {
     this.rows.set(row.sub, { ...row, kekVersion: 1 });
@@ -173,7 +177,10 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       expect(written.value).not.toContain('carton');
       expect(written.value).not.toContain('calories');
       // `unit` is a unit literal, not content — plaintext by design, like `servingGrams`.
-      const [row] = JSON.parse(written.value) as Array<{ unit: string; servings: Array<{ grams: number }> }>;
+      const [row] = JSON.parse(written.value) as Array<{
+        unit: string;
+        servings: Array<{ grams: number }>;
+      }>;
       expect(row.unit).toBe('ml');
       expect(row.servings[0].grams).toBe(1000);
     });
@@ -232,9 +239,7 @@ describe('FoodsCache (read-through + ciphertext-only)', () => {
       expect(loaderCallsAfterFirst).toBe(loaderCallsBefore + 1);
       expect(h.foods.find.mock.calls).toHaveLength(loaderCallsAfterFirst);
 
-      const written = client.values.find(
-        (v) => v.key === `meal:${SUB}:v2:food:list`,
-      )!;
+      const written = client.values.find((v) => v.key === `meal:${SUB}:v2:food:list`)!;
       expect(written).toBeDefined();
       const [row] = JSON.parse(written.value) as Array<{ deletedAt: string | null }>;
       expect(row.deletedAt).not.toBeNull();

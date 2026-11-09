@@ -8,7 +8,7 @@ import {
   canProvidePostgres,
   startThrowawayPostgres,
   type ThrowawayPostgres,
-} from './feedback-harness';
+} from './feedback-harness.js';
 
 /**
  * Group 6 of `SPEC-feedback-service`'s Testing Strategy — the service-kernel
@@ -52,7 +52,7 @@ describeDb('Health dialect (e2e)', () => {
     delete process.env.REDIS_URL;
     delete process.env.RABBITMQ_URL;
 
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

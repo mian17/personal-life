@@ -1,11 +1,10 @@
 import { NUTRIENTS } from '@life/nutrition';
-import { GeminiClient, MAX_TOOL_ROUNDS, type SearchFoodResult } from '../src/photo/gemini.client';
 import {
-  FakeGemini,
-  geminiResponse,
-  item,
-  readablePayload,
-} from './fake-gemini';
+  GeminiClient,
+  MAX_TOOL_ROUNDS,
+  type SearchFoodResult,
+} from '../src/photo/gemini.client.js';
+import { FakeGemini, geminiResponse, item, readablePayload } from './fake-gemini.js';
 
 /**
  * The Gemini boundary (`SPEC-meal-service` Testing Strategy: "Gemini client: hint
@@ -41,7 +40,11 @@ function functionCallTurn(query: string): Response {
   return new Response(
     JSON.stringify({
       candidates: [
-        { content: { parts: [{ functionCall: { name: 'search_food', args: { query }, id: 'call-1' } }] } },
+        {
+          content: {
+            parts: [{ functionCall: { name: 'search_food', args: { query }, id: 'call-1' } }],
+          },
+        },
       ],
     }),
   );
@@ -66,9 +69,13 @@ function functionCallTurnFor(calls: { query: string; id: string }[]): Response {
 
 /** Every `functionResponse` part the most recent request carries, in order. */
 function receivedAnswers(fake: FakeGemini): { id?: string; response?: SearchFoodResult }[] {
-  const contents = (fake.lastRequestBody() as {
-    contents?: { parts?: { functionResponse?: { id?: string; response?: SearchFoodResult } }[] }[];
-  }).contents;
+  const contents = (
+    fake.lastRequestBody() as {
+      contents?: {
+        parts?: { functionResponse?: { id?: string; response?: SearchFoodResult } }[];
+      }[];
+    }
+  ).contents;
   return (contents ?? [])
     .flatMap((turn) => turn.parts ?? [])
     .map((part) => part.functionResponse)
@@ -106,9 +113,11 @@ function answersSoFar(call: { init: RequestInit }): number {
 
 /** The `response` payload of the last `functionResponse` the most recent request carries. */
 function lastToolResult(fake: FakeGemini): unknown {
-  const contents = (fake.lastRequestBody() as {
-    contents?: { parts?: { functionResponse?: { response?: unknown } }[] }[];
-  }).contents;
+  const contents = (
+    fake.lastRequestBody() as {
+      contents?: { parts?: { functionResponse?: { response?: unknown } }[] }[];
+    }
+  ).contents;
   const responses = (contents ?? [])
     .flatMap((turn) => turn.parts ?? [])
     .filter((part) => part.functionResponse !== undefined)
@@ -118,9 +127,7 @@ function lastToolResult(fake: FakeGemini): unknown {
 
 /** The tool-calling mode a request body carried, read from the parsed body. */
 function toolModeOf(body: Record<string, unknown>): unknown {
-  const toolConfig = body.toolConfig as
-    | { functionCallingConfig?: { mode?: unknown } }
-    | undefined;
+  const toolConfig = body.toolConfig as { functionCallingConfig?: { mode?: unknown } } | undefined;
   return toolConfig?.functionCallingConfig?.mode;
 }
 
@@ -132,7 +139,9 @@ describe('GeminiClient', () => {
     expect(withHint.readable).toBe(true);
 
     const parts = fake.lastParts();
-    const textParts = parts.filter((part) => typeof part.text === 'string').map((p) => p.text as string);
+    const textParts = parts
+      .filter((part) => typeof part.text === 'string')
+      .map((p) => p.text as string);
     expect(textParts).toHaveLength(2);
     // The hint rides in the request, labelled as steering — it cannot read as a
     // correction of an estimate that does not exist yet.
@@ -152,7 +161,8 @@ describe('GeminiClient', () => {
 
     // The rule must be in the request the client actually sends: one item per
     // distinct food, no dish or recipe name, and the worked three-item example.
-    const firstText = fake.lastParts().find((part) => typeof part.text === 'string')?.text as string;
+    const firstText = fake.lastParts().find((part) => typeof part.text === 'string')
+      ?.text as string;
     expect(firstText).toMatch(/one item per distinct food/i);
     expect(firstText).toMatch(/never (answer with )?a dish/i);
     expect(firstText).toMatch(/chicken, tofu, and yardlong beans is three items/i);
@@ -172,7 +182,9 @@ describe('GeminiClient', () => {
       other,
       envOf({ GEMINI_API_BASE: 'https://proxy.internal/genai', GEMINI_MODEL: 'other-model' }),
     ).readPhoto({ mimeType: MIME, bytes: BYTES });
-    expect(other.calls[0].url).toBe('https://proxy.internal/genai/models/other-model:generateContent');
+    expect(other.calls[0].url).toBe(
+      'https://proxy.internal/genai/models/other-model:generateContent',
+    );
     expect(other.calls[0].url).not.toContain('googleapis.com');
 
     // A trailing slash on the base must not double up.
@@ -198,7 +210,9 @@ describe('GeminiClient', () => {
       geminiResponse({ readable: true, items: [boundItem({ foodId: 'food-1', fdcId: 12345 })] });
     expect(await clientFor(identified).readPhoto({ mimeType: MIME, bytes: BYTES })).toEqual({
       readable: true,
-      items: [{ name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345, searchQuery: null }],
+      items: [
+        { name: 'Chicken salad', grams: 250, foodId: 'food-1', fdcId: 12345, searchQuery: null },
+      ],
     });
   });
 
@@ -211,7 +225,9 @@ describe('GeminiClient', () => {
     const body = fake.lastRequestBody() as {
       generationConfig: {
         responseSchema: {
-          properties: { items: { items: { properties: Record<string, unknown>; required: string[] } } };
+          properties: {
+            items: { items: { properties: Record<string, unknown>; required: string[] } };
+          };
         };
       };
     };
@@ -342,13 +358,20 @@ describe('GeminiClient', () => {
 
   it('sends AUTO on every turn and lets the prompt ask for search-before-answer', async () => {
     const fake = new FakeGemini();
-    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({
+      catalog: [],
+      usda: [],
+    });
     fake.reply = (call) =>
       alreadyAnswered(call)
         ? geminiResponse({ readable: true, items: [boundItem()] })
         : functionCallTurn('chicken');
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     expect(result.readable).toBe(true);
     expect(fake.calls).toHaveLength(2);
@@ -360,7 +383,10 @@ describe('GeminiClient', () => {
 
   it('carries the identity schema on every round and never pairs ANY with a mime type', async () => {
     const fake = new FakeGemini();
-    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({
+      catalog: [],
+      usda: [],
+    });
     fake.reply = (call) =>
       alreadyAnswered(call)
         ? geminiResponse({ readable: true, items: [boundItem()] })
@@ -395,7 +421,11 @@ describe('GeminiClient', () => {
         ? geminiResponse({ readable: true, items: [boundItem({ name: 'Chicken' })] })
         : functionCallTurn('chicken');
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     expect(result).toEqual({ readable: true, items: [boundItem({ name: 'Chicken' })] });
     // The cap allowed exactly MAX_TOOL_ROUNDS searches; the overflow turn ran the
@@ -410,13 +440,20 @@ describe('GeminiClient', () => {
 
   it('maps a non-2xx on the request after a tool round to service-unavailable', async () => {
     const fake = new FakeGemini();
-    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({
+      catalog: [],
+      usda: [],
+    });
     fake.reply = (call) =>
       alreadyAnswered(call)
         ? geminiResponse({ error: { code: 429 } }, 429)
         : functionCallTurn('chicken');
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     // The tool round succeeded; the failure is the second request, so the loop
     // path's own non-2xx branch (not the single-shot one) is what runs.
@@ -426,13 +463,20 @@ describe('GeminiClient', () => {
 
   it('maps a transport throw on the request after a tool round to service-unavailable', async () => {
     const fake = new FakeGemini();
-    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({ catalog: [], usda: [] });
+    const tool: (query: string) => Promise<SearchFoodResult> = async () => ({
+      catalog: [],
+      usda: [],
+    });
     fake.reply = (call) =>
       alreadyAnswered(call)
         ? Promise.reject(new Error('fetch failed'))
         : functionCallTurn('chicken');
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     expect(fake.calls).toHaveLength(2);
     expect(result).toEqual(SERVICE_UNAVAILABLE);
@@ -450,11 +494,19 @@ describe('GeminiClient', () => {
       alreadyAnswered(call)
         ? geminiResponse({
             readable: true,
-            items: foods.map((name) => boundItem({ name, foodId: `food-${name}`, searchQuery: name })),
+            items: foods.map((name) =>
+              boundItem({ name, foodId: `food-${name}`, searchQuery: name }),
+            ),
           })
-        : functionCallTurnFor(foods.map((name, index) => ({ query: name, id: `call-${index + 1}` })));
+        : functionCallTurnFor(
+            foods.map((name, index) => ({ query: name, id: `call-${index + 1}` })),
+          );
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     expect(result.readable).toBe(true);
     // All three searches ran, in the order the model asked for them.
@@ -486,7 +538,11 @@ describe('GeminiClient', () => {
             { query: 'broth', id: 'call-3' },
           ]);
 
-    const result = await clientFor(fake).readPhoto({ mimeType: MIME, bytes: BYTES }, undefined, tool);
+    const result = await clientFor(fake).readPhoto(
+      { mimeType: MIME, bytes: BYTES },
+      undefined,
+      tool,
+    );
 
     expect(result.readable).toBe(true);
     // Every food was searched before the model's first text turn, so the answer

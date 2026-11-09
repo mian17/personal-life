@@ -1,6 +1,6 @@
-import { loadOrCreateKeySet, signJwt } from '../src/crypto/signing-keys';
-import { resolveKeysPath } from '../src/crypto/signing-key.service';
-import { ACCESS_TOKEN_TTL_S, audienceFor } from '../src/oidc/access-token.policy';
+import { loadOrCreateKeySet, signJwt } from '../src/crypto/signing-keys.js';
+import { resolveKeysPath } from '../src/crypto/signing-key.service.js';
+import { ACCESS_TOKEN_TTL_S, audienceFor } from '../src/oidc/access-token.policy.js';
 
 /**
  * Dev-only helper: signs a short-lived, audience-scoped access token with the

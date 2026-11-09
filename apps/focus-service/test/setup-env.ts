@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuthGuard } from '@life/service-kit';
-import { FOCUS_CACHE, FocusCache, type CacheClient } from '../src/cache/focus-cache';
-import { VERIFIER_ENV } from '../src/service-config';
-import { TEST_AUDIENCE, TEST_ISSUER, TEST_MASTER_KEY } from './jwt-harness';
+import { FOCUS_CACHE, FocusCache, type CacheClient } from '../src/cache/focus-cache.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import { TEST_AUDIENCE, TEST_ISSUER, TEST_MASTER_KEY } from './jwt-harness.js';
 
 /**
  * Test environment for the `focus-service` suites (`SPEC-focus-service` §6): a
@@ -79,7 +79,7 @@ export async function startFocusApp(options: {
   applyFocusTestEnv(options.databasePath, options.jwksUrl);
 
   const redis = options.redis === undefined ? null : options.redis;
-  const { AppModule } = await import('../src/app.module');
+  const { AppModule } = await import('../src/app.module.js');
   const app = (
     await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(FOCUS_CACHE)

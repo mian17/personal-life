@@ -3,10 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Between, Repository } from 'typeorm';
 import { DEFAULT_PAGE_LIMIT, paginate } from '@life/service-kit';
-import { FOCUS_CACHE, type FocusCache } from '../cache/focus-cache';
-import type { CreateSessionDto } from './dto/create-session.dto';
-import type { ListSessionsQuery } from './dto/list-sessions.query';
-import { Session } from './session.entity';
+import { FOCUS_CACHE, type FocusCache } from '../cache/focus-cache.js';
+import type { CreateSessionDto } from './dto/create-session.dto.js';
+import type { ListSessionsQuery } from './dto/list-sessions.query.js';
+import { Session } from './session.entity.js';
 
 /**
  * A session row as persisted, which is also the row as served: `createdAt` is the
@@ -100,10 +100,8 @@ export class SessionsService {
    */
   async findAll(sub: string, query: ListSessionsQuery): Promise<SessionPage> {
     const { from, to } = query;
-    const rows = await this.cache.getThrough(
-      sub,
-      `focus:sessions:${from}:${to}`,
-      () => this.loadRange(sub, { from, to }),
+    const rows = await this.cache.getThrough(sub, `focus:sessions:${from}:${to}`, () =>
+      this.loadRange(sub, { from, to }),
     );
 
     const page = paginate(rows, {
@@ -116,10 +114,7 @@ export class SessionsService {
   }
 
   /** Range load, owner-scoped; days are text so `YYYY-MM-DD` compares lexically. */
-  private async loadRange(
-    sub: string,
-    range: { from: string; to: string },
-  ): Promise<SessionRow[]> {
+  private async loadRange(sub: string, range: { from: string; to: string }): Promise<SessionRow[]> {
     const found = await this.sessions.find({
       where: { ownerSub: sub, date: Between(range.from, range.to) },
       order: { date: 'ASC', createdAt: 'ASC', id: 'ASC' },

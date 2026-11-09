@@ -4,7 +4,7 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { NUTRIENTS, sum, type NutrientVector } from '@life/nutrition';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * Diary entries over HTTP (`SPEC-meal-service` entries / Success Criterion 3):
@@ -51,7 +51,7 @@ describe('Diary entries (e2e)', () => {
     tokenA = await harness.sign({ subject: 'user-a', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -77,8 +77,7 @@ describe('Diary entries (e2e)', () => {
       ),
       tokenA,
     );
-  const one = (id: string) =>
-    auth(request(app.getHttpServer()).get(`/api/entries/${id}`), tokenA);
+  const one = (id: string) => auth(request(app.getHttpServer()).get(`/api/entries/${id}`), tokenA);
   const patch = (id: string, body: Record<string, unknown>) =>
     auth(request(app.getHttpServer()).patch(`/api/entries/${id}`), tokenA).send(body);
   const remove = (id: string) =>
@@ -94,7 +93,12 @@ describe('Diary entries (e2e)', () => {
       nutrients: snapshot,
     }).expect(201);
 
-    expect(created.body).toMatchObject({ date: DAY, mealGroup: 'breakfast', foodId: 'food-1', quantity: 2 });
+    expect(created.body).toMatchObject({
+      date: DAY,
+      mealGroup: 'breakfast',
+      foodId: 'food-1',
+      quantity: 2,
+    });
     expect(created.body.nutrients).toEqual(snapshot);
     expect(created.body).not.toHaveProperty('ownerSub');
 
@@ -105,8 +109,20 @@ describe('Diary entries (e2e)', () => {
   it("a day's total equals sum() of its entries, and deleting one entry moves the total", async () => {
     const first = vector({ calories: 400, protein: 20 });
     const second = vector({ calories: 600, protein: 10 });
-    const a = await post({ date: OTHER_DAY, mealGroup: 'lunch', foodId: 'food-2', quantity: 1, nutrients: first }).expect(201);
-    await post({ date: OTHER_DAY, mealGroup: 'dinner', foodId: 'food-3', quantity: 1, nutrients: second }).expect(201);
+    const a = await post({
+      date: OTHER_DAY,
+      mealGroup: 'lunch',
+      foodId: 'food-2',
+      quantity: 1,
+      nutrients: first,
+    }).expect(201);
+    await post({
+      date: OTHER_DAY,
+      mealGroup: 'dinner',
+      foodId: 'food-3',
+      quantity: 1,
+      nutrients: second,
+    }).expect(201);
 
     const listed = await day(OTHER_DAY).expect(200);
     expect(listed.body.entries).toHaveLength(2);
@@ -173,7 +189,13 @@ describe('Diary entries (e2e)', () => {
 
   it('a quantity change without a corrected vector is a 400, with one it replaces the snapshot', async () => {
     const snapshot = vector({ calories: 300 });
-    const created = await post({ date: DAY, mealGroup: 'snack', foodId: 'food-4', quantity: 1, nutrients: snapshot }).expect(201);
+    const created = await post({
+      date: DAY,
+      mealGroup: 'snack',
+      foodId: 'food-4',
+      quantity: 1,
+      nutrients: snapshot,
+    }).expect(201);
 
     await patch(created.body.id, { quantity: 3 }).expect(400);
 
@@ -186,7 +208,7 @@ describe('Diary entries (e2e)', () => {
     expect(reread.body.nutrients).toEqual(corrected);
   });
 
-  it('rejects a missing or malformed day (the service never defaults the user\'s day)', async () => {
+  it("rejects a missing or malformed day (the service never defaults the user's day)", async () => {
     const missingDay = await post({
       mealGroup: 'lunch',
       foodId: 'food-5',
@@ -216,7 +238,9 @@ describe('Diary entries (e2e)', () => {
 
   it('stores the snapshot as ciphertext, never plaintext', async () => {
     const dataSource = app.get(DataSource);
-    const rows: Array<{ nutrients: string }> = await dataSource.query('SELECT nutrients FROM entry');
+    const rows: Array<{ nutrients: string }> = await dataSource.query(
+      'SELECT nutrients FROM entry',
+    );
     expect(rows.length).toBeGreaterThanOrEqual(1);
     for (const row of rows) {
       expect(row.nutrients.startsWith('enc.v1.')).toBe(true);

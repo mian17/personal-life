@@ -2,11 +2,11 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import { DATE_ONLY, type UpdateProfileDto } from './dto/update-profile.dto';
-import { calculateTarget, type Goal } from './target';
-import type { ActivityLevel, Sex } from './target-calculator';
-import { Target } from './target.entity';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import { DATE_ONLY, type UpdateProfileDto } from './dto/update-profile.dto.js';
+import { calculateTarget, type Goal } from './target.js';
+import type { ActivityLevel, Sex } from './target-calculator.js';
+import { Target } from './target.entity.js';
 
 /**
  * The wire shape of a target row: profile inputs (reproducible) + computed

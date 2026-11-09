@@ -13,8 +13,12 @@ import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypt
 import { likeMatch } from '@life/shared';
 import { scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import {
+  softDeleteBatch,
+  softDeleteOne,
+  type SoftDeleteTarget,
+} from '../batch/soft-delete-batch.js';
 import {
   completeVector,
   foodNameAad,
@@ -23,12 +27,12 @@ import {
   servingLabelAad,
   servingNutrientsAad,
   zeroVector,
-} from './content';
-import { Food, type FoodUnit } from './food.entity';
-import { Serving } from './serving.entity';
-import type { CreateFoodDto, ServingInputDto } from './dto/create-food.dto';
-import type { UpdateFoodDto } from './dto/update-food.dto';
-import { FoodsCache, toCachedFoodRow, type CachedFoodRow } from './foods-cache';
+} from './content.js';
+import { Food, type FoodUnit } from './food.entity.js';
+import { Serving } from './serving.entity.js';
+import type { CreateFoodDto, ServingInputDto } from './dto/create-food.dto.js';
+import type { UpdateFoodDto } from './dto/update-food.dto.js';
+import { FoodsCache, toCachedFoodRow, type CachedFoodRow } from './foods-cache.js';
 
 /** The wire shape of a serving: label, amount (in the food's unit), and its complete per-serving vector. */
 export interface ServingDto {
@@ -93,11 +97,7 @@ function afterCatalogPosition(food: FoodDto, at: string[]): boolean {
  * and the UI can never disagree on a number (lesson 0016 — one owner). The
  * amount is in the food's canonical unit, so the factor is `amount / servingGrams`.
  */
-function servingVector(
-  base: NutrientVector,
-  servingGrams: number,
-  amount: number,
-): NutrientVector {
+function servingVector(base: NutrientVector, servingGrams: number, amount: number): NutrientVector {
   const model: FoodModel = {
     id: 'derive',
     name: '',
@@ -398,10 +398,7 @@ export class FoodsService {
    * stale `expectedVersion` or one invalid nutrient vector rolls the whole batch
    * back.
    */
-  async updateMany(
-    sub: string,
-    items: (UpdateFoodDto & { id: string })[]
-  ): Promise<FoodDto[]> {
+  async updateMany(sub: string, items: (UpdateFoodDto & { id: string })[]): Promise<FoodDto[]> {
     return runAtomicBatch({
       items,
       sub,
@@ -611,7 +608,9 @@ export class FoodsService {
    */
   private storedBaseVector(sub: string, food: Food, dek: Buffer): NutrientVector {
     if (!food.nutrients) return zeroVector();
-    return readStoredVector(this.openField(food.nutrients, dek, foodNutrientsAad(sub, food.id), food.id));
+    return readStoredVector(
+      this.openField(food.nutrients, dek, foodNutrientsAad(sub, food.id), food.id),
+    );
   }
 
   /**

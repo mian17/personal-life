@@ -4,7 +4,7 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { NUTRIENTS } from '@life/nutrition';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `q` search (`foods.findMatching(sub, q)`): owner-scoped, matching only the decrypted
@@ -43,7 +43,7 @@ describe('Foods search `q` (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -143,7 +143,7 @@ describe('Foods search `q` (e2e)', () => {
     expect([...ids].sort()).toEqual([...created].sort());
   });
 
-  it('returns only the caller\'s matches (owner scoping survives the filter)', async () => {
+  it("returns only the caller's matches (owner scoping survives the filter)", async () => {
     await post({ name: 'shared-token-A', servingGrams: 100 }, tokenA).expect(201);
     await post({ name: 'shared-token-B', servingGrams: 100 }, tokenB).expect(201);
 

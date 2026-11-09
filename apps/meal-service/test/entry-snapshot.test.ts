@@ -1,13 +1,19 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { decryptField } from '@life/crypto';
-import { MealCache, generationKey } from '../src/cache/meal-cache';
+import { MealCache, generationKey } from '../src/cache/meal-cache.js';
 import { KeysService } from '@life/service-kit';
-import { NUTRIENTS, scale, sum, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import type { Entry } from '../src/entries/entry.entity';
-import { EntriesCache } from '../src/entries/entries-cache';
-import { EntriesService, type EntryDto } from '../src/entries/entries.service';
-import type { UpdateEntryDto } from '../src/entries/dto/update-entry.dto';
-import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto';
+import {
+  NUTRIENTS,
+  scale,
+  sum,
+  type Food as FoodModel,
+  type NutrientVector,
+} from '@life/nutrition';
+import type { Entry } from '../src/entries/entry.entity.js';
+import { EntriesCache } from '../src/entries/entries-cache.js';
+import { EntriesService, type EntryDto } from '../src/entries/entries.service.js';
+import type { UpdateEntryDto } from '../src/entries/dto/update-entry.dto.js';
+import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
 
 /**
@@ -66,9 +72,12 @@ class FakeEntryRepo {
 
   constructor(private readonly events: string[] = []) {}
 
-  create = jest.fn((data: Partial<StoredEntry>): StoredEntry => ({
-    ...data,
-  } as StoredEntry));
+  create = jest.fn(
+    (data: Partial<StoredEntry>): StoredEntry =>
+      ({
+        ...data,
+      }) as StoredEntry,
+  );
 
   save = jest.fn(async (row: StoredEntry): Promise<StoredEntry> => {
     this.events.push('db:save');
@@ -84,10 +93,7 @@ class FakeEntryRepo {
     async (opts: { where: { ownerSub: string; date: string } }): Promise<StoredEntry[]> =>
       this.rows
         .filter(
-          (r) =>
-            r.ownerSub === opts.where.ownerSub &&
-            r.date === opts.where.date &&
-            !r.deletedAt,
+          (r) => r.ownerSub === opts.where.ownerSub && r.date === opts.where.date && !r.deletedAt,
         )
         .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id.localeCompare(b.id)),
   );
@@ -104,7 +110,9 @@ class FakeEntryRepo {
 class FakeUserKeysRepo {
   rows = new Map<string, { sub: string; wrappedDek: Buffer; kekVersion: number }>();
 
-  findOne = jest.fn(async (opts: { where: { sub: string } }) => this.rows.get(opts.where.sub) ?? null);
+  findOne = jest.fn(
+    async (opts: { where: { sub: string } }) => this.rows.get(opts.where.sub) ?? null,
+  );
 
   insert = jest.fn(async (row: { sub: string; wrappedDek: Buffer }) => {
     this.rows.set(row.sub, { ...row, kekVersion: 1 });
@@ -144,9 +152,14 @@ function body(overrides: Partial<CreateEntryDto> = {}): CreateEntryDto {
 }
 
 /** Open a stored row's envelope with the byte-exact AAD the service must use. */
-async function openSnapshot(h: ReturnType<typeof makeHarness>, row: StoredEntry): Promise<NutrientVector> {
+async function openSnapshot(
+  h: ReturnType<typeof makeHarness>,
+  row: StoredEntry,
+): Promise<NutrientVector> {
   const dek = await h.keys.getDekForRead(row.ownerSub!);
-  return JSON.parse(decryptField(dek, row.nutrients, `life.v1|${row.ownerSub}|meal|entry|${row.id}`)) as NutrientVector;
+  return JSON.parse(
+    decryptField(dek, row.nutrients, `life.v1|${row.ownerSub}|meal|entry|${row.id}`),
+  ) as NutrientVector;
 }
 
 describe('Entry snapshot immutability', () => {
@@ -180,7 +193,9 @@ describe('Entry snapshot immutability', () => {
     expect(reread.nutrients.calories).toBe(200);
     expect(reread.nutrients).toEqual(scale(food(original), 2));
     expect(h.repo.rows[0].nutrients).toBe(storedBefore);
-    expect((await h.service.findAll(SUB, { date: DAY })).entries[0].nutrients).toEqual(scale(food(original), 2));
+    expect((await h.service.findAll(SUB, { date: DAY })).entries[0].nutrients).toEqual(
+      scale(food(original), 2),
+    );
   });
 
   it('changes the snapshot only through an explicit corrected write', async () => {
@@ -251,15 +266,17 @@ describe('EntriesService — read path discipline', () => {
     const h = makeHarness();
     const created = await h.service.create(SUB, body());
 
-    await expect(h.service.findOne(OTHER_SUB, created.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(h.service.findOne(OTHER_SUB, created.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     await expect(
       h.service.findOne(OTHER_SUB, '11111111-1111-4111-8111-111111111111'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect((await h.service.findAll(OTHER_SUB, { date: DAY })).entries).toEqual([]);
 
-    await expect(h.service.update(OTHER_SUB, created.id, {} as UpdateEntryDto)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      h.service.update(OTHER_SUB, created.id, {} as UpdateEntryDto),
+    ).rejects.toBeInstanceOf(NotFoundException);
     await expect(h.service.remove(OTHER_SUB, created.id)).rejects.toBeInstanceOf(NotFoundException);
     // B's failed attempts never touched A's row.
     expect((await h.service.findOne(SUB, created.id)).nutrients).toEqual(created.nutrients);

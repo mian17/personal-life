@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { FoodsModule } from '../foods/foods.module';
-import { UsdaModule } from '../usda/usda.module';
-import { GeminiClient } from './gemini.client';
-import { PhotoController } from './photo.controller';
-import { GEMINI_CLIENT_FACTORY, PhotoService } from './photo.service';
+import { FoodsModule } from '../foods/foods.module.js';
+import { UsdaModule } from '../usda/usda.module.js';
+import { GeminiClient } from './gemini.client.js';
+import { PhotoController } from './photo.controller.js';
+import { GEMINI_CLIENT_FACTORY, PhotoService } from './photo.service.js';
 
 /**
  * The Gemini photo pipeline (`SPEC-meal-service` Photo → Gemini pipeline).

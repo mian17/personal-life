@@ -12,7 +12,12 @@ import {
   Min,
 } from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
-import { FOOD_ID_MAX, MEAL_GROUPS, type MealGroup, QUANTITY_MAX } from '../../entries/dto/create-entry.dto';
+import {
+  FOOD_ID_MAX,
+  MEAL_GROUPS,
+  type MealGroup,
+  QUANTITY_MAX,
+} from '../../entries/dto/create-entry.dto.js';
 
 /**
  * Body of `POST /api/saved-meals` — one frozen meal snapshot.

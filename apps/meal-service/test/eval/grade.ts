@@ -15,7 +15,7 @@
  * query really offered its `fdcId`.
  */
 
-import type { PhotoFoodSuggestion } from '../../src/photo/gemini.client';
+import type { PhotoFoodSuggestion } from '../../src/photo/gemini.client.js';
 
 /** How the answer's item count relates to the fixture's: the two failure directions. */
 export type Granularity = 'exact' | 'merged' | 'split';
@@ -70,7 +70,14 @@ export function gradeRead({
 
   const matchedItemsByFood = matchFoodsToItems(expected.foods, items, failures);
   reportForbiddenInNames(items, expected.forbiddenInName, failures);
-  reportUnboundIds(expected.foods, items, matchedItemsByFood, issuedQueries, offeredIdsByQuery, failures);
+  reportUnboundIds(
+    expected.foods,
+    items,
+    matchedItemsByFood,
+    issuedQueries,
+    offeredIdsByQuery,
+    failures,
+  );
 
   return {
     pass: failures.length === 0,
@@ -117,12 +124,20 @@ function matchFoodsToItems(
   );
 
   matchedItemsByFood.forEach((matchedItems, foodIndex) => {
-    if (matchedItems.length === 0) failures.push(`expected "${describeFood(foods[foodIndex])}" matched no item`);
-    if (matchedItems.length > 1) failures.push(`expected "${describeFood(foods[foodIndex])}" matched ${matchedItems.length} items`);
+    if (matchedItems.length === 0)
+      failures.push(`expected "${describeFood(foods[foodIndex])}" matched no item`);
+    if (matchedItems.length > 1)
+      failures.push(
+        `expected "${describeFood(foods[foodIndex])}" matched ${matchedItems.length} items`,
+      );
   });
   matchedFoodsByItem.forEach((matchedFoods, itemIndex) => {
-    if (matchedFoods.length === 0) failures.push(`item "${items[itemIndex].name}" matches no expected food`);
-    if (matchedFoods.length > 1) failures.push(`item "${items[itemIndex].name}" matches ${matchedFoods.length} expected foods`);
+    if (matchedFoods.length === 0)
+      failures.push(`item "${items[itemIndex].name}" matches no expected food`);
+    if (matchedFoods.length > 1)
+      failures.push(
+        `item "${items[itemIndex].name}" matches ${matchedFoods.length} expected foods`,
+      );
   });
 
   return matchedItemsByFood;
@@ -133,11 +148,16 @@ function matchesFood(normalizedName: string, food: ExpectedFood): boolean {
   return food.any.some((fragment) => normalizedName.includes(normalizeName(fragment)));
 }
 
-function reportForbiddenInNames(items: PhotoFoodSuggestion[], forbidden: string[], failures: string[]): void {
+function reportForbiddenInNames(
+  items: PhotoFoodSuggestion[],
+  forbidden: string[],
+  failures: string[],
+): void {
   for (const item of items) {
     const normalizedName = normalizeName(item.name);
     for (const fragment of forbidden) {
-      if (normalizedName.includes(fragment)) failures.push(`name "${item.name}" contains forbidden "${fragment}"`);
+      if (normalizedName.includes(fragment))
+        failures.push(`name "${item.name}" contains forbidden "${fragment}"`);
     }
   }
 }
@@ -184,7 +204,9 @@ function reportBoundId(
   }
   const offered = offeredIdsByQuery.get(item.searchQuery) ?? [];
   if (!offered.includes(item.fdcId)) {
-    failures.push(`"${item.name}" fdcId ${item.fdcId} was not offered by its own searchQuery "${item.searchQuery}"`);
+    failures.push(
+      `"${item.name}" fdcId ${item.fdcId} was not offered by its own searchQuery "${item.searchQuery}"`,
+    );
   }
 }
 

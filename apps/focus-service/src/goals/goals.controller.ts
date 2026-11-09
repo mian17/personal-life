@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { ListGoalsQuery } from './dto/list-goals.query';
-import { SetGoalDto } from './dto/set-goal.dto';
-import { GoalsService } from './goals.service';
+import { ListGoalsQuery } from './dto/list-goals.query.js';
+import { SetGoalDto } from './dto/set-goal.dto.js';
+import { GoalsService } from './goals.service.js';
 
 /**
  * Goal routes (`SPEC-focus-service` §1). `ownerSub` always comes from

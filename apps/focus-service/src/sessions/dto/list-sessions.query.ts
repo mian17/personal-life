@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { MAX_PAGE_LIMIT } from '@life/service-kit';
-import { DATE_ONLY, SESSION_DATE_MAX } from './session-rules';
+import { DATE_ONLY, SESSION_DATE_MAX } from './session-rules.js';
 
 /**
  * `GET /api/sessions?from=&to=&limit=&cursor=`: both bounds required, both

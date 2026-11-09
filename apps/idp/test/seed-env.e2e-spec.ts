@@ -1,8 +1,9 @@
 import { execFile } from 'child_process';
+
 import { existsSync, rmSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { promisify } from 'util';
-import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
+import { isProductionDbPath, resolveDbPath } from '../src/config/db-path.js';
 
 /**
  * Seed environment-safety e2e (2026-09-25). Proves the seed script's DB targeting
@@ -13,8 +14,11 @@ import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
 const IDP_ROOT = join(__dirname, '..');
 
-const TS_NODE_BIN = require.resolve('ts-node/dist/bin.js');
 const SEED_SCRIPT = join(IDP_ROOT, 'scripts', 'seed-user.ts');
+/** ts-node 10 predates Node's ESM detection, so the CJS bin cannot load these
+ * ESM scripts; the ESM loader plus a cwd of apps/idp (which selects its
+ * NodeNext tsconfig) is what runs them. */
+const TS_NODE_ESM_LOADER_ARGS = ['--loader', 'ts-node/esm'];
 const execFileAsync = promisify(execFile);
 
 /**
@@ -32,10 +36,14 @@ async function runSeed(
   }
   Object.assign(env, overrides);
   try {
-    const { stdout, stderr } = await execFileAsync(process.execPath, [TS_NODE_BIN, SEED_SCRIPT], {
-      cwd: IDP_ROOT,
-      env,
-    });
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      [...TS_NODE_ESM_LOADER_ARGS, SEED_SCRIPT],
+      {
+        cwd: IDP_ROOT,
+        env,
+      },
+    );
     return { code: 0, stdout, stderr };
   } catch (err) {
     const e = err as { code?: number; stdout?: string; stderr?: string };

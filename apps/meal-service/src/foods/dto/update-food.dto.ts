@@ -12,7 +12,7 @@ import {
   Min,
 } from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
-import { FOOD_NAME_MAX, GRAMS_MAX, PORTIONS_MAX, ServingInputDto } from './create-food.dto';
+import { FOOD_NAME_MAX, GRAMS_MAX, PORTIONS_MAX, ServingInputDto } from './create-food.dto.js';
 
 /**
  * Body of `PATCH /api/foods/:id` — every field optional, so omitted fields are

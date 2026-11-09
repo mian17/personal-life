@@ -3,9 +3,9 @@ import { createHash, randomBytes } from 'crypto';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import { decodeJwt } from 'jose';
-import { Client } from './oidc-harness';
-import { SessionsService } from '../src/sessions/sessions.service';
-import { UsersService } from '../src/users/users.service';
+import { Client } from './oidc-harness.js';
+import { SessionsService } from '../src/sessions/sessions.service.js';
+import { UsersService } from '../src/users/users.service.js';
 
 const TEST_DB = join(__dirname, 'test-idp-logout.db');
 const TEST_KEYS = join(__dirname, 'test-idp-logout-keys.json');
@@ -18,7 +18,7 @@ process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = ISSUER;
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;
@@ -197,7 +197,9 @@ describe('Logout revokes grants (e2e)', () => {
 
     // Alice's grant rows are gone; Bob's are untouched.
     expect(grantIdsFor(aliceUser!.id)).toHaveLength(0);
-    expect(grantIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([...bobGrantsBefore].sort((a: string, b: string) => a.localeCompare(b)));
+    expect(grantIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+      [...bobGrantsBefore].sort((a: string, b: string) => a.localeCompare(b)),
+    );
 
     // And the behavior follows: Bob can still refresh, Alice cannot.
     expect((await refresh(app, bob.tokens.refresh_token!)).status).toBe(200);

@@ -2,11 +2,11 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DEFAULT_PAGE_LIMIT, paginate } from '@life/service-kit';
-import { FOCUS_CACHE, type FocusCache } from '../cache/focus-cache';
-import { DATE_ONLY } from '../sessions/dto/session-rules';
-import type { ListGoalsQuery } from './dto/list-goals.query';
-import type { SetGoalDto } from './dto/set-goal.dto';
-import { Goal } from './goal.entity';
+import { FOCUS_CACHE, type FocusCache } from '../cache/focus-cache.js';
+import { DATE_ONLY } from '../sessions/dto/session-rules.js';
+import type { ListGoalsQuery } from './dto/list-goals.query.js';
+import type { SetGoalDto } from './dto/set-goal.dto.js';
+import { Goal } from './goal.entity.js';
 
 /**
  * A goal row as persisted, which is also the row as served: the wire shape locked

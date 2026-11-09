@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { resolveDbPath } from './db-path';
-import { User } from '../users/user.entity';
-import { UsersModule } from '../users/users.module';
+import { resolveDbPath } from './db-path.js';
+import { User } from '../users/user.entity.js';
+import { UsersModule } from '../users/users.module.js';
 
 /**
  * Minimal module for host tooling (the seed script): just the database and

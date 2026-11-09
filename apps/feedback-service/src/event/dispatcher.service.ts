@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, MoreThan, type Repository } from 'typeorm';
-import { FeedbackCursor } from '../feedback/feedback-cursor.entity';
-import { FeedbackEvent } from '../feedback/feedback-event.entity';
-import { EVENT_SINK, toSubmittedBody, type EventSink } from './publisher.service';
-import { ensureFeedbackNotifyTrigger, FEEDBACK_NOTIFY_CHANNEL } from './trigger-ddl';
+import { FeedbackCursor } from '../feedback/feedback-cursor.entity.js';
+import { FeedbackEvent } from '../feedback/feedback-event.entity.js';
+import { EVENT_SINK, toSubmittedBody, type EventSink } from './publisher.service.js';
+import { ensureFeedbackNotifyTrigger, FEEDBACK_NOTIFY_CHANNEL } from './trigger-ddl.js';
 
 /** The singleton cursor row (`feedback_cursor.id`). */
 const CURSOR_ID = 'feedback';
@@ -98,10 +98,12 @@ export class DispatcherService implements OnApplicationBootstrap, OnModuleDestro
   /** Any trigger: notification, tick, or reconnect — they all drain the log. */
   private trigger(): void {
     if (this.stopped || this.retryTimer) return; // a backoff owns the next attempt
-    this.chain = this.chain.then(() => this.attempt()).then(
-      () => this.onSuccess(),
-      (err) => this.onFailure(err),
-    );
+    this.chain = this.chain
+      .then(() => this.attempt())
+      .then(
+        () => this.onSuccess(),
+        (err) => this.onFailure(err),
+      );
   }
 
   /** (Re)establish the listener if needed, then drain the log. */

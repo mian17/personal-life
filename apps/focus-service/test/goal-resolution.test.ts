@@ -1,9 +1,9 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import type { FocusCache } from '../src/cache/focus-cache';
-import { SetGoalDto } from '../src/goals/dto/set-goal.dto';
-import { Goal } from '../src/goals/goal.entity';
-import { GoalsService, resolveGoal } from '../src/goals/goals.service';
+import type { FocusCache } from '../src/cache/focus-cache.js';
+import { SetGoalDto } from '../src/goals/dto/set-goal.dto.js';
+import { Goal } from '../src/goals/goal.entity.js';
+import { GoalsService, resolveGoal } from '../src/goals/goals.service.js';
 
 /**
  * `SPEC-focus-service` §1, §6, §8.5 — the goal slice's own rules:
@@ -123,6 +123,10 @@ describe('GoalsService', () => {
     const goals = createService();
     await goals.setGoal(OWNER, { date: A_DAY, minutes: 40 });
 
-    await expect(goals.findAll('fresh-owner')).resolves.toEqual({ goals: [], nextCursor: null, total: 0 });
+    await expect(goals.findAll('fresh-owner')).resolves.toEqual({
+      goals: [],
+      nextCursor: null,
+      total: 0,
+    });
   });
 });

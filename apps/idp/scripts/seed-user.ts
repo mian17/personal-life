@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { SeedModule } from '../src/config/seed.module';
-import { UsersService } from '../src/users/users.service';
-import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
+import { SeedModule } from '../src/config/seed.module.js';
+import { UsersService } from '../src/users/users.service.js';
+import { isProductionDbPath, resolveDbPath } from '../src/config/db-path.js';
 
 /**
  * Seeds the single pre-approved user. There is deliberately no signup path:
@@ -42,7 +42,7 @@ function oneLine(value: string): string {
 function loadDevEnvFile(): void {
   if (process.env.SEED_LOAD_DEV_ENV !== '1') return;
   try {
-    process.loadEnvFile(resolve(__dirname, '..', '..', '..', '.env.development'));
+    process.loadEnvFile(resolve(import.meta.dirname, '..', '..', '..', '.env.development'));
   } catch {
     // No dev env file — fine; defaults apply.
   }
@@ -54,7 +54,8 @@ async function main(): Promise<void> {
 
   // Credentials: production MUST supply them explicitly (no defaulted prod
   // credentials, ever). Non-production falls back to the documented dev pair.
-  const username = process.env.SEED_USERNAME?.trim() || (isProduction ? undefined : DEV_SEED_USERNAME);
+  const username =
+    process.env.SEED_USERNAME?.trim() || (isProduction ? undefined : DEV_SEED_USERNAME);
   const password = process.env.SEED_PASSWORD ?? (isProduction ? undefined : DEV_SEED_PASSWORD);
 
   if (!username || !password) {

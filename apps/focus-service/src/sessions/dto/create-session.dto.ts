@@ -1,5 +1,5 @@
 import { IsInt, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from './session-rules';
+import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from './session-rules.js';
 
 /**
  * Body of `POST /api/sessions`: one recorded focus block.

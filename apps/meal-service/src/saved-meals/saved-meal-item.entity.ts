@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { SavedMeal } from './saved-meal.entity';
+import { SavedMeal } from './saved-meal.entity.js';
 
 /**
  * One frozen per-item snapshot inside a saved meal

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CryptoModule } from '../crypto/crypto.module';
-import { OidcAdapterService } from './adapter/oidc-adapter.service';
-import { OidcPayload } from './adapter/oidc-payload.entity';
-import { OidcService } from './oidc.service';
+import { CryptoModule } from '../crypto/crypto.module.js';
+import { OidcAdapterService } from './adapter/oidc-adapter.service.js';
+import { OidcPayload } from './adapter/oidc-payload.entity.js';
+import { OidcService } from './oidc.service.js';
 
 @Module({
   imports: [CryptoModule, TypeOrmModule.forFeature([OidcPayload])],

@@ -1,4 +1,4 @@
-import type { CacheClient } from '../src/users/users-cache';
+import type { CacheClient } from '../src/users/users-cache.js';
 
 /**
  * In-memory stand-in for the node-redis client, used to prove cache behavior

@@ -8,7 +8,7 @@ import {
   type Profile,
   basalMetabolicRate,
   totalDailyEnergyExpenditure,
-} from './target-calculator';
+} from './target-calculator.js';
 
 /** The weight goal. Declared as a value array for exhaustive keying. */
 export const GOALS = ['lose', 'maintain', 'gain'] as const;
@@ -71,8 +71,7 @@ export function calculateTarget(profile: Profile, goal: Goal): Target {
   const carbG = Math.max(
     0,
     Math.round(
-      (calories - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) /
-        KCAL_PER_G.carb,
+      (calories - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) / KCAL_PER_G.carb,
     ),
   );
 
