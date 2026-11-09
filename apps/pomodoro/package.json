@@ -17,8 +17,8 @@
     "@life/ui": "*"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
@@ -27,9 +27,9 @@
     "@types/react": "^19.0.10",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "ts-jest": "^29.2.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "ts-jest": "^29.4.15",
     "typescript": "^5.7.3"
   },
   "jest": {
