@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { CryptoError } from './errors';
+import { CryptoError } from './errors.js';
 
 /** Field-envelope format marker: `enc.v1.<nonce-b64url>.<ct-b64url>`. */
 export const ENC_PREFIX = 'enc.v1.';

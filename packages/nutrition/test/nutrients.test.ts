@@ -1,9 +1,4 @@
-import {
-  NUTRIENTS,
-  NUTRIENT_LABELS,
-  type Nutrient,
-  type NutrientUnit,
-} from '../src/index';
+import { NUTRIENTS, NUTRIENT_LABELS, type Nutrient, type NutrientUnit } from '../src/index.js';
 
 /**
  * Vocabulary invariants for the §0.1-locked nutrient table. A 28th nutrient, a

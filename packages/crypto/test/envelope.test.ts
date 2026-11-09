@@ -1,5 +1,5 @@
-import { CryptoError, ENC_PREFIX, decryptField, encryptField, generateDek } from '../src';
-import { open, seal } from '../src/envelope';
+import { CryptoError, ENC_PREFIX, decryptField, encryptField, generateDek } from '../src/index.js';
+import { open, seal } from '../src/envelope.js';
 
 /**
  * Published known-answer vector.
@@ -52,11 +52,7 @@ describe('known-answer vector', () => {
       KAT.ct + KAT.tag,
       'hex',
     ).toString('base64url')}`;
-    const plaintext = open(
-      Buffer.from(KAT.key, 'hex'),
-      envelope,
-      Buffer.from(KAT.aad, 'hex'),
-    );
+    const plaintext = open(Buffer.from(KAT.key, 'hex'), envelope, Buffer.from(KAT.aad, 'hex'));
     expect(plaintext.compare(Buffer.from(KAT.pt, 'hex'))).toBe(0);
   });
 });
@@ -65,7 +61,12 @@ describe('encryptField / decryptField round-trip', () => {
   it('round-trips unicode, empty string and a 100KB payload', () => {
     const dek = generateDek();
     const aad = 'life.v1|user|note|body|00000000-0000-0000-0000-000000000001';
-    const cases = ['', 'hello world', 'héllo — 世界 🌍 Ω≈ç√∫˜µ≤≥÷ こんにちは', 'a'.repeat(100 * 1024)];
+    const cases = [
+      '',
+      'hello world',
+      'héllo — 世界 🌍 Ω≈ç√∫˜µ≤≥÷ こんにちは',
+      'a'.repeat(100 * 1024),
+    ];
 
     for (const plaintext of cases) {
       const envelope = encryptField(dek, plaintext, aad);

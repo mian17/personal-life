@@ -5,7 +5,7 @@
  * nutrient math stays `scale(serving, quantity)` — pure and clock-free.
  */
 
-import type { NutrientVector } from './nutrients';
+import type { NutrientVector } from './nutrients.js';
 
 /** A named, measured serving size ("100 g", "1 cup") the user can pick. */
 export interface Serving {

@@ -1,11 +1,6 @@
 import { createDecipheriv, createCipheriv, hkdfSync, randomBytes } from 'node:crypto';
-import { CryptoError } from './errors';
-import {
-  KEY_BYTES,
-  NONCE_BYTES,
-  encodeBase64Url,
-  splitSealed,
-} from './envelope';
+import { CryptoError } from './errors.js';
+import { KEY_BYTES, NONCE_BYTES, encodeBase64Url, splitSealed } from './envelope.js';
 
 /** Wrapped-DEK format marker: `kw.v1.<nonce-b64url>.<ct-b64url>`. */
 export const KW_PREFIX = 'kw.v1.';

@@ -4,7 +4,7 @@
  * disagree on a total.
  */
 
-import { NUTRIENTS, type NutrientVector } from './nutrients';
+import { NUTRIENTS, type NutrientVector } from './nutrients.js';
 
 /**
  * Add vectors together, nutrient by nutrient. Exactly additive: each output

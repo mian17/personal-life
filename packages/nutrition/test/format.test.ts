@@ -8,7 +8,7 @@ import {
   sum,
   type Food,
   type NutrientVector,
-} from '../src/index';
+} from '../src/index.js';
 
 /**
  * Display invariants: `%DV` is a read-time derivation that must never leak into
