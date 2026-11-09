@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
     "test:unit": "jest",
     "db:backup": "ts-node scripts/backup.ts",
     "db:restore": "ts-node scripts/restore.ts",

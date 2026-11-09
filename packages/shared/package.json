@@ -26,6 +26,7 @@
     "dev": "tsc -p tsconfig.json --watch",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
     "test:unit": "jest"
   },
   "devDependencies": {
