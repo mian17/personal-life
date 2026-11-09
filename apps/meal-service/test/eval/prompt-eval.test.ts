@@ -20,8 +20,8 @@ import {
   type PhotoReadResult,
   type PhotoFoodSuggestion,
   type SearchFoodResult,
-} from '../../src/photo/gemini.client';
-import { gradeRead, passAtK, type ExpectedMeal } from './grade';
+} from '../../src/photo/gemini.client.js';
+import { gradeRead, passAtK, type ExpectedMeal } from './grade.js';
 
 /** The two metrics a run may headline; `PROMPT_EVAL_METRIC` names one, unset names neither. */
 const HEADLINED_METRICS = ['pass1', 'pass5'] as const;

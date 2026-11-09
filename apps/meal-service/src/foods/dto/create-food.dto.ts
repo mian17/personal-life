@@ -1,6 +1,17 @@
-import { ArrayMaxSize, IsArray, IsIn, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
-import { FOOD_UNITS, type FoodUnit } from '../food.entity';
+import { FOOD_UNITS, type FoodUnit } from '../food.entity.js';
 
 /** Wire bounds for the food catalog. */
 export const FOOD_NAME_MAX = 120;

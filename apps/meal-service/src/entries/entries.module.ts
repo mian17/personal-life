@@ -1,15 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
+import { MEAL_CACHE, createMealCache } from '../cache/meal-cache.js';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { Entry } from './entry.entity';
-import { EntriesController } from './entries.controller';
-import { EntriesCache } from './entries-cache';
-import { EntriesService } from './entries.service';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { Entry } from './entry.entity.js';
+import { EntriesController } from './entries.controller.js';
+import { EntriesCache } from './entries-cache.js';
+import { EntriesService } from './entries.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Entry]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
+  imports: [
+    TypeOrmModule.forFeature([Entry]),
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+  ],
   controllers: [EntriesController],
   // Exported so the batch controller in `AppModule` can reach the same service
   // instance, whose write path the batch runs per item.

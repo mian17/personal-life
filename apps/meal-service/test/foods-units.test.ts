@@ -4,7 +4,7 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { NUTRIENTS, scale, type Food as FoodModel, type NutrientVector } from '@life/nutrition';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * The Lose It! unit contract (`SPEC-food-units`, `docs/intent/meal-food-management.md`):
@@ -52,7 +52,7 @@ describe('Food units contract (e2e)', () => {
     tokenA = await harness.sign({ subject: 'user-a', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -203,7 +203,9 @@ describe('Food units contract (e2e)', () => {
     // The food itself is gone: reads like a missing row, absent from the default catalog.
     await one(created.body.id).expect(404);
     const catalog = await auth(request(app.getHttpServer()).get('/api/foods'), tokenA).expect(200);
-    expect(catalog.body.foods.map((food: { id: string }) => food.id)).not.toContain(created.body.id);
+    expect(catalog.body.foods.map((food: { id: string }) => food.id)).not.toContain(
+      created.body.id,
+    );
 
     // ...but a past entry's dish name still resolves: the include-deleted read
     // returns the soft-deleted row with the same DTO and owner scoping.

@@ -1,12 +1,12 @@
 import request from 'supertest';
-import { FakeRedisClient } from './fake-redis';
-import { JwtTestHarness } from './jwt-harness';
+import { FakeRedisClient } from './fake-redis.js';
+import { JwtTestHarness } from './jwt-harness.js';
 import {
   startFocusApp,
   startThrowawayDatabase,
   type FocusApp,
   type ThrowawayDatabase,
-} from './setup-env';
+} from './setup-env.js';
 
 /**
  * The behaviours the service exists for, over HTTP (`SPEC-focus-service` §1, §8
@@ -47,7 +47,13 @@ describe('Focus sessions (e2e)', () => {
       .get(`/api/sessions?from=${from}&to=${to}`)
       .set('Authorization', `Bearer ${token}`);
   /** One page of a range: the same route with the shared paging window. */
-  const listSessionPage = (token: string, from: string, to: string, limit: number, cursor?: string) =>
+  const listSessionPage = (
+    token: string,
+    from: string,
+    to: string,
+    limit: number,
+    cursor?: string,
+  ) =>
     request(running.app.getHttpServer())
       .get(`/api/sessions?from=${from}&to=${to}&limit=${limit}`)
       .query(cursor === undefined ? {} : { cursor })

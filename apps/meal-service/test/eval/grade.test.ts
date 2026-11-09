@@ -4,8 +4,8 @@
  * items, so no test inherits state from another.
  */
 
-import type { PhotoFoodSuggestion } from '../../src/photo/gemini.client';
-import { combinations, gradeRead, passAtK, type ExpectedMeal } from './grade';
+import type { PhotoFoodSuggestion } from '../../src/photo/gemini.client.js';
+import { combinations, gradeRead, passAtK, type ExpectedMeal } from './grade.js';
 
 /** A fresh three-food fixture: chicken, tofu, yardlong beans, each needing a bound id. */
 function threeFoodMeal(): ExpectedMeal {
@@ -23,7 +23,11 @@ function threeFoodMeal(): ExpectedMeal {
   };
 }
 
-function suggestion(name: string, fdcId: number | null, searchQuery: string | null): PhotoFoodSuggestion {
+function suggestion(
+  name: string,
+  fdcId: number | null,
+  searchQuery: string | null,
+): PhotoFoodSuggestion {
   return { name, grams: 100, foodId: null, fdcId, searchQuery };
 }
 
@@ -108,7 +112,11 @@ describe('gradeRead', () => {
   it('rejects an item carrying an fdcId but no searchQuery', () => {
     const verdict = gradeRead({
       expected: threeFoodMeal(),
-      items: [suggestion('chicken', 11, null), suggestion('tofu', 22, 'tofu'), suggestion('yardlong beans', 33, 'yardlong beans')],
+      items: [
+        suggestion('chicken', 11, null),
+        suggestion('tofu', 22, 'tofu'),
+        suggestion('yardlong beans', 33, 'yardlong beans'),
+      ],
       ...threeFoodSearch(),
     });
 
@@ -119,23 +127,35 @@ describe('gradeRead', () => {
   it('rejects a searchQuery that was never issued to the tool', () => {
     const verdict = gradeRead({
       expected: threeFoodMeal(),
-      items: [suggestion('chicken', 11, 'chiken'), suggestion('tofu', 22, 'tofu'), suggestion('yardlong beans', 33, 'yardlong beans')],
+      items: [
+        suggestion('chicken', 11, 'chiken'),
+        suggestion('tofu', 22, 'tofu'),
+        suggestion('yardlong beans', 33, 'yardlong beans'),
+      ],
       ...threeFoodSearch(),
     });
 
     expect(verdict.pass).toBe(false);
-    expect(verdict.failures).toContain('"chicken" reports searchQuery "chiken" that was never issued');
+    expect(verdict.failures).toContain(
+      '"chicken" reports searchQuery "chiken" that was never issued',
+    );
   });
 
   it('rejects an fdcId its own searchQuery did not offer', () => {
     const verdict = gradeRead({
       expected: threeFoodMeal(),
-      items: [suggestion('chicken', 999, 'chicken'), suggestion('tofu', 22, 'tofu'), suggestion('yardlong beans', 33, 'yardlong beans')],
+      items: [
+        suggestion('chicken', 999, 'chicken'),
+        suggestion('tofu', 22, 'tofu'),
+        suggestion('yardlong beans', 33, 'yardlong beans'),
+      ],
       ...threeFoodSearch(),
     });
 
     expect(verdict.pass).toBe(false);
-    expect(verdict.failures).toContain('"chicken" fdcId 999 was not offered by its own searchQuery "chicken"');
+    expect(verdict.failures).toContain(
+      '"chicken" fdcId 999 was not offered by its own searchQuery "chicken"',
+    );
   });
 });
 

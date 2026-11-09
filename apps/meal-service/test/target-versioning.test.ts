@@ -1,11 +1,11 @@
 import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
-import { MealCache, generationKey } from '../src/cache/meal-cache';
-import { calculateTarget } from '../src/targets/target';
-import { UpdateProfileDto } from '../src/targets/dto/update-profile.dto';
-import type { TargetDto } from '../src/targets/target.service';
-import { TargetService } from '../src/targets/target.service';
-import type { Target } from '../src/targets/target.entity';
+import { MealCache, generationKey } from '../src/cache/meal-cache.js';
+import { calculateTarget } from '../src/targets/target.js';
+import { UpdateProfileDto } from '../src/targets/dto/update-profile.dto.js';
+import type { TargetDto } from '../src/targets/target.service.js';
+import { TargetService } from '../src/targets/target.service.js';
+import type { Target } from '../src/targets/target.entity.js';
 
 /**
  * Unit-level contract for target versioning (`SPEC-target-onboarding`). The DB
@@ -65,11 +65,14 @@ class FakeTargetRepo {
 
   constructor(private readonly events: string[] = []) {}
 
-  create = jest.fn((data: Partial<Row>): Row => ({
-    ...data,
-    createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-  }) as Row);
+  create = jest.fn(
+    (data: Partial<Row>): Row =>
+      ({
+        ...data,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }) as Row,
+  );
 
   save = jest.fn(async (row: Row): Promise<Row> => {
     this.events.push('db:save');
@@ -152,7 +155,9 @@ describe('TargetService.getTarget — date resolves to exactly one row', () => {
 
   it('rejects a missing or malformed date string at the boundary', async () => {
     const h = makeHarness();
-    await expect(h.service.getTarget(SUB, '2026/01/01')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(h.service.getTarget(SUB, '2026/01/01')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     await expect(h.service.getTarget(SUB, undefined)).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -203,7 +208,7 @@ describe('TargetService.updateProfile — row per change, bump after insert', ()
     expect(saved).toMatchObject(expected);
   });
 
-  it('a profile change does not alter an earlier date\'s target', async () => {
+  it("a profile change does not alter an earlier date's target", async () => {
     const h = makeHarness();
     const dto: UpdateProfileDto = { ...PROFILE, date: '2026-01-01' };
     await h.service.updateProfile(SUB, dto);
@@ -225,14 +230,14 @@ describe('UpdateProfileDto — the client cannot send computed values or an owne
     return pipe.transform(body, { type: 'body', metatype: UpdateProfileDto });
   }
 
-  it('accepts the profile inputs together with the client\'s date', async () => {
+  it("accepts the profile inputs together with the client's date", async () => {
     await expect(validate({ ...PROFILE, date: '2026-03-01' })).resolves.toMatchObject({
       ...PROFILE,
       date: '2026-03-01',
     });
   });
 
-  it('rejects a body with no date (the service never defaults the user\'s day)', async () => {
+  it("rejects a body with no date (the service never defaults the user's day)", async () => {
     await expect(validate({ ...PROFILE })).rejects.toBeInstanceOf(BadRequestException);
     await expect(validate({ ...PROFILE, date: '03-01-2026' })).rejects.toBeInstanceOf(
       BadRequestException,
@@ -240,7 +245,9 @@ describe('UpdateProfileDto — the client cannot send computed values or an owne
   });
 
   it('rejects a body carrying computed kcal / bmr / tdee / macros', async () => {
-    await expect(validate({ ...PROFILE, calories: 9999 })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(validate({ ...PROFILE, calories: 9999 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     await expect(validate({ ...PROFILE, bmr: 1 })).rejects.toBeInstanceOf(BadRequestException);
     await expect(validate({ ...PROFILE, proteinG: 1 })).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -255,6 +262,8 @@ describe('UpdateProfileDto — the client cannot send computed values or an owne
     await expect(validate({ ...PROFILE, activity: 'extreme' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    await expect(validate({ ...PROFILE, goal: 'bulk' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(validate({ ...PROFILE, goal: 'bulk' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

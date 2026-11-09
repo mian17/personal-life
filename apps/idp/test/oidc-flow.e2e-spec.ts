@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+
 import { execFile } from 'child_process';
 import { createHash, randomBytes } from 'crypto';
 import { rmSync, writeFileSync } from 'fs';
@@ -6,13 +7,16 @@ import { join } from 'path';
 import request from 'supertest';
 import { decodeJwt } from 'jose';
 import { promisify } from 'util';
-import { Client } from './oidc-harness';
-import { OidcAdapterService } from '../src/oidc/adapter/oidc-adapter.service';
-import { OidcService } from '../src/oidc/oidc.service';
-import { UsersService } from '../src/users/users.service';
+import { Client } from './oidc-harness.js';
+import { OidcAdapterService } from '../src/oidc/adapter/oidc-adapter.service.js';
+import { OidcService } from '../src/oidc/oidc.service.js';
+import { UsersService } from '../src/users/users.service.js';
 
+/** ts-node 10 predates Node's ESM detection, so the CJS bin cannot load these
+ * ESM scripts; the ESM loader plus a cwd of apps/idp (which selects its
+ * NodeNext tsconfig) is what runs them. */
+const TS_NODE_ESM_LOADER_ARGS = ['--loader', 'ts-node/esm'];
 const execFileAsync = promisify(execFile);
-const TS_NODE_BIN = require.resolve('ts-node/dist/bin.js');
 const VERIFY_SCRIPT = join(__dirname, '..', 'scripts', 'verify-jwks.ts');
 
 const TEST_DB = join(__dirname, 'test-idp-flow.db');
@@ -27,17 +31,19 @@ process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = ISSUER;
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;
 }
 
-async function runVerifier(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runVerifier(
+  args: string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
-      [TS_NODE_BIN, VERIFY_SCRIPT, ...args],
+      [...TS_NODE_ESM_LOADER_ARGS, VERIFY_SCRIPT, ...args],
       { cwd: join(__dirname, '..') },
     );
     return { code: 0, stdout, stderr };
@@ -60,7 +66,12 @@ function pkce(): { verifier: string; challenge: string } {
   return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
 }
 
-function authorizePath(opts: { verifier: string; nonce: string; state: string; resource?: string }): string {
+function authorizePath(opts: {
+  verifier: string;
+  nonce: string;
+  state: string;
+  resource?: string;
+}): string {
   const challenge = createHash('sha256').update(opts.verifier).digest('base64url');
   const params = new URLSearchParams({
     client_id: 'dev',
@@ -85,7 +96,14 @@ function isIdpPath(pathname: string): boolean {
 /** Drives authorize → (login) → resume and returns the code/state from the redirect. */
 async function completeAuthorize(
   client: Client,
-  opts: { verifier: string; nonce: string; state: string; username?: string; password?: string; resource?: string },
+  opts: {
+    verifier: string;
+    nonce: string;
+    state: string;
+    username?: string;
+    password?: string;
+    resource?: string;
+  },
 ): Promise<Dance> {
   const auth = await client.get(authorizePath(opts));
   let location = auth.location;
@@ -157,7 +175,12 @@ describe('Authorization code + PKCE flow (e2e)', () => {
   it('completes the code+PKCE dance and mints an audience-scoped JWT access token', async () => {
     const state = randomBytes(8).toString('hex');
     const nonce = randomBytes(8).toString('hex');
-    const dance = await completeAuthorize(client, { ...pkce(), state, nonce, resource: 'https://note-service' });
+    const dance = await completeAuthorize(client, {
+      ...pkce(),
+      state,
+      nonce,
+      resource: 'https://note-service',
+    });
     expect(dance.code).toBeDefined();
 
     const tokens = await tokenRequest(client, dance.code!, dance.verifier);
@@ -189,68 +212,83 @@ describe('Authorization code + PKCE flow (e2e)', () => {
 
   it('round-trips state to the redirect_uri', async () => {
     const state = 'state-' + randomBytes(4).toString('hex');
-    const dance = await completeAuthorize(client, { ...pkce(), state, nonce: randomBytes(8).toString('hex') });
+    const dance = await completeAuthorize(client, {
+      ...pkce(),
+      state,
+      nonce: randomBytes(8).toString('hex'),
+    });
     expect(dance.state).toBe(state);
   });
 
-  it(
-    'verifies the minted access token offline against the fetched JWKS alone, and rejects a wrong audience',
-    async () => {
-      const dance = await completeAuthorize(client, {
-        ...pkce(),
-        state: randomBytes(8).toString('hex'),
-        nonce: randomBytes(8).toString('hex'),
-        resource: 'https://note-service',
-      });
-      const tokens = await tokenRequest(client, dance.code!, dance.verifier);
-      const accessToken = (tokens.json as { access_token: string }).access_token;
+  it('verifies the minted access token offline against the fetched JWKS alone, and rejects a wrong audience', async () => {
+    const dance = await completeAuthorize(client, {
+      ...pkce(),
+      state: randomBytes(8).toString('hex'),
+      nonce: randomBytes(8).toString('hex'),
+      resource: 'https://note-service',
+    });
+    const tokens = await tokenRequest(client, dance.code!, dance.verifier);
+    const accessToken = (tokens.json as { access_token: string }).access_token;
 
-      // Fetch the public JWKS document from the running IdP and hand it to a
-      // separate process; that process never calls the IdP.
-      const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
-      writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
+    // Fetch the public JWKS document from the running IdP and hand it to a
+    // separate process; that process never calls the IdP.
+    const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
+    writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
 
-      const good = await runVerifier([
-        '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'note-service',
-      ]);
-      expect(good.code).toBe(0);
-      expect(good.stdout).toContain('verified:');
+    const good = await runVerifier([
+      '--token',
+      accessToken,
+      '--jwks-file',
+      PUBLIC_JWKS_FILE,
+      '--iss',
+      ISSUER,
+      '--aud',
+      'note-service',
+    ]);
+    expect(good.code).toBe(0);
+    expect(good.stdout).toContain('verified:');
 
-      const wrongAud = await runVerifier([
-        '--token', accessToken, '--jwks-file', PUBLIC_JWKS_FILE, '--iss', ISSUER, '--aud', 'todo-service',
-      ]);
-      expect(wrongAud.code).not.toBe(0);
-      expect(wrongAud.stderr).toContain('aud');
-    },
-    30000,
-  );
+    const wrongAud = await runVerifier([
+      '--token',
+      accessToken,
+      '--jwks-file',
+      PUBLIC_JWKS_FILE,
+      '--iss',
+      ISSUER,
+      '--aud',
+      'todo-service',
+    ]);
+    expect(wrongAud.code).not.toBe(0);
+    expect(wrongAud.stderr).toContain('aud');
+  }, 30000);
 
-  it(
-    'rejects a tampered and an expired minted token',
-    async () => {
-      const dance = await completeAuthorize(client, {
-        ...pkce(),
-        state: randomBytes(8).toString('hex'),
-        nonce: randomBytes(8).toString('hex'),
-        resource: 'https://note-service',
-      });
-      const tokens = await tokenRequest(client, dance.code!, dance.verifier);
-      const accessToken = (tokens.json as { access_token: string }).access_token;
-      const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
-      writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
+  it('rejects a tampered and an expired minted token', async () => {
+    const dance = await completeAuthorize(client, {
+      ...pkce(),
+      state: randomBytes(8).toString('hex'),
+      nonce: randomBytes(8).toString('hex'),
+      resource: 'https://note-service',
+    });
+    const tokens = await tokenRequest(client, dance.code!, dance.verifier);
+    const accessToken = (tokens.json as { access_token: string }).access_token;
+    const jwks = await request(app.getHttpServer()).get('/jwks').expect(200);
+    writeFileSync(PUBLIC_JWKS_FILE, JSON.stringify(jwks.body));
 
-      const [h, p, s] = accessToken.split('.');
-      const tampered = `${h}.${p}.AAAA${s.slice(4)}`;
-      const tamperedResult = await runVerifier(['--token', tampered, '--jwks-file', PUBLIC_JWKS_FILE]);
-      expect(tamperedResult.code).not.toBe(0);
+    const [h, p, s] = accessToken.split('.');
+    const tampered = `${h}.${p}.AAAA${s.slice(4)}`;
+    const tamperedResult = await runVerifier([
+      '--token',
+      tampered,
+      '--jwks-file',
+      PUBLIC_JWKS_FILE,
+    ]);
+    expect(tamperedResult.code).not.toBe(0);
 
-      // Expired: verify the same token without expiration tolerance would need a
-      // real clock; instead assert the claim policy directly (Task 4 covered expiry).
-      const claims = decodeJwt(accessToken);
-      expect(claims.exp! - claims.iat!).toBe(600);
-    },
-    30000,
-  );
+    // Expired: verify the same token without expiration tolerance would need a
+    // real clock; instead assert the claim policy directly (Task 4 covered expiry).
+    const claims = decodeJwt(accessToken);
+    expect(claims.exp! - claims.iat!).toBe(600);
+  }, 30000);
 
   it('fails closed with 400 invalid_grant when the PKCE verifier does not match', async () => {
     const dance = await completeAuthorize(client, {
@@ -300,7 +338,9 @@ describe('Authorization code + PKCE flow (e2e)', () => {
     expect(client!.tokenEndpointAuthMethod).toBe('client_secret_basic');
     expect(client!.grantTypes).toContain('authorization_code');
     // Task 6 adds refresh_token; both clients get it and nothing else.
-    expect([...(client!.grantTypes ?? [])].sort((a: string, b: string) => a.localeCompare(b))).toEqual(['authorization_code', 'refresh_token']);
+    expect(
+      [...(client!.grantTypes ?? [])].sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual(['authorization_code', 'refresh_token']);
     expect(client!.responseTypes).toEqual(['code']);
     expect(client!.idTokenSignedResponseAlg).toBe('EdDSA');
     expect(client!.redirectUris?.length ?? 0).toBeGreaterThan(0);
@@ -358,8 +398,8 @@ describe('Storage adapter persistence across app instances (e2e)', () => {
     process.env.DB_PATH = SHARED_DB;
     process.env.KEYS_PATH = SHARED_KEYS;
     const [{ createApp }, { UsersService: FreshUsersService }] = await Promise.all([
-      import('../src/app.factory'),
-      import('../src/users/users.service'),
+      import('../src/app.factory.js'),
+      import('../src/users/users.service.js'),
     ]);
     const app = await createApp();
     await app.init();

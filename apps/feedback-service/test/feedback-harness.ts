@@ -4,19 +4,19 @@ import { DataSource } from 'typeorm';
 import { createServer, type Server } from 'http';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { bin, childEnv } from '../../../packages/shared/src/child-process';
+import { bin, childEnv } from '../../../packages/shared/src/child-process.js';
 import request from 'supertest';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
 import { AuthGuard } from '@life/service-kit';
-import { VERIFIER_ENV } from '../src/service-config';
-import { FEEDBACK_CACHE, FeedbackCache } from '../src/feedback/feedback-cache';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import { FEEDBACK_CACHE, FeedbackCache } from '../src/feedback/feedback-cache.js';
 import {
   EVENT_SINK,
   type EventSink,
   type FeedbackSubmittedBody,
-} from '../src/event/publisher.service';
-import { FEEDBACK_NOTIFY_CHANNEL } from '../src/event/trigger-ddl';
+} from '../src/event/publisher.service.js';
+import { FEEDBACK_NOTIFY_CHANNEL } from '../src/event/trigger-ddl.js';
 
 /**
  * Integration harness for `SPEC-feedback-service`'s seven behavior groups.
@@ -164,7 +164,22 @@ async function startContainer(): Promise<{ url: string; stop(): Promise<void> }>
     // unexpectedly" a few hundred ms into a suite.
     for (let attempt = 0; ; attempt += 1) {
       try {
-        run(['exec', name, 'psql', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1'], true);
+        run(
+          [
+            'exec',
+            name,
+            'psql',
+            '-h',
+            '127.0.0.1',
+            '-U',
+            'postgres',
+            '-d',
+            'postgres',
+            '-c',
+            'select 1',
+          ],
+          true,
+        );
         break;
       } catch {
         if (attempt >= 60) throw new Error('postgres never became ready');
@@ -386,10 +401,12 @@ export async function startFeedbackApp(options: StartAppOptions): Promise<Feedba
       ? null
       : new FeedbackCache(options.cache === 'failing' ? new FailingRedisClient() : options.cache);
 
-  const { AppModule } = await import('../src/app.module');
+  const { AppModule } = await import('../src/app.module.js');
   let builder: TestingModuleBuilder = Test.createTestingModule({
     imports: [AppModule],
-  }).overrideProvider(EVENT_SINK).useValue(sink);
+  })
+    .overrideProvider(EVENT_SINK)
+    .useValue(sink);
   if (cache) builder = builder.overrideProvider(FEEDBACK_CACHE).useValue(cache);
 
   const app = (await builder.compile()).createNestApplication();

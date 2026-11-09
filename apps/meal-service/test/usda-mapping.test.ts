@@ -1,5 +1,5 @@
 import { NUTRIENTS } from '@life/nutrition';
-import { mapUsdaNutrients, type UsdaNutrientRow } from '../src/usda/mapping';
+import { mapUsdaNutrients, type UsdaNutrientRow } from '../src/usda/mapping.js';
 
 /**
  * `docs/specs/SPEC-usda-source.md` § "The mapping" — the pure join. Fixtures

@@ -1,5 +1,5 @@
 import { type NutrientVector } from '@life/nutrition';
-import { mapUsdaNutrients, type UsdaNutrientRow } from './mapping';
+import { mapUsdaNutrients, type UsdaNutrientRow } from './mapping.js';
 
 /**
  * The USDA FoodData Central client — `usda-source`'s only HTTP boundary

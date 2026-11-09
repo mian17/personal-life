@@ -1,13 +1,13 @@
 import request from 'supertest';
 import { MAX_PAGE_LIMIT } from '@life/service-kit';
-import { FakeRedisClient } from './fake-redis';
-import { JwtTestHarness } from './jwt-harness';
+import { FakeRedisClient } from './fake-redis.js';
+import { JwtTestHarness } from './jwt-harness.js';
 import {
   startFocusApp,
   startThrowawayDatabase,
   type FocusApp,
   type ThrowawayDatabase,
-} from './setup-env';
+} from './setup-env.js';
 
 /**
  * The daily-goal history over HTTP (`SPEC-focus-service` §1, §8 criterion 6): setting
@@ -39,9 +39,7 @@ describe('Daily focus goal (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send(body);
   const getGoals = (token: string) =>
-    request(running.app.getHttpServer())
-      .get('/api/goal')
-      .set('Authorization', `Bearer ${token}`);
+    request(running.app.getHttpServer()).get('/api/goal').set('Authorization', `Bearer ${token}`);
   /** One page of the goal history: the same route with the shared paging window. */
   const getGoalPage = (token: string, limit: number, cursor?: string) =>
     request(running.app.getHttpServer())
@@ -134,7 +132,7 @@ describe('Daily focus goal (e2e)', () => {
     });
   });
 
-  it('refuses a page size outside the seam\'s cap rather than clamping silently', async () => {
+  it("refuses a page size outside the seam's cap rather than clamping silently", async () => {
     // The DTO imports `MAX_PAGE_LIMIT`, so a page can never be asked to exceed it.
     await request(running.app.getHttpServer())
       .get('/api/goal?limit=0')

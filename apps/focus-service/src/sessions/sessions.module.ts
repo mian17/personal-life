@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FOCUS_CACHE, createFocusCache } from '../cache/focus-cache';
-import { Session } from './session.entity';
-import { SessionsController } from './sessions.controller';
-import { SessionsService } from './sessions.service';
+import { FOCUS_CACHE, createFocusCache } from '../cache/focus-cache.js';
+import { Session } from './session.entity.js';
+import { SessionsController } from './sessions.controller.js';
+import { SessionsService } from './sessions.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Session])],

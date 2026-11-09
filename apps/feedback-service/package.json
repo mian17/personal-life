@@ -2,6 +2,7 @@
   "name": "@life/feedback-service",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
@@ -64,7 +65,15 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+          }
+        }
+      ]
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(jose)/)"

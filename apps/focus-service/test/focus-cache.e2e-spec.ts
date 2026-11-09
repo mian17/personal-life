@@ -1,11 +1,11 @@
 import { DataSource } from 'typeorm';
-import { Goal } from '../src/goals/goal.entity';
-import { GoalsService } from '../src/goals/goals.service';
-import { FocusCache, generationKey } from '../src/cache/focus-cache';
-import { Session } from '../src/sessions/session.entity';
-import { SessionsService } from '../src/sessions/sessions.service';
-import { FakeRedisClient, UnreachableRedisClient } from './fake-redis';
-import { startThrowawayDatabase, type ThrowawayDatabase } from './setup-env';
+import { Goal } from '../src/goals/goal.entity.js';
+import { GoalsService } from '../src/goals/goals.service.js';
+import { FocusCache, generationKey } from '../src/cache/focus-cache.js';
+import { Session } from '../src/sessions/session.entity.js';
+import { SessionsService } from '../src/sessions/sessions.service.js';
+import { FakeRedisClient, UnreachableRedisClient } from './fake-redis.js';
+import { startThrowawayDatabase, type ThrowawayDatabase } from './setup-env.js';
 
 /**
  * The read-through cache contract for `focus-service` (`SPEC-focus-service`

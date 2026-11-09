@@ -26,7 +26,7 @@ describe('Health (e2e)', () => {
   beforeAll(async () => {
     rmSync(TEST_DB, { force: true });
     rmSync(TEST_KEYS, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

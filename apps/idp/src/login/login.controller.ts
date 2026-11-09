@@ -1,14 +1,14 @@
 import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { LoginDto } from './dto/login.dto';
-import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
-import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
-import { secureCookie } from './dev-stack';
-import { homePage, loginPage, logoutPage } from './login.view';
-import { OidcAdapterService } from '../oidc/adapter/oidc-adapter.service';
-import { OidcService } from '../oidc/oidc.service';
-import { SessionsService } from '../sessions/sessions.service';
-import { UsersService } from '../users/users.service';
+import { LoginDto } from './dto/login.dto.js';
+import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials.js';
+import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies.js';
+import { secureCookie } from './dev-stack.js';
+import { homePage, loginPage, logoutPage } from './login.view.js';
+import { OidcAdapterService } from '../oidc/adapter/oidc-adapter.service.js';
+import { OidcService } from '../oidc/oidc.service.js';
+import { SessionsService } from '../sessions/sessions.service.js';
+import { UsersService } from '../users/users.service.js';
 
 @Controller()
 export class LoginController {

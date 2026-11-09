@@ -1,7 +1,7 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { resolveKeysPath } from '../crypto/signing-key.service';
+import { resolveKeysPath } from '../crypto/signing-key.service.js';
 
 /** The health body vocabulary (SPEC-service-kernel, Health dialect). */
 export interface HealthBody {

@@ -12,8 +12,8 @@ import {
   Min,
 } from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
-import { DATE_ONLY } from '../../targets/dto/update-profile.dto';
-import { ENTRY_DATE_MAX, MEAL_GROUPS, type MealGroup, QUANTITY_MAX } from './create-entry.dto';
+import { DATE_ONLY } from '../../targets/dto/update-profile.dto.js';
+import { ENTRY_DATE_MAX, MEAL_GROUPS, type MealGroup, QUANTITY_MAX } from './create-entry.dto.js';
 
 /**
  * Body of `PATCH /api/entries/:id` — every field optional, so omitted fields

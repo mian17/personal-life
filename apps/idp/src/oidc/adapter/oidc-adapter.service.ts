@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Adapter, AdapterPayload } from 'oidc-provider';
 import { LessThanOrEqual, Repository } from 'typeorm';
-import { OidcPayload } from './oidc-payload.entity';
+import { OidcPayload } from './oidc-payload.entity.js';
 
 /** The Grant model name used as the `model` discriminator in `oidc_payload`. */
 const GRANT_MODEL = 'Grant';
@@ -71,15 +71,11 @@ class SqliteAdapter implements Adapter {
   }
 
   async findByUid(uid: string): Promise<AdapterPayload | undefined> {
-    return this.decode(
-      await this.repo.findOne({ where: { model: this.model, uid } }),
-    );
+    return this.decode(await this.repo.findOne({ where: { model: this.model, uid } }));
   }
 
   async findByUserCode(userCode: string): Promise<AdapterPayload | undefined> {
-    return this.decode(
-      await this.repo.findOne({ where: { model: this.model, userCode } }),
-    );
+    return this.decode(await this.repo.findOne({ where: { model: this.model, userCode } }));
   }
 
   async consume(id: string): Promise<void> {
@@ -112,9 +108,7 @@ class SqliteAdapter implements Adapter {
  */
 @Injectable()
 export class OidcAdapterService {
-  constructor(
-    @InjectRepository(OidcPayload) private readonly repo: Repository<OidcPayload>,
-  ) {}
+  constructor(@InjectRepository(OidcPayload) private readonly repo: Repository<OidcPayload>) {}
 
   factory(): (name: string) => Adapter {
     return (name: string) => new SqliteAdapter(name, this.repo);

@@ -4,8 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { Repository } from 'typeorm';
-import { User } from '../src/users/user.entity';
-import { UsersService } from '../src/users/users.service';
+import { User } from '../src/users/user.entity.js';
+import { UsersService } from '../src/users/users.service.js';
 import {
   PassthroughCache,
   USERS_CACHE,
@@ -14,8 +14,8 @@ import {
   RedisUsersCache,
   createUsersCache,
   userCacheKey,
-} from '../src/users/users-cache';
-import { FakeCacheClient } from './fake-cache-client';
+} from '../src/users/users-cache.js';
+import { FakeCacheClient } from './fake-cache-client.js';
 
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
 
@@ -42,7 +42,7 @@ describe('IdP users read-through cache (e2e)', () => {
     // `resolveDbPath()` at decorator evaluation, so importing it up front would
     // capture the default `data/scratch.db` and leak fixtures there (the house
     // pattern every other idp spec uses).
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(USERS_CACHE)
       .useValue(new RedisUsersCache(cache))
@@ -222,18 +222,18 @@ describe('RedisUsersCache helper (unit)', () => {
     const loader = jest.fn(async () => row({ id: 'u2', username: 'yan' }));
 
     fake.failReads = true;
-    expect(
-      (await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id,
-    ).toBe('u2');
+    expect((await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id).toBe(
+      'u2',
+    );
     fake.failReads = false;
 
     // Read-error path populated a value above; drop it so the write-error case
     // is a genuine miss and must reach the loader again.
     await fake.del(userCacheKey('yan'));
     fake.failWrites = true;
-    expect(
-      (await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id,
-    ).toBe('u2');
+    expect((await cache.getThrough(userCacheKey('yan'), USERS_CACHE_TTL_SECONDS, loader))?.id).toBe(
+      'u2',
+    );
     expect(loader).toHaveBeenCalledTimes(2);
   });
 

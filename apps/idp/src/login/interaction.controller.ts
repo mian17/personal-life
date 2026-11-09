@@ -1,14 +1,14 @@
 import { Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { errors } from 'oidc-provider';
-import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials';
-import { LoginDto } from './dto/login.dto';
-import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies';
-import { secureCookie } from './dev-stack';
-import { loginPage } from './login.view';
-import { SessionsService } from '../sessions/sessions.service';
-import { OidcService } from '../oidc/oidc.service';
-import { UsersService } from '../users/users.service';
+import { GENERIC_LOGIN_ERROR, verifyCredentials } from './credentials.js';
+import { LoginDto } from './dto/login.dto.js';
+import { SESSION_COOKIE, readSessionToken, sessionCookieOptions } from './cookies.js';
+import { secureCookie } from './dev-stack.js';
+import { loginPage } from './login.view.js';
+import { SessionsService } from '../sessions/sessions.service.js';
+import { OidcService } from '../oidc/oidc.service.js';
+import { UsersService } from '../users/users.service.js';
 
 const { SessionNotFound } = errors;
 
@@ -53,7 +53,10 @@ export class InteractionController {
       return;
     }
 
-    res.type('html').status(200).send(loginPage(undefined, `/interaction/${uid}`));
+    res
+      .type('html')
+      .status(200)
+      .send(loginPage(undefined, `/interaction/${uid}`));
   }
 
   @Post(':uid')
@@ -75,7 +78,10 @@ export class InteractionController {
 
     const user = await verifyCredentials(this.users, dto.username, dto.password);
     if (!user) {
-      res.type('html').status(401).send(loginPage(GENERIC_LOGIN_ERROR, `/interaction/${uid}`));
+      res
+        .type('html')
+        .status(401)
+        .send(loginPage(GENERIC_LOGIN_ERROR, `/interaction/${uid}`));
       return;
     }
 
@@ -93,7 +99,10 @@ export class InteractionController {
 
   /** Expired/unknown interaction (or an unexpected prompt): fail closed with 400. */
   private expired(err: unknown, res: Response): void {
-    if (err instanceof SessionNotFound || (err instanceof Error && /interaction/.test(err.message))) {
+    if (
+      err instanceof SessionNotFound ||
+      (err instanceof Error && /interaction/.test(err.message))
+    ) {
       res.status(400).type('text/plain').send('interaction expired or invalid');
       return;
     }

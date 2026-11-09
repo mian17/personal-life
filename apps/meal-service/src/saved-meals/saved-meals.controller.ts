@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
-import { ListSavedMealsQuery } from './dto/list-saved-meals.query';
-import { SavedMealsService } from './saved-meals.service';
+import { CreateSavedMealDto } from './dto/create-saved-meal.dto.js';
+import { ListSavedMealsQuery } from './dto/list-saved-meals.query.js';
+import { SavedMealsService } from './saved-meals.service.js';
 
 /**
  * Saved-meal routes (`SPEC-meal-service` saved meals). `ownerSub` always comes

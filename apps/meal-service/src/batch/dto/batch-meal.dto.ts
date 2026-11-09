@@ -1,10 +1,10 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
-import { CreateEntryDto } from '../../entries/dto/create-entry.dto';
-import { UpdateEntryDto } from '../../entries/dto/update-entry.dto';
-import { CreateFoodDto } from '../../foods/dto/create-food.dto';
-import { UpdateFoodDto } from '../../foods/dto/update-food.dto';
-import { CreateSavedMealDto } from '../../saved-meals/dto/create-saved-meal.dto';
+import { CreateEntryDto } from '../../entries/dto/create-entry.dto.js';
+import { UpdateEntryDto } from '../../entries/dto/update-entry.dto.js';
+import { CreateFoodDto } from '../../foods/dto/create-food.dto.js';
+import { UpdateFoodDto } from '../../foods/dto/update-food.dto.js';
+import { CreateSavedMealDto } from '../../saved-meals/dto/create-saved-meal.dto.js';
 
 /**
  * Batch request bodies (`SPEC-meal-service.md` §5): one body per

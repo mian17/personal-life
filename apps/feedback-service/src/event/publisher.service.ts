@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { connect, type ChannelModel, type ConfirmChannel } from 'amqplib';
-import type { FeedbackEvent } from '../feedback/feedback-event.entity';
+import type { FeedbackEvent } from '../feedback/feedback-event.entity.js';
 
 /** Durable topic exchange every feedback event is published to. */
 const EXCHANGE = 'feedback';

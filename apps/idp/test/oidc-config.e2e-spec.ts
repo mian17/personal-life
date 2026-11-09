@@ -2,8 +2,13 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { appClient, assertOidcConfig, resolveAppClientSecret, staticClients } from '../src/oidc/clients';
-import { audienceFor, defaultResource } from '../src/oidc/access-token.policy';
+import {
+  appClient,
+  assertOidcConfig,
+  resolveAppClientSecret,
+  staticClients,
+} from '../src/oidc/clients.js';
+import { audienceFor, defaultResource } from '../src/oidc/access-token.policy.js';
 
 describe('resolveAppClientSecret', () => {
   it('returns the configured secret when present', () => {
@@ -51,7 +56,9 @@ describe('static clients', () => {
     expect(dev?.token_endpoint_auth_method).toBe('none');
     for (const c of clients) {
       expect(c.response_types).toEqual(['code']);
-      expect([...(c.grant_types ?? [])].sort((a: string, b: string) => a.localeCompare(b))).toEqual(['authorization_code', 'refresh_token']);
+      expect([...(c.grant_types ?? [])].sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+        ['authorization_code', 'refresh_token'],
+      );
     }
   });
 
@@ -67,10 +74,7 @@ describe('static clients', () => {
     // The app canonicalizes a loopback redirect to `localhost` (the host Next's
     // middleware puts the browser on), and a hand-run setup may still send
     // `127.0.0.1`, so both are registered with zero config.
-    const expected = [
-      'http://localhost:3000/auth/callback',
-      'http://127.0.0.1:3000/auth/callback',
-    ];
+    const expected = ['http://localhost:3000/auth/callback', 'http://127.0.0.1:3000/auth/callback'];
     expect(appClient({ NODE_ENV: 'development' }).redirect_uris).toEqual(expected);
     expect(appClient({}).redirect_uris).toEqual(expected);
   });
@@ -143,7 +147,7 @@ describe('enabled protocol surface (discovery + routes)', () => {
     process.env.KEYS_PATH = TEST_KEYS;
     rmSync(TEST_DB, { force: true });
     rmSync(TEST_KEYS, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });

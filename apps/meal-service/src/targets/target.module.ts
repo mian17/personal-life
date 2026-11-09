@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
-import { TargetController } from './target.controller';
-import { Target } from './target.entity';
-import { TargetService } from './target.service';
+import { MEAL_CACHE, createMealCache } from '../cache/meal-cache.js';
+import { TargetController } from './target.controller.js';
+import { Target } from './target.entity.js';
+import { TargetService } from './target.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Target])],

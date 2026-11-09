@@ -12,17 +12,17 @@ import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
-import { completeVector, readStoredVector } from '../foods/content';
-import { Entry } from './entry.entity';
-import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto';
-import type { UpdateEntryDto } from './dto/update-entry.dto';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
 import {
-  EntriesCache,
-  toCachedEntryRow,
-  type CachedEntryRow,
-} from './entries-cache';
+  softDeleteBatch,
+  softDeleteOne,
+  type SoftDeleteTarget,
+} from '../batch/soft-delete-batch.js';
+import { completeVector, readStoredVector } from '../foods/content.js';
+import { Entry } from './entry.entity.js';
+import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto.js';
+import type { UpdateEntryDto } from './dto/update-entry.dto.js';
+import { EntriesCache, toCachedEntryRow, type CachedEntryRow } from './entries-cache.js';
 
 /**
  * The wire shape of a diary entry. `ownerSub` is deliberately absent —
@@ -318,10 +318,7 @@ export class EntriesService {
    * The `entries` batch update: one transaction, submission order, one bump. A
    * stale `expectedVersion` on any item is a 409 and rolls the whole batch back.
    */
-  async updateMany(
-    sub: string,
-    items: (UpdateEntryDto & { id: string })[]
-  ): Promise<EntryDto[]> {
+  async updateMany(sub: string, items: (UpdateEntryDto & { id: string })[]): Promise<EntryDto[]> {
     return runAtomicBatch({
       items,
       sub,

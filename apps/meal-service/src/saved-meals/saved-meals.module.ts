@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MEAL_CACHE, createMealCache } from '../cache/meal-cache';
+import { MEAL_CACHE, createMealCache } from '../cache/meal-cache.js';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { SavedMeal } from './saved-meal.entity';
-import { SavedMealItem } from './saved-meal-item.entity';
-import { SavedMealsController } from './saved-meals.controller';
-import { SavedMealsCache } from './saved-meals-cache';
-import { SavedMealsService } from './saved-meals.service';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { SavedMeal } from './saved-meal.entity.js';
+import { SavedMealItem } from './saved-meal-item.entity.js';
+import { SavedMealsController } from './saved-meals.controller.js';
+import { SavedMealsCache } from './saved-meals-cache.js';
+import { SavedMealsService } from './saved-meals.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SavedMeal, SavedMealItem]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],
+  imports: [
+    TypeOrmModule.forFeature([SavedMeal, SavedMealItem]),
+    KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+  ],
   controllers: [SavedMealsController],
   // Exported so the batch controller in `AppModule` can reach the same service
   // instance, whose write path the batch runs per item.

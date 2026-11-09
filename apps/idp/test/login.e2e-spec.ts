@@ -4,8 +4,8 @@ import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { Session } from '../src/sessions/session.entity';
-import { UsersService } from '../src/users/users.service';
+import { Session } from '../src/sessions/session.entity.js';
+import { UsersService } from '../src/users/users.service.js';
 
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
 const COOKIE = 'idp_session';
@@ -32,7 +32,7 @@ describe('Login and sessions (e2e)', () => {
   beforeAll(async () => {
     rmSync(TEST_DB, { force: true });
     rmSync(TEST_KEYS, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     users = app.get(UsersService);
@@ -108,7 +108,10 @@ describe('Login and sessions (e2e)', () => {
     const cookie = sessionCookie(res)!;
     await request(app.getHttpServer()).get('/').set('Cookie', cookie).expect(200);
 
-    const out = await request(app.getHttpServer()).post('/logout').set('Cookie', cookie).expect(303);
+    const out = await request(app.getHttpServer())
+      .post('/logout')
+      .set('Cookie', cookie)
+      .expect(303);
     const cleared = (out.headers['set-cookie'] as unknown as string[]).find((c) =>
       c.startsWith(`${COOKIE}=`),
     );
@@ -139,10 +142,7 @@ describe('Login and sessions (e2e)', () => {
   });
 
   it('redirects GET / to /login without a session', async () => {
-    await request(app.getHttpServer())
-      .get('/')
-      .expect(302)
-      .expect('Location', '/login');
+    await request(app.getHttpServer()).get('/').expect(302).expect('Location', '/login');
   });
 
   it('treats a malformed session cookie as absent (login redirect, not a 500)', async () => {
@@ -173,8 +173,8 @@ describe('Raw session storage (e2e)', () => {
     process.env.DB_PATH = RAW_DB;
 
     const [{ createApp }, { UsersService: FreshUsersService }] = await Promise.all([
-      import('../src/app.factory'),
-      import('../src/users/users.service'),
+      import('../src/app.factory.js'),
+      import('../src/users/users.service.js'),
     ]);
 
     const app = await createApp();

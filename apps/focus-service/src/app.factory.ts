@@ -3,8 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AuthGuard, resolveVerifierConfig } from '@life/service-kit';
-import { AppModule } from './app.module';
-import { VERIFIER_ENV } from './service-config';
+import { AppModule } from './app.module.js';
+import { VERIFIER_ENV } from './service-config.js';
 
 /**
  * Build the application with the global kernel wiring. Boot fails closed

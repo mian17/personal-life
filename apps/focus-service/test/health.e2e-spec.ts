@@ -43,7 +43,7 @@ describe('Health dialect (e2e)', () => {
     process.env.NODE_ENV = BASE_NODE_ENV;
     delete process.env.REDIS_URL;
 
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

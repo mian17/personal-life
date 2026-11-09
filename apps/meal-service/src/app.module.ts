@@ -1,20 +1,20 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'node:path';
-import { Entry } from './entries/entry.entity';
-import { EntriesModule } from './entries/entries.module';
-import { Food } from './foods/food.entity';
-import { FoodsModule } from './foods/foods.module';
-import { Serving } from './foods/serving.entity';
+import { Entry } from './entries/entry.entity.js';
+import { EntriesModule } from './entries/entries.module.js';
+import { Food } from './foods/food.entity.js';
+import { FoodsModule } from './foods/foods.module.js';
+import { Serving } from './foods/serving.entity.js';
 import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from './service-config';
-import { PhotoModule } from './photo/photo.module';
-import { SavedMeal } from './saved-meals/saved-meal.entity';
-import { SavedMealItem } from './saved-meals/saved-meal-item.entity';
-import { SavedMealsModule } from './saved-meals/saved-meals.module';
-import { MealBatchController } from './batch/meal-batch.controller';
-import { Target } from './targets/target.entity';
-import { TargetModule } from './targets/target.module';
+import { MASTER_KEY_ENV } from './service-config.js';
+import { PhotoModule } from './photo/photo.module.js';
+import { SavedMeal } from './saved-meals/saved-meal.entity.js';
+import { SavedMealItem } from './saved-meals/saved-meal-item.entity.js';
+import { SavedMealsModule } from './saved-meals/saved-meals.module.js';
+import { MealBatchController } from './batch/meal-batch.controller.js';
+import { Target } from './targets/target.entity.js';
+import { TargetModule } from './targets/target.module.js';
 
 @Module({
   imports: [

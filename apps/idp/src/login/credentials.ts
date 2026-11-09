@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
-import type { User } from '../users/user.entity';
-import { UsersService } from '../users/users.service';
+import type { User } from '../users/user.entity.js';
+import { UsersService } from '../users/users.service.js';
 
 /**
  * The dummy hash is derived at runtime from a random, discarded value, so no

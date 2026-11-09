@@ -9,10 +9,10 @@ import {
   BatchDeleteSavedMealsDto,
   BatchUpdateEntriesDto,
   BatchUpdateFoodsDto,
-} from './dto/batch-meal.dto';
-import { EntriesService } from '../entries/entries.service';
-import { FoodsService } from '../foods/foods.service';
-import { SavedMealsService } from '../saved-meals/saved-meals.service';
+} from './dto/batch-meal.dto.js';
+import { EntriesService } from '../entries/entries.service.js';
+import { FoodsService } from '../foods/foods.service.js';
+import { SavedMealsService } from '../saved-meals/saved-meals.service.js';
 
 /**
  * The eight meal-service batch routes (`SPEC-meal-service.md` §5).
