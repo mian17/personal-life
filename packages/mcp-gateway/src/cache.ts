@@ -14,7 +14,7 @@
  * absence is never persisted, and a later success fills its key in without disturbing the others.
  */
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import type { UpstreamSlice, UpstreamTool } from './merge';
+import type { UpstreamSlice, UpstreamTool } from './merge.js';
 
 /** Where this config's cache lives, and which config content it is allowed to answer for. */
 export interface ToolCacheLocation {

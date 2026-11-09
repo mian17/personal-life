@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { finalizeBackup } from './backup';
+import { finalizeBackup } from './backup.js';
 import {
   createComposePgRunner,
   pgDump,
@@ -8,8 +8,8 @@ import {
   resolvePgDatabases,
   selectPgDatabases,
   tableCounts,
-} from './pg-client';
-import type { PgIdentity, PgRunner } from './pg-client';
+} from './pg-client.js';
+import type { PgIdentity, PgRunner } from './pg-client.js';
 
 /**
  * `db:backup:pg` core (`SPEC-feedback-infra.md` "Backup behavior"). Dumps every Postgres

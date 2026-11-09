@@ -9,24 +9,67 @@ export interface ResolvedPath {
   source: string;
 }
 
-const REPO_ROOT = join(__dirname, '..', '..', '..');
+/** The six databases' env var names, in the order every CLI reports them. */
+const ENV_NAMES: Readonly<Record<DatabaseName, string>> = {
+  life: 'NOTE_DB_PATH',
+  tags: 'TAGS_DB_PATH',
+  todo: 'TODO_DB_PATH',
+  idp: 'IDP_DB_PATH',
+  meal: 'MEAL_DB_PATH',
+  focus: 'FOCUS_DB_PATH',
+};
 
-export const DEFAULT_NOTE_DB_PATH = join(REPO_ROOT, 'apps', 'note-service', 'data', 'life.db');
-export const DEFAULT_TAGS_DB_PATH = join(REPO_ROOT, 'apps', 'tags-service', 'data', 'tags.db');
-export const DEFAULT_TODO_DB_PATH = join(REPO_ROOT, 'apps', 'todo-service', 'data', 'todo.db');
-export const DEFAULT_IDP_DB_PATH = join(REPO_ROOT, 'apps', 'idp', 'data', 'idp.db');
-export const DEFAULT_MEAL_DB_PATH = join(REPO_ROOT, 'apps', 'meal-service', 'data', 'meal.db');
-export const DEFAULT_FOCUS_DB_PATH = join(REPO_ROOT, 'apps', 'focus-service', 'data', 'focus.db');
+const DATABASE_NAMES = Object.keys(ENV_NAMES) as DatabaseName[];
 
-export function resolvePaths(env: NodeJS.ProcessEnv = process.env): ResolvedPath[] {
-  return [
-    { name: 'life', envName: 'NOTE_DB_PATH', source: resolveDbPath('NOTE_DB_PATH', DEFAULT_NOTE_DB_PATH, env) },
-    { name: 'tags', envName: 'TAGS_DB_PATH', source: resolveDbPath('TAGS_DB_PATH', DEFAULT_TAGS_DB_PATH, env) },
-    { name: 'todo', envName: 'TODO_DB_PATH', source: resolveDbPath('TODO_DB_PATH', DEFAULT_TODO_DB_PATH, env) },
-    { name: 'idp', envName: 'IDP_DB_PATH', source: resolveDbPath('IDP_DB_PATH', DEFAULT_IDP_DB_PATH, env) },
-    { name: 'meal', envName: 'MEAL_DB_PATH', source: resolveDbPath('MEAL_DB_PATH', DEFAULT_MEAL_DB_PATH, env) },
-    { name: 'focus', envName: 'FOCUS_DB_PATH', source: resolveDbPath('FOCUS_DB_PATH', DEFAULT_FOCUS_DB_PATH, env) },
-  ];
+/** Each database's file, relative to the repository root. */
+const DATABASE_FILES: Readonly<Record<DatabaseName, string>> = {
+  life: join('apps', 'note-service', 'data', 'life.db'),
+  tags: join('apps', 'tags-service', 'data', 'tags.db'),
+  todo: join('apps', 'todo-service', 'data', 'todo.db'),
+  idp: join('apps', 'idp', 'data', 'idp.db'),
+  meal: join('apps', 'meal-service', 'data', 'meal.db'),
+  focus: join('apps', 'focus-service', 'data', 'focus.db'),
+};
+
+/** The six repo-anchored defaults, as `resolvePaths` wants them. */
+export type DatabasePaths = Readonly<Record<DatabaseName, string>>;
+
+/**
+ * The six package-anchored defaults for one repository root, so the documented repo-root command
+ * opens the right files regardless of cwd.
+ *
+ * The anchor is a parameter, not `__dirname`: this module is imported by tests, which ts-jest
+ * compiles to CommonJS, where `import.meta` is illegal (TS1343) — and `__dirname` is illegal in
+ * the ESM build. `src/repo-paths.ts` owns the `import.meta.dirname` hop and is imported only by
+ * the CLI entries.
+ */
+export function defaultDatabasePaths(repoRoot: string): DatabasePaths {
+  const paths = {} as Record<DatabaseName, string>;
+  for (const name of DATABASE_NAMES) paths[name] = join(repoRoot, DATABASE_FILES[name]);
+  return paths;
+}
+
+/** No anchor at all: every database then needs its own env override, which fails loudly if absent. */
+const NO_DEFAULTS: Partial<Record<DatabaseName, string>> = {};
+
+/**
+ * Resolve each database's path: its env override against `INIT_CWD ?? cwd`, else `defaults[name]`.
+ * `defaults` is supplied by the caller — the CLI entries pass the package-anchored
+ * {@link defaultDatabasePaths} result, a test passes its own fixture root.
+ */
+export function resolvePaths(
+  env: NodeJS.ProcessEnv = process.env,
+  defaults: Partial<Record<DatabaseName, string>> = NO_DEFAULTS,
+): ResolvedPath[] {
+  return DATABASE_NAMES.map((name) => {
+    const envName = ENV_NAMES[name];
+    const fallback = defaults[name];
+    const source = resolveDbPath(envName, fallback ?? '', env);
+    if (source === '') {
+      throw new Error(`${envName} is unset and no default DB path was supplied`);
+    }
+    return { name, envName, source };
+  });
 }
 
 export function selectPaths(

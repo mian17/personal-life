@@ -6,7 +6,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfigError, CONFIG_ERROR_CODE, loadGatewayConfig } from '../src/config';
+import { ConfigError, CONFIG_ERROR_CODE, loadGatewayConfig } from '../src/config.js';
 
 let directory: string;
 
@@ -83,11 +83,7 @@ describe('loadGatewayConfig on a broken config', () => {
       () => loadGatewayConfig({ MCP_GATEWAY_CONFIG: join(directory, 'absent.json') }),
       /cannot read MCP_GATEWAY_CONFIG file .*absent\.json/,
     ],
-    [
-      'invalid JSON',
-      () => loadFor(configSavedAs('{ "mcpServers": ')),
-      /is not valid JSON/,
-    ],
+    ['invalid JSON', () => loadFor(configSavedAs('{ "mcpServers": ')), /is not valid JSON/],
     [
       'a non-object mcpServers',
       () => loadFor(configSavedAs('{ "mcpServers": [] }')),
@@ -128,14 +124,18 @@ describe('the config hash', () => {
 
     const compactHash = loadGatewayConfig({ MCP_GATEWAY_CONFIG: configSavedAs(compact) }).hash;
     const spreadHash = loadGatewayConfig({ MCP_GATEWAY_CONFIG: configSavedAs(spread) }).hash;
-    const sameContentHash = loadGatewayConfig({ MCP_GATEWAY_CONFIG: configSavedAs(sameContent) }).hash;
+    const sameContentHash = loadGatewayConfig({
+      MCP_GATEWAY_CONFIG: configSavedAs(sameContent),
+    }).hash;
 
     expect(spreadHash).toBe(sameContentHash);
     expect(compactHash).not.toBe(spreadHash);
   });
 
   it('changes when a key, a command, or an argument changes', () => {
-    const baseline = loadGatewayConfig({ MCP_GATEWAY_CONFIG: configSavedAs(TWO_UPSTREAM_CONFIG) }).hash;
+    const baseline = loadGatewayConfig({
+      MCP_GATEWAY_CONFIG: configSavedAs(TWO_UPSTREAM_CONFIG),
+    }).hash;
     const renamedKey = TWO_UPSTREAM_CONFIG.replace('"notes"', '"journal"');
     const renamedCommand = TWO_UPSTREAM_CONFIG.replace('"command": "npx"', '"command": "pnpm"');
     const extraArgument = TWO_UPSTREAM_CONFIG.replace('"todos"]', '"todos", "--fast"]');

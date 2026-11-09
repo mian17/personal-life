@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { snapshotAndVerify, uniqueSnapshotPath, verifyDatabase } from '../src/index';
+import { snapshotAndVerify, uniqueSnapshotPath, verifyDatabase } from '../src/index.js';
 
 /**
  * `@life/db` snapshot primitive (plan T3): the shared `VACUUM INTO` + `quick_check`

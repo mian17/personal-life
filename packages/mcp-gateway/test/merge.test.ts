@@ -9,8 +9,8 @@ import {
   MERGE_ERROR_CODE,
   MergeCollision,
   mergeToolTables,
-} from '../src/merge';
-import type { ForwardedTool, UpstreamSlice, UpstreamTool } from '../src/merge';
+} from '../src/merge.js';
+import type { ForwardedTool, UpstreamSlice, UpstreamTool } from '../src/merge.js';
 
 const LEGAL_MERGED_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
 

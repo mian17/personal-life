@@ -6,9 +6,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from '../src/cache';
-import type { ToolCacheLocation } from '../src/cache';
-import type { UpstreamSlice, UpstreamTool } from '../src/merge';
+import { dropToolSlice, readToolSlices, toolCacheFileFor, writeToolSlices } from '../src/cache.js';
+import type { ToolCacheLocation } from '../src/cache.js';
+import type { UpstreamSlice, UpstreamTool } from '../src/merge.js';
 
 let directory: string;
 let configPath: string;
@@ -41,10 +41,7 @@ function storedJson(location: ToolCacheLocation): unknown {
 describe('readToolSlices after a write', () => {
   it('returns the slices it wrote, in the declared key order', () => {
     const location = locationFor('hash-one');
-    const written = [
-      sliceNamed('notes', ['create', 'search']),
-      sliceNamed('todos', ['add']),
-    ];
+    const written = [sliceNamed('notes', ['create', 'search']), sliceNamed('todos', ['add'])];
 
     writeToolSlices(location, written);
 
@@ -127,7 +124,10 @@ describe('readToolSlices on a cache it cannot use', () => {
 
   it('reads a foreign file shape as a miss without throwing', () => {
     const location = locationFor('hash-one');
-    writeFileSync(location.path, JSON.stringify({ configHash: 'hash-one', slices: [{ tools: [] }] }));
+    writeFileSync(
+      location.path,
+      JSON.stringify({ configHash: 'hash-one', slices: [{ tools: [] }] }),
+    );
 
     expect(readToolSlices(location)).toEqual([]);
   });
