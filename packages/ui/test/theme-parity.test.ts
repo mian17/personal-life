@@ -281,9 +281,18 @@ function accentScopesIn(source: string): string[] {
   return [...new Set([...scopes, ...declaredInLayout])].sort();
 }
 
+/**
+ * The source text of every component file, so the theme vocabulary these sources read can be
+ * checked against `tokens.css`. Only regular source files count: a subdirectory (the pre-commit
+ * Sonar hook leaves `.sonar-hook-scratch/` beside the components) is not a component, and a
+ * stray non-source file must not join the scan. An empty directory yields an empty string.
+ */
 function componentSources(): string {
-  return readdirSync(COMPONENTS_DIRECTORY)
-    .map((file) => readFileSync(join(COMPONENTS_DIRECTORY, file), 'utf8'))
+  const sourceFiles = readdirSync(COMPONENTS_DIRECTORY, { withFileTypes: true }).filter(
+    (entry) => entry.isFile() && /\.[jt]sx?$/.test(entry.name),
+  );
+  return sourceFiles
+    .map((file) => readFileSync(join(COMPONENTS_DIRECTORY, file.name), 'utf8'))
     .join('\n');
 }
 
