@@ -4,8 +4,8 @@ import { join } from 'path';
 import request from 'supertest';
 import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-landing.db');
-const TEST_KEYS = join(__dirname, 'test-idp-landing-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-landing.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-landing-keys.json');
 
 process.env.DB_PATH = TEST_DB;
 process.env.KEYS_PATH = TEST_KEYS;

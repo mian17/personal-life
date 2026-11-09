@@ -12,7 +12,7 @@ import { isProductionDbPath, resolveDbPath } from '../src/config/db-path.js';
  */
 
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
-const IDP_ROOT = join(__dirname, '..');
+const IDP_ROOT = join(import.meta.dirname, '..');
 
 const SEED_SCRIPT = join(IDP_ROOT, 'scripts', 'seed-user.ts');
 /** ts-node 10 predates Node's ESM detection, so the CJS bin cannot load these
@@ -96,7 +96,7 @@ describe('Seed DB targeting (e2e)', () => {
   }, 30000);
 
   it('non-prod + a scratch DB_PATH seeds normally', async () => {
-    const scratch = join(__dirname, 'test-seed-env-scratch.db');
+    const scratch = join(import.meta.dirname, 'test-seed-env-scratch.db');
     rmSync(scratch, { force: true });
     try {
       const res = await runSeed({
@@ -114,7 +114,7 @@ describe('Seed DB targeting (e2e)', () => {
   }, 30000);
 
   it('NODE_ENV=production + a scratch DB_PATH seeds and announces production mode', async () => {
-    const scratch = join(__dirname, 'test-seed-env-prod.db');
+    const scratch = join(import.meta.dirname, 'test-seed-env-prod.db');
     rmSync(scratch, { force: true });
     try {
       const res = await runSeed({
@@ -132,7 +132,7 @@ describe('Seed DB targeting (e2e)', () => {
   }, 30000);
 
   it('NODE_ENV=production with NO credentials set refuses (never defaults prod creds)', async () => {
-    const scratch = join(__dirname, 'test-seed-env-nocreds.db');
+    const scratch = join(import.meta.dirname, 'test-seed-env-nocreds.db');
     rmSync(scratch, { force: true });
     try {
       const res = await runSeed({ NODE_ENV: 'production', DB_PATH: scratch });
@@ -145,7 +145,7 @@ describe('Seed DB targeting (e2e)', () => {
   }, 30000);
 
   it('non-production with NO credentials seeds the default dev user', async () => {
-    const scratch = join(__dirname, 'test-seed-env-devdefault.db');
+    const scratch = join(import.meta.dirname, 'test-seed-env-devdefault.db');
     rmSync(scratch, { force: true });
     try {
       const res = await runSeed({ NODE_ENV: 'test', DB_PATH: scratch });

@@ -20,7 +20,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * is sealed except `unit`) lives in its own cache suite, `foods-cache.e2e-spec.ts`.
  */
 
-const TEST_DB = join(__dirname, 'test-foods-units.db');
+const TEST_DB = join(import.meta.dirname, 'test-foods-units.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

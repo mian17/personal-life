@@ -8,8 +8,8 @@ import { OidcAdapterService } from '../src/oidc/adapter/oidc-adapter.service.js'
 import { REFRESH_TOKEN_TTL_S } from '../src/oidc/refresh-token.policy.js';
 import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-refresh.db');
-const TEST_KEYS = join(__dirname, 'test-idp-refresh-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-refresh.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-refresh-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const DEV_REDIRECT = 'http://127.0.0.1:8080/cb';
 /** The `app` client's registered redirect in dev (see src/oidc/clients.ts defaults). */

@@ -19,10 +19,10 @@ import { OidcService, isProviderPath } from '../src/oidc/oidc.service.js';
  * NodeNext tsconfig) is what runs them. */
 const TS_NODE_ESM_LOADER_ARGS = ['--loader', 'ts-node/esm'];
 const execFileAsync = promisify(execFile);
-const VERIFY_SCRIPT = join(__dirname, '..', 'scripts', 'verify-jwks.ts');
+const VERIFY_SCRIPT = join(import.meta.dirname, '..', 'scripts', 'verify-jwks.ts');
 
-const TEST_DB = join(__dirname, 'test-idp-keys.db');
-const TEST_KEYS = join(__dirname, 'test-idp-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-keys.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 process.env.DB_PATH = TEST_DB;
 process.env.KEYS_PATH = TEST_KEYS;
@@ -42,7 +42,7 @@ async function runVerifier(
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       [...TS_NODE_ESM_LOADER_ARGS, VERIFY_SCRIPT, ...args],
-      { cwd: join(__dirname, '..') },
+      { cwd: join(import.meta.dirname, '..') },
     );
     return { code: 0, stdout, stderr };
   } catch (err) {
@@ -150,7 +150,7 @@ describe('Signing keys and JWKS (e2e)', () => {
 });
 
 describe('Offline verification against fetched JWKS (e2e)', () => {
-  const OFFLINE_KEYS = join(__dirname, 'test-idp-offline-keys.json');
+  const OFFLINE_KEYS = join(import.meta.dirname, 'test-idp-offline-keys.json');
 
   beforeAll(() => {
     process.env.KEYS_PATH = OFFLINE_KEYS;
@@ -173,7 +173,7 @@ describe('Offline verification against fetched JWKS (e2e)', () => {
     );
 
     // Fetch the public JWKS from a running app, using the same key file.
-    const keysFile = join(__dirname, 'test-idp-offline-public.json');
+    const keysFile = join(import.meta.dirname, 'test-idp-offline-public.json');
     rmSync(keysFile, { force: true });
     const app = await startApp();
     const res = await request(app.getHttpServer()).get('/jwks').expect(200);
@@ -231,7 +231,7 @@ describe('Offline verification against fetched JWKS (e2e)', () => {
 });
 
 describe('Access-token policy', () => {
-  const POLICY_KEYS = join(__dirname, 'test-idp-policy-keys.json');
+  const POLICY_KEYS = join(import.meta.dirname, 'test-idp-policy-keys.json');
 
   afterAll(() => rmSync(POLICY_KEYS, { force: true }));
 

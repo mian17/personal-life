@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { ENC_PREFIX } from '@life/crypto';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import type { CacheClient } from '@life/cache';

@@ -18,7 +18,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * `createdAt` values cannot leak between cases.
  */
 
-const TEST_DB = join(__dirname, 'test-todos.db');
+const TEST_DB = join(import.meta.dirname, 'test-todos.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

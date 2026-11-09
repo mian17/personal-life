@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { decryptField } from '@life/crypto';
 import { MealCache, generationKey } from '../src/cache/meal-cache.js';

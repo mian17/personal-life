@@ -5,8 +5,8 @@ import { join } from 'path';
 import { Client } from './oidc-harness.js';
 import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-logout-sso.db');
-const TEST_KEYS = join(__dirname, 'test-idp-logout-sso-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-logout-sso.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-logout-sso-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const REDIRECT_URI = 'http://127.0.0.1:8080/cb';
 const PASSWORD = 'fixture-password-not-a-secret';

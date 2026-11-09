@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { existsSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -14,8 +15,8 @@ import { DataSource } from 'typeorm';
  * must NOT create the keys file.
  */
 
-const TEST_DB = join(__dirname, 'test-idp.db');
-const TEST_KEYS = join(__dirname, 'test-idp-health-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-health-keys.json');
 process.env.DB_PATH = TEST_DB;
 process.env.KEYS_PATH = TEST_KEYS;
 

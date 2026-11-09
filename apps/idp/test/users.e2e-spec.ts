@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 
 import * as argon2 from 'argon2';
@@ -10,7 +11,7 @@ import { UsersService } from '../src/users/users.service.js';
 
 const FIXTURE_PASSWORD = 'fixture-password-not-a-secret';
 
-const SEED_SCRIPT = join(__dirname, '..', 'scripts', 'seed-user.ts');
+const SEED_SCRIPT = join(import.meta.dirname, '..', 'scripts', 'seed-user.ts');
 /** ts-node 10 predates Node's ESM detection, so the CJS bin cannot load these
  * ESM scripts; the ESM loader plus a cwd of apps/idp (which selects its
  * NodeNext tsconfig) is what runs them. */
@@ -25,7 +26,7 @@ async function runSeed(
       process.execPath,
       [...TS_NODE_ESM_LOADER_ARGS, SEED_SCRIPT],
       {
-        cwd: join(__dirname, '..'),
+        cwd: join(import.meta.dirname, '..'),
         env: { ...process.env, ...env },
       },
     );
@@ -37,8 +38,8 @@ async function runSeed(
 }
 
 describe('Users credentials (e2e)', () => {
-  const TEST_DB = join(__dirname, 'test-idp-users.db');
-  const TEST_KEYS = join(__dirname, 'test-idp-users-keys.json');
+  const TEST_DB = join(import.meta.dirname, 'test-idp-users.db');
+  const TEST_KEYS = join(import.meta.dirname, 'test-idp-users-keys.json');
   process.env.DB_PATH = TEST_DB;
   process.env.KEYS_PATH = TEST_KEYS;
 
@@ -94,19 +95,29 @@ describe('Users credentials (e2e)', () => {
 });
 
 describe('Raw database storage (e2e)', () => {
-  const RAW_DB = join(__dirname, 'test-idp-raw.db');
+  const RAW_DB = join(import.meta.dirname, 'test-idp-raw.db');
 
   afterAll(() => rmSync(RAW_DB, { force: true }));
 
   it('never writes the plaintext password to the database file', async () => {
-    jest.resetModules();
     rmSync(RAW_DB, { force: true });
     process.env.DB_PATH = RAW_DB;
 
-    const [{ createApp }, { UsersService: FreshUsersService }] = await Promise.all([
-      import('../src/app.factory.js'),
-      import('../src/users/users.service.js'),
-    ]);
+    // ESM has no `resetModules`: the isolated registry is the way to re-evaluate
+    // `app.module.ts` so TypeORM reads the new DB_PATH (see oidc-flow's note).
+    // Sequential, not `Promise.all`: two concurrent dynamic imports race Jest's
+    // ESM linker inside an isolated registry ("request for 'reflect-metadata' is
+    // from a module not been linked").
+    let fresh!: [
+      typeof import('../src/app.factory.js'),
+      typeof import('../src/users/users.service.js'),
+    ];
+    await jest.isolateModulesAsync(async () => {
+      const factory = await import('../src/app.factory.js');
+      const users = await import('../src/users/users.service.js');
+      fresh = [factory, users];
+    });
+    const [{ createApp }, { UsersService: FreshUsersService }] = fresh;
 
     const app = await createApp();
     await app.init();
@@ -124,9 +135,9 @@ describe('Raw database storage (e2e)', () => {
 });
 
 describe('Seed script (e2e)', () => {
-  const CREATE_DB = join(__dirname, 'test-seed-create.db');
-  const MISSING_DB = join(__dirname, 'test-seed-missing.db');
-  const EXISTING_DB = join(__dirname, 'test-seed-existing.db');
+  const CREATE_DB = join(import.meta.dirname, 'test-seed-create.db');
+  const MISSING_DB = join(import.meta.dirname, 'test-seed-missing.db');
+  const EXISTING_DB = join(import.meta.dirname, 'test-seed-existing.db');
 
   beforeAll(() => {
     rmSync(CREATE_DB, { force: true });

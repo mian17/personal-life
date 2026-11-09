@@ -51,11 +51,33 @@ function testableWorkspaces() {
   });
 }
 
-/** Whether this workspace has an `.mts` suite, which jest cannot load without the vm-modules flag. */
+/**
+ * Whether this workspace's suites load an ESM-only package out of `node_modules`,
+ * which jest can only do under `--experimental-vm-modules`: either an `.mts`
+ * suite (the step-2 layer), or product source that `require()`s `@nestjs` 12,
+ * which ships as an ES module and so needs Node's `require(esm)`.
+ *
+ * Deliberately workspace-scoped rather than a blanket flag: the flag flips jest
+ * onto its sync-ESM evaluate path, which runs ts-jest's CommonJS output as ESM
+ * and fails with `exports is not defined` for every transformed ESM-only
+ * dependency (measured: nine workspaces red under a global flag).
+ */
 function needsVmModules(dir) {
   const testDir = join(ROOT, dir, 'test');
-  if (!existsSync(testDir)) return false;
-  return readdirSync(testDir, { recursive: true }).some((entry) => entry.endsWith('.test.mts'));
+  const hasMtsSuite =
+    existsSync(testDir) &&
+    readdirSync(testDir, { recursive: true }).some((entry) => entry.endsWith('.test.mts'));
+  if (hasMtsSuite) return true;
+
+  const manifest = JSON.parse(readFileSync(join(ROOT, dir, 'package.json'), 'utf8'));
+  const declared = {
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.peerDependencies,
+  };
+  return Object.entries(declared).some(
+    ([name, range]) => name.startsWith('@nestjs/') && /\^12\./.test(range),
+  );
 }
 
 function runWorkspace(dir) {

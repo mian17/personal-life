@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
@@ -664,10 +665,10 @@ describe('import-tags default DB paths (regression)', () => {
     // the documented no-var runbook would have written a phantom registry next to
     // dropping the real tag table (five-lane CRITICAL). String assertions only —
     // this suite never opens anything under apps/*/data/.
-    const repoRoot = join(__dirname, '..', '..', '..');
+    const repoRoot = join(import.meta.dirname, '..', '..', '..');
     // `defaultImportPaths` is what `src/tags/paths.ts` calls at CLI startup, with
     // `import.meta.dirname` in place of this literal.
-    const defaults = defaultImportPaths(join(__dirname, '..', 'src', 'tags'));
+    const defaults = defaultImportPaths(join(import.meta.dirname, '..', 'src', 'tags'));
     expect(defaults.noteDbPath).toBe(join(repoRoot, 'apps', 'note-service', 'data', 'life.db'));
     expect(defaults.tagsDbPath).toBe(join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'));
     expect(defaults.noteDbPath).not.toContain(join('apps', 'apps'));

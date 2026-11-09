@@ -20,7 +20,7 @@ import { FakeRedisClient } from './fake-redis.js';
  * observable if the test can read the generation counter.
  */
 
-const TEST_DB = join(__dirname, 'test-tags-batch.db');
+const TEST_DB = join(import.meta.dirname, 'test-tags-batch.db');
 process.env.DB_PATH = TEST_DB;
 
 const owner = 'batch-tags-owner';

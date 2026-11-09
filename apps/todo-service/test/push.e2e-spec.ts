@@ -14,7 +14,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
  * The fixture DB is a throwaway under `test/` — never `apps/todo-service/data/**`.
  */
 
-const TEST_DB = join(__dirname, 'test-push.db');
+const TEST_DB = join(import.meta.dirname, 'test-push.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

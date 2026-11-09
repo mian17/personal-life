@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { rmSync } from 'fs';
@@ -24,7 +25,7 @@ import { FakeRedisClient } from './fake-redis.js';
  * so in a development worker every subject would collapse to `dev-user`.
  */
 
-const TEST_DB = join(__dirname, 'test-life-batch.db');
+const TEST_DB = join(import.meta.dirname, 'test-life-batch.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';

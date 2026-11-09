@@ -1,12 +1,9 @@
+import { jest } from '@jest/globals';
 import 'reflect-metadata';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { CryptoError, ENC_PREFIX, wrapDek } from '@life/crypto';
-import { createMasterKey, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config.js';
-import { Todo } from '../src/todos/todo.entity.js';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
+import type { UnitHarness } from './todo-harness.js';
 
 /**
  * `SPEC-todo-service` Testing Strategy #1 + #2 (encryption half): envelope
@@ -20,15 +17,21 @@ import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
  *
  * `unwrapDek` is wrapped in a `jest.fn` so the memoization contract ("unwrap
  * each sub's DEK at most once per process") is asserted on the real call count.
+ *
+ * ESM has no hoisted `jest.mock`: the real module is imported first, the spy is
+ * built from the real `unwrapDek`, and only then is the module registry mocked.
+ * Every module that reaches `@life/crypto` (service-kit's `KeysService` included)
+ * is loaded with `await import` AFTER that, so it binds the spy, not the original.
  */
-jest.mock('@life/crypto', () => {
-  const actual = jest.requireActual('@life/crypto');
-  return { ...actual, unwrapDek: jest.fn(actual.unwrapDek) };
-});
+const realCrypto = await import('@life/crypto');
+const { CryptoError, ENC_PREFIX, wrapDek } = realCrypto;
+const unwrapSpy = jest.fn(realCrypto.unwrapDek);
+jest.unstable_mockModule('@life/crypto', () => ({ ...realCrypto, unwrapDek: unwrapSpy }));
 
-import * as cryptoModule from '@life/crypto';
-
-const unwrapSpy = cryptoModule.unwrapDek as unknown as jest.Mock;
+const { createMasterKey, UserKeys } = await import('@life/service-kit');
+const { MASTER_KEY_ENV } = await import('../src/service-config.js');
+const { Todo } = await import('../src/todos/todo.entity.js');
+const { makeUnitHarness, SUB } = await import('./todo-harness.js');
 
 /** Flip one ciphertext byte while keeping the envelope base64url-canonical. */
 function flipCiphertextByte(envelope: string): string {
@@ -224,7 +227,7 @@ describe('master-key bootstrap', () => {
 
 describe('jest suite collection', () => {
   it('collects the unit + e2e suites under the pinned testRegex', () => {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
     const re = new RegExp(pkg.jest.testRegex);
 
     expect(re.test('todos.e2e-spec.ts')).toBe(true);

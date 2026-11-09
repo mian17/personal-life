@@ -1,12 +1,10 @@
+import { jest } from '@jest/globals';
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
-import { CryptoError, wrapDek } from '@life/crypto';
-import { KeysService, UserKeys, createMasterKey } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config.js';
 
 /**
  * `notes-at-rest` T2 — DEK provisioning/memo (`SPEC-notes-at-rest` Data Model +
@@ -16,15 +14,19 @@ import { MASTER_KEY_ENV } from '../src/service-config.js';
  * `unwrapDek` is wrapped in a `jest.fn` so the memoization contract ("unwrap each
  * sub's DEK at most once per process lifetime") is asserted on the real call count,
  * not on a re-implementation.
+ *
+ * ESM has no hoisted `jest.mock`: the real module is imported first, the spy is
+ * built from the real `unwrapDek`, and only then is the module registry mocked.
+ * Modules that reach `@life/crypto` (`KeysService` in service-kit included) load
+ * with `await import` AFTER that, so they bind the spy, not the original.
  */
-jest.mock('@life/crypto', () => {
-  const actual = jest.requireActual('@life/crypto');
-  return { ...actual, unwrapDek: jest.fn(actual.unwrapDek) };
-});
+const realCrypto = await import('@life/crypto');
+const { CryptoError, wrapDek } = realCrypto;
+const unwrapSpy = jest.fn(realCrypto.unwrapDek);
+jest.unstable_mockModule('@life/crypto', () => ({ ...realCrypto, unwrapDek: unwrapSpy }));
 
-import * as cryptoModule from '@life/crypto';
-
-const unwrapSpy = cryptoModule.unwrapDek as unknown as jest.Mock;
+const { KeysService, UserKeys, createMasterKey } = await import('@life/service-kit');
+const { MASTER_KEY_ENV } = await import('../src/service-config.js');
 
 const MASTER_KEY = Buffer.alloc(32, 0x2a);
 
@@ -135,7 +137,7 @@ describe('KeysService', () => {
   it('collects both unit and existing e2e suites under the extended testRegex', () => {
     // `jest --listTests` is the authoritative check; this asserts the same regex
     // contract in-suite so it cannot silently regress, without running other suites.
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
     const re = new RegExp(pkg.jest.testRegex);
 
     expect(re.test('keys.service.test.ts')).toBe(true);

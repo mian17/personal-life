@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { ENC_PREFIX } from '@life/crypto';
 import type { FeedbackPage } from '@life/shared';
 import {
