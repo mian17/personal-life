@@ -3,11 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { EntityManager, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { List } from './list.entity';
+import { List } from './list.entity.js';
 import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
 import { likeMatch } from '@life/shared';
 import type { ListPage } from '@life/shared';
-import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache';
+import { TODO_CACHE, TODO_LISTS, TodosCache } from '../cache/todo-cache.js';
 
 /** The list DTO (`SPEC-todo-service` API): `version` is the OCC counter. */
 export interface ListDto {

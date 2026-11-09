@@ -9,13 +9,9 @@ import {
   createTodosCache,
   generationKey,
   TodosCache,
-} from '../src/cache/todo-cache';
-import {
-  makeUnitHarness,
-  SUB,
-  type UnitHarness,
-} from './todo-harness';
-import { FakeRedisClient, FailingRedisClient } from './fake-redis';
+} from '../src/cache/todo-cache.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
+import { FakeRedisClient, FailingRedisClient } from './fake-redis.js';
 
 /**
  * `SPEC-todo-service` Cache Rules (AGENTS.md Contract 2):
@@ -118,7 +114,12 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     const client = new FakeRedisClient();
     h = await makeUnitHarness(new TodosCache(client));
     const l = await h.lists.create(SUB, 'Filter-list');
-    const t = await h.todos.create(SUB, { title: 'alpha', note: 'beta', listId: l.id, tagIds: [1] });
+    const t = await h.todos.create(SUB, {
+      title: 'alpha',
+      note: 'beta',
+      listId: l.id,
+      tagIds: [1],
+    });
     const gen = currentGen(client, SUB);
     h.log.length = 0;
     // `create` already populated `todo:lists` via the importance join; the
@@ -133,7 +134,10 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     await h.todos.findAll(SUB, { dueBefore: '2030-01-01', dueAfter: '2000-01-01' });
     // A cursor the seam itself issued: since the seam landed, a hand-made string is
     // a `400` by contract (`paging.ts` `decodeCursor`), so it is round-tripped first.
-    await h.todos.findAll(SUB, { limit: 1, cursor: encodeCursor(['~', '2020-01-01T00:00:00.000Z', 'x']) });
+    await h.todos.findAll(SUB, {
+      limit: 1,
+      cursor: encodeCursor(['~', '2020-01-01T00:00:00.000Z', 'x']),
+    });
 
     expect(loaderCalls(h, 'todo')).toBe(1);
     expect(client.setCalls).toEqual([`todo:${SUB}:v${gen}:all`]);
@@ -521,7 +525,7 @@ describe('TodosCache (read-through + generation invalidation)', () => {
     expect(after.todos.map((t) => t.title)).toEqual(['after']);
   });
 
-  it('per-owner isolation: one owner\'s write never bumps another owner\'s counter', async () => {
+  it("per-owner isolation: one owner's write never bumps another owner's counter", async () => {
     const client = new FakeRedisClient();
     h = await makeUnitHarness(new TodosCache(client));
     const A = 'user-a';

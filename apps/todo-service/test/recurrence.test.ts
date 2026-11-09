@@ -3,7 +3,7 @@ import {
   formatRepeatDays,
   nextOccurrence,
   parseRepeatDays,
-} from '../src/todos/recurrence';
+} from '../src/todos/recurrence.js';
 
 describe('recurrence: nextOccurrence shape and rules', () => {
   it('advances daily by one day, preserving shape', () => {

@@ -4,9 +4,9 @@ import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { CryptoError, ENC_PREFIX, wrapDek } from '@life/crypto';
 import { createMasterKey, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config';
-import { Todo } from '../src/todos/todo.entity';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
+import { MASTER_KEY_ENV } from '../src/service-config.js';
+import { Todo } from '../src/todos/todo.entity.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
 
 /**
  * `SPEC-todo-service` Testing Strategy #1 + #2 (encryption half): envelope

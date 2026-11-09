@@ -4,18 +4,18 @@ import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { Todo } from '../src/todos/todo.entity';
-import { TodosService } from '../src/todos/todos.service';
-import { TODO_CACHE, TodosCache, type CacheHitOptions } from '../src/cache/todo-cache';
-import { PushService } from '../src/push/push.service';
+import { Todo } from '../src/todos/todo.entity.js';
+import { TodosService } from '../src/todos/todos.service.js';
+import { TODO_CACHE, TodosCache, type CacheHitOptions } from '../src/cache/todo-cache.js';
+import { PushService } from '../src/push/push.service.js';
 import {
   REMINDER_PUSH_SENDER,
   type PushSender,
   type ReminderPayload,
   VAPID_PRIVATE_KEY_ENV,
   VAPID_PUBLIC_KEY_ENV,
-} from '../src/reminders/push-sender';
-import { ReminderService } from '../src/reminders/reminder.service';
+} from '../src/reminders/push-sender.js';
+import { ReminderService } from '../src/reminders/reminder.service.js';
 
 /**
  * `SPEC-todo-due-repeat-notify` Testing #6 + #8: the reminder sweep fires a due
@@ -97,7 +97,7 @@ describe('Reminder sweep (e2e)', () => {
     process.env[VAPID_PUBLIC_KEY_ENV] = 'test-public-key';
     process.env[VAPID_PRIVATE_KEY_ENV] = 'test-private-key';
 
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     cache = new SpyingTodosCache(null);
     sender = new FakePushSender();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -138,10 +138,9 @@ describe('Reminder sweep (e2e)', () => {
     push.subscribe(sub, { endpoint, keys: { p256dh: 'p', auth: 'a' } });
 
   const reminderOf = async (id: string): Promise<string | null> => {
-    const rows = await dataSource.query(
-      'SELECT reminderScheduledAt AS r FROM todo WHERE id = ?',
-      [id],
-    );
+    const rows = await dataSource.query('SELECT reminderScheduledAt AS r FROM todo WHERE id = ?', [
+      id,
+    ]);
     return rows.length > 0 ? (rows[0].r as string | null) : undefined!;
   };
 
@@ -193,7 +192,9 @@ describe('Reminder sweep (e2e)', () => {
 
     await reminder.sweep();
 
-    expect(sender.calls.map((c) => c.endpoint).sort((a: string, b: string) => a.localeCompare(b))).toEqual([alive, dead].sort((a: string, b: string) => a.localeCompare(b)));
+    expect(
+      sender.calls.map((c) => c.endpoint).sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual([alive, dead].sort((a: string, b: string) => a.localeCompare(b)));
     expect((await push.listFor(SUB)).map((s) => s.endpoint)).toEqual([alive]);
   });
 

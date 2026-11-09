@@ -3,9 +3,9 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { dueSortKey, localToUtc, reminderLocal } from '../src/todos/due-time';
-import { TodoCompletion } from '../src/todos/todo-completion.entity';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { dueSortKey, localToUtc, reminderLocal } from '../src/todos/due-time.js';
+import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-todo-custom-repeat` behavior at the service boundary: create/update
@@ -46,7 +46,7 @@ describe('Todos custom repeat (e2e)', () => {
     tokenA = await harness.sign({ subject: 'user-a', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
@@ -73,7 +73,8 @@ describe('Todos custom repeat (e2e)', () => {
 
   /** The service's own local-day key, day-granular. */
   const localToday = () => dueSortKey(new Date().toISOString(), TZ).slice(0, 10);
-  const reminderAt = (due: string) => localToUtc(reminderLocal(dueSortKey(due, TZ)), TZ).toISOString();
+  const reminderAt = (due: string) =>
+    localToUtc(reminderLocal(dueSortKey(due, TZ)), TZ).toISOString();
 
   /** ISO weekday (1=Mon … 7=Sun) of a `YYYY-MM-DD` string, computed in UTC. */
   const isoWeekdayOf = (localDate: string): number => {
@@ -138,7 +139,9 @@ describe('Todos custom repeat (e2e)', () => {
       const created = await create({ title: 'set days', dueDate: '2026-10-05' }).expect(201);
       expect(created.body.repeatDays).toBeNull();
 
-      const custom = await patch(created.body.id, { repeat: 'custom', repeatDays: [4] }).expect(200);
+      const custom = await patch(created.body.id, { repeat: 'custom', repeatDays: [4] }).expect(
+        200,
+      );
       expect(custom.body.repeat).toBe('custom');
       expect(custom.body.repeatDays).toEqual([4]);
 

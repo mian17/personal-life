@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'node:path';
-import { List } from './lists/list.entity';
-import { ListsModule } from './lists/lists.module';
-import { TodosModule } from './todos/todos.module';
-import { Todo } from './todos/todo.entity';
-import { TodoTag } from './todos/todo-tag.entity';
-import { TodoCompletion } from './todos/todo-completion.entity';
+import { List } from './lists/list.entity.js';
+import { ListsModule } from './lists/lists.module.js';
+import { TodosModule } from './todos/todos.module.js';
+import { Todo } from './todos/todo.entity.js';
+import { TodoTag } from './todos/todo-tag.entity.js';
+import { TodoCompletion } from './todos/todo-completion.entity.js';
 import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from './service-config';
-import { PushSubscription } from './push/push-subscription.entity';
-import { PushModule } from './push/push.module';
-import { RemindersModule } from './reminders/reminders.module';
+import { MASTER_KEY_ENV } from './service-config.js';
+import { PushSubscription } from './push/push-subscription.entity.js';
+import { PushModule } from './push/push.module.js';
+import { RemindersModule } from './reminders/reminders.module.js';
 
 @Module({
   imports: [

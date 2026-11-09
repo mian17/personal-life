@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
-import { CreateTodoDto } from '../../todos/dto/create-todo.dto';
-import { UpdateTodoDto } from '../../todos/dto/update-todo.dto';
-import { CreateListDto } from '../../lists/dto/create-list.dto';
-import { UpdateListDto } from '../../lists/dto/update-list.dto';
+import { CreateTodoDto } from '../../todos/dto/create-todo.dto.js';
+import { UpdateTodoDto } from '../../todos/dto/update-todo.dto.js';
+import { CreateListDto } from '../../lists/dto/create-list.dto.js';
+import { UpdateListDto } from '../../lists/dto/update-list.dto.js';
 
 /**
  * Batch request bodies (`SPEC-todo-service.md` §5): one wildcard body per kind,

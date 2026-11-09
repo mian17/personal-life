@@ -2,9 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { dueSortKey, localToUtc } from '../src/todos/due-time';
-import { nextOccurrence } from '../src/todos/recurrence';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { dueSortKey, localToUtc } from '../src/todos/due-time.js';
+import { nextOccurrence } from '../src/todos/recurrence.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-todo-due-repeat-notify` Testing #2–#5: the timed/date-only due round-trip,
@@ -43,7 +43,7 @@ describe('Todos due/repeat (e2e)', () => {
     tokenA = await harness.sign({ subject: 'user-a', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });

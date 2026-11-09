@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateListDto } from './dto/create-list.dto';
-import { ListListsQuery } from './dto/list-lists.query';
-import { UpdateListDto } from './dto/update-list.dto';
-import { ListsService } from './lists.service';
+import { CreateListDto } from './dto/create-list.dto.js';
+import { ListListsQuery } from './dto/list-lists.query.js';
+import { UpdateListDto } from './dto/update-list.dto.js';
+import { ListsService } from './lists.service.js';
 
 /** The todo-local list HTTP surface (`SPEC-todo-service` API). */
 @Controller('api/lists')
@@ -27,7 +27,13 @@ export class ListsController {
 
   @Patch(':id')
   update(@Principal() principal: Principal, @Param('id') id: string, @Body() dto: UpdateListDto) {
-    return this.lists.update(principal.sub, id, dto.name, dto.importantDefault, dto.expectedVersion);
+    return this.lists.update(
+      principal.sub,
+      id,
+      dto.name,
+      dto.importantDefault,
+      dto.expectedVersion,
+    );
   }
 
   @Delete(':id')

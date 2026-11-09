@@ -15,7 +15,7 @@ import {
 } from 'class-validator';
 import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS, TODO_REPEAT_DAYS } from '@life/shared';
 import type { TodoRepeat } from '@life/shared';
-import { ISO_DUE } from '../due-time';
+import { ISO_DUE } from '../due-time.js';
 
 /**
  * PATCH body. An omitted field is left unchanged (last-write-wins). For the

@@ -19,18 +19,18 @@ import type {
   TodoPage,
   TodoRepeat,
 } from '@life/shared';
-import { Todo } from './todo.entity';
-import { TodoCompletion } from './todo-completion.entity';
-import { TodoTag } from './todo-tag.entity';
-import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time';
+import { Todo } from './todo.entity.js';
+import { TodoCompletion } from './todo-completion.entity.js';
+import { TodoTag } from './todo-tag.entity.js';
+import { ISO_DUE, dueSortKey, localToUtc, reminderLocal } from './due-time.js';
 import {
   advanceToOnOrAfter,
   formatRepeatDays,
   nextOccurrence,
   parseRepeatDays,
-} from './recurrence';
+} from './recurrence.js';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
-import { ListsService } from '../lists/lists.service';
+import { ListsService } from '../lists/lists.service.js';
 import {
   TODO_ALL,
   TODO_CACHE,
@@ -38,7 +38,7 @@ import {
   TODO_TAGS,
   TODO_TRASH,
   TodosCache,
-} from '../cache/todo-cache';
+} from '../cache/todo-cache.js';
 
 /** A todo as a create carries it — the shape one `:batchCreate` item holds. */
 type TodoDraft = {
@@ -95,7 +95,11 @@ function matchesTodoFilters(
   // In memory against the computed value — never a SQL predicate, never in the key.
   if (opts.important !== undefined && todo.effectiveImportant !== opts.important) return false;
   if (!matchesDueWindow(todo.dueDate, opts)) return false;
-  if (opts.q && !likeMatch(todo.title, `%${opts.q}%`) && !likeMatch(todo.note ?? '', `%${opts.q}%`)) {
+  if (
+    opts.q &&
+    !likeMatch(todo.title, `%${opts.q}%`) &&
+    !likeMatch(todo.note ?? '', `%${opts.q}%`)
+  ) {
     return false;
   }
   return true;
@@ -172,7 +176,8 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
  */
 function isCiphertextTodoRow(row: CachedTodoRow): boolean {
   const titleOk = typeof row?.title === 'string' && row.title.startsWith(ENC_PREFIX);
-  const noteOk = row?.note === null || (typeof row?.note === 'string' && row.note.startsWith(ENC_PREFIX));
+  const noteOk =
+    row?.note === null || (typeof row?.note === 'string' && row.note.startsWith(ENC_PREFIX));
   return titleOk && noteOk;
 }
 
@@ -260,8 +265,7 @@ function afterCursor(item: OrderedTodo, at: string[]): boolean {
     // Cursor is in the undated group: only undated rows can follow.
     if (due !== '~') return false;
     return (
-      dto.createdAt < cursorCreatedAt ||
-      (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
+      dto.createdAt < cursorCreatedAt || (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
     );
   }
   // Cursor is dated: undated rows always follow.
@@ -269,8 +273,7 @@ function afterCursor(item: OrderedTodo, at: string[]): boolean {
   if (due > cursorDue) return true;
   if (due < cursorDue) return false;
   return (
-    dto.createdAt < cursorCreatedAt ||
-    (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
+    dto.createdAt < cursorCreatedAt || (dto.createdAt === cursorCreatedAt && dto.id < cursorId)
   );
 }
 
@@ -278,30 +281,18 @@ function afterCursor(item: OrderedTodo, at: string[]): boolean {
  * True when a trash row falls strictly after the cursor in `deletedAt DESC, id
  * DESC` order, so a page boundary can neither repeat nor skip a row.
  */
-function afterTrashCursor(
-  item: { deletedAt: string; id: string },
-  at: string[],
-): boolean {
+function afterTrashCursor(item: { deletedAt: string; id: string }, at: string[]): boolean {
   const [deletedAt, id] = at;
-  return (
-    item.deletedAt < deletedAt ||
-    (item.deletedAt === deletedAt && item.id < id)
-  );
+  return item.deletedAt < deletedAt || (item.deletedAt === deletedAt && item.id < id);
 }
 
 /**
  * True when a completion row falls strictly after the cursor in `completedAt
  * DESC, id DESC` order, so a page boundary can neither repeat nor skip a row.
  */
-function afterCompletionCursor(
-  item: { completedAt: string; id: string },
-  at: string[],
-): boolean {
+function afterCompletionCursor(item: { completedAt: string; id: string }, at: string[]): boolean {
   const [completedAt, id] = at;
-  return (
-    item.completedAt < completedAt ||
-    (item.completedAt === completedAt && item.id < id)
-  );
+  return item.completedAt < completedAt || (item.completedAt === completedAt && item.id < id);
 }
 
 /**
@@ -370,9 +361,7 @@ export class TodosService {
       id: row.id,
       title: this.openField(row.title, dek, todoTitleAad(sub, row.id), row.id),
       note:
-        row.note === null
-          ? null
-          : this.openField(row.note, dek, todoNoteAad(sub, row.id), row.id),
+        row.note === null ? null : this.openField(row.note, dek, todoNoteAad(sub, row.id), row.id),
       done: row.done,
       important: row.important,
       effectiveImportant,
@@ -421,11 +410,8 @@ export class TodosService {
    * `defaults` omitted there is no list context, so the effective value is
    * `important ?? false` (todo has no list, or a single-row write).
    */
-  private effectiveImportant(
-    todo: CachedTodoRow,
-    defaults?: Map<string, boolean | null>,
-  ): boolean {
-    const listDefault = todo.listId !== null ? defaults?.get(todo.listId) ?? null : null;
+  private effectiveImportant(todo: CachedTodoRow, defaults?: Map<string, boolean | null>): boolean {
+    const listDefault = todo.listId !== null ? (defaults?.get(todo.listId) ?? null) : null;
     return todo.important ?? listDefault ?? false;
   }
 
@@ -622,11 +608,7 @@ export class TodosService {
    * batch passes the transaction's manager, so the kernel owns one bump for the
    * whole request.
    */
-  private async insertOne(
-    manager: EntityManager,
-    sub: string,
-    input: TodoDraft,
-  ): Promise<TodoDto> {
+  private async insertOne(manager: EntityManager, sub: string, input: TodoDraft): Promise<TodoDto> {
     const todos = manager.getRepository(Todo);
     const todoTags = manager.getRepository(TodoTag);
     const dueDate = input.dueDate == null ? null : this.normalizeDue(input.dueDate, this.tz);
@@ -644,8 +626,7 @@ export class TodosService {
     const todo = todos.create({
       id,
       title: encryptField(dek, input.title, todoTitleAad(sub, id)),
-      note:
-        input.note === undefined ? null : encryptField(dek, input.note, todoNoteAad(sub, id)),
+      note: input.note === undefined ? null : encryptField(dek, input.note, todoNoteAad(sub, id)),
       done: false,
       // Omitted or `null` both store `null` (inherit the list default).
       important: input.important ?? null,
@@ -708,7 +689,11 @@ export class TodosService {
     }));
     ordered.sort(compareTodos);
 
-    const { rows: page, nextCursor, total } = paginate(ordered, {
+    const {
+      rows: page,
+      nextCursor,
+      total,
+    } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       // `due` is the local `dueSortKey` (`~` = undated) and the first key part, so
@@ -753,19 +738,19 @@ export class TodosService {
     // The loader guarantees `deletedAt` is set on every row; the type guard
     // narrows that for the cursor helpers without an assertion.
     const decoded = rows
-      .map((row) =>
-        this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)),
-      )
+      .map((row) => this.decodeCachedTodoRow(row, sub, dek, this.effectiveImportant(row, defaults)))
       .filter((todo): todo is TodoDto & { deletedAt: string } => todo.deletedAt !== null);
     const desc = (a: string, b: string) => {
       if (a === b) return 0;
       return a < b ? 1 : -1;
     };
-    const ordered = [...decoded].sort(
-      (a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id),
-    );
+    const ordered = [...decoded].sort((a, b) => desc(a.deletedAt, b.deletedAt) || desc(a.id, b.id));
 
-    const { rows: page, nextCursor, total } = paginate(ordered, {
+    const {
+      rows: page,
+      nextCursor,
+      total,
+    } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       keyOf: (item) => [item.deletedAt, item.id],
@@ -816,7 +801,11 @@ export class TodosService {
     const ordered = [...joined].sort(
       (a, b) => desc(a.completedAt, b.completedAt) || desc(a.id, b.id),
     );
-    const { rows: page, nextCursor, total } = paginate(ordered, {
+    const {
+      rows: page,
+      nextCursor,
+      total,
+    } = paginate(ordered, {
       limit,
       cursor: opts.cursor,
       keyOf: (row) => [row.completedAt, row.id],
@@ -843,7 +832,7 @@ export class TodosService {
         completedAt: row.completedAt,
         title: this.openField(todo.title, dek!, todoTitleAad(sub, row.todoId), row.todoId),
         listId: todo.listId,
-        listName: todo.listId !== null ? names.get(todo.listId) ?? null : null,
+        listName: todo.listId !== null ? (names.get(todo.listId) ?? null) : null,
       };
     });
     return { completions, nextCursor, total };
@@ -900,10 +889,7 @@ export class TodosService {
    * stale `expectedVersion` on any item throws `409` and rolls the whole batch
    * back, so the items before it are unchanged too.
    */
-  async updateMany(
-    sub: string,
-    items: (TodoPatch & { id: string })[],
-  ): Promise<TodoDto[]> {
+  async updateMany(sub: string, items: (TodoPatch & { id: string })[]): Promise<TodoDto[]> {
     const results = await runAtomicBatch({
       items,
       sub,
@@ -1032,7 +1018,9 @@ export class TodosService {
     }
     if (patch.repeat !== undefined) todo.repeat = patch.repeat ?? null;
     if (repeatChanged) {
-      todo.repeatDays = formatRepeatDays(this.normalizeRepeat(todo.repeat, patch.repeatDays ?? null));
+      todo.repeatDays = formatRepeatDays(
+        this.normalizeRepeat(todo.repeat, patch.repeatDays ?? null),
+      );
     }
     return { dueChanged, repeatChanged };
   }

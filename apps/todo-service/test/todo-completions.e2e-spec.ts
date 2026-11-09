@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { rmSync } from 'fs';
-import { TodoCompletion } from '../src/todos/todo-completion.entity';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
+import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
 
 /**
  * `SPEC-todo-completion-history` API `GET /api/todos/completions` at the service
@@ -37,8 +37,7 @@ describe('TodosService.findCompletions', () => {
       .getRepository(TodoCompletion)
       .insert({ id, ownerSub: sub, todoId, occurrence, completedAt });
 
-  const ids = (page: { completions: Array<{ id: string }> }) =>
-    page.completions.map((c) => c.id);
+  const ids = (page: { completions: Array<{ id: string }> }) => page.completions.map((c) => c.id);
 
   it('returns rows in completedAt DESC, id DESC order', async () => {
     const t = await h.todos.create(SUB, { title: 'order' });
@@ -92,7 +91,7 @@ describe('TodosService.findCompletions', () => {
     expect(capped.nextCursor).not.toBeNull();
   });
 
-  it('owner scoping: a foreign sub never sees another owner\'s rows', async () => {
+  it("owner scoping: a foreign sub never sees another owner's rows", async () => {
     const mine = await h.todos.create(SUB, { title: 'mine' });
     await insert(mine.id, 'm', '2026-01-01T00:00:00.000Z', SUB, 'mine-row');
 
