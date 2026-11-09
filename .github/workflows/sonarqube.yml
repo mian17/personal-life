@@ -105,3 +105,71 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://127.0.0.1:9000
+
+      # The scan only UPLOADS a report; it never reads the resulting gate, so
+      # this job stayed green even when the gate was ERROR. Read the gate here
+      # and fail on it, which turns "gate OK" into a checkable fact instead of
+      # an assumption.
+      - name: Wait for the quality gate
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: http://127.0.0.1:9000
+        run: |
+          # The compute engine finishes asynchronously after the upload, so an
+          # early poll still sees the previous analysis. Bounded on purpose:
+          # 30 attempts 5s apart is 150s, then the job fails loudly instead of
+          # hanging the serialised `concurrency` group forever.
+          report=""
+          for attempt in $(seq 1 30); do
+            # Token travels in the header only - never in the URL, never echoed.
+            # `node` is guaranteed here (setup-node runs above); `jq` is not.
+            # Parse defensively: an HTTP error body carries no projectStatus, so
+            # a parse failure counts as a failed poll rather than a crash.
+            report="$(curl --silent --show-error \
+              --header "Authorization: Bearer ${SONAR_TOKEN}" \
+              "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=personal-life" || true)"
+            status="$(printf '%s' "$report" | node -e '
+              let body = "";
+              process.stdin.on("data", (chunk) => (body += chunk)).on("end", () => {
+                try {
+                  console.log(JSON.parse(body).projectStatus.status);
+                } catch {
+                  console.log("UNREACHABLE");
+                }
+              });
+            ')"
+            if [ "$status" = "OK" ]; then
+              echo "Quality gate is OK."
+              exit 0
+            fi
+            echo "Quality gate is ${status} (attempt ${attempt}/30)."
+            if [ "$attempt" -lt 30 ]; then
+              echo "Retrying in 5s."
+              sleep 5
+            fi
+          done
+
+          # Status plus every non-OK condition, so the failure is actionable
+          # without hand-querying the API.
+          printf '%s' "$report" | node -e '
+            let body = "";
+            process.stdin.on("data", (chunk) => (body += chunk)).on("end", () => {
+              let gate;
+              try {
+                gate = JSON.parse(body).projectStatus;
+              } catch {
+                console.error("Unexpected response from the quality gate API.");
+                process.exit(1);
+              }
+              console.error(`Quality gate did not pass: ${gate.status}`);
+              for (const condition of gate.conditions ?? []) {
+                if (condition.status === "OK") continue;
+                console.error(
+                  `  ${condition.status} ${condition.metricKey}: actual ${condition.actualValue}, required ${condition.errorThreshold}`,
+                );
+              }
+              process.exit(1);
+            });
+          '
+          exit 1
