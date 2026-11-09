@@ -9,13 +9,6 @@
       "reason": "IP spoofing via an IPv4-mapped IPv6 trust subnet. It sits under the express `trust proxy` path, so a forged X-Forwarded-For can be believed by rate limiting and audit logging; fixAvailable is a patch bump of proxy-addr itself, and that upgrade must land before anything else in the express tree."
     },
     {
-      "id": "GHSA-27r3-jxmh-p828",
-      "package": "body-parser",
-      "severity": "high",
-      "reviewBy": "2026-12-08",
-      "reason": "DoS via trailing bytes after a compressed request body. Remediation is a patch bump of body-parser inside the express dependency tree, tracked separately from this gate."
-    },
-    {
       "id": "GHSA-wc9g-mqfw-jrwm",
       "package": "multer",
       "severity": "high",
@@ -70,13 +63,6 @@
       "severity": "moderate",
       "reviewBy": null,
       "reason": "DoS via globparts amplification. Reached through glob under typeorm; same MAJOR typeorm upgrade."
-    },
-    {
-      "id": "GHSA-6pq8-jhm2-2vcw",
-      "package": "qs",
-      "severity": "moderate",
-      "reviewBy": null,
-      "reason": "qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements with a non-callable toString. Remediation is a patch bump of qs, tracked separately."
     }
   ]
 }
