@@ -52,6 +52,10 @@
         }
       ]
     },
-    "testEnvironment": "jsdom"
+    "testEnvironment": "jsdom",
+    "moduleNameMapper": {
+      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
   }
 }

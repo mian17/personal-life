@@ -69,7 +69,9 @@
       ]
     },
     "moduleNameMapper": {
-      "^next/link$": "<rootDir>/test/stubs/next-link.tsx"
+      "^next/link$": "<rootDir>/test/stubs/next-link.tsx",
+      "^@life/shared$": "<rootDir>/../shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "testEnvironment": "jsdom"
   }

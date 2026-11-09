@@ -57,7 +57,8 @@
     "rootDir": ".",
     "testRegex": ".e2e-spec.ts$",
     "moduleNameMapper": {
-      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts"
+      "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

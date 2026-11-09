@@ -59,7 +59,8 @@
     "moduleNameMapper": {
       "^@life/cache$": "<rootDir>/../cache/src/index.ts",
       "^@life/shared$": "<rootDir>/../shared/src/index.ts",
-      "^@life/crypto$": "<rootDir>/../crypto/src/index.ts"
+      "^@life/crypto$": "<rootDir>/../crypto/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(jose)/)"

@@ -56,7 +56,8 @@
     ],
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@life/shared/node$": "<rootDir>/../shared/src/node.ts"
+      "^@life/shared/node$": "<rootDir>/../shared/src/node.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   }
 }
