@@ -4,9 +4,9 @@
  * Nothing here touches validation, schemas, or the wire — those derive from the
  * registry in sibling modules.
  */
-import type { BulkKind } from './bulk';
-import { BULK_KINDS, bulkSourceKind } from './bulk';
-import type { FieldSpec, OpSpec, ResourceRegistry, ResourceSpec } from './types';
+import type { BulkKind } from './bulk.js';
+import { BULK_KINDS, bulkSourceKind } from './bulk.js';
+import type { FieldSpec, OpSpec, ResourceRegistry, ResourceSpec } from './types.js';
 
 /** The wrapper field every derived bulk op owns, so no source op may declare it (§2.2). */
 const BULK_WRAPPER_FIELD = 'items';
@@ -103,8 +103,7 @@ function normalizeField(field: FieldSpec): FieldSpec {
     required: field.required ?? false,
     description: field.description,
   };
-  const withEnum =
-    field.enum === undefined ? normalized : { ...normalized, enum: [...field.enum] };
+  const withEnum = field.enum === undefined ? normalized : { ...normalized, enum: [...field.enum] };
   return field.properties === undefined
     ? withEnum
     : { ...withEnum, properties: normalizeFields(field.properties) };
@@ -129,10 +128,7 @@ export function fieldNames(operation: OpSpec): string[] {
   return Object.keys(operation.fields);
 }
 
-export function fieldEntry(
-  operation: OpSpec,
-  fieldName: string,
-): [string, FieldSpec] | undefined {
+export function fieldEntry(operation: OpSpec, fieldName: string): [string, FieldSpec] | undefined {
   const field = operation.fields[fieldName];
   return field === undefined ? undefined : [fieldName, field];
 }

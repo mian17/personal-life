@@ -7,8 +7,8 @@
  * IdP discovery happens once per call from `IDP_ISSUER`; the request channel
  * is injectable so the auth suite drives a stub token endpoint.
  */
-import { discoverEndpoints, resolveLoginOptions } from './login';
-import { readTokens, storeTokens, type StoredTokens } from './token-store';
+import { discoverEndpoints, resolveLoginOptions } from './login.js';
+import { readTokens, storeTokens, type StoredTokens } from './token-store.js';
 
 /** Everything `refresh` needs; issuer/client/resource all resolve like `login`. */
 export interface RefreshOptions {
@@ -30,7 +30,9 @@ const FALLBACK_EXPIRY_S = 3600;
 const ROTATION_DEADLINE_MS = 30_000;
 
 /** Rotates the stored refresh token; returns the fresh pair, or `undefined` when login is required. */
-export async function refresh(partial?: Partial<RefreshOptions>): Promise<StoredTokens | undefined> {
+export async function refresh(
+  partial?: Partial<RefreshOptions>,
+): Promise<StoredTokens | undefined> {
   const options = defaults(partial);
   const held = await readTokens();
   if (held?.refreshToken === undefined) return undefined;
@@ -52,7 +54,10 @@ function boundedRequest(url: string, init?: RequestInit): Promise<Response> {
   return fetch(url, { ...init, signal: AbortSignal.timeout(ROTATION_DEADLINE_MS) });
 }
 
-async function rotate(options: RefreshOptions, refreshToken: string): Promise<StoredTokens | undefined> {
+async function rotate(
+  options: RefreshOptions,
+  refreshToken: string,
+): Promise<StoredTokens | undefined> {
   const endpoints = await discoverEndpoints(options);
   const reply = await requestRotation(endpoints.tokenEndpoint, options, refreshToken);
   if (reply === undefined) return undefined;
@@ -80,7 +85,10 @@ async function requestRotation(
   return isRotationReply(reply) ? reply : undefined;
 }
 
-function rotationForm(options: Pick<RefreshOptions, 'clientId' | 'resource'>, refreshToken: string): string {
+function rotationForm(
+  options: Pick<RefreshOptions, 'clientId' | 'resource'>,
+  refreshToken: string,
+): string {
   const form = new URLSearchParams();
   form.set('grant_type', 'refresh_token');
   form.set('client_id', options.clientId);

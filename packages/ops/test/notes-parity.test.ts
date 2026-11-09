@@ -11,17 +11,17 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { service } from '../src/services/notes';
-import { storeTokens } from '../src/auth/token-store';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { service } from '../src/services/notes.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
@@ -133,7 +133,16 @@ describe('notes operation parity', () => {
 
   it('sends the same update and renders the same note', async () => {
     const pair = await runBoth({
-      argv: ['notes', 'update', '--id', 'note-a', '--body', 'Call the dentist twice', '--expectedVersion', '0'],
+      argv: [
+        'notes',
+        'update',
+        '--id',
+        'note-a',
+        '--body',
+        'Call the dentist twice',
+        '--expectedVersion',
+        '0',
+      ],
       tool: 'notes_update',
       args: { id: 'note-a', body: 'Call the dentist twice', expectedVersion: 0 },
     });
@@ -228,7 +237,11 @@ describe('notes error parity', () => {
   });
 
   it('renders a refused token identically', async () => {
-    await storeTokens({ accessToken: 'bogus', refreshToken: undefined, expiresAt: Date.now() + ONE_HOUR_MS });
+    await storeTokens({
+      accessToken: 'bogus',
+      refreshToken: undefined,
+      expiresAt: Date.now() + ONE_HOUR_MS,
+    });
     const pair = await runBoth({
       argv: ['notes', 'get', '--id', 'note-a'],
       tool: 'notes_get',
@@ -269,7 +282,16 @@ describe('notes error parity', () => {
 
   it('renders a stale version identically', async () => {
     const pair = await runBoth({
-      argv: ['notes', 'update', '--id', 'note-a', '--body', 'Late edit', '--expectedVersion', '999'],
+      argv: [
+        'notes',
+        'update',
+        '--id',
+        'note-a',
+        '--body',
+        'Late edit',
+        '--expectedVersion',
+        '999',
+      ],
       tool: 'notes_update',
       args: { id: 'note-a', body: 'Late edit', expectedVersion: 999 },
     });
@@ -364,11 +386,20 @@ function seededNotes(): SampleRow[] {
 function seededWithTrashedNote(): SampleRow[] {
   return [
     ...seededNotes(),
-    noteRow({ id: 'note-trashed', body: 'Throw the boxes out', deletedAt: '2026-10-01T09:00:00.000Z' }),
+    noteRow({
+      id: 'note-trashed',
+      body: 'Throw the boxes out',
+      deletedAt: '2026-10-01T09:00:00.000Z',
+    }),
   ];
 }
 
-function noteRow(fields: { id: string; body: string; ownerSub?: string; deletedAt?: string }): SampleRow {
+function noteRow(fields: {
+  id: string;
+  body: string;
+  ownerSub?: string;
+  deletedAt?: string;
+}): SampleRow {
   return {
     id: fields.id,
     ownerSub: fields.ownerSub ?? OWNER_SUBJECT,

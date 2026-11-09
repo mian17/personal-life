@@ -10,9 +10,9 @@
  * `validateInput` here, `deriveInputSchema` in schema.ts — so a malformed
  * declaration fails before any tool schema or request exists to carry it.
  */
-import type { BulkKind } from './bulk';
-import { bulkItemInput, isBulkKind, resolveBulkLimit } from './bulk';
-import type { FieldSpec, OpSpec, ValidationIssue } from './types';
+import type { BulkKind } from './bulk.js';
+import { bulkItemInput, isBulkKind, resolveBulkLimit } from './bulk.js';
+import type { FieldSpec, OpSpec, ValidationIssue } from './types.js';
 
 /**
  * The one field every bulk op takes: one submitted item per entry (§2.3). The
@@ -143,7 +143,10 @@ function judgedInput(context: FieldTable, supplied: Record<string, unknown>): Va
   return [...missingProperties(context, supplied), ...wrongValues(context, supplied)];
 }
 
-function missingProperties(context: FieldTable, supplied: Record<string, unknown>): ValidationIssue[] {
+function missingProperties(
+  context: FieldTable,
+  supplied: Record<string, unknown>,
+): ValidationIssue[] {
   return Object.entries(context.fields)
     .filter(([, field]) => field.required === true)
     .filter(([fieldName, field]) => holdsNothing(field, supplied[fieldName]))
@@ -174,13 +177,15 @@ function valueIssues(located: LocatedField, value: unknown): ValidationIssue[] {
   const { fieldPath, field } = located;
   if (value === undefined) return [];
   if (field === undefined) return [{ field: fieldPath, reason: 'unknown field' }];
-  if (!hasExpectedShape(value, field)) return [{ field: fieldPath, reason: `expected ${field.type}` }];
+  if (!hasExpectedShape(value, field))
+    return [{ field: fieldPath, reason: `expected ${field.type}` }];
   return [...enumIssues(located, value), ...nestedIssues(located, value)];
 }
 
 function enumIssues(located: LocatedField, value: unknown): ValidationIssue[] {
   const { fieldPath, field } = located;
-  if (typeof value !== 'string' || field?.enum === undefined || field.enum.includes(value)) return [];
+  if (typeof value !== 'string' || field?.enum === undefined || field.enum.includes(value))
+    return [];
   return [{ field: fieldPath, reason: `expected one of ${field.enum.join(', ')}` }];
 }
 

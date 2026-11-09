@@ -20,8 +20,8 @@
  * server-enforced (`name` at most 50 characters, ids integers) and so does the
  * `409` a stale `expectedVersion` raises.
  */
-import { defineResource } from '../core/registry';
-import type { ResourceRegistry } from '../core/types';
+import { defineResource } from '../core/registry.js';
+import type { ResourceRegistry } from '../core/types.js';
 
 export const resources: ResourceRegistry[] = [
   defineResource({

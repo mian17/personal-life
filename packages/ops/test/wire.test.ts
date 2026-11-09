@@ -10,21 +10,21 @@
  * is refused at the schema derivation every adapter calls — before any request
  * exists to assemble.
  */
-import { defineResource, fieldNames, findOp, kindIsDestructive } from '../src/core/registry';
-import { wireFor } from '../src/core/wire';
-import { deriveInputSchema, toolName } from '../src/core/schema';
-import { validateInput } from '../src/core/validate';
-import { listTools } from '../src/mcp/tools';
-import { parseCallCommand } from '../src/cli/parse';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { service } from '../src/services/notes';
-import { resources as focusResources } from '../src/services/focus';
-import { resources as mealResources } from '../src/services/meal';
-import { resources as tagResources } from '../src/services/tags';
-import { resources as todoResources } from '../src/services/todo';
-import { service as feedbackService } from '../src/services/feedback';
-import type { OpSpec, ResourceRegistry, WireRequest } from '../src/core/types';
-import { accepts } from './support/schema-accepts';
+import { defineResource, fieldNames, findOp, kindIsDestructive } from '../src/core/registry.js';
+import { wireFor } from '../src/core/wire.js';
+import { deriveInputSchema, toolName } from '../src/core/schema.js';
+import { validateInput } from '../src/core/validate.js';
+import { listTools } from '../src/mcp/tools.js';
+import { parseCallCommand } from '../src/cli/parse.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { service } from '../src/services/notes.js';
+import { resources as focusResources } from '../src/services/focus.js';
+import { resources as mealResources } from '../src/services/meal.js';
+import { resources as tagResources } from '../src/services/tags.js';
+import { resources as todoResources } from '../src/services/todo.js';
+import { service as feedbackService } from '../src/services/feedback.js';
+import type { OpSpec, ResourceRegistry, WireRequest } from '../src/core/types.js';
+import { accepts } from './support/schema-accepts.js';
 
 /** One kind's compiled request: the input an adapter hands to `wireFor`, then what it must produce. */
 interface WireCase {
@@ -40,7 +40,11 @@ const restoreRegistry: ResourceRegistry = defineResource({
     {
       kind: 'restore',
       fields: {
-        id: { type: 'string', required: true, description: 'Identifier of the sample to bring back' },
+        id: {
+          type: 'string',
+          required: true,
+          description: 'Identifier of the sample to bring back',
+        },
       },
     },
   ],
@@ -120,12 +124,16 @@ describe('the restore kind', () => {
 
 describe('the tool a restore op advertises', () => {
   it('names and titles itself the way every other kind does', () => {
-    const tool = listTools(restoreRegistry).find((candidate) => candidate.name === 'sample_restore');
+    const tool = listTools(restoreRegistry).find(
+      (candidate) => candidate.name === 'sample_restore',
+    );
     expect(tool?.title).toBe('Restore sample');
   });
 
   it('states non-read-only, destructive, idempotent, closed-world hints', () => {
-    const tool = listTools(restoreRegistry).find((candidate) => candidate.name === 'sample_restore');
+    const tool = listTools(restoreRegistry).find(
+      (candidate) => candidate.name === 'sample_restore',
+    );
     expect(tool?.annotations).toEqual({
       readOnlyHint: false,
       destructiveHint: true,
@@ -535,7 +543,12 @@ const routeTable: RouteCase[] = [
     resource: 'saved-meals',
     kind: 'create',
     supplied: suppliedSavedMealCreate,
-    expected: { method: 'POST', path: '/api/saved-meals', query: {}, body: suppliedSavedMealCreate },
+    expected: {
+      method: 'POST',
+      path: '/api/saved-meals',
+      query: {},
+      body: suppliedSavedMealCreate,
+    },
   },
   {
     resource: 'saved-meals',

@@ -3,11 +3,11 @@
  * parser as an empty string, and an empty `id` must never compile into a request that
  * addresses the collection instead of one row. An optional string may still be empty.
  */
-import { wireFor } from '../src/core/wire';
-import { validateInput } from '../src/core/validate';
-import { parseCallCommand } from '../src/cli/parse';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { service as notesService } from '../src/services/notes';
+import { wireFor } from '../src/core/wire.js';
+import { validateInput } from '../src/core/validate.js';
+import { parseCallCommand } from '../src/cli/parse.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { service as notesService } from '../src/services/notes.js';
 
 describe('an empty required string', () => {
   it('is reported as a required issue naming the field', () => {
@@ -47,7 +47,9 @@ describe('a quoted empty --id from the CLI', () => {
   it('reaches the validator as an empty string and fails there, before any request', () => {
     const call = parseCallCommand(['notes', 'get', '--id', ''], notesService.registry);
 
-    expect(validateInput(call.operation, call.input)).toEqual([{ field: 'id', reason: 'required' }]);
+    expect(validateInput(call.operation, call.input)).toEqual([
+      { field: 'id', reason: 'required' },
+    ]);
   });
 });
 

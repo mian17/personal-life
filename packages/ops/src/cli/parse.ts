@@ -11,12 +11,12 @@
  * request exists rather than becoming one id that merely looks like a batch.
  */
 import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
-import { bulkItemInput, isBulkKind, type BulkKind } from '../core/bulk';
-import type { FieldSpec, OpSpec, ResourceRegistry } from '../core/types';
-import { BULK_WRAPPER_FIELD } from '../core/validate';
-import { ADDRESSING_FIELD } from '../core/wire';
-import { fieldNames, findOp } from '../core/registry';
-import { invalidInputError, operationLabel } from '../transport/errors';
+import { bulkItemInput, isBulkKind, type BulkKind } from '../core/bulk.js';
+import type { FieldSpec, OpSpec, ResourceRegistry } from '../core/types.js';
+import { BULK_WRAPPER_FIELD } from '../core/validate.js';
+import { ADDRESSING_FIELD } from '../core/wire.js';
+import { fieldNames, findOp } from '../core/registry.js';
+import { invalidInputError, operationLabel } from '../transport/errors.js';
 
 /** A bulk op once its kind is narrowed, so every item it submits has a known shape. */
 type BulkOperation = OpSpec & { kind: BulkKind };
@@ -37,7 +37,8 @@ export function commandName(argv: string[]): 'login' | 'logout' | 'call' {
 /** Reads the call arguments against the registry; an unknown resource or op fails here. */
 export function parseCallCommand(argv: string[], registry: ResourceRegistry): OperationCall {
   const [resourceName, kind, ...flags] = argv;
-  if (resourceName !== registry.name) throw new Error(`unknown resource: ${resourceName ?? '(none)'}`);
+  if (resourceName !== registry.name)
+    throw new Error(`unknown resource: ${resourceName ?? '(none)'}`);
   const operation = operationNamed(registry, kind);
   return { operation, input: flagsToInput(registry, operation, flags) };
 }
@@ -48,7 +49,10 @@ function operationNamed(registry: ResourceRegistry, spelling: string | undefined
 }
 
 /** An op resolves by its kebab spelling too; a spelling no kind matches travels on to `findOp` unchanged. */
-function declaredKindNamed(registry: ResourceRegistry, spelling: string | undefined): OpSpec['kind'] {
+function declaredKindNamed(
+  registry: ResourceRegistry,
+  spelling: string | undefined,
+): OpSpec['kind'] {
   const declared = registry.ops
     .map((operation) => operation.kind)
     .find((kind) => kebabName(kind) === spelling);
@@ -101,11 +105,7 @@ function submittedItem(
 }
 
 /** One id string per flag, converted as its field declares; a JSON array of ids is refused (§2.8). */
-function submittedId(
-  registry: ResourceRegistry,
-  operation: BulkOperation,
-  text: string,
-): unknown {
+function submittedId(registry: ResourceRegistry, operation: BulkOperation, text: string): unknown {
   if (Array.isArray(toJsonValue(text))) throw jsonArrayItemsError(registry, operation);
   return toInputValue(operation.fields[ADDRESSING_FIELD], text);
 }
@@ -119,7 +119,8 @@ function jsonArrayItemsError(registry: ResourceRegistry, operation: BulkOperatio
   return invalidInputError(operationLabel(registry, operation.kind), [
     {
       field: BULK_WRAPPER_FIELD,
-      reason: '--items takes one id string per flag, not a JSON array; repeat the flag once per item',
+      reason:
+        '--items takes one id string per flag, not a JSON array; repeat the flag once per item',
     },
   ]);
 }

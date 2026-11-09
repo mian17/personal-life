@@ -6,9 +6,9 @@
  * The registry is the fixture one that opted into bulk, so no shipped resource is
  * involved (§2.2).
  */
-import type { BulkEnvelope } from '../src/core/bulk';
-import { createExecutor, type Executor, type OpsResult } from '../src/transport/executor';
-import { resources } from './support/bulk-service-module';
+import type { BulkEnvelope } from '../src/core/bulk.js';
+import { createExecutor, type Executor, type OpsResult } from '../src/transport/executor.js';
+import { resources } from './support/bulk-service-module.js';
 
 /** The opted-in fixture resource, declared first in the fixture module. */
 const journals = resources[0];
@@ -77,9 +77,11 @@ describe('the envelope one bulk call returns', () => {
     const service = startRecordingFetch(() => new Response(null, { status: 200 }));
 
     try {
-      const envelope = await envelopeOf(executorWith({ token: TOKEN }).run('deleteMany', {
-        items: ['j1'],
-      }));
+      const envelope = await envelopeOf(
+        executorWith({ token: TOKEN }).run('deleteMany', {
+          items: ['j1'],
+        }),
+      );
 
       expect(envelope.results[0]).toEqual({ index: 0, status: 'succeeded', item: 'j1' });
     } finally {
@@ -101,10 +103,16 @@ describe('the order the items are sent in', () => {
     ];
 
     try {
-      const envelope = await envelopeOf(executorWith({ token: TOKEN }).run('updateMany', { items }));
+      const envelope = await envelopeOf(
+        executorWith({ token: TOKEN }).run('updateMany', { items }),
+      );
 
       expect(service.mostOpenAtOnce).toBe(1);
-      expect(service.requests.map((request) => request.method)).toEqual(['PATCH', 'PATCH', 'PATCH']);
+      expect(service.requests.map((request) => request.method)).toEqual([
+        'PATCH',
+        'PATCH',
+        'PATCH',
+      ]);
       expect(service.requests.map((request) => request.path)).toEqual([
         `${COLLECTION_PATH}/j1`,
         `${COLLECTION_PATH}/j2`,
@@ -155,7 +163,9 @@ describe('a call-level failure', () => {
     try {
       await expect(
         executorWith({ token: TOKEN, bulkLimit: 2 }).run('getMany', { items: ['j1', 'j2', 'j3'] }),
-      ).rejects.toThrow('journals.getMany failed (invalidInput): items: exceeds LIFE_OPS_BULK_LIMIT (2)');
+      ).rejects.toThrow(
+        'journals.getMany failed (invalidInput): items: exceeds LIFE_OPS_BULK_LIMIT (2)',
+      );
       expect(service.requests).toHaveLength(0);
     } finally {
       service.stop();
@@ -166,7 +176,9 @@ describe('a call-level failure', () => {
     const service = startRecordingFetch(() => replied(200, { id: 'j1' }));
 
     try {
-      await expect(executorWith({ token: undefined }).run('getMany', { items: ['j1'] })).rejects.toThrow(
+      await expect(
+        executorWith({ token: undefined }).run('getMany', { items: ['j1'] }),
+      ).rejects.toThrow(
         'journals.getMany failed (unauthenticated): no token found, run `npm run ops -- login` first',
       );
       expect(service.requests).toHaveLength(0);

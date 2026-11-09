@@ -18,8 +18,8 @@
  *   query-bearing `list` op may not declare one — that declaration is refused by
  *   the shape guard before any schema or request exists (core/validate.ts).
  */
-import type { OpSpec, ResourceRegistry, WireRequest } from './types';
-import { findOp } from './registry';
+import type { OpSpec, ResourceRegistry, WireRequest } from './types.js';
+import { findOp } from './registry.js';
 
 /**
  * The field every single-row op addresses its row by, and the one a bare batch item
@@ -116,7 +116,10 @@ function bodyFor(operation: OpSpec, supplied: Record<string, unknown>): WireRequ
 const BODYLESS_KINDS: ReadonlySet<OpSpec['kind']> = new Set(['get', 'delete', 'restore']);
 
 /** Supplied fields only: absent optional fields must never appear on the wire. */
-function suppliedEntries(operation: OpSpec, supplied: Record<string, unknown>): [string, unknown][] {
+function suppliedEntries(
+  operation: OpSpec,
+  supplied: Record<string, unknown>,
+): [string, unknown][] {
   return Object.entries(supplied).filter(
     ([fieldName, value]) => value !== undefined && fieldName in operation.fields,
   );

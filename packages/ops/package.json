@@ -2,9 +2,10 @@
   "name": "@life/ops",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "life-ops": "dist/cli/run.js"
+    "life-ops": "dist/cli/entry.js"
   },
   "types": "dist/index.d.ts",
   "exports": {
@@ -13,8 +14,8 @@
       "default": "./dist/index.js"
     },
     "./mcp/server": {
-      "types": "./dist/mcp/server.d.ts",
-      "default": "./dist/mcp/server.js"
+      "types": "./dist/mcp/entry.d.ts",
+      "default": "./dist/mcp/entry.js"
     },
     "./package.json": "./package.json"
   },
@@ -47,7 +48,15 @@
       "/node_modules/"
     ],
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+          }
+        }
+      ]
     },
     "testEnvironment": "node",
     "moduleNameMapper": {

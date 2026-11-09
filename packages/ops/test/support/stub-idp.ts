@@ -10,7 +10,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { sampleApiToken } from './stub-api';
+import { sampleApiToken } from './stub-api.js';
 
 /** A running stub IdP: discovery issuer, the browser stand-in, rotation count, shutdown. */
 export interface StubIdp {
@@ -215,7 +215,11 @@ function callbackUrl(redirectUri: string, code: string, state: string): string {
   return callback.href;
 }
 
-async function exchange(body: URLSearchParams, response: ServerResponse, state: StubIdpState): Promise<void> {
+async function exchange(
+  body: URLSearchParams,
+  response: ServerResponse,
+  state: StubIdpState,
+): Promise<void> {
   const grant = body.get('grant_type');
   if (grant === 'authorization_code') {
     redeemCode(body, response, state);

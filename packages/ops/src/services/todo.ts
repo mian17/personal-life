@@ -14,8 +14,8 @@
  * resource, whose three routes are browser plumbing; and no null-means-clear path,
  * so an absent field is simply not sent and no field ever accepts `null`.
  */
-import { defineResource } from '../core/registry';
-import type { FieldSpec, ResourceRegistry } from '../core/types';
+import { defineResource } from '../core/registry.js';
+import type { FieldSpec, ResourceRegistry } from '../core/types.js';
 
 export const resources: ResourceRegistry[] = [
   defineResource({

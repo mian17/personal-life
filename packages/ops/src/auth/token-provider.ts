@@ -9,9 +9,9 @@
  * `RefreshRejected` instead: rotation was needed and could not deliver, which is a
  * different fix from logging in, and the executor names the operation it happened on.
  */
-import { RefreshRejected, REFRESH_REJECTED_DETAIL } from '../transport/errors';
-import { refresh } from './refresh';
-import { readTokens, type StoredTokens } from './token-store';
+import { RefreshRejected, REFRESH_REJECTED_DETAIL } from '../transport/errors.js';
+import { refresh } from './refresh.js';
+import { readTokens, type StoredTokens } from './token-store.js';
 
 const DEFAULT_REFRESH_SKEW_MS = 60_000;
 

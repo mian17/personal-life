@@ -1,32 +1,37 @@
 /**
  * Official-SDK conformance suite (SPEC-ops-agent-contract §3.8, §10.9): the one
  * place in the package that imports an MCP SDK. It spawns the server's own stdio
- * entry — TypeScript source, through `test/support/transpile-require.cjs`, with
- * no `dist` build — and drives it with the SDK's `Client` over
- * `StdioClientTransport`, so an independent implementation proves the handshake,
- * the tool surface, and one round trip through the stub service.
+ * entry (`src/mcp/entry.ts`, not the library in `src/mcp/server.ts`) — TypeScript
+ * source, through `test/support/transpile-require.cjs`, with no `dist` build — and
+ * drives it with the SDK's `Client` over `StdioClientTransport`, so an independent
+ * implementation proves the handshake, the tool surface, and one round trip
+ * through the stub service.
  *
  * The SDK is loaded with `require` so it answers from its own `dist/cjs` build;
  * no `src/` module imports it, and neither does any other suite.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { storeTokens } from '../src/auth/token-store';
-import { renderOpsResult } from '../src/cli/render';
-import { sampleApiToken, startStubApi } from './support/stub-api';
-import type { StubApi } from './support/stub-api';
+import { storeTokens } from '../src/auth/token-store.js';
+import { renderOpsResult } from '../src/cli/render.js';
+import { sampleApiToken, startStubApi } from './support/stub-api.js';
+import type { StubApi } from './support/stub-api.js';
 
 const { Client } = require('@modelcontextprotocol/sdk/client') as SdkModule;
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js') as SdkModule;
 
-const SERVER_ENTRY = 'src/mcp/server.ts';
+const SERVER_ENTRY = 'src/mcp/entry.ts';
 const TRANSPILE_HOOK = './test/support/transpile-require.cjs';
 const SERVICE_MODULE = 'test/support/service-module.ts';
 const OWNER_SUBJECT = 'agent-under-test';
 const ROW = { id: 'row-a', title: 'Row A', version: 1 };
+/** The version the spawned entry reads out of `package.json` and the handshake reports. */
+const PACKAGE_VERSION = (
+  JSON.parse(readFileSync(join(packageRoot(), 'package.json'), 'utf8')) as { version: string }
+).version;
 const ONE_HOUR_MS = 3_600_000;
 const CONNECT_TIMEOUT_MS = 15_000;
 
@@ -96,6 +101,7 @@ describe('the official SDK client over the spawned stdio entry', () => {
   it('completes the initialize handshake', async () => {
     await withSdkSession(async (session) => {
       expect(session.serverVersion()?.name).toBe('life-ops');
+      expect(session.serverVersion()?.version).toBe(PACKAGE_VERSION);
     });
   });
 

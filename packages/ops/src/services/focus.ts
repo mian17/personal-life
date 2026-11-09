@@ -18,15 +18,14 @@
  * arrives whole and unbounded here: the service owns the recorded 1–180 bound
  * (§9.13), and a second copy in this package would be a bound that can drift.
  */
-import { defineResource } from '../core/registry';
-import type { FieldSpec, ResourceRegistry } from '../core/types';
+import { defineResource } from '../core/registry.js';
+import type { FieldSpec, ResourceRegistry } from '../core/types.js';
 
 export const resources: ResourceRegistry[] = [
   defineResource({
     name: 'goal',
     basePath: '/api/goal',
     ops: [
-
       {
         kind: 'list',
         fields: {
@@ -37,7 +36,6 @@ export const resources: ResourceRegistry[] = [
           },
         },
       },
-
     ],
   }),
 
@@ -45,7 +43,6 @@ export const resources: ResourceRegistry[] = [
     name: 'sessions',
     basePath: '/api/sessions',
     ops: [
-
       {
         kind: 'create',
         fields: {
@@ -70,7 +67,6 @@ export const resources: ResourceRegistry[] = [
           },
         },
       },
-
     ],
   }),
 ];

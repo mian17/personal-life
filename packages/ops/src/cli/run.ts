@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 /**
- * The `life-ops` bin entry (SPEC.md §3 CLI): the CLI adapter itself. A `call` loads
+ * The `life-ops` CLI adapter (SPEC.md §3 CLI): a `call` loads
  * the service modules `LIFE_OPS_SERVICE` names — one, or several comma-separated
  * (SPEC-ops-all-services §1.1.2 E3) — parses the user's arguments,
  * validates them locally through the shared core executor, sends them to the
@@ -11,16 +10,15 @@
  * Output parity with the MCP adapter is a string comparison on `renderOpsResult`
  * and `renderFailure`, so both adapters render through `./render`.
  */
-import type { BulkEnvelope } from '../core/bulk';
-import { isBulkKind, resolveBulkLimit } from '../core/bulk';
-import type { OpSpec, ResourceRegistry } from '../core/types';
-import { toolName } from '../core/schema';
-import { createExecutor, resolveDeadlineMs } from '../transport/executor';
-import { currentAccessToken } from '../auth/token-provider';
-import { clearTokens } from '../auth/token-store';
-import { login } from '../auth/login';
-import { renderFailure, renderOpsResult } from './render';
-import { commandName, parseCallCommand } from './parse';
+import type { BulkEnvelope } from '../core/bulk.js';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk.js';
+import type { OpSpec, ResourceRegistry } from '../core/types.js';
+import { toolName } from '../core/schema.js';
+import { createExecutor, resolveDeadlineMs } from '../transport/executor.js';
+import { currentAccessToken } from '../auth/token-provider.js';
+import { clearTokens } from '../auth/token-store.js';
+import { renderFailure, renderOpsResult } from './render.js';
+import { commandName, parseCallCommand } from './parse.js';
 
 /** One registered service: the registries its adapters render and the API it speaks to. */
 export interface ServiceModule {
@@ -197,7 +195,8 @@ function isSoleService(service: ServiceModule): boolean {
 
 /** Names the variable an operator must set, which is the shared one only when one service loads. */
 function missingBaseMessage(service: ServiceModule, owner: LoadedModule): string {
-  if (isSoleService(service)) return 'LIFE_OPS_API_BASE is not set; point it at the service API base';
+  if (isSoleService(service))
+    return 'LIFE_OPS_API_BASE is not set; point it at the service API base';
   if (owner.name === undefined) {
     return `LIFE_OPS_SERVICE entry ${owner.entry} is not a bare service name; it needs its own apiBase when several services load`;
   }
@@ -286,9 +285,14 @@ function bareServiceName(entry: string): string | undefined {
   return isBareServiceName(entry) ? entry : undefined;
 }
 
+/**
+ * The module specifier a bare name resolves to. The `.js` is required, not cosmetic: this
+ * package emits ES modules, and an extensionless specifier only resolves under jest's
+ * CommonJS resolver — the dist binary fails on it (ESM requires the extension).
+ */
 function inPackageServiceSpecifier(serviceName: string): string {
   if (!isInPackageService(serviceName)) throw new Error(unknownServiceMessage(serviceName));
-  return `../services/${serviceName}`;
+  return `../services/${serviceName}.js`;
 }
 
 function isInPackageService(serviceName: string): boolean {
@@ -338,11 +342,15 @@ function loadedService(declared: ServiceModuleDeclaration): ServiceModule {
 /** One of the two registry forms, never both and never neither. */
 function declaredResources(declared: ServiceModuleDeclaration): ResourceRegistry[] {
   if (declared.registry !== undefined && declared.resources !== undefined) {
-    throw new Error('service module exports both registry and resources; export exactly one of the two');
+    throw new Error(
+      'service module exports both registry and resources; export exactly one of the two',
+    );
   }
   if (declared.registry !== undefined) return [declared.registry];
   if (declared.resources !== undefined && declared.resources.length > 0) return declared.resources;
-  throw new Error('service module exports no registry: declare `registry` or a non-empty `resources`');
+  throw new Error(
+    'service module exports no registry: declare `registry` or a non-empty `resources`',
+  );
 }
 
 /** Two resources may not expose the same `<resource>_<op>` tool name (SPEC-ops-all-services §1.1.2). */
@@ -380,27 +388,4 @@ function collisionMessage(collision: ToolNameCollision): string {
 
 function describeResource(resource: ResourceRegistry): string {
   return `${resource.name} (${resource.basePath})`;
-}
-
-/** The `bin` runner: read the environment, hand over service loading, dispatch, exit. */
-async function runBin(): Promise<void> {
-  try {
-    process.exitCode = await main({
-      argv: process.argv.slice(2),
-      service: () => loadService(process.env),
-      env: process.env,
-      stdout: (line) => process.stdout.write(`${line}\n`),
-      stderr: (line) => process.stderr.write(`${line}\n`),
-      signIn: async () => {
-        await login();
-      },
-    });
-  } catch (error) {
-    process.stderr.write(`${renderFailure(error)}\n`);
-    process.exitCode = FAILURE_EXIT;
-  }
-}
-
-if (require.main === module) {
-  void runBin();
 }
