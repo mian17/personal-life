@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'node:path';
-import { Note } from './notes/note.entity';
-import { NoteTag } from './notes/note-tag.entity';
+import { Note } from './notes/note.entity.js';
+import { NoteTag } from './notes/note-tag.entity.js';
 import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from './service-config';
-import { NotesModule } from './notes/notes.module';
+import { MASTER_KEY_ENV } from './service-config.js';
+import { NotesModule } from './notes/notes.module.js';
 
 @Module({
   imports: [

@@ -5,19 +5,18 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { decryptField, encryptField, unwrapDek, wrapDek } from '@life/crypto';
 import {
-  DEFAULT_NOTE_DB_PATH,
-  DEFAULT_TAGS_DB_PATH,
   LEGACY_OWNER,
   ImportRowError,
   applyImport,
   bootstrapRegistrySchema,
+  defaultImportPaths,
   formatImportReport,
   importTags,
   planImport,
   type FieldEncryptor,
   type ImportReport,
-} from '../src/tags/import';
-import { main } from '../scripts/import-tags';
+} from '../src/tags/import.js';
+import { main } from '../scripts/import-tags.js';
 
 /**
  * `SPEC-tags-extraction` migration case list. Every fixture is a throwaway DB
@@ -142,12 +141,7 @@ function createTagsDb(path: string, fx: TagsFixture): void {
       }
       db.prepare(
         'INSERT INTO "tag" ("id","name","ownerSub","version","createdAt") VALUES (?,?,?,0,?)',
-      ).run(
-        tag.id,
-        name,
-        tag.ownerSub ?? LEGACY_OWNER,
-        '2026-01-01 00:00:00',
-      );
+      ).run(tag.id, name, tag.ownerSub ?? LEGACY_OWNER, '2026-01-01 00:00:00');
     }
   } finally {
     db.close();
@@ -157,9 +151,11 @@ function createTagsDb(path: string, fx: TagsFixture): void {
 function rawRegistry(path: string): Array<{ id: number; name: string; ownerSub: string }> {
   const db = open(path, true);
   try {
-    return db
-      .prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id"')
-      .all() as Array<{ id: number; name: string; ownerSub: string }>;
+    return db.prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id"').all() as Array<{
+      id: number;
+      name: string;
+      ownerSub: string;
+    }>;
   } finally {
     db.close();
   }
@@ -168,9 +164,10 @@ function rawRegistry(path: string): Array<{ id: number; name: string; ownerSub: 
 function decryptRegistryName(path: string, id: number): string {
   const db = open(path, true);
   try {
-    const row = db
-      .prepare('SELECT "name","ownerSub" FROM "tag" WHERE "id" = ?')
-      .get(id) as { name: string; ownerSub: string };
+    const row = db.prepare('SELECT "name","ownerSub" FROM "tag" WHERE "id" = ?').get(id) as {
+      name: string;
+      ownerSub: string;
+    };
     const keyRow = db
       .prepare('SELECT "wrappedDek" FROM "user_keys" WHERE "sub" = ?')
       .get(row.ownerSub) as { wrappedDek: string };
@@ -195,9 +192,8 @@ function tableExists(path: string, table: string): boolean {
   const db = open(path, true);
   try {
     return (
-      db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
-        .get(table) !== undefined
+      db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(table) !==
+      undefined
     );
   } finally {
     db.close();
@@ -660,7 +656,6 @@ describe('import-tags migration (SPEC-tags-extraction)', () => {
   });
 });
 
-
 describe('import-tags default DB paths (regression)', () => {
   it('anchors both defaults at the repo root regardless of module depth', () => {
     // The module lives at apps/tags-service/src/tags (ts-node) and
@@ -670,13 +665,12 @@ describe('import-tags default DB paths (regression)', () => {
     // dropping the real tag table (five-lane CRITICAL). String assertions only —
     // this suite never opens anything under apps/*/data/.
     const repoRoot = join(__dirname, '..', '..', '..');
-    expect(DEFAULT_NOTE_DB_PATH).toBe(
-      join(repoRoot, 'apps', 'note-service', 'data', 'life.db'),
-    );
-    expect(DEFAULT_TAGS_DB_PATH).toBe(
-      join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'),
-    );
-    expect(DEFAULT_NOTE_DB_PATH).not.toContain(join('apps', 'apps'));
-    expect(DEFAULT_TAGS_DB_PATH).not.toContain(join('apps', 'apps'));
+    // `defaultImportPaths` is what `src/tags/paths.ts` calls at CLI startup, with
+    // `import.meta.dirname` in place of this literal.
+    const defaults = defaultImportPaths(join(__dirname, '..', 'src', 'tags'));
+    expect(defaults.noteDbPath).toBe(join(repoRoot, 'apps', 'note-service', 'data', 'life.db'));
+    expect(defaults.tagsDbPath).toBe(join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'));
+    expect(defaults.noteDbPath).not.toContain(join('apps', 'apps'));
+    expect(defaults.tagsDbPath).not.toContain(join('apps', 'apps'));
   });
 });

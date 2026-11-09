@@ -4,11 +4,11 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { AuthGuard } from '@life/service-kit';
-import { TAGS_CACHE, TagsCache, generationKey } from '../src/tags/tags-cache';
-import { VERIFIER_ENV } from '../src/service-config';
-import type { TagDto } from '../src/tags/tags.service';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
-import { FakeRedisClient } from './fake-redis';
+import { TAGS_CACHE, TagsCache, generationKey } from '../src/tags/tags-cache.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import type { TagDto } from '../src/tags/tags.service.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * The `tags` batch pair (`SPEC-tags-service.md` §9). Every case drives the real
@@ -47,7 +47,7 @@ describe('Tags batch API (e2e)', () => {
     strangerToken = await harness.sign({ subject: stranger, expiresIn: 3600 });
 
     redis = new FakeRedisClient();
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(TAGS_CACHE)
       .useValue(new TagsCache(redis))

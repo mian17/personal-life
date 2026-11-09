@@ -4,17 +4,15 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync }
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
-  DEFAULT_NOTE_DB_PATH,
-  DEFAULT_TAGS_DB_PATH,
-  DEFAULT_TODO_DB_PATH,
   applyCleanup,
+  defaultCleanupPaths,
   formatCleanupReport,
   formatOrphanLine,
   planCleanup,
   resolvePaths,
   type CleanupReport,
-} from '../src/tags/cleanup';
-import { main } from '../scripts/cleanup-tags';
+} from '../src/tags/cleanup.js';
+import { main } from '../scripts/cleanup-tags.js';
 
 /**
  * `SPEC-tags-service` `## Maintenance scripts` → `cleanup-tags` case list.
@@ -159,14 +157,13 @@ function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
-function registryRows(
-  path: string,
-): Array<{ id: number; ownerSub: string }> {
+function registryRows(path: string): Array<{ id: number; ownerSub: string }> {
   const db = open(path, true);
   try {
-    return db
-      .prepare('SELECT "id","ownerSub" FROM "tag" ORDER BY "id"')
-      .all() as Array<{ id: number; ownerSub: string }>;
+    return db.prepare('SELECT "id","ownerSub" FROM "tag" ORDER BY "id"').all() as Array<{
+      id: number;
+      ownerSub: string;
+    }>;
   } finally {
     db.close();
   }
@@ -186,7 +183,12 @@ interface Fixture {
 
 function makeFixture(): { dir: string; note: string; todo: string; tags: string } {
   const dir = tmpDir();
-  return { dir, note: join(dir, 'life.db'), todo: join(dir, 'todo.db'), tags: join(dir, 'tags.db') };
+  return {
+    dir,
+    note: join(dir, 'life.db'),
+    todo: join(dir, 'todo.db'),
+    tags: join(dir, 'tags.db'),
+  };
 }
 
 function pathsFor(fx: { note: string; todo: string; tags: string }): Fixture['paths'] {
@@ -200,8 +202,19 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('1. deletes nothing when every registry row is referenced', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
-    createNoteDb(fx.note, { notes: [{ id: 'n1' }], links: [['n1', 1], ['n1', 2]] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
+    createNoteDb(fx.note, {
+      notes: [{ id: 'n1' }],
+      links: [
+        ['n1', 1],
+        ['n1', 2],
+      ],
+    });
     createTodoDb(fx.todo, { todos: [], links: [] });
 
     const report = applyCleanup(pathsFor(fx));
@@ -223,7 +236,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('2. deletes an unreferenced row on apply', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [{ id: 'n1' }], links: [['n1', 1]] });
     createTodoDb(fx.todo, { todos: [], links: [] });
 
@@ -313,7 +331,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('7. dry-run leaves all three DBs byte-identical and writes no backup', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [{ id: 'n1' }], links: [['n1', 1]] });
     createTodoDb(fx.todo, { todos: [], links: [] });
 
@@ -339,7 +362,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('8. apply writes a verified backup that still holds the pre-delete state', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [{ id: 'n1' }], links: [['n1', 1]] });
     createTodoDb(fx.todo, { todos: [], links: [] });
 
@@ -364,7 +392,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('9. missing todo.db → exit 1, no deletion, no backup', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [{ id: 'n1' }], links: [['n1', 1]] });
     // `todo.db` intentionally never created.
 
@@ -382,7 +415,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('10. an existing DB with no note_tag table contributes the empty set', () => {
     const fx = makeFixture();
-    createTagsDb(fx.tags, { tags: [{ id: 1, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 1, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [], links: [], noteTag: false });
     createTodoDb(fx.todo, { todos: [{ id: 't1' }], links: [['t1', 1]] });
 
@@ -487,20 +525,17 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
 
   it('15. anchors the default paths at the repo root and honours env overrides', () => {
     const repoRoot = join(__dirname, '..', '..', '..');
-    expect(DEFAULT_NOTE_DB_PATH).toBe(
-      join(repoRoot, 'apps', 'note-service', 'data', 'life.db'),
-    );
-    expect(DEFAULT_TODO_DB_PATH).toBe(
-      join(repoRoot, 'apps', 'todo-service', 'data', 'todo.db'),
-    );
-    expect(DEFAULT_TAGS_DB_PATH).toBe(
-      join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'),
-    );
-    expect(DEFAULT_NOTE_DB_PATH).not.toContain(join('apps', 'apps'));
+    // `defaultCleanupPaths` is what `src/tags/paths.ts` calls at CLI startup,
+    // with `import.meta.dirname` in place of this literal.
+    const defaults = defaultCleanupPaths(join(__dirname, '..', 'src', 'tags'));
+    expect(defaults.noteDbPath).toBe(join(repoRoot, 'apps', 'note-service', 'data', 'life.db'));
+    expect(defaults.todoDbPath).toBe(join(repoRoot, 'apps', 'todo-service', 'data', 'todo.db'));
+    expect(defaults.tagsDbPath).toBe(join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'));
+    expect(defaults.noteDbPath).not.toContain(join('apps', 'apps'));
 
     const fx = makeFixture();
     const env = envFor(fx.dir, fx.note, fx.todo, fx.tags);
-    expect(resolvePaths(env)).toEqual({
+    expect(resolvePaths(env, defaults)).toEqual({
       noteDbPath: fx.note,
       todoDbPath: fx.todo,
       tagsDbPath: fx.tags,
@@ -511,7 +546,12 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
   it('16. prints the summary first, then orphan lines in ascending id order', () => {
     const fx = makeFixture();
     // Inserted out of order (9 before 2) so ORDER BY id is observable.
-    createTagsDb(fx.tags, { tags: [{ id: 9, ownerSub: 'u1' }, { id: 2, ownerSub: 'u1' }] });
+    createTagsDb(fx.tags, {
+      tags: [
+        { id: 9, ownerSub: 'u1' },
+        { id: 2, ownerSub: 'u1' },
+      ],
+    });
     createNoteDb(fx.note, { notes: [], links: [] });
     createTodoDb(fx.todo, { todos: [], links: [] });
 
@@ -528,7 +568,9 @@ describe('cleanup-tags orphan registry cleanup (SPEC-tags-service)', () => {
     expect(code).toBe(0);
 
     const lines = print.mock.calls.map((c: string[]) => c[0] as string);
-    expect(lines[0]).toBe('cleanup-tags [plan]: scanned=2 referenced=0 orphans=2 deleted=0 errors=0');
+    expect(lines[0]).toBe(
+      'cleanup-tags [plan]: scanned=2 referenced=0 orphans=2 deleted=0 errors=0',
+    );
     expect(lines.slice(1)).toEqual(['orphan id=2 owner=u1', 'orphan id=9 owner=u1']);
 
     const details = lines.filter((l: string) => l.startsWith('orphan id='));

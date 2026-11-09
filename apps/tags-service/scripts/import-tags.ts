@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { main } from '../src/tags/import';
+import { main } from '../src/tags/import.js';
 
 /**
  * `import-tags` entry (`SPEC-tags-extraction` Migration script). Thin CLI over
@@ -26,10 +26,5 @@ import { main } from '../src/tags/import';
  * The core owns the ordering (backup → bootstrap → import/merge → surgery) and the
  * `import-tags [plan|apply]: …` report line.
  */
-
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  process.exitCode = main();
-}
 
 export { main };

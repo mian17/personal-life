@@ -219,21 +219,17 @@ function ensureTagTable(db: Database.Database): SchemaResult {
     return { mutated: false, actions: ['skipped tag rebuild (already migrated)'] };
   }
   const ownerSelect = hasColumn(db, 'tag', 'ownerSub') ? '"ownerSub"' : 'NULL';
-  rebuildWithForeignKeysOff(
-    db,
-    'tag rebuild',
-    () => {
-      db.exec(
-        'CREATE TABLE "temporary_tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)',
-      );
-      db.exec(
-        `INSERT INTO "temporary_tag" ("id","name","ownerSub") ` +
-          `SELECT "id","name",${ownerSelect} FROM "tag"`,
-      );
-      db.exec('DROP TABLE "tag"');
-      db.exec('ALTER TABLE "temporary_tag" RENAME TO "tag"');
-    },
-  );
+  rebuildWithForeignKeysOff(db, 'tag rebuild', () => {
+    db.exec(
+      'CREATE TABLE "temporary_tag" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "ownerSub" text)',
+    );
+    db.exec(
+      `INSERT INTO "temporary_tag" ("id","name","ownerSub") ` +
+        `SELECT "id","name",${ownerSelect} FROM "tag"`,
+    );
+    db.exec('DROP TABLE "tag"');
+    db.exec('ALTER TABLE "temporary_tag" RENAME TO "tag"');
+  });
   return { mutated: true, actions: ['rebuilt tag (removed legacy UNIQUE(name))'] };
 }
 
@@ -264,19 +260,15 @@ function ensureNoteTagTable(db: Database.Database): SchemaResult {
     noteTagSql.sql.includes('REFERENCES "tag"') ||
     hasIndexNamed(db, 'note_tag', 'IDX_ddfc0b18dcc060cb8899a24991');
   if (!legacyNoteTag) return { mutated: false, actions: [] };
-  rebuildWithForeignKeysOff(
-    db,
-    'note_tag rebuild',
-    () => {
-      db.exec(NOTE_TAG_TEMP_DDL);
-      db.exec(
-        'INSERT INTO "temporary_note_tag" ("noteId","tagId") ' +
-          'SELECT "noteId","tagId" FROM "note_tag"',
-      );
-      db.exec('DROP TABLE "note_tag"');
-      db.exec('ALTER TABLE "temporary_note_tag" RENAME TO "note_tag"');
-    },
-  );
+  rebuildWithForeignKeysOff(db, 'note_tag rebuild', () => {
+    db.exec(NOTE_TAG_TEMP_DDL);
+    db.exec(
+      'INSERT INTO "temporary_note_tag" ("noteId","tagId") ' +
+        'SELECT "noteId","tagId" FROM "note_tag"',
+    );
+    db.exec('DROP TABLE "note_tag"');
+    db.exec('ALTER TABLE "temporary_note_tag" RENAME TO "note_tag"');
+  });
   return { mutated: true, actions: ['rebuilt note_tag (association-only, dropped FK to tag)'] };
 }
 
@@ -378,9 +370,9 @@ export function backfillNullOwners(noteDbPath: string, sub: string): StampResult
 }
 
 function countWhereNull(db: Database.Database, table: string): number {
-  const row = db
-    .prepare(`SELECT COUNT(*) AS c FROM "${table}" WHERE "ownerSub" IS NULL`)
-    .get() as { c: number };
+  const row = db.prepare(`SELECT COUNT(*) AS c FROM "${table}" WHERE "ownerSub" IS NULL`).get() as {
+    c: number;
+  };
   return row.c;
 }
 
@@ -411,7 +403,9 @@ export function runBackfill(env: Env = process.env): RunResult {
 export function main(env: Env = process.env): number {
   try {
     const result = runBackfill(env);
-    console.log(`backup: ${result.backup.backupPath} (verified: quick_check ok, ${result.backup.noteCount} note rows)`);
+    console.log(
+      `backup: ${result.backup.backupPath} (verified: quick_check ok, ${result.backup.noteCount} note rows)`,
+    );
     console.log(`schema: ${result.schema.actions.join('; ') || 'no changes'}`);
     console.log(
       `owner: ${result.sub} (oldest user in ${result.idpDbPath}); ` +
@@ -423,9 +417,4 @@ export function main(env: Env = process.env): number {
     console.error('backfill failed:', err instanceof Error ? err.message : 'unknown error');
     return 1;
   }
-}
-
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  process.exitCode = main();
 }

@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { snapshotAndVerify, uniqueSnapshotPath } from '@life/db';
-import { resolveDbPath } from '../src/keys/db';
+import { resolveDbPath } from '../src/keys/db.js';
 
 export { resolveDbPath };
 
@@ -90,15 +90,15 @@ export function backfillContentUpdatedAt(noteDbPath: string): StampResult {
   const db = new Database(noteDbPath);
   try {
     const alreadySet = countWhereNull(db, 'note', 'contentUpdatedAt');
-    const total = (
-      db.prepare('SELECT COUNT(*) AS c FROM "note"').get() as { c: number }
-    ).c;
+    const total = (db.prepare('SELECT COUNT(*) AS c FROM "note"').get() as { c: number }).c;
     let stamped = 0;
     if (alreadySet > 0) {
       // `alreadySet` counts NULLs before the write (naming kept symmetric with
       // backfill-owner's StampResult shape).
       stamped = db
-        .prepare('UPDATE "note" SET "contentUpdatedAt" = "createdAt" WHERE "contentUpdatedAt" IS NULL')
+        .prepare(
+          'UPDATE "note" SET "contentUpdatedAt" = "createdAt" WHERE "contentUpdatedAt" IS NULL',
+        )
         .run().changes;
     }
     return { stamped, alreadySet: total - stamped };
@@ -108,8 +108,8 @@ export function backfillContentUpdatedAt(noteDbPath: string): StampResult {
 }
 
 /** Run all steps in order and return the evidence. Throws on any failure. */
-export function runBackfill(env: NodeJS.ProcessEnv = process.env): RunResult {
-  const noteDbPath = resolveDbPath(env);
+export function runBackfill(env: NodeJS.ProcessEnv = process.env, defaultPath = ''): RunResult {
+  const noteDbPath = resolveDbPath(env, defaultPath);
   // Step 1 — aborts on any failure; no write precedes it.
   const result = snapshotAndVerify(noteDbPath, uniqueSnapshotPath(noteDbPath, 'bak'), {
     rowCountTables: ['note'],
@@ -141,9 +141,9 @@ export function runBackfill(env: NodeJS.ProcessEnv = process.env): RunResult {
  * CLI wrapper. Prints the evidence on success and returns 0; on any thrown
  * error prints the reason and returns 1. Never calls `process.exit`.
  */
-export function main(env: NodeJS.ProcessEnv = process.env): number {
+export function main(env: NodeJS.ProcessEnv = process.env, defaultPath = ''): number {
   try {
-    const result = runBackfill(env);
+    const result = runBackfill(env, defaultPath);
     console.log(
       `backup: ${result.backup.backupPath} (verified: quick_check ok, ${result.backup.noteCount} note rows)`,
     );
@@ -156,9 +156,4 @@ export function main(env: NodeJS.ProcessEnv = process.env): number {
     console.error('backfill failed:', err instanceof Error ? err.message : 'unknown error');
     return 1;
   }
-}
-
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  process.exitCode = main();
 }

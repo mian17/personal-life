@@ -6,7 +6,7 @@ import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import { CryptoError, wrapDek } from '@life/crypto';
 import { KeysService, UserKeys, createMasterKey } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config';
+import { MASTER_KEY_ENV } from '../src/service-config.js';
 
 /**
  * `notes-at-rest` T2 — DEK provisioning/memo (`SPEC-notes-at-rest` Data Model +
@@ -87,7 +87,7 @@ describe('KeysService', () => {
     expect(b.equals(a1)).toBe(false);
     expect(await h.repo.count()).toBe(2);
     // The second call for user-a is a memo hit, not a second insert.
-    expect((await h.repo.find({ where: { sub: 'user-a' } }))).toHaveLength(1);
+    expect(await h.repo.find({ where: { sub: 'user-a' } })).toHaveLength(1);
   });
 
   it('unwraps a sub DEK at most once (process-local memo)', async () => {

@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateNoteDto } from './dto/create-note.dto';
-import { UpdateNoteDto } from './dto/update-note.dto';
-import { ListNotesQuery } from './dto/list-notes.query';
-import { NotesService } from './notes.service';
+import { CreateNoteDto } from './dto/create-note.dto.js';
+import { UpdateNoteDto } from './dto/update-note.dto.js';
+import { ListNotesQuery } from './dto/list-notes.query.js';
+import { NotesService } from './notes.service.js';
 
 @Controller('api/notes')
 export class NotesController {

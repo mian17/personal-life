@@ -4,11 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { IsNull, Not, Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
-import { Note } from './note.entity';
-import { NoteTag } from './note-tag.entity';
+import { Note } from './note.entity.js';
+import { NoteTag } from './note-tag.entity.js';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
-import { NOTES_CACHE, NotesCache } from './notes-cache';
-import { likeMatch } from './content-match';
+import { NOTES_CACHE, NotesCache } from './notes-cache.js';
+import { likeMatch } from './content-match.js';
 import { decodeTagUsage, normalizeTagIds } from '@life/shared';
 import type { Note as NoteDto, NotePage, TagUsage, TagUsagePage } from '@life/shared';
 
@@ -390,7 +390,11 @@ export class NotesService {
       .filter(({ note }) => matchesListRequest(note, opts))
       .sort(newestContentFirst);
 
-    const { rows: page, nextCursor, total } = paginate(matching, {
+    const {
+      rows: page,
+      nextCursor,
+      total,
+    } = paginate(matching, {
       limit,
       cursor: opts.cursor,
       keyOf: (entry) => [entry.listTimestamp, entry.id],
@@ -399,10 +403,7 @@ export class NotesService {
     return { notes: page.map((entry) => entry.note), nextCursor, total };
   }
 
-  async findTrash(
-    sub: string,
-    opts: { limit?: number; cursor?: string },
-  ): Promise<NotePage> {
+  async findTrash(sub: string, opts: { limit?: number; cursor?: string }): Promise<NotePage> {
     const limit = opts.limit ?? DEFAULT_PAGE_LIMIT;
     // Key: `note:<sub>:v<gen>:trash` — pagination is in memory, so limit/cursor
     // are not part of the key and one entry serves every trash page request.
@@ -435,7 +436,11 @@ export class NotesService {
       listTimestamp: note.deletedAt!,
       note,
     }));
-    const { rows: page, nextCursor, total } = paginate(positioned, {
+    const {
+      rows: page,
+      nextCursor,
+      total,
+    } = paginate(positioned, {
       limit,
       cursor: opts.cursor,
       keyOf: (entry) => [entry.listTimestamp, entry.id],
@@ -481,10 +486,7 @@ export class NotesService {
   }
 
   /** The `notes` batch update: one transaction, submission order, one bump. */
-  async updateMany(
-    sub: string,
-    items: (NotePatch & { id: string })[],
-  ): Promise<NoteDto[]> {
+  async updateMany(sub: string, items: (NotePatch & { id: string })[]): Promise<NoteDto[]> {
     return runAtomicBatch({
       items,
       sub,

@@ -1,17 +1,17 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { loadMasterKeyFromEnv } from '@life/crypto';
-import { Note } from '../src/notes/note.entity';
-import { NoteTag } from '../src/notes/note-tag.entity';
+import { Note } from '../src/notes/note.entity.js';
+import { NoteTag } from '../src/notes/note-tag.entity.js';
 import { UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config';
-import { resolveDbPath } from '../src/keys/db';
+import { MASTER_KEY_ENV } from '../src/service-config.js';
+import { resolveDbPath } from '../src/keys/db.js';
 import {
   applyBackfill,
   formatBackfillReport,
   planBackfill,
   type BackfillReport,
-} from '../src/keys/backfill';
+} from '../src/keys/backfill.js';
 
 export { resolveDbPath };
 
@@ -57,6 +57,8 @@ export interface BackfillCliDeps {
   /** Inject for testing; defaults to opening the mirror DataSource. */
   dataSource?: DataSource;
   env?: NodeJS.ProcessEnv;
+  /** Package-anchored default, supplied by the ESM CLI entry (`DEFAULT_NOTE_DB_PATH`). */
+  defaultNoteDbPath?: string;
   print?: (line: string) => void;
   printError?: (line: string) => void;
 }
@@ -79,7 +81,7 @@ export async function main(
   try {
     const masterKey = loadMasterKeyFromEnv(MASTER_KEY_ENV);
     if (!ds) {
-      ds = createDataSource(resolveDbPath(env));
+      ds = createDataSource(resolveDbPath(env, deps.defaultNoteDbPath));
       await ds.initialize();
     }
     const report: BackfillReport = dryRun
@@ -88,20 +90,11 @@ export async function main(
     print(formatBackfillReport(report));
     return 0;
   } catch (err) {
-    printError(
-      `notes-backfill failed: ${err instanceof Error ? err.message : 'unknown error'}`,
-    );
+    printError(`notes-backfill failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     return 1;
   } finally {
     if (ownDataSource && ds?.isInitialized) {
       await ds.destroy();
     }
   }
-}
-
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  void main().then((code) => {
-    process.exitCode = code;
-  });
 }

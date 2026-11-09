@@ -6,10 +6,10 @@ import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { CryptoError } from '@life/crypto';
 import { KeysService, UserKeys } from '@life/service-kit';
-import { Note } from '../src/notes/note.entity';
-import { NoteTag } from '../src/notes/note-tag.entity';
-import { NotesCache } from '../src/notes/notes-cache';
-import { NotesService } from '../src/notes/notes.service';
+import { Note } from '../src/notes/note.entity.js';
+import { NoteTag } from '../src/notes/note-tag.entity.js';
+import { NotesCache } from '../src/notes/notes-cache.js';
+import { NotesService } from '../src/notes/notes.service.js';
 
 /**
  * `notes-at-rest` T3 — encrypted writes/reads + tag handling
@@ -157,7 +157,7 @@ describe('notes-at-rest T3: encrypted fields + transparent dual-read', () => {
     expect((await h.service.findOne(SUB, id)).body).toBe('converted body');
   });
 
-  it('AAD binding: swapping two notes\' body ciphertexts fails closed for both', async () => {
+  it("AAD binding: swapping two notes' body ciphertexts fails closed for both", async () => {
     const a = await h.service.create(SUB, 'note a body', []);
     const b = await h.service.create(SUB, 'note b body', []);
     const aBody = await rawBody(h.dataSource, a.id);
@@ -181,12 +181,10 @@ describe('notes-at-rest T3: encrypted fields + transparent dual-read', () => {
     ]);
 
     const chunks: string[] = [];
-    const stderr = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        chunks.push(String(chunk));
-        return true;
-      });
+    const stderr = jest.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+      chunks.push(String(chunk));
+      return true;
+    });
     try {
       await expect(h.service.findOne(SUB, created.id)).rejects.toBeInstanceOf(CryptoError);
     } finally {

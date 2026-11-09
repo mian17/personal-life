@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * Two-subject ownership isolation (Task 2, SPEC-note-ownership). Boots the real
@@ -42,7 +42,7 @@ describe('Notes ownership (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -61,20 +61,17 @@ describe('Notes ownership (e2e)', () => {
 
   const post = (body: Record<string, unknown>, token: string) =>
     auth(request(app.getHttpServer()).post('/api/notes'), token).send(body);
-  const list = (token: string) =>
-    auth(request(app.getHttpServer()).get('/api/notes'), token);
+  const list = (token: string) => auth(request(app.getHttpServer()).get('/api/notes'), token);
   const trash = (token: string) =>
     auth(request(app.getHttpServer()).get('/api/notes/trash'), token);
-  const tags = (token: string) =>
-    auth(request(app.getHttpServer()).get('/api/tags'), token);
+  const tags = (token: string) => auth(request(app.getHttpServer()).get('/api/tags'), token);
 
   it('scopes list and trash to the caller (B sees nothing of A)', async () => {
     const active = await post({ body: 'a-active' }, tokenA).expect(201);
     const trashed = await post({ body: 'a-trashed' }, tokenA).expect(201);
-    await auth(
-      request(app.getHttpServer()).delete(`/api/notes/${trashed.body.id}`),
-      tokenA,
-    ).expect(200);
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${trashed.body.id}`), tokenA).expect(
+      200,
+    );
 
     // First case in the suite: B has created nothing, so B's world is empty.
     const bList = await list(tokenB).expect(200);
@@ -94,10 +91,9 @@ describe('Notes ownership (e2e)', () => {
   it('returns a byte-identical 404 for a foreign id and a missing id', async () => {
     const active = await post({ body: 'foreign-active' }, tokenA).expect(201);
     const trashed = await post({ body: 'foreign-trashed' }, tokenA).expect(201);
-    await auth(
-      request(app.getHttpServer()).delete(`/api/notes/${trashed.body.id}`),
-      tokenA,
-    ).expect(200);
+    await auth(request(app.getHttpServer()).delete(`/api/notes/${trashed.body.id}`), tokenA).expect(
+      200,
+    );
 
     const compare404 = async (foreign: () => request.Test, missing: () => request.Test) => {
       const f = await foreign().expect(404);
@@ -121,8 +117,7 @@ describe('Notes ownership (e2e)', () => {
         }),
     );
     await compare404(
-      () =>
-        auth(request(app.getHttpServer()).delete(`/api/notes/${active.body.id}`), tokenB),
+      () => auth(request(app.getHttpServer()).delete(`/api/notes/${active.body.id}`), tokenB),
       () => auth(request(app.getHttpServer()).delete(`/api/notes/${MISSING_ID}`), tokenB),
     );
     await compare404(
@@ -136,8 +131,7 @@ describe('Notes ownership (e2e)', () => {
           request(app.getHttpServer()).delete(`/api/notes/${trashed.body.id}/permanent`),
           tokenB,
         ),
-      () =>
-        auth(request(app.getHttpServer()).delete(`/api/notes/${MISSING_ID}/permanent`), tokenB),
+      () => auth(request(app.getHttpServer()).delete(`/api/notes/${MISSING_ID}/permanent`), tokenB),
     );
 
     // B's failed attempts never touched A's rows.
@@ -192,10 +186,9 @@ describe('Notes ownership (e2e)', () => {
     ).expect(200);
     expect(byA.body.id).toBe(created.body.id);
 
-    await auth(
-      request(app.getHttpServer()).get(`/api/notes/${created.body.id}`),
-      tokenB,
-    ).expect(404);
+    await auth(request(app.getHttpServer()).get(`/api/notes/${created.body.id}`), tokenB).expect(
+      404,
+    );
   });
 
   it('stamps dev-user when NODE_ENV=development', async () => {
@@ -235,7 +228,9 @@ describe('Notes ownership (e2e)', () => {
 
     expect(fetched.body).not.toHaveProperty('owner');
     expect(fetched.body).not.toHaveProperty('ownerSub');
-    expect(Object.keys(fetched.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(noteKeys);
+    expect(Object.keys(fetched.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+      noteKeys,
+    );
     expect(fetched.body.tagIds).toEqual([5]);
 
     const listed = await list(tokenA).expect(200);
@@ -254,10 +249,7 @@ describe('Notes ownership (e2e)', () => {
     const listed = await list(tokenA).expect(200);
     expect(listed.body.notes.map((n: { id: string }) => n.id)).toContain(id);
 
-    const updated = await auth(
-      request(app.getHttpServer()).patch(`/api/notes/${id}`),
-      tokenA,
-    )
+    const updated = await auth(request(app.getHttpServer()).patch(`/api/notes/${id}`), tokenA)
       .send({ body: 'lifecycle edited', expectedVersion: 0 })
       .expect(200);
     expect(updated.body.body).toBe('lifecycle edited');
