@@ -9,7 +9,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { storeTokens, type StoredTokens } from './token-store';
+import { storeTokens, type StoredTokens } from './token-store.js';
 
 /** Everything `login` needs from the environment; the IdP stays a plain-HTTP dev URL. */
 export interface LoginOptions {
@@ -88,11 +88,12 @@ function defaults(partial?: Partial<LoginOptions>): LoginOptions {
 }
 
 /** Discovers `authorization_endpoint` and `token_endpoint` from the issuer. */
-export async function discoverEndpoints(options: Pick<LoginOptions, 'issuer' | 'request'>): Promise<IdpEndpoints> {
-  const metadata = (await (await options.request(issuerMetadataUrl(options.issuer))).json()) as Record<
-    string,
-    unknown
-  >;
+export async function discoverEndpoints(
+  options: Pick<LoginOptions, 'issuer' | 'request'>,
+): Promise<IdpEndpoints> {
+  const metadata = (await (
+    await options.request(issuerMetadataUrl(options.issuer))
+  ).json()) as Record<string, unknown>;
   const authorizationEndpoint = metadata['authorization_endpoint'];
   const tokenEndpoint = metadata['token_endpoint'];
   if (typeof authorizationEndpoint !== 'string' || typeof tokenEndpoint !== 'string') {
@@ -105,7 +106,10 @@ function issuerMetadataUrl(issuer: string): string {
   return `${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
 }
 
-async function authorizeWithLoopback(endpoints: IdpEndpoints, options: LoginOptions): Promise<StoredTokens> {
+async function authorizeWithLoopback(
+  endpoints: IdpEndpoints,
+  options: LoginOptions,
+): Promise<StoredTokens> {
   const listener = await listenOnLoopback();
   try {
     return await authorizeThrough(endpoints, options, listener);
@@ -165,7 +169,10 @@ function redirectUriFor(port: number): string {
   return `http://127.0.0.1:${port}${CALLBACK_PATH}`;
 }
 
-async function openAuthorizationUrl(options: LoginOptions, authorizationUrl: string): Promise<void> {
+async function openAuthorizationUrl(
+  options: LoginOptions,
+  authorizationUrl: string,
+): Promise<void> {
   try {
     await options.openBrowser(authorizationUrl);
   } catch {
@@ -174,7 +181,8 @@ async function openAuthorizationUrl(options: LoginOptions, authorizationUrl: str
 }
 
 function rejectForeignState(state: string | undefined, expected: string): void {
-  if (!state || state !== expected) throw new Error('login failed: authorization response did not match');
+  if (!state || state !== expected)
+    throw new Error('login failed: authorization response did not match');
 }
 
 async function redeemCode(
@@ -260,7 +268,9 @@ function listenError(error: NodeJS.ErrnoException): Error {
       `login failed: port ${CALLBACK_PORT} is already in use; the dev client only accepts ${redirectUriFor(CALLBACK_PORT)}, so free the port and run login again`,
     );
   }
-  return new Error(`login failed: cannot listen on 127.0.0.1:${CALLBACK_PORT} (${error.code ?? error.message})`);
+  return new Error(
+    `login failed: cannot listen on 127.0.0.1:${CALLBACK_PORT} (${error.code ?? error.message})`,
+  );
 }
 
 function waitForCallback(server: Server): Promise<CallbackQuery> {
@@ -294,7 +304,11 @@ function queryOf(url: string | undefined): CallbackQuery | undefined {
   return { code, state: query.searchParams.get('state') ?? undefined };
 }
 
-function respond(response: { end: (body: string) => void; writeHead: (status: number) => void }, status: number, body: string): void {
+function respond(
+  response: { end: (body: string) => void; writeHead: (status: number) => void },
+  status: number,
+  body: string,
+): void {
   response.writeHead(status);
   response.end(`${body}\n`);
 }

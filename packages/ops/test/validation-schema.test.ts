@@ -11,18 +11,18 @@
  * two-level nesting. The schema judgement lives in `support/schema-accepts.ts`
  * and recurses, so nested drift is a failure rather than an unchecked region.
  */
-import { defineResource, kindIsDestructive } from '../src/core/registry';
-import { deriveInputSchema } from '../src/core/schema';
-import { shapeProblems, validateInput } from '../src/core/validate';
-import { describeIssues } from '../src/core/validate';
-import { fieldNames, findOp } from '../src/core/registry';
-import { sampleRegistry } from '../src/fixtures/sample';
-import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types';
-import { listTools } from '../src/mcp/tools';
-import { parseCallCommand } from '../src/cli/parse';
-import { wireFor } from '../src/core/wire';
-import { service as notesService } from '../src/services/notes';
-import { accepts } from './support/schema-accepts';
+import { defineResource, kindIsDestructive } from '../src/core/registry.js';
+import { deriveInputSchema } from '../src/core/schema.js';
+import { shapeProblems, validateInput } from '../src/core/validate.js';
+import { describeIssues } from '../src/core/validate.js';
+import { fieldNames, findOp } from '../src/core/registry.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types.js';
+import { listTools } from '../src/mcp/tools.js';
+import { parseCallCommand } from '../src/cli/parse.js';
+import { wireFor } from '../src/core/wire.js';
+import { service as notesService } from '../src/services/notes.js';
+import { accepts } from './support/schema-accepts.js';
 
 interface Case {
   name: string;
@@ -100,7 +100,9 @@ const nutrientProperties: Record<string, FieldSpec> = Object.fromEntries(
 );
 
 /** A full 27-key nutrient vector, for the accepted nested cases. */
-const nutrientVector: Record<string, number> = Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, 1]));
+const nutrientVector: Record<string, number> = Object.fromEntries(
+  NUTRIENT_KEYS.map((key) => [key, 1]),
+);
 
 /**
  * The field table of the saved-meals `create` op (SPEC-ops-all-services §1.3),
@@ -165,35 +167,209 @@ const CASES: Case[] = [
     supplied: { title: 'a', priority: 1, archived: false, labels: ['x'] },
     accepted: true,
   },
-  { name: 'an omitted create title', registry: sampleRegistry, kind: 'create', supplied: { priority: 1 }, accepted: false },
-  { name: 'an optional create priority', registry: sampleRegistry, kind: 'create', supplied: { title: 'a' }, accepted: true },
-  { name: 'a numeric string priority', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', priority: '1' }, accepted: false },
-  { name: 'an infinite priority', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', priority: Number.POSITIVE_INFINITY }, accepted: false },
-  { name: 'a boolean archived', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', archived: true }, accepted: true },
-  { name: 'a string archived', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', archived: 'yes' }, accepted: false },
-  { name: 'a string array labels', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', labels: ['x', 'y'] }, accepted: true },
-  { name: 'an empty label array', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', labels: [] }, accepted: true },
-  { name: 'a mixed label array', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', labels: ['x', 1] }, accepted: false },
-  { name: 'a bare label value', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', labels: 'x' }, accepted: false },
-  { name: 'an undeclared create field', registry: sampleRegistry, kind: 'create', supplied: { title: 'a', bogus: 1 }, accepted: false },
-  { name: 'a required get id', registry: sampleRegistry, kind: 'get', supplied: { id: 'r1' }, accepted: true },
-  { name: 'a missing get id', registry: sampleRegistry, kind: 'get', supplied: {}, accepted: false },
-  { name: 'a numeric list limit', registry: sampleRegistry, kind: 'list', supplied: { limit: 5 }, accepted: true },
-  { name: 'a string list limit', registry: sampleRegistry, kind: 'list', supplied: { limit: 'five' }, accepted: false },
-  { name: 'a boolean list flag', registry: sampleRegistry, kind: 'list', supplied: { includeArchived: true }, accepted: true },
-  { name: 'a string list flag', registry: sampleRegistry, kind: 'list', supplied: { includeArchived: 'yes' }, accepted: false },
-  { name: 'an update version', registry: sampleRegistry, kind: 'update', supplied: { id: 'r1', expectedVersion: 2 }, accepted: true },
-  { name: 'a string update version', registry: sampleRegistry, kind: 'update', supplied: { id: 'r1', expectedVersion: '2' }, accepted: false },
-  { name: 'a declared enum value', registry: enumRegistry, kind: 'create', supplied: { title: 'a', status: 'draft' }, accepted: true },
-  { name: 'an undeclared enum value', registry: enumRegistry, kind: 'create', supplied: { title: 'a', status: 'gone' }, accepted: false },
-  { name: 'an empty tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [] }, accepted: true },
-  { name: 'a two-element tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1, 2] }, accepted: true },
-  { name: 'a fractional tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1.5] }, accepted: true },
-  { name: 'a mixed tag id array', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [1, '2'] }, accepted: false },
-  { name: 'a NaN tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [Number.NaN] }, accepted: false },
-  { name: 'an infinite tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: [Number.POSITIVE_INFINITY] }, accepted: false },
-  { name: 'a bare tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: 1 }, accepted: false },
-  { name: 'a text tag id', registry: tagRegistry, kind: 'create', supplied: { body: 'a', tagIds: '1' }, accepted: false },
+  {
+    name: 'an omitted create title',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { priority: 1 },
+    accepted: false,
+  },
+  {
+    name: 'an optional create priority',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a' },
+    accepted: true,
+  },
+  {
+    name: 'a numeric string priority',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', priority: '1' },
+    accepted: false,
+  },
+  {
+    name: 'an infinite priority',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', priority: Number.POSITIVE_INFINITY },
+    accepted: false,
+  },
+  {
+    name: 'a boolean archived',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', archived: true },
+    accepted: true,
+  },
+  {
+    name: 'a string archived',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', archived: 'yes' },
+    accepted: false,
+  },
+  {
+    name: 'a string array labels',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', labels: ['x', 'y'] },
+    accepted: true,
+  },
+  {
+    name: 'an empty label array',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', labels: [] },
+    accepted: true,
+  },
+  {
+    name: 'a mixed label array',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', labels: ['x', 1] },
+    accepted: false,
+  },
+  {
+    name: 'a bare label value',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', labels: 'x' },
+    accepted: false,
+  },
+  {
+    name: 'an undeclared create field',
+    registry: sampleRegistry,
+    kind: 'create',
+    supplied: { title: 'a', bogus: 1 },
+    accepted: false,
+  },
+  {
+    name: 'a required get id',
+    registry: sampleRegistry,
+    kind: 'get',
+    supplied: { id: 'r1' },
+    accepted: true,
+  },
+  {
+    name: 'a missing get id',
+    registry: sampleRegistry,
+    kind: 'get',
+    supplied: {},
+    accepted: false,
+  },
+  {
+    name: 'a numeric list limit',
+    registry: sampleRegistry,
+    kind: 'list',
+    supplied: { limit: 5 },
+    accepted: true,
+  },
+  {
+    name: 'a string list limit',
+    registry: sampleRegistry,
+    kind: 'list',
+    supplied: { limit: 'five' },
+    accepted: false,
+  },
+  {
+    name: 'a boolean list flag',
+    registry: sampleRegistry,
+    kind: 'list',
+    supplied: { includeArchived: true },
+    accepted: true,
+  },
+  {
+    name: 'a string list flag',
+    registry: sampleRegistry,
+    kind: 'list',
+    supplied: { includeArchived: 'yes' },
+    accepted: false,
+  },
+  {
+    name: 'an update version',
+    registry: sampleRegistry,
+    kind: 'update',
+    supplied: { id: 'r1', expectedVersion: 2 },
+    accepted: true,
+  },
+  {
+    name: 'a string update version',
+    registry: sampleRegistry,
+    kind: 'update',
+    supplied: { id: 'r1', expectedVersion: '2' },
+    accepted: false,
+  },
+  {
+    name: 'a declared enum value',
+    registry: enumRegistry,
+    kind: 'create',
+    supplied: { title: 'a', status: 'draft' },
+    accepted: true,
+  },
+  {
+    name: 'an undeclared enum value',
+    registry: enumRegistry,
+    kind: 'create',
+    supplied: { title: 'a', status: 'gone' },
+    accepted: false,
+  },
+  {
+    name: 'an empty tag id array',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [] },
+    accepted: true,
+  },
+  {
+    name: 'a two-element tag id array',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [1, 2] },
+    accepted: true,
+  },
+  {
+    name: 'a fractional tag id',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [1.5] },
+    accepted: true,
+  },
+  {
+    name: 'a mixed tag id array',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [1, '2'] },
+    accepted: false,
+  },
+  {
+    name: 'a NaN tag id',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [Number.NaN] },
+    accepted: false,
+  },
+  {
+    name: 'an infinite tag id',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: [Number.POSITIVE_INFINITY] },
+    accepted: false,
+  },
+  {
+    name: 'a bare tag id',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: 1 },
+    accepted: false,
+  },
+  {
+    name: 'a text tag id',
+    registry: tagRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: '1' },
+    accepted: false,
+  },
   {
     name: 'a two-element notes tag id array',
     registry: notesRegistry,
@@ -201,21 +377,111 @@ const CASES: Case[] = [
     supplied: { body: 'a', tagIds: [1, 2] },
     accepted: true,
   },
-  { name: 'a quoted notes tag id', registry: notesRegistry, kind: 'create', supplied: { body: 'a', tagIds: ['1'] }, accepted: false },
-  { name: 'a bare notes tag id', registry: notesRegistry, kind: 'create', supplied: { body: 'a', tagIds: 1 }, accepted: false },
-  { name: 'omitting the notes body', registry: notesRegistry, kind: 'create', supplied: { tagIds: [] }, accepted: false },
-  { name: 'a notes get id', registry: notesRegistry, kind: 'get', supplied: { id: 'n1' }, accepted: true },
-  { name: 'omitting the notes get id', registry: notesRegistry, kind: 'get', supplied: {}, accepted: false },
-  { name: 'an empty notes list input', registry: notesRegistry, kind: 'list', supplied: {}, accepted: true },
-  { name: 'a notes list filter page', registry: notesRegistry, kind: 'list', supplied: { tagId: 3, q: 'x', limit: 20, cursor: 'c1' }, accepted: true },
-  { name: 'a quoted notes list limit', registry: notesRegistry, kind: 'list', supplied: { limit: '5' }, accepted: false },
-  { name: 'a notes update id', registry: notesRegistry, kind: 'update', supplied: { id: 'n1', tagIds: [1] }, accepted: true },
-  { name: 'omitting the notes update id', registry: notesRegistry, kind: 'update', supplied: { tagIds: [1] }, accepted: false },
-  { name: 'a stale notes update version', registry: notesRegistry, kind: 'update', supplied: { id: 'n1', expectedVersion: 2 }, accepted: true },
-  { name: 'a notes delete id', registry: notesRegistry, kind: 'delete', supplied: { id: 'n1' }, accepted: true },
-  { name: 'omitting the notes delete id', registry: notesRegistry, kind: 'delete', supplied: {}, accepted: false },
-  { name: 'a notes restore id', registry: notesRegistry, kind: 'restore', supplied: { id: 'n1' }, accepted: true },
-  { name: 'omitting the notes restore id', registry: notesRegistry, kind: 'restore', supplied: {}, accepted: false },
+  {
+    name: 'a quoted notes tag id',
+    registry: notesRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: ['1'] },
+    accepted: false,
+  },
+  {
+    name: 'a bare notes tag id',
+    registry: notesRegistry,
+    kind: 'create',
+    supplied: { body: 'a', tagIds: 1 },
+    accepted: false,
+  },
+  {
+    name: 'omitting the notes body',
+    registry: notesRegistry,
+    kind: 'create',
+    supplied: { tagIds: [] },
+    accepted: false,
+  },
+  {
+    name: 'a notes get id',
+    registry: notesRegistry,
+    kind: 'get',
+    supplied: { id: 'n1' },
+    accepted: true,
+  },
+  {
+    name: 'omitting the notes get id',
+    registry: notesRegistry,
+    kind: 'get',
+    supplied: {},
+    accepted: false,
+  },
+  {
+    name: 'an empty notes list input',
+    registry: notesRegistry,
+    kind: 'list',
+    supplied: {},
+    accepted: true,
+  },
+  {
+    name: 'a notes list filter page',
+    registry: notesRegistry,
+    kind: 'list',
+    supplied: { tagId: 3, q: 'x', limit: 20, cursor: 'c1' },
+    accepted: true,
+  },
+  {
+    name: 'a quoted notes list limit',
+    registry: notesRegistry,
+    kind: 'list',
+    supplied: { limit: '5' },
+    accepted: false,
+  },
+  {
+    name: 'a notes update id',
+    registry: notesRegistry,
+    kind: 'update',
+    supplied: { id: 'n1', tagIds: [1] },
+    accepted: true,
+  },
+  {
+    name: 'omitting the notes update id',
+    registry: notesRegistry,
+    kind: 'update',
+    supplied: { tagIds: [1] },
+    accepted: false,
+  },
+  {
+    name: 'a stale notes update version',
+    registry: notesRegistry,
+    kind: 'update',
+    supplied: { id: 'n1', expectedVersion: 2 },
+    accepted: true,
+  },
+  {
+    name: 'a notes delete id',
+    registry: notesRegistry,
+    kind: 'delete',
+    supplied: { id: 'n1' },
+    accepted: true,
+  },
+  {
+    name: 'omitting the notes delete id',
+    registry: notesRegistry,
+    kind: 'delete',
+    supplied: {},
+    accepted: false,
+  },
+  {
+    name: 'a notes restore id',
+    registry: notesRegistry,
+    kind: 'restore',
+    supplied: { id: 'n1' },
+    accepted: true,
+  },
+  {
+    name: 'omitting the notes restore id',
+    registry: notesRegistry,
+    kind: 'restore',
+    supplied: {},
+    accepted: false,
+  },
   {
     name: 'a complete nested meal',
     registry: mealRegistry,
@@ -269,7 +535,11 @@ const CASES: Case[] = [
     name: 'an undeclared portion key',
     registry: mealRegistry,
     kind: 'create',
-    supplied: { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half', amount: 2, unit: 'g' }] },
+    supplied: {
+      name: 'a',
+      nutrients: nutrientVector,
+      portions: [{ label: 'half', amount: 2, unit: 'g' }],
+    },
     accepted: false,
   },
   {
@@ -364,16 +634,20 @@ describe('the descriptor shape guard', () => {
   });
 
   it('names a nested field that declares no properties', () => {
-    expect(shapeProblems(operationOver({ nutrients: { type: 'object', description: 'Nutrients' } }))).toEqual([
-      'nutrients: object without properties',
-    ]);
+    expect(
+      shapeProblems(operationOver({ nutrients: { type: 'object', description: 'Nutrients' } })),
+    ).toEqual(['nutrients: object without properties']);
   });
 
   it('names a flat field that declares properties', () => {
     expect(
       shapeProblems(
         operationOver({
-          title: { type: 'string', description: 'Title', properties: { inner: { type: 'string', description: 'Inner' } } },
+          title: {
+            type: 'string',
+            description: 'Title',
+            properties: { inner: { type: 'string', description: 'Inner' } },
+          },
         }),
       ),
     ).toEqual(['title: properties on flat field string']);
@@ -483,7 +757,10 @@ describe('the call flag parser', () => {
   });
 
   it('turns a repeated numeric flag into a number array', () => {
-    const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', '1', '--tagIds', '2'], tagRegistry);
+    const call = parseCallCommand(
+      ['notes', 'create', '--body', 'a', '--tagIds', '1', '--tagIds', '2'],
+      tagRegistry,
+    );
 
     expect(call.input['tagIds']).toEqual([1, 2]);
   });
@@ -495,13 +772,19 @@ describe('the call flag parser', () => {
   });
 
   it('keeps repeated string flags a string array', () => {
-    const call = parseCallCommand(['sample', 'create', '--title', 'a', '--labels', 'x', '--labels', 'y'], sampleRegistry);
+    const call = parseCallCommand(
+      ['sample', 'create', '--title', 'a', '--labels', 'x', '--labels', 'y'],
+      sampleRegistry,
+    );
 
     expect(call.input['labels']).toEqual(['x', 'y']);
   });
 
   it('converts a repeated non-numeric flag into a value the validator rejects', () => {
-    const call = parseCallCommand(['notes', 'create', '--body', 'a', '--tagIds', 'one'], tagRegistry);
+    const call = parseCallCommand(
+      ['notes', 'create', '--body', 'a', '--tagIds', 'one'],
+      tagRegistry,
+    );
     const issues = validateInput(call.operation, call.input);
 
     expect(describeIssues('notes', 'create', issues)).toBe(
@@ -564,22 +847,36 @@ describe('the call flag parser', () => {
   });
 
   it('records the same request from the CLI and from an MCP object input', () => {
-    const supplied = { name: 'a', nutrients: nutrientVector, portions: [{ label: 'half', amount: 2 }] };
+    const supplied = {
+      name: 'a',
+      nutrients: nutrientVector,
+      portions: [{ label: 'half', amount: 2 }],
+    };
     const call = parseCallCommand(
-      ['saved-meals', 'create', '--name', 'a', '--nutrients', JSON.stringify(nutrientVector), '--portions', '[{"label":"half","amount":2}]'],
+      [
+        'saved-meals',
+        'create',
+        '--name',
+        'a',
+        '--nutrients',
+        JSON.stringify(nutrientVector),
+        '--portions',
+        '[{"label":"half","amount":2}]',
+      ],
       mealRegistry,
     );
 
-    expect(wireFor(mealRegistry, 'create', call.input)).toEqual(wireFor(mealRegistry, 'create', supplied));
+    expect(wireFor(mealRegistry, 'create', call.input)).toEqual(
+      wireFor(mealRegistry, 'create', supplied),
+    );
   });
 });
 
 describe('the destructiveness flag', () => {
   // SPEC-ops-agent-contract §3.2, row by row over the closed kind set.
-  const HINT_ROWS: Array<[
-    OpSpec['kind'],
-    { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean },
-  ]> = [
+  const HINT_ROWS: Array<
+    [OpSpec['kind'], { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean }]
+  > = [
     ['get', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
     ['list', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
     ['create', { readOnlyHint: false, destructiveHint: true, idempotentHint: false }],
@@ -701,13 +998,17 @@ const NOTES_REQUIRED_ROWS: Array<[OpSpec['kind'], string[]]> = [
 
 describe('the notes tool surface', () => {
   it('names and titles the six notes tools in registry order', () => {
-    expect(listTools(notesRegistry).map((tool) => [tool.name, tool.title])).toEqual(NOTES_TOOL_ROWS);
+    expect(listTools(notesRegistry).map((tool) => [tool.name, tool.title])).toEqual(
+      NOTES_TOOL_ROWS,
+    );
   });
 
   it('marks the read kinds read-only and non-destructive', () => {
     const tools = listTools(notesRegistry).filter((tool) => isReadTool(tool.name));
 
-    expect(tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint])).toEqual([
+    expect(
+      tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint]),
+    ).toEqual([
       [true, false],
       [true, false],
     ]);
@@ -716,7 +1017,9 @@ describe('the notes tool surface', () => {
   it('marks every writing kind non-read-only and destructive', () => {
     const tools = listTools(notesRegistry).filter((tool) => !isReadTool(tool.name));
 
-    expect(tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint])).toEqual([
+    expect(
+      tools.map((tool) => [tool.annotations.readOnlyHint, tool.annotations.destructiveHint]),
+    ).toEqual([
       [false, true],
       [false, true],
       [false, true],
@@ -725,7 +1028,9 @@ describe('the notes tool surface', () => {
   });
 
   it('closes the world for every notes tool', () => {
-    expect(listTools(notesRegistry).every((tool) => tool.annotations.openWorldHint === false)).toBe(true);
+    expect(listTools(notesRegistry).every((tool) => tool.annotations.openWorldHint === false)).toBe(
+      true,
+    );
   });
 
   it('advertises number tag ids wherever the registry declares them', () => {

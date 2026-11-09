@@ -15,9 +15,9 @@
  * `feedback-parity.test.ts` is what holds these lists to the ones the DTO validates
  * against — the same division `meal.ts` uses for the nutrient keys.
  */
-import type { ServiceModule } from '../cli/run';
-import { defineResource } from '../core/registry';
-import type { FieldSpec } from '../core/types';
+import type { ServiceModule } from '../cli/run.js';
+import { defineResource } from '../core/registry.js';
+import type { FieldSpec } from '../core/types.js';
 
 /**
  * The status vocabulary `@life/shared` owns (`FEEDBACK_STATUS_VALUES`), written in
@@ -95,7 +95,8 @@ export const service: ServiceModule = {
           id: {
             type: 'string',
             required: true,
-            description: 'Identifier of the feedback row to restatus; the service parses it as a UUIDv4',
+            description:
+              'Identifier of the feedback row to restatus; the service parses it as a UUIDv4',
           },
           status: {
             type: 'string',

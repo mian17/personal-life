@@ -11,14 +11,14 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { storeTokens } from '../src/auth/token-store';
-import { renderOpsResult } from '../src/cli/render';
-import type { LoadedModule } from '../src/cli/run';
-import type { ResourceRegistry } from '../src/core/types';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { createMcpServer, main, type McpServer, type McpServerOptions } from '../src/mcp/server';
-import { resolveDeadlineMs } from '../src/transport/executor';
-import { sampleApiToken } from './support/stub-api';
+import { storeTokens } from '../src/auth/token-store.js';
+import { renderOpsResult } from '../src/cli/render.js';
+import type { LoadedModule } from '../src/cli/run.js';
+import type { ResourceRegistry } from '../src/core/types.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { createMcpServer, main, type McpServer, type McpServerOptions } from '../src/mcp/server.js';
+import { resolveDeadlineMs } from '../src/transport/executor.js';
+import { sampleApiToken } from './support/stub-api.js';
 
 const PACKAGE_VERSION = (
   JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version: string }
@@ -80,19 +80,25 @@ afterEach(() => {
 
 describe('handshake', () => {
   it('echoes a version it speaks', async () => {
-    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', { protocolVersion: '2025-06-18' });
+    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', {
+      protocolVersion: '2025-06-18',
+    });
 
     expect(protocolVersionOf(reply)).toBe('2025-06-18');
   });
 
   it('answers the highest version it speaks when asked for an unknown one', async () => {
-    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', { protocolVersion: '1999-01-01' });
+    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', {
+      protocolVersion: '1999-01-01',
+    });
 
     expect(protocolVersionOf(reply)).toBe('2025-11-25');
   });
 
   it('declares the tools capability and its own identity', async () => {
-    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', { protocolVersion: '2025-06-18' });
+    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', {
+      protocolVersion: '2025-06-18',
+    });
     const result = reply.result as {
       capabilities: Record<string, unknown>;
       serverInfo: { name: string; version: string };
@@ -102,8 +108,11 @@ describe('handshake', () => {
     expect(result.serverInfo.name).toBe('life-ops');
   });
 
-  it('keeps its declared version equal to the package version', async () => {
-    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', { protocolVersion: '2025-06-18' });
+  // The library takes the version as an option; `src/mcp/entry.ts` is what reads `package.json`.
+  it('reports the version the stdio entry passes it', async () => {
+    const reply = await ask(serverOver(UNREACHABLE_API), 'initialize', {
+      protocolVersion: '2025-06-18',
+    });
 
     expect(serverVersionOf(reply)).toBe(PACKAGE_VERSION);
   });
@@ -403,6 +412,7 @@ function unionRun(settings: NodeJS.ProcessEnv): McpServerOptions {
   return {
     registry: modules.flatMap((module) => module.resources),
     modules,
+    serverVersion: PACKAGE_VERSION,
     env: { ...process.env, ...settings },
     stdout: () => {},
     stderr: () => {},
@@ -423,6 +433,7 @@ function serverOverConfigured(apiBase: string, env: NodeJS.ProcessEnv): McpServe
   return createMcpServer({
     registry: sampleRegistry,
     apiBase,
+    serverVersion: PACKAGE_VERSION,
     env,
     stdout: () => {},
     stderr: () => {},
@@ -449,6 +460,7 @@ function record(apiBase: string): Recorder {
   const options: McpServerOptions = {
     registry: sampleRegistry,
     apiBase,
+    serverVersion: PACKAGE_VERSION,
     env: process.env,
     stdout: (line) => {
       stdout.push(line);
@@ -484,7 +496,9 @@ async function serveLines(recorder: Recorder, run: StdinRun): Promise<void> {
 function watchedStdinListeners(): { data: (chunk: string) => void; end: () => void } {
   const listeners: StdinListeners = {};
   jest.spyOn(process.stdin, 'setEncoding').mockReturnValue(process.stdin);
-  jest.spyOn(process.stdin, 'on').mockImplementation(watchStdin(listeners) as typeof process.stdin.on);
+  jest
+    .spyOn(process.stdin, 'on')
+    .mockImplementation(watchStdin(listeners) as typeof process.stdin.on);
   return {
     data: (chunk) => listeners['data']?.(chunk),
     end: () => listeners['end']?.(),
@@ -582,7 +596,10 @@ function closeSilentApi(server: Server): Promise<void> {
 }
 
 /** Whether the call settled inside `waitMs`; a call still waiting answers `in flight`. */
-async function settleWithin(call: Promise<unknown>, waitMs: number): Promise<'settled' | 'in flight'> {
+async function settleWithin(
+  call: Promise<unknown>,
+  waitMs: number,
+): Promise<'settled' | 'in flight'> {
   const settled = call.then(
     () => 'settled' as const,
     () => 'settled' as const,

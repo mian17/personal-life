@@ -16,15 +16,15 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { login } from '../src/auth/login';
-import { currentAccessToken } from '../src/auth/token-provider';
-import { readTokens, storeTokens } from '../src/auth/token-store';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { createMcpServer } from '../src/mcp/server';
-import { main as runCli } from '../src/cli/run';
-import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
-import { REFRESH_REJECTED_DETAIL } from '../src/transport/errors';
-import { startStubIdp, type StubIdp } from './support/stub-idp';
+import { login } from '../src/auth/login.js';
+import { currentAccessToken } from '../src/auth/token-provider.js';
+import { readTokens, storeTokens } from '../src/auth/token-store.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { main as runCli } from '../src/cli/run.js';
+import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api.js';
+import { REFRESH_REJECTED_DETAIL } from '../src/transport/errors.js';
+import { startStubIdp, type StubIdp } from './support/stub-idp.js';
 
 const ONE_HOUR_MS = 3_600_000;
 const TEN_MINUTES_MS = 600_000;
@@ -63,7 +63,11 @@ afterEach(async () => {
 
 describe('a token outside the skew window', () => {
   it('is returned as stored, with no rotation', async () => {
-    await storeTokens({ accessToken: sampleApiToken, refreshToken: 'stub.refresh.token', expiresAt: Date.now() + ONE_HOUR_MS });
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: 'stub.refresh.token',
+      expiresAt: Date.now() + ONE_HOUR_MS,
+    });
 
     expect(await currentAccessToken()).toBe(sampleApiToken);
     expect(idp.rotations()).toBe(0);
@@ -104,14 +108,22 @@ describe('refreshing cannot happen', () => {
   });
 
   it('raises a dead credential when the store holds no refresh token', async () => {
-    await storeTokens({ accessToken: sampleApiToken, refreshToken: undefined, expiresAt: Date.now() + EXPIRING_SOON_MS });
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: undefined,
+      expiresAt: Date.now() + EXPIRING_SOON_MS,
+    });
 
     await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
     expect(idp.rotations()).toBe(0);
   });
 
   it('raises a dead credential when the IdP refuses the grant', async () => {
-    await storeTokens({ accessToken: sampleApiToken, refreshToken: 'not-a-live-refresh', expiresAt: Date.now() + EXPIRING_SOON_MS });
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: 'not-a-live-refresh',
+      expiresAt: Date.now() + EXPIRING_SOON_MS,
+    });
 
     await expect(currentAccessToken()).rejects.toThrow(REFRESH_REJECTED_DETAIL);
     expect(idp.rotations()).toBe(0);
@@ -136,9 +148,7 @@ describe('concurrent readers', () => {
     process.env.LIFE_OPS_REFRESH_SKEW_MS = ALWAYS_ROTATE_SKEW_MS;
     await storeExpiringTokens();
 
-    const readers = await Promise.all(
-      Array.from({ length: 10 }, () => currentAccessToken()),
-    );
+    const readers = await Promise.all(Array.from({ length: 10 }, () => currentAccessToken()));
     expect(idp.rotations()).toBe(1);
     expect(new Set(readers).size).toBe(1);
 
@@ -168,7 +178,11 @@ describe('concurrent readers', () => {
 describe('LIFE_OPS_REFRESH_SKEW_MS', () => {
   it('disables the window at 0, so even an expired token is handed over as stored', async () => {
     process.env.LIFE_OPS_REFRESH_SKEW_MS = '0';
-    await storeTokens({ accessToken: sampleApiToken, refreshToken: 'stub.refresh.token', expiresAt: Date.now() - ONE_HOUR_MS });
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: 'stub.refresh.token',
+      expiresAt: Date.now() - ONE_HOUR_MS,
+    });
 
     expect(await currentAccessToken()).toBe(sampleApiToken);
     expect(idp.rotations()).toBe(0);
@@ -281,7 +295,11 @@ async function startBrokenIssuer(): Promise<BrokenIssuer> {
     response.end('not json');
   });
   const port = await listenOnLoopback(server);
-  return { issuer: `http://127.0.0.1:${port}`, requestCount: () => count, stop: () => closeServer(server) };
+  return {
+    issuer: `http://127.0.0.1:${port}`,
+    requestCount: () => count,
+    stop: () => closeServer(server),
+  };
 }
 
 function listenOnLoopback(server: Server): Promise<number> {

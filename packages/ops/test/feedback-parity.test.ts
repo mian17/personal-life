@@ -21,26 +21,31 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { FEEDBACK_APPS, FEEDBACK_STATUS_VALUES, FEEDBACK_TYPE_VALUES } from '../../shared/src';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { findOp } from '../src/core/registry';
-import * as feedbackService from '../src/services/feedback';
-import { storeTokens } from '../src/auth/token-store';
+import {
+  FEEDBACK_APPS,
+  FEEDBACK_STATUS_VALUES,
+  FEEDBACK_TYPE_VALUES,
+} from '../../shared/src/index.js';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { findOp } from '../src/core/registry.js';
+import * as feedbackService from '../src/services/feedback.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
 const ONE_HOUR_MS = 3_600_000;
 const REFUSED_TOKEN_MESSAGE = 'feedback.update failed (unauthenticated): Unauthorized';
 const ABSENT_FEEDBACK_MESSAGE = 'feedback.update failed (notFound): Sample not found';
-const EMPTY_UPDATE_MESSAGE = 'feedback.update failed (invalidInput): id: required; status: required';
+const EMPTY_UPDATE_MESSAGE =
+  'feedback.update failed (invalidInput): id: required; status: required';
 const EMPTY_CREATE_MESSAGE = 'feedback.create failed (invalidInput): id: required';
 const UNKNOWN_STATUS_MESSAGE =
   'feedback.update failed (invalidInput): status: expected one of open, in_progress, done, wont_do';
@@ -96,7 +101,10 @@ interface WireShape {
 let credentialsFile = '';
 
 beforeEach(async () => {
-  credentialsFile = join(mkdtempSync(join(tmpdir(), 'life-ops-feedback-parity-')), 'credentials.json');
+  credentialsFile = join(
+    mkdtempSync(join(tmpdir(), 'life-ops-feedback-parity-')),
+    'credentials.json',
+  );
   process.env.LIFE_OPS_CREDENTIALS_PATH = credentialsFile;
   await storeTokens({
     accessToken: sampleApiToken,

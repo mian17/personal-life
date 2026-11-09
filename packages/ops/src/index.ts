@@ -14,8 +14,8 @@ export type {
   ResourceSpec,
   ValidationIssue,
   WireRequest,
-} from './core/types';
-export { defineResource, fieldEntry, fieldNames, findOp } from './core/registry';
+} from './core/types.js';
+export { defineResource, fieldEntry, fieldNames, findOp } from './core/registry.js';
 export {
   BULK_KINDS,
   DEFAULT_BULK_LIMIT,
@@ -24,32 +24,38 @@ export {
   bulkSourceKind,
   isBulkKind,
   resolveBulkLimit,
-} from './core/bulk';
+} from './core/bulk.js';
 export type {
   BulkEnvelope,
   BulkFailedItem,
   BulkItemResult,
   BulkKind,
   BulkSucceededItem,
-} from './core/bulk';
-export { describeIssues, validateInput } from './core/validate';
-export { deriveInputSchema, toolName } from './core/schema';
-export type { JsonSchema, JsonSchemaProperty } from './core/schema';
-export { wireFor } from './core/wire';
+} from './core/bulk.js';
+export { describeIssues, validateInput } from './core/validate.js';
+export { deriveInputSchema, toolName } from './core/schema.js';
+export type { JsonSchema, JsonSchemaProperty } from './core/schema.js';
+export { wireFor } from './core/wire.js';
 export {
   OpsError,
   invalidInputError,
   missingTokenError,
   operationLabel,
   renderOpsError,
-} from './transport/errors';
-export type { OpsErrorCode, OpsFailure } from './transport/errors';
-export { createExecutor } from './transport/executor';
-export type { Executor, ExecutorOptions, OpsResult } from './transport/executor';
-export { login, resolveLoginOptions } from './auth/login';
-export type { IdpEndpoints, LoginOptions } from './auth/login';
-export { refresh } from './auth/refresh';
-export type { RefreshOptions } from './auth/refresh';
-export { currentAccessToken } from './auth/token-provider';
-export { clearTokens, credentialsPath, readToken, readTokens, storeTokens } from './auth/token-store';
-export type { StoredTokens } from './auth/token-store';
+} from './transport/errors.js';
+export type { OpsErrorCode, OpsFailure } from './transport/errors.js';
+export { createExecutor } from './transport/executor.js';
+export type { Executor, ExecutorOptions, OpsResult } from './transport/executor.js';
+export { login, resolveLoginOptions } from './auth/login.js';
+export type { IdpEndpoints, LoginOptions } from './auth/login.js';
+export { refresh } from './auth/refresh.js';
+export type { RefreshOptions } from './auth/refresh.js';
+export { currentAccessToken } from './auth/token-provider.js';
+export {
+  clearTokens,
+  credentialsPath,
+  readToken,
+  readTokens,
+  storeTokens,
+} from './auth/token-store.js';
+export type { StoredTokens } from './auth/token-store.js';

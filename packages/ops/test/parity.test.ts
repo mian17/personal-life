@@ -10,16 +10,11 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { storeTokens } from '../src/auth/token-store';
-import {
-  sampleApiToken,
-  startStubApi,
-  type SampleRow,
-  type StubApi,
-} from './support/stub-api';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { storeTokens } from '../src/auth/token-store.js';
+import { sampleApiToken, startStubApi, type SampleRow, type StubApi } from './support/stub-api.js';
 
 const OWNER = 'owner-a';
 const VALID_REFRESH = 'stub.refresh.token';
@@ -89,7 +84,19 @@ afterEach(() => {
 describe('operation parity', () => {
   it('sends the same create and renders the same row', async () => {
     const pair = await runBoth({
-      argv: ['sample', 'create', '--title', 'New', '--priority', '3', '--archived', '--labels', 'x', '--labels', 'y'],
+      argv: [
+        'sample',
+        'create',
+        '--title',
+        'New',
+        '--priority',
+        '3',
+        '--archived',
+        '--labels',
+        'x',
+        '--labels',
+        'y',
+      ],
       tool: 'sample_create',
       args: { title: 'New', priority: 3, archived: true, labels: ['x', 'y'] },
     });
@@ -182,7 +189,11 @@ describe('error parity', () => {
   });
 
   it('renders a refused token identically', async () => {
-    await storeTokens({ accessToken: 'bogus', refreshToken: undefined, expiresAt: Date.now() + 3600000 });
+    await storeTokens({
+      accessToken: 'bogus',
+      refreshToken: undefined,
+      expiresAt: Date.now() + 3600000,
+    });
     const pair = await runBoth({
       argv: ['sample', 'get', '--id', 'row-a'],
       tool: 'sample_get',
@@ -299,7 +310,10 @@ function seededRows(): SampleRow[] {
 }
 
 function seededWithForeignRow(): SampleRow[] {
-  return [...seededRows(), { id: 'row-foreign', title: 'Foreign', version: 1, ownerSub: 'owner-b' }];
+  return [
+    ...seededRows(),
+    { id: 'row-foreign', title: 'Foreign', version: 1, ownerSub: 'owner-b' },
+  ];
 }
 
 /** The adapter-owned shape of the last recorded request; `undefined` when none arrived. */

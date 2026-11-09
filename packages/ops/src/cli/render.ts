@@ -4,8 +4,8 @@
  * `renderOpsError` shape. The MCP adapter prints these same strings, so output
  * parity is a string comparison rather than a convention.
  */
-import type { OpsResult } from '../transport/executor';
-import { OpsError, renderOpsError } from '../transport/errors';
+import type { OpsResult } from '../transport/executor.js';
+import { OpsError, renderOpsError } from '../transport/errors.js';
 
 /** The service body as the one canonical success output; an empty body renders empty. */
 export function renderOpsResult(result: OpsResult): string {

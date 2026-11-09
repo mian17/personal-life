@@ -5,7 +5,7 @@
  * conformance run proves no second contract, and takes its API base from
  * `LIFE_OPS_API_BASE`, so the spawned child speaks to the suite's stub only.
  */
-import type { ResourceRegistry } from '../../src/core/types';
-import { sampleRegistry } from '../../src/fixtures/sample';
+import type { ResourceRegistry } from '../../src/core/types.js';
+import { sampleRegistry } from '../../src/fixtures/sample.js';
 
 export const registry: ResourceRegistry = sampleRegistry;

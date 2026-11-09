@@ -8,18 +8,18 @@
  * once under `LIFE_OPS_BULK_LIMIT=25`, which may move `maxItems` and nothing else —
  * so both comparisons are made against the resolved value, never a fixed 10.
  */
-import { BULK_KINDS, resolveBulkLimit } from '../src/core/bulk';
-import { deriveInputSchema } from '../src/core/schema';
-import type { JsonSchema, JsonSchemaProperty } from '../src/core/schema';
-import { findOp } from '../src/core/registry';
-import { accepts } from './support/schema-accepts';
-import { listTools } from '../src/mcp/tools';
-import { BULK_WRAPPER_FIELD, describeIssues, validateInput } from '../src/core/validate';
-import type { OpSpec, ResourceRegistry, WireRequest } from '../src/core/types';
-import { wireFor } from '../src/core/wire';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { service as notesService } from '../src/services/notes';
-import { resources } from './support/bulk-service-module';
+import { BULK_KINDS, resolveBulkLimit } from '../src/core/bulk.js';
+import { deriveInputSchema } from '../src/core/schema.js';
+import type { JsonSchema, JsonSchemaProperty } from '../src/core/schema.js';
+import { findOp } from '../src/core/registry.js';
+import { accepts } from './support/schema-accepts.js';
+import { listTools } from '../src/mcp/tools.js';
+import { BULK_WRAPPER_FIELD, describeIssues, validateInput } from '../src/core/validate.js';
+import type { OpSpec, ResourceRegistry, WireRequest } from '../src/core/types.js';
+import { wireFor } from '../src/core/wire.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { service as notesService } from '../src/services/notes.js';
+import { resources } from './support/bulk-service-module.js';
 
 const journals = registryNamed('journals');
 const entries = registryNamed('entries');
@@ -91,7 +91,9 @@ describe('the item shape', () => {
   });
 
   it('stays closed for a resource that never opted in', () => {
-    expect(() => deriveInputSchema(entries, 'getMany')).toThrow('unknown operation: entries.getMany');
+    expect(() => deriveInputSchema(entries, 'getMany')).toThrow(
+      'unknown operation: entries.getMany',
+    );
   });
 });
 
@@ -132,12 +134,28 @@ describe('the schemas that already shipped', () => {
 
 /** Every bulk kind's title word, description tail, and hint row (§2.8, Task 5 AC 1 and 3). */
 const BULK_TOOL_ROWS: Array<
-  [OpSpec['kind'], string, { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean }]
+  [
+    OpSpec['kind'],
+    string,
+    { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean },
+  ]
 > = [
   ['getMany', 'Get many', { readOnlyHint: true, destructiveHint: false, idempotentHint: true }],
-  ['createMany', 'Create many', { readOnlyHint: false, destructiveHint: true, idempotentHint: false }],
-  ['updateMany', 'Update many', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
-  ['deleteMany', 'Delete many', { readOnlyHint: false, destructiveHint: true, idempotentHint: true }],
+  [
+    'createMany',
+    'Create many',
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+  ],
+  [
+    'updateMany',
+    'Update many',
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+  ],
+  [
+    'deleteMany',
+    'Delete many',
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+  ],
 ];
 
 describe('the bulk tool a model reads', () => {
@@ -146,9 +164,7 @@ describe('the bulk tool a model reads', () => {
       const tool = toolOf(kind);
 
       expect(tool.title).toBe(`${words} journals`);
-      expect(tool.description).toBe(
-        `${words} journals through /api/journals, one result per item`,
-      );
+      expect(tool.description).toBe(`${words} journals through /api/journals, one result per item`);
       expect(tool.annotations).toEqual({ ...hints, openWorldHint: false });
     });
   }

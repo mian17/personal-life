@@ -9,17 +9,17 @@ import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { login } from '../src/auth/login';
-import { refresh } from '../src/auth/refresh';
+import { login } from '../src/auth/login.js';
+import { refresh } from '../src/auth/refresh.js';
 import {
   clearTokens,
   credentialsPath,
   readToken,
   readTokens,
   storeTokens,
-} from '../src/auth/token-store';
-import { sampleApiToken } from './support/stub-api';
-import { startStubIdp, type StubIdp } from './support/stub-idp';
+} from '../src/auth/token-store.js';
+import { sampleApiToken } from './support/stub-api.js';
+import { startStubIdp, type StubIdp } from './support/stub-idp.js';
 
 const VALID_REFRESH = 'stub.refresh.token';
 
@@ -47,7 +47,9 @@ describe('login', () => {
 
     expect(tokens.accessToken).toBe(sampleApiToken);
     expect(await readToken()).toBe(sampleApiToken);
-    expect(await readTokens()).toEqual(expect.objectContaining({ refreshToken: expect.any(String) }));
+    expect(await readTokens()).toEqual(
+      expect.objectContaining({ refreshToken: expect.any(String) }),
+    );
   });
 
   it('writes the credentials file at mode 0600', async () => {
@@ -119,7 +121,11 @@ describe('refresh rotation', () => {
   });
 
   it('answers "login required" when the store holds no refresh token', async () => {
-    await storeTokens({ accessToken: sampleApiToken, refreshToken: undefined, expiresAt: Date.now() + 3600000 });
+    await storeTokens({
+      accessToken: sampleApiToken,
+      refreshToken: undefined,
+      expiresAt: Date.now() + 3600000,
+    });
 
     expect(await refresh({ issuer: idp.issuer })).toBeUndefined();
     expect(idp.rotations()).toBe(0);

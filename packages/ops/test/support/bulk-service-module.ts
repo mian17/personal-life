@@ -5,8 +5,8 @@
  * opted in at all, and opted in with `delete` as its only source gap — so one
  * module serves every bulk suite.
  */
-import { defineResource } from '../../src/core/registry';
-import type { OpSpec, ResourceRegistry } from '../../src/core/types';
+import { defineResource } from '../../src/core/registry.js';
+import type { OpSpec, ResourceRegistry } from '../../src/core/types.js';
 
 const singleRowOps: OpSpec[] = [
   {

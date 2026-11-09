@@ -38,7 +38,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CLI = join(ROOT, 'packages', 'ops', 'dist', 'cli', 'run.js');
+const CLI = join(ROOT, 'packages', 'ops', 'dist', 'cli', 'entry.js');
 
 /** The dev stack's port map (`scripts/dev-infra.sh` + the root `dev`/`dev:build`). */
 const PORTS = new Map([
@@ -336,7 +336,13 @@ const STEPS = [
       },
       {
         marker: 'Read a chapter',
-        flags: (ids) => ['--title', 'Read a chapter', '--listId', idOf(ids, 'list:weekend'), '--important'],
+        flags: (ids) => [
+          '--title',
+          'Read a chapter',
+          '--listId',
+          idOf(ids, 'list:weekend'),
+          '--important',
+        ],
       },
       {
         marker: 'Return the library book',
@@ -467,14 +473,18 @@ export function rowsOf(body, label) {
     const rows = Object.values(body).find(Array.isArray);
     if (rows !== undefined) return rows;
   }
-  throw new Error(`${label} returned neither an array nor an envelope of rows: ${JSON.stringify(body)}`);
+  throw new Error(
+    `${label} returned neither an array nor an envelope of rows: ${JSON.stringify(body)}`,
+  );
 }
 
 /** An id a previous step registered; a missing one is a script bug, never an empty flag. */
 export function idOf(ids, key) {
   const id = ids.get(key);
   if (id === undefined) {
-    throw new Error(`seed-stack: no id registered for "${key}"; the step that creates it must run first`);
+    throw new Error(
+      `seed-stack: no id registered for "${key}"; the step that creates it must run first`,
+    );
   }
   return id;
 }
@@ -577,7 +587,9 @@ async function waitForHttp(url, attempt = 1) {
     const failure = error instanceof Error ? error.message : String(error);
     await new Promise((done) => setTimeout(done, PROBE_INTERVAL_MS));
     if (attempt === PROBE_ATTEMPTS) {
-      throw new Error(`${url} never answered ${PROBE_ATTEMPTS} probes, ${PROBE_INTERVAL_MS}ms apart: ${failure}`);
+      throw new Error(
+        `${url} never answered ${PROBE_ATTEMPTS} probes, ${PROBE_INTERVAL_MS}ms apart: ${failure}`,
+      );
     }
     await waitForHttp(url, attempt + 1);
   }
@@ -585,7 +597,13 @@ async function waitForHttp(url, attempt = 1) {
 
 /** Refuse to seed a stack that is not up: half a stack is how a seed reports a false success. */
 async function probeStack() {
-  await inTurn([...PORTS].map(([name, port]) => async () => probeOne(name, port)));
+  await inTurn(
+    [...PORTS].map(
+      ([name, port]) =>
+        async () =>
+          probeOne(name, port),
+    ),
+  );
 }
 
 /** One service's probe, announced the moment it answers. */
@@ -612,13 +630,20 @@ function printTable(counts) {
   ];
   const widths = rows[0].map((_, column) => Math.max(...rows.map((row) => row[column].length)));
   for (const row of rows) {
-    console.log(row.map((cell, column) => cell.padEnd(widths[column])).join(' | ').trimEnd());
+    console.log(
+      row
+        .map((cell, column) => cell.padEnd(widths[column]))
+        .join(' | ')
+        .trimEnd(),
+    );
   }
 }
 
 async function main() {
   if (!existsSync(CLI)) {
-    console.error('packages/ops/dist is not built; run npm run build first (npm run dev:build does it)');
+    console.error(
+      'packages/ops/dist is not built; run npm run build first (npm run dev:build does it)',
+    );
     process.exitCode = 1;
     return;
   }

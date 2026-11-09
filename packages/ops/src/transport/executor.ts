@@ -6,17 +6,12 @@
  * A bulk kind is a strategy inside this executor — one source-kind request per
  * submitted item, then the envelope — never a second executor.
  */
-import type { BulkEnvelope, BulkItemResult, BulkKind } from '../core/bulk';
-import {
-  assembleBulkEnvelope,
-  bulkItemInput,
-  bulkSourceKind,
-  isBulkKind,
-} from '../core/bulk';
-import type { OpSpec, ResourceRegistry, WireRequest } from '../core/types';
-import { findOp } from '../core/registry';
-import { BULK_WRAPPER_FIELD, validateInput } from '../core/validate';
-import { wireFor } from '../core/wire';
+import type { BulkEnvelope, BulkItemResult, BulkKind } from '../core/bulk.js';
+import { assembleBulkEnvelope, bulkItemInput, bulkSourceKind, isBulkKind } from '../core/bulk.js';
+import type { OpSpec, ResourceRegistry, WireRequest } from '../core/types.js';
+import { findOp } from '../core/registry.js';
+import { BULK_WRAPPER_FIELD, validateInput } from '../core/validate.js';
+import { wireFor } from '../core/wire.js';
 import {
   deadlineExceededError,
   expiredCredentialsError,
@@ -29,7 +24,7 @@ import {
   RefreshRejected,
   renderOpsError,
   transportFailureError,
-} from './errors';
+} from './errors.js';
 
 export interface ExecutorOptions {
   registry: ResourceRegistry;

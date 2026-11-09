@@ -5,12 +5,18 @@
  * arrays. A nested case table can then assert the validator's verdict and the
  * schema's verdict on the same input, which is what makes drift a failure.
  */
-import type { JsonSchema, JsonSchemaProperty, JsonSchemaValueShape } from '../../src/core/schema';
+import type {
+  JsonSchema,
+  JsonSchemaProperty,
+  JsonSchemaValueShape,
+} from '../../src/core/schema.js';
 
 export function accepts(schema: JsonSchema, supplied: Record<string, unknown>): boolean {
   if (schema.required.some((name) => supplied[name] === undefined)) return false;
   if (!declaresEveryKey(schema, supplied)) return false;
-  return Object.entries(supplied).every(([name, value]) => matchesValue(schema.properties[name], value));
+  return Object.entries(supplied).every(([name, value]) =>
+    matchesValue(schema.properties[name], value),
+  );
 }
 
 /** One value against its declared shape; an undeclared shape carries no constraint here. */
@@ -44,7 +50,9 @@ function isObjectShape(shape: JsonSchemaValueShape, value: unknown): boolean {
   const supplied = value as Record<string, unknown>;
   if ((shape.required ?? []).some((name) => supplied[name] === undefined)) return false;
   if (!declaresEveryKey(shape, supplied)) return false;
-  return Object.entries(supplied).every(([name, entry]) => matchesValue(shape.properties?.[name], entry));
+  return Object.entries(supplied).every(([name, entry]) =>
+    matchesValue(shape.properties?.[name], entry),
+  );
 }
 
 /** A shape that closes its key set rejects a supplied key it never declares. */

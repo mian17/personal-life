@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { rowsOf } from './seed-stack.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CLI = join(ROOT, 'packages', 'ops', 'dist', 'cli', 'run.js');
+const CLI = join(ROOT, 'packages', 'ops', 'dist', 'cli', 'entry.js');
 const IDS_FILE = join(ROOT, 'apps', 'app', 'test', 'screens', 'screens.ids.json');
 
 /** The dev stack's port map (`scripts/dev-infra.sh` + the root `dev`/`dev:build`). */
@@ -97,7 +97,10 @@ function listRows(service, resource, flags, credentialsDir) {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: childEnv(service, credentialsDir),
     });
-    return rowsOf(stdout.trim() === '' ? undefined : JSON.parse(stdout), `${service} ${resource} list`);
+    return rowsOf(
+      stdout.trim() === '' ? undefined : JSON.parse(stdout),
+      `${service} ${resource} list`,
+    );
   } catch (error) {
     throw new Error(`${service} ${args.join(' ')} failed: ${failureText(error)}`);
   }
@@ -150,10 +153,7 @@ function readIds(credentialsDir) {
   const food = findRow('meal', 'foods', [], (row) => row.name === SEEDED_FOOD, credentialsDir);
   const mealDate = clientDay();
   const ids = [
-    [
-      'note',
-      findRow('notes', 'notes', [], (row) => row.body === SEEDED_NOTE, credentialsDir)?.id,
-    ],
+    ['note', findRow('notes', 'notes', [], (row) => row.body === SEEDED_NOTE, credentialsDir)?.id],
     ['todo', findRow('todo', 'todos', [], (row) => row.title === SEEDED_TODO, credentialsDir)?.id],
     ['mealDate', mealDate],
     [
@@ -173,7 +173,8 @@ function readIds(credentialsDir) {
     ['food', food?.id],
     [
       'savedMeal',
-      findRow('meal', 'saved-meals', [], (row) => row.name === SEEDED_SAVED_MEAL, credentialsDir)?.id,
+      findRow('meal', 'saved-meals', [], (row) => row.name === SEEDED_SAVED_MEAL, credentialsDir)
+        ?.id,
     ],
     ['feedback', findRow('feedback', 'feedback', [], isSeededFeedback, credentialsDir)?.id],
   ];
@@ -197,7 +198,9 @@ async function main() {
     const missing = missingIds(ids);
     for (const [key, value] of ids) console.log(`${key}: ${value ?? '(missing)'}`);
     if (missing.length > 0) {
-      console.error(`screens:ids found no seeded row for: ${missing.join(', ')} (run npm run seed:stack)`);
+      console.error(
+        `screens:ids found no seeded row for: ${missing.join(', ')} (run npm run seed:stack)`,
+      );
       process.exitCode = 1;
       return;
     }

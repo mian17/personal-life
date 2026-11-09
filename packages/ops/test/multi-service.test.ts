@@ -15,14 +15,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { login } from '../src/auth/login';
-import { storeTokens, type StoredTokens } from '../src/auth/token-store';
-import { loadService, main as runCli } from '../src/cli/run';
-import type { ServiceModule } from '../src/cli/run';
-import { createMcpServer, type McpServer } from '../src/mcp/server';
-import { sampleApiToken, startStubApi } from './support/stub-api';
-import type { SampleRow, StubApi } from './support/stub-api';
-import { startStubIdp, type StubIdp } from './support/stub-idp';
+import { login } from '../src/auth/login.js';
+import { storeTokens, type StoredTokens } from '../src/auth/token-store.js';
+import { loadService, main as runCli } from '../src/cli/run.js';
+import type { ServiceModule } from '../src/cli/run.js';
+import { createMcpServer, type McpServer } from '../src/mcp/server.js';
+import { sampleApiToken, startStubApi } from './support/stub-api.js';
+import type { SampleRow, StubApi } from './support/stub-api.js';
+import { startStubIdp, type StubIdp } from './support/stub-idp.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const SELECTOR = 'todo,meal,notes';
@@ -107,7 +107,10 @@ let credentialsFile = '';
 let savedCredentialsPath: string | undefined;
 
 beforeAll(async () => {
-  credentialsFile = join(mkdtempSync(join(tmpdir(), 'life-ops-multi-service-')), 'credentials.json');
+  credentialsFile = join(
+    mkdtempSync(join(tmpdir(), 'life-ops-multi-service-')),
+    'credentials.json',
+  );
   savedCredentialsPath = process.env.LIFE_OPS_CREDENTIALS_PATH;
   process.env.LIFE_OPS_CREDENTIALS_PATH = credentialsFile;
   await storeTokens({

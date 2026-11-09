@@ -7,7 +7,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { loadService, main } from '../src/cli/run';
+import { loadService, main } from '../src/cli/run.js';
 
 interface Outcome {
   exit: number;
@@ -45,7 +45,10 @@ describe('main service resolution', () => {
   let savedCredentialsPath: string | undefined;
 
   beforeEach(() => {
-    credentialsFile = join(mkdtempSync(join(tmpdir(), 'life-ops-cli-bootstrap-')), 'credentials.json');
+    credentialsFile = join(
+      mkdtempSync(join(tmpdir(), 'life-ops-cli-bootstrap-')),
+      'credentials.json',
+    );
     savedCredentialsPath = process.env.LIFE_OPS_CREDENTIALS_PATH;
     process.env.LIFE_OPS_CREDENTIALS_PATH = credentialsFile;
   });

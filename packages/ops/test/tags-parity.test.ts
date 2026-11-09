@@ -15,19 +15,19 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { findOp } from '../src/core/registry';
-import type { ResourceRegistry } from '../src/core/types';
-import * as tagsService from '../src/services/tags';
-import { storeTokens } from '../src/auth/token-store';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { findOp } from '../src/core/registry.js';
+import type { ResourceRegistry } from '../src/core/types.js';
+import * as tagsService from '../src/services/tags.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
@@ -99,7 +99,10 @@ afterEach(() => {
 
 describe('the tags registry', () => {
   it('declares the two resources at their service base paths', () => {
-    expect(tagsService.resources.map((resource) => resource.name)).toEqual(['tags', 'tags-resolve']);
+    expect(tagsService.resources.map((resource) => resource.name)).toEqual([
+      'tags',
+      'tags-resolve',
+    ]);
     expect(tagsService.resources.map((resource) => resource.basePath)).toEqual([
       '/api/tags',
       '/api/tags/resolve',
