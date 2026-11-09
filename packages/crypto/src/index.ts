@@ -1,5 +1,5 @@
-export { CryptoError } from './errors';
-export { ENC_PREFIX, encryptField, decryptField } from './envelope';
+export { CryptoError } from './errors.js';
+export { ENC_PREFIX, encryptField, decryptField } from './envelope.js';
 export {
   KW_PREFIX,
   generateDek,
@@ -7,4 +7,4 @@ export {
   wrapDek,
   unwrapDek,
   rewrapDek,
-} from './keys';
+} from './keys.js';

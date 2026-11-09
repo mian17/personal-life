@@ -1,4 +1,4 @@
-import { NUTRIENTS, scale, type Food, type Nutrient, type NutrientVector } from '../src/index';
+import { NUTRIENTS, scale, type Food, type Nutrient, type NutrientVector } from '../src/index.js';
 
 /**
  * Scaling invariants: exact linearity at 0×/0.5×/2×, totality (all 27 keys even

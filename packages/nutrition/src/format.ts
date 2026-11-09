@@ -4,7 +4,7 @@
  * `DAILY_VALUES`, never stored in and never returned by `scale`/`sum`.
  */
 
-import { NUTRIENTS, type Nutrient, type NutrientUnit } from './nutrients';
+import { NUTRIENTS, type Nutrient, type NutrientUnit } from './nutrients.js';
 
 /**
  * The `%DV`-eligible micronutrients, keyed like `NUTRIENTS` so a non-eligible
@@ -46,9 +46,10 @@ export const DAILY_VALUES: Record<Nutrient, number | null> = {
 /** The unknown affordance: an estimated-but-unknown value renders this, never `0`. */
 export const UNKNOWN = '—';
 
-const UNITS = Object.fromEntries(
-  NUTRIENTS.map((n) => [n.key, n.unit]),
-) as Record<Nutrient, NutrientUnit>;
+const UNITS = Object.fromEntries(NUTRIENTS.map((n) => [n.key, n.unit])) as Record<
+  Nutrient,
+  NutrientUnit
+>;
 
 /**
  * Render a value with its unit, or `UNKNOWN` when the model does not know it
