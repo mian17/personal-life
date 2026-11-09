@@ -3,8 +3,8 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { Todo } from '../src/todos/todo.entity';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { Todo } from '../src/todos/todo.entity.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-todo-service` Behaviour/API — the todo domain over HTTP.
@@ -46,7 +46,7 @@ describe('Todos API (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
@@ -79,8 +79,7 @@ describe('Todos API (e2e)', () => {
     auth(request(server()).post(`/api/todos/${id}/restore`), token);
   const removePermanent = (id: string, token = tokenA) =>
     auth(request(server()).delete(`/api/todos/${id}/permanent`), token);
-  const emptyTrash = (token = tokenA) =>
-    auth(request(server()).delete('/api/todos/trash'), token);
+  const emptyTrash = (token = tokenA) => auth(request(server()).delete('/api/todos/trash'), token);
   const tags = (token = tokenA) => auth(request(server()).get('/api/todos/tags'), token);
   const createList = (name: string, token = tokenA) =>
     auth(request(server()).post('/api/lists'), token).send({ name });
@@ -178,9 +177,21 @@ describe('Todos API (e2e)', () => {
 
       const undatedOld = await create({ title: 'undated-old', listId: l.body.id }).expect(201);
       const undatedNew = await create({ title: 'undated-new', listId: l.body.id }).expect(201);
-      const later = await create({ title: 'due-later', dueDate: '2026-06-01', listId: l.body.id }).expect(201);
-      const overdue = await create({ title: 'due-overdue', dueDate: '2026-01-01', listId: l.body.id }).expect(201);
-      const today = await create({ title: 'due-today', dueDate: '2026-03-03', listId: l.body.id }).expect(201);
+      const later = await create({
+        title: 'due-later',
+        dueDate: '2026-06-01',
+        listId: l.body.id,
+      }).expect(201);
+      const overdue = await create({
+        title: 'due-overdue',
+        dueDate: '2026-01-01',
+        listId: l.body.id,
+      }).expect(201);
+      const today = await create({
+        title: 'due-today',
+        dueDate: '2026-03-03',
+        listId: l.body.id,
+      }).expect(201);
 
       // Pin createdAt to make the undated/createdAt tiebreak deterministic.
       await pinCreatedAt(undatedOld.body.id, new Date(base));
@@ -199,13 +210,29 @@ describe('Todos API (e2e)', () => {
 
     it('filters by done, dueBefore/dueAfter, listId, tagId and q, all post-decrypt', async () => {
       const l = await createList('Filters').expect(201);
-      const a = await create({ title: 'filter alpha', dueDate: '2026-02-02', listId: l.body.id, tagIds: [1] }).expect(201);
-      const b = await create({ title: 'filter beta', dueDate: '2026-04-04', listId: l.body.id, tagIds: [2] }).expect(201);
-      const c = await create({ title: 'filter gamma', listId: l.body.id, tagIds: [1, 2] }).expect(201);
+      const a = await create({
+        title: 'filter alpha',
+        dueDate: '2026-02-02',
+        listId: l.body.id,
+        tagIds: [1],
+      }).expect(201);
+      const b = await create({
+        title: 'filter beta',
+        dueDate: '2026-04-04',
+        listId: l.body.id,
+        tagIds: [2],
+      }).expect(201);
+      const c = await create({ title: 'filter gamma', listId: l.body.id, tagIds: [1, 2] }).expect(
+        201,
+      );
       await patch(b.body.id, { done: true }).expect(200);
 
       const byDone = await list(`?listId=${l.body.id}&done=false`).expect(200);
-      expect(byDone.body.todos.map((t: { id: string }) => t.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
+      expect(
+        byDone.body.todos
+          .map((t: { id: string }) => t.id)
+          .sort((a: string, b: string) => a.localeCompare(b)),
+      ).toEqual([a.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       const byDueBefore = await list(`?listId=${l.body.id}&dueBefore=2026-03-03`).expect(200);
       expect(byDueBefore.body.todos.map((t: { id: string }) => t.id)).toEqual([a.body.id]);
@@ -214,7 +241,11 @@ describe('Todos API (e2e)', () => {
       expect(byDueAfter.body.todos.map((t: { id: string }) => t.id)).toEqual([b.body.id]);
 
       const byTag = await list(`?listId=${l.body.id}&tagId=2`).expect(200);
-      expect(byTag.body.todos.map((t: { id: string }) => t.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([b.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
+      expect(
+        byTag.body.todos
+          .map((t: { id: string }) => t.id)
+          .sort((a: string, b: string) => a.localeCompare(b)),
+      ).toEqual([b.body.id, c.body.id].sort((a: string, b: string) => a.localeCompare(b)));
 
       const byQ = await list(`?listId=${l.body.id}&q=ALPHA`).expect(200);
       expect(byQ.body.todos.map((t: { id: string }) => t.id)).toEqual([a.body.id]);
@@ -228,7 +259,11 @@ describe('Todos API (e2e)', () => {
       const same = new Date('2026-07-07T00:00:00Z');
       const ids: string[] = [];
       for (let i = 0; i < 5; i++) {
-        const created = await create({ title: `page todo ${i}`, dueDate: '2026-07-07', listId: l.body.id }).expect(201);
+        const created = await create({
+          title: `page todo ${i}`,
+          dueDate: '2026-07-07',
+          listId: l.body.id,
+        }).expect(201);
         ids.push(created.body.id);
         await pinCreatedAt(created.body.id, same);
       }
@@ -239,7 +274,11 @@ describe('Todos API (e2e)', () => {
       do {
         const query = `?listId=${l.body.id}&limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
         const res = await list(query).expect(200);
-        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['nextCursor', 'todos', 'total']);
+        expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+          'nextCursor',
+          'todos',
+          'total',
+        ]);
         seen.push(...res.body.todos.map((t: { id: string }) => t.id));
         cursor = res.body.nextCursor ?? undefined;
         pages += 1;
@@ -253,7 +292,11 @@ describe('Todos API (e2e)', () => {
     it('pages across the dated/undated boundary without repeating the boundary row', async () => {
       const l = await createList('Boundary').expect(201);
       const same = new Date('2026-08-08T00:00:00Z');
-      const dated = await create({ title: 'the dated one', dueDate: '2026-01-01', listId: l.body.id }).expect(201);
+      const dated = await create({
+        title: 'the dated one',
+        dueDate: '2026-01-01',
+        listId: l.body.id,
+      }).expect(201);
       const u1 = await create({ title: 'undated 1', listId: l.body.id }).expect(201);
       const u2 = await create({ title: 'undated 2', listId: l.body.id }).expect(201);
       await pinCreatedAt(dated.body.id, same);
@@ -262,7 +305,10 @@ describe('Todos API (e2e)', () => {
 
       // Undated rows order by createdAt DESC, so u2 (newer) precedes u1.
       const first = await list(`?listId=${l.body.id}&limit=2`).expect(200);
-      expect(first.body.todos.map((t: { id: string }) => t.id)).toEqual([dated.body.id, u2.body.id]);
+      expect(first.body.todos.map((t: { id: string }) => t.id)).toEqual([
+        dated.body.id,
+        u2.body.id,
+      ]);
       expect(first.body.nextCursor).not.toBeNull();
 
       const second = await list(
@@ -276,8 +322,12 @@ describe('Todos API (e2e)', () => {
       await create({ title: 'a-only-visible' }, tokenA).expect(201);
       await create({ title: 'b-only-visible' }, tokenB).expect(201);
 
-      const aNames = (await list('', tokenA).expect(200)).body.todos.map((t: { title: string }) => t.title);
-      const bNames = (await list('', tokenB).expect(200)).body.todos.map((t: { title: string }) => t.title);
+      const aNames = (await list('', tokenA).expect(200)).body.todos.map(
+        (t: { title: string }) => t.title,
+      );
+      const bNames = (await list('', tokenB).expect(200)).body.todos.map(
+        (t: { title: string }) => t.title,
+      );
       expect(aNames).toContain('a-only-visible');
       expect(aNames).not.toContain('b-only-visible');
       expect(bNames).toContain('b-only-visible');
@@ -297,15 +347,22 @@ describe('Todos API (e2e)', () => {
       expect(eleven.count).toBe(2);
       expect(twentyTwo.count).toBe(1);
       // Ids + counts only — no names, no content.
-      expect(Object.keys(eleven).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['count', 'tagId']);
+      expect(Object.keys(eleven).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+        'count',
+        'tagId',
+      ]);
     });
 
     it('drops a tag from the usage surface once its last todo is deleted', async () => {
       const created = await create({ title: 'sole-33', tagIds: [33] }).expect(201);
-      expect((await tags().expect(200)).body.some((r: { tagId: number }) => r.tagId === 33)).toBe(true);
+      expect((await tags().expect(200)).body.some((r: { tagId: number }) => r.tagId === 33)).toBe(
+        true,
+      );
 
       await remove(created.body.id).expect(200);
-      expect((await tags().expect(200)).body.some((r: { tagId: number }) => r.tagId === 33)).toBe(false);
+      expect((await tags().expect(200)).body.some((r: { tagId: number }) => r.tagId === 33)).toBe(
+        false,
+      );
     });
   });
 
@@ -339,23 +396,45 @@ describe('Todos API (e2e)', () => {
     });
 
     it('applies a partial update and increments version', async () => {
-      const created = await create({ title: 'before', note: 'old note', dueDate: '2026-02-02' }).expect(201);
+      const created = await create({
+        title: 'before',
+        note: 'old note',
+        dueDate: '2026-02-02',
+      }).expect(201);
 
       const updated = await patch(created.body.id, { title: 'after', done: true }).expect(200);
-      expect(updated.body).toMatchObject({ title: 'after', note: 'old note', done: true, dueDate: '2026-02-02', version: 1 });
+      expect(updated.body).toMatchObject({
+        title: 'after',
+        note: 'old note',
+        done: true,
+        dueDate: '2026-02-02',
+        version: 1,
+      });
     });
 
     it('clears note/dueDate/listId with an explicit null', async () => {
       const l = await createList('Clearing').expect(201);
-      const created = await create({ title: 'clear me', note: 'x', dueDate: '2026-02-02', listId: l.body.id }).expect(201);
+      const created = await create({
+        title: 'clear me',
+        note: 'x',
+        dueDate: '2026-02-02',
+        listId: l.body.id,
+      }).expect(201);
 
-      const updated = await patch(created.body.id, { note: null, dueDate: null, listId: null }).expect(200);
+      const updated = await patch(created.body.id, {
+        note: null,
+        dueDate: null,
+        listId: null,
+      }).expect(200);
       expect(updated.body).toMatchObject({ note: null, dueDate: null, listId: null });
     });
 
     it('rejects a stale expectedVersion with 409 and leaves the row unchanged', async () => {
       const created = await create({ title: 'optimistic' }).expect(201);
-      const first = await patch(created.body.id, { title: 'optimistic 1', expectedVersion: 0 }).expect(200);
+      const first = await patch(created.body.id, {
+        title: 'optimistic 1',
+        expectedVersion: 0,
+      }).expect(200);
       expect(first.body.version).toBe(1);
 
       await patch(created.body.id, { title: 'optimistic stale', expectedVersion: 0 }).expect(409);
@@ -431,7 +510,9 @@ describe('Todos API (e2e)', () => {
 
       const row = await dataSource.query('SELECT COUNT(*) AS c FROM todo WHERE id = ?', [id]);
       expect(Number(row[0].c)).toBe(0);
-      const assoc = await dataSource.query('SELECT COUNT(*) AS c FROM todo_tag WHERE todoId = ?', [id]);
+      const assoc = await dataSource.query('SELECT COUNT(*) AS c FROM todo_tag WHERE todoId = ?', [
+        id,
+      ]);
       expect(Number(assoc[0].c)).toBe(0);
       const inTrash = await trash().expect(200);
       expect(inTrash.body.todos.map((t: { id: string }) => t.id)).not.toContain(id);
@@ -481,7 +562,11 @@ describe('Todos API (e2e)', () => {
       expect(inheriting.body.important).toBeNull();
       expect(inheriting.body.effectiveImportant).toBe(true);
 
-      const overriding = await create({ title: 'overriding', listId: l.body.id, important: false }).expect(201);
+      const overriding = await create({
+        title: 'overriding',
+        listId: l.body.id,
+        important: false,
+      }).expect(201);
       expect(overriding.body.effectiveImportant).toBe(false);
     });
 
@@ -502,7 +587,9 @@ describe('Todos API (e2e)', () => {
 
     it('clearing the override with PATCH null returns the todo to inheritance', async () => {
       const l = await createListWith('Clearing-imp', true).expect(201);
-      const t = await create({ title: 'clear-imp', listId: l.body.id, important: false }).expect(201);
+      const t = await create({ title: 'clear-imp', listId: l.body.id, important: false }).expect(
+        201,
+      );
       expect(t.body.effectiveImportant).toBe(false);
 
       const cleared = await patch(t.body.id, { important: null }).expect(200);
@@ -521,7 +608,11 @@ describe('Todos API (e2e)', () => {
     it('filters on effectiveImportant in memory off the one cached todo:all entry', async () => {
       const l = await createListWith('Filter-imp', true).expect(201);
       const viaDefault = await create({ title: 'via-default', listId: l.body.id }).expect(201);
-      const explicitFalse = await create({ title: 'explicit-false', listId: l.body.id, important: false }).expect(201);
+      const explicitFalse = await create({
+        title: 'explicit-false',
+        listId: l.body.id,
+        important: false,
+      }).expect(201);
       const explicitTrue = await create({ title: 'explicit-true', important: true }).expect(201);
 
       const imp = await list(`?listId=${l.body.id}&important=true`).expect(200);
@@ -556,7 +647,9 @@ describe('Todos API (e2e)', () => {
       const created = await create({ title: 'dangling', tagIds: [999999] }).expect(201);
       expect(created.body.tagIds).toEqual([999999]);
 
-      const rows = await dataSource.query('SELECT tagId FROM todo_tag WHERE todoId = ?', [created.body.id]);
+      const rows = await dataSource.query('SELECT tagId FROM todo_tag WHERE todoId = ?', [
+        created.body.id,
+      ]);
       expect(rows.map((r: { tagId: number }) => r.tagId)).toEqual([999999]);
     });
   });

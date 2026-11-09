@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { rmSync } from 'fs';
 import { DataSource } from 'typeorm';
 import { likeMatch } from '@life/shared';
-import { TodosCache } from '../src/cache/todo-cache';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
+import { TodosCache } from '../src/cache/todo-cache.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
 
 /**
  * `SPEC-todo-service` Testing Strategy #3: search parity. Expected `LIKE`

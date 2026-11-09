@@ -4,7 +4,7 @@ import { join } from 'path';
 import request from 'supertest';
 import { ENC_PREFIX } from '@life/crypto';
 import { DataSource } from 'typeorm';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-todo-service` lists behaviour (Testing Strategy #5): create with a
@@ -44,7 +44,7 @@ describe('Lists API (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
@@ -94,17 +94,32 @@ describe('Lists API (e2e)', () => {
         'total',
       ]);
       expect(res.body.nextCursor).toBeNull();
-      const lists = res.body.lists as Array<{ id: string; name: string; version: number; createdAt: string }>;
+      const lists = res.body.lists as Array<{
+        id: string;
+        name: string;
+        version: number;
+        createdAt: string;
+      }>;
       expect(lists.map((l) => l.name)).toEqual(['Alpha', 'zeta']);
       for (const l of lists) {
-        expect(Object.keys(l).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'importantDefault', 'name', 'version']);
+        expect(Object.keys(l).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+          'createdAt',
+          'id',
+          'importantDefault',
+          'name',
+          'version',
+        ]);
         expect(typeof l.version).toBe('number');
         expect(l.createdAt.endsWith('Z')).toBe(true);
       }
-      expect(lists.map((l) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)));
+      expect(lists.map((l) => l.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+        [a.body.id, z.body.id].sort((a: string, b: string) => a.localeCompare(b)),
+      );
 
       // B's lists never appear to A.
-      expect((await listLists(tokenB).expect(200)).body.lists.map((l: { name: string }) => l.name)).toEqual(['beta']);
+      expect(
+        (await listLists(tokenB).expect(200)).body.lists.map((l: { name: string }) => l.name),
+      ).toEqual(['beta']);
     });
 
     it('pages the case-insensitive name order with no gap and no duplicate', async () => {
@@ -116,7 +131,9 @@ describe('Lists API (e2e)', () => {
         await createList(name, pageToken).expect(201);
       }
 
-      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(200);
+      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(
+        200,
+      );
       const expected = (whole.body.lists as Array<{ name: string }>).map((l) => l.name);
       expect(expected).toEqual(['apple', 'Banana', 'cherry', 'mango', 'Zebra']);
 
@@ -125,7 +142,9 @@ describe('Lists API (e2e)', () => {
       let pages = 0;
       do {
         const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
-        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(200);
+        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(
+          200,
+        );
         const page = res.body as { lists: Array<{ name: string }>; nextCursor: string | null };
         expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
           'lists',
@@ -191,7 +210,9 @@ describe('Lists API (e2e)', () => {
         await createList(name, pageToken).expect(201);
       }
 
-      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(200);
+      const whole = await auth(request(server()).get('/api/lists?limit=200'), pageToken).expect(
+        200,
+      );
       const expected = (whole.body.lists as Array<{ name: string }>).map((l) => l.name);
       expect(expected).toEqual(['a|b', 'ends|', 'plain', 'z|z']);
 
@@ -200,7 +221,9 @@ describe('Lists API (e2e)', () => {
       let pages = 0;
       do {
         const query = cursor === null ? { limit: '1' } : { limit: '1', cursor };
-        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(200);
+        const res = await auth(request(server()).get('/api/lists').query(query), pageToken).expect(
+          200,
+        );
         const page = res.body as { lists: Array<{ name: string }>; nextCursor: string | null };
         seen.push(...page.lists.map((l) => l.name));
         cursor = page.nextCursor;
@@ -221,9 +244,11 @@ describe('Lists API (e2e)', () => {
       const stored = (await rawNames('user-a')).find((n) => n.startsWith(ENC_PREFIX));
       expect(stored).toBeDefined();
       expect(stored).not.toContain('TOPSECRET-LIST');
-      expect((await listLists().expect(200)).body.lists.find((l: { id: string }) => l.id === created.body.id).name).toBe(
-        'TOPSECRET-LIST',
-      );
+      expect(
+        (await listLists().expect(200)).body.lists.find(
+          (l: { id: string }) => l.id === created.body.id,
+        ).name,
+      ).toBe('TOPSECRET-LIST');
     });
 
     it('rejects a case-insensitive collision within one owner with 409', async () => {
@@ -262,8 +287,12 @@ describe('Lists API (e2e)', () => {
       await renameList(alpha.body.id, { name: 'C-BETA' }).expect(409);
 
       const listed = await listLists().expect(200);
-      expect(listed.body.lists.find((l: { id: string }) => l.id === alpha.body.id).name).toBe('C-alpha');
-      expect(listed.body.lists.find((l: { id: string }) => l.id === beta.body.id).name).toBe('C-beta');
+      expect(listed.body.lists.find((l: { id: string }) => l.id === alpha.body.id).name).toBe(
+        'C-alpha',
+      );
+      expect(listed.body.lists.find((l: { id: string }) => l.id === beta.body.id).name).toBe(
+        'C-beta',
+      );
     });
 
     it('allows a pure case change of the same list', async () => {
@@ -274,10 +303,15 @@ describe('Lists API (e2e)', () => {
 
     it('rejects a stale expectedVersion with 409 and leaves the row unchanged', async () => {
       const created = await createList('Optimistic').expect(201);
-      const first = await renameList(created.body.id, { name: 'Optimistic 1', expectedVersion: 0 }).expect(200);
+      const first = await renameList(created.body.id, {
+        name: 'Optimistic 1',
+        expectedVersion: 0,
+      }).expect(200);
       expect(first.body.version).toBe(1);
 
-      await renameList(created.body.id, { name: 'Optimistic stale', expectedVersion: 0 }).expect(409);
+      await renameList(created.body.id, { name: 'Optimistic stale', expectedVersion: 0 }).expect(
+        409,
+      );
 
       const listed = await listLists().expect(200);
       const row = listed.body.lists.find((l: { id: string }) => l.id === created.body.id);
@@ -315,11 +349,16 @@ describe('Lists API (e2e)', () => {
     it('PATCH sets and clears importantDefault without touching name-collision identity', async () => {
       const l = await createList('Imp-patch').expect(201);
 
-      const set = await renameList(l.body.id, { name: 'Imp-patch', importantDefault: true }).expect(200);
+      const set = await renameList(l.body.id, { name: 'Imp-patch', importantDefault: true }).expect(
+        200,
+      );
       expect(set.body.importantDefault).toBe(true);
       expect(set.body.version).toBe(1);
 
-      const cleared = await renameList(l.body.id, { name: 'Imp-patch', importantDefault: null }).expect(200);
+      const cleared = await renameList(l.body.id, {
+        name: 'Imp-patch',
+        importantDefault: null,
+      }).expect(200);
       expect(cleared.body.importantDefault).toBeNull();
 
       // Omitted on a later PATCH leaves the stored default unchanged.
@@ -329,8 +368,14 @@ describe('Lists API (e2e)', () => {
 
     it('deleting a list detaches its todos: an inheriting todo falls back to false, an override survives', async () => {
       const l = await createListWith('Imp-detach', true).expect(201);
-      const inheriting = await createTodo({ title: 'imp-inherit', listId: l.body.id }, tokenA).expect(201);
-      const overriding = await createTodo({ title: 'imp-override', listId: l.body.id, important: false }, tokenA).expect(201);
+      const inheriting = await createTodo(
+        { title: 'imp-inherit', listId: l.body.id },
+        tokenA,
+      ).expect(201);
+      const overriding = await createTodo(
+        { title: 'imp-override', listId: l.body.id, important: false },
+        tokenA,
+      ).expect(201);
       expect(inheriting.body.effectiveImportant).toBe(true);
 
       await deleteList(l.body.id).expect(200);
@@ -363,12 +408,16 @@ describe('Lists API (e2e)', () => {
 
       // The list is gone, and a second delete is a missing id → 404.
       await deleteList(l.body.id).expect(404);
-      expect((await listLists().expect(200)).body.lists.map((l2: { id: string }) => l2.id)).not.toContain(l.body.id);
+      expect(
+        (await listLists().expect(200)).body.lists.map((l2: { id: string }) => l2.id),
+      ).not.toContain(l.body.id);
     });
 
-    it('only detaches the caller\'s todo (a foreign list delete is a 404, rows untouched)', async () => {
+    it("only detaches the caller's todo (a foreign list delete is a 404, rows untouched)", async () => {
       const l = await createList('Owned-by-a').expect(201);
-      const t = await createTodo({ title: 'still-attached', listId: l.body.id }, tokenA).expect(201);
+      const t = await createTodo({ title: 'still-attached', listId: l.body.id }, tokenA).expect(
+        201,
+      );
 
       await deleteList(l.body.id, tokenB).expect(404);
 

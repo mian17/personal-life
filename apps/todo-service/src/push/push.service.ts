@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { PushSubscribeInput } from '@life/shared';
-import { PushSubscription } from './push-subscription.entity';
+import { PushSubscription } from './push-subscription.entity.js';
 
 /** Env var holding the VAPID public key served to the client. */
 export const PUSH_VAPID_PUBLIC_KEY_ENV = 'TODO_VAPID_PUBLIC_KEY';

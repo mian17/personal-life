@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as webpush from 'web-push';
-import { PushService } from '../push/push.service';
+import { PushService } from '../push/push.service.js';
 
 /** DI token for the injectable push sender; a test fake overrides it. */
 export const REMINDER_PUSH_SENDER = Symbol('REMINDER_PUSH_SENDER');

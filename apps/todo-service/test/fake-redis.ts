@@ -1,4 +1,4 @@
-import type { CacheClient, CacheSetOptions } from '../src/cache/todo-cache';
+import type { CacheClient, CacheSetOptions } from '../src/cache/todo-cache.js';
 
 /**
  * In-memory stand-in for the node-redis v6 client. It is deliberately *not* a

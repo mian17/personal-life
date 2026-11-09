@@ -1,7 +1,15 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import type { TodoRepeat } from '@life/shared';
-import { List } from '../lists/list.entity';
-import { TodoTag } from './todo-tag.entity';
+import { List } from '../lists/list.entity.js';
+import { TodoTag } from './todo-tag.entity.js';
 
 /**
  * The todo row (`SPEC-todo-service` Data model). Content fields (`title`,

@@ -1,8 +1,8 @@
 import { ConflictException } from '@nestjs/common';
 import { rmSync } from 'fs';
-import { TodoCompletion } from '../src/todos/todo-completion.entity';
-import { dueSortKey, localToUtc, reminderLocal } from '../src/todos/due-time';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
+import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
+import { dueSortKey, localToUtc, reminderLocal } from '../src/todos/due-time.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
 
 /**
  * `SPEC-todo-completion-history` Completion rules (C2/C3/C4/C7) at the service
@@ -146,7 +146,10 @@ describe('Todo completion log (tick/undo rules)', () => {
   });
 
   it('undo after the due is edited deletes the newest recorded occurrence and reverts the due to it', async () => {
-    const created = await h.todos.create(SUB, { title: 'edited after tick', dueDate: '2026-10-02' });
+    const created = await h.todos.create(SUB, {
+      title: 'edited after tick',
+      dueDate: '2026-10-02',
+    });
     await h.todos.update(SUB, created.id, { done: true });
     // Editing the due after the tick: the old occurrence-scoped rule matched
     // nothing here; the unified rule deletes the newest row whatever it recorded.

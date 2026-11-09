@@ -3,13 +3,13 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { KeysService, UserKeys } from '@life/service-kit';
-import { Todo } from '../src/todos/todo.entity';
-import { TodoCompletion } from '../src/todos/todo-completion.entity';
-import { TodoTag } from '../src/todos/todo-tag.entity';
-import { List } from '../src/lists/list.entity';
-import { TodosService } from '../src/todos/todos.service';
-import { ListsService } from '../src/lists/lists.service';
-import { TodosCache } from '../src/cache/todo-cache';
+import { Todo } from '../src/todos/todo.entity.js';
+import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
+import { TodoTag } from '../src/todos/todo-tag.entity.js';
+import { List } from '../src/lists/list.entity.js';
+import { TodosService } from '../src/todos/todos.service.js';
+import { ListsService } from '../src/lists/lists.service.js';
+import { TodosCache } from '../src/cache/todo-cache.js';
 
 /**
  * Shared service-level test harness for the unit suites (encryption, search

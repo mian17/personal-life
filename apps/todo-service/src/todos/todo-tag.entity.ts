@@ -1,5 +1,5 @@
-import { Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { Todo } from './todo.entity';
+import { Entity, JoinColumn, ManyToOne, PrimaryColumn, type Relation } from 'typeorm';
+import { Todo } from './todo.entity.js';
 
 /**
  * Association-only join row for the todo domain (`SPEC-todo-service` Data
@@ -23,5 +23,5 @@ export class TodoTag {
     onUpdate: 'NO ACTION',
   })
   @JoinColumn({ name: 'todoId' })
-  todo: Todo;
+  todo: Relation<Todo>;
 }

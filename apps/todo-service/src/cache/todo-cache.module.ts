@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TODO_CACHE, createTodosCache } from './todo-cache';
+import { TODO_CACHE, createTodosCache } from './todo-cache.js';
 
 /**
  * The single cache instance shared by the todo and list services (one

@@ -5,7 +5,7 @@ import {
   reminderLocal,
   utcToLocal,
   zoneOffsetMs,
-} from '../src/todos/due-time';
+} from '../src/todos/due-time.js';
 
 describe('due-time: ISO_DUE shape', () => {
   it('accepts date-only and timed values, rejects anything else', () => {

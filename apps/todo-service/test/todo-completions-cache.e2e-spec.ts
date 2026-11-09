@@ -5,9 +5,9 @@ import {
   TODO_COMPLETIONS,
   TodosCache,
   type CacheHitOptions,
-} from '../src/cache/todo-cache';
-import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness';
-import { FakeRedisClient } from './fake-redis';
+} from '../src/cache/todo-cache.js';
+import { makeUnitHarness, SUB, type UnitHarness } from './todo-harness.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * `SPEC-todo-completion-history` Cache Rules (AGENTS.md Contract 2) for the
