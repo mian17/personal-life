@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build context is the repo root so the npm workspace (including @life/shared) is available.
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
@@ -29,7 +29,7 @@ RUN npm run build -w @life/shared \
   && npm run build -w @life/nutrition \
   && npm run build -w @life/app
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=3002 \
     HOSTNAME=0.0.0.0

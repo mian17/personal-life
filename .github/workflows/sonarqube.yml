@@ -49,7 +49,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.guard.outputs.skip != 'true'
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       # `--ignore-scripts` on purpose: Sonar rule S6505 flags installing with
