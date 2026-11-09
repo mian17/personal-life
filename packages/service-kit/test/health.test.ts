@@ -5,11 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { TypeOrmModule, getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
-import {
-  IS_PUBLIC_KEY,
-  HealthController,
-  HealthModule,
-} from '../src/index';
+import { IS_PUBLIC_KEY, HealthController, HealthModule } from '../src/index.js';
 
 const MASTER_KEY_ENV = 'SERVICE_KIT_TEST_MASTER_KEY';
 
@@ -59,34 +55,23 @@ describe('@life/service-kit health', () => {
     const reflector = new Reflector();
     // `@Public()` sits on the controller, so it covers all three routes at once.
     expect(reflector.get(IS_PUBLIC_KEY, HealthController)).toBe(true);
-    expect(Reflect.getMetadata(GUARDS_METADATA, HealthController) ?? []).toEqual(
-      [],
-    );
+    expect(Reflect.getMetadata(GUARDS_METADATA, HealthController) ?? []).toEqual([]);
   });
 
   it('reports liveness 200 without touching the database', async () => {
     const app = await buildApp();
     const dataSource = app.get(DataSource);
     const query = jest.spyOn(dataSource, 'query');
-    await request(app.getHttpServer())
-      .get('/health/live')
-      .expect(200)
-      .expect({ status: 'ok' });
+    await request(app.getHttpServer()).get('/health/live').expect(200).expect({ status: 'ok' });
     await app.close();
     expect(query).not.toHaveBeenCalled();
   });
 
   it('reports readiness 200 when the DB answers and key custody loads', async () => {
     const app = await buildApp();
-    await request(app.getHttpServer())
-      .get('/health/ready')
-      .expect(200)
-      .expect({ status: 'ok' });
+    await request(app.getHttpServer()).get('/health/ready').expect(200).expect({ status: 'ok' });
     // The deprecated alias must answer identically — the harness polls it.
-    await request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect({ status: 'ok' });
+    await request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
     await app.close();
   });
 
@@ -94,9 +79,7 @@ describe('@life/service-kit health', () => {
     const app = await buildApp();
     // A destroyed pool is what a real outage looks like: `SELECT 1` throws.
     await app.get(DataSource).destroy();
-    const res = await request(app.getHttpServer())
-      .get('/health/ready')
-      .expect(503);
+    const res = await request(app.getHttpServer()).get('/health/ready').expect(503);
     expect(res.body).toEqual({ status: 'degraded' });
     await app.close();
   });
@@ -104,9 +87,7 @@ describe('@life/service-kit health', () => {
   it('reports degraded 503 when key custody is missing', async () => {
     delete process.env[MASTER_KEY_ENV];
     const app = await buildApp();
-    const res = await request(app.getHttpServer())
-      .get('/health/ready')
-      .expect(503);
+    const res = await request(app.getHttpServer()).get('/health/ready').expect(503);
     expect(res.body).toEqual({ status: 'degraded' });
     await app.close();
   });
@@ -116,12 +97,8 @@ describe('@life/service-kit health', () => {
     const dataSource = app.get(DataSource);
     jest
       .spyOn(dataSource, 'query')
-      .mockRejectedValueOnce(
-        new Error('connection refused: password=hunter2'),
-      );
-    const res = await request(app.getHttpServer())
-      .get('/health/ready')
-      .expect(503);
+      .mockRejectedValueOnce(new Error('connection refused: password=hunter2'));
+    const res = await request(app.getHttpServer()).get('/health/ready').expect(503);
     expect(JSON.stringify(res.body)).not.toContain('hunter2');
     await app.close();
   });

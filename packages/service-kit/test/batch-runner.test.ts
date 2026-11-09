@@ -1,9 +1,5 @@
 import 'reflect-metadata';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import type { ReadThroughCache } from '@life/cache';
 import {
@@ -11,7 +7,7 @@ import {
   assertBatchSize,
   runAtomicBatch,
   runInSubmissionOrder,
-} from '../src/index';
+} from '../src/index.js';
 
 const fakeManager = { name: 'fake-manager' } as unknown as EntityManager;
 
@@ -20,8 +16,8 @@ const fakeManager = { name: 'fake-manager' } as unknown as EntityManager;
  * counts how often it was opened — the whole point of the cap tests.
  */
 function createDataSource() {
-  const transaction = jest.fn(
-    async (work: (manager: EntityManager) => Promise<unknown>) => work(fakeManager),
+  const transaction = jest.fn(async (work: (manager: EntityManager) => Promise<unknown>) =>
+    work(fakeManager),
   );
   return { dataSource: { transaction } as unknown as DataSource, transaction };
 }
@@ -38,13 +34,11 @@ function createCache(commitLog: string[] = []) {
 }
 
 function createDataSourceLoggingCommits(commitLog: string[]) {
-  const transaction = jest.fn(
-    async (work: (manager: EntityManager) => Promise<unknown>) => {
-      const result = await work(fakeManager);
-      commitLog.push('commit');
-      return result;
-    },
-  );
+  const transaction = jest.fn(async (work: (manager: EntityManager) => Promise<unknown>) => {
+    const result = await work(fakeManager);
+    commitLog.push('commit');
+    return result;
+  });
   return { dataSource: { transaction } as unknown as DataSource, transaction };
 }
 
@@ -64,9 +58,7 @@ describe('batch limits', () => {
     'rejects a batch of %i items with a 400 naming the cap',
     (count) => {
       expect(() => assertBatchSize(range(count))).toThrow(BadRequestException);
-      expect(() => assertBatchSize(range(count))).toThrow(
-        new RegExp(String(MAX_BATCH_ITEMS)),
-      );
+      expect(() => assertBatchSize(range(count))).toThrow(new RegExp(String(MAX_BATCH_ITEMS)));
     },
   );
 

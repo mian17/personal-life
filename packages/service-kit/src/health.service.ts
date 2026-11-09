@@ -1,9 +1,8 @@
 import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { loadMasterKeyFromEnv } from '@life/crypto';
-import { runReadinessChecks, type HealthBody } from './readiness';
+import { runReadinessChecks, type HealthBody } from './readiness.js';
 import { DataSource } from 'typeorm';
-
 
 /** What a service must tell the kit: which env var holds its master key. */
 export interface HealthOptions {

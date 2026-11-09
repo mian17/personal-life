@@ -1,4 +1,4 @@
-import { runReadinessChecks, type HealthBody } from '../src/readiness';
+import { runReadinessChecks, type HealthBody } from '../src/readiness.js';
 
 /** The `503`-shaped error the Nest apps raise; a plain Error proves the identity. */
 class Degraded extends Error {

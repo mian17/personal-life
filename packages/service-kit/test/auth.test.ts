@@ -1,15 +1,12 @@
 import 'reflect-metadata';
 import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthGuard } from '../src/auth/auth.guard';
-import { IS_PUBLIC_KEY } from '../src/public.decorator';
-import { resolveVerifierConfig } from '../src/auth/jwt-verifier';
+import { AuthGuard } from '../src/auth/auth.guard.js';
+import { IS_PUBLIC_KEY } from '../src/public.decorator.js';
+import { resolveVerifierConfig } from '../src/auth/jwt-verifier.js';
 
 /** Minimal `ExecutionContext` stub: the guard only reads the handler, class and request. */
-function contextFor(
-  req: Record<string, unknown>,
-  isPublic = false,
-): ExecutionContext {
+function contextFor(req: Record<string, unknown>, isPublic = false): ExecutionContext {
   const handler = () => undefined;
   if (isPublic) Reflect.defineMetadata(IS_PUBLIC_KEY, true, handler);
   return {
@@ -43,9 +40,7 @@ describe('@life/service-kit AuthGuard', () => {
   it('rejects a request with no bearer token', () => {
     process.env.NODE_ENV = 'production';
     const guard = new AuthGuard(ENV_NAMES, new Reflector());
-    expect(() => guard.canActivate(contextFor({ headers: {} }))).toThrow(
-      UnauthorizedException,
-    );
+    expect(() => guard.canActivate(contextFor({ headers: {} }))).toThrow(UnauthorizedException);
   });
 
   it('rejects a non-Bearer scheme', () => {
@@ -60,9 +55,7 @@ describe('@life/service-kit AuthGuard', () => {
     delete process.env.IDP_ISSUER;
     const guard = new AuthGuard(ENV_NAMES, new Reflector());
     const ctx = contextFor({ headers: { authorization: 'Bearer token' } });
-    await expect(Promise.resolve(guard.canActivate(ctx))).rejects.toThrow(
-      UnauthorizedException,
-    );
+    await expect(Promise.resolve(guard.canActivate(ctx))).rejects.toThrow(UnauthorizedException);
   });
 
   it('bypasses verification only in development, stamping the dev principal', () => {
@@ -95,8 +88,6 @@ describe('@life/service-kit verifier config', () => {
   });
 
   it('fails when IDP_ISSUER is missing', () => {
-    expect(() => resolveVerifierConfig(ENV_NAMES, {} as NodeJS.ProcessEnv)).toThrow(
-      /IDP_ISSUER/,
-    );
+    expect(() => resolveVerifierConfig(ENV_NAMES, {} as NodeJS.ProcessEnv)).toThrow(/IDP_ISSUER/);
   });
 });

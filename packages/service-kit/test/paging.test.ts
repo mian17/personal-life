@@ -6,7 +6,7 @@ import {
   decodeCursor,
   encodeCursor,
   paginate,
-} from '../src/index';
+} from '../src/index.js';
 
 /** A row in `timestamp DESC, id DESC` order — the notes list's order. */
 type Ranked = { id: string; at: string };

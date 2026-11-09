@@ -1,6 +1,6 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import { HealthController } from './health.controller';
-import { HEALTH_OPTIONS, HealthService, type HealthOptions } from './health.service';
+import { HealthController } from './health.controller.js';
+import { HEALTH_OPTIONS, HealthService, type HealthOptions } from './health.service.js';
 
 export { HEALTH_OPTIONS };
 export type { HealthOptions };
