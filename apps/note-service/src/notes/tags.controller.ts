@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { ListTagUsageQuery } from './dto/list-tag-usage.query';
-import { NotesService } from './notes.service';
+import { ListTagUsageQuery } from './dto/list-tag-usage.query.js';
+import { NotesService } from './notes.service.js';
 
 /**
  * The owner's tag usage surface. Shape changed in place by the tags extraction:

@@ -1,4 +1,4 @@
-import { main } from '../src/tags/cleanup';
+import { main } from '../src/tags/cleanup.js';
 
 /**
  * `cleanup-tags` entry (`SPEC-tags-service` `## Maintenance scripts`). Thin CLI
@@ -23,10 +23,5 @@ import { main } from '../src/tags/cleanup';
  * Hard line: the human runs this against the real DBs; agents and tests only
  * ever touch temp fixtures. It never touches the cache layer.
  */
-
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  process.exitCode = main();
-}
 
 export { main };

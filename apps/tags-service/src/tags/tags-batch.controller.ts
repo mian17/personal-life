@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { BatchCreateTagsDto, BatchUpdateTagsDto } from './dto/batch-tags.dto';
-import { TagsService } from './tags.service';
+import { BatchCreateTagsDto, BatchUpdateTagsDto } from './dto/batch-tags.dto.js';
+import { TagsService } from './tags.service.js';
 
 /**
  * The `tags` batch pair (`SPEC-tags-service.md` §5). There is no

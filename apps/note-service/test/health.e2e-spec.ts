@@ -30,7 +30,7 @@ describe('Health dialect (e2e)', () => {
     process.env.DB_PATH = TEST_DB;
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
@@ -55,9 +55,7 @@ describe('Health dialect (e2e)', () => {
   };
 
   it('reports liveness 200 {status:ok} without any dependency check', async () => {
-    const spy = jest
-      .spyOn(dataSource, 'query')
-      .mockRejectedValue(new Error('db down'));
+    const spy = jest.spyOn(dataSource, 'query').mockRejectedValue(new Error('db down'));
 
     const res = await get('/health/live').expect(200);
 

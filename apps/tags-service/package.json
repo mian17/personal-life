@@ -2,6 +2,7 @@
   "name": "@life/tags-service",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
@@ -10,8 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "jest",
-    "import-tags": "ts-node scripts/import-tags.ts",
-    "cleanup-tags": "ts-node scripts/cleanup-tags.ts"
+    "import-tags": "node --loader ts-node/esm scripts/import-tags.cli.ts",
+    "cleanup-tags": "node --loader ts-node/esm scripts/cleanup-tags.cli.ts"
   },
   "dependencies": {
     "@life/cache": "*",
@@ -71,7 +72,15 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+          }
+        }
+      ]
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(jose)/)"

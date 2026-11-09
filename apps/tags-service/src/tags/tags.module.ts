@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { Tag } from './tag.entity';
-import { TagsController } from './tags.controller';
-import { TagsBatchController } from './tags-batch.controller';
-import { TAGS_CACHE, createTagsCache } from './tags-cache';
-import { TagsService } from './tags.service';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { Tag } from './tag.entity.js';
+import { TagsController } from './tags.controller.js';
+import { TagsBatchController } from './tags-batch.controller.js';
+import { TAGS_CACHE, createTagsCache } from './tags-cache.js';
+import { TagsService } from './tags.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tag]), KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV })],

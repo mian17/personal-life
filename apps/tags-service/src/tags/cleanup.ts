@@ -22,43 +22,23 @@ import { resolveDbPath } from '@life/shared/node';
  */
 
 /**
- * Defaults anchored at the repository root via this module's own directory
- * (`apps/tags-service/src/tags`), mirroring `import.ts:56-77`, so the documented
- * repo-root command opens the right files regardless of cwd.
+ * Defaults anchored at the repository root, four hops above the module's own
+ * directory (`apps/tags-service/src/tags`), mirroring `import.ts`, so the
+ * documented repo-root command opens the right files regardless of cwd.
+ *
+ * The anchor is a parameter, not `__dirname`: this module is imported by tests,
+ * which ts-jest compiles to CommonJS, where `import.meta` is illegal (TS1343) —
+ * and `__dirname` is illegal in the ESM build. `src/tags/paths.ts` owns the
+ * `import.meta.dirname` hop and is imported only by the ESM CLI entries.
  */
-export const DEFAULT_NOTE_DB_PATH = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'apps',
-  'note-service',
-  'data',
-  'life.db',
-);
-export const DEFAULT_TODO_DB_PATH = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'apps',
-  'todo-service',
-  'data',
-  'todo.db',
-);
-export const DEFAULT_TAGS_DB_PATH = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'apps',
-  'tags-service',
-  'data',
-  'tags.db',
-);
+export function defaultCleanupPaths(moduleDir: string): CleanupPaths {
+  const repoRoot = join(moduleDir, '..', '..', '..', '..');
+  return {
+    noteDbPath: join(repoRoot, 'apps', 'note-service', 'data', 'life.db'),
+    todoDbPath: join(repoRoot, 'apps', 'todo-service', 'data', 'todo.db'),
+    tagsDbPath: join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'),
+  };
+}
 
 export type CleanupMode = 'plan' | 'apply';
 
@@ -132,9 +112,7 @@ function computeOrphans(paths: CleanupPaths): OrphanSet {
       ...readTagIds(todo, 'todo_tag'),
     ]);
     const registryRows = tableExists(tags, 'tag')
-      ? (tags
-          .prepare('SELECT "id","ownerSub" FROM "tag" ORDER BY "id"')
-          .all() as CleanupOrphan[])
+      ? (tags.prepare('SELECT "id","ownerSub" FROM "tag" ORDER BY "id"').all() as CleanupOrphan[])
       : [];
 
     const orphanRows = registryRows.filter((row) => !referenced.has(row.id));
@@ -153,14 +131,31 @@ function computeOrphans(paths: CleanupPaths): OrphanSet {
 /**
  * Resolve the three DB paths. `NOTE_DB_PATH`/`TODO_DB_PATH`/`TAGS_DB_PATH`
  * overrides resolve against `INIT_CWD ?? cwd` (the `import-tags` convention);
- * otherwise the repo-root-anchored defaults are returned unchanged.
+ * otherwise `defaults` ({@link defaultCleanupPaths}, supplied by the ESM CLI
+ * entry) are returned unchanged. An unset override with no default fails loudly
+ * rather than opening the process cwd as a database.
  */
-export function resolvePaths(env: NodeJS.ProcessEnv = process.env): CleanupPaths {
+export function resolvePaths(
+  env: NodeJS.ProcessEnv = process.env,
+  defaults: Partial<CleanupPaths> = {},
+): CleanupPaths {
   return {
-    noteDbPath: resolveDbPath('NOTE_DB_PATH', DEFAULT_NOTE_DB_PATH, env),
-    todoDbPath: resolveDbPath('TODO_DB_PATH', DEFAULT_TODO_DB_PATH, env),
-    tagsDbPath: resolveDbPath('TAGS_DB_PATH', DEFAULT_TAGS_DB_PATH, env),
+    noteDbPath: requireResolved('NOTE_DB_PATH', env, defaults.noteDbPath),
+    todoDbPath: requireResolved('TODO_DB_PATH', env, defaults.todoDbPath),
+    tagsDbPath: requireResolved('TAGS_DB_PATH', env, defaults.tagsDbPath),
   };
+}
+
+/** `resolveDbPath` with a loud failure when neither an override nor a default exists. */
+function requireResolved(
+  envName: string,
+  env: NodeJS.ProcessEnv,
+  defaultPath: string | undefined,
+): string {
+  if (!defaultPath && !env[envName]) {
+    throw new Error(`${envName} is unset and no default DB path was supplied`);
+  }
+  return resolveDbPath(envName, defaultPath ?? '', env);
 }
 
 /** `--dry-run`: report the orphan set without writing (asserted byte-pure). */
@@ -230,6 +225,8 @@ export function formatOrphanLine(orphan: CleanupOrphan): string {
 
 export interface CleanupCliDeps {
   env?: NodeJS.ProcessEnv;
+  /** Package-anchored defaults, supplied by the ESM CLI entry (`src/tags/paths.ts`). */
+  defaultPaths?: Partial<CleanupPaths>;
   print?: (line: string) => void;
   printError?: (line: string) => void;
 }
@@ -246,7 +243,7 @@ export function main(argv: string[] = process.argv.slice(2), deps: CleanupCliDep
   const dryRun = argv.includes('--dry-run');
 
   try {
-    const paths = resolvePaths(env);
+    const paths = resolvePaths(env, deps.defaultPaths);
     const report = dryRun ? planCleanup(paths) : applyCleanup(paths);
     print(formatCleanupReport(report));
     for (const row of report.orphanRows) {

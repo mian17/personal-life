@@ -4,7 +4,7 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { ENC_PREFIX } from '@life/crypto';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-tags-service` Behaviour/API — the ecosystem tag registry over HTTP.
@@ -47,7 +47,7 @@ describe('Tags API (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
@@ -110,10 +110,20 @@ describe('Tags API (e2e)', () => {
         'total',
       ]);
       expect(res.body.nextCursor).toBeNull();
-      const tags = res.body.tags as Array<{ id: number; name: string; version: number; createdAt: string }>;
+      const tags = res.body.tags as Array<{
+        id: number;
+        name: string;
+        version: number;
+        createdAt: string;
+      }>;
       expect(tags.map((t) => t.name)).toEqual(['Alpha', 'zeta']);
       for (const tag of tags) {
-        expect(Object.keys(tag).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['createdAt', 'id', 'name', 'version']);
+        expect(Object.keys(tag).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+          'createdAt',
+          'id',
+          'name',
+          'version',
+        ]);
         expect(typeof tag.version).toBe('number');
         expect(typeof tag.createdAt).toBe('string');
         expect(tag.createdAt.endsWith('Z')).toBe(true);
@@ -149,7 +159,10 @@ describe('Tags API (e2e)', () => {
       let pages = 0;
       do {
         const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
-        const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query), pageToken).expect(200);
+        const res = await auth(
+          request(app.getHttpServer()).get('/api/tags').query(query),
+          pageToken,
+        ).expect(200);
         const page = res.body as { tags: Array<{ name: string }>; nextCursor: string | null };
         expect(Object.keys(res.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
           'nextCursor',
@@ -228,7 +241,10 @@ describe('Tags API (e2e)', () => {
       let pages = 0;
       do {
         const query = cursor === null ? { limit: '1' } : { limit: '1', cursor };
-        const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query), pageToken).expect(200);
+        const res = await auth(
+          request(app.getHttpServer()).get('/api/tags').query(query),
+          pageToken,
+        ).expect(200);
         const page = res.body as { tags: Array<{ name: string }>; nextCursor: string | null };
         seen.push(...page.tags.map((t) => t.name));
         cursor = page.nextCursor;
@@ -246,10 +262,9 @@ describe('Tags API (e2e)', () => {
   describe('POST /api/tags (create-or-get, case-insensitive)', () => {
     it('collapses Work / work / WORK into one row (201 then 200, original spelling preserved)', async () => {
       const count = async (sub: string): Promise<number> => {
-        const rows = await dataSource.query(
-          'SELECT COUNT(*) AS c FROM tag WHERE ownerSub = ?',
-          [sub],
-        );
+        const rows = await dataSource.query('SELECT COUNT(*) AS c FROM tag WHERE ownerSub = ?', [
+          sub,
+        ]);
         return Number(rows[0].c);
       };
       const before = await count('user-a');
@@ -344,8 +359,12 @@ describe('Tags API (e2e)', () => {
       await rename(alpha.body.id, { name: 'C-BETA' }).expect(409);
 
       const listed = await list().expect(200);
-      expect(listed.body.tags.find((t: { id: number }) => t.id === alpha.body.id).name).toBe('C-alpha');
-      expect(listed.body.tags.find((t: { id: number }) => t.id === betaTag.body.id).name).toBe('C-beta');
+      expect(listed.body.tags.find((t: { id: number }) => t.id === alpha.body.id).name).toBe(
+        'C-alpha',
+      );
+      expect(listed.body.tags.find((t: { id: number }) => t.id === betaTag.body.id).name).toBe(
+        'C-beta',
+      );
     });
 
     it('allows a pure case change of the same tag (no self-collision)', async () => {
@@ -399,13 +418,15 @@ describe('Tags API (e2e)', () => {
   });
 
   describe('POST /api/tags/resolve', () => {
-    it('returns [{id, name}] for the caller\'s own tags and omits unknown/foreign ids', async () => {
+    it("returns [{id, name}] for the caller's own tags and omits unknown/foreign ids", async () => {
       const a = await create('R-a').expect(201);
       const b = await create('R-b', tokenB).expect(201);
 
       const resolved = await resolve([a.body.id, b.body.id, MISSING_ID]).expect(201);
       expect(resolved.body).toEqual([{ id: a.body.id, name: 'R-a' }]);
-      expect(Object.keys(resolved.body[0]).sort((a: string, b: string) => a.localeCompare(b))).toEqual(['id', 'name']);
+      expect(
+        Object.keys(resolved.body[0]).sort((a: string, b: string) => a.localeCompare(b)),
+      ).toEqual(['id', 'name']);
 
       // B sees only B's tag.
       const fromB = await resolve([a.body.id, b.body.id], tokenB).expect(201);

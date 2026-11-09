@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { NoteTag } from './note-tag.entity';
+import { NoteTag } from './note-tag.entity.js';
 
 @Entity('note')
 @Index('IDX_note_owner_sub', ['ownerSub'])

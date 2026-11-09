@@ -6,10 +6,10 @@ import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, wrapDek } from '@life/crypto';
 import { KeysService, UserKeys, createMasterKey } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config';
-import { Tag } from '../src/tags/tag.entity';
-import { TagsCache } from '../src/tags/tags-cache';
-import { TagsService } from '../src/tags/tags.service';
+import { MASTER_KEY_ENV } from '../src/service-config.js';
+import { Tag } from '../src/tags/tag.entity.js';
+import { TagsCache } from '../src/tags/tags-cache.js';
+import { TagsService } from '../src/tags/tags.service.js';
 
 /**
  * `SPEC-tags-service` Encryption + Testing Strategy cases: key custody
@@ -145,7 +145,7 @@ describe('TagsService encryption + key custody', () => {
     expect(output).not.toContain(ENC_PREFIX);
   });
 
-  it('AAD binding: swapping two tags\' name ciphertexts fails closed for both', async () => {
+  it("AAD binding: swapping two tags' name ciphertexts fails closed for both", async () => {
     // Same owner ⇒ same AAD, so this case proves per-row integrity from the tag
     // id in the log rather than AAD separation. A cross-owner transplant (a
     // different AAD) is the separation proof:

@@ -5,8 +5,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { decryptField, encryptField, unwrapDek, wrapDek } from '@life/crypto';
-import { Note } from '../src/notes/note.entity';
-import { NoteTag } from '../src/notes/note-tag.entity';
+import { Note } from '../src/notes/note.entity.js';
+import { NoteTag } from '../src/notes/note-tag.entity.js';
 import { UserKeys } from '@life/service-kit';
 import {
   BackfillRowError,
@@ -14,8 +14,8 @@ import {
   formatBackfillReport,
   planBackfill,
   type FieldEncryptor,
-} from '../src/keys/backfill';
-import { RotationRowError, rotateMasterKeys } from '../src/keys/rotation';
+} from '../src/keys/backfill.js';
+import { RotationRowError, rotateMasterKeys } from '../src/keys/rotation.js';
 
 /**
  * `notes-backfill` T6 — migration + rotation cores (SPEC-notes-backfill).
@@ -272,9 +272,9 @@ describe('notes-backfill T6: idempotent plaintext → envelope migration', () =>
     const tags = await allTags(h.ds);
     expect(decryptField(deks.get('user-a')!, tags[0].name, 'life.v1|user-a|tag|name')).toBe('Work');
     expect(decryptField(deks.get('user-a')!, tags[1].name, 'life.v1|user-a|tag|name')).toBe('work');
-    expect(
-      decryptField(deks.get('_legacy_')!, tags[2].name, 'life.v1|_legacy_|tag|name'),
-    ).toBe('Legacy');
+    expect(decryptField(deks.get('_legacy_')!, tags[2].name, 'life.v1|_legacy_|tag|name')).toBe(
+      'Legacy',
+    );
   });
 
   it('dry-run changes nothing on disk and predicts the counts apply would perform', async () => {

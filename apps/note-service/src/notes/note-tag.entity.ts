@@ -1,5 +1,5 @@
-import { Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { Note } from './note.entity';
+import { Entity, JoinColumn, ManyToOne, PrimaryColumn, type Relation } from 'typeorm';
+import { Note } from './note.entity.js';
 
 /**
  * Association-only join row for `SPEC-tags-extraction`: note-service stores
@@ -29,5 +29,5 @@ export class NoteTag {
     onUpdate: 'NO ACTION',
   })
   @JoinColumn({ name: 'noteId' })
-  note: Note;
+  note: Relation<Note>;
 }

@@ -5,11 +5,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { KeysService, UserKeys } from '@life/service-kit';
-import { Note } from '../src/notes/note.entity';
-import { NoteTag } from '../src/notes/note-tag.entity';
-import { NotesCache } from '../src/notes/notes-cache';
-import { NotesService } from '../src/notes/notes.service';
-import { likeMatch } from '../src/notes/content-match';
+import { Note } from '../src/notes/note.entity.js';
+import { NoteTag } from '../src/notes/note-tag.entity.js';
+import { NotesCache } from '../src/notes/notes-cache.js';
+import { NotesService } from '../src/notes/notes.service.js';
+import { likeMatch } from '../src/notes/content-match.js';
 import type { NotePage } from '@life/shared';
 
 /**
@@ -323,7 +323,9 @@ describe('notes-at-rest T4: decrypt-then-match service', () => {
     h.log.length = 0;
     await h.service.findAll(SUB, { q: 'hello', tagId: 1 });
 
-    const contentMatching = h.log.filter((sql) => /\bLIKE\b/i.test(sql) || /\bLOWER\s*\(/i.test(sql));
+    const contentMatching = h.log.filter(
+      (sql) => /\bLIKE\b/i.test(sql) || /\bLOWER\s*\(/i.test(sql),
+    );
     expect(contentMatching).toEqual([]);
     // The candidate fetch is present and only scoped by metadata.
     expect(h.log.some((sql) => /from "note"/i.test(sql))).toBe(true);

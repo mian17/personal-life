@@ -4,12 +4,12 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { Note } from '../src/notes/note.entity';
-import { NoteTag } from '../src/notes/note-tag.entity';
+import { Note } from '../src/notes/note.entity.js';
+import { NoteTag } from '../src/notes/note-tag.entity.js';
 import { KeysService, UserKeys } from '@life/service-kit';
-import { NotesCache } from '../src/notes/notes-cache';
-import { NotesService } from '../src/notes/notes.service';
-import { applySurgery } from '../../tags-service/src/tags/import';
+import { NotesCache } from '../src/notes/notes-cache.js';
+import { NotesService } from '../src/notes/notes.service.js';
+import { applySurgery } from '../../tags-service/src/tags/import.js';
 
 /**
  * `SPEC-tags-extraction` "Owned by T5" — note-service TagRef behaviors.
@@ -199,9 +199,8 @@ CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT
   function noteTagDdl(path: string): string {
     const db = new Database(path, { readonly: true });
     try {
-      const row = db
-        .prepare("SELECT sql FROM sqlite_master WHERE name = 'note_tag'")
-        .get() as { sql: string } | undefined;
+      const row = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'note_tag'").get() as
+        { sql: string } | undefined;
       return row?.sql ?? '';
     } finally {
       db.close();
@@ -263,7 +262,7 @@ CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT
     delete process.env.REDIS_URL;
     process.env.NODE_ENV = 'test';
     try {
-      const { createApp } = await import('../src/app.factory');
+      const { createApp } = await import('../src/app.factory.js');
       const app = await createApp();
       await app.init();
       await app.close();

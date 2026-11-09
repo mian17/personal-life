@@ -50,32 +50,22 @@ export const NOTE_MASTER_KEY_ENV = 'NOTE_MASTER_KEY';
 export const TAGS_MASTER_KEY_ENV = 'TAGS_MASTER_KEY';
 
 /**
- * Defaults anchored at the repository root via this module's own directory
- * (`apps/tags-service/src/tags`), so the documented repo-root command opens the
- * right files regardless of cwd — the `note-service` `db.ts` precedent.
+ * Defaults anchored at the repository root, four hops above the module's own
+ * directory (`apps/tags-service/src/tags`), so the documented repo-root command
+ * opens the right files regardless of cwd — the `note-service` `db.ts` precedent.
+ *
+ * The anchor is a parameter, not `__dirname`: this module is imported by tests,
+ * which ts-jest compiles to CommonJS, where `import.meta` is illegal (TS1343) —
+ * and `__dirname` is illegal in the ESM build. `src/tags/paths.ts` owns the
+ * `import.meta.dirname` hop and is imported only by the ESM CLI entries.
  */
-export const DEFAULT_NOTE_DB_PATH = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'apps',
-  'note-service',
-  'data',
-  'life.db',
-);
-export const DEFAULT_TAGS_DB_PATH = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'apps',
-  'tags-service',
-  'data',
-  'tags.db',
-);
+export function defaultImportPaths(moduleDir: string): ResolvedPaths {
+  const repoRoot = join(moduleDir, '..', '..', '..', '..');
+  return {
+    noteDbPath: join(repoRoot, 'apps', 'note-service', 'data', 'life.db'),
+    tagsDbPath: join(repoRoot, 'apps', 'tags-service', 'data', 'tags.db'),
+  };
+}
 
 /** `tag` DDL byte-equivalent to the registry `Tag` entity's `synchronize` output. */
 const TAG_DDL =
@@ -225,14 +215,31 @@ function hasForeignKeyTo(db: Database.Database, table: string, target: string): 
 
 /**
  * Resolve the two DB paths. `NOTE_DB_PATH`/`TAGS_DB_PATH` overrides resolve
- * against `INIT_CWD ?? cwd` (the `backfill-owner` convention); otherwise the
- * repo-root-anchored defaults are returned unchanged.
+ * against `INIT_CWD ?? cwd` (the `backfill-owner` convention); otherwise
+ * `defaults` ({@link defaultImportPaths}, supplied by the ESM CLI entry) are
+ * returned unchanged. An unset override with no default fails loudly rather
+ * than opening the process cwd as a database.
  */
-export function resolvePaths(env: NodeJS.ProcessEnv = process.env): ResolvedPaths {
+export function resolvePaths(
+  env: NodeJS.ProcessEnv = process.env,
+  defaults: Partial<ResolvedPaths> = {},
+): ResolvedPaths {
   return {
-    noteDbPath: resolveDbPath('NOTE_DB_PATH', DEFAULT_NOTE_DB_PATH, env),
-    tagsDbPath: resolveDbPath('TAGS_DB_PATH', DEFAULT_TAGS_DB_PATH, env),
+    noteDbPath: requireResolved('NOTE_DB_PATH', env, defaults.noteDbPath),
+    tagsDbPath: requireResolved('TAGS_DB_PATH', env, defaults.tagsDbPath),
   };
+}
+
+/** `resolveDbPath` with a loud failure when neither an override nor a default exists. */
+function requireResolved(
+  envName: string,
+  env: NodeJS.ProcessEnv,
+  defaultPath: string | undefined,
+): string {
+  if (!defaultPath && !env[envName]) {
+    throw new Error(`${envName} is unset and no default DB path was supplied`);
+  }
+  return resolveDbPath(envName, defaultPath ?? '', env);
 }
 
 function ensureRegistrySchema(db: Database.Database): string[] {
@@ -271,9 +278,10 @@ export function bootstrapRegistrySchema(tagsDbPath: string): string[] {
 function loadRegistryKeys(db: Database.Database, tagsMasterKey: Buffer): Map<string, Buffer> {
   const deks = new Map<string, Buffer>();
   if (!tableExists(db, 'user_keys')) return deks;
-  const rows = db
-    .prepare('SELECT "sub","wrappedDek" FROM "user_keys"')
-    .all() as Array<{ sub: string; wrappedDek: string }>;
+  const rows = db.prepare('SELECT "sub","wrappedDek" FROM "user_keys"').all() as Array<{
+    sub: string;
+    wrappedDek: string;
+  }>;
   for (const row of rows) {
     deks.set(row.sub, unwrapDek(row.wrappedDek, tagsMasterKey));
   }
@@ -289,9 +297,8 @@ function noteDek(
 ): Buffer | null {
   if (cache.has(owner)) return cache.get(owner) ?? null;
   const row = tableExists(note, 'user_keys')
-    ? (note
-        .prepare('SELECT "wrappedDek" FROM "user_keys" WHERE "sub" = ?')
-        .get(owner) as { wrappedDek: string } | undefined)
+    ? (note.prepare('SELECT "wrappedDek" FROM "user_keys" WHERE "sub" = ?').get(owner) as
+        { wrappedDek: string } | undefined)
     : undefined;
   const dek = row ? unwrapDek(row.wrappedDek, noteMasterKey) : null;
   cache.set(owner, dek);
@@ -332,17 +339,13 @@ function simulate(
 ): Simulation {
   const sourceRows = (
     tableExists(note, 'tag')
-      ? note
-          .prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id" ASC')
-          .all()
+      ? note.prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id" ASC').all()
       : []
   ) as SourceTag[];
 
   const existingRows = (
     tags && tableExists(tags, 'tag')
-      ? tags
-          .prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id" ASC')
-          .all()
+      ? tags.prepare('SELECT "id","name","ownerSub" FROM "tag" ORDER BY "id" ASC').all()
       : []
   ) as Array<{ id: number; name: string; ownerSub: string }>;
 
@@ -653,6 +656,8 @@ export function formatImportReport(report: ImportReport): string {
 
 export interface ImportCliDeps {
   env?: NodeJS.ProcessEnv;
+  /** Package-anchored defaults, supplied by the ESM CLI entry (`src/tags/paths.ts`). */
+  defaultPaths?: Partial<ResolvedPaths>;
   print?: (line: string) => void;
   printError?: (line: string) => void;
   options?: ImportOptions;
@@ -669,7 +674,7 @@ export function main(argv: string[] = process.argv.slice(2), deps: ImportCliDeps
   const dryRun = argv.includes('--dry-run');
 
   try {
-    const { noteDbPath, tagsDbPath } = resolvePaths(env);
+    const { noteDbPath, tagsDbPath } = resolvePaths(env, deps.defaultPaths);
     const noteMasterKey = loadMasterKeyFromEnv(NOTE_MASTER_KEY_ENV);
     const tagsMasterKey = loadMasterKeyFromEnv(TAGS_MASTER_KEY_ENV);
     const report = dryRun

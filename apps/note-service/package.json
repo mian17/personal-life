@@ -2,14 +2,15 @@
   "name": "@life/note-service",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3001} node dist/main.js",
-    "backfill-owner": "ts-node scripts/backfill-owner.ts",
-    "backfill-encrypt": "ts-node scripts/encrypt-backfill.ts",
-    "backfill-content-updated-at": "ts-node scripts/backfill-content-updated-at.ts",
-    "rotate-master-key": "ts-node scripts/rotate-master-key.ts",
+    "backfill-owner": "node --loader ts-node/esm scripts/backfill-owner.cli.ts",
+    "backfill-encrypt": "node --loader ts-node/esm scripts/encrypt-backfill.cli.ts",
+    "backfill-content-updated-at": "node --loader ts-node/esm scripts/backfill-content-updated-at.cli.ts",
+    "rotate-master-key": "node --loader ts-node/esm scripts/rotate-master-key.cli.ts",
     "test": "jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -73,7 +74,15 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+          }
+        }
+      ]
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(jose)/)"

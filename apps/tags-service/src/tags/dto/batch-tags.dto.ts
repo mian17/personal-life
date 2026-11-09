@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsInt, ValidateNested } from 'class-validator';
-import { CreateTagDto } from './create-tag.dto';
-import { UpdateTagDto } from './update-tag.dto';
+import { CreateTagDto } from './create-tag.dto.js';
+import { UpdateTagDto } from './update-tag.dto.js';
 
 /**
  * Batch request bodies (`SPEC-tags-service.md` §5): one wildcard body per kind,
