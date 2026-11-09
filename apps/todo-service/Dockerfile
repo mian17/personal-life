@@ -2,7 +2,7 @@
 
 # Build context is the repo root so the npm workspace (@life/shared, @life/crypto,
 # @life/cache) is available. Mirrors apps/note-service/Dockerfile.
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
@@ -32,7 +32,7 @@ RUN npm run build -w @life/shared \
   && npm run build -w @life/todo-service \
   && npm prune --omit=dev
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=3005 \
     HOST=0.0.0.0 \

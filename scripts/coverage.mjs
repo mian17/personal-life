@@ -51,6 +51,13 @@ function testableWorkspaces() {
   });
 }
 
+/** Whether this workspace has an `.mts` suite, which jest cannot load without the vm-modules flag. */
+function needsVmModules(dir) {
+  const testDir = join(ROOT, dir, 'test');
+  if (!existsSync(testDir)) return false;
+  return readdirSync(testDir, { recursive: true }).some((entry) => entry.endsWith('.test.mts'));
+}
+
 function runWorkspace(dir) {
   const coverageDir = join(OUT_DIR, 'raw', dir.replaceAll('/', '__'));
   rmSync(coverageDir, { recursive: true, force: true });
@@ -61,11 +68,11 @@ function runWorkspace(dir) {
     // an e2e `beforeAll` that boots Nest + sqlite crosses 5s and fails the suite
     // spuriously — measured 2/13 note-service suites red cold vs green warm.
     //
-    // `NODE_OPTIONS` carries the vm-modules flag because a workspace's `.mts`
-    // suites need it, and this runner spawns jest directly instead of through
-    // `npm run test:unit`, so it does not inherit the flag from the script. Jest
-    // cannot load an ESM-only package without it: its CommonJS registry rejects
-    // the import with ERR_REQUIRE_ESM.
+    // The vm-modules flag is workspace-scoped, not global: an `.mts` suite
+    // cannot load an ESM-only package without it (ERR_REQUIRE_ESM), but on Node
+    // 24 a flag every workspace sees makes jest evaluate ts-jest's CommonJS
+    // output through its sync-ESM path, which fails with `exports is not
+    // defined` in every suite that imports an ESM-only dependency.
     execFileSync(
       JEST,
       [
@@ -77,7 +84,9 @@ function runWorkspace(dir) {
       ],
       {
         cwd: join(ROOT, dir),
-        env: { ...process.env, NODE_OPTIONS: '--experimental-vm-modules' },
+        env: needsVmModules(dir)
+          ? { ...process.env, NODE_OPTIONS: '--experimental-vm-modules' }
+          : process.env,
         stdio: ['ignore', 'inherit', 'inherit'],
       },
     );
