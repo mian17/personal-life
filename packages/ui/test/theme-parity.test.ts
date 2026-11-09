@@ -26,7 +26,9 @@ const APP_LAYOUT = readFileSync(join(__dirname, '../../../apps/app/app/layout.ts
  * segment's own layout, so the scopes the app paints are declared here (one `app="…"` per area).
  */
 const AREA_LAYOUTS = ['notes', 'todos', '(meals)/meals', 'pomodoro', 'feedback']
-  .map((directory) => readFileSync(join(__dirname, '../../../apps/app/app', directory, 'layout.tsx'), 'utf8'))
+  .map((directory) =>
+    readFileSync(join(__dirname, '../../../apps/app/app', directory, 'layout.tsx'), 'utf8'),
+  )
   .join('\n');
 
 const DARK_SCHEME_MEDIA = '@media (prefers-color-scheme: dark)';
@@ -116,7 +118,9 @@ describe('the light scheme', () => {
 
   it('paints a raised surface above the ground it sits on', () => {
     const light = declarationsOf(TOKENS_CSS, ':root');
-    expect(relativeLuminance(light['--surface'])).toBeGreaterThan(relativeLuminance(light['--page']));
+    expect(relativeLuminance(light['--surface'])).toBeGreaterThan(
+      relativeLuminance(light['--page']),
+    );
   });
 });
 
@@ -126,7 +130,9 @@ describe('the dark scheme', () => {
   });
 
   it('differs from light in every role, so the two schemes cannot drift into one', () => {
-    const sharedRoles = Object.keys(LIGHT_SCHEME).filter((role) => LIGHT_SCHEME[role] === DARK_SCHEME[role]);
+    const sharedRoles = Object.keys(LIGHT_SCHEME).filter(
+      (role) => LIGHT_SCHEME[role] === DARK_SCHEME[role],
+    );
     expect(sharedRoles).toEqual([]);
   });
 
@@ -155,13 +161,15 @@ describe.each(Object.keys(APP_ACCENTS))('the %s accent', (app) => {
   });
 
   it('follows the chosen dark scheme under data-theme="dark"', () => {
-    expect(declarationsOf(TOKENS_CSS, `[data-theme='dark'] [data-app='${app}']`)).toEqual(APP_ACCENTS[app].dark);
+    expect(declarationsOf(TOKENS_CSS, `[data-theme='dark'] [data-app='${app}']`)).toEqual(
+      APP_ACCENTS[app].dark,
+    );
   });
 
   it('follows the OS under System', () => {
-    expect(declarationsOf(systemStylesheet(), `${SYSTEM_ROOT_SELECTOR} [data-app='${app}']`)).toEqual(
-      APP_ACCENTS[app].dark,
-    );
+    expect(
+      declarationsOf(systemStylesheet(), `${SYSTEM_ROOT_SELECTOR} [data-app='${app}']`),
+    ).toEqual(APP_ACCENTS[app].dark);
   });
 });
 
@@ -277,13 +285,24 @@ function referencedValues(source: string): string[] {
 /** The `data-app` scopes a stylesheet names, or the `app` each area layout renders it with. */
 function accentScopesIn(source: string): string[] {
   const scopes = [...source.matchAll(/\[data-app='([\w-]+)'\]/g)].map(([, app]) => app);
-  const declaredInLayout = [...source.matchAll(/<RouteLayout app="([\w-]+)"/g)].map(([, app]) => app);
+  const declaredInLayout = [...source.matchAll(/<RouteLayout app="([\w-]+)"/g)].map(
+    ([, app]) => app,
+  );
   return [...new Set([...scopes, ...declaredInLayout])].sort();
 }
 
+/**
+ * The source text of every component file, so the theme vocabulary these sources read can be
+ * checked against `tokens.css`. Only regular source files count: a subdirectory (the pre-commit
+ * Sonar hook leaves `.sonar-hook-scratch/` beside the components) is not a component, and a
+ * stray non-source file must not join the scan. An empty directory yields an empty string.
+ */
 function componentSources(): string {
-  return readdirSync(COMPONENTS_DIRECTORY)
-    .map((file) => readFileSync(join(COMPONENTS_DIRECTORY, file), 'utf8'))
+  const sourceFiles = readdirSync(COMPONENTS_DIRECTORY, { withFileTypes: true }).filter(
+    (entry) => entry.isFile() && /\.[jt]sx?$/.test(entry.name),
+  );
+  return sourceFiles
+    .map((file) => readFileSync(join(COMPONENTS_DIRECTORY, file.name), 'utf8'))
     .join('\n');
 }
 
@@ -307,12 +326,16 @@ function motionSection(preference: 'no-preference' | 'reduce'): string {
 
 function expectedTailwindRoles(): Declarations {
   const roles = [...Object.keys(LIGHT_SCHEME), ...ACCENT_ROLES];
-  return Object.fromEntries(roles.map((role) => [`--color-${role.slice('--'.length)}`, `var(${role})`]));
+  return Object.fromEntries(
+    roles.map((role) => [`--color-${role.slice('--'.length)}`, `var(${role})`]),
+  );
 }
 
 function tailwindColourRoles(): Declarations {
   return Object.fromEntries(
-    Object.entries(declarationsOf(THEME_CSS, '@theme')).filter(([name]) => name.startsWith('--color-')),
+    Object.entries(declarationsOf(THEME_CSS, '@theme')).filter(([name]) =>
+      name.startsWith('--color-'),
+    ),
   );
 }
 

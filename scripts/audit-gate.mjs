@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ALLOWLIST_FILE = fileURLToPath(new URL('../.github/audit-allowlist.json', import.meta.url));
-const FAILING_SEVERITIES = ['high', 'critical'];
+const FAILING_SEVERITIES = new Set(['high', 'critical']);
 const SEVERITY_RANK = new Map([
   ['info', 0],
   ['low', 1],
@@ -103,7 +103,7 @@ function violationsOf({ advisories, allowlist }) {
   return {
     unaccounted: [...advisories.values()].filter(
       (advisory) =>
-        FAILING_SEVERITIES.includes(advisory.severity) &&
+        FAILING_SEVERITIES.has(advisory.severity) &&
         !allowlistCovers(allowlist.get(advisory.id), advisory.severity),
     ),
     stale: [...allowlist.values()].filter((entry) => !reported.has(entry.id)),
@@ -154,7 +154,7 @@ function reportViolations({ unaccounted, stale, overdue }) {
 
 function reportInformational(advisories) {
   const informational = [...advisories.values()].filter(
-    (advisory) => !FAILING_SEVERITIES.includes(advisory.severity),
+    (advisory) => !FAILING_SEVERITIES.has(advisory.severity),
   );
   if (informational.length === 0) return;
   console.log(`audit: ${informational.length} moderate/low advisories (information only):`);
