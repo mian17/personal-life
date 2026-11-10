@@ -74,6 +74,21 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: npm rebuild better-sqlite3 argon2
 
+      # Same real cache as `tests.yml`: Next warns from `getCacheDir()` whenever CI
+      # is set and `apps/app/.next/cache` is absent, and there is no config switch
+      # to silence it — a cache has to actually be restored. Key = commit +
+      # lockfile hash so a warm hit never crosses a dependency change; the restore
+      # prefix is deliberately narrow for the same reason. Next hashes module
+      # contents into its cache keys, so stale entries from another commit are not
+      # served; a cold key still warns on its first run, which is honest.
+      - name: Restore Next build cache
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/cache@v6
+        with:
+          path: apps/app/.next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-next-${{ hashFiles('package-lock.json') }}-
+
       # Workspace `@life/*` types only exist after a build: a fresh clone has no
       # `dist/`, so every suite importing another workspace fails with TS2307
       # (measured: 13/13 note-service suites red). `dist/` is in
