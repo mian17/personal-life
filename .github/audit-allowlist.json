@@ -1,19 +1,4 @@
 {
   "comment": "Known production advisories, signed off with a review deadline. scripts/audit-gate.mjs fails CI on any high/critical advisory missing here, on any entry audit no longer reports, and on a critical entry past reviewBy. `reviewBy: null` means informational only (moderate/low) — no deadline, never gating.",
-  "advisories": [
-    {
-      "id": "GHSA-3g3m-2fjr-6pw4",
-      "package": "glob",
-      "severity": "moderate",
-      "reviewBy": null,
-      "reason": "AbortSignal cancellation bypass allows post-timeout filesystem traversal. Only reachable through typeorm, whose fixAvailable is a MAJOR upgrade (0.3.x -> 1.x); not fixable without that migration."
-    },
-    {
-      "id": "GHSA-g3hv-75wg-m249",
-      "package": "minimatch",
-      "severity": "moderate",
-      "reviewBy": null,
-      "reason": "DoS via globparts amplification. Reached through glob under typeorm; same MAJOR typeorm upgrade."
-    }
-  ]
+  "advisories": []
 }
