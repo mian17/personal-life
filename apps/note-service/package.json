@@ -11,10 +11,10 @@
     "backfill-encrypt": "node --loader ts-node/esm scripts/encrypt-backfill.cli.ts",
     "backfill-content-updated-at": "node --loader ts-node/esm scripts/backfill-content-updated-at.cli.ts",
     "rotate-master-key": "node --loader ts-node/esm scripts/rotate-master-key.cli.ts",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest"
   },
   "dependencies": {
     "@life/cache": "*",
