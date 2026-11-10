@@ -2,7 +2,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { MAX_PAGE_LIMIT } from '@life/service-kit';
 import { DATE_ONLY } from '../../targets/dto/update-profile.dto.js';
-import { ENTRY_DATE_MAX, MEAL_GROUPS, MealGroup } from './create-entry.dto.js';
+import { ENTRY_DATE_MAX, MEAL_GROUPS, type MealGroup } from './create-entry.dto.js';
 
 /**
  * The `GET /api/entries?date=&meal=&limit=&cursor=` surface. `date` is part of the

@@ -77,12 +77,7 @@
         "ts-jest",
         {
           "useESM": true,
-          "tsconfig": "tsconfig.esm-test.json",
-          "diagnostics": {
-            "ignoreCodes": [
-              151002
-            ]
-          }
+          "tsconfig": "tsconfig.esm-test.json"
         }
       ]
     },

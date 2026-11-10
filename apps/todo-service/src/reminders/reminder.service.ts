@@ -7,9 +7,9 @@ import { TodosService } from '../todos/todos.service.js';
 import { KeysService } from '@life/service-kit';
 import { PushService } from '../push/push.service.js';
 import {
-  PushSender,
+  type PushSender,
   REMINDER_PUSH_SENDER,
-  ReminderPayload,
+  type ReminderPayload,
   VAPID_PRIVATE_KEY_ENV,
   VAPID_PUBLIC_KEY_ENV,
 } from './push-sender.js';
