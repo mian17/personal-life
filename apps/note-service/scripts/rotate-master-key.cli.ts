@@ -11,7 +11,7 @@ import { DEFAULT_NOTE_DB_PATH } from '../src/keys/db-path.js';
  * entry path.
  */
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void main(process.argv.slice(2), { defaultNoteDbPath: DEFAULT_NOTE_DB_PATH }).then((code) => {
-    process.exitCode = code;
+  process.exitCode = await main(process.argv.slice(2), {
+    defaultNoteDbPath: DEFAULT_NOTE_DB_PATH,
   });
 }

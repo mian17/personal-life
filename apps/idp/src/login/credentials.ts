@@ -27,7 +27,11 @@ function dummyPasswordHash(): Promise<string> {
   return dummyHash;
 }
 
-void dummyPasswordHash().catch(() => {});
+try {
+  await dummyPasswordHash();
+} catch {
+  // A failed warm-up must not block startup; the first unknown-username probe retries the hash.
+}
 
 /** Generic message for every credential failure (no user enumeration). */
 export const GENERIC_LOGIN_ERROR = 'Invalid username or password';

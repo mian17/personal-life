@@ -8,9 +8,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import type { DatabaseName } from './paths.js';
 import { resolvePaths, selectPaths } from './paths.js';
-import type { DatabasePaths } from './paths.js';
+import type { DatabaseName, DatabasePaths } from './paths.js';
 import { snapshotAndVerify } from './snapshot.js';
 
 /**
