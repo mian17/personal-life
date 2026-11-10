@@ -61,7 +61,11 @@
     "typescript-eslint": "^8.72.1"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --fix --max-warnings=0"
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{js,jsx,mjs,cjs,json,css,md,yml,yaml}": "prettier --write"
   },
   "overrides": {
     "glob@>=9.0.0 <=14.0.1": "14.0.2",
