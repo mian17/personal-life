@@ -26,7 +26,7 @@ import { absoluteUrl } from '@/lib/auth/origin';
  * resume (a GET navigation outside `/api/*`); the value is validated downstream
  * by `sanitizeReturnTo`, so it can never move the browser off-origin.
  */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const hasValidSession = Boolean(await sessionStore.get(req.cookies.get(SESSION_COOKIE)?.value));
   // The single dev-stack switch: it skips the ACCESS gate here and is passed as
   // the cookie `secure` flag by every route handler that writes one. Set ONLY on
@@ -63,6 +63,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  runtime: 'nodejs',
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
