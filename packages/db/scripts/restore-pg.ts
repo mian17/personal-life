@@ -18,7 +18,6 @@ import { main } from '../src/restore-pg.js';
  * container. It refuses unless the stack probes stopped.
  */
 if (import.meta.url === pathToFileURL(process.argv[1] as string).href) {
-  void main().then((code) => {
-    process.exitCode = code;
-  });
+  const code = await main();
+  process.exitCode = code;
 }

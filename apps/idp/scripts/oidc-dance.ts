@@ -28,7 +28,10 @@ function oneLine(value: string | number | null | undefined): string {
     .trim();
 }
 
-const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(/\/$/, '');
+const ISSUER = (arg('--issuer') ?? process.env.IDP_ISSUER ?? 'http://127.0.0.1:3003').replace(
+  /\/$/,
+  '',
+);
 const CLIENT_ID = arg('--client-id') ?? 'dev';
 const REDIRECT_URI = arg('--redirect-uri') ?? 'http://127.0.0.1:8080/cb';
 const USERNAME = arg('--username') ?? process.env.SEED_USERNAME;
@@ -120,7 +123,9 @@ async function followToCode(next: string | null): Promise<{
       break;
     }
     const res = await get(url.toString());
-    console.log(`   resume[${i}] -> ${oneLine(res.status)} ${oneLine(res.headers.get('location'))}`);
+    console.log(
+      `   resume[${i}] -> ${oneLine(res.status)} ${oneLine(res.headers.get('location'))}`,
+    );
     next = res.headers.get('location');
   }
   return { code, returnedState };
@@ -147,10 +152,14 @@ async function checkRefreshRotation(
   if (!newToken) throw new Error('refresh did not return a new refresh token');
 
   const reuse = await refreshUse(refreshToken);
-  console.log(`8. replay retired RT -> ${oneLine(reuse.status)} ${oneLine(reuse.body.error)} (expect 400 invalid_grant)`);
+  console.log(
+    `8. replay retired RT -> ${oneLine(reuse.status)} ${oneLine(reuse.body.error)} (expect 400 invalid_grant)`,
+  );
 
   const afterRevoke = await refreshUse(newToken);
-  console.log(`9. newest RT after replay -> ${oneLine(afterRevoke.status)} ${oneLine(afterRevoke.body.error)} (expect 400: family revoked)`);
+  console.log(
+    `9. newest RT after replay -> ${oneLine(afterRevoke.status)} ${oneLine(afterRevoke.body.error)} (expect 400: family revoked)`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -170,7 +179,9 @@ async function main(): Promise<void> {
 
   const authorize = await get(buildAuthorizeUrl(pkce, dance));
   const interaction = authorize.headers.get('location');
-  console.log(`1. authorize -> ${oneLine(authorize.status)} ${oneLine(interaction ?? authorize.statusText)}`);
+  console.log(
+    `1. authorize -> ${oneLine(authorize.status)} ${oneLine(interaction ?? authorize.statusText)}`,
+  );
   if (!interaction) throw new Error('expected an interaction redirect');
 
   const interactionUrl = new URL(interaction, ISSUER).toString();
@@ -181,7 +192,9 @@ async function main(): Promise<void> {
   console.log(`3. login -> ${oneLine(login.status)} ${oneLine(login.headers.get('location'))}`);
 
   const { code, returnedState } = await followToCode(login.headers.get('location'));
-  console.log(`4. code -> ${code ? 'received' : 'MISSING'} (state ${returnedState === dance.state ? 'matches' : 'MISMATCH'})`);
+  console.log(
+    `4. code -> ${code ? 'received' : 'MISSING'} (state ${returnedState === dance.state ? 'matches' : 'MISMATCH'})`,
+  );
   if (!code) throw new Error('no authorization code returned');
 
   const tokenRes = await postForm(`${ISSUER}/token`, {
@@ -202,12 +215,17 @@ async function main(): Promise<void> {
   };
   const outcome = tokens.error ?? `${tokens.token_type} expires_in=${tokens.expires_in}`;
   console.log(`5. token -> ${oneLine(tokenRes.status)} ${oneLine(outcome)}`);
-  if (!tokens.access_token) throw new Error(`token exchange failed: ${tokens.error} ${tokens.error_description}`);
+  if (!tokens.access_token)
+    throw new Error(`token exchange failed: ${tokens.error} ${tokens.error_description}`);
 
   const atClaims = jwtClaims(tokens.access_token) as { aud?: string; exp?: number; iat?: number };
   const idClaims = tokens.id_token ? (jwtClaims(tokens.id_token) as { nonce?: string }) : undefined;
-  console.log(`6. access token -> aud=${JSON.stringify(atClaims.aud)} ttl=${(atClaims.exp ?? 0) - (atClaims.iat ?? 0)}s`);
-  console.log(`   id_token nonce ${idClaims?.nonce === dance.nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent'}`);
+  console.log(
+    `6. access token -> aud=${JSON.stringify(atClaims.aud)} ttl=${(atClaims.exp ?? 0) - (atClaims.iat ?? 0)}s`,
+  );
+  console.log(
+    `   id_token nonce ${idClaims?.nonce === dance.nonce ? 'matches' : 'MISSING/MISMATCH'}; refresh_token ${tokens.refresh_token ? 'present' : 'absent'}`,
+  );
 
   // 7. Refresh: rotate, then replay the retired token to trigger family revocation.
   const refreshToken = tokens.refresh_token;
@@ -220,7 +238,9 @@ async function main(): Promise<void> {
     });
   await checkRefreshRotation(refreshUse, refreshToken);
 
-  console.log(`10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${oneLine(atClaims.aud)}`);
+  console.log(
+    `10. offline verify: node scripts/verify-jwks.ts --token <access_token> --jwks-url ${ISSUER}/jwks --aud ${oneLine(atClaims.aud)}`,
+  );
 }
 
 interface RefreshBody {
@@ -240,7 +260,9 @@ async function postJson(
   return { status: res.status, body };
 }
 
-main().catch((err: unknown) => {
+try {
+  await main();
+} catch (err: unknown) {
   console.error('dance failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
   process.exitCode = 1;
-});
+}

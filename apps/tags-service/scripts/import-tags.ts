@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { main } from '../src/tags/import.js';
 
 /**
  * `import-tags` entry (`SPEC-tags-extraction` Migration script). Thin CLI over
@@ -27,4 +26,4 @@ import { main } from '../src/tags/import.js';
  * `import-tags [plan|apply]: …` report line.
  */
 
-export { main };
+export { main } from '../src/tags/import.js';
