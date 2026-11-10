@@ -19,9 +19,11 @@
  * Fails when:
  *   - a high/critical advisory is reported but not allowlisted at that severity;
  *   - an allowlisted advisory is no longer reported (delete the exception, it rots);
- *   - a critical allowlist entry is past its own `reviewBy` date (a time bomb, so a
- *     critical cannot sit forever behind a doc comment).
+ *   - any allowlist entry is past its own `reviewBy` date (a deadline is a deadline at
+ *     any severity, or the exception is permanent instead of time-boxed).
  * Moderate/low advisories are printed for information and never fail the run.
+ * `reviewBy: null` is the one exception: it says "no deadline, informational only" and
+ * never gates.
  *
  * Run: node scripts/audit-gate.mjs   (`npm run audit:gate`)
  */
@@ -120,8 +122,10 @@ function violationsOf({ advisories, allowlist }) {
         !allowlistCovers(allowlist.get(advisory.id), advisory.severity),
     ),
     stale: [...allowlist.values()].filter((entry) => !reported.has(entry.id)),
+    // Every entry that declared a deadline, not just the critical ones: gating only
+    // criticals leaves a low entry with a date that silently never expires.
     overdue: [...allowlist.values()]
-      .filter((entry) => entry.severity === 'critical' && daysOverdue(entry.reviewBy) > 0)
+      .filter((entry) => daysOverdue(entry.reviewBy) > 0)
       .map((entry) => ({ entry, days: daysOverdue(entry.reviewBy) })),
   };
 }
@@ -156,7 +160,7 @@ function reportViolations({ unaccounted, stale, overdue }) {
   }
   for (const { entry, days } of overdue) {
     console.error(
-      `  past reviewBy    ${entry.id}  ${entry.package}  critical — ${days} day${days === 1 ? '' : 's'} overdue (reviewBy ${entry.reviewBy})`,
+      `  past reviewBy    ${entry.id}  ${entry.package}  ${entry.severity} — ${days} day${days === 1 ? '' : 's'} overdue (reviewBy ${entry.reviewBy})`,
     );
   }
 
