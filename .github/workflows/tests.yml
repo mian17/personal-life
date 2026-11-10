@@ -123,6 +123,23 @@ jobs:
       - name: Build native dependencies
         run: npm rebuild better-sqlite3 argon2
 
+      # Next prints "No build cache found" from `getCacheDir()` whenever CI is set
+      # and `apps/app/.next/cache` does not exist — it has no config switch, so the
+      # only fix is to make a real cache present. The key carries the commit and
+      # the lockfile hash: an exact-key hit restores this commit's own cache, and
+      # the narrow restore prefix lets a same-lockfile commit warm the build
+      # without ever crossing a dependency change. Residual risk: a warm hit from
+      # a different commit could in principle restore stale Turbopack entries, but
+      # Next hashes module contents into its cache keys, so stale output is not
+      # served. A cold key (first run after a lockfile bump) still warns — nothing
+      # exists to restore, and pre-creating an empty dir would only hide that.
+      - name: Restore Next build cache
+        uses: actions/cache@v6
+        with:
+          path: apps/app/.next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-next-${{ hashFiles('package-lock.json') }}-
+
       # Workspace `@life/*` types only exist after a build: a fresh clone has no
       # `dist/`, so every suite importing another workspace fails with TS2307.
       - name: Build workspaces
