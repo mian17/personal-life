@@ -12,16 +12,16 @@ process rules live in [`AGENTS.md`](AGENTS.md); setup lives in [`README.md`](REA
 
 ## Topology
 
-| Path | Role | Prod port | Dev port | Store |
-|---|---|---|---|---|
-| `apps/app` | Next.js App Router UI + PWA; the server-side BFF is the only API caller | 3002 (`compose.yaml`) | 3100 (`WEB_PORT` default in `apps/app/package.json`) | session in `redis-app` |
-| `apps/idp` | OpenID Connect provider (`oidc-provider`): users, login, sessions, JWKS | 3003 | 3102 (`dev:build` in `package.json`) | SQLite `idp.db` + `redis-idp` |
-| `apps/note-service` | Notes and tags-registry API | 3001 | 3101 | SQLite `life.db` + `redis-note` |
-| `apps/tags-service` | Tag registry shared by notes and todos | 3004 | 3104 | SQLite `tags.db` + `redis-tags` |
-| `apps/todo-service` | Todos, lists, reminders, Web Push | 3005 | 3105 | SQLite `todo.db` + `redis-todo` |
-| `apps/meal-service` | Meals, foods, entries, nutrition, Gemini photo estimate | 3106 | 3106 | SQLite `meal.db` + `redis-meal` |
-| `apps/feedback-service` | Feedback ingest plus a `feedback_event` change log | 3008 | 3108 | **Postgres** `postgres-feedback` + RabbitMQ + `redis-feedback` |
-| `apps/focus-service` | Pomodoro sessions and goals | 3107 | 3107 | SQLite `focus.db` + `redis-focus` |
+| Path                    | Role                                                                    | Prod port             | Dev port                                             | Store                                                          |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
+| `apps/app`              | Next.js App Router UI + PWA; the server-side BFF is the only API caller | 3002 (`compose.yaml`) | 3100 (`WEB_PORT` default in `apps/app/package.json`) | session in `redis-app`                                         |
+| `apps/idp`              | OpenID Connect provider (`oidc-provider`): users, login, sessions, JWKS | 3003                  | 3102 (`dev:build` in `package.json`)                 | SQLite `idp.db` + `redis-idp`                                  |
+| `apps/note-service`     | Notes and tags-registry API                                             | 3001                  | 3101                                                 | SQLite `life.db` + `redis-note`                                |
+| `apps/tags-service`     | Tag registry shared by notes and todos                                  | 3004                  | 3104                                                 | SQLite `tags.db` + `redis-tags`                                |
+| `apps/todo-service`     | Todos, lists, reminders, Web Push                                       | 3005                  | 3105                                                 | SQLite `todo.db` + `redis-todo`                                |
+| `apps/meal-service`     | Meals, foods, entries, nutrition, Gemini photo estimate                 | 3106                  | 3106                                                 | SQLite `meal.db` + `redis-meal`                                |
+| `apps/feedback-service` | Feedback ingest plus a `feedback_event` change log                      | 3008                  | 3108                                                 | **Postgres** `postgres-feedback` + RabbitMQ + `redis-feedback` |
+| `apps/focus-service`    | Pomodoro sessions and goals                                             | 3107                  | 3107                                                 | SQLite `focus.db` + `redis-focus`                              |
 
 Port provenance: production ports are the `PORT` values in `compose.yaml`; dev ports are pinned in
 the root `dev`/`dev:build` scripts (`package.json`) or in each app's own `start`/`dev` script.
@@ -146,16 +146,16 @@ Visual values themselves are not repeated here: see
 
 ## Storage map
 
-| Service | Store | Content encryption |
-|---|---|---|
-| `app` | none; `redis-app` holds sessions and refresh locks (AOF + volume) | n/a |
-| `idp` | SQLite `idp.db`, argon2 password hashes, users/grants cache in `redis-idp` | password hashing, not envelope encryption |
-| `note-service` | SQLite `life.db` | note body is an `enc.v1.` envelope |
-| `tags-service` | SQLite `tags.db` | tag names encrypted |
-| `todo-service` | SQLite `todo.db` | titles, notes, list names encrypted; dates/flags not |
-| `meal-service` | SQLite `meal.db` | food/entry/saved-meal text encrypted |
-| `focus-service` | SQLite `focus.db` | rows are numbers and date keys; master key guards the owner-key table |
-| `feedback-service` | **Postgres** (`postgres-feedback`) + RabbitMQ | title/description encrypted |
+| Service            | Store                                                                      | Content encryption                                                    |
+| ------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `app`              | none; `redis-app` holds sessions and refresh locks (AOF + volume)          | n/a                                                                   |
+| `idp`              | SQLite `idp.db`, argon2 password hashes, users/grants cache in `redis-idp` | password hashing, not envelope encryption                             |
+| `note-service`     | SQLite `life.db`                                                           | note body is an `enc.v1.` envelope                                    |
+| `tags-service`     | SQLite `tags.db`                                                           | tag names encrypted                                                   |
+| `todo-service`     | SQLite `todo.db`                                                           | titles, notes, list names encrypted; dates/flags not                  |
+| `meal-service`     | SQLite `meal.db`                                                           | food/entry/saved-meal text encrypted                                  |
+| `focus-service`    | SQLite `focus.db`                                                          | rows are numbers and date keys; master key guards the owner-key table |
+| `feedback-service` | **Postgres** (`postgres-feedback`) + RabbitMQ                              | title/description encrypted                                           |
 
 Only feedback is Postgres. Every other service is a single SQLite file, opened through TypeORM
 from a host bind mount: `compose.yaml` mounts each service's host data directory into the
@@ -239,12 +239,12 @@ True by construction; a violation is a bug rather than a choice.
 
 ## Where the rest lives
 
-| Need | File |
-|---|---|
-| Setup, env files, run commands, Tailscale Serve layout | [`README.md`](README.md) |
-| Agent process, delegation template, branches, hard lines | [`AGENTS.md`](AGENTS.md) |
-| Visual design system: tokens, palette, type, components | [`docs/design-systems/personal-life/DESIGN.md`](docs/design-systems/personal-life/DESIGN.md) |
-| Incident lessons (27 files, read before repeating a mistake) | [`docs/lessons/`](docs/lessons/) |
-| Deploy, restore, e2e, ops runbooks | [`docs/runbooks/`](docs/runbooks/) |
-| Backmerge procedure | [`docs/ops/backmerge.md`](docs/ops/backmerge.md) |
-| Research notes and open design questions | [`docs/research/`](docs/research/) |
+| Need                                                         | File                                                                                         |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Setup, env files, run commands, Tailscale Serve layout       | [`README.md`](README.md)                                                                     |
+| Agent process, delegation template, branches, hard lines     | [`AGENTS.md`](AGENTS.md)                                                                     |
+| Visual design system: tokens, palette, type, components      | [`docs/design-systems/personal-life/DESIGN.md`](docs/design-systems/personal-life/DESIGN.md) |
+| Incident lessons (27 files, read before repeating a mistake) | [`docs/lessons/`](docs/lessons/)                                                             |
+| Deploy, restore, e2e, ops runbooks                           | [`docs/runbooks/`](docs/runbooks/)                                                           |
+| Backmerge procedure                                          | [`docs/ops/backmerge.md`](docs/ops/backmerge.md)                                             |
+| Research notes and open design questions                     | [`docs/research/`](docs/research/)                                                           |
