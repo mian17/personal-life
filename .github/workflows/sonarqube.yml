@@ -172,4 +172,45 @@ jobs:
               process.exit(1);
             });
           '
+
+          # A failing metric name is not actionable on its own: "new_violations:
+          # actual 13" says nothing about which 13. List the offending issues
+          # too. Best effort on purpose - an HTTP error or a non-JSON body here
+          # must not hide the gate verdict printed above, so it notes the
+          # problem and the step still exits 1.
+          issues="$(curl --silent --show-error \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            "${SONAR_HOST_URL}/api/issues/search?componentKeys=personal-life&resolved=false&inNewCodePeriod=true&ps=100&facets=severities" || true)"
+          printf '%s' "$issues" | node -e '
+            let body = "";
+            process.stdin.on("data", (chunk) => (body += chunk)).on("end", () => {
+              let result;
+              try {
+                result = JSON.parse(body);
+              } catch {
+                console.error("Could not read the issues API response; see the gate conditions above.");
+                return;
+              }
+              if (!Array.isArray(result.issues)) {
+                console.error("Unexpected response from the issues API; see the gate conditions above.");
+                return;
+              }
+              const issues = result.issues;
+              const total = result.total ?? issues.length;
+              if (issues.length === 0) {
+                console.error("The issues API returned no issues for the new code period.");
+                return;
+              }
+              console.error(`Offending issues (${issues.length} of ${total}):`);
+              for (const issue of issues) {
+                const component = (issue.component ?? "").replace(/^personal-life:/, "");
+                console.error(
+                  `  ${issue.severity} ${issue.rule} ${component}:${issue.line ?? "-"} ${issue.message}`,
+                );
+              }
+              if (total > issues.length) {
+                console.error(`  ...and ${total - issues.length} more (page size 100).`);
+              }
+            });
+          '
           exit 1
