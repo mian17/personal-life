@@ -34,6 +34,13 @@ jobs:
           fetch-depth: 0
           ref: dev
 
+      # github-hosted runners ship no global git identity, so the merge commit
+      # cannot be authored without this (`Committer identity unknown`).
+      - name: Set git identity for the bookkeeping merge
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
       # Idempotency guard: after a landed back-merge (or a promotion that was
       # itself a merge commit) `main` is already an ancestor of `dev` and there
       # is nothing to do. Covers re-runs and repeated dispatches.

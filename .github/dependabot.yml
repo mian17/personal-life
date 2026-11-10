@@ -1,39 +1,26 @@
-# Why this exists: 19 npm workspaces with zero automated dependency updates is the
-# only reason a transitive CVE in this repo goes unnoticed.
+# Version updates are deliberately disabled: a pull-request limit of zero turns the
+# scheduled bump engine off for both ecosystems. Do not raise it. Routine PRs from
+# this file carried no CVE and only added review load.
 #
-# Routine minor+patch bumps land as one grouped PR per ecosystem per week.
-# Security advisories are deliberately NOT in a group: GitHub ignores group patterns
-# for them, so each security fix arrives as its own PR and stays reviewable and
-# mergeable on its own.
+# Dependabot *security* updates are a separate repository setting (Settings -> Code
+# security -> Dependabot alerts + Dependabot security updates). This file and its
+# limit do not affect them; they keep opening PRs for known advisories.
+#
+# Dependency freshness is covered instead by `npm run audit:gate`, which audits the
+# full tree including devDependencies, plus `.github/audit-allowlist.json` for the
+# advisories that cannot be fixed, each with a `reviewBy` deadline.
+#
+# `schedule` stays because it is schema-required even with the limit at 0.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: '/'
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    commit-message:
-      # Routine bumps: chore(deps): <summary>
-      # Security PRs keep Dependabot's default prefix (no commit-message override applies to them).
-      prefix: chore
-      include: scope
-    groups:
-      npm-minor-patch:
-        update-types:
-          - minor
-          - patch
-    # major stays ungrouped and opens its own PR, one per upgrade
+    open-pull-requests-limit: 0
 
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      actions-minor-patch:
-        update-types:
-          - minor
-          - patch
+    open-pull-requests-limit: 0
