@@ -58,9 +58,17 @@ jobs:
       # rating C. Only three dependencies carry install scripts, and only the two
       # native ones matter here: `better-sqlite3` (sqlite suites) and `argon2`
       # (idp). Rebuild those explicitly; `fsevents` is macOS-only and optional.
+
+      # No `.npmrc` is committed on purpose: `replace-registry-host: always` rewrites the
+      # lockfile's mirror `resolved` hosts to the pinned registry in CI only, leaving local
+      # npm alone; the fetch flags turn a flaky mirror into bounded retries, and
+      # `--no-audit --no-fund` drop two round-trips (advisories are gated elsewhere).
       - name: Install dependencies
         if: steps.guard.outputs.skip != 'true'
-        run: npm ci --ignore-scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=60000 --fetch-timeout=300000
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_REPLACE_REGISTRY_HOST: always
 
       - name: Build native dependencies
         if: steps.guard.outputs.skip != 'true'
