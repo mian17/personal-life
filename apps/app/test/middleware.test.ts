@@ -19,7 +19,7 @@ jest.mock('@/lib/auth/session-store', () => ({
   sessionStore: { get: (id: string | undefined) => mockGet(id) },
 }));
 
-import { middleware } from '../middleware';
+import { proxy } from '../proxy';
 import { SESSION_COOKIE } from '@/lib/auth/cookies';
 
 function request(path = '/', cookie?: string, method = 'GET'): NextRequest {
@@ -35,7 +35,7 @@ describe('middleware identity gate (async store)', () => {
   it('redirects to login when there is no session (the async read is awaited)', async () => {
     // A resolved Promise carrying "no session": the trap case.
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request());
+    const res = await proxy(request());
 
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/auth/login');
@@ -44,7 +44,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('passes the request through when a live session exists', async () => {
     mockGet.mockResolvedValue({ id: 'sess-1', subject: 'me' });
-    const res = await middleware(request('/', `${SESSION_COOKIE}=sess-1`));
+    const res = await proxy(request('/', `${SESSION_COOKIE}=sess-1`));
 
     expect(res.headers.get('x-middleware-next')).toBe('1');
     expect(res.headers.get('location')).toBeNull();
@@ -53,7 +53,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('redirects when the cookie names a session the store no longer has', async () => {
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request('/', `${SESSION_COOKIE}=stale`));
+    const res = await proxy(request('/', `${SESSION_COOKIE}=stale`));
 
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/auth/login');
@@ -61,7 +61,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('lets public auth paths through without a session', async () => {
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request('/auth/callback'));
+    const res = await proxy(request('/auth/callback'));
 
     expect(res.headers.get('x-middleware-next')).toBe('1');
     expect(res.headers.get('location')).toBeNull();
@@ -69,7 +69,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('carries the requested GET path as returnTo', async () => {
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request('/todos'));
+    const res = await proxy(request('/todos'));
 
     expect(res.status).toBe(307);
     const location = res.headers.get('location');
@@ -79,7 +79,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('carries the query string in returnTo', async () => {
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request('/todos?done=false'));
+    const res = await proxy(request('/todos?done=false'));
 
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('returnTo=%2Ftodos%3Fdone%3Dfalse');
@@ -87,7 +87,7 @@ describe('middleware identity gate (async store)', () => {
 
   it('does not carry returnTo for a POST to an API route', async () => {
     mockGet.mockResolvedValue(undefined);
-    const res = await middleware(request('/api/notes/flush', undefined, 'POST'));
+    const res = await proxy(request('/api/notes/flush', undefined, 'POST'));
 
     expect(res.status).toBe(307);
     const location = res.headers.get('location');
