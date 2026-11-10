@@ -18,7 +18,10 @@ import { DEFAULT_DATABASE_PATHS } from '../src/repo-paths.js';
  * only ever touch temp fixtures. It refuses unless the stack probes down.
  */
 if (import.meta.url === pathToFileURL(process.argv[1] as string).href) {
-  void main(process.argv.slice(2), process.env, undefined, DEFAULT_DATABASE_PATHS).then((code) => {
-    process.exitCode = code;
-  });
+  process.exitCode = await main(
+    process.argv.slice(2),
+    process.env,
+    undefined,
+    DEFAULT_DATABASE_PATHS,
+  );
 }
