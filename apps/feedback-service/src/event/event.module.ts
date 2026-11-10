@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FeedbackCursor } from '../feedback/feedback-cursor.entity';
-import { FeedbackEvent } from '../feedback/feedback-event.entity';
-import { DispatcherService } from './dispatcher.service';
-import { EVENT_SINK, RabbitPublisher } from './publisher.service';
+import { FeedbackCursor } from '../feedback/feedback-cursor.entity.js';
+import { FeedbackEvent } from '../feedback/feedback-event.entity.js';
+import { DispatcherService } from './dispatcher.service.js';
+import { EVENT_SINK, RabbitPublisher } from './publisher.service.js';
 
 /**
  * The durable event path (`SPEC-feedback-service` Event stream): the boot-ensured

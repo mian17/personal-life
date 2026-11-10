@@ -51,6 +51,35 @@ function testableWorkspaces() {
   });
 }
 
+/**
+ * Whether this workspace's suites load an ESM-only package out of `node_modules`,
+ * which jest can only do under `--experimental-vm-modules`: either an `.mts`
+ * suite (the step-2 layer), or product source that `require()`s `@nestjs` 12,
+ * which ships as an ES module and so needs Node's `require(esm)`.
+ *
+ * Deliberately workspace-scoped rather than a blanket flag: the flag flips jest
+ * onto its sync-ESM evaluate path, which runs ts-jest's CommonJS output as ESM
+ * and fails with `exports is not defined` for every transformed ESM-only
+ * dependency (measured: nine workspaces red under a global flag).
+ */
+function needsVmModules(dir) {
+  const testDir = join(ROOT, dir, 'test');
+  const hasMtsSuite =
+    existsSync(testDir) &&
+    readdirSync(testDir, { recursive: true }).some((entry) => entry.endsWith('.test.mts'));
+  if (hasMtsSuite) return true;
+
+  const manifest = JSON.parse(readFileSync(join(ROOT, dir, 'package.json'), 'utf8'));
+  const declared = {
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.peerDependencies,
+  };
+  return Object.entries(declared).some(
+    ([name, range]) => name.startsWith('@nestjs/') && /\^12\./.test(range),
+  );
+}
+
 function runWorkspace(dir) {
   const coverageDir = join(OUT_DIR, 'raw', dir.replaceAll('/', '__'));
   rmSync(coverageDir, { recursive: true, force: true });
@@ -60,11 +89,29 @@ function runWorkspace(dir) {
     // roughly doubles ts-jest compile cost, and on a cold cache (every CI run)
     // an e2e `beforeAll` that boots Nest + sqlite crosses 5s and fails the suite
     // spuriously — measured 2/13 note-service suites red cold vs green warm.
+    //
+    // The vm-modules flag is workspace-scoped, not global: an `.mts` suite
+    // cannot load an ESM-only package without it (ERR_REQUIRE_ESM), but on Node
+    // 24 a flag every workspace sees makes jest evaluate ts-jest's CommonJS
+    // output through its sync-ESM path, which fails with `exports is not
+    // defined` in every suite that imports an ESM-only dependency.
     execFileSync(
       JEST,
-      ['--coverage', '--coverageReporters=lcov', `--coverageDirectory=${coverageDir}`, '--silent', '--testTimeout=30000'],
+      [
+        '--coverage',
+        '--coverageReporters=lcov',
+        `--coverageDirectory=${coverageDir}`,
+        '--silent',
+        '--testTimeout=30000',
+      ],
       {
         cwd: join(ROOT, dir),
+        env: needsVmModules(dir)
+          ? {
+              ...process.env,
+              NODE_OPTIONS: '--experimental-vm-modules --disable-warning=ExperimentalWarning',
+            }
+          : process.env,
         stdio: ['ignore', 'inherit', 'inherit'],
       },
     );

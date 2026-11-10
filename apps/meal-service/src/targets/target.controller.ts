@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { TargetService } from './target.service';
+import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { TargetService } from './target.service.js';
 
 /**
  * Target routes (`SPEC-target-onboarding`). `ownerSub` always comes from

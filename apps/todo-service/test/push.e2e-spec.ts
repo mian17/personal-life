@@ -3,7 +3,7 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * `SPEC-todo-due-repeat-notify` Testing #7: the push-subscription HTTP surface.
@@ -14,7 +14,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
  * The fixture DB is a throwaway under `test/` — never `apps/todo-service/data/**`.
  */
 
-const TEST_DB = join(__dirname, 'test-push.db');
+const TEST_DB = join(import.meta.dirname, 'test-push.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -45,7 +45,7 @@ describe('Push subscriptions (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

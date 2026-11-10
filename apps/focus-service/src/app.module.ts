@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'node:path';
 import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from './service-config';
-import { Goal } from './goals/goal.entity';
-import { GoalsModule } from './goals/goals.module';
-import { Session } from './sessions/session.entity';
-import { SessionsModule } from './sessions/sessions.module';
+import { MASTER_KEY_ENV } from './service-config.js';
+import { Goal } from './goals/goal.entity.js';
+import { GoalsModule } from './goals/goals.module.js';
+import { Session } from './sessions/session.entity.js';
+import { SessionsModule } from './sessions/sessions.module.js';
 
 /**
  * SQLite through `better-sqlite3`, the `note-service` shape (`SPEC-focus-service`

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { ENC_PREFIX } from '@life/crypto';
 import type { FeedbackPage } from '@life/shared';
 import {
@@ -15,7 +16,7 @@ import {
   waitFor,
   type FeedbackApp,
   type ThrowawayPostgres,
-} from './feedback-harness';
+} from './feedback-harness.js';
 
 /**
  * Groups 1, 4 and 5 of `SPEC-feedback-service`'s Testing Strategy, proved
@@ -194,10 +195,9 @@ describeDb('Feedback API (e2e)', () => {
 
       // The DB, not the client, supplies the default: the POST body never
       // carried a status, yet the row reads back `open`.
-      const stored = await app.dataSource.query(
-        'SELECT status FROM feedback WHERE id = $1',
-        [mine[0]],
-      );
+      const stored = await app.dataSource.query('SELECT status FROM feedback WHERE id = $1', [
+        mine[0],
+      ]);
       expect(stored[0].status).toBe('open');
 
       const [first, second] = known;
@@ -469,7 +469,9 @@ describeDb('Feedback API (e2e)', () => {
       // re-queries the DB and repopulates under generation 1.
       const afterWrite = await get(app, token).expect(200);
       expect(redis.setCalls).toContain(listKey(1));
-      expect((afterWrite.body as FeedbackPage).feedback.some((entry) => entry.id === id)).toBe(true);
+      expect((afterWrite.body as FeedbackPage).feedback.some((entry) => entry.id === id)).toBe(
+        true,
+      );
 
       // An identical read is a hit: no second populate, no second DB loader run.
       const setsSoFar = redis.setCalls.filter((key) => key === listKey(1)).length;
@@ -541,9 +543,9 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, token, validBody(id, 'survives a broken cache')).expect(201);
 
       const listed = await get(app, token).expect(200);
-      expect((listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description).toBe(
-        'survives a broken cache',
-      );
+      expect(
+        (listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description,
+      ).toBe('survives a broken cache');
       await get(app, token).expect(200);
     });
   });
@@ -568,9 +570,9 @@ describeDb('Feedback API (e2e)', () => {
       await post(app, token, validBody(id, 'direct from the database')).expect(201);
 
       const listed = await get(app, token).expect(200);
-      expect((listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description).toBe(
-        'direct from the database',
-      );
+      expect(
+        (listed.body as FeedbackPage).feedback.find((entry) => entry.id === id)?.description,
+      ).toBe('direct from the database');
 
       // Repeated reads stay correct without a cache: the loader runs every time.
       const again = await get(app, token).expect(200);

@@ -1,14 +1,15 @@
+import { jest } from '@jest/globals';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { AuthGuard } from '@life/service-kit';
-import { NOTES_CACHE, NotesCache } from '../src/notes/notes-cache';
-import { VERIFIER_ENV } from '../src/service-config';
+import { NOTES_CACHE, NotesCache } from '../src/notes/notes-cache.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
 import type { Note as NoteDto } from '@life/shared';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
-import { FakeRedisClient } from './fake-redis';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * The `notes` batch trio (`SPEC-note-service.md` §9). Every case drives the real
@@ -24,7 +25,7 @@ import { FakeRedisClient } from './fake-redis';
  * so in a development worker every subject would collapse to `dev-user`.
  */
 
-const TEST_DB = join(__dirname, 'test-life-batch.db');
+const TEST_DB = join(import.meta.dirname, 'test-life-batch.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -70,7 +71,7 @@ describe('Notes batch API (e2e)', () => {
 
   /** The app as `app.factory` builds it, with the cache swapped for the recorder. */
   async function startApp(cache: NotesCache): Promise<INestApplication> {
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(NOTES_CACHE)
       .useValue(cache)
@@ -95,9 +96,9 @@ describe('Notes batch API (e2e)', () => {
     });
 
     it('does not answer on a slashed path, which would be the parameter route', async () => {
-      const response = await apiPost('/api/notes/batchCreate', { items: [{ body: 'nope' }] }).expect(
-        404,
-      );
+      const response = await apiPost('/api/notes/batchCreate', {
+        items: [{ body: 'nope' }],
+      }).expect(404);
 
       expect(response.body).toEqual(routedNowhere('POST', '/api/notes/batchCreate'));
     });

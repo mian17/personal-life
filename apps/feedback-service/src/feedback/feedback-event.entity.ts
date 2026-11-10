@@ -1,6 +1,6 @@
 import { Check, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { FEEDBACK_TYPE_VALUES, type FeedbackType } from '@life/shared';
-import { Feedback } from './feedback.entity';
+import { Feedback } from './feedback.entity.js';
 
 /** The `type` vocabulary as a SQL literal list, so the CHECK cannot drift from `@life/shared`. */
 const TYPE_VALUES_SQL = FEEDBACK_TYPE_VALUES.map((v) => `'${v}'`).join(',');

@@ -5,10 +5,10 @@ import type { EntityManager } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { likeMatch } from '@life/shared';
 import { KeysService, DEFAULT_PAGE_LIMIT, paginate, runAtomicBatch } from '@life/service-kit';
-import { Tag } from './tag.entity';
-import { TAGS_CACHE, TagsCache } from './tags-cache';
-import type { CreateTagDto } from './dto/create-tag.dto';
-import type { BatchUpdateTagItem } from './dto/batch-tags.dto';
+import { Tag } from './tag.entity.js';
+import { TAGS_CACHE, TagsCache } from './tags-cache.js';
+import type { CreateTagDto } from './dto/create-tag.dto.js';
+import type { BatchUpdateTagItem } from './dto/batch-tags.dto.js';
 
 /** A create-or-get that either wrote a row or reused one. */
 interface CreatedOrReused {
@@ -325,21 +325,14 @@ export class TagsService {
   ): Promise<Tag | undefined> {
     const wanted = name.toLowerCase();
     const rows = await this.ownerRows(manager, sub);
-    return rows.find(
-      (row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
-    );
+    return rows.find((row) => this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted);
   }
 
   /**
    * `PATCH /api/tags/:id {name, expectedVersion?}` — rename. Every path here
    * mutates, so the singular route bumps unconditionally after it returns.
    */
-  async rename(
-    sub: string,
-    id: number,
-    name: string,
-    expectedVersion?: number,
-  ): Promise<TagDto> {
+  async rename(sub: string, id: number, name: string, expectedVersion?: number): Promise<TagDto> {
     const tag = await this.renameOne(this.tags.manager, sub, id, name, expectedVersion);
     // Bump AFTER the mutation — see bumpGeneration(); a thrown rename never bumps.
     await this.cache.bumpGeneration(sub);
@@ -383,8 +376,7 @@ export class TagsService {
     const wanted = name.toLowerCase();
     const siblings = await this.ownerRows(manager, sub);
     const collision = siblings.some(
-      (row) =>
-        row.id !== id && this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
+      (row) => row.id !== id && this.openName(row.name, dek, sub, row.id).toLowerCase() === wanted,
     );
     if (collision) throw new ConflictException('Tag name already exists');
 

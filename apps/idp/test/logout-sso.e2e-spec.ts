@@ -2,11 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { rmSync } from 'fs';
 import { join } from 'path';
-import { Client } from './oidc-harness';
-import { UsersService } from '../src/users/users.service';
+import { Client } from './oidc-harness.js';
+import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-logout-sso.db');
-const TEST_KEYS = join(__dirname, 'test-idp-logout-sso-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-logout-sso.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-logout-sso-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const REDIRECT_URI = 'http://127.0.0.1:8080/cb';
 const PASSWORD = 'fixture-password-not-a-secret';
@@ -16,7 +16,7 @@ process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = ISSUER;
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;
@@ -71,9 +71,8 @@ async function dance(app: INestApplication, username: string): Promise<Client> {
     const interaction = new URL(location!, ISSUER);
     const form = await client.get(interaction.pathname);
     if (form.status === 200) {
-      location = (
-        await client.postForm(interaction.pathname, { username, password: PASSWORD })
-      ).location;
+      location = (await client.postForm(interaction.pathname, { username, password: PASSWORD }))
+        .location;
     } else {
       location = form.location;
     }
@@ -170,7 +169,9 @@ describe('Logout ends the SSO session (e2e)', () => {
 
     // Alice's Session rows are gone; Bob's are untouched.
     expect(sessionIdsFor(aliceUser!.id)).toHaveLength(0);
-    expect(sessionIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([...bobSessionsBefore].sort((a: string, b: string) => a.localeCompare(b)));
+    expect(sessionIdsFor(bobUser!.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+      [...bobSessionsBefore].sort((a: string, b: string) => a.localeCompare(b)),
+    );
 
     // And Bob's provider session still skips login.
     const bobAuthorize = await bob.get(authorizePath());

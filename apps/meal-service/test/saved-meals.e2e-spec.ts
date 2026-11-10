@@ -2,7 +2,7 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { NUTRIENTS, type Nutrient } from '@life/nutrition';
-import { SavedMealsService } from '../src/saved-meals/saved-meals.service';
+import { SavedMealsService } from '../src/saved-meals/saved-meals.service.js';
 import { KeysService, MAX_PAGE_LIMIT } from '@life/service-kit';
 
 /**
@@ -18,7 +18,7 @@ import { KeysService, MAX_PAGE_LIMIT } from '@life/service-kit';
  * Exercised through `SavedMealsService` (behavior proof, not transport).
  */
 
-const TEST_DB = join(__dirname, 'test-saved-meals.db');
+const TEST_DB = join(import.meta.dirname, 'test-saved-meals.db');
 const SUB = 'user-a';
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 
@@ -39,7 +39,7 @@ describe('Saved meals — frozen snapshots', () => {
     process.env.DB_PATH = TEST_DB;
     process.env.MEAL_MASTER_KEY ??= Buffer.alloc(32, 0x2c).toString('base64');
 
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     service = app.get(SavedMealsService);

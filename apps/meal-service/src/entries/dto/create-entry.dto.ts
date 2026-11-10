@@ -1,6 +1,6 @@
 import { IsIn, IsNumber, IsObject, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import type { NutrientVector } from '@life/nutrition';
-import { DATE_ONLY } from '../../targets/dto/update-profile.dto';
+import { DATE_ONLY } from '../../targets/dto/update-profile.dto.js';
 
 /**
  * The meal a diary entry belongs to (`docs/intent/meal-nutrition.md`:

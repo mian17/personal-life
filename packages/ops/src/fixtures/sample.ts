@@ -4,8 +4,8 @@
  * `FieldSpec` type, so the suites prove the contract on this registry alone
  * and no test ever contacts a real service.
  */
-import { defineResource } from '../core/registry';
-import type { ResourceRegistry } from '../core/types';
+import { defineResource } from '../core/registry.js';
+import type { ResourceRegistry } from '../core/types.js';
 
 export const sampleRegistry: ResourceRegistry = defineResource({
   name: 'sample',

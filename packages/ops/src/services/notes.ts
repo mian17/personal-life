@@ -13,8 +13,8 @@
  * rows in bulk, which belongs on the human checklist rather than an agent's
  * single call.
  */
-import type { ServiceModule } from '../cli/run';
-import { defineResource } from '../core/registry';
+import type { ServiceModule } from '../cli/run.js';
+import { defineResource } from '../core/registry.js';
 
 export const service: ServiceModule = {
   registry: defineResource({

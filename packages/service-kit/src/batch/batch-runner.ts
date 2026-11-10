@@ -13,8 +13,8 @@
  */
 import type { DataSource, EntityManager } from 'typeorm';
 import type { ReadThroughCache } from '@life/cache';
-import { assertBatchSize } from './batch-limits';
-import { runInSubmissionOrder } from './batch-item';
+import { assertBatchSize } from './batch-limits.js';
+import { runInSubmissionOrder } from './batch-item.js';
 
 export interface BatchRun<Item, Result> {
   /** The batch, in submission order; the DTO layer has validated its shape only. */

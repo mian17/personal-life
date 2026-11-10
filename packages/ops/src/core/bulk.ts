@@ -5,8 +5,8 @@
  * per-item input derivation. Registry, validator, schema, executor, and both
  * adapters read this module; a second copy of any mapping here is a bug.
  */
-import type { OpSpec } from './types';
-import { ADDRESSING_FIELD } from './wire';
+import type { OpSpec } from './types.js';
+import { ADDRESSING_FIELD } from './wire.js';
 
 /** The four kinds a `bulk: true` resource declares (SPEC-bulk-ops §2.1). */
 export type BulkKind = 'getMany' | 'createMany' | 'updateMany' | 'deleteMany';
@@ -72,8 +72,7 @@ export interface BulkFailedItem<Item = unknown> {
 
 /** Every submitted item's outcome, in submitted order (§2.7). */
 export type BulkItemResult<Item = unknown, Body = unknown> =
-  | BulkSucceededItem<Item, Body>
-  | BulkFailedItem<Item>;
+  BulkSucceededItem<Item, Body> | BulkFailedItem<Item>;
 
 /** The one body a bulk op returns: counts derived from the entries, never tracked apart. */
 export interface BulkEnvelope<Item = unknown, Body = unknown> {

@@ -4,8 +4,8 @@ import {
   basalMetabolicRate,
   totalDailyEnergyExpenditure,
   type Profile,
-} from '../src/targets/target-calculator';
-import { GOALS, KCAL_PER_G, calculateTarget } from '../src/targets/target';
+} from '../src/targets/target-calculator.js';
+import { GOALS, KCAL_PER_G, calculateTarget } from '../src/targets/target.js';
 
 /**
  * Worked examples. Mifflin-St Jeor:
@@ -41,9 +41,7 @@ describe('basalMetabolicRate', () => {
 
 describe('ACTIVITY_FACTORS', () => {
   it('names every activity level in the enum', () => {
-    expect(Object.keys(ACTIVITY_FACTORS).sort()).toEqual(
-      [...ACTIVITY_LEVELS].sort(),
-    );
+    expect(Object.keys(ACTIVITY_FACTORS).sort()).toEqual([...ACTIVITY_LEVELS].sort());
   });
 
   it('uses the standard Harris-Benedict multipliers', () => {
@@ -80,9 +78,7 @@ describe('calculateTarget', () => {
     expect(t.bmr).toBe(basalMetabolicRate(FEMALE));
     expect(t.tdee).toBe(totalDailyEnergyExpenditure(FEMALE));
     expect(t.calories).toBe(t.tdee);
-    expect(calculateTarget({ ...FEMALE, weightKg: 70 }, 'maintain').calories).not.toBe(
-      t.calories,
-    );
+    expect(calculateTarget({ ...FEMALE, weightKg: 70 }, 'maintain').calories).not.toBe(t.calories);
   });
 
   it('rounds macro grams into the calorie target within rounding', () => {
@@ -90,14 +86,11 @@ describe('calculateTarget', () => {
     for (const goal of GOALS) {
       const t = calculateTarget(profile, goal);
       const fromGrams =
-        t.proteinG * KCAL_PER_G.protein +
-        t.fatG * KCAL_PER_G.fat +
-        t.carbG * KCAL_PER_G.carb;
+        t.proteinG * KCAL_PER_G.protein + t.fatG * KCAL_PER_G.fat + t.carbG * KCAL_PER_G.carb;
       // Protein/fat are ceil'd to whole grams and carbs rounded to the nearest,
       // so the residual is bounded by one gram of each floor plus half a gram
       // of carbs.
-      const bound =
-        KCAL_PER_G.protein + KCAL_PER_G.fat + KCAL_PER_G.carb / 2;
+      const bound = KCAL_PER_G.protein + KCAL_PER_G.fat + KCAL_PER_G.carb / 2;
       expect(Math.abs(fromGrams - t.calories)).toBeLessThanOrEqual(bound);
     }
   });

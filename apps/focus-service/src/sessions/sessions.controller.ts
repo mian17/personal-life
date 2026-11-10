@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateSessionDto } from './dto/create-session.dto';
-import { ListSessionsQuery } from './dto/list-sessions.query';
-import { SessionsService } from './sessions.service';
+import { CreateSessionDto } from './dto/create-session.dto.js';
+import { ListSessionsQuery } from './dto/list-sessions.query.js';
+import { SessionsService } from './sessions.service.js';
 
 /**
  * Session routes (`SPEC-focus-service` §1). `ownerSub` always comes from

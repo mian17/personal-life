@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { Note } from './note.entity';
-import { NoteTag } from './note-tag.entity';
-import { NotesController } from './notes.controller';
-import { NotesBatchController } from './notes-batch.controller';
-import { NOTES_CACHE, createNotesCache } from './notes-cache';
-import { NotesService } from './notes.service';
-import { TagsController } from './tags.controller';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { Note } from './note.entity.js';
+import { NoteTag } from './note-tag.entity.js';
+import { NotesController } from './notes.controller.js';
+import { NotesBatchController } from './notes-batch.controller.js';
+import { NOTES_CACHE, createNotesCache } from './notes-cache.js';
+import { NotesService } from './notes.service.js';
+import { TagsController } from './tags.controller.js';
 
 @Module({
   imports: [

@@ -3,7 +3,7 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { NUTRIENTS, type Nutrient } from '@life/nutrition';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * Two-subject ownership isolation (`SPEC-meal-service` Success Criterion 1):
@@ -19,7 +19,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
  * per request).
  */
 
-const TEST_DB = join(__dirname, 'test-ownership.db');
+const TEST_DB = join(import.meta.dirname, 'test-ownership.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -46,7 +46,7 @@ describe('Meal ownership (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -151,7 +151,13 @@ describe('Meal ownership (e2e)', () => {
 
     it("scopes the day to the caller (B sees nothing of A's entries)", async () => {
       await post(
-        { date: DAY, mealGroup: 'breakfast', foodId: 'food-a', quantity: 1, nutrients: entryVector(500) },
+        {
+          date: DAY,
+          mealGroup: 'breakfast',
+          foodId: 'food-a',
+          quantity: 1,
+          nutrients: entryVector(500),
+        },
         tokenA,
       ).expect(201);
 
@@ -164,9 +170,15 @@ describe('Meal ownership (e2e)', () => {
       expect(aList.body.entries[0]).not.toHaveProperty('ownerSub');
     });
 
-    it("returns a byte-identical 404 for a foreign id and a missing id", async () => {
+    it('returns a byte-identical 404 for a foreign id and a missing id', async () => {
       const created = await post(
-        { date: DAY, mealGroup: 'lunch', foodId: 'food-a', quantity: 1, nutrients: entryVector(300) },
+        {
+          date: DAY,
+          mealGroup: 'lunch',
+          foodId: 'food-a',
+          quantity: 1,
+          nutrients: entryVector(300),
+        },
         tokenA,
       ).expect(201);
 
@@ -204,7 +216,13 @@ describe('Meal ownership (e2e)', () => {
       );
 
       await post(
-        { date: DAY, mealGroup: 'snack', foodId: 'food-b', quantity: 1, nutrients: entryVector(700) },
+        {
+          date: DAY,
+          mealGroup: 'snack',
+          foodId: 'food-b',
+          quantity: 1,
+          nutrients: entryVector(700),
+        },
         tokenB,
       ).expect(201);
 
@@ -233,7 +251,7 @@ describe('Meal ownership (e2e)', () => {
       goal: 'maintain',
     };
 
-    it("scopes the target read to the caller (B 404s while A has a row)", async () => {
+    it('scopes the target read to the caller (B 404s while A has a row)', async () => {
       await put({ ...PROFILE, date: '2026-01-01' }, tokenA).expect(200);
 
       await get('2026-06-01', tokenB).expect(404);
@@ -247,10 +265,7 @@ describe('Meal ownership (e2e)', () => {
       await put({ ...PROFILE, date: '2026-01-01' }, tokenA).expect(200);
       const aBefore = await get('2026-06-01', tokenA).expect(200);
 
-      await put(
-        { ...PROFILE, weightKg: 120, date: '2026-01-01' },
-        tokenB,
-      ).expect(200);
+      await put({ ...PROFILE, weightKg: 120, date: '2026-01-01' }, tokenB).expect(200);
 
       const aAfter = await get('2026-06-01', tokenA).expect(200);
       expect(aAfter.body).toEqual(aBefore.body);
@@ -295,7 +310,7 @@ describe('Meal ownership (e2e)', () => {
       await one(created.body.id, tokenA).expect(200);
     });
 
-    it("returns a byte-identical 404 for a foreign id and a missing id", async () => {
+    it('returns a byte-identical 404 for a foreign id and a missing id', async () => {
       const created = await post(body('A lunch', 500), tokenA).expect(201);
 
       const f = await one(created.body.id, tokenB).expect(404);
@@ -308,4 +323,3 @@ describe('Meal ownership (e2e)', () => {
     });
   });
 });
-

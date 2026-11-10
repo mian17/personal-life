@@ -1,13 +1,9 @@
+import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
-import {
-  main,
-  resolvePaths,
-  runBackfill,
-  type RunResult,
-} from '../scripts/backfill-owner';
+import { main, resolvePaths, runBackfill, type RunResult } from '../scripts/backfill-owner.js';
 
 /**
  * `owner-backfill` script suite (Task 5, SPEC-owner-backfill). Every fixture is a
@@ -71,7 +67,12 @@ function createLegacyLifeDb(path: string, life: LegacyLife): void {
     for (const note of life.notes) {
       db.prepare(
         'INSERT INTO "note" ("id","body","version","createdAt","updatedAt") VALUES (?,?,0,?,?)',
-      ).run(note.id, note.body, note.createdAt ?? '2026-01-01 00:00:00', note.createdAt ?? '2026-01-01 00:00:00');
+      ).run(
+        note.id,
+        note.body,
+        note.createdAt ?? '2026-01-01 00:00:00',
+        note.createdAt ?? '2026-01-01 00:00:00',
+      );
     }
     life.tags.forEach((name, i) => {
       db.prepare('INSERT INTO "tag" ("id","name") VALUES (?,?)').run(i + 1, name);
@@ -115,12 +116,17 @@ function hasIndex(db: Db, table: string, name: string): boolean {
 }
 
 function indexColumns(db: Db, index: string): string[] {
-  return (db.prepare(`PRAGMA index_info("${index}")`).all() as Array<{ name: string }>).map((c) => c.name);
+  return (db.prepare(`PRAGMA index_info("${index}")`).all() as Array<{ name: string }>).map(
+    (c) => c.name,
+  );
 }
 
 /** True when `table` still carries the un-droppable legacy inline `UNIQUE(name)`. */
 function hasSingleColumnUniqueOnName(db: Db, table: string): boolean {
-  const list = db.prepare(`PRAGMA index_list("${table}")`).all() as Array<{ name: string; unique: number }>;
+  const list = db.prepare(`PRAGMA index_list("${table}")`).all() as Array<{
+    name: string;
+    unique: number;
+  }>;
   return list.some((idx) => {
     if (!idx.unique) return false;
     const cols = indexColumns(db, idx.name);
@@ -129,9 +135,9 @@ function hasSingleColumnUniqueOnName(db: Db, table: string): boolean {
 }
 
 function tableSql(db: Db, table: string): string {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table) as
-    | { sql: string }
-    | undefined;
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+    .get(table) as { sql: string } | undefined;
   return row?.sql ?? '';
 }
 
@@ -176,8 +182,7 @@ function ownerOf(path: string, table: 'note' | 'tag', id: string | number): stri
   const db = open(path, true);
   try {
     const row = db.prepare(`SELECT ownerSub FROM "${table}" WHERE "id" = ?`).get(id) as
-      | { ownerSub: string | null }
-      | undefined;
+      { ownerSub: string | null } | undefined;
     return row?.ownerSub ?? null;
   } finally {
     db.close();
@@ -296,7 +301,9 @@ describe('owner-backfill (e2e)', () => {
         { id: 1, name: 'work' },
         { id: 2, name: 'home' },
       ]);
-      expect(db.prepare('SELECT noteId, tagId FROM "note_tag" ORDER BY noteId, tagId').all()).toEqual([
+      expect(
+        db.prepare('SELECT noteId, tagId FROM "note_tag" ORDER BY noteId, tagId').all(),
+      ).toEqual([
         { noteId: 'n1', tagId: 1 },
         { noteId: 'n1', tagId: 2 },
         { noteId: 'n2', tagId: 2 },
@@ -330,14 +337,18 @@ describe('owner-backfill (e2e)', () => {
 
       // Every legacy row was stamped to the oldest user.
       expect(
-        (db.prepare('SELECT COUNT(*) AS c FROM "tag" WHERE ownerSub IS NULL').get() as { c: number }).c,
+        (
+          db.prepare('SELECT COUNT(*) AS c FROM "tag" WHERE ownerSub IS NULL').get() as {
+            c: number;
+          }
+        ).c,
       ).toBe(0);
     } finally {
       db.close();
     }
   });
 
-  it("boots the app after migration with zero schema-mutating statements", async () => {
+  it('boots the app after migration with zero schema-mutating statements', async () => {
     const dir = tmpDir();
     const life = join(dir, 'life.db');
     const idp = join(dir, 'idp.db');
@@ -358,7 +369,7 @@ describe('owner-backfill (e2e)', () => {
     delete process.env.REDIS_URL;
     process.env.NODE_ENV = 'test';
     try {
-      const { createApp } = await import('../src/app.factory');
+      const { createApp } = await import('../src/app.factory.js');
       const app = await createApp();
       await app.init();
       await app.close();
@@ -394,7 +405,9 @@ describe('owner-backfill (e2e)', () => {
     const life = join(dir, 'life.db');
     createLegacyLifeDb(life, { notes: [{ id: 'n1', body: 'keep' }], tags: ['work'], links: [] });
 
-    expect(() => runBackfill({ INIT_CWD: dir, NOTE_DB_PATH: life })).toThrow(/IDP_DB_PATH is required/);
+    expect(() => runBackfill({ INIT_CWD: dir, NOTE_DB_PATH: life })).toThrow(
+      /IDP_DB_PATH is required/,
+    );
     // Resolution fails first: not even a backup file exists, let alone schema.
     const db = open(life, true);
     try {
@@ -409,7 +422,9 @@ describe('owner-backfill (e2e)', () => {
     const life = join(dir, 'life.db');
     createLegacyLifeDb(life, { notes: [{ id: 'n1', body: 'keep' }], tags: ['work'], links: [] });
 
-    expect(() => runBackfill(envFor(dir, life, join(dir, 'nope.db')))).toThrow(/seed the user first/);
+    expect(() => runBackfill(envFor(dir, life, join(dir, 'nope.db')))).toThrow(
+      /seed the user first/,
+    );
     // An unreadable target (a directory) aborts too.
     expect(() => runBackfill(envFor(dir, life, dir))).toThrow(/unreadable/);
     // The row data is untouched by either abort.

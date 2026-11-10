@@ -10,25 +10,29 @@
  */
 import { answerUntilStdinCloses, errorAnswer, idOf, readMessage } from '@life/shared';
 import type { RpcRequest } from '@life/shared';
-import type { OpSpec, ResourceRegistry } from '../core/types';
-import type { BulkEnvelope } from '../core/bulk';
-import { isBulkKind, resolveBulkLimit } from '../core/bulk';
-import { createExecutor, resolveDeadlineMs } from '../transport/executor';
-import type { Executor } from '../transport/executor';
-import { currentAccessToken } from '../auth/token-provider';
-import { renderFailure, renderOpsResult } from '../cli/render';
-import { apiBaseFor, loadService } from '../cli/run';
-import type { LoadedModule, ServiceModule } from '../cli/run';
-import { everyRegistry, findTool, listTools } from './tools';
-import type { RegistryUnion, ToolLocation } from './tools';
+import type { OpSpec, ResourceRegistry } from '../core/types.js';
+import type { BulkEnvelope } from '../core/bulk.js';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk.js';
+import { createExecutor, resolveDeadlineMs } from '../transport/executor.js';
+import type { Executor } from '../transport/executor.js';
+import { currentAccessToken } from '../auth/token-provider.js';
+import { renderFailure, renderOpsResult } from '../cli/render.js';
+import { apiBaseFor } from '../cli/run.js';
+import type { LoadedModule, ServiceModule } from '../cli/run.js';
+import { everyRegistry, findTool, listTools } from './tools.js';
+import type { RegistryUnion, ToolLocation } from './tools.js';
 
 const SERVER_NAME = 'life-ops';
 
 /** Highest first: the first entry is what an unknown requested version falls back to. */
 const PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25', '2025-06-18'];
 
-/** `serverInfo.version`, pinned to the published package version by `test/mcp-lifecycle.test.ts`. */
-const SERVER_VERSION: string = (require('../../package.json') as { version: string }).version;
+/**
+ * `serverInfo.version` when a caller names none: a library caller is not the published
+ * package, so it does not get to claim a version. The stdio entry (`mcp/entry.ts`) always
+ * passes the real one, and `test/sdk-client.test.ts` pins the spawned entry to `package.json`.
+ */
+const DEVELOPMENT_VERSION = '0.0.0-dev';
 
 /**
  * The stdio-facing server contract: the resources it serves, the loaded modules, the
@@ -41,6 +45,8 @@ export interface McpServerOptions {
   modules?: LoadedModule[];
   /** Overrides `LIFE_OPS_API_BASE` when the service module knows its own base. */
   apiBase?: string;
+  /** `serverInfo.version`; the stdio entry passes the published version, a library caller may omit it. */
+  serverVersion?: string;
   env: NodeJS.ProcessEnv;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
@@ -63,24 +69,6 @@ export function createMcpServer(options: McpServerOptions): McpServer {
 /** Serve the session until stdin closes, answering every JSON-RPC request. */
 export async function main(options: McpServerOptions): Promise<number> {
   return await answerRequestsUntilStdinCloses({ server: createMcpServer(options), options });
-}
-
-/** The stdio entry: the service modules named by `LIFE_OPS_SERVICE`, then the loop. */
-async function serveFromEnvironment(): Promise<void> {
-  try {
-    const service = await loadService(process.env);
-    process.exitCode = await main({
-      registry: service.resources ?? service.registry,
-      modules: service.modules,
-      apiBase: service.apiBase,
-      env: process.env,
-      stdout: (line) => process.stdout.write(`${line}\n`),
-      stderr: (line) => process.stderr.write(`${line}\n`),
-    });
-  } catch (error) {
-    process.stderr.write(`${renderFailure(error)}\n`);
-    process.exitCode = 1;
-  }
 }
 
 /** This server's line loop: the shared reader, told how an escaped failure is rendered here. */
@@ -117,21 +105,24 @@ function notARequestAnswer(): unknown {
 
 async function answerRequest(request: RpcRequest, session: Session): Promise<unknown> {
   if (request.id === undefined) return null; // a notification gets no answer
-  if (request.method === 'initialize') return initializeAnswer(request);
+  if (request.method === 'initialize') return initializeAnswer(request, session);
   if (request.method === 'ping') return pingAnswer(request);
   if (request.method === 'tools/list') return listAnswer(request, session);
   if (request.method === 'tools/call') return callAnswer(request, session);
   return methodNotSupportedAnswer(request);
 }
 
-function initializeAnswer(request: RpcRequest): unknown {
+function initializeAnswer(request: RpcRequest, session: Session): unknown {
   return {
     jsonrpc: '2.0',
     id: idOf(request),
     result: {
       protocolVersion: negotiateVersion(requestedVersion(request)),
       capabilities: { tools: {} },
-      serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+      serverInfo: {
+        name: SERVER_NAME,
+        version: session.options.serverVersion ?? DEVELOPMENT_VERSION,
+      },
     },
   };
 }
@@ -303,8 +294,4 @@ function paramsOf(request: RpcRequest): Record<string, unknown> | undefined {
   const params = request.params;
   if (typeof params !== 'object' || params === null || Array.isArray(params)) return undefined;
   return params as Record<string, unknown>;
-}
-
-if (require.main === module) {
-  void serveFromEnvironment();
 }

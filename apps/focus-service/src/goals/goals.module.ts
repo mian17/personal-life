@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FOCUS_CACHE, createFocusCache } from '../cache/focus-cache';
-import { Goal } from './goal.entity';
-import { GoalsController } from './goals.controller';
-import { GoalsService } from './goals.service';
+import { FOCUS_CACHE, createFocusCache } from '../cache/focus-cache.js';
+import { Goal } from './goal.entity.js';
+import { GoalsController } from './goals.controller.js';
+import { GoalsService } from './goals.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Goal])],

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
-import type { User } from '../users/user.entity';
-import { UsersService } from '../users/users.service';
+import type { User } from '../users/user.entity.js';
+import { UsersService } from '../users/users.service.js';
 
 /**
  * The dummy hash is derived at runtime from a random, discarded value, so no
@@ -27,7 +27,11 @@ function dummyPasswordHash(): Promise<string> {
   return dummyHash;
 }
 
-void dummyPasswordHash().catch(() => {});
+try {
+  await dummyPasswordHash();
+} catch {
+  // A failed warm-up must not block startup; the first unknown-username probe retries the hash.
+}
 
 /** Generic message for every credential failure (no user enumeration). */
 export const GENERIC_LOGIN_ERROR = 'Invalid username or password';

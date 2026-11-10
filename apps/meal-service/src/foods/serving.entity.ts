@@ -6,9 +6,10 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
-import { Food } from './food.entity';
+import { Food } from './food.entity.js';
 
 /**
  * One pickable serving size of a food ("100 g", "1 cup"), with the nutrients
@@ -53,7 +54,7 @@ export class Serving {
 
   @ManyToOne(() => Food, (food) => food.servings, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'foodId' })
-  food: Food;
+  food: Relation<Food>;
 
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;

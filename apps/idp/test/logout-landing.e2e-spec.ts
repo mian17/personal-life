@@ -2,17 +2,17 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { UsersService } from '../src/users/users.service';
+import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-landing.db');
-const TEST_KEYS = join(__dirname, 'test-idp-landing-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-landing.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-landing-keys.json');
 
 process.env.DB_PATH = TEST_DB;
 process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = 'http://127.0.0.1:3003';
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;

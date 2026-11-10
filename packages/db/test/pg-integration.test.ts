@@ -2,11 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runBackupPg } from '../src/backup-pg';
-import type { PgBackupManifest } from '../src/backup-pg';
-import { createDockerPgRunner } from '../src/pg-client';
-import type { PgRunner } from '../src/pg-client';
-import { runRestorePg } from '../src/restore-pg';
+import { runBackupPg } from '../src/backup-pg.js';
+import type { PgBackupManifest } from '../src/backup-pg.js';
+import { createDockerPgRunner } from '../src/pg-client.js';
+import type { PgRunner } from '../src/pg-client.js';
+import { runRestorePg } from '../src/restore-pg.js';
 
 /**
  * `db:restore:pg` integration (`SPEC-feedback-infra.md` "Testing Strategy"): a throwaway
@@ -100,7 +100,19 @@ async function waitForPostmaster(): Promise<void> {
     // the real postmaster accepts connections. Probe TCP instead: `-h 127.0.0.1`
     // only answers once the postmaster that outlives the entrypoint is up.
     const probe = docker(
-      ['exec', CONTAINER, 'psql', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'feedback', '-c', 'select 1'],
+      [
+        'exec',
+        CONTAINER,
+        'psql',
+        '-h',
+        '127.0.0.1',
+        '-U',
+        'postgres',
+        '-d',
+        'feedback',
+        '-c',
+        'select 1',
+      ],
       budget,
     );
     if (probe.status === 0) return;
@@ -120,35 +132,32 @@ describeDocker('pg backup/restore against a throwaway container', () => {
     FEEDBACK_DB_URL: 'postgresql://postgres@postgres-feedback:5432/feedback',
   });
 
-  beforeAll(
-    async () => {
-      docker(['rm', '-f', CONTAINER], RUN_TIMEOUT_MS);
-      const started = docker(
-        [
-          'run',
-          '--rm',
-          '-d',
-          '--name',
-          CONTAINER,
-          '-e',
-          'POSTGRES_USER=postgres',
-          '-e',
-          'POSTGRES_PASSWORD=test-only',
-          '-e',
-          'POSTGRES_DB=feedback',
-          IMAGE,
-        ],
-        RUN_TIMEOUT_MS,
-      );
-      if (started.status !== 0) throw new Error(`container start failed: ${started.stderr}`);
+  beforeAll(async () => {
+    docker(['rm', '-f', CONTAINER], RUN_TIMEOUT_MS);
+    const started = docker(
+      [
+        'run',
+        '--rm',
+        '-d',
+        '--name',
+        CONTAINER,
+        '-e',
+        'POSTGRES_USER=postgres',
+        '-e',
+        'POSTGRES_PASSWORD=test-only',
+        '-e',
+        'POSTGRES_DB=feedback',
+        IMAGE,
+      ],
+      RUN_TIMEOUT_MS,
+    );
+    if (started.status !== 0) throw new Error(`container start failed: ${started.stderr}`);
 
-      await waitForPostmaster();
+    await waitForPostmaster();
 
-      runner = createDockerPgRunner(CONTAINER);
-      root = mkdtempSync(join(tmpdir(), 'life-db-pg-int-'));
-    },
-    STARTUP_TIMEOUT_MS,
-  );
+    runner = createDockerPgRunner(CONTAINER);
+    root = mkdtempSync(join(tmpdir(), 'life-db-pg-int-'));
+  }, STARTUP_TIMEOUT_MS);
 
   afterAll(() => {
     docker(['rm', '-f', CONTAINER], RUN_TIMEOUT_MS);

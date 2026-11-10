@@ -2,7 +2,8 @@
  * Package-surface suite (SPEC-ops-agent-contract §3.6, §10.4): the `exports` map
  * declares exactly the three public subpaths a consumer needs, points the two
  * executable ones at the paths `tsconfig.build.json` emits, and agrees with the
- * retained `main`/`types`/`bin` fields. The acceptance is the resolver: a
+ * retained `main`/`types`/`bin` fields. Both executable entries are the `entry.ts`
+ * shims, not the libraries beside them: only the shim starts a process. The acceptance is the resolver: a
  * directory outside the package links it and `import.meta.resolve` settles
  * everything, so no `dist` is built, loaded, or probed.
  *
@@ -16,7 +17,15 @@
  * resolver, all reached through the entry point rather than a deep import.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,8 +37,8 @@ import {
   DEFAULT_BULK_LIMIT,
   isBulkKind,
   resolveBulkLimit,
-} from '../src/index';
-import type { BulkEnvelope, BulkKind } from '../src/index';
+} from '../src/index.js';
+import type { BulkEnvelope, BulkKind } from '../src/index.js';
 
 const packageDirectory = realpathSync(resolve(__dirname, '..'));
 const distDirectory = join(packageDirectory, 'dist');
@@ -91,7 +100,9 @@ function resolveFromOutsidePackage(): Resolution[] {
   const consumerDirectory = mkdtempSync(join(tmpdir(), 'life-ops-consumer-'));
   try {
     linkPackageInto(consumerDirectory);
-    return runResolverIn(consumerDirectory).map((resolution) => normalizeResolved(resolution, consumerDirectory));
+    return runResolverIn(consumerDirectory).map((resolution) =>
+      normalizeResolved(resolution, consumerDirectory),
+    );
   } finally {
     rmSync(consumerDirectory, { recursive: true, force: true });
   }
@@ -113,17 +124,24 @@ function normalizeResolved(resolution: Resolution, consumerDirectory: string): R
   for (const base of new Set([consumerDirectory, realpathSync(consumerDirectory)])) {
     const linkPrefix = join(base, 'node_modules', '@life', 'ops');
     if (resolution.resolved.startsWith(linkPrefix)) {
-      return { ...resolution, resolved: packageDirectory + resolution.resolved.slice(linkPrefix.length) };
+      return {
+        ...resolution,
+        resolved: packageDirectory + resolution.resolved.slice(linkPrefix.length),
+      };
     }
   }
   return resolution;
 }
 
 function runResolverIn(consumerDirectory: string): Resolution[] {
-  const child = spawnSync(process.execPath, ['--input-type=module', '-e', resolverScript(CONSUMER_REQUESTS)], {
-    cwd: consumerDirectory,
-    encoding: 'utf8',
-  });
+  const child = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', resolverScript(CONSUMER_REQUESTS)],
+    {
+      cwd: consumerDirectory,
+      encoding: 'utf8',
+    },
+  );
   if (child.status !== 0) throw new Error(`resolver child failed: ${child.stderr}`);
   return (JSON.parse(child.stdout) as Resolution[]).map(asFilesystemPath);
 }
@@ -156,7 +174,11 @@ function resolutionFor(resolutions: Resolution[], name: string): Resolution {
 
 describe('the declared package surface', () => {
   it('exports exactly the three public subpaths', () => {
-    expect(Object.keys(manifest.exports ?? {}).sort()).toEqual(['.', './mcp/server', './package.json']);
+    expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([
+      '.',
+      './mcp/server',
+      './package.json',
+    ]);
   });
 
   it('sends the programmatic surface to the build output main and types name', () => {
@@ -165,21 +187,21 @@ describe('the declared package surface', () => {
     expect(exportTypes(entry)).toBe(manifest.types);
   });
 
-  it('sends the stdio entry to the path tsconfig.build.json emits for src/mcp/server.ts', () => {
+  it('sends the stdio entry to the path tsconfig.build.json emits for src/mcp/entry.ts', () => {
     const entry = manifest.exports?.['./mcp/server'];
-    const emittedServer = buildTargetFor(join('src', 'mcp', 'server.ts'));
+    const emittedServer = buildTargetFor(join('src', 'mcp', 'entry.ts'));
     expect(exportTarget(entry)).toBe(emittedServer);
     expect(exportTypes(entry)).toBe(emittedServer.replace(/\.js$/, '.d.ts'));
   });
 
   it('carries a types condition on both dist entries and none elsewhere', () => {
     expect(exportTypes(manifest.exports?.['.'])).toBe('dist/index.d.ts');
-    expect(exportTypes(manifest.exports?.['./mcp/server'])).toBe('dist/mcp/server.d.ts');
+    expect(exportTypes(manifest.exports?.['./mcp/server'])).toBe('dist/mcp/entry.d.ts');
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
   });
 
   it('keeps the binary and adds no runtime dependency', () => {
-    expect(manifest.bin?.['life-ops']).toBe('dist/cli/run.js');
+    expect(manifest.bin?.['life-ops']).toBe('dist/cli/entry.js');
     expect(manifest.dependencies).toBeUndefined();
   });
 });
@@ -192,9 +214,9 @@ describe('a consumer outside the package', () => {
     expect(resolution.resolved).toBe(join(packageDirectory, 'dist', 'index.js'));
   });
 
-  it('resolves the stdio entry to the built server', () => {
+  it('resolves the stdio entry to the built entry', () => {
     const resolution = resolutionFor(resolutions, STDIO_ENTRY);
-    expect(resolution.resolved).toBe(join(packageDirectory, 'dist', 'mcp', 'server.js'));
+    expect(resolution.resolved).toBe(join(packageDirectory, 'dist', 'mcp', 'entry.js'));
   });
 
   it('resolves the manifest read-only', () => {

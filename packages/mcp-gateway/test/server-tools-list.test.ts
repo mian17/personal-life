@@ -9,11 +9,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
-import { createMcpServer } from '../src/server';
-import type { McpServer, McpServerOptions } from '../src/server';
+import { createMcpServer } from '../src/server.js';
+import type { McpServer, McpServerOptions } from '../src/server.js';
 
 jest.setTimeout(20_000);
 
+/**
+ * The version `src/entry.ts` reads from `package.json` and passes into the library; a test that
+ * drives `createMcpServer` directly supplies the same one, so this assertion still pins the
+ * handshake to the published package version.
+ */
 const PACKAGE_VERSION: string = (require('../package.json') as { version: string }).version;
 
 const NOTES_TOOLS = [
@@ -187,6 +192,7 @@ function gatewayWith(upstreams: readonly FixtureUpstream[]): FixtureGateway {
     env: { MCP_GATEWAY_CONFIG: configPath },
     stdout: () => undefined,
     stderr: (line) => stderr.push(line),
+    version: PACKAGE_VERSION,
   };
 
   return { server: createMcpServer(options), handshakeLog, stderr };

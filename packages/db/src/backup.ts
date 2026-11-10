@@ -1,8 +1,16 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import type { DatabaseName } from './paths';
-import { resolvePaths, selectPaths } from './paths';
-import { snapshotAndVerify } from './snapshot';
+import { resolvePaths, selectPaths } from './paths.js';
+import type { DatabaseName, DatabasePaths } from './paths.js';
+import { snapshotAndVerify } from './snapshot.js';
 
 /**
  * `db:backup` core (`SPEC-db-backup-restore` "Backup behavior"). Snapshots the
@@ -137,7 +145,10 @@ export function finalizeBackup(options: {
     pinned: options.pinned,
     databases: options.entries,
   };
-  writeFileSync(join(options.destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(
+    join(options.destination, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
   if (options.pinned) writeFileSync(join(options.destination, 'PINNED'), '');
 
   if (!options.pinned) {
@@ -153,13 +164,17 @@ export function finalizeBackup(options: {
 export function runBackup(options: {
   argv: string[];
   env?: NodeJS.ProcessEnv;
+  /** The repo-anchored defaults an unset env var falls back to; the CLI entries pass them in. */
+  defaults?: Partial<DatabasePaths>;
   now?: () => Date;
 }): BackupResult {
   const env = options.env ?? process.env;
   const pinned = options.argv.includes('--pin');
-  const selected = selectPaths(resolvePaths(env), parseOnly(options.argv));
+  const selected = selectPaths(resolvePaths(env, options.defaults), parseOnly(options.argv));
 
-  const missing = selected.filter((entry) => !existsSync(entry.source)).map((entry) => entry.source);
+  const missing = selected
+    .filter((entry) => !existsSync(entry.source))
+    .map((entry) => entry.source);
   if (missing.length > 0) throw new MissingInputsError(missing);
 
   const at = options.now ? options.now() : new Date();
@@ -205,9 +220,10 @@ export function runBackup(options: {
 export function main(
   argv: string[] = process.argv.slice(2),
   env: NodeJS.ProcessEnv = process.env,
+  defaults?: Partial<DatabasePaths>,
 ): number {
   try {
-    const result = runBackup({ argv, env });
+    const result = runBackup({ argv, env, defaults });
     for (const snapshot of result.snapshots) {
       console.log(
         `db:backup [${result.mode}] ${snapshot.file} -> ${join(result.destination, snapshot.file)}` +

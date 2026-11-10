@@ -1,4 +1,4 @@
-import { NUTRIENTS, sum, type Nutrient, type NutrientVector } from '../src/index';
+import { NUTRIENTS, sum, type Nutrient, type NutrientVector } from '../src/index.js';
 
 /**
  * Day-summation invariants: exact additivity, completeness of the result at
@@ -34,7 +34,9 @@ describe('sum', () => {
   });
 
   it('order does not matter: summation commutes across inputs', () => {
-    expect(sum([vector(1), vector(2), vector(0.5)])).toEqual(sum([vector(0.5), vector(2), vector(1)]));
+    expect(sum([vector(1), vector(2), vector(0.5)])).toEqual(
+      sum([vector(0.5), vector(2), vector(1)]),
+    );
   });
 
   it('every result is a complete vector of numbers, never NaN or negative', () => {

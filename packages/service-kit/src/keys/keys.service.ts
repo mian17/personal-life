@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CryptoError, generateDek, unwrapDek, wrapDek } from '@life/crypto';
-import { UserKeys } from './user-keys.entity';
+import { UserKeys } from './user-keys.entity.js';
 
 /** DI token for the process-wide master key (a 32-byte `Buffer`). */
 export const MASTER_KEY = Symbol('SERVICE_KIT_MASTER_KEY');

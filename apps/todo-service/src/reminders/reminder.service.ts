@@ -1,24 +1,18 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { decryptField } from '@life/crypto';
-import { Todo } from '../todos/todo.entity';
-import { TodosService } from '../todos/todos.service';
+import { Todo } from '../todos/todo.entity.js';
+import { TodosService } from '../todos/todos.service.js';
 import { KeysService } from '@life/service-kit';
-import { PushService } from '../push/push.service';
+import { PushService } from '../push/push.service.js';
 import {
-  PushSender,
+  type PushSender,
   REMINDER_PUSH_SENDER,
-  ReminderPayload,
+  type ReminderPayload,
   VAPID_PRIVATE_KEY_ENV,
   VAPID_PUBLIC_KEY_ENV,
-} from './push-sender';
+} from './push-sender.js';
 
 /** Sweep cadence. A single `setInterval` is the whole scheduling need (ponytail). */
 export const SWEEP_INTERVAL_MS = 30_000;
@@ -66,6 +60,9 @@ export class ReminderService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.timer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
+    // A worker that exits before onModuleDestroy runs must not be held open by
+    // this timer; unref lets the process end and the interval still fires while alive.
+    this.timer.unref();
   }
 
   onModuleDestroy(): void {

@@ -14,19 +14,19 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { findOp } from '../src/core/registry';
-import type { ResourceRegistry } from '../src/core/types';
-import * as focusService from '../src/services/focus';
-import { storeTokens } from '../src/auth/token-store';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { findOp } from '../src/core/registry.js';
+import type { ResourceRegistry } from '../src/core/types.js';
+import * as focusService from '../src/services/focus.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
@@ -115,7 +115,7 @@ describe('the focus registry', () => {
     expect(list.fields['to'].required).toBe(true);
   });
 
-  it('offers the shared page window on both listings, with the seam\'s cap in the description', () => {
+  it("offers the shared page window on both listings, with the seam's cap in the description", () => {
     // `@life/ops` takes no dependency on `@life/service-kit`, so the number is copied
     // here and pinned here: a drifted cap fails parity instead of production.
     for (const resourceName of ['goal', 'sessions']) {

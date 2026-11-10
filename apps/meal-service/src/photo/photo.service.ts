@@ -1,15 +1,15 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { NutrientVector } from '@life/nutrition';
-import { completeVector, zeroVector } from '../foods/content';
-import { FoodsService, type FoodDto } from '../foods/foods.service';
-import type { UsdaClient } from '../usda/usda.client';
-import { USDA_CLIENT_FACTORY } from '../usda/usda.module';
+import { completeVector, zeroVector } from '../foods/content.js';
+import { FoodsService, type FoodDto } from '../foods/foods.service.js';
+import type { UsdaClient } from '../usda/usda.client.js';
+import { USDA_CLIENT_FACTORY } from '../usda/usda.module.js';
 import {
   GeminiClient,
   type PhotoFailureReason,
   type PhotoFoodSuggestion,
   type SearchFoodResult,
-} from './gemini.client';
+} from './gemini.client.js';
 
 /**
  * DI token for the Gemini client factory.
@@ -387,7 +387,10 @@ class OfferedIds {
   private idsFor(query: string): OfferedIdsForQuery {
     const existing = this.idsByQuery.get(query);
     if (existing) return existing;
-    const created: OfferedIdsForQuery = { catalogIds: new Set<string>(), fdcIds: new Set<number>() };
+    const created: OfferedIdsForQuery = {
+      catalogIds: new Set<string>(),
+      fdcIds: new Set<number>(),
+    };
     this.idsByQuery.set(query, created);
     return created;
   }

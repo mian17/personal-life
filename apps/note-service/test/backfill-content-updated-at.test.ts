@@ -6,7 +6,7 @@ import {
   applySchema,
   backfillContentUpdatedAt,
   runBackfill,
-} from '../scripts/backfill-content-updated-at';
+} from '../scripts/backfill-content-updated-at.js';
 
 /**
  * `contentUpdatedAt` backfill script — step semantics on a throwaway legacy DB.
@@ -47,9 +47,10 @@ describe('backfill-content-updated-at', () => {
   const stampedValues = (): Array<{ id: string; contentUpdatedAt: string }> => {
     const db = new Database(dbPath);
     try {
-      return db
-        .prepare('SELECT "id","contentUpdatedAt" FROM "note" ORDER BY "id"')
-        .all() as Array<{ id: string; contentUpdatedAt: string }>;
+      return db.prepare('SELECT "id","contentUpdatedAt" FROM "note" ORDER BY "id"').all() as Array<{
+        id: string;
+        contentUpdatedAt: string;
+      }>;
     } finally {
       db.close();
     }

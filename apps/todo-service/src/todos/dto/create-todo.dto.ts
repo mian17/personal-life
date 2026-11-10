@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 import { TODO_TITLE_MAX, TODO_NOTE_MAX, TODO_REPEATS, TODO_REPEAT_DAYS } from '@life/shared';
 import type { TodoRepeat } from '@life/shared';
-import { ISO_DUE } from '../due-time';
+import { ISO_DUE } from '../due-time.js';
 
 /** `YYYY-MM-DD` — the wire form of the plaintext `dueDate` metadata column. */
 export const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

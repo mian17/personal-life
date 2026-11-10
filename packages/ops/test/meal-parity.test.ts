@@ -17,21 +17,21 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { NUTRIENTS } from '../../nutrition/src/nutrients';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { findOp, kindIsDestructive } from '../src/core/registry';
-import { deriveInputSchema } from '../src/core/schema';
-import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types';
-import * as mealService from '../src/services/meal';
-import { storeTokens } from '../src/auth/token-store';
+import { NUTRIENTS } from '../../nutrition/src/nutrients.js';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { findOp, kindIsDestructive } from '../src/core/registry.js';
+import { deriveInputSchema } from '../src/core/schema.js';
+import type { FieldSpec, OpSpec, ResourceRegistry } from '../src/core/types.js';
+import * as mealService from '../src/services/meal.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';

@@ -1,5 +1,13 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
-import { Todo } from './todo.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
+import { Todo } from './todo.entity.js';
 
 @Entity('todo_completion')
 @Unique('UQ_todo_completion_todo_occurrence', ['todoId', 'occurrence'])

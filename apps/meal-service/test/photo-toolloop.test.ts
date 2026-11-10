@@ -1,11 +1,12 @@
+import { jest } from '@jest/globals';
 import { NUTRIENTS } from '@life/nutrition';
 import {
   GeminiClient,
   MAX_TOOL_ROUNDS,
   type SearchFood,
   type SearchFoodResult,
-} from '../src/photo/gemini.client';
-import { FakeGemini, geminiResponse, item, readablePayload } from './fake-gemini';
+} from '../src/photo/gemini.client.js';
+import { FakeGemini, geminiResponse, item, readablePayload } from './fake-gemini.js';
 
 /**
  * The `search_food` turn loop (`SPEC-photo-identity.md` § The tool loop).
@@ -56,7 +57,9 @@ function searchingFake(query = 'chicken'): FakeGemini {
 function toolCallTurn(query: string, id?: string): Response {
   return new Response(
     JSON.stringify({
-      candidates: [{ content: { parts: [{ functionCall: { name: 'search_food', args: { query }, id } }] } }],
+      candidates: [
+        { content: { parts: [{ functionCall: { name: 'search_food', args: { query }, id } }] } },
+      ],
     }),
     { status: 200 },
   );
@@ -91,7 +94,7 @@ function startClockWithOneMillisecondOfToolBudget(): jest.SpiedFunction<typeof D
 }
 
 describe('the search_food turn loop', () => {
-  it('answers a food found by the tool with the model\'s final JSON', async () => {
+  it("answers a food found by the tool with the model's final JSON", async () => {
     const fake = searchingFake();
     const queries: string[] = [];
     const searchTool: SearchFood = async (query) => {
@@ -193,15 +196,19 @@ describe('the search_food turn loop', () => {
     const searchTool: SearchFood = () => Promise.resolve(CATALOG_HIT);
     await clientFor(fake).readPhoto(image, undefined, searchTool);
 
-    const [firstRequest, toolResultRequest] = [fake.calls[0], fake.calls[1]].map((call) =>
-      JSON.parse(String(call?.init.body ?? '')) as Record<string, unknown>,
+    const [firstRequest, toolResultRequest] = [fake.calls[0], fake.calls[1]].map(
+      (call) => JSON.parse(String(call?.init.body ?? '')) as Record<string, unknown>,
     );
 
     // The declaration the model reads: exactly the query, no nutrient argument.
-    const declaration = (firstRequest.tools as Array<{ functionDeclarations: Array<Record<string, unknown>> }>)[0]
-      .functionDeclarations[0];
+    const declaration = (
+      firstRequest.tools as Array<{ functionDeclarations: Array<Record<string, unknown>> }>
+    )[0].functionDeclarations[0];
     expect(declaration.name).toBe('search_food');
-    const parameters = declaration.parameters as { properties: Record<string, unknown>; required: string[] };
+    const parameters = declaration.parameters as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
     expect(Object.keys(parameters.properties)).toEqual(['query']);
     expect(parameters.required).toEqual(['query']);
 
@@ -220,9 +227,7 @@ describe('the search_food turn loop', () => {
     expect(response.response).toEqual(CATALOG_HIT);
 
     // Not one of the 27 nutrient keys appears anywhere in any request body.
-    const serialised = fake.calls
-      .map((call) => String(call.init.body))
-      .join('\n');
+    const serialised = fake.calls.map((call) => String(call.init.body)).join('\n');
     for (const { key } of NUTRIENTS) expect(serialised).not.toContain(key);
   });
 });

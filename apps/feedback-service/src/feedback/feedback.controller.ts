@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateFeedbackDto } from './dto/create-feedback.dto';
-import { ListFeedbackQuery } from './dto/list-feedback.query';
-import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
-import { FeedbackService } from './feedback.service';
+import { CreateFeedbackDto } from './dto/create-feedback.dto.js';
+import { ListFeedbackQuery } from './dto/list-feedback.query.js';
+import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto.js';
+import { FeedbackService } from './feedback.service.js';
 
 /**
  * Owner-scoped feedback API. The owner always comes from `principal.sub`

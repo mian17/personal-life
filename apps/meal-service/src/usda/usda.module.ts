@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { UsdaClient } from './usda.client';
+import { UsdaClient } from './usda.client.js';
 
 /**
  * DI token for the USDA client factory.

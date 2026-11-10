@@ -15,8 +15,8 @@
  * (`packages/nutrition/src/nutrients.ts:55-91`): the package imports nothing from
  * `@life/nutrition`, so `meal-parity.test.ts` is what holds the two tables together.
  */
-import { defineResource } from '../core/registry';
-import type { FieldSpec, ResourceRegistry } from '../core/types';
+import { defineResource } from '../core/registry.js';
+import type { FieldSpec, ResourceRegistry } from '../core/types.js';
 
 /** The meal groups an entry or a saved meal belongs to, as `MEAL_GROUPS` spells them. */
 const MEAL_GROUPS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;

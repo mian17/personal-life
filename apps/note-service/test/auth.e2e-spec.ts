@@ -4,13 +4,8 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { AuthGuard, Principal } from '@life/service-kit';
-import { VERIFIER_ENV } from '../src/service-config';
-import {
-  configureVerifierEnv,
-  JwtTestHarness,
-  TEST_AUDIENCE,
-  TEST_ISSUER,
-} from './jwt-harness';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import { configureVerifierEnv, JwtTestHarness, TEST_AUDIENCE, TEST_ISSUER } from './jwt-harness.js';
 
 /**
  * JWT-only auth e2e (Task 10). Every request is verified through the real guard
@@ -18,7 +13,7 @@ import {
  * token case was deleted with the path it covered.
  */
 
-const TEST_DB = join(__dirname, 'test-auth.db');
+const TEST_DB = join(import.meta.dirname, 'test-auth.db');
 process.env.DB_PATH = TEST_DB;
 
 describe('JWT auth (e2e)', () => {
@@ -32,7 +27,7 @@ describe('JWT auth (e2e)', () => {
     configureVerifierEnv(harness);
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });

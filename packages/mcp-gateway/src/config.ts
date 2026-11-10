@@ -116,7 +116,8 @@ function entryFrom(configKey: string, shape: unknown): UpstreamEntry {
   };
   const cwd = shape.cwd;
   if (cwd === undefined) return entry;
-  if (typeof cwd !== 'string') throw new ConfigError(`config entry "${configKey}" has a non-string cwd`);
+  if (typeof cwd !== 'string')
+    throw new ConfigError(`config entry "${configKey}" has a non-string cwd`);
   return { ...entry, cwd };
 }
 
@@ -128,7 +129,8 @@ function assertLegalConfigKey(configKey: string): void {
 function argsFrom(shape: Record<string, unknown>, configKey: string): string[] {
   const args = shape.args;
   if (args === undefined) return [];
-  if (!isStringArray(args)) throw new ConfigError(`config entry "${configKey}" has non-string args`);
+  if (!isStringArray(args))
+    throw new ConfigError(`config entry "${configKey}" has non-string args`);
   return args;
 }
 

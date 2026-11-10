@@ -8,7 +8,7 @@
  * No test contacts a real service.
  */
 import { join } from 'node:path';
-import { apiBaseFor, loadService } from '../src/cli/run';
+import { apiBaseFor, loadService } from '../src/cli/run.js';
 
 /** The conformance suite's external module, loaded by absolute path exactly as the SDK suite loads it. */
 const EXTERNAL_SERVICE_MODULE = 'test/support/service-module.ts';
@@ -53,7 +53,9 @@ describe('loadService', () => {
 
   describe('comma-separated selector', () => {
     it('loads every entry, its resources in selector order', async () => {
-      const service = await loadService({ LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource') });
+      const service = await loadService({
+        LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource'),
+      });
 
       expect(service.resources?.map((resource) => resource.name)).toEqual([
         'notes',
@@ -147,7 +149,9 @@ describe('loadService', () => {
 
     it('rejects two resources exposing one tool name, naming both', async () => {
       await expect(
-        loadService({ LIFE_OPS_SERVICE: externalModulePath('colliding-resource-service-module.ts') }),
+        loadService({
+          LIFE_OPS_SERVICE: externalModulePath('colliding-resource-service-module.ts'),
+        }),
       ).rejects.toThrow(
         'resources todos (/api/todos) and todos (/api/archived-todos) both register tool name todos_get',
       );
@@ -171,7 +175,9 @@ describe('loadService', () => {
     });
 
     it('prefers the per-service variable over the shared one', async () => {
-      const service = await loadService({ LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource') });
+      const service = await loadService({
+        LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource'),
+      });
       const env = {
         LIFE_OPS_API_BASE_NOTES: 'http://notes.test',
         LIFE_OPS_API_BASE: 'http://shared.test',
@@ -181,7 +187,9 @@ describe('loadService', () => {
     });
 
     it('resolves each service to its own variable, one call at a time', async () => {
-      const service = await loadService({ LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource') });
+      const service = await loadService({
+        LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource'),
+      });
       const env = { LIFE_OPS_API_BASE_NOTES: 'http://notes.test' };
       const [notesResource, todosResource] = service.resources ?? [];
 
@@ -192,7 +200,9 @@ describe('loadService', () => {
     });
 
     it('never falls back to the shared base when several services load', async () => {
-      const service = await loadService({ LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource') });
+      const service = await loadService({
+        LIFE_OPS_SERVICE: commaSelector('notes', 'multi-resource'),
+      });
       const env = { LIFE_OPS_API_BASE: 'http://shared.test' };
 
       expect(() => apiBaseFor({ service, registry: service.registry, env })).toThrow(
@@ -203,7 +213,9 @@ describe('loadService', () => {
 
   describe('path-like value', () => {
     it('loads an absolute module that exports a bare registry', async () => {
-      const service = await loadService({ LIFE_OPS_SERVICE: join(__dirname, '..', EXTERNAL_SERVICE_MODULE) });
+      const service = await loadService({
+        LIFE_OPS_SERVICE: join(__dirname, '..', EXTERNAL_SERVICE_MODULE),
+      });
 
       expect(service.registry.name).toBe('sample');
     });

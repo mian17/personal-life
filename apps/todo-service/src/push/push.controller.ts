@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { PushSubscribeDto, PushUnsubscribeDto } from './push-subscribe.dto';
-import { PushService } from './push.service';
+import { PushSubscribeDto, PushUnsubscribeDto } from './push-subscribe.dto.js';
+import { PushService } from './push.service.js';
 
 /**
  * The push HTTP surface (`SPEC-todo-service`). The global `AuthGuard` guards

@@ -1,5 +1,5 @@
 import { NUTRIENTS, type Nutrient, type NutrientUnit, type NutrientVector } from '@life/nutrition';
-import { completeVector, zeroVector } from '../foods/content';
+import { completeVector, zeroVector } from '../foods/content.js';
 
 /**
  * The pure join between USDA FoodData Central rows and our 27-key vocabulary
@@ -26,8 +26,7 @@ export interface UsdaNutrientRow {
 
 /** The mapper's outcome: our complete vector, or the typed reason we have none. */
 export type MappedNutrients =
-  | { ok: true; vector: NutrientVector }
-  | { ok: false; reason: 'unmapped' };
+  { ok: true; vector: NutrientVector } | { ok: false; reason: 'unmapped' };
 
 /** USDA nutrient number (string on the wire) → our key and unit, from the spec table. */
 const NUTRIENT_BY_USDA_NUMBER: Record<string, { key: Nutrient; unit: NutrientUnit }> = {

@@ -1,11 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { Provider } from 'oidc-provider';
-import { SigningKeyService } from '../crypto/signing-key.service';
-import { OidcAdapterService } from './adapter/oidc-adapter.service';
-import { ACCESS_TOKEN_TTL_S, defaultResource, resourceServerPolicy } from './access-token.policy';
-import { assertOidcConfig, staticClients } from './clients';
-import { interactionPolicyPrompts, INTERACTION_TTL_S, loadExistingGrant } from './interaction-policy';
+import { SigningKeyService } from '../crypto/signing-key.service.js';
+import { OidcAdapterService } from './adapter/oidc-adapter.service.js';
+import {
+  ACCESS_TOKEN_TTL_S,
+  defaultResource,
+  resourceServerPolicy,
+} from './access-token.policy.js';
+import { assertOidcConfig, staticClients } from './clients.js';
+import {
+  interactionPolicyPrompts,
+  INTERACTION_TTL_S,
+  loadExistingGrant,
+} from './interaction-policy.js';
 import {
   GRANT_TTL_S,
   REFRESH_TOKEN_TTL_S,
@@ -13,7 +21,7 @@ import {
   SESSION_TTL_S,
   expiresWithSession,
   issueRefreshToken,
-} from './refresh-token.policy';
+} from './refresh-token.policy.js';
 
 /** Issuer identifier; production must be browser-reachable (Tasks 7/8 design point). */
 export function resolveIssuer(): string {

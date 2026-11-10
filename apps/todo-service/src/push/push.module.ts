@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PushSubscription } from './push-subscription.entity';
-import { PushController } from './push.controller';
-import { PushService } from './push.service';
+import { PushSubscription } from './push-subscription.entity.js';
+import { PushController } from './push.controller.js';
+import { PushService } from './push.service.js';
 
 /**
  * The push module. `PushService` is exported so the reminders sweep can list a

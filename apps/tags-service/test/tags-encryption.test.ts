@@ -1,15 +1,10 @@
+import { jest } from '@jest/globals';
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
-import { CryptoError, ENC_PREFIX, wrapDek } from '@life/crypto';
-import { KeysService, UserKeys, createMasterKey } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../src/service-config';
-import { Tag } from '../src/tags/tag.entity';
-import { TagsCache } from '../src/tags/tags-cache';
-import { TagsService } from '../src/tags/tags.service';
 
 /**
  * `SPEC-tags-service` Encryption + Testing Strategy cases: key custody
@@ -21,15 +16,22 @@ import { TagsService } from '../src/tags/tags.service';
  * `unwrapDek` is wrapped in a `jest.fn` so the memoization contract ("unwrap
  * each sub's DEK at most once per process lifetime") is asserted on the real
  * call count, not a re-implementation.
+ *
+ * ESM has no hoisted `jest.mock`: the real module is imported first, the spy is
+ * built from the real `unwrapDek`, and only then is the module registry mocked.
+ * Modules that reach `@life/crypto` (service-kit + this service's own src) load
+ * with `await import` AFTER that, so they bind the spy, not the original.
  */
-jest.mock('@life/crypto', () => {
-  const actual = jest.requireActual('@life/crypto');
-  return { ...actual, unwrapDek: jest.fn(actual.unwrapDek) };
-});
+const realCrypto = await import('@life/crypto');
+const { CryptoError, ENC_PREFIX, wrapDek } = realCrypto;
+const unwrapSpy = jest.fn(realCrypto.unwrapDek);
+jest.unstable_mockModule('@life/crypto', () => ({ ...realCrypto, unwrapDek: unwrapSpy }));
 
-import * as cryptoModule from '@life/crypto';
-
-const unwrapSpy = cryptoModule.unwrapDek as unknown as jest.Mock;
+const { KeysService, UserKeys, createMasterKey } = await import('@life/service-kit');
+const { MASTER_KEY_ENV } = await import('../src/service-config.js');
+const { Tag } = await import('../src/tags/tag.entity.js');
+const { TagsCache } = await import('../src/tags/tags-cache.js');
+const { TagsService } = await import('../src/tags/tags.service.js');
 
 const MASTER_KEY = Buffer.alloc(32, 0x2b);
 const SUB = 'user-a';
@@ -145,7 +147,7 @@ describe('TagsService encryption + key custody', () => {
     expect(output).not.toContain(ENC_PREFIX);
   });
 
-  it('AAD binding: swapping two tags\' name ciphertexts fails closed for both', async () => {
+  it("AAD binding: swapping two tags' name ciphertexts fails closed for both", async () => {
     // Same owner ⇒ same AAD, so this case proves per-row integrity from the tag
     // id in the log rather than AAD separation. A cross-owner transplant (a
     // different AAD) is the separation proof:
@@ -212,7 +214,7 @@ describe('master-key bootstrap', () => {
 
 describe('jest suite collection', () => {
   it('collects the unit + e2e suites under the pinned testRegex', () => {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
     const re = new RegExp(pkg.jest.testRegex);
 
     expect(re.test('tags.e2e-spec.ts')).toBe(true);

@@ -1,9 +1,14 @@
+// Must stay the first import: ts-node's ESM loader evaluates the decorator modules
+// this script reaches before `@nestjs/common`'s barrel (the one place that loads
+// reflect-metadata), and the first `@Optional()` call throws
+// `TypeError: Reflect.getMetadata is not a function` when the polyfill is absent.
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { SeedModule } from '../src/config/seed.module';
-import { UsersService } from '../src/users/users.service';
-import { isProductionDbPath, resolveDbPath } from '../src/config/db-path';
+import { SeedModule } from '../src/config/seed.module.js';
+import { UsersService } from '../src/users/users.service.js';
+import { isProductionDbPath, resolveDbPath } from '../src/config/db-path.js';
 
 /**
  * Seeds the single pre-approved user. There is deliberately no signup path:
@@ -42,9 +47,30 @@ function oneLine(value: string): string {
 function loadDevEnvFile(): void {
   if (process.env.SEED_LOAD_DEV_ENV !== '1') return;
   try {
-    process.loadEnvFile(resolve(__dirname, '..', '..', '..', '.env.development'));
+    process.loadEnvFile(resolve(import.meta.dirname, '..', '..', '..', '.env.development'));
   } catch {
     // No dev env file — fine; defaults apply.
+  }
+}
+
+/**
+ * Boots the seed context so that a boot failure is reported by this script.
+ *
+ * Nest runs initialization inside its ExceptionsZone, whose default teardown is
+ * `process.exit(1)` — it fires before the caller's catch can run — and the `logger: false`
+ * that keeps the seed quiet also swallows the one line ExceptionsZone logs. The two
+ * together killed the process silently with an empty stderr. `abortOnError: false`
+ * turns the teardown into a rethrow, and the wrapper names the failing step.
+ */
+async function createSeedContext() {
+  try {
+    return await NestFactory.createApplicationContext(SeedModule, {
+      logger: false,
+      abortOnError: false,
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`seed application context failed to boot: ${oneLine(reason)}`, { cause: err });
   }
 }
 
@@ -54,7 +80,8 @@ async function main(): Promise<void> {
 
   // Credentials: production MUST supply them explicitly (no defaulted prod
   // credentials, ever). Non-production falls back to the documented dev pair.
-  const username = process.env.SEED_USERNAME?.trim() || (isProduction ? undefined : DEV_SEED_USERNAME);
+  const username =
+    process.env.SEED_USERNAME?.trim() || (isProduction ? undefined : DEV_SEED_USERNAME);
   const password = process.env.SEED_PASSWORD ?? (isProduction ? undefined : DEV_SEED_PASSWORD);
 
   if (!username || !password) {
@@ -84,7 +111,7 @@ async function main(): Promise<void> {
 
   mkdirSync(dirname(dbPath), { recursive: true });
 
-  const app = await NestFactory.createApplicationContext(SeedModule, { logger: false });
+  const app = await createSeedContext();
   try {
     const users = app.get(UsersService);
 
@@ -102,7 +129,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: unknown) => {
-  console.error('seed failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
+try {
+  await main();
+} catch (err: unknown) {
+  // The cause chain is the whole point: a bare message sent the last reader of a
+  // silent exit hunting through Nest internals. `stack` carries `[cause]:` too.
+  const detail = err instanceof Error ? (err.stack ?? err.message) : 'unknown error';
+  console.error('seed failed:', detail);
   process.exitCode = 1;
-});
+}

@@ -3,13 +3,13 @@ import { createHash, randomBytes } from 'crypto';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import { decodeJwt } from 'jose';
-import { Client } from './oidc-harness';
-import { OidcAdapterService } from '../src/oidc/adapter/oidc-adapter.service';
-import { REFRESH_TOKEN_TTL_S } from '../src/oidc/refresh-token.policy';
-import { UsersService } from '../src/users/users.service';
+import { Client } from './oidc-harness.js';
+import { OidcAdapterService } from '../src/oidc/adapter/oidc-adapter.service.js';
+import { REFRESH_TOKEN_TTL_S } from '../src/oidc/refresh-token.policy.js';
+import { UsersService } from '../src/users/users.service.js';
 
-const TEST_DB = join(__dirname, 'test-idp-refresh.db');
-const TEST_KEYS = join(__dirname, 'test-idp-refresh-keys.json');
+const TEST_DB = join(import.meta.dirname, 'test-idp-refresh.db');
+const TEST_KEYS = join(import.meta.dirname, 'test-idp-refresh-keys.json');
 const ISSUER = 'http://127.0.0.1:3003';
 const DEV_REDIRECT = 'http://127.0.0.1:8080/cb';
 /** The `app` client's registered redirect in dev (see src/oidc/clients.ts defaults). */
@@ -22,7 +22,7 @@ process.env.KEYS_PATH = TEST_KEYS;
 process.env.IDP_ISSUER = ISSUER;
 
 async function startApp(): Promise<INestApplication> {
-  const { createApp } = await import('../src/app.factory');
+  const { createApp } = await import('../src/app.factory.js');
   const app = await createApp();
   await app.init();
   return app;
@@ -42,7 +42,6 @@ function pkce(): { verifier: string; challenge: string } {
   const verifier = randomBytes(32).toString('base64url');
   return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
 }
-
 
 async function authorizeAndExchange(
   app: INestApplication,
@@ -114,11 +113,20 @@ function refreshWith(
   const client = new Client(() => app.getHttpServer());
   if (clientId === 'app') {
     return client
-      .postFormBasic('/token', { grant_type: 'refresh_token', refresh_token: refreshToken }, 'app', APP_CLIENT_SECRET)
+      .postFormBasic(
+        '/token',
+        { grant_type: 'refresh_token', refresh_token: refreshToken },
+        'app',
+        APP_CLIENT_SECRET,
+      )
       .then((r) => ({ status: r.status, body: (r.json as TokenResponse) ?? {} }));
   }
   return client
-    .postForm('/token', { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'dev' })
+    .postForm('/token', {
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: 'dev',
+    })
     .then((r) => ({ status: r.status, body: (r.json as TokenResponse) ?? {} }));
 }
 

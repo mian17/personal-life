@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import type { SavedMeal } from './saved-meal.entity';
-import type { SavedMealItem } from './saved-meal-item.entity';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import type { SavedMeal } from './saved-meal.entity.js';
+import type { SavedMealItem } from './saved-meal-item.entity.js';
 
 /**
  * meal-service's saved-meals read-through cache (`SPEC-meal-service` Cache
@@ -121,7 +121,11 @@ export class SavedMealsCache {
   }
 
   /** One saved meal by id. Key `meal:<sub>:v<gen>:saved:one:<id>`. */
-  one(sub: string, id: string, loader: () => Promise<CachedSavedMealRow>): Promise<CachedSavedMealRow> {
+  one(
+    sub: string,
+    id: string,
+    loader: () => Promise<CachedSavedMealRow>,
+  ): Promise<CachedSavedMealRow> {
     return this.cache.getThrough(sub, `meal:saved:one:${id}`, loader, {
       decode: decodeCiphertextSavedMealRow,
       cacheable: isCiphertextSavedMealRow,

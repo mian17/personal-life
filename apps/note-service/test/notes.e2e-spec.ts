@@ -4,10 +4,10 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import type { Note as NoteDto } from '@life/shared';
-import { Note } from '../src/notes/note.entity';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { Note } from '../src/notes/note.entity.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
-const TEST_DB = join(__dirname, 'test-life.db');
+const TEST_DB = join(import.meta.dirname, 'test-life.db');
 process.env.DB_PATH = TEST_DB;
 
 // Every request now carries a minted JWT (Task 10); the guard is JWT-only.
@@ -25,7 +25,7 @@ describe('Notes API (e2e)', () => {
     token = await harness.sign({ expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -68,7 +68,9 @@ describe('Notes API (e2e)', () => {
 
   it('hides registry ids that no longer have notes', async () => {
     const created = await auth(
-      request(app.getHttpServer()).post('/api/notes').send({ body: 'x', tagIds: [77] }),
+      request(app.getHttpServer())
+        .post('/api/notes')
+        .send({ body: 'x', tagIds: [77] }),
     ).expect(201);
 
     const withNote = await auth(request(app.getHttpServer()).get('/api/tags')).expect(200);
@@ -85,7 +87,11 @@ describe('Notes API (e2e)', () => {
   it('pages the tag usage surface with no gap and no duplicate', async () => {
     // Five fresh ids, so this owner's usage surface has more rows than one page.
     for (const tagId of [10, 20, 30, 40, 50]) {
-      await auth(request(app.getHttpServer()).post('/api/notes').send({ body: `u${tagId}`, tagIds: [tagId] })).expect(201);
+      await auth(
+        request(app.getHttpServer())
+          .post('/api/notes')
+          .send({ body: `u${tagId}`, tagIds: [tagId] }),
+      ).expect(201);
     }
 
     const whole = await auth(request(app.getHttpServer()).get('/api/tags?limit=200')).expect(200);
@@ -96,7 +102,9 @@ describe('Notes API (e2e)', () => {
     let pages = 0;
     do {
       const query = cursor === null ? { limit: '2' } : { limit: '2', cursor };
-      const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query)).expect(200);
+      const res = await auth(request(app.getHttpServer()).get('/api/tags').query(query)).expect(
+        200,
+      );
       const page = res.body as { tagUsages: Array<{ tagId: number }>; nextCursor: string | null };
       expect(Object.keys(res.body).sort()).toEqual(['nextCursor', 'tagUsages', 'total']);
       expect(page.tagUsages.length).toBeLessThanOrEqual(2);
@@ -115,7 +123,9 @@ describe('Notes API (e2e)', () => {
 
   it('supports the full note lifecycle with tagId filtering', async () => {
     const created = await auth(
-      request(app.getHttpServer()).post('/api/notes').send({ body: 'hello', tagIds: [1] }),
+      request(app.getHttpServer())
+        .post('/api/notes')
+        .send({ body: 'hello', tagIds: [1] }),
     ).expect(201);
     const id = created.body.id;
     expect(created.body.tagIds).toHaveLength(1);
@@ -123,9 +133,7 @@ describe('Notes API (e2e)', () => {
     const listed = await auth(request(app.getHttpServer()).get('/api/notes')).expect(200);
     expect(listed.body.notes.map((n: { body: string }) => n.body)).toContain('hello');
 
-    const filtered = await auth(
-      request(app.getHttpServer()).get('/api/notes?tagId=1'),
-    ).expect(200);
+    const filtered = await auth(request(app.getHttpServer()).get('/api/notes?tagId=1')).expect(200);
     expect(filtered.body.notes.map((n: { id: string }) => n.id)).toContain(id);
 
     const updated = await auth(
@@ -256,9 +264,7 @@ describe('Notes API (e2e)', () => {
     const createdAt = created.body.createdAt;
 
     const updated = await auth(
-      request(app.getHttpServer())
-        .patch(`/api/notes/${id}`)
-        .send({ body: 'restore me edited' }),
+      request(app.getHttpServer()).patch(`/api/notes/${id}`).send({ body: 'restore me edited' }),
     ).expect(200);
     expect(updated.body.version).toBe(1);
 
@@ -438,7 +444,9 @@ describe('Notes API (e2e)', () => {
       expect([...new Set(walked)]).toHaveLength(walked.length);
 
       const listed = await listedNoteIds();
-      expect([...walked].sort((a: string, b: string) => a.localeCompare(b))).toEqual([...listed].sort((a: string, b: string) => a.localeCompare(b)));
+      expect([...walked].sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+        [...listed].sort((a: string, b: string) => a.localeCompare(b)),
+      );
 
       const walkedOrder = walked.filter((id) => [oldest.id, middle.id, newest.id].includes(id));
       expect(walkedOrder).toEqual([newest.id, middle.id, oldest.id]);
@@ -499,7 +507,8 @@ describe('Notes API (e2e)', () => {
       limit: number,
       cursor: string | null,
     ): Promise<{ ids: string[]; nextCursor: string | null }> {
-      const query = cursor === null ? `limit=${limit}` : `limit=${limit}&cursor=${encodeURIComponent(cursor)}`;
+      const query =
+        cursor === null ? `limit=${limit}` : `limit=${limit}&cursor=${encodeURIComponent(cursor)}`;
       const page = await apiGet(`/api/notes?${query}`).expect(200);
       return {
         ids: page.body.notes.map((note: { id: string }) => note.id),

@@ -6,9 +6,9 @@ import {
   BatchDeleteTodosDto,
   BatchUpdateListsDto,
   BatchUpdateTodosDto,
-} from './dto/batch-todos.dto';
-import { TodosService } from '../todos/todos.service';
-import { ListsService } from '../lists/lists.service';
+} from './dto/batch-todos.dto.js';
+import { TodosService } from '../todos/todos.service.js';
+import { ListsService } from '../lists/lists.service.js';
 
 /**
  * The `todos` and `lists` batch routes (`SPEC-todo-service.md` §5).

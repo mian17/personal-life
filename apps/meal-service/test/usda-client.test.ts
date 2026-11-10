@@ -1,5 +1,6 @@
+import { jest } from '@jest/globals';
 import { NUTRIENTS } from '@life/nutrition';
-import { UsdaClient, type UsdaTransport } from '../src/usda/usda.client';
+import { UsdaClient, type UsdaTransport } from '../src/usda/usda.client.js';
 
 /**
  * The USDA boundary (`docs/specs/SPEC-usda-source.md`). Fixtures copy the two
@@ -72,7 +73,13 @@ function searchPayload(): unknown {
         dataType: 'SR Legacy',
         score: 371.21582,
         foodNutrients: [
-          { nutrientId: 1292, nutrientNumber: '645', nutrientName: 'Fatty acids, total monounsaturated', unitName: 'G', value: 0.031 },
+          {
+            nutrientId: 1292,
+            nutrientNumber: '645',
+            nutrientName: 'Fatty acids, total monounsaturated',
+            unitName: 'G',
+            value: 0.031,
+          },
         ],
       },
     ],
@@ -85,11 +92,30 @@ function foodPayload(): unknown {
     fdcId: FDC_ID,
     description: 'Broccoli, raw',
     foodNutrients: [
-      { nutrient: { id: 2045, number: '951', name: 'Proximates', rank: 50, unitName: 'g' }, type: 'FoodNutrient' },
-      { nutrient: { id: 1008, number: '208', name: 'Energy', rank: 300, unitName: 'kcal' }, amount: 34.0, type: 'FoodNutrient' },
-      { nutrient: { id: 1004, number: '204', name: 'Total lipid (fat)', rank: 800, unitName: 'g' }, amount: 0.37, type: 'FoodNutrient' },
-      { nutrient: { id: 1093, number: '307', name: 'Sodium, Na', rank: 600, unitName: 'mg' }, amount: 33.0, type: 'FoodNutrient' },
-      { nutrient: { id: 1062, number: '268', name: 'Energy', rank: 400, unitName: 'kJ' }, amount: 141.0, type: 'FoodNutrient' },
+      {
+        nutrient: { id: 2045, number: '951', name: 'Proximates', rank: 50, unitName: 'g' },
+        type: 'FoodNutrient',
+      },
+      {
+        nutrient: { id: 1008, number: '208', name: 'Energy', rank: 300, unitName: 'kcal' },
+        amount: 34.0,
+        type: 'FoodNutrient',
+      },
+      {
+        nutrient: { id: 1004, number: '204', name: 'Total lipid (fat)', rank: 800, unitName: 'g' },
+        amount: 0.37,
+        type: 'FoodNutrient',
+      },
+      {
+        nutrient: { id: 1093, number: '307', name: 'Sodium, Na', rank: 600, unitName: 'mg' },
+        amount: 33.0,
+        type: 'FoodNutrient',
+      },
+      {
+        nutrient: { id: 1062, number: '268', name: 'Energy', rank: 400, unitName: 'kJ' },
+        amount: 141.0,
+        type: 'FoodNutrient',
+      },
     ],
   };
 }
@@ -223,7 +249,10 @@ describe('UsdaClient — one batch request becomes every food’s vector', () =>
     const fake = new FakeUsda();
     fake.reply = () =>
       usdaResponse([
-        { fdcId: FDC_ID, foodNutrients: [{ nutrient: { number: '951', unitName: 'g' }, type: 'FoodNutrient' }] },
+        {
+          fdcId: FDC_ID,
+          foodNutrients: [{ nutrient: { number: '951', unitName: 'g' }, type: 'FoodNutrient' }],
+        },
       ]);
     const vectors = await clientFor(fake).fetchByFdcIds([FDC_ID]);
 
@@ -259,7 +288,9 @@ describe('UsdaClient — every failure is one failure', () => {
     fake.reply = () => usdaResponse({ error: { message: 'rate limit exceeded' } }, 429);
 
     expect(await clientFor(fake).fetchByFdcId(FDC_ID)).toEqual(RATE_LIMITED);
-    expect(await clientFor(fake).usda_search('broccoli', ['Foundation', 'SR Legacy'])).toEqual(RATE_LIMITED);
+    expect(await clientFor(fake).usda_search('broccoli', ['Foundation', 'SR Legacy'])).toEqual(
+      RATE_LIMITED,
+    );
     // One request each. A retry would extend the key's one-hour block.
     expect(fake.calls).toHaveLength(2);
   });
@@ -268,7 +299,9 @@ describe('UsdaClient — every failure is one failure', () => {
     const rejected = new FakeUsda();
     rejected.reply = () => usdaResponse({}, 500);
     expect(await clientFor(rejected).fetchByFdcId(FDC_ID)).toEqual(UNAVAILABLE);
-    expect(await clientFor(rejected).usda_search('broccoli', ['Foundation', 'SR Legacy'])).toEqual(UNAVAILABLE);
+    expect(await clientFor(rejected).usda_search('broccoli', ['Foundation', 'SR Legacy'])).toEqual(
+      UNAVAILABLE,
+    );
 
     const missing = new FakeUsda();
     missing.reply = () => usdaResponse({}, 404);
@@ -283,15 +316,22 @@ describe('UsdaClient — every failure is one failure', () => {
     }
     const searchMalformed = new FakeUsda();
     searchMalformed.reply = () => usdaResponse({ foods: [{ description: 'Broccoli' }] });
-    expect(await clientFor(searchMalformed).usda_search('broccoli', ['Foundation', 'SR Legacy'])).toEqual(UNAVAILABLE);
+    expect(
+      await clientFor(searchMalformed).usda_search('broccoli', ['Foundation', 'SR Legacy']),
+    ).toEqual(UNAVAILABLE);
 
     // A food USDA described in rows we cannot map is the mapper's own verdict.
     const noReadableRows = new FakeUsda();
     noReadableRows.reply = () =>
       usdaResponse({
-        foodNutrients: [{ nutrient: { number: '951', name: 'Proximates', unitName: 'g' }, type: 'FoodNutrient' }],
+        foodNutrients: [
+          { nutrient: { number: '951', name: 'Proximates', unitName: 'g' }, type: 'FoodNutrient' },
+        ],
       });
-    expect(await clientFor(noReadableRows).fetchByFdcId(FDC_ID)).toEqual({ ok: false, reason: 'unmapped' });
+    expect(await clientFor(noReadableRows).fetchByFdcId(FDC_ID)).toEqual({
+      ok: false,
+      reason: 'unmapped',
+    });
 
     // A hung connection is a failure, not an estimate that never returns.
     const hanging = new FakeUsda();

@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateFoodDto } from './dto/create-food.dto';
-import { ListFoodsQuery } from './dto/list-foods.query';
-import { UpdateFoodDto } from './dto/update-food.dto';
-import { FoodsService } from './foods.service';
+import { CreateFoodDto } from './dto/create-food.dto.js';
+import { ListFoodsQuery } from './dto/list-foods.query.js';
+import { UpdateFoodDto } from './dto/update-food.dto.js';
+import { FoodsService } from './foods.service.js';
 
 /**
  * Food routes. `ownerSub` always comes from `@Principal()`, never the body

@@ -14,21 +14,16 @@
 import { dirname, join } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import type { ServiceModule } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import type { McpTool } from '../src/mcp/tools';
-import { storeTokens } from '../src/auth/token-store';
-import type { BulkEnvelope, BulkItemResult } from '../src/core/bulk';
-import type { JsonSchemaProperty } from '../src/core/schema';
-import { BULK_WRAPPER_FIELD } from '../src/core/validate';
-import { resources } from './support/bulk-service-module';
-import {
-  sampleApiToken,
-  startStubApi,
-  type SampleRow,
-  type StubApi,
-} from './support/stub-api';
+import { main as runCli } from '../src/cli/run.js';
+import type { ServiceModule } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import type { McpTool } from '../src/mcp/tools.js';
+import { storeTokens } from '../src/auth/token-store.js';
+import type { BulkEnvelope, BulkItemResult } from '../src/core/bulk.js';
+import type { JsonSchemaProperty } from '../src/core/schema.js';
+import { BULK_WRAPPER_FIELD } from '../src/core/validate.js';
+import { resources } from './support/bulk-service-module.js';
+import { sampleApiToken, startStubApi, type SampleRow, type StubApi } from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
@@ -267,12 +262,21 @@ describe('one resolved cap, advertised and enforced', () => {
   const OVER_CAP_MESSAGE =
     'journals.getMany failed (invalidInput): items: exceeds LIFE_OPS_BULK_LIMIT (2)';
   const ABOVE_THE_CAP: AdapterCall = {
-    argv: ['journals', 'get-many', '--items', 'journal-a', '--items', 'journal-b', '--items', 'journal-a'],
+    argv: [
+      'journals',
+      'get-many',
+      '--items',
+      'journal-a',
+      '--items',
+      'journal-b',
+      '--items',
+      'journal-a',
+    ],
     tool: 'journals_get_many',
     args: { items: ['journal-a', 'journal-b', 'journal-a'] },
   };
 
-  it('advertises the cap the adapter\'s own environment resolves', async () => {
+  it("advertises the cap the adapter's own environment resolves", async () => {
     const stub = await startJournalsStub();
 
     try {
@@ -285,7 +289,7 @@ describe('one resolved cap, advertised and enforced', () => {
     }
   });
 
-  it('enforces that same cap on both adapters\' calls before item 0 runs', async () => {
+  it("enforces that same cap on both adapters' calls before item 0 runs", async () => {
     const pair = await runBoth(ABOVE_THE_CAP, TIGHT_ENV);
 
     expect(pair.cli.exit).toBe(1);

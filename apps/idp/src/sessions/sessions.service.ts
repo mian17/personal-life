@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'node:crypto';
 import { Repository } from 'typeorm';
-import { User } from '../users/user.entity';
-import { Session } from './session.entity';
+import { User } from '../users/user.entity.js';
+import { Session } from './session.entity.js';
 
 /** 30 days absolute — tech-lead call, aligned with the refresh-token lifetime. */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;

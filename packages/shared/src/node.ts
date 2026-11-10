@@ -10,4 +10,4 @@
  * `packages/shared/src/index.ts` is unchanged in kind — only this subpath may
  * import `node:*` builtins.
  */
-export { resolveDbPath } from './db-path';
+export { resolveDbPath } from './db-path.js';

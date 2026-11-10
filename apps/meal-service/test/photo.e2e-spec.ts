@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { rmSync } from 'fs';
@@ -5,14 +6,14 @@ import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AuthGuard } from '@life/service-kit';
-import { MealCache } from '../src/cache/meal-cache';
-import { Entry } from '../src/entries/entry.entity';
-import { COULD_NOT_READ, GeminiClient } from '../src/photo/gemini.client';
-import { zeroVector } from '../src/foods/content';
-import { GEMINI_CLIENT_FACTORY } from '../src/photo/photo.service';
-import { FakeGemini, geminiResponse, readablePayload } from './fake-gemini';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
-import { VERIFIER_ENV } from '../src/service-config';
+import { MealCache } from '../src/cache/meal-cache.js';
+import { Entry } from '../src/entries/entry.entity.js';
+import { COULD_NOT_READ, GeminiClient } from '../src/photo/gemini.client.js';
+import { zeroVector } from '../src/foods/content.js';
+import { GEMINI_CLIENT_FACTORY } from '../src/photo/photo.service.js';
+import { FakeGemini, geminiResponse, readablePayload } from './fake-gemini.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
 
 /**
  * Photo estimates over HTTP (`SPEC-meal-service` Photo → Gemini pipeline,
@@ -31,7 +32,7 @@ import { VERIFIER_ENV } from '../src/service-config';
  *   photo reaches the model on every request).
  */
 
-const TEST_DB = join(__dirname, 'test-photo.db');
+const TEST_DB = join(import.meta.dirname, 'test-photo.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -76,7 +77,7 @@ describe('Photo estimates (e2e)', () => {
 
     rmSync(TEST_DB, { force: true });
     fake = new FakeGemini();
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(GEMINI_CLIENT_FACTORY)
       .useValue(() => new GeminiClient(geminiEnv(), fake.handler))
@@ -113,9 +114,9 @@ describe('Photo estimates (e2e)', () => {
       });
     }
 
-    const res = await auth(post(app, { imageBase64: IMAGE_B64, mimeType: MIME, hint: HINT })).expect(
-      200,
-    );
+    const res = await auth(
+      post(app, { imageBase64: IMAGE_B64, mimeType: MIME, hint: HINT }),
+    ).expect(200);
 
     expect(res.body.readable).toBe(true);
     expect(res.body.items).toHaveLength(1);
@@ -188,7 +189,9 @@ describe('Photo estimates (e2e)', () => {
     expect(await entryCount(app)).toBe(0);
 
     // Route-level: a confirmed entry would appear here; it does not.
-    const listed = await auth(request(app.getHttpServer()).get('/api/entries?date=2026-10-03')).expect(200);
+    const listed = await auth(
+      request(app.getHttpServer()).get('/api/entries?date=2026-10-03'),
+    ).expect(200);
     expect(listed.body.entries).toEqual([]);
   });
 

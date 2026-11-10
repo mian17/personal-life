@@ -1,13 +1,14 @@
+import { jest } from '@jest/globals';
 import {
   CACHE_TTL_SECONDS,
   createNotesCache,
   generationKey,
   NotesCache,
-} from '../src/notes/notes-cache';
-import { NotesService } from '../src/notes/notes.service';
+} from '../src/notes/notes-cache.js';
+import { NotesService } from '../src/notes/notes.service.js';
 import { KeysService, encodeCursor } from '@life/service-kit';
 import { ENC_PREFIX, encryptField, generateDek, wrapDek } from '@life/crypto';
-import { FakeRedisClient, FailingRedisClient } from './fake-redis';
+import { FakeRedisClient, FailingRedisClient } from './fake-redis.js';
 
 /**
  * Unit-level contract for the note read-through cache. The DB is a repository
@@ -103,11 +104,7 @@ function makeKeysService(): KeysService {
 class CapturingRedisClient extends FakeRedisClient {
   readonly values: Array<{ key: string; value: string }> = [];
 
-  override async set(
-    key: string,
-    value: string,
-    options?: { EX?: number },
-  ): Promise<'OK'> {
+  override async set(key: string, value: string, options?: { EX?: number }): Promise<'OK'> {
     this.values.push({ key, value });
     return super.set(key, value, options);
   }
@@ -178,8 +175,7 @@ function makeHarness(cache: NotesCache, events: string[] = []): Harness {
       chainable({
         events,
         onTerminal: 'db:list',
-        getMany: () =>
-          state.getManyImpl ? state.getManyImpl() : Promise.resolve(state.noteRows),
+        getMany: () => (state.getManyImpl ? state.getManyImpl() : Promise.resolve(state.noteRows)),
       }),
     ),
     findOne: jest.fn(async () => {
@@ -826,7 +822,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
     });
   });
 
-  describe('isolation: one user\'s writes never reach another user\'s entries', () => {
+  describe("isolation: one user's writes never reach another user's entries", () => {
     it("A's write bumps only note:gen:<a>; B's cached entries survive and still serve", async () => {
       const client = new FakeRedisClient();
       const h = makeHarness(new NotesCache(client));
@@ -839,10 +835,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
       await h.service.findAll(A, {});
       await h.service.findAll(B, {});
       expect(h.notes.createQueryBuilder).toHaveBeenCalledTimes(2);
-      expect(client.setCalls).toEqual([
-        `note:${A}:v0:list`,
-        `note:${B}:v0:list`,
-      ]);
+      expect(client.setCalls).toEqual([`note:${A}:v0:list`, `note:${B}:v0:list`]);
 
       // A writes: exactly A's counter bumps and nothing else.
       await h.service.create(A, 'a-note', []);
@@ -910,7 +903,7 @@ describe('NotesCache (read-through + generation invalidation)', () => {
     });
   });
 
-  describe('selection: REDIS_URL unset is today\'s direct path', () => {
+  describe("selection: REDIS_URL unset is today's direct path", () => {
     it('createNotesCache(undefined) performs no caching', async () => {
       const h = makeHarness(createNotesCache(undefined));
 

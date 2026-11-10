@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { JWTPayload } from 'jose';
 import {
@@ -13,9 +8,9 @@ import {
   type JwksResolver,
   type VerifierConfig,
   type VerifierEnvNames,
-} from './jwt-verifier';
-import type { AuthenticatedRequest, Principal } from './principal';
-import { IS_PUBLIC_KEY } from '../public.decorator';
+} from './jwt-verifier.js';
+import type { AuthenticatedRequest, Principal } from './principal.js';
+import { IS_PUBLIC_KEY } from '../public.decorator.js';
 
 /**
  * JWT-only auth guard shared by every service. Each request must carry a valid

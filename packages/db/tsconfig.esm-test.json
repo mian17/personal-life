@@ -1,0 +1,23 @@
+// Compiler settings for this workspace's `.mts` tests only.
+//
+// Separate from tsconfig.json because it must not inherit `module: commonjs`:
+// product source stays CommonJS, while a test that imports an ESM-only package
+// has to be emitted as an ES module. NodeNext is what makes TypeScript accept
+// that package's `exports` map.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // Required by ts-jest for a NodeNext module kind; also correct here, since
+    // each test file compiles on its own with no cross-file emit.
+    "isolatedModules": true,
+    "declaration": false,
+    // Overrides the base's "6.0", which only the TypeScript 6 compiler accepts;
+    // ts-jest resolves TypeScript from the repo root, which is 5.x (pinned by
+    // @nestjs/cli@11). Transitional: drop back to "6.0" once the CLI moves to
+    // v12, which brings a root TypeScript 6 with it.
+    "ignoreDeprecations": "5.0"
+  },
+  "include": ["test/**/*.mts"]
+}

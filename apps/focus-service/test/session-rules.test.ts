@@ -1,7 +1,7 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { CreateSessionDto } from '../src/sessions/dto/create-session.dto';
-import { ListSessionsQuery } from '../src/sessions/dto/list-sessions.query';
-import { DATE_ONLY, MINUTES_RANGE } from '../src/sessions/dto/session-rules';
+import { CreateSessionDto } from '../src/sessions/dto/create-session.dto.js';
+import { ListSessionsQuery } from '../src/sessions/dto/list-sessions.query.js';
+import { DATE_ONLY, MINUTES_RANGE } from '../src/sessions/dto/session-rules.js';
 
 /**
  * `SPEC-focus-service` §1 / §9.2 — the session boundary's two rules, as the global
@@ -79,9 +79,7 @@ describe('CreateSessionDto — date', () => {
 
   it('refuses a malformed date', async () => {
     for (const date of ['28-10-2026', '2026-1-28', '', 'today']) {
-      await expect(validateBody({ date, minutes: 20 })).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(validateBody({ date, minutes: 20 })).rejects.toBeInstanceOf(BadRequestException);
     }
   });
 
@@ -92,23 +90,22 @@ describe('CreateSessionDto — date', () => {
   });
 });
 
-describe('ListSessionsQuery — both range bounds are the client\'s', () => {
+describe("ListSessionsQuery — both range bounds are the client's", () => {
   it('accepts a well-formed range', async () => {
-    await expect(
-      validateQuery({ from: '2026-10-01', to: '2026-10-31' }),
-    ).resolves.toMatchObject({ from: '2026-10-01', to: '2026-10-31' });
+    await expect(validateQuery({ from: '2026-10-01', to: '2026-10-31' })).resolves.toMatchObject({
+      from: '2026-10-01',
+      to: '2026-10-31',
+    });
   });
 
   it('refuses a range missing either bound', async () => {
-    await expect(validateQuery({ from: '2026-10-01' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(validateQuery({ from: '2026-10-01' })).rejects.toBeInstanceOf(BadRequestException);
     await expect(validateQuery({ to: '2026-10-31' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('refuses a malformed bound', async () => {
-    await expect(
-      validateQuery({ from: '01-10-2026', to: '2026-10-31' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(validateQuery({ from: '01-10-2026', to: '2026-10-31' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

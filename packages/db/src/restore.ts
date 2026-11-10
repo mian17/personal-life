@@ -1,9 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import type { DatabaseName } from './paths';
-import { resolvePaths, selectPaths } from './paths';
-import { snapshotAndVerify, verifyDatabase } from './snapshot';
+import type { DatabaseName, DatabasePaths } from './paths.js';
+import { resolvePaths, selectPaths } from './paths.js';
+import { snapshotAndVerify, verifyDatabase } from './snapshot.js';
 
 /**
  * `db:restore` core (`SPEC-db-backup-restore` "Restore behavior", "Restore safety
@@ -138,8 +138,9 @@ function chooseTargets(
   env: NodeJS.ProcessEnv,
   fromDir: string,
   only: readonly DatabaseName[] | undefined,
+  defaults: Partial<DatabasePaths>,
 ): ChosenTarget[] {
-  const resolved = resolvePaths(env);
+  const resolved = resolvePaths(env, defaults);
   const chosenPaths = only
     ? selectPaths(resolved, only)
     : resolved.filter((entry) => existsSync(join(fromDir, basename(entry.source))));
@@ -258,6 +259,8 @@ export async function runRestore(options: {
   from: string;
   only?: readonly DatabaseName[];
   env?: NodeJS.ProcessEnv;
+  /** The repo-anchored defaults an unset env var falls back to; the CLI entries pass them in. */
+  defaults?: Partial<DatabasePaths>;
   probe?: StackProbe;
   now?: () => Date;
 }): Promise<RestoreResult> {
@@ -267,7 +270,7 @@ export async function runRestore(options: {
   const backupRoot = resolve(cwd, 'backup');
 
   const fromDir = resolveSnapshotDir(cwd, backupRoot, options.from);
-  const chosen = chooseTargets(env, fromDir, options.only);
+  const chosen = chooseTargets(env, fromDir, options.only, options.defaults ?? {});
   assertSnapshotsUsable(chosen, fromDir);
   await assertStackStopped(probe);
 
@@ -290,9 +293,16 @@ export async function main(
   argv: string[] = process.argv.slice(2),
   env: NodeJS.ProcessEnv = process.env,
   probe?: StackProbe,
+  defaults?: Partial<DatabasePaths>,
 ): Promise<number> {
   try {
-    const result = await runRestore({ from: parseFrom(argv), only: parseOnly(argv), env, probe });
+    const result = await runRestore({
+      from: parseFrom(argv),
+      only: parseOnly(argv),
+      env,
+      defaults,
+      probe,
+    });
     for (const entry of result.replaced) {
       const recovery = entry.preRestore ? ` pre-restore=${entry.preRestore}` : '';
       console.log(`db:restore ${entry.name} <- ${entry.snapshot} quick_check=ok${recovery}`);

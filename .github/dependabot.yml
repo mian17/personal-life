@@ -1,0 +1,39 @@
+# Why this exists: 19 npm workspaces with zero automated dependency updates is the
+# only reason a transitive CVE in this repo goes unnoticed.
+#
+# Routine minor+patch bumps land as one grouped PR per ecosystem per week.
+# Security advisories are deliberately NOT in a group: GitHub ignores group patterns
+# for them, so each security fix arrives as its own PR and stays reviewable and
+# mergeable on its own.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      # Routine bumps: chore(deps): <summary>
+      # Security PRs keep Dependabot's default prefix (no commit-message override applies to them).
+      prefix: chore
+      include: scope
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+    # major stays ungrouped and opens its own PR, one per upgrade
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch

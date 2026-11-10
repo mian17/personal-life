@@ -1,4 +1,4 @@
-# Production runbook — full stack (deploy `master` @ `21f7256`)
+# Production runbook — full stack
 
 > Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
 > recover any of them with `git show d1f54c9^:<path>`. New work still writes them
@@ -17,11 +17,12 @@ copy-pasteable from that directory:
 cd /home/night/WebstormProjects/personal-life
 ```
 
-Ref: `master` @ `21f7256` (`style(pomodoro): iOS red icon, matching sibling palette`).
-That pin already contains `pi/wf/feedback-status` (the status workflow), the meal photo
-body-limit fix, the ops agent contract and the whole pomodoro app (`/pomodoro`,
-`/pomodoro/settings`, its own PWA manifest). Record the exact commit you deploy in §3:
-the runbook pins a hash, and the hash moves as master advances.
+Ref: the ref **you choose** — this runbook pins no hash. `dev` is the current line and
+`main` lags it: `origin/main` was 141 commits behind `origin/dev` when this was written,
+and every `apps/*/Dockerfile` on `main` builds `FROM node:22-bookworm-slim` while `dev`
+builds `node:24-bookworm-slim`. Deploying `main` therefore deploys an older runtime —
+check `git log --oneline -1 origin/dev` and the `FROM node:` line in the Dockerfile of
+the ref you mean to ship before choosing. Record the exact commit you deploy in §3.
 `compose.yaml` defines **18 services**: 8 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`,
 `focus-service`) plus 8 Redis instances, `postgres-feedback` and
@@ -209,11 +210,12 @@ the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path
 cd /home/night/WebstormProjects/personal-life
 ```
 
-- [ ] Ref pinned: `git log -1 --oneline` → record the commit you are deploying. It must
-      contain the feedback status workflow — check with
+- [ ] Ref chosen and recorded: `git log -1 --oneline` → record the commit you are
+      deploying. `dev` is the current line; `main` lags it (141 commits when this was
+      written) and still builds Node 22 images, so name the ref deliberately instead of
+      defaulting to `main`. It must contain the feedback status workflow — check with
       `git log --oneline -1 d1f54c9^ -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
-      "unknown revision"). On the revision this runbook was written against that is
-      `21f7256`; `git status --short` shows only untracked `docs/reference-repo/`,
+      "unknown revision"). `git status --short` shows only untracked `docs/reference-repo/`,
       `pictures/`, `.pi/`.
 - [ ] Record the images you are about to replace (rollback reference):
       `docker compose images`.
@@ -573,15 +575,15 @@ Code and data roll back together: older code cannot read an arrangement it never
 
 ## Hard lines
 
-No one else does these: merging to `master`, stopping the stack, running `import-tags` or
-any backfill, `db:backup` / `db:backup:pg`, `db:restore` / `db:restore:pg`, `docker compose
-up` against production, installing the crontab, and generating a master key. A key's
-**value** never enters a doc, a log or a chat — names only.
+No one else does these: merging to `main` (the dev→main promotion), stopping the stack,
+running `import-tags` or any backfill, `db:backup` / `db:backup:pg`, `db:restore` /
+`db:restore:pg`, `docker compose up` against production, installing the crontab, and
+generating a master key. A key's **value** never enters a doc, a log or a chat — names only.
 
 ## Superseded / historical runbooks
 
 Per-chapter runbooks kept for their chapter-level detail, superseded by this one where they
-disagree (they predate `master`'s current service set):
+disagree (they predate `main`'s current service set):
 
 - `docs/runbooks/deploy-feedback-stack.md` — feedback-service + Postgres/RabbitMQ/Redis.
   Superseded by §2, §4, §6–§9 here; still the deepest drill detail for the feedback store.

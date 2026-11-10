@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
@@ -16,7 +17,7 @@ import { DataSource } from 'typeorm';
  * bypass).
  */
 
-const TEST_DB = join(__dirname, 'test-tags-health.db');
+const TEST_DB = join(import.meta.dirname, 'test-tags-health.db');
 const BASE_NODE_ENV = 'test';
 
 describe('Health dialect (e2e)', () => {
@@ -30,7 +31,7 @@ describe('Health dialect (e2e)', () => {
     process.env.DB_PATH = TEST_DB;
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

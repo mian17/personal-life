@@ -11,20 +11,10 @@ import {
 } from 'fs';
 import { tmpdir } from 'os';
 import { basename, dirname, join } from 'path';
-import {
-  DEFAULT_FOCUS_DB_PATH,
-  DEFAULT_IDP_DB_PATH,
-  DEFAULT_MEAL_DB_PATH,
-  DEFAULT_NOTE_DB_PATH,
-  DEFAULT_TAGS_DB_PATH,
-  DEFAULT_TODO_DB_PATH,
-  pruneRoutineSnapshots,
-  resolvePaths,
-  runBackup,
-  selectPaths,
-} from '../src/index';
-import type { DatabaseName } from '../src/index';
-import { main } from '../scripts/backup';
+import { pruneRoutineSnapshots, runBackup, selectPaths } from '../src/index.js';
+import type { DatabaseName } from '../src/index.js';
+import { main } from '../src/backup.js';
+import { defaultDatabasePaths, resolvePaths } from '../src/paths.js';
 
 /**
  * Path-resolution contract for the backup/restore CLIs (plan T2): the six
@@ -33,9 +23,24 @@ import { main } from '../scripts/backup';
  * string comparison; no database under `apps/*\/data/**` is opened.
  */
 
+/**
+ * The repository root this test file sits three levels below. The defaults themselves are now a
+ * parameter (`src/paths.ts` takes the root; `src/repo-paths.ts` is where the CLI entries get it
+ * from `import.meta.dirname`), so the assertion names the same root the entries compute.
+ */
+const REPO_ROOT = join(__dirname, '..', '..', '..');
+const DEFAULTS = defaultDatabasePaths(REPO_ROOT);
+
+const DEFAULT_NOTE_DB_PATH = DEFAULTS.life;
+const DEFAULT_TAGS_DB_PATH = DEFAULTS.tags;
+const DEFAULT_TODO_DB_PATH = DEFAULTS.todo;
+const DEFAULT_IDP_DB_PATH = DEFAULTS.idp;
+const DEFAULT_MEAL_DB_PATH = DEFAULTS.meal;
+const DEFAULT_FOCUS_DB_PATH = DEFAULTS.focus;
+
 describe('resolvePaths / selectPaths', () => {
   it('returns the six databases in order with their env names', () => {
-    const paths = resolvePaths({});
+    const paths = resolvePaths({}, DEFAULTS);
     expect(paths.map((p) => p.name)).toEqual(['life', 'tags', 'todo', 'idp', 'meal', 'focus']);
     expect(paths.map((p) => p.envName)).toEqual([
       'NOTE_DB_PATH',
@@ -48,56 +53,64 @@ describe('resolvePaths / selectPaths', () => {
   });
 
   it('anchors each default at the repo root', () => {
-    const paths = resolvePaths({});
+    const paths = resolvePaths({}, DEFAULTS);
     expect(paths[0].source).toBe(DEFAULT_NOTE_DB_PATH);
     expect(paths[1].source).toBe(DEFAULT_TAGS_DB_PATH);
     expect(paths[2].source).toBe(DEFAULT_TODO_DB_PATH);
     expect(paths[3].source).toBe(DEFAULT_IDP_DB_PATH);
     expect(paths[4].source).toBe(DEFAULT_MEAL_DB_PATH);
     expect(paths[5].source).toBe(DEFAULT_FOCUS_DB_PATH);
-    expect(DEFAULT_NOTE_DB_PATH.endsWith(join('apps', 'note-service', 'data', 'life.db'))).toBe(true);
-    expect(DEFAULT_TAGS_DB_PATH.endsWith(join('apps', 'tags-service', 'data', 'tags.db'))).toBe(true);
-    expect(DEFAULT_TODO_DB_PATH.endsWith(join('apps', 'todo-service', 'data', 'todo.db'))).toBe(true);
+    expect(DEFAULT_NOTE_DB_PATH.endsWith(join('apps', 'note-service', 'data', 'life.db'))).toBe(
+      true,
+    );
+    expect(DEFAULT_TAGS_DB_PATH.endsWith(join('apps', 'tags-service', 'data', 'tags.db'))).toBe(
+      true,
+    );
+    expect(DEFAULT_TODO_DB_PATH.endsWith(join('apps', 'todo-service', 'data', 'todo.db'))).toBe(
+      true,
+    );
     expect(DEFAULT_IDP_DB_PATH.endsWith(join('apps', 'idp', 'data', 'idp.db'))).toBe(true);
-    expect(DEFAULT_MEAL_DB_PATH.endsWith(join('apps', 'meal-service', 'data', 'meal.db'))).toBe(true);
+    expect(DEFAULT_MEAL_DB_PATH.endsWith(join('apps', 'meal-service', 'data', 'meal.db'))).toBe(
+      true,
+    );
     expect(DEFAULT_FOCUS_DB_PATH.endsWith(join('apps', 'focus-service', 'data', 'focus.db'))).toBe(
       true,
     );
   });
 
   it('honours a MEAL_DB_PATH override', () => {
-    const paths = resolvePaths({ INIT_CWD: '/repo/root', MEAL_DB_PATH: 'rel/meal.db' });
+    const paths = resolvePaths({ INIT_CWD: '/repo/root', MEAL_DB_PATH: 'rel/meal.db' }, DEFAULTS);
     expect(paths[4].name).toBe('meal');
     expect(paths[4].envName).toBe('MEAL_DB_PATH');
     expect(paths[4].source).toBe(join('/repo/root', 'rel', 'meal.db'));
   });
 
   it('yields the default unchanged when the env override is absent', () => {
-    expect(resolvePaths({})[0].source).toBe(DEFAULT_NOTE_DB_PATH);
+    expect(resolvePaths({}, DEFAULTS)[0].source).toBe(DEFAULT_NOTE_DB_PATH);
   });
 
   it('resolves a relative override against INIT_CWD', () => {
-    const paths = resolvePaths({ INIT_CWD: '/repo/root', NOTE_DB_PATH: 'rel/life.db' });
+    const paths = resolvePaths({ INIT_CWD: '/repo/root', NOTE_DB_PATH: 'rel/life.db' }, DEFAULTS);
     expect(paths[0].source).toBe(join('/repo/root', 'rel', 'life.db'));
   });
 
   it('falls back to cwd when INIT_CWD is absent', () => {
-    const paths = resolvePaths({ TAGS_DB_PATH: 'rel/tags.db' });
+    const paths = resolvePaths({ TAGS_DB_PATH: 'rel/tags.db' }, DEFAULTS);
     expect(paths[1].source).toBe(join(process.cwd(), 'rel', 'tags.db'));
   });
 
   it('returns the full list from selectPaths when only is undefined', () => {
-    const paths = resolvePaths({});
+    const paths = resolvePaths({}, DEFAULTS);
     expect(selectPaths(paths)).toEqual(paths);
   });
 
   it('returns the named subset from selectPaths', () => {
-    const paths = resolvePaths({});
+    const paths = resolvePaths({}, DEFAULTS);
     expect(selectPaths(paths, ['idp', 'life'])).toEqual([paths[3], paths[0]]);
   });
 
   it('throws on an unknown --only database name', () => {
-    const paths = resolvePaths({});
+    const paths = resolvePaths({}, DEFAULTS);
     expect(() => selectPaths(paths, ['nope' as DatabaseName])).toThrow(/unknown database name/);
   });
 });
@@ -194,7 +207,12 @@ describe('db:backup run', () => {
 
   it('routine run writes one verified file per database plus manifest.json', () => {
     const fx = makeBackupFixture();
-    const result = runBackup({ argv: [], env: envFor(fx), now: at });
+    const result = runBackup({
+      argv: [],
+      env: envFor(fx),
+      defaults: defaultDatabasePaths(fx.root),
+      now: at,
+    });
 
     expect(result.mode).toBe('routine');
     expect(result.destination).toBe(join(fx.backupRoot, STAMP));
@@ -214,9 +232,9 @@ describe('db:backup run', () => {
       expect(snapshot.bytes).toBeGreaterThan(0);
       const db = new Database(target, { readonly: true });
       try {
-        expect((db.prepare('PRAGMA quick_check').get() as { quick_check: string }).quick_check).toBe(
-          'ok',
-        );
+        expect(
+          (db.prepare('PRAGMA quick_check').get() as { quick_check: string }).quick_check,
+        ).toBe('ok');
         expect((db.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number }).c).toBe(2);
       } finally {
         db.close();
@@ -244,7 +262,7 @@ describe('db:backup run', () => {
       (Object.keys(fx.sources) as DatabaseName[]).map((name) => [name, sha256(fx.sources[name])]),
     );
 
-    runBackup({ argv: [], env: envFor(fx), now: at });
+    runBackup({ argv: [], env: envFor(fx), defaults: defaultDatabasePaths(fx.root), now: at });
 
     for (const name of Object.keys(fx.sources) as DatabaseName[]) {
       expect(sha256(fx.sources[name])).toBe(before[name]);
@@ -253,7 +271,12 @@ describe('db:backup run', () => {
 
   it('--pin is deliberate and distinguishable by name and manifest', () => {
     const fx = makeBackupFixture();
-    const result = runBackup({ argv: ['--pin'], env: envFor(fx), now: at });
+    const result = runBackup({
+      argv: ['--pin'],
+      env: envFor(fx),
+      defaults: defaultDatabasePaths(fx.root),
+      now: at,
+    });
 
     expect(result.mode).toBe('deliberate');
     expect(result.destination).toBe(join(fx.backupRoot, `${STAMP}-pinned`));
@@ -270,7 +293,12 @@ describe('db:backup run', () => {
     rmSync(fx.sources.todo);
     rmSync(fx.sources.idp);
 
-    const result = runBackup({ argv: ['--only', 'meal'], env: envFor(fx, ['meal']), now: at });
+    const result = runBackup({
+      argv: ['--only', 'meal'],
+      env: envFor(fx, ['meal']),
+      defaults: defaultDatabasePaths(fx.root),
+      now: at,
+    });
 
     expect(result.snapshots.map((s) => s.name)).toEqual(['meal']);
     expect(existsSync(join(result.destination, basename(fx.sources.meal)))).toBe(true);
@@ -282,7 +310,12 @@ describe('db:backup run', () => {
     rmSync(fx.sources.tags);
     rmSync(fx.sources.todo);
 
-    const result = runBackup({ argv: ['--only', 'life,idp'], env: envFor(fx), now: at });
+    const result = runBackup({
+      argv: ['--only', 'life,idp'],
+      env: envFor(fx),
+      defaults: defaultDatabasePaths(fx.root),
+      now: at,
+    });
 
     expect(result.snapshots.map((s) => s.name)).toEqual(['life', 'idp']);
     expect(existsSync(join(result.destination, basename(fx.sources.life)))).toBe(true);
@@ -291,9 +324,14 @@ describe('db:backup run', () => {
 
   it('rejects an unknown --only name before anything is written', () => {
     const fx = makeBackupFixture();
-    expect(() => runBackup({ argv: ['--only', 'life,nope'], env: envFor(fx), now: at })).toThrow(
-      /unknown database name/,
-    );
+    expect(() =>
+      runBackup({
+        argv: ['--only', 'life,nope'],
+        env: envFor(fx),
+        defaults: defaultDatabasePaths(fx.root),
+        now: at,
+      }),
+    ).toThrow(/unknown database name/);
     expect(existsSync(fx.backupRoot)).toBe(false);
   });
 
@@ -305,7 +343,7 @@ describe('db:backup run', () => {
     const original = console.error;
     console.error = ((line: string) => printError(line)) as typeof console.error;
     try {
-      expect(main([], envFor(fx))).toBe(1);
+      expect(main([], envFor(fx), defaultDatabasePaths(fx.root))).toBe(1);
     } finally {
       console.error = original;
     }
@@ -323,7 +361,7 @@ describe('db:backup run', () => {
     const original = console.error;
     console.error = ((line: string) => printError(line)) as typeof console.error;
     try {
-      expect(main([], envFor(fx))).toBe(1);
+      expect(main([], envFor(fx), defaultDatabasePaths(fx.root))).toBe(1);
     } finally {
       console.error = original;
     }
@@ -339,7 +377,7 @@ describe('db:backup run', () => {
     const original = console.log;
     console.log = ((line: string) => print(line)) as typeof console.log;
     try {
-      expect(main([], envFor(fx))).toBe(0);
+      expect(main([], envFor(fx), defaultDatabasePaths(fx.root))).toBe(0);
     } finally {
       console.log = original;
     }
@@ -385,10 +423,10 @@ describe('pruneRoutineSnapshots', () => {
 
   it('honours a custom keep count', () => {
     const fx = makeBackupFixture();
-    for (let i = 0; i < 5; i += 1) makeRoutineSnapshot(fx.backupRoot, `2026-10-01T00-00-00-00${i}Z`);
+    for (let i = 0; i < 5; i += 1)
+      makeRoutineSnapshot(fx.backupRoot, `2026-10-01T00-00-00-00${i}Z`);
     const { pruned } = pruneRoutineSnapshots(fx.backupRoot, 2);
     expect(pruned).toHaveLength(3);
     expect(readdirSync(fx.backupRoot)).toHaveLength(2);
   });
 });
-

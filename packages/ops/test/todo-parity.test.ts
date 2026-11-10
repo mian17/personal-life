@@ -11,19 +11,19 @@
 import { join, dirname } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { main as runCli } from '../src/cli/run';
-import { createMcpServer } from '../src/mcp/server';
-import { findOp } from '../src/core/registry';
-import type { ResourceRegistry } from '../src/core/types';
-import { resources } from '../src/services/todo';
-import { storeTokens } from '../src/auth/token-store';
+import { main as runCli } from '../src/cli/run.js';
+import { createMcpServer } from '../src/mcp/server.js';
+import { findOp } from '../src/core/registry.js';
+import type { ResourceRegistry } from '../src/core/types.js';
+import { resources } from '../src/services/todo.js';
+import { storeTokens } from '../src/auth/token-store.js';
 import {
   sampleApiToken,
   startStubApi,
   type RecordingStubApi,
   type SampleRow,
   type StubApi,
-} from './support/stub-api';
+} from './support/stub-api.js';
 
 const OWNER_SUBJECT = 'owner-a';
 const VALID_REFRESH_TOKEN = 'stub.refresh.token';
@@ -495,7 +495,16 @@ describe('todo error parity', () => {
   it('renders a stale version identically', async () => {
     const pair = await runBoth({
       resource: 'todos',
-      argv: ['todos', 'update', '--id', 'todo-a', '--title', 'Late edit', '--expectedVersion', '999'],
+      argv: [
+        'todos',
+        'update',
+        '--id',
+        'todo-a',
+        '--title',
+        'Late edit',
+        '--expectedVersion',
+        '999',
+      ],
       tool: 'todos_update',
       args: { id: 'todo-a', title: 'Late edit', expectedVersion: 999 },
     });

@@ -13,12 +13,12 @@ import {
   OpsError,
   renderOpsError,
   type OpsErrorCode,
-} from '../src/transport/errors';
-import { createExecutor, type Executor } from '../src/transport/executor';
-import { main as runCli } from '../src/cli/run';
-import { sampleRegistry } from '../src/fixtures/sample';
-import { storeTokens } from '../src/auth/token-store';
-import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api';
+} from '../src/transport/errors.js';
+import { createExecutor, type Executor } from '../src/transport/executor.js';
+import { main as runCli } from '../src/cli/run.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
+import { storeTokens } from '../src/auth/token-store.js';
+import { sampleApiToken, startStubApi, type StubApi } from './support/stub-api.js';
 
 const OPERATION = 'sample.get';
 const OWNER_SUBJECT = 'owner-a';
@@ -48,10 +48,20 @@ interface DetailCase {
 }
 
 const DETAIL_CASES: DetailCase[] = [
-  { name: 'a message field', body: '{"message":"boom"}', statusText: 'Boom', detail: '503 Boom: boom' },
+  {
+    name: 'a message field',
+    body: '{"message":"boom"}',
+    statusText: 'Boom',
+    detail: '503 Boom: boom',
+  },
   { name: 'a bare string', body: '"boom"', statusText: 'Boom', detail: '503 Boom: boom' },
   { name: 'a list of strings', body: '["a","b"]', statusText: 'Boom', detail: '503 Boom: a; b' },
-  { name: 'a message list', body: '{"message":["a","b"]}', statusText: 'Boom', detail: '503 Boom: a; b' },
+  {
+    name: 'a message list',
+    body: '{"message":["a","b"]}',
+    statusText: 'Boom',
+    detail: '503 Boom: a; b',
+  },
   { name: 'plain text', body: 'not json', statusText: 'Boom', detail: '503 Boom' },
   { name: 'an empty body', body: '', statusText: 'Boom', detail: '503 Boom' },
 ];
@@ -161,7 +171,10 @@ describe('cursor pagination', () => {
     let cursor: string | undefined;
 
     for (;;) {
-      const page = await listSamples(stub, { limit: 1, ...(cursor === undefined ? {} : { cursor }) });
+      const page = await listSamples(stub, {
+        limit: 1,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
       walked.push(...page.items.map((item) => String(item['id'])));
       cursor = nextCursorOf(page);
       if (cursor === undefined) break;
@@ -227,38 +240,42 @@ describe('the per-call deadline', () => {
     }
   });
 
-  it('honours LIFE_OPS_DEADLINE_MS at the CLI, so a hung call fails there after it', async () => {
-    const silentApi = await startSilentApi();
-    const credentialHome = mkdtempSync(join(tmpdir(), 'life-ops-cli-deadline-'));
-    const savedCredentialsPath = process.env.LIFE_OPS_CREDENTIALS_PATH;
-    process.env.LIFE_OPS_CREDENTIALS_PATH = join(credentialHome, 'credentials.json');
-    await storeTokens({
-      accessToken: VALID_TOKEN,
-      refreshToken: 'stub.refresh.token',
-      expiresAt: Date.now() + ONE_HOUR_MS,
-    });
-    const stderr: string[] = [];
-    try {
-      const exit = await runCli({
-        argv: ['sample', 'get', '--id', 'row-a'],
-        service: async () => ({ registry: sampleRegistry }),
-        env: { LIFE_OPS_API_BASE: silentApi.baseUrl, LIFE_OPS_DEADLINE_MS: '100' },
-        stdout: () => {},
-        stderr: (line) => stderr.push(line),
-        signIn: async () => {},
+  it(
+    'honours LIFE_OPS_DEADLINE_MS at the CLI, so a hung call fails there after it',
+    async () => {
+      const silentApi = await startSilentApi();
+      const credentialHome = mkdtempSync(join(tmpdir(), 'life-ops-cli-deadline-'));
+      const savedCredentialsPath = process.env.LIFE_OPS_CREDENTIALS_PATH;
+      process.env.LIFE_OPS_CREDENTIALS_PATH = join(credentialHome, 'credentials.json');
+      await storeTokens({
+        accessToken: VALID_TOKEN,
+        refreshToken: 'stub.refresh.token',
+        expiresAt: Date.now() + ONE_HOUR_MS,
       });
+      const stderr: string[] = [];
+      try {
+        const exit = await runCli({
+          argv: ['sample', 'get', '--id', 'row-a'],
+          service: async () => ({ registry: sampleRegistry }),
+          env: { LIFE_OPS_API_BASE: silentApi.baseUrl, LIFE_OPS_DEADLINE_MS: '100' },
+          stdout: () => {},
+          stderr: (line) => stderr.push(line),
+          signIn: async () => {},
+        });
 
-      expect(exit).toBe(1);
-      expect(stderr.join('\n')).toBe(
-        'sample.get failed (timeout): sample.get did not answer within 100 ms',
-      );
-    } finally {
-      if (savedCredentialsPath === undefined) delete process.env.LIFE_OPS_CREDENTIALS_PATH;
-      else process.env.LIFE_OPS_CREDENTIALS_PATH = savedCredentialsPath;
-      rmSync(credentialHome, { recursive: true, force: true });
-      await silentApi.stop();
-    }
-  }, ONE_SECOND_MS);
+        expect(exit).toBe(1);
+        expect(stderr.join('\n')).toBe(
+          'sample.get failed (timeout): sample.get did not answer within 100 ms',
+        );
+      } finally {
+        if (savedCredentialsPath === undefined) delete process.env.LIFE_OPS_CREDENTIALS_PATH;
+        else process.env.LIFE_OPS_CREDENTIALS_PATH = savedCredentialsPath;
+        rmSync(credentialHome, { recursive: true, force: true });
+        await silentApi.stop();
+      }
+    },
+    ONE_SECOND_MS,
+  );
 });
 
 interface SamplePage {

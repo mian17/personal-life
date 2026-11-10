@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KeysModule } from '@life/service-kit';
-import { MASTER_KEY_ENV } from '../service-config';
-import { Todo } from '../todos/todo.entity';
-import { TodosModule } from '../todos/todos.module';
-import { PushModule } from '../push/push.module';
-import { ReminderService } from './reminder.service';
-import { REMINDER_PUSH_SENDER, WebPushSender } from './push-sender';
+import { MASTER_KEY_ENV } from '../service-config.js';
+import { Todo } from '../todos/todo.entity.js';
+import { TodosModule } from '../todos/todos.module.js';
+import { PushModule } from '../push/push.module.js';
+import { ReminderService } from './reminder.service.js';
+import { REMINDER_PUSH_SENDER, WebPushSender } from './push-sender.js';
 
 /**
  * The bounded reminders module (`SPEC-todo-due-repeat-notify`). It owns the
@@ -22,10 +22,7 @@ import { REMINDER_PUSH_SENDER, WebPushSender } from './push-sender';
     KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     PushModule,
   ],
-  providers: [
-    ReminderService,
-    { provide: REMINDER_PUSH_SENDER, useClass: WebPushSender },
-  ],
+  providers: [ReminderService, { provide: REMINDER_PUSH_SENDER, useClass: WebPushSender }],
   exports: [ReminderService],
 })
 export class RemindersModule {}

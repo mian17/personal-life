@@ -1,6 +1,6 @@
 import type { OnModuleDestroy } from '@nestjs/common';
 import { createClient } from 'redis';
-import type { User } from './user.entity';
+import type { User } from './user.entity.js';
 
 /**
  * Read-through cache in front of the users table. Exactly one hot read is served

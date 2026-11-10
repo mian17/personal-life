@@ -4,8 +4,8 @@ import {
   BatchCreateNotesDto,
   BatchDeleteNotesDto,
   BatchUpdateNotesDto,
-} from './dto/batch-notes.dto';
-import { NotesService } from './notes.service';
+} from './dto/batch-notes.dto.js';
+import { NotesService } from './notes.service.js';
 
 /**
  * The `notes` batch trio (`SPEC-note-service.md` §5).

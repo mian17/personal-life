@@ -1,5 +1,3 @@
-import { main } from '../src/tags/cleanup';
-
 /**
  * `cleanup-tags` entry (`SPEC-tags-service` `## Maintenance scripts`). Thin CLI
  * over the tested core in `src/tags/cleanup.ts`; run via the workspace
@@ -24,9 +22,4 @@ import { main } from '../src/tags/cleanup';
  * ever touch temp fixtures. It never touches the cache layer.
  */
 
-/* istanbul ignore next — CLI entry, exercised manually at deploy time */
-if (require.main === module) {
-  process.exitCode = main();
-}
-
-export { main };
+export { main } from '../src/tags/cleanup.js';

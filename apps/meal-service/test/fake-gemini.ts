@@ -1,4 +1,4 @@
-import type { GeminiTransport } from '../src/photo/gemini.client';
+import type { GeminiTransport } from '../src/photo/gemini.client.js';
 
 /**
  * Test double for the Gemini HTTP transport (`SPEC-meal-service` Testing

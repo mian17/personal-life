@@ -4,7 +4,7 @@ import {
   ReadThroughCache,
   type CacheClient,
   type CacheSetOptions,
-} from '../src/index';
+} from '../src/index.js';
 
 /**
  * Contract suite for the generic read-through cache (`SPEC-service-kernel`

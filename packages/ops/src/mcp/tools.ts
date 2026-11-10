@@ -8,11 +8,11 @@
  * (SPEC-ops-all-services §1.1.2). This file owns nothing but that projection — a
  * tool that restated a schema or a wire shape would be a bug.
  */
-import type { BulkKind } from '../core/bulk';
-import { isBulkKind, resolveBulkLimit } from '../core/bulk';
-import type { JsonSchema } from '../core/schema';
-import { deriveInputSchema, toolName } from '../core/schema';
-import type { OpSpec, ResourceRegistry } from '../core/types';
+import type { BulkKind } from '../core/bulk.js';
+import { isBulkKind, resolveBulkLimit } from '../core/bulk.js';
+import type { JsonSchema } from '../core/schema.js';
+import { deriveInputSchema, toolName } from '../core/schema.js';
+import type { OpSpec, ResourceRegistry } from '../core/types.js';
 
 /** The four MCP behavior hints, always stated rather than left to protocol defaults. */
 export interface ToolAnnotations {

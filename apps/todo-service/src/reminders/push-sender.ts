@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as webpush from 'web-push';
-import { PushService } from '../push/push.service';
+// The default import is the only handle that works under Node ESM: the `web-push`
+// namespace (`import * as webpush`) exposes just `{ WebPushError, default,
+// supportedContentEncodings }`, so `webpush.setVapidDetails` was `undefined` and the
+// service crashed at boot whenever VAPID keys were set.
+import webpush from 'web-push';
+import { PushService } from '../push/push.service.js';
 
 /** DI token for the injectable push sender; a test fake overrides it. */
 export const REMINDER_PUSH_SENDER = Symbol('REMINDER_PUSH_SENDER');

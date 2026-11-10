@@ -1,13 +1,14 @@
+import { jest } from '@jest/globals';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { ENC_PREFIX } from '@life/crypto';
 import { KeysService, UserKeys } from '@life/service-kit';
-import { Tag } from '../src/tags/tag.entity';
-import { TagsCache, createTagsCache, generationKey } from '../src/tags/tags-cache';
-import { TagsService } from '../src/tags/tags.service';
-import { FakeRedisClient, FailingRedisClient } from './fake-redis';
+import { Tag } from '../src/tags/tag.entity.js';
+import { TagsCache, createTagsCache, generationKey } from '../src/tags/tags-cache.js';
+import { TagsService } from '../src/tags/tags.service.js';
+import { FakeRedisClient, FailingRedisClient } from './fake-redis.js';
 
 /**
  * `SPEC-tags-service` Cache Rules (AGENTS.md Contract 2): one cached shape —
@@ -28,11 +29,7 @@ const SUB = 'user-a';
 class CapturingRedisClient extends FakeRedisClient {
   readonly values: Array<{ key: string; value: string }> = [];
 
-  override async set(
-    key: string,
-    value: string,
-    options?: { EX?: number },
-  ): Promise<'OK'> {
+  override async set(key: string, value: string, options?: { EX?: number }): Promise<'OK'> {
     this.values.push({ key, value });
     return super.set(key, value, options);
   }
@@ -241,7 +238,7 @@ describe('TagsCache (read-through + generation invalidation)', () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
-  it('per-owner isolation: one owner\'s write never bumps another owner\'s counter', async () => {
+  it("per-owner isolation: one owner's write never bumps another owner's counter", async () => {
     const client = new FakeRedisClient();
     h = await makeHarness(new TagsCache(client));
     const A = 'user-a';

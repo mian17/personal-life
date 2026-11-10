@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
-import { CreateNoteDto } from './create-note.dto';
-import { UpdateNoteDto } from './update-note.dto';
+import { CreateNoteDto } from './create-note.dto.js';
+import { UpdateNoteDto } from './update-note.dto.js';
 
 /**
  * Batch request bodies (`SPEC-note-service.md` §5): one wildcard body per kind,

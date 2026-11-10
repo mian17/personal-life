@@ -1,10 +1,10 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { loadMasterKeyFromEnv } from '@life/crypto';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { KeysService, MASTER_KEY, type KeysOptions } from './keys.service';
-import { UserKeys } from './user-keys.entity';
+import { KeysService, MASTER_KEY, type KeysOptions } from './keys.service.js';
+import { UserKeys } from './user-keys.entity.js';
 
-export { MASTER_KEY, KeysService, type KeysOptions } from './keys.service';
+export { MASTER_KEY, KeysService, type KeysOptions } from './keys.service.js';
 
 /**
  * Load a service's master key exactly once at bootstrap. `loadMasterKeyFromEnv`

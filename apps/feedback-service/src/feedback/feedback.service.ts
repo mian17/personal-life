@@ -3,9 +3,9 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { CreateFeedbackInput, FeedbackDto, FeedbackPage, FeedbackStatus } from '@life/shared';
-import { Feedback } from './feedback.entity';
-import { FeedbackEvent } from './feedback-event.entity';
-import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache';
+import { Feedback } from './feedback.entity.js';
+import { FeedbackEvent } from './feedback-event.entity.js';
+import { FEEDBACK_CACHE, FeedbackCache } from './feedback-cache.js';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate } from '@life/service-kit';
 
 /**
@@ -260,6 +260,14 @@ export class FeedbackService {
       this.logger.error(`decrypt failed for feedback ${row.id}`);
       throw err;
     }
-    return { id: row.id, app: row.app, type: row.type, status: row.status, title, description, createdAt: row.createdAt };
+    return {
+      id: row.id,
+      app: row.app,
+      type: row.type,
+      status: row.status,
+      title,
+      description,
+      createdAt: row.createdAt,
+    };
   }
 }

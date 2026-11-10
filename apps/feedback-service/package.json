@@ -2,28 +2,29 @@
   "name": "@life/feedback-service",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3008} node dist/main.js",
-    "test": "jest --passWithNoTests",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --passWithNoTests",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "jest"
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest"
   },
   "dependencies": {
     "@life/cache": "*",
     "@life/crypto": "*",
     "@life/service-kit": "*",
     "@life/shared": "*",
-    "@nestjs/common": "^11.0.11",
-    "@nestjs/core": "^11.0.11",
-    "@nestjs/platform-express": "^11.0.11",
-    "@nestjs/typeorm": "^11.0.0",
-    "amqplib": "^2.2.0",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/platform-express": "^12.4.2",
+    "@nestjs/typeorm": "^12.0.3",
+    "amqplib": "^2.2.1",
     "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
-    "jose": "^6.2.12",
+    "class-validator": "^0.15.1",
+    "jose": "^6.2.15",
     "pg": "^8.16.3",
     "redis": "^5.12.1",
     "reflect-metadata": "^0.2.2",
@@ -31,21 +32,21 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.5",
-    "@nestjs/schematics": "^11.0.2",
-    "@nestjs/testing": "^11.0.11",
+    "@nestjs/cli": "^12.0.12",
+    "@nestjs/schematics": "^12.0.13",
+    "@nestjs/testing": "^12.4.2",
     "@types/amqplib": "^0.10.8",
     "@types/express": "^5.0.0",
-    "@types/jest": "^29.5.14",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.13.9",
-    "@types/supertest": "^6.0.2",
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0",
-    "ts-jest": "^29.2.6",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.2",
+    "supertest": "^7.3.1",
+    "ts-jest": "^29.4.15",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3"
+    "typescript": "^6.0.3"
   },
   "jest": {
     "maxWorkers": 2,
@@ -60,14 +61,24 @@
       "^@life/cache$": "<rootDir>/../../packages/cache/src/index.ts",
       "^@life/crypto$": "<rootDir>/../../packages/crypto/src/index.ts",
       "^@life/shared$": "<rootDir>/../../packages/shared/src/index.ts",
-      "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts"
+      "^@life/service-kit$": "<rootDir>/../../packages/service-kit/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": "tsconfig.esm-test.json"
+        }
+      ]
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!(jose)/)"
+      "/node_modules/"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ]
   }
 }

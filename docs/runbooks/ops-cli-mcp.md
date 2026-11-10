@@ -6,7 +6,7 @@ one credential store `npm run ops -- login` writes; neither opens a browser exce
 
 ## Run the CLI by hand
 
-`packages/ops/package.json` publishes the bin as `life-ops` → `dist/cli/run.js`; the repo
+`packages/ops/package.json` publishes the bin as `life-ops` → `dist/cli/entry.js`; the repo
 script `npm run ops` reads it back from `.env.development`, where
 `scripts/setup-dev-env.sh` writes the ops block (`LIFE_OPS_*` plus `IDP_ISSUER`, whose
 IdP port is the one `login` dials). Export nothing by hand.
@@ -43,7 +43,7 @@ npm prints two `> personal-life@… ops:mcp` banner lines on **stdout** before t
 JSON-RPC line, and a client that treats a parse error as fatal dies before `initialize`:
 
 ```json
-{"mcpServers":{"life-ops":{"command":"node","args":["--env-file-if-exists=.env.development","packages/ops/dist/mcp/server.js"],"cwd":"<repo>"}}}
+{"mcpServers":{"life-ops":{"command":"node","args":["--env-file-if-exists=.env.development","packages/ops/dist/mcp/entry.js"],"cwd":"<repo>"}}}
 ```
 
 Every operation of every loaded service module is one tool, named `<resource>_<op>`:

@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { EstimatePhotoDto } from './dto/estimate-photo.dto';
-import { PhotoService } from './photo.service';
+import { EstimatePhotoDto } from './dto/estimate-photo.dto.js';
+import { PhotoService } from './photo.service.js';
 
 /**
  * `POST /api/estimates/photo` — the ONE path string the UI's server action

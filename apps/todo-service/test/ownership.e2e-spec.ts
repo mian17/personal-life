@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**
  * Two-subject ownership isolation for the todo trash verbs (plan-todo-trash T4).
@@ -16,7 +16,7 @@ import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
  * only the dedicated dev case flips it, restoring it immediately after.
  */
 
-const TEST_DB = join(__dirname, 'test-ownership.db');
+const TEST_DB = join(import.meta.dirname, 'test-ownership.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -43,7 +43,7 @@ describe('Todos ownership (e2e)', () => {
     tokenB = await harness.sign({ subject: 'user-b', expiresIn: 3600 });
 
     rmSync(TEST_DB, { force: true });
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
   });
@@ -62,12 +62,10 @@ describe('Todos ownership (e2e)', () => {
 
   const post = (body: Record<string, unknown>, token: string) =>
     auth(request(app.getHttpServer()).post('/api/todos'), token).send(body);
-  const list = (token: string) =>
-    auth(request(app.getHttpServer()).get('/api/todos'), token);
+  const list = (token: string) => auth(request(app.getHttpServer()).get('/api/todos'), token);
   const trash = (token: string) =>
     auth(request(app.getHttpServer()).get('/api/todos/trash'), token);
-  const tags = (token: string) =>
-    auth(request(app.getHttpServer()).get('/api/todos/tags'), token);
+  const tags = (token: string) => auth(request(app.getHttpServer()).get('/api/todos/tags'), token);
   const remove = (id: string, token: string) =>
     auth(request(app.getHttpServer()).delete(`/api/todos/${id}`), token);
   const restore = (id: string, token: string) =>
@@ -186,17 +184,19 @@ describe('Todos ownership (e2e)', () => {
     ).expect(200);
     expect(byA.body.id).toBe(created.body.id);
 
-    await auth(
-      request(app.getHttpServer()).get(`/api/todos/${created.body.id}`),
-      tokenB,
-    ).expect(404);
+    await auth(request(app.getHttpServer()).get(`/api/todos/${created.body.id}`), tokenB).expect(
+      404,
+    );
   });
 
   it('stamps dev-user when NODE_ENV=development', async () => {
     process.env.NODE_ENV = 'development';
     try {
       // No token: the dev bypass authenticates the request as `dev-user`.
-      await request(app.getHttpServer()).post('/api/todos').send({ title: 'dev-owned' }).expect(201);
+      await request(app.getHttpServer())
+        .post('/api/todos')
+        .send({ title: 'dev-owned' })
+        .expect(201);
     } finally {
       process.env.NODE_ENV = BASE_NODE_ENV;
     }
@@ -238,7 +238,9 @@ describe('Todos ownership (e2e)', () => {
 
     expect(fetched.body).not.toHaveProperty('owner');
     expect(fetched.body).not.toHaveProperty('ownerSub');
-    expect(Object.keys(fetched.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(todoKeys);
+    expect(Object.keys(fetched.body).sort((a: string, b: string) => a.localeCompare(b))).toEqual(
+      todoKeys,
+    );
     expect(fetched.body.tagIds).toEqual([5]);
 
     const listed = await list(tokenA).expect(200);
@@ -257,10 +259,7 @@ describe('Todos ownership (e2e)', () => {
     const listed = await list(tokenA).expect(200);
     expect(listed.body.todos.map((t: { id: string }) => t.id)).toContain(id);
 
-    const updated = await auth(
-      request(app.getHttpServer()).patch(`/api/todos/${id}`),
-      tokenA,
-    )
+    const updated = await auth(request(app.getHttpServer()).patch(`/api/todos/${id}`), tokenA)
       .send({ title: 'lifecycle edited', expectedVersion: 0 })
       .expect(200);
     expect(updated.body.title).toBe('lifecycle edited');

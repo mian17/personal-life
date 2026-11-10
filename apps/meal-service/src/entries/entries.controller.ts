@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Principal } from '@life/service-kit';
-import { CreateEntryDto } from './dto/create-entry.dto';
-import { ListEntriesQuery } from './dto/list-entries.query';
-import { UpdateEntryDto } from './dto/update-entry.dto';
-import { EntriesService } from './entries.service';
+import { CreateEntryDto } from './dto/create-entry.dto.js';
+import { ListEntriesQuery } from './dto/list-entries.query.js';
+import { UpdateEntryDto } from './dto/update-entry.dto.js';
+import { EntriesService } from './entries.service.js';
 
 /**
  * Diary-entry routes (`SPEC-meal-service` entries). `ownerSub` always comes

@@ -6,8 +6,8 @@ import {
   rewrapDek,
   unwrapDek,
   wrapDek,
-} from '../src';
-import { deriveKek } from '../src/keys';
+} from '../src/index.js';
+import { deriveKek } from '../src/keys.js';
 
 const ENV_NAME = 'LIFE_TEST_MASTER_KEY';
 

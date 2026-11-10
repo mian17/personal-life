@@ -5,12 +5,12 @@
  * advertises one capped `items` array over its sibling's item table, so the cap
  * a caller reads there is the cap the validator enforces.
  */
-import type { BulkKind } from './bulk';
-import { bulkItemInput, isBulkKind, resolveBulkLimit } from './bulk';
-import type { FieldSpec, OpSpec, ResourceRegistry } from './types';
-import { findOp } from './registry';
-import { BULK_WRAPPER_FIELD, rejectMalformedDeclaration } from './validate';
-import { ADDRESSING_FIELD } from './wire';
+import type { BulkKind } from './bulk.js';
+import { bulkItemInput, isBulkKind, resolveBulkLimit } from './bulk.js';
+import type { FieldSpec, OpSpec, ResourceRegistry } from './types.js';
+import { findOp } from './registry.js';
+import { BULK_WRAPPER_FIELD, rejectMalformedDeclaration } from './validate.js';
+import { ADDRESSING_FIELD } from './wire.js';
 
 export interface JsonSchema {
   type: 'object';
@@ -115,7 +115,9 @@ function propertiesForOp(operation: OpSpec): Record<string, JsonSchemaProperty> 
   return propertiesForFields(operation.fields);
 }
 
-function propertiesForFields(fields: Record<string, FieldSpec>): Record<string, JsonSchemaProperty> {
+function propertiesForFields(
+  fields: Record<string, FieldSpec>,
+): Record<string, JsonSchemaProperty> {
   return Object.fromEntries(
     Object.entries(fields).map(([fieldName, field]) => [fieldName, schemaForField(field)]),
   );
@@ -139,7 +141,8 @@ function schemaForField(field: FieldSpec): JsonSchemaProperty {
 /** The value shape one field declares, before its description and enum. */
 function valueShape(field: FieldSpec): JsonSchemaValueShape {
   if (field.type === 'object') return objectShape(field.properties ?? {});
-  if (field.type === 'object[]') return { type: 'array', items: objectShape(field.properties ?? {}) };
+  if (field.type === 'object[]')
+    return { type: 'array', items: objectShape(field.properties ?? {}) };
   if (field.type === 'string[]') return { type: 'array', items: { type: 'string' } };
   if (field.type === 'number[]') return { type: 'array', items: { type: 'number' } };
   return { type: field.type };

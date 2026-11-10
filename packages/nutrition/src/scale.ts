@@ -4,8 +4,8 @@
  * disagree on a number.
  */
 
-import { NUTRIENTS, type NutrientVector } from './nutrients';
-import type { Food } from './food';
+import { NUTRIENTS, type NutrientVector } from './nutrients.js';
+import type { Food } from './food.js';
 
 /**
  * Scale a food's per-serving nutrients by `quantity` (1 = one serving,

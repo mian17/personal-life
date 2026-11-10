@@ -13,11 +13,11 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { Principal } from '@life/service-kit';
-import { TagsService, type TagDto, type TagPage } from './tags.service';
-import { CreateTagDto } from './dto/create-tag.dto';
-import { ListTagsQuery } from './dto/list-tags.query';
-import { UpdateTagDto } from './dto/update-tag.dto';
-import { ResolveTagsDto } from './dto/resolve-tags.dto';
+import { TagsService, type TagDto, type TagPage } from './tags.service.js';
+import { CreateTagDto } from './dto/create-tag.dto.js';
+import { ListTagsQuery } from './dto/list-tags.query.js';
+import { UpdateTagDto } from './dto/update-tag.dto.js';
+import { ResolveTagsDto } from './dto/resolve-tags.dto.js';
 
 /**
  * The ecosystem tag registry HTTP surface (`SPEC-tags-service` API).
@@ -36,10 +36,7 @@ export class TagsController {
    * gets the seam's default (50) and the cap (200) is the seam's constant.
    */
   @Get()
-  list(
-    @Principal() principal: Principal,
-    @Query() query: ListTagsQuery,
-  ): Promise<TagPage> {
+  list(@Principal() principal: Principal, @Query() query: ListTagsQuery): Promise<TagPage> {
     return this.tags.page(principal.sub, query);
   }
 

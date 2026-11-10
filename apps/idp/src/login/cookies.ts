@@ -1,5 +1,5 @@
 import type { CookieOptions } from 'express';
-import { SESSION_TTL_MS } from '../sessions/sessions.service';
+import { SESSION_TTL_MS } from '../sessions/sessions.service.js';
 
 export const SESSION_COOKIE = 'idp_session';
 

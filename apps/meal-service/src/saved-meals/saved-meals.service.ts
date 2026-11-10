@@ -1,29 +1,27 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { EntityManager, IsNull, Repository } from 'typeorm';
 import { CryptoError, ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import type { NutrientVector } from '@life/nutrition';
 import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import { softDeleteBatch, softDeleteOne, type SoftDeleteTarget } from '../batch/soft-delete-batch';
-import { completeVector, readStoredVector } from '../foods/content';
-import type { MealGroup } from '../entries/dto/create-entry.dto';
-import { SavedMeal } from './saved-meal.entity';
-import { SavedMealItem } from './saved-meal-item.entity';
-import type { CreateSavedMealDto } from './dto/create-saved-meal.dto';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import {
+  softDeleteBatch,
+  softDeleteOne,
+  type SoftDeleteTarget,
+} from '../batch/soft-delete-batch.js';
+import { completeVector, readStoredVector } from '../foods/content.js';
+import type { MealGroup } from '../entries/dto/create-entry.dto.js';
+import { SavedMeal } from './saved-meal.entity.js';
+import { SavedMealItem } from './saved-meal-item.entity.js';
+import type { CreateSavedMealDto } from './dto/create-saved-meal.dto.js';
 import {
   SavedMealsCache,
   toCachedSavedMealRow,
   type CachedSavedMealItemRow,
   type CachedSavedMealRow,
-} from './saved-meals-cache';
+} from './saved-meals-cache.js';
 
 /**
  * The wire shape of one frozen item. `foodId` is optional metadata; the
@@ -187,7 +185,11 @@ export class SavedMealsService {
     };
   }
 
-  private toItemDto(item: CachedSavedMealItemRow, sub: string, dek: Buffer | null): SavedMealItemDto {
+  private toItemDto(
+    item: CachedSavedMealItemRow,
+    sub: string,
+    dek: Buffer | null,
+  ): SavedMealItemDto {
     return {
       id: item.id,
       foodId: item.foodId,
@@ -244,9 +246,7 @@ export class SavedMealsService {
       order: { updatedAt: 'DESC', id: 'ASC' },
     });
     return Promise.all(
-      meals.map(async (meal) =>
-        toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id)),
-      ),
+      meals.map(async (meal) => toCachedSavedMealRow(meal, await this.loadItems(sub, meal.id))),
     );
   }
 

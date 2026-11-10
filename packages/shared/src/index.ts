@@ -1,4 +1,4 @@
-export { likeMatch } from './like-match';
+export { likeMatch } from './like-match.js';
 
 /**
  * The JSON-RPC stdio seam the MCP servers share (`SPEC-mcp-gateway`,
@@ -13,8 +13,8 @@ export {
   parseLine,
   readMessage,
   readRequest,
-} from './mcp-json-rpc';
-export type { MessageRead, RpcFailure, RpcRequest, StdioLoop } from './mcp-json-rpc';
+} from './mcp-json-rpc.js';
+export type { MessageRead, RpcFailure, RpcRequest, StdioLoop } from './mcp-json-rpc.js';
 
 /**
  * `TagRef` — the ecosystem tag vocabulary reference (`SPEC-service-kernel`).
@@ -47,7 +47,7 @@ export interface TagUsagePage {
   total: number;
 }
 
-export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage';
+export { decodeTagUsage, isTagUsageRow, normalizeTagIds } from './tag-usage.js';
 
 export interface Note {
   id: string;
@@ -173,12 +173,12 @@ export interface TodoPage {
 /** One appended completion occurrence (`SPEC-todo-completion-history`, C2/C6/C7). */
 export interface TodoCompletion {
   id: string;
-  todoId: string;                       // link to the live definition (edit screen)
-  occurrence: string;                   // the satisfied due, or '~' (undated one-off)
-  completedAt: string;                  // canonical UTC instant of the tick
-  title: string;                        // DECRYPTED, joined at read time (C7 — never a snapshot)
-  listId: string | null;                // the todo's list at read time
-  listName: string | null;              // DECRYPTED list name; null when unlisted
+  todoId: string; // link to the live definition (edit screen)
+  occurrence: string; // the satisfied due, or '~' (undated one-off)
+  completedAt: string; // canonical UTC instant of the tick
+  title: string; // DECRYPTED, joined at read time (C7 — never a snapshot)
+  listId: string | null; // the todo's list at read time
+  listName: string | null; // DECRYPTED list name; null when unlisted
 }
 
 export interface TodoCompletionPage {

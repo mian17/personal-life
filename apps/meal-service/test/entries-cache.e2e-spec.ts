@@ -1,14 +1,15 @@
+import { jest } from '@jest/globals';
 import { NotFoundException } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
-import { MealCache, generationKey } from '../src/cache/meal-cache';
-import { EntriesCache } from '../src/entries/entries-cache';
-import { EntriesService } from '../src/entries/entries.service';
+import { MealCache, generationKey } from '../src/cache/meal-cache.js';
+import { EntriesCache } from '../src/entries/entries-cache.js';
+import { EntriesService } from '../src/entries/entries.service.js';
 import { KeysService } from '@life/service-kit';
-import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto';
-import type { Entry } from '../src/entries/entry.entity';
+import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
+import type { Entry } from '../src/entries/entry.entity.js';
 import type { CacheClient } from '@life/cache';
-import { FakeRedisClient, FailingRedisClient } from './fake-redis';
+import { FakeRedisClient, FailingRedisClient } from './fake-redis.js';
 
 /**
  * Unit-level contract for the meal entries read-through cache. Mirrors
@@ -60,11 +61,7 @@ function body(overrides: Partial<CreateEntryDto> = {}): CreateEntryDto {
 class CapturingRedisClient extends FakeRedisClient {
   readonly values: Array<{ key: string; value: string }> = [];
 
-  override async set(
-    key: string,
-    value: string,
-    options?: { EX?: number },
-  ): Promise<'OK'> {
+  override async set(key: string, value: string, options?: { EX?: number }): Promise<'OK'> {
     this.values.push({ key, value });
     return super.set(key, value, options);
   }
@@ -93,7 +90,9 @@ class FakeEntryRepo {
   find = jest.fn(
     async (opts: { where: { ownerSub: string; date: string } }): Promise<StoredEntry[]> =>
       this.rows
-        .filter((r) => r.ownerSub === opts.where.ownerSub && r.date === opts.where.date && !r.deletedAt)
+        .filter(
+          (r) => r.ownerSub === opts.where.ownerSub && r.date === opts.where.date && !r.deletedAt,
+        )
         .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id.localeCompare(b.id)),
   );
 
@@ -130,11 +129,7 @@ function makeHarness(client: CacheClient, events: string[] = []): Harness {
   const repo = new FakeEntryRepo(events);
   const userKeys = new FakeUserKeysRepo();
   const keys = new KeysService(userKeys as never, Buffer.alloc(32, 0x2c));
-  const service = new EntriesService(
-    repo as never,
-    new EntriesCache(new MealCache(client)),
-    keys,
-  );
+  const service = new EntriesService(repo as never, new EntriesCache(new MealCache(client)), keys);
   return { service, repo, client, keys, events };
 }
 
@@ -242,10 +237,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
       expect(client.setCalls).toEqual([`meal:${SUB}:v1:entries:${DAY}`]);
 
       // The next write bumps to v2; the v1 entry can no longer be addressed.
-      await h.service.create(
-        SUB,
-        body({ foodId: 'food-2', nutrients: vector({ calories: 250 }) }),
-      );
+      await h.service.create(SUB, body({ foodId: 'food-2', nutrients: vector({ calories: 250 }) }));
       expect(client.incrCalls).toContain(generationKey(SUB));
 
       const after = await h.service.findAll(SUB, { date: DAY });
@@ -281,9 +273,7 @@ describe('MealCache (read-through + generation invalidation)', () => {
 
       await h.service.create(SUB, body());
 
-      expect(events.indexOf('db:save')).toBeLessThan(
-        events.indexOf(`incr:${generationKey(SUB)}`),
-      );
+      expect(events.indexOf('db:save')).toBeLessThan(events.indexOf(`incr:${generationKey(SUB)}`));
     });
 
     it('a failed mutation does not bump (cache stays consistent)', async () => {

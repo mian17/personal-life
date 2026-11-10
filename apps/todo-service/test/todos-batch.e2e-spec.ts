@@ -10,11 +10,11 @@ import type {
   Todo as TodoDto,
   TodoCompletion as TodoCompletionDto,
 } from '@life/shared';
-import { TODO_CACHE, TodosCache } from '../src/cache/todo-cache';
-import { TodoCompletion } from '../src/todos/todo-completion.entity';
-import { VERIFIER_ENV } from '../src/service-config';
-import { configureVerifierEnv, JwtTestHarness } from './jwt-harness';
-import { FakeRedisClient } from './fake-redis';
+import { TODO_CACHE, TodosCache } from '../src/cache/todo-cache.js';
+import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
+import { VERIFIER_ENV } from '../src/service-config.js';
+import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
+import { FakeRedisClient } from './fake-redis.js';
 
 /**
  * The `todos` and `lists` batch routes (`SPEC-todo-service.md` §9). Every case
@@ -33,7 +33,7 @@ import { FakeRedisClient } from './fake-redis';
  * `apps/todo-service/data/` (the hard line).
  */
 
-const TEST_DB = join(__dirname, 'test-todos-batch.db');
+const TEST_DB = join(import.meta.dirname, 'test-todos-batch.db');
 process.env.DB_PATH = TEST_DB;
 
 const BASE_NODE_ENV = 'test';
@@ -76,7 +76,7 @@ describe('Todos and lists batch API (e2e)', () => {
 
   /** The app as `app.factory` builds it, with the cache swapped for the recorder. */
   async function startApp(cache: TodosCache): Promise<INestApplication> {
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(TODO_CACHE)
       .useValue(cache)

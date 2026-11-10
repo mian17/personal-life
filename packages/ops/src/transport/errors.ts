@@ -4,15 +4,10 @@
  * an OpsError, and both adapters print renderOpsError(error) verbatim.
  * Adapter output parity is a string comparison on that rendering.
  */
-import type { OpSpec, ResourceRegistry, ValidationIssue } from '../core/types';
+import type { OpSpec, ResourceRegistry, ValidationIssue } from '../core/types.js';
 
 export type OpsErrorCode =
-  | 'invalidInput'
-  | 'unauthenticated'
-  | 'notFound'
-  | 'conflict'
-  | 'requestFailed'
-  | 'timeout';
+  'invalidInput' | 'unauthenticated' | 'notFound' | 'conflict' | 'requestFailed' | 'timeout';
 
 export interface OpsFailure {
   operation: string;
@@ -105,7 +100,8 @@ export function transportFailureError(
   return new OpsError({
     operation,
     code: 'requestFailed',
-    detail: reason === undefined ? `cannot reach ${endpoint}` : `cannot reach ${endpoint}: ${reason}`,
+    detail:
+      reason === undefined ? `cannot reach ${endpoint}` : `cannot reach ${endpoint}: ${reason}`,
   });
 }
 

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { SessionsModule } from '../sessions/sessions.module';
-import { UsersModule } from '../users/users.module';
-import { LoginController } from './login.controller';
-import { InteractionController } from './interaction.controller';
-import { OidcModule } from '../oidc/oidc.module';
+import { SessionsModule } from '../sessions/sessions.module.js';
+import { UsersModule } from '../users/users.module.js';
+import { LoginController } from './login.controller.js';
+import { InteractionController } from './interaction.controller.js';
+import { OidcModule } from '../oidc/oidc.module.js';
 
 @Module({
   imports: [UsersModule, SessionsModule, OidcModule],

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENC_PREFIX } from '@life/crypto';
-import { MEAL_CACHE, type MealCache } from '../cache/meal-cache';
-import type { Food, FoodUnit } from './food.entity';
-import type { Serving } from './serving.entity';
-import type { StoredVector } from './content';
+import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import type { Food, FoodUnit } from './food.entity.js';
+import type { Serving } from './serving.entity.js';
+import type { StoredVector } from './content.js';
 
 /**
  * meal-service's foods read-through cache (`SPEC-meal-service` Cache Rules).

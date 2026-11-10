@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Feedback } from './feedback/feedback.entity';
-import { FeedbackEvent } from './feedback/feedback-event.entity';
-import { FeedbackCursor } from './feedback/feedback-cursor.entity';
-import { EventModule } from './event/event.module';
-import { FeedbackModule } from './feedback/feedback.module';
+import { Feedback } from './feedback/feedback.entity.js';
+import { FeedbackEvent } from './feedback/feedback-event.entity.js';
+import { FeedbackCursor } from './feedback/feedback-cursor.entity.js';
+import { EventModule } from './event/event.module.js';
+import { FeedbackModule } from './feedback/feedback.module.js';
 import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
-import { MASTER_KEY_ENV } from './service-config';
+import { MASTER_KEY_ENV } from './service-config.js';
 
 /** Fail closed: no Postgres URL, no boot (`SPEC-feedback-service` Security). */
 const dbUrl = process.env.FEEDBACK_DB_URL?.trim();

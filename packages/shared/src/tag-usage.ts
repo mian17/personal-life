@@ -1,4 +1,4 @@
-import type { TagUsage } from './index';
+import type { TagUsage } from './index.js';
 
 /**
  * The `<domain>:tags` caches hold **metadata only** (ids + counts, no names). A hit

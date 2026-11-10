@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthService } from './health.service';
-import type { HealthBody } from './readiness';
-import { Public } from './public.decorator';
+import { HealthService } from './health.service.js';
+import type { HealthBody } from './readiness.js';
+import { Public } from './public.decorator.js';
 
 export type { HealthBody };
 

@@ -1,7 +1,7 @@
 import { IsIn, IsInt, IsNumber, IsString, Matches, Max, Min } from 'class-validator';
-import { ACTIVITY_LEVELS, SEXES } from '../target-calculator';
-import { GOALS, type Goal } from '../target';
-import type { ActivityLevel, Sex } from '../target-calculator';
+import { ACTIVITY_LEVELS, SEXES } from '../target-calculator.js';
+import { GOALS, type Goal } from '../target.js';
+import type { ActivityLevel, Sex } from '../target-calculator.js';
 
 /**
  * `YYYY-MM-DD` — the wire form of `validFrom` and of `GET /api/target?date=`.

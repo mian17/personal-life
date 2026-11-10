@@ -7,11 +7,11 @@
  * and a resource that never opts in holds zero bulk ops — bulk stays dormant
  * until a resource asks for it, which no shipped module does.
  */
-import { BULK_KINDS, bulkSourceKind } from '../src/core/bulk';
-import { defineResource, findOp, kindIsDestructive } from '../src/core/registry';
-import type { OpSpec, ResourceRegistry } from '../src/core/types';
-import { loadService } from '../src/cli/run';
-import { sampleRegistry } from '../src/fixtures/sample';
+import { BULK_KINDS, bulkSourceKind } from '../src/core/bulk.js';
+import { defineResource, findOp, kindIsDestructive } from '../src/core/registry.js';
+import type { OpSpec, ResourceRegistry } from '../src/core/types.js';
+import { loadService } from '../src/cli/run.js';
+import { sampleRegistry } from '../src/fixtures/sample.js';
 
 /** The four source ops every opt-in case fans out over, in the shipped declaration order. */
 const sourceOps: OpSpec[] = [

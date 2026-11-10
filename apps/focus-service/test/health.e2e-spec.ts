@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
@@ -21,7 +22,7 @@ import { join } from 'node:path';
  */
 jest.setTimeout(60_000);
 
-const TEST_DB = join(__dirname, 'test-focus-health.db');
+const TEST_DB = join(import.meta.dirname, 'test-focus-health.db');
 const TEST_ISSUER = 'https://idp.test';
 const TEST_AUDIENCE = 'life-api';
 /** Obviously-fake key: a public test artifact, never a real secret. */
@@ -43,7 +44,7 @@ describe('Health dialect (e2e)', () => {
     process.env.NODE_ENV = BASE_NODE_ENV;
     delete process.env.REDIS_URL;
 
-    const { createApp } = await import('../src/app.factory');
+    const { createApp } = await import('../src/app.factory.js');
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);

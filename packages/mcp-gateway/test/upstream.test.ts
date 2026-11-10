@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
-import type { UpstreamEntry } from '../src/config';
+import type { UpstreamEntry } from '../src/config.js';
 import {
   CALL_TIMEOUT_MS,
   HANDSHAKE_TIMEOUT_MS,
@@ -16,7 +16,7 @@ import {
   UpstreamError,
   callUpstreamTool,
   listUpstreamTools,
-} from '../src/upstream';
+} from '../src/upstream.js';
 
 jest.setTimeout(20_000);
 

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
 import {
   FakeConsumer,
@@ -17,7 +18,7 @@ import {
   type FeedbackApp,
   type NotificationProbe,
   type ThrowawayPostgres,
-} from './feedback-harness';
+} from './feedback-harness.js';
 
 /**
  * Groups 2, 3 and 7 of `SPEC-feedback-service`'s Testing Strategy, proved
@@ -157,9 +158,10 @@ describeDb('Feedback event stream (e2e)', () => {
 
       // Crash window between confirm and cursor advance: rewind the cursor and
       // let the tick replay, then prove the consumer applies each event once.
-      await app.dataSource.query(`UPDATE feedback_cursor SET "lastSeq" = $1 WHERE id = 'feedback'`, [
-        headBefore,
-      ]);
+      await app.dataSource.query(
+        `UPDATE feedback_cursor SET "lastSeq" = $1 WHERE id = 'feedback'`,
+        [headBefore],
+      );
       await waitFor(
         () => app.sink.eventIds.filter((id) => id === missed[0]).length >= 2,
         'replayed missed event',
@@ -186,9 +188,12 @@ describeDb('Feedback event stream (e2e)', () => {
     const head = async (): Promise<string> =>
       (await live().dataSource.query(HEAD))[0].head as string;
     const seqOf = async (id: string): Promise<string> =>
-      (await live().dataSource.query('SELECT seq::text AS seq FROM feedback_event WHERE "eventId" = $1', [
-        id,
-      ]))[0].seq as string;
+      (
+        await live().dataSource.query(
+          'SELECT seq::text AS seq FROM feedback_event WHERE "eventId" = $1',
+          [id],
+        )
+      )[0].seq as string;
 
     beforeAll(async () => {
       first = await startFeedbackApp({
@@ -257,7 +262,8 @@ describeDb('Feedback event stream (e2e)', () => {
       });
 
       await waitFor(
-        () => second!.sink.eventIds.includes(pending[0]) && second!.sink.eventIds.includes(pending[1]),
+        () =>
+          second!.sink.eventIds.includes(pending[0]) && second!.sink.eventIds.includes(pending[1]),
         'restart replay',
         15_000,
       );
