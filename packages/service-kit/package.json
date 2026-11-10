@@ -9,8 +9,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest"
   },
   "peerDependencies": {
     "@life/cache": "*",

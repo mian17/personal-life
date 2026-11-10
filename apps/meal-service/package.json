@@ -7,10 +7,10 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3106} node dist/main.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest",
     "eval:pass1": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass1 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand",
     "eval:pass5": "PROMPT_EVAL=1 PROMPT_EVAL_METRIC=pass5 PROMPT_EVAL_SAMPLES=20 jest test/eval/prompt-eval.test.ts --runInBand"
   },

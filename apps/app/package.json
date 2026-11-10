@@ -53,6 +53,9 @@
       "/.next/",
       "/test/e2e/"
     ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/.next/"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@life/ui$": "<rootDir>/../../packages/ui/src/index.ts",

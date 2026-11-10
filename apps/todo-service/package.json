@@ -7,10 +7,10 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "PORT=${PORT:-3005} node dist/main.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --passWithNoTests",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest"
   },
   "dependencies": {
     "@life/cache": "*",

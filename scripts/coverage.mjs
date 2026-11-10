@@ -107,7 +107,10 @@ function runWorkspace(dir) {
       {
         cwd: join(ROOT, dir),
         env: needsVmModules(dir)
-          ? { ...process.env, NODE_OPTIONS: '--experimental-vm-modules' }
+          ? {
+              ...process.env,
+              NODE_OPTIONS: '--experimental-vm-modules --disable-warning=ExperimentalWarning',
+            }
           : process.env,
         stdio: ['ignore', 'inherit', 'inherit'],
       },
