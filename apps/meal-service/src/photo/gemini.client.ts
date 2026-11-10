@@ -204,8 +204,7 @@ const RESPONSE_SCHEMA = {
           searchQuery: {
             type: 'STRING',
             nullable: true,
-            description:
-              'The search_food query whose result carried this food’s id, else null.',
+            description: 'The search_food query whose result carried this food’s id, else null.',
           },
         },
         required: ['name', 'grams', 'foodId', 'fdcId', 'searchQuery'],
@@ -517,7 +516,9 @@ function finishReading(parts: unknown[]): PhotoReadResult {
   const items = readItems(parseJson(text));
   // `[]` covers the model's own `readable: false` — an empty suggestion is
   // the failure result, so there is no second way to express "no answer".
-  return items === null || items.length === 0 ? readFailure(COULD_NOT_READ) : { readable: true, items };
+  return items === null || items.length === 0
+    ? readFailure(COULD_NOT_READ)
+    : { readable: true, items };
 }
 
 /**
@@ -599,25 +600,31 @@ async function runSearchTool(
   query: string,
   deadline: number,
 ): Promise<SearchFoodResult | null> {
+  const budget = deadline - Date.now();
+  if (budget <= 0) return null;
+  const refusal = refuseAfter(budget);
   try {
-    const budget = deadline - Date.now();
-    if (budget <= 0) return null;
-    return await Promise.race([searchTool(query), refuseAfter(budget)]);
+    return await Promise.race([searchTool(query), refusal.expires]);
   } catch {
     return null;
+  } finally {
+    // The tool almost always wins the race; the losing timer must not stay armed
+    // for the rest of the budget, holding the event loop open after the read.
+    refusal.cancel();
   }
 }
 
-/** Rejects when the loop's remaining wall clock runs out, clearing its timer if it does not. */
-async function refuseAfter(budgetMs: number): Promise<never> {
+/**
+ * Rejects when the loop's remaining wall clock runs out. `cancel` disarms the
+ * timer, and `unref` keeps a still-armed one from holding the process open.
+ */
+function refuseAfter(budgetMs: number): { expires: Promise<never>; cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('search tool outlived its budget')), budgetMs);
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+  const expires = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('search tool outlived its budget')), budgetMs);
+    timer.unref();
+  });
+  return { expires, cancel: () => clearTimeout(timer) };
 }
 
 /**

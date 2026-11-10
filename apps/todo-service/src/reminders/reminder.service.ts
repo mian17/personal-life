@@ -60,6 +60,9 @@ export class ReminderService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.timer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
+    // A worker that exits before onModuleDestroy runs must not be held open by
+    // this timer; unref lets the process end and the interval still fires while alive.
+    this.timer.unref();
   }
 
   onModuleDestroy(): void {
