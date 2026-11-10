@@ -53,6 +53,27 @@ function loadDevEnvFile(): void {
   }
 }
 
+/**
+ * Boots the seed context so that a boot failure is reported by this script.
+ *
+ * Nest runs initialization inside its ExceptionsZone, whose default teardown is
+ * `process.exit(1)` — it fires before `main().catch` can run — and the `logger: false`
+ * that keeps the seed quiet also swallows the one line ExceptionsZone logs. The two
+ * together killed the process silently with an empty stderr. `abortOnError: false`
+ * turns the teardown into a rethrow, and the wrapper names the failing step.
+ */
+async function createSeedContext() {
+  try {
+    return await NestFactory.createApplicationContext(SeedModule, {
+      logger: false,
+      abortOnError: false,
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`seed application context failed to boot: ${oneLine(reason)}`, { cause: err });
+  }
+}
+
 async function main(): Promise<void> {
   loadDevEnvFile();
   const isProduction = process.env.NODE_ENV === 'production';
@@ -90,7 +111,7 @@ async function main(): Promise<void> {
 
   mkdirSync(dirname(dbPath), { recursive: true });
 
-  const app = await NestFactory.createApplicationContext(SeedModule, { logger: false });
+  const app = await createSeedContext();
   try {
     const users = app.get(UsersService);
 
@@ -109,6 +130,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error('seed failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
+  // The cause chain is the whole point: a bare message sent the last reader of a
+  // silent exit hunting through Nest internals. `stack` carries `[cause]:` too.
+  const detail = err instanceof Error ? (err.stack ?? err.message) : 'unknown error';
+  console.error('seed failed:', detail);
   process.exitCode = 1;
 });
