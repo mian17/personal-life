@@ -1,3 +1,8 @@
+// Must stay the first import: ts-node's ESM loader evaluates the decorator modules
+// this script reaches before `@nestjs/common`'s barrel (the one place that loads
+// reflect-metadata), and the first `@Optional()` call throws
+// `TypeError: Reflect.getMetadata is not a function` when the polyfill is absent.
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
