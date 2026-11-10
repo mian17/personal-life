@@ -3,8 +3,8 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-
-    "declaration": false
+    "declaration": false,
+    "isolatedModules": true
   },
   "include": ["src/**/*", "test/**/*"]
 }
