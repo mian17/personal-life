@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fail CI on a production advisory that nobody has signed off on.
+ * Fail CI on a high/critical advisory that nobody has signed off on.
  *
  * `npm audit` can only report: it cannot tell "known debt, time-boxed" apart from
  * "a new advisory landed today", so a plain `npm audit --audit-level=high` step is
@@ -8,6 +8,13 @@
  * one advisory pending an upgrade). This gate is the missing distinction: the
  * checked-in allowlist `.github/audit-allowlist.json` is the sign-off, and this
  * script fails when the audit and the allowlist disagree.
+ *
+ * The audit covers the whole dependency tree, devDependencies included. A dev
+ * advisory does not ship, but it still executes — jest, ts-jest and the build
+ * tooling run with the developer's own credentials on the developer's own machine —
+ * so a critical one is a real risk that deserves the same sign-off, and excluding
+ * dev is how a critical advisory can sit invisible while the gate reports that
+ * everything is accounted for.
  *
  * Fails when:
  *   - a high/critical advisory is reported but not allowlisted at that severity;
@@ -33,10 +40,16 @@ const SEVERITY_RANK = new Map([
 ]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** `npm audit --omit=dev --json`, parsed. A non-zero exit is expected and ignored. */
+/**
+ * `npm audit --json` over the full tree, parsed. A non-zero exit is expected and ignored.
+ *
+ * One whole-tree run rather than `--omit=dev` plus a dev run: the full report is a
+ * superset of the production-only one, so merging two reports would only add a way
+ * for the two to disagree.
+ */
 function readAuditReport() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const { stdout, stderr, error } = spawnSync(npm, ['audit', '--omit=dev', '--json'], {
+  const { stdout, stderr, error } = spawnSync(npm, ['audit', '--json'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -174,7 +187,7 @@ function reportPass(advisories, packageCount) {
     .map((severity) => `${counts.get(severity)} ${severity}`)
     .join(', ');
   console.log(
-    `audit: ${advisories.size} production advisories in ${packageCount} packages (${breakdown}), all accounted for`,
+    `audit: ${advisories.size} advisories in ${packageCount} packages (${breakdown}), all accounted for`,
   );
 }
 
