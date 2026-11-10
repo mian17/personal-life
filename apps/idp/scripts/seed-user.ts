@@ -57,7 +57,7 @@ function loadDevEnvFile(): void {
  * Boots the seed context so that a boot failure is reported by this script.
  *
  * Nest runs initialization inside its ExceptionsZone, whose default teardown is
- * `process.exit(1)` — it fires before `main().catch` can run — and the `logger: false`
+ * `process.exit(1)` — it fires before the caller's catch can run — and the `logger: false`
  * that keeps the seed quiet also swallows the one line ExceptionsZone logs. The two
  * together killed the process silently with an empty stderr. `abortOnError: false`
  * turns the teardown into a rethrow, and the wrapper names the failing step.
@@ -129,10 +129,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: unknown) => {
+try {
+  await main();
+} catch (err: unknown) {
   // The cause chain is the whole point: a bare message sent the last reader of a
   // silent exit hunting through Nest internals. `stack` carries `[cause]:` too.
   const detail = err instanceof Error ? (err.stack ?? err.message) : 'unknown error';
   console.error('seed failed:', detail);
   process.exitCode = 1;
-});
+}

@@ -61,7 +61,12 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err: unknown) => {
-  console.error('verification failed:', oneLine(err instanceof Error ? err.message : 'unknown error'));
+try {
+  await main();
+} catch (err: unknown) {
+  console.error(
+    'verification failed:',
+    oneLine(err instanceof Error ? err.message : 'unknown error'),
+  );
   process.exitCode = 1;
-});
+}
