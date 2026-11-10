@@ -151,7 +151,10 @@ jobs:
           done
 
           # Status plus every non-OK condition, so the failure is actionable
-          # without hand-querying the API.
+          # without hand-querying the API. The node blocks below always exit 0:
+          # the step runs under `bash -e`, so a non-zero exit here would abort
+          # before the issue listing prints its page. The trailing `exit 1` is
+          # the step's single failure point.
           printf '%s' "$report" | node -e '
             let body = "";
             process.stdin.on("data", (chunk) => (body += chunk)).on("end", () => {
@@ -160,7 +163,7 @@ jobs:
                 gate = JSON.parse(body).projectStatus;
               } catch {
                 console.error("Unexpected response from the quality gate API.");
-                process.exit(1);
+                process.exit(0);
               }
               console.error(`Quality gate did not pass: ${gate.status}`);
               for (const condition of gate.conditions ?? []) {
@@ -169,7 +172,7 @@ jobs:
                   `  ${condition.status} ${condition.metricKey}: actual ${condition.actualValue}, required ${condition.errorThreshold}`,
                 );
               }
-              process.exit(1);
+              process.exit(0);
             });
           '
 
@@ -213,4 +216,6 @@ jobs:
               }
             });
           '
+          # Sole failure point: `bash -e` aborts the step on the first non-zero
+          # exit, so every block above must succeed for the listing to print.
           exit 1
