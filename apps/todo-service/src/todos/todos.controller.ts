@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import type { TagUsage } from '@life/shared';
 import { Principal } from '@life/service-kit';
 import { CreateTodoDto } from './dto/create-todo.dto.js';
+import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
 import { ListTodosQuery } from './dto/list-todos.query.js';
 import { TodosService } from './todos.service.js';
@@ -9,7 +10,7 @@ import { TodosService } from './todos.service.js';
 /**
  * The todo HTTP surface (`SPEC-todo-service` API).
  *
- * Route declaration order matters: the literal `tags`/`trash` routes are
+ * Route declaration order matters: the literal `origin`/`tags`/`trash` routes are
  * declared **before** any `:id` route so Nest does not shadow them (the
  * `GET`/`DELETE /api/todos/trash` verbs must not be read as an id), and the
  * `:id` suffix verbs (`restore`/`permanent`) before the plain `@Delete(':id')`.
@@ -21,6 +22,18 @@ export class TodosController {
   @Post()
   create(@Principal() principal: Principal, @Body() dto: CreateTodoDto) {
     return this.todos.create(principal.sub, dto);
+  }
+
+  // Literal routes declared before the `:id` routes.
+  @Post('origin')
+  createWithOrigin(@Principal() principal: Principal, @Body() dto: CreateWithOriginDto) {
+    return this.todos.createWithOrigin(principal, dto);
+  }
+
+  // `originId` is the producer's own id, never this service's todo id.
+  @Post('origin/:originId/complete')
+  completeByOrigin(@Principal() principal: Principal, @Param('originId') originId: string) {
+    return this.todos.completeByOrigin(principal, originId);
   }
 
   @Get()

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { KeysModule } from '@life/service-kit';
+import { GrantsModule, KeysModule } from '@life/service-kit';
 import { MASTER_KEY_ENV } from '../service-config.js';
 import { TodoCacheModule } from '../cache/todo-cache.module.js';
 import { ListsModule } from '../lists/lists.module.js';
@@ -20,6 +20,10 @@ import { TodosService } from './todos.service.js';
   imports: [
     TypeOrmModule.forFeature([Todo, TodoTag, TodoCompletion]),
     KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    // Origin writes are scoped by the caller's verified `client_id`, so the todo
+    // domain injects the grant lookup rather than reading a request field
+    // (`SPEC-todo-origin` §7).
+    GrantsModule.forRoot(),
     TodoCacheModule,
     ListsModule,
   ],

@@ -26,6 +26,9 @@ export {
 export { KeysModule, createMasterKey } from './keys/keys.module.js';
 export { KeysService, MASTER_KEY, type KeysOptions } from './keys/keys.service.js';
 export { UserKeys } from './keys/user-keys.entity.js';
+export { GrantsModule } from './grants/grants.module.js';
+export { GrantsService } from './grants/grants.service.js';
+export { OriginGrant } from './grants/origin-grant.entity.js';
 export { runReadinessChecks, type HealthBody, type ReadinessChecks } from './readiness.js';
 export { AuditModule } from './audit/audit.module.js';
 export {

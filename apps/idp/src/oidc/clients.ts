@@ -38,9 +38,7 @@ export function resolveAppClientSecret(env: NodeJS.ProcessEnv = process.env): st
   const secret = env.OIDC_APP_CLIENT_SECRET?.trim();
   if (secret) return secret;
   if (env.NODE_ENV === 'production') {
-    throw new Error(
-      'OIDC_APP_CLIENT_SECRET must be set in production (no placeholder fallback)',
-    );
+    throw new Error('OIDC_APP_CLIENT_SECRET must be set in production (no placeholder fallback)');
   }
   return DEV_APP_CLIENT_SECRET;
 }
@@ -70,6 +68,49 @@ const CODE_CLIENT = {
   scope: 'openid',
   id_token_signed_response_alg: 'EdDSA' as const,
 };
+
+/**
+ * The producer clients the acceptance sequence exercises: one granted, one
+ * deliberately ungranted. They are listed here rather than derived because a
+ * producer is a known deployment, and the grant table keys off these ids.
+ */
+const PRODUCER_CLIENT_IDS = ['producer-a', 'producer-b'] as const;
+
+/**
+ * Producer callbacks are loopback-only and their ports come from the producer
+ * app, so each client registers under its own
+ * `OIDC_PRODUCER_<NAME>_REDIRECT_URIS`. Production must supply it, mirroring
+ * `OIDC_APP_REDIRECT_URIS`: a boot that forgot a producer's callback fails
+ * loudly instead of registering a client nobody can reach.
+ */
+function producerRedirectUris(producerName: string, env: NodeJS.ProcessEnv): string[] {
+  const setting = `OIDC_PRODUCER_${producerName.toUpperCase().replaceAll('-', '_')}_REDIRECT_URIS`;
+  const registered = env[setting]?.trim();
+  if (registered) {
+    return registered
+      .split(',')
+      .map((uri) => uri.trim())
+      .filter(Boolean);
+  }
+  if (env.NODE_ENV === 'production') {
+    throw new Error(`${setting} must be set in production (no placeholder callback)`);
+  }
+  return [...DEV_REDIRECT_URIS];
+}
+
+/**
+ * A producer app runs on the user's machine, so its client is public: no secret,
+ * and PKCE is the only proof it can give.
+ */
+function producerClient(producerName: (typeof PRODUCER_CLIENT_IDS)[number]): ClientMetadata {
+  return {
+    ...CODE_CLIENT,
+    client_id: producerName,
+    client_name: `producer ${producerName}`,
+    token_endpoint_auth_method: 'none',
+    redirect_uris: producerRedirectUris(producerName, process.env),
+  };
+}
 
 /**
  * The `app` relying party. Confidential, authenticates with
@@ -109,5 +150,5 @@ export function assertOidcConfig(env: NodeJS.ProcessEnv = process.env): void {
 }
 
 export function staticClients(): ClientMetadata[] {
-  return [appClient(), devClient()];
+  return [appClient(), devClient(), ...PRODUCER_CLIENT_IDS.map(producerClient)];
 }

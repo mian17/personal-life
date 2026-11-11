@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -29,7 +30,15 @@ import {
   nextOccurrence,
   parseRepeatDays,
 } from './recurrence.js';
-import { DEFAULT_PAGE_LIMIT, KeysService, paginate, runAtomicBatch } from '@life/service-kit';
+import {
+  DEFAULT_PAGE_LIMIT,
+  GrantsService,
+  KeysService,
+  paginate,
+  runAtomicBatch,
+  type Principal,
+} from '@life/service-kit';
+import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import { ListsService } from '../lists/lists.service.js';
 import {
   TODO_ALL,
@@ -50,6 +59,27 @@ type TodoDraft = {
   listId?: string;
   important?: boolean | null;
   tagIds?: number[];
+  /** The producer service a grant scoped this write to; `undefined` = app write. */
+  originService?: string;
+  /** The producer's own id for this todo; `undefined` = app write. */
+  originId?: string;
+};
+
+/** A todo plus the origin columns its row persisted — the origin APIs' wire body. */
+export type OriginatedTodo = TodoDto & {
+  originService: string | null;
+  originId: string | null;
+};
+
+/** What a producer names: the origin service its grant allows, and its own todo id. */
+type OriginRef = { service: string; id: string };
+
+/** One completion log row, ready to insert. */
+type CompletionEntry = {
+  ownerSub: string;
+  todoId: string;
+  occurrence: string;
+  completedAt: string;
 };
 
 /** The `PATCH /api/todos/:id` field set, applied after the ownership/version checks. */
@@ -124,8 +154,9 @@ function todoNoteAad(ownerSub: string, id: string): string {
  * never a decrypted DTO. `tagIds` are association ids (metadata) copied verbatim
  * so the tag filter and the DTO can run after a hit; `dueDate`/`done`/
  * `important`/`listId`/`deletedAt` are plaintext metadata (`important` is the
- * non-content importance override, `SPEC-todo-importance`). `origin` is the
- * reserved seam (unused).
+ * non-content importance override, `SPEC-todo-importance`). `originService`/
+ * `originId` are the origin columns, plaintext metadata exactly like `listId`
+ * (`SPEC-todo-origin` §11). `origin` is the reserved seam (unused).
  */
 interface CachedTodoRow {
   id: string;
@@ -139,6 +170,8 @@ interface CachedTodoRow {
   reminderScheduledAt: string | null;
   listId: string | null;
   origin: string | null;
+  originService: string | null;
+  originId: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -160,6 +193,8 @@ function toCachedTodoRow(todo: Todo): CachedTodoRow {
     reminderScheduledAt: todo.reminderScheduledAt,
     listId: todo.listId,
     origin: todo.origin,
+    originService: todo.originService,
+    originId: todo.originId,
     version: todo.version,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
@@ -323,6 +358,7 @@ export class TodosService {
     @Inject(TODO_CACHE) private readonly cache: TodosCache,
     private readonly keys: KeysService,
     private readonly lists: ListsService,
+    private readonly grants: GrantsService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
@@ -464,12 +500,6 @@ export class TodosService {
   }
 
   /**
-   * Append exactly one completion occurrence, idempotently. The guarded read
-   * makes a repeated tick a no-op; the UNIQUE constraint is the backstop, and
-   * only that violation is swallowed so a real write failure still aborts the
-   * transaction.
-   */
-  /**
    * Advance-on-tick for a recurring todo: log the pre-advance due `D`, then move
    * the todo strictly past it and forward to on/after now, remaining open.
    */
@@ -544,16 +574,25 @@ export class TodosService {
     const repo = manager.getRepository(TodoCompletion);
     const existing = await repo.findOne({ where: { todoId, occurrence } });
     if (existing) return;
+    await this.insertCompletionOnce(manager, { ownerSub: sub, todoId, occurrence, completedAt });
+  }
+
+  /**
+   * Insert exactly one completion row, bare. Whether this occurrence was already
+   * logged is the database's answer: the UNIQUE constraint raises and that one
+   * violation is swallowed, so a caller can tell the first write from the repeat
+   * without ever reading the log first. Any other driver error propagates.
+   */
+  private async insertCompletionOnce(
+    manager: EntityManager,
+    entry: CompletionEntry,
+  ): Promise<boolean> {
     try {
-      await repo.insert({
-        id: randomUUID(),
-        ownerSub: sub,
-        todoId,
-        occurrence,
-        completedAt,
-      });
+      await manager.getRepository(TodoCompletion).insert({ id: randomUUID(), ...entry });
+      return true;
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
+      return false;
     }
   }
 
@@ -587,6 +626,107 @@ export class TodosService {
     // repopulate a stale generation (todo-cache.e2e-spec).
     if (todo.listId !== null) await this.lists.rawRows(sub);
     return todo;
+  }
+
+  /**
+   * `POST /api/todos/origin` — a producer client creates a todo on the user's
+   * behalf (`SPEC-todo-origin` §7). The write goes through the app's own create
+   * path, so the owner's cache generation bumps like any app write; only
+   * `originId` comes from the request, and `ownerSub` from the verified `sub`.
+   */
+  async createWithOrigin(
+    principal: Principal,
+    input: CreateWithOriginDto,
+  ): Promise<OriginatedTodo> {
+    const originService = await this.grantedOrigin(principal.clientId);
+    const todo = await this.create(principal.sub, { ...input, originService });
+    return { ...todo, originService, originId: input.originId };
+  }
+
+  /**
+   * The origin the caller's verified `client_id` may write, or 403. Fail closed:
+   * a token carrying no `client_id` holds no grant row, so it may not create by
+   * origin at all.
+   */
+  private async grantedOrigin(clientId: string | null): Promise<string> {
+    const originService = clientId === null ? null : await this.grants.findByClientId(clientId);
+    if (originService === null) throw new ForbiddenException('No origin grant for this client');
+    return originService;
+  }
+
+  /**
+   * `POST /api/todos/origin/:originId/complete` — a producer ticks off the todo
+   * its own create made, so the user never repeats the work
+   * (`SPEC-todo-origin` §7). Idempotency is the database's, not a prior read's:
+   * the first call logs the completion and closes the todo, and the repeat is a
+   * swallowed UNIQUE violation that writes nothing, invalidates nothing, and
+   * answers the very state the first call left.
+   *
+   * Recurrence never advances here (spec assumption 7): a producer closes an
+   * occurrence, it does not roll a repeating todo forward.
+   */
+  async completeByOrigin(principal: Principal, originId: string): Promise<OriginatedTodo> {
+    const origin: OriginRef = {
+      service: await this.grantedOrigin(principal.clientId),
+      id: originId,
+    };
+    const todo = await this.loadOriginTodo(principal.sub, origin);
+    // The ownership resolve above is the only read; the write decides idempotency.
+    const completed = await this.dataSource.transaction((manager) =>
+      this.completeTodoOnce(manager, todo),
+    );
+    if (completed === null) return this.originatedTodoView(todo);
+    // Bump AFTER a write that happened; the swallowed no-op never reaches here.
+    await this.cache.bumpGeneration(principal.sub);
+    return this.originatedTodoView(completed);
+  }
+
+  /**
+   * The todo this origin created for this owner. Both origin columns come from the
+   * grant row and the verified `sub`, so another origin's `originId` — or one the
+   * app itself created — is a byte-identical 404.
+   */
+  private async loadOriginTodo(sub: string, origin: OriginRef): Promise<Todo> {
+    const todo = await this.todos.findOne({
+      where: {
+        ownerSub: sub,
+        originService: origin.service,
+        originId: origin.id,
+        deletedAt: IsNull(),
+      },
+    });
+    if (!todo) throw new NotFoundException('Todo not found');
+    return todo;
+  }
+
+  /**
+   * Log this todo's completion occurrence and close it, or `null` when that
+   * occurrence was already logged. `occurrence = dueDate ?? '~'` is the same
+   * sentinel the app's non-recurring tick writes, so the completeness rule holds
+   * for a dated and an undated todo alike.
+   */
+  private async completeTodoOnce(manager: EntityManager, todo: Todo): Promise<Todo | null> {
+    const logged = await this.insertCompletionOnce(manager, {
+      ownerSub: todo.ownerSub,
+      todoId: todo.id,
+      occurrence: todo.dueDate ?? '~',
+      completedAt: new Date().toISOString(),
+    });
+    if (!logged) return null;
+    todo.done = true;
+    todo.updatedAt = new Date();
+    return manager.save(todo);
+  }
+
+  /**
+   * The wire body an origin write answers with: the decoded todo plus the origin
+   * columns, read off the row exactly as it was persisted (`SPEC-todo-origin` §11).
+   */
+  private async originatedTodoView(todo: Todo): Promise<OriginatedTodo> {
+    const tagIds = await this.resolveTagIds(this.todos.manager, todo.id, undefined);
+    const dek = await this.keys.getDekForRead(todo.ownerSub);
+    const decoded = await this.answerWithDecodedTodo(todo, tagIds, todo.ownerSub, dek);
+    return { ...decoded, originService: todo.originService, originId: todo.originId };
   }
 
   /** The `todos` batch create: one transaction, submission order, one bump (MAP §4). */
@@ -636,13 +776,15 @@ export class TodosService {
       reminderScheduledAt: this.reminderAt(dueDate, this.tz),
       listId: input.listId ?? null,
       origin: null,
+      originService: input.originService ?? null,
+      originId: input.originId ?? null,
       ownerSub: sub,
       version: 0,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
     });
-    const saved = await todos.save(todo);
+    const saved = await this.insertTodo(todos, todo);
     // Association rows are managed explicitly (TagRef joins, not a cascade
     // relation) so a write stores exactly the ids it carries.
     if (ids.length > 0) {
@@ -650,6 +792,20 @@ export class TodosService {
     }
     const row = { ...toCachedTodoRow(saved), tagIds: ids };
     return this.decodeCachedTodoRow(row, sub, dek, await this.effectiveForRow(sub, row));
+  }
+
+  /**
+   * Insert one row. A repeated `(originService, originId)` is the database's
+   * answer, not a prior SELECT's: the unique constraint raises, and only that
+   * one violation becomes a 409 (`SPEC-todo-origin` §5).
+   */
+  private async insertTodo(todos: Repository<Todo>, todo: Todo): Promise<Todo> {
+    try {
+      return await todos.save(todo);
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      throw new ConflictException('This origin id was already used for this service');
+    }
   }
 
   /**

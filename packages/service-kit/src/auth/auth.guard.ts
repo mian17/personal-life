@@ -23,9 +23,16 @@ import { IS_PUBLIC_KEY } from '../public.decorator.js';
  * constructed directly (`new AuthGuard(envNames)`) in `app.factory` and in tests
  * without Nest's injector.
  *
- * On success the verified `sub` is propagated as `request.principal`, and a
- * verified token without a usable `sub` is rejected with 401: claims without
- * identity are unauthenticated, and `sub` becomes an owner filter downstream.
+ * On success the verified `sub` and `client_id` are propagated as
+ * `request.principal`, and a verified token without a usable `sub` is rejected
+ * with 401: claims without identity are unauthenticated, and `sub` becomes an
+ * owner filter downstream. `clientId` is always `null` when the token carries no
+ * `client_id` claim.
+ *
+ * The `NODE_ENV=development` bypass only covers a request that presents no
+ * credentials at all; a request that does present a bearer token is verified
+ * normally in every environment, so a local token is never downgraded to the
+ * shared `dev-user` and cannot borrow a caller's provenance.
  *
  * The two service-specific env var names arrive as `envNames`, so this one class
  * serves every service without a per-service copy of the verification logic.
@@ -53,20 +60,19 @@ export class AuthGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const token = bearerToken(req);
 
-    // Dev skips the token check for localhost; production behavior below is unchanged.
-    if (process.env.NODE_ENV === 'development') {
-      req.principal = { sub: 'dev-user' };
+    // Dev bypass is narrowed to anonymous localhost: a presented token always
+    // verifies, so the shared `dev-user` principal never stands in for a caller.
+    if (token === undefined && process.env.NODE_ENV === 'development') {
+      req.principal = { sub: 'dev-user', clientId: null };
       return true;
     }
-
-    const header = req.headers.authorization ?? '';
-    const [scheme, value] = header.split(' ');
-    if (scheme !== 'Bearer' || !value) {
+    if (token === undefined) {
       throw new UnauthorizedException();
     }
 
-    return this.verifyJwt(req, value);
+    return this.verifyJwt(req, token);
   }
 
   private async verifyJwt(req: AuthenticatedRequest, token: string): Promise<boolean> {
@@ -90,7 +96,18 @@ export class AuthGuard implements CanActivate {
       // about to become an owner filter.
       throw new UnauthorizedException();
     }
-    req.principal = { sub: payload.sub } satisfies Principal;
+    req.principal = { sub: payload.sub, clientId: clientIdOf(payload) } satisfies Principal;
     return true;
   }
+}
+
+/** The bearer token a request presents, or `undefined` when it presents none. */
+function bearerToken(req: AuthenticatedRequest): string | undefined {
+  const [scheme, value] = (req.headers.authorization ?? '').split(' ');
+  return scheme === 'Bearer' && value ? value : undefined;
+}
+
+/** The verified `client_id` claim of a token, or `null` when it carries none. */
+function clientIdOf(payload: JWTPayload): string | null {
+  return typeof payload.client_id === 'string' ? payload.client_id : null;
 }
