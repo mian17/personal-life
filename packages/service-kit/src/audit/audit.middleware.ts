@@ -25,6 +25,7 @@ import {
   deriveDecision,
   deriveRoute,
   deriveVia,
+  sanitizeCallerService,
   sanitizeRequestId,
   sanitizeUserAgent,
   type CredentialPresence,
@@ -38,6 +39,13 @@ export const REQUEST_ID_HEADER = 'x-request-id';
 
 /** The self-declared caller claim: a claim, never a credential (§9.2). */
 export const CALLER_SERVICE_HEADER = 'x-caller-service';
+
+/**
+ * The app's session cookie name (`apps/app/lib/auth`). A cookie only counts as a
+ * session credential when it carries this name; any other cookie is unrelated
+ * state and must not change how the request is reported as authenticated.
+ */
+export const SESSION_COOKIE_NAME = 'app_session';
 
 /**
  * The slice of a request this middleware reads. Narrow on purpose: a field that
@@ -122,7 +130,7 @@ function describeAuditEvent(capture: RequestCapture, response: AuditResponse): A
   return {
     occurredAt: capture.occurredAt,
     actorSub: capture.request.principal?.sub ?? null,
-    callerService: headerValue(capture.request, CALLER_SERVICE_HEADER),
+    callerService: sanitizeCallerService(headerValue(capture.request, CALLER_SERVICE_HEADER)),
     via: deriveVia(credentials),
     credentialKind: deriveCredentialKind(credentials),
     method: capture.request.method,
@@ -145,10 +153,25 @@ function requestIdFor(request: AuditRequest): string {
 /** Presence only: no credential value is read, so no value can be kept (§8.4). */
 function credentialPresence(request: AuditRequest): CredentialPresence {
   return {
-    hasSessionCookie: headerValue(request, 'cookie') !== null,
+    hasSessionCookie: hasSessionCookie(headerValue(request, 'cookie')),
     hasBearerToken: isBearerAuthorization(headerValue(request, 'authorization')),
     hasCallerClaim: headerValue(request, CALLER_SERVICE_HEADER) !== null,
   };
+}
+
+/**
+ * Whether a `Cookie` header carries this app's session cookie — not merely
+ * whether some cookie exists. Any unrelated cookie (`theme=dark`) used to make
+ * `via` report `oidc-cookie` while `actorSub` named a bearer-token subject, so
+ * the row contradicted itself and the stronger signal was masked. The name is
+ * read; the value never is.
+ */
+function hasSessionCookie(cookieHeader: string | null): boolean {
+  if (cookieHeader === null) return false;
+  return cookieHeader.split(';').some((pair) => {
+    const [name] = pair.split('=');
+    return name.trim() === SESSION_COOKIE_NAME;
+  });
 }
 
 /** `Bearer` in any case; the scheme is read and the token behind it is not. */

@@ -17,6 +17,9 @@ export const MAX_USER_AGENT_LENGTH = 256;
 /** The stored length of a client-supplied `x-request-id`; same hostile-text reason. */
 export const MAX_REQUEST_ID_LENGTH = 64;
 
+/** The stored length of a client-supplied `x-caller-service`; same hostile-text reason. */
+export const MAX_CALLER_SERVICE_LENGTH = 64;
+
 /**
  * Which credentials a request presented, reduced to presence. This is the whole
  * input to `via` and `credentialKind`: the derivation never needs a value, so it
@@ -86,6 +89,18 @@ export function deriveRoute(routeTemplate: string | null | undefined): string {
  */
 export function sanitizeUserAgent(userAgent: string | null | undefined): string {
   return oneLine(userAgent ?? '').slice(0, MAX_USER_AGENT_LENGTH);
+}
+
+/**
+ * The stored `callerService`: an inbound `x-caller-service` collapsed to one
+ * printable line and capped, else `null` (owned by the middleware). Like
+ * `requestId` and `userAgent` this header is client-controlled, so it is hostile
+ * text: a newline in it would forge a log line and an unbounded one would bloat
+ * the row. It stays a *claim* either way — sanitized text does not make it true.
+ */
+export function sanitizeCallerService(callerService: string | null | undefined): string | null {
+  const sanitized = oneLine(callerService ?? '').slice(0, MAX_CALLER_SERVICE_LENGTH);
+  return sanitized.length === 0 ? null : sanitized;
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   AuditEntry,
   AuditMiddleware,
   AuditModule,
+  MAX_CALLER_SERVICE_LENGTH,
   UNMATCHED_ROUTE,
   type AuditEvent,
 } from '../src/index.js';
@@ -244,7 +245,7 @@ describe('AuditMiddleware over a real app', () => {
     await request(harness.app.getHttpServer())
       .get('/notes/note-1?USDA_API_KEY=abc123')
       .set('Authorization', 'Bearer secret-bearer-token')
-      .set('Cookie', 'session=cookie-value-42')
+      .set('Cookie', 'app_session=cookie-value-42')
       .set('x-caller-service', 'tags-service')
       .set('User-Agent', 'probe/1.0')
       .send({ note: 'body-substring-marker' })
@@ -263,6 +264,35 @@ describe('AuditMiddleware over a real app', () => {
       callerService: 'tags-service',
       userAgent: 'probe/1.0',
     });
+  });
+
+  it('reports bearer, not a cookie, when an unrelated cookie is present alongside a token', async () => {
+    harness = await buildHarness();
+    await request(harness.app.getHttpServer())
+      .get('/notes/note-1')
+      .set('Authorization', 'Bearer the-token')
+      .set('Cookie', 'theme=dark')
+      .expect(200);
+    await harness.waitForEvents(1);
+
+    // Any cookie used to be read as a session cookie, which masked the stronger
+    // bearer signal and made the row contradict its own `actorSub`.
+    expect(harness.events[0]).toMatchObject({ via: 'bearer', credentialKind: 'bearer' });
+  });
+
+  it('sanitizes and caps the self-declared caller service, like the other text fields', async () => {
+    harness = await buildHarness();
+    // supertest refuses control characters in a header value, so the hostile text
+    // here is a tab — the same class of character `oneLine` folds to a space.
+    await request(harness.app.getHttpServer())
+      .get('/notes/note-1')
+      .set('x-caller-service', `${'a'.repeat(5000)}\tprobe`)
+      .expect(200);
+    await harness.waitForEvents(1);
+
+    const stored = harness.events[0].callerService ?? '';
+    expect(stored.length).toBeLessThanOrEqual(MAX_CALLER_SERVICE_LENGTH);
+    expect(stored).not.toContain('\t');
   });
 });
 

@@ -186,7 +186,7 @@ describe('Audit log wiring (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/notes?USDA_API_KEY=${apiKey}`)
         .set('Authorization', `Bearer ${bearerToken}`)
-        .set('Cookie', `session=${cookieValue}`)
+        .set('Cookie', `app_session=${cookieValue}`)
         .set('User-Agent', 'audit-probe/1.0')
         .send({ body: bodySubstring });
 
