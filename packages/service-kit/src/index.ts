@@ -27,3 +27,32 @@ export { KeysModule, createMasterKey } from './keys/keys.module.js';
 export { KeysService, MASTER_KEY, type KeysOptions } from './keys/keys.service.js';
 export { UserKeys } from './keys/user-keys.entity.js';
 export { runReadinessChecks, type HealthBody, type ReadinessChecks } from './readiness.js';
+export { AuditModule } from './audit/audit.module.js';
+export { AuditMiddleware, AUDIT_EVENT_NAME } from './audit/audit.middleware.js';
+export {
+  AUDIT_EMITTER,
+  type AuditCredentialKind,
+  type AuditDecision,
+  type AuditEvent,
+  type AuditVia,
+} from './audit/audit-event.js';
+export {
+  createAuditListener,
+  resolveAuditListener,
+  NOOP_AUDIT_LISTENER,
+  type AuditListener,
+  type AuditRowWriter,
+} from './audit/audit-listener.js';
+export { AuditEntry } from './audit/audit-entry.entity.js';
+export {
+  MAX_REQUEST_ID_LENGTH,
+  MAX_USER_AGENT_LENGTH,
+  UNMATCHED_ROUTE,
+  deriveCredentialKind,
+  deriveDecision,
+  deriveRoute,
+  deriveVia,
+  sanitizeRequestId,
+  sanitizeUserAgent,
+  type CredentialPresence,
+} from './audit/audit-fields.js';

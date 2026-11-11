@@ -5,7 +5,7 @@ import { FeedbackEvent } from './feedback/feedback-event.entity.js';
 import { FeedbackCursor } from './feedback/feedback-cursor.entity.js';
 import { EventModule } from './event/event.module.js';
 import { FeedbackModule } from './feedback/feedback.module.js';
-import { HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import { AuditEntry, AuditModule, HealthModule, KeysModule, UserKeys } from '@life/service-kit';
 import { MASTER_KEY_ENV } from './service-config.js';
 
 /** Fail closed: no Postgres URL, no boot (`SPEC-feedback-service` Security). */
@@ -19,13 +19,14 @@ if (!dbUrl) {
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: dbUrl,
-      entities: [UserKeys, Feedback, FeedbackEvent, FeedbackCursor],
+      entities: [UserKeys, Feedback, FeedbackEvent, FeedbackCursor, AuditEntry],
       synchronize: true,
     }),
     KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     FeedbackModule,
     EventModule,
+    AuditModule.forRoot(),
   ],
 })
 export class AppModule {}
