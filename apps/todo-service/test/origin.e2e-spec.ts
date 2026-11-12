@@ -25,7 +25,9 @@ const PRODUCER_A = 'producer-a';
 const PRODUCER_B = 'producer-b';
 const GRANTED_ORIGIN = 'meal-service';
 const APP_USER = 'user-a';
+/** A second user who granted the same producer client, for a different origin. */
 const OTHER_USER = 'user-b';
+const OTHER_GRANTED_ORIGIN = 'calendar-service';
 
 let tokenWithGrant = '';
 let tokenWithoutGrant = '';
@@ -53,9 +55,22 @@ describe('Origin API (e2e)', () => {
     app = await createApp();
     await app.init();
     dataSource = app.get(DataSource);
-    await dataSource
-      .getRepository(OriginGrant)
-      .insert({ clientId: PRODUCER_A, originService: GRANTED_ORIGIN, grantedAt: new Date() });
+    // A grant is per owner: two users may grant the same producer client, each with
+    // its own origin. Client B is granted by nobody.
+    await dataSource.getRepository(OriginGrant).insert([
+      {
+        ownerSub: APP_USER,
+        clientId: PRODUCER_A,
+        originService: GRANTED_ORIGIN,
+        grantedAt: new Date(),
+      },
+      {
+        ownerSub: OTHER_USER,
+        clientId: PRODUCER_A,
+        originService: OTHER_GRANTED_ORIGIN,
+        grantedAt: new Date(),
+      },
+    ]);
   });
 
   afterAll(async () => {
@@ -122,6 +137,37 @@ describe('Origin API (e2e)', () => {
       const rows = await todosByOriginId('meal-shared');
       expect(rows).toHaveLength(2);
       expect(rows.map((row) => row.ownerSub).sort()).toEqual([APP_USER, OTHER_USER]);
+    });
+
+    it("stamps each owner's own granted origin for the same producer client", async () => {
+      const ownerA = await createWithOrigin({ title: 'lunch for a', originId: 'meal-scoped' });
+      const ownerB = await createWithOrigin(
+        { title: 'meeting for b', originId: 'meal-scoped' },
+        await harness.sign({ subject: OTHER_USER, clientId: PRODUCER_A }),
+      );
+
+      expect(ownerA.body.originService).toBe(GRANTED_ORIGIN);
+      expect(ownerB.body.originService).toBe(OTHER_GRANTED_ORIGIN);
+
+      const rows = await todosByOriginId('meal-scoped');
+      expect(rows.map((row) => [row.ownerSub, row.originService]).sort()).toEqual([
+        [APP_USER, GRANTED_ORIGIN],
+        [OTHER_USER, OTHER_GRANTED_ORIGIN],
+      ]);
+    });
+
+    it('rejects a client granted by other users but not by this one', async () => {
+      // A third user presents producer A's client: two other users granted it, this
+      // one never did, so the grant is invisible and the write is refused.
+      const strangerToken = await harness.sign({ subject: 'user-c', clientId: PRODUCER_A });
+
+      const response = await createWithOrigin(
+        { title: 'sneak in', originId: 'ungranted-2' },
+        strangerToken,
+      );
+
+      expect(response.status).toBe(403);
+      expect(await todosByOriginId('ungranted-2')).toEqual([]);
     });
   });
 

@@ -23,6 +23,9 @@ import { FakeRedisClient } from './fake-redis.js';
  */
 
 const GRANTED = 'meal-service';
+/** A second owner's grant for the same producer client — a different origin. */
+const OTHER_GRANTED = 'calendar-service';
+const OTHER_USER = 'user-b';
 
 /** Records every read-through call and every generation bump. */
 class RecordingTodosCache extends TodosCache {
@@ -48,7 +51,7 @@ class RecordingTodosCache extends TodosCache {
 const principalOf = (): Principal => ({ sub: SUB, clientId: 'producer-a' });
 
 /** A second owner: a different verified `sub`, the same producer client. */
-const otherOwner = (): Principal => ({ sub: 'user-b', clientId: 'producer-a' });
+const otherOwner = (): Principal => ({ sub: OTHER_USER, clientId: 'producer-a' });
 
 const uniqueViolation = () =>
   new QueryFailedError(
@@ -83,9 +86,17 @@ describe('Origin write guards (service seam)', () => {
     client = new FakeRedisClient();
     cache = new RecordingTodosCache(client);
     h = await makeUnitHarness(cache);
-    await h.dataSource
-      .getRepository(OriginGrant)
-      .insert({ clientId: 'producer-a', originService: GRANTED, grantedAt: new Date() });
+    // A grant is per owner: this owner granted producer-a `meal-service`, and a
+    // second owner granted the same client `calendar-service`.
+    await h.dataSource.getRepository(OriginGrant).insert([
+      { ownerSub: SUB, clientId: 'producer-a', originService: GRANTED, grantedAt: new Date() },
+      {
+        ownerSub: OTHER_USER,
+        clientId: 'producer-a',
+        originService: OTHER_GRANTED,
+        grantedAt: new Date(),
+      },
+    ]);
   });
 
   afterEach(async () => {
@@ -141,6 +152,17 @@ describe('Origin write guards (service seam)', () => {
   });
 
   describe('the origin lookup is owner-scoped', () => {
+    it("stamps each owner's own granted origin for the same producer client", async () => {
+      const mine = await originedTodo('guard-scope-1');
+      await h.todos.createWithOrigin(otherOwner(), { title: 'prep', originId: 'guard-scope-1' });
+      const theirs = await h.dataSource
+        .getRepository(Todo)
+        .findOneByOrFail({ ownerSub: OTHER_USER, originId: 'guard-scope-1' });
+
+      expect(mine.originService).toBe(GRANTED);
+      expect(theirs.originService).toBe(OTHER_GRANTED);
+    });
+
     it("answers another owner's origin id with the same 404 a nonexistent id gets", async () => {
       const todo = await originedTodo('guard-oracle-1');
 

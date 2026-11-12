@@ -638,18 +638,20 @@ export class TodosService {
     principal: Principal,
     input: CreateWithOriginDto,
   ): Promise<OriginatedTodo> {
-    const originService = await this.grantedOrigin(principal.clientId);
+    const originService = await this.grantedOrigin(principal.sub, principal.clientId);
     const todo = await this.create(principal.sub, { ...input, originService });
     return { ...todo, originService, originId: input.originId };
   }
 
   /**
-   * The origin the caller's verified `client_id` may write, or 403. Fail closed:
-   * a token carrying no `client_id` holds no grant row, so it may not create by
-   * origin at all.
+   * The origin this owner granted the caller's verified `client_id`, or 403. Fail
+   * closed: a token carrying no `client_id` holds no grant row, and a grant is per
+   * owner — the same client writing for a user who granted it nothing may not
+   * create by origin at all.
    */
-  private async grantedOrigin(clientId: string | null): Promise<string> {
-    const originService = clientId === null ? null : await this.grants.findByClientId(clientId);
+  private async grantedOrigin(ownerSub: string, clientId: string | null): Promise<string> {
+    const originService =
+      clientId === null ? null : await this.grants.findGrantedOrigin(ownerSub, clientId);
     if (originService === null) throw new ForbiddenException('No origin grant for this client');
     return originService;
   }
@@ -667,7 +669,7 @@ export class TodosService {
    */
   async completeByOrigin(principal: Principal, originId: string): Promise<OriginatedTodo> {
     const origin: OriginRef = {
-      service: await this.grantedOrigin(principal.clientId),
+      service: await this.grantedOrigin(principal.sub, principal.clientId),
       id: originId,
     };
     const todo = await this.loadOriginTodo(principal.sub, origin);
