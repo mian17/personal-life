@@ -42,10 +42,16 @@ export interface CreateIntent {
   dueDate: string;
 }
 
-/** `POST /api/todos/origin/:originId/complete` body. */
+/** `POST /api/todos/origin/:originId/complete` body, plus the task it means. */
 export interface TickIntent {
   title: string;
   occurrence: string;
+  /**
+   * The task to tick. It travels *inside* the body because the BFF does the
+   * delivering and has no other way to know which todo a bare tick names — the
+   * route's own path parameter is built from this value.
+   */
+  originId: string;
 }
 
 /**
@@ -92,7 +98,11 @@ export function createIntent(group: TodoGroup, calories: number, today: string):
  * exists to prevent (`SPEC-todo-origin` §9.16).
  */
 export function tickIntent(group: TodoGroup, calories: number, today: string): TickIntent {
-  return { title: titleForGroup(group, calories), occurrence: today };
+  return {
+    title: titleForGroup(group, calories),
+    occurrence: today,
+    originId: originIdForGroup(group),
+  };
 }
 
 /** Whether a logged entry's group has a task to tick. */

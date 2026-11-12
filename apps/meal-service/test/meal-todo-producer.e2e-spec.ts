@@ -213,7 +213,11 @@ describe('Meal todo producer (e2e)', () => {
 
     const ticks = await payloads('todos.complete');
     expect(ticks).toHaveLength(1);
-    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
+    expect(ticks[0]).toEqual({
+      title: 'Eat Breakfast to reach 2200 kcal',
+      occurrence: DAY,
+      originId: 'meal:breakfast',
+    });
     expect(await payloads('todos.create')).toHaveLength(0);
   });
 
@@ -225,8 +229,16 @@ describe('Meal todo producer (e2e)', () => {
 
     const ticks = await payloads('todos.complete');
     expect(ticks).toHaveLength(2);
-    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
-    expect(ticks[1]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
+    expect(ticks[0]).toEqual({
+      title: 'Eat Breakfast to reach 2200 kcal',
+      occurrence: DAY,
+      originId: 'meal:breakfast',
+    });
+    expect(ticks[1]).toEqual({
+      title: 'Eat Breakfast to reach 2200 kcal',
+      occurrence: DAY,
+      originId: 'meal:breakfast',
+    });
   });
 
   it('still logs the meal when the owner has no target profile, but enqueues no tick', async () => {
@@ -253,8 +265,16 @@ describe('Meal todo producer (e2e)', () => {
 
     const ticks = await payloads('todos.complete');
     expect(ticks).toHaveLength(2);
-    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
-    expect(ticks[1]).toEqual({ title: 'Eat Breakfast to reach 2500 kcal', occurrence: DAY });
+    expect(ticks[0]).toEqual({
+      title: 'Eat Breakfast to reach 2200 kcal',
+      occurrence: DAY,
+      originId: 'meal:breakfast',
+    });
+    expect(ticks[1]).toEqual({
+      title: 'Eat Breakfast to reach 2500 kcal',
+      occurrence: DAY,
+      originId: 'meal:breakfast',
+    });
   });
 
   it('does not tick a snack, which has no daily task', async () => {

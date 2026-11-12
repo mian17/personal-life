@@ -24,8 +24,13 @@ export const OUTBOX_SWEEP_BATCH = 20;
 /** `lastError` carries one diagnostic line, never a stack. */
 export const OUTBOX_ERROR_MAX_CHARS = 256;
 
-/** One failure reason, flattened to a single capped line. */
-function oneLine(err: unknown): string {
+/**
+ * One failure reason, flattened to a single capped line.
+ *
+ * Shared with the drain route's outcome write (`OutboxService.recordOutcomes`), so a
+ * reason reaches `lastError` the same way whichever caller recorded it.
+ */
+export function oneLine(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   return message.replace(/\s+/g, ' ').trim().slice(0, OUTBOX_ERROR_MAX_CHARS);
 }

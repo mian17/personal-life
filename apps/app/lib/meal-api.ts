@@ -443,6 +443,52 @@ export function setMealTodos(enabled: boolean, date: string): Promise<{ enabled:
   });
 }
 
+/**
+ * One intent meal-service still owes, as `GET /api/meal-todo/pending` serves it:
+ * this service's delivery id, the logical destination (`todos.create` /
+ * `todos.complete`), and the exact JSON body todo-service accepts.
+ *
+ * The payload is forwarded verbatim — the relay reads two fields out of it to build
+ * a route and sends nothing else, so there is no second place where the wire shape
+ * of a todo intent is defined.
+ */
+export interface PendingMealIntent {
+  id: string;
+  destination: string;
+  payload: string;
+}
+
+/**
+ * One row's outcome after a delivery attempt (`POST /api/meal-todo/published`).
+ * `published: false` keeps the row pending and carries the reason, so a queue that
+ * cannot drain stays diagnosable instead of silently stuck.
+ */
+export interface MealIntentOutcome {
+  id: string;
+  published: boolean;
+  lastError?: string;
+}
+
+/**
+ * `GET /api/meal-todo/pending` — the intents this owner still owes, oldest first.
+ * Owner-scoped by the forwarded token, so this can only ever read the caller's own
+ * queue.
+ */
+export function listPendingMealIntents(): Promise<{ intents: PendingMealIntent[] }> {
+  return call<{ intents: PendingMealIntent[] }>('/api/meal-todo/pending');
+}
+
+/**
+ * `POST /api/meal-todo/published` — report a whole batch's outcomes in one call.
+ * The service writes each row owner-scoped, so an id from another owner is ignored.
+ */
+export function markMealIntents(outcomes: MealIntentOutcome[]): Promise<{ updated: number }> {
+  return call<{ updated: number }>('/api/meal-todo/published', {
+    method: 'POST',
+    body: JSON.stringify({ records: outcomes }),
+  });
+}
+
 export function createSavedMeal(input: CreateSavedMealInput): Promise<SavedMeal> {
   return call<SavedMeal>('/api/saved-meals', { method: 'POST', body: JSON.stringify(input) });
 }

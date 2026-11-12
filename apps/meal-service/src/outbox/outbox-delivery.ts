@@ -32,12 +32,19 @@ export interface OutboxDelivery {
 }
 
 /**
- * The default sender. It is intentionally inert: the producer credential story
- * is a later task, and a POST with no credential would be rejected by
- * todo-service's guard while burning the row's `attempts`.
+ * The default sender. It stays intentionally inert: **the live delivery path is the
+ * BFF's drain** (`apps/app/lib/outbox-relay.ts`), not this poller.
  *
- * ponytail: no producer credential yet — N4 wires the OIDC client; until then
- * this refuses loudly instead of sending an unauthenticated request.
+ * Delivery needs the user's own token, because `origin_grant` is keyed
+ * `(ownerSub, clientId)` and the user's session token names the client that holds
+ * that grant. A service cannot hold that credential — `clientCredentials` is disabled
+ * in the IdP — so this sender has nothing to send with. The BFF drains
+ * `GET /api/meal-todo/pending` and reports through `POST /api/meal-todo/published`
+ * instead. The poller stays for the case where a service credential does exist, and
+ * does nothing until then.
+ *
+ * ponytail: no producer credential, by design — the BFF drain is the delivery leg;
+ * replace this sender only if a service-identity path is ever granted.
  */
 export function createHttpDelivery(env: NodeJS.ProcessEnv = process.env): OutboxDelivery {
   const baseUrl = env[TODOS_API_URL_ENV];

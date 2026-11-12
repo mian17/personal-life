@@ -10,9 +10,22 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Principal } from '@life/service-kit';
+import { OUTBOX_SWEEP_BATCH } from './outbox/outbox-poller.service.js';
+import { OutboxService, type PendingIntent } from './outbox/outbox.service.js';
 import { MealTodoProducerService } from './outbox/producer/meal-todo-producer.service.js';
 import { MealTodoStateDto } from './outbox/producer/meal-todo-state.dto.js';
 import { MEAL_ORIGIN_SERVICE, ORIGIN_GRANT_PATH } from './outbox/producer/todo-intents.js';
@@ -20,6 +33,48 @@ import { TODOS_API_URL_ENV } from './outbox/outbox-delivery.js';
 
 /** `YYYY-MM-DD`, the wire form of the client's day. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Body of `POST /api/meal-todo/published` — what became of the intents the caller
+ * was handed by `GET /api/meal-todo/pending`.
+ *
+ * One body carries both outcomes on purpose: a batch whose rows partly succeeded
+ * takes one round trip, and a row that failed learns *why* in the same write that
+ * leaves it pending. A publish-only route would leave a stuck row with no reason to
+ * diagnose it by — the silent-failure shape this codebase refuses.
+ *
+ * The cap is the pending read's own batch constant, so no caller can be asked to
+ * report on more rows than one read can have handed it.
+ */
+export class OutboxOutcomesDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(OUTBOX_SWEEP_BATCH)
+  @ValidateNested({ each: true })
+  @Type(() => OutboxOutcomeDto)
+  records: OutboxOutcomeDto[];
+}
+
+/**
+ * One row's outcome. `id` is this service's delivery id, never a todo id.
+ *
+ * `published: false` means the caller attempted delivery and it did not take: the row
+ * stays pending with `lastError` as the reason. A reason longer than the column's bound
+ * is flattened and cut to it by the writer (`oneLine`), never refused: a caller
+ * reporting a noisy upstream error must still be able to close its batch.
+ */
+export class OutboxOutcomeDto {
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @IsBoolean()
+  published: boolean;
+
+  @IsOptional()
+  @IsString()
+  lastError?: string;
+}
 
 /**
  * The meals settings switch (`SPEC-todo-origin` assumption 12).
@@ -48,6 +103,7 @@ export class MealTodoController {
 
   constructor(
     private readonly producer: MealTodoProducerService,
+    private readonly outbox: OutboxService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
@@ -87,6 +143,49 @@ export class MealTodoController {
   async revoke(@Principal() principal: Principal): Promise<{ enabled: false }> {
     await this.producer.revoke(principal.sub, this.dataSource.manager);
     return { enabled: false };
+  }
+
+  /**
+   * `GET /api/meal-todo/pending` — the intents this owner still owes, oldest first.
+   *
+   * This is the delivery leg's read. The BFF drains it with the user's own token,
+   * which is the only credential a grant names (`origin_grant` is keyed
+   * `(ownerSub, clientId)` and that token's `client_id` is `app`), so no service ever
+   * needs to hold a user credential to deliver.
+   *
+   * `payload` is the exact JSON body todo-service accepts, unreshaped — the deliverer
+   * forwards it as it stands. Owner-scoped from `@Principal()`, never a parameter, so
+   * one owner's queue can never be read by another.
+   *
+   * Declared before the parameterless `GET /api/meal-todo`? Nest matches by path
+   * segment, not declaration order, and there is no `:id` route on this controller at
+   * all — so `pending` and `published` can never be mistaken for an id here.
+   */
+  @Get('pending')
+  async pending(@Principal() principal: Principal): Promise<{ intents: PendingIntent[] }> {
+    return { intents: await this.outbox.pendingFor(principal.sub, OUTBOX_SWEEP_BATCH) };
+  }
+
+  /**
+   * `POST /api/meal-todo/published` — record what became of a batch of intents.
+   *
+   * One call per batch, carrying both outcomes: a published row closes
+   * (`publishedAt = now`, `lastError = null`), a failed one stays pending with its
+   * reason on `lastError` and its `attempts` counter bumped. `attempts` is a
+   * diagnostic counter, never a retry limit — the poller and the BFF both retry
+   * indefinitely by design, and a case that must stop retrying is closed by
+   * publishing it with a reason (a todo-service 403, say).
+   *
+   * Every write is owner-scoped, so an id belonging to someone else is silently
+   * ignored rather than reported: whether that row exists is not this caller's
+   * business. Nothing but these three fields is writable through this route.
+   */
+  @Post('published')
+  async recordOutcomes(
+    @Principal() principal: Principal,
+    @Body() dto: OutboxOutcomesDto,
+  ): Promise<{ updated: number }> {
+    return { updated: await this.outbox.recordOutcomes(principal.sub, dto.records) };
   }
 
   /**

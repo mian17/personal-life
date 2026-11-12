@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
 import { getToday } from '@/lib/today';
 import { setMealTodos } from '@/lib/meal-api';
+import { kickPendingTodos } from '@/lib/outbox-relay';
 
 /** What the switch needs back: whether it stayed moved, and why not when it did not. */
 export type MealTodoResult = { ok: true } | { ok: false; message: string };
@@ -24,6 +25,10 @@ export type MealTodoResult = { ok: true } | { ok: false; message: string };
 export async function setMealTodosAction(enabled: boolean): Promise<MealTodoResult> {
   try {
     await setMealTodos(enabled, await getToday());
+    // Enabling seeds the day's three creates, so the first drain is what turns them
+    // into real tasks. Best-effort: the switch has moved, and a tick that cannot be
+    // delivered yet must not un-move it. Off needs no drain — nothing is owed.
+    if (enabled) kickPendingTodos();
     revalidatePath('/meals/settings');
     revalidatePath('/todos');
     return { ok: true };
