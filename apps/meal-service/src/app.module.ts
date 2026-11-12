@@ -14,6 +14,7 @@ import { SavedMealItem } from './saved-meals/saved-meal-item.entity.js';
 import { SavedMealsModule } from './saved-meals/saved-meals.module.js';
 import { MealBatchController } from './batch/meal-batch.controller.js';
 import { Outbox } from './outbox/outbox.entity.js';
+import { MealTodoToggle } from './outbox/producer/meal-toggle.entity.js';
 import { OutboxModule } from './outbox/outbox.module.js';
 import { Target } from './targets/target.entity.js';
 import { TargetModule } from './targets/target.module.js';
@@ -40,6 +41,7 @@ const SQLITE_BUSY_TIMEOUT_MS = 5_000;
         SavedMealItem,
         AuditEntry,
         Outbox,
+        MealTodoToggle,
       ],
       synchronize: true,
       // A busy file must make a writer wait, not fail: the outbox poller marks

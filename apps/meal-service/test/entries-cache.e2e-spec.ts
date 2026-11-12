@@ -5,6 +5,7 @@ import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { MealCache, generationKey } from '../src/cache/meal-cache.js';
 import { EntriesCache } from '../src/entries/entries-cache.js';
 import { EntriesService } from '../src/entries/entries.service.js';
+import { MealTodoProducerService } from '../src/outbox/producer/meal-todo-producer.service.js';
 import { KeysService } from '@life/service-kit';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
 import type { Entry } from '../src/entries/entry.entity.js';
@@ -35,6 +36,12 @@ const SUB = 'sub-1';
 const OTHER_SUB = 'sub-2';
 const DAY = '2026-09-03';
 const ISO = '2026-01-01T00:00:00.000Z';
+
+/** No-op producer: these suites assert caching, not what an entry owes todo-service. */
+const NO_PRODUCER = {
+  ensureDailyTasks: async () => {},
+  noteEntryLogged: async () => {},
+} as unknown as MealTodoProducerService;
 
 /** A complete nutrient vector: `overrides` on top of zeroes. */
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
@@ -129,7 +136,14 @@ function makeHarness(client: CacheClient, events: string[] = []): Harness {
   const repo = new FakeEntryRepo(events);
   const userKeys = new FakeUserKeysRepo();
   const keys = new KeysService(userKeys as never, Buffer.alloc(32, 0x2c));
-  const service = new EntriesService(repo as never, new EntriesCache(new MealCache(client)), keys);
+  // A no-op producer is correct here: this suite asserts cache behaviour, not
+  // what a logged entry owes todo-service.
+  const service = new EntriesService(
+    repo as never,
+    new EntriesCache(new MealCache(client)),
+    keys,
+    NO_PRODUCER,
+  );
   return { service, repo, client, keys, events };
 }
 

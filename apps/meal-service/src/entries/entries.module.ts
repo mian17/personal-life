@@ -7,11 +7,15 @@ import { Entry } from './entry.entity.js';
 import { EntriesController } from './entries.controller.js';
 import { EntriesCache } from './entries-cache.js';
 import { EntriesService } from './entries.service.js';
+import { OutboxModule } from '../outbox/outbox.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Entry]),
     KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
+    // A logged entry owes todo-service a tick; the producer lives with the
+    // outbox it writes to, so this module imports it rather than the reverse.
+    OutboxModule,
   ],
   controllers: [EntriesController],
   // Exported so the batch controller in `AppModule` can reach the same service

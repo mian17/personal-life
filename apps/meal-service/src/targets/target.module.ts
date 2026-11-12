@@ -20,5 +20,9 @@ import { TargetService } from './target.service.js';
     },
     TargetService,
   ],
+  // Exported so the todos producer can read the day's target through this one
+  // service instance. `MEAL_CACHE` stays unexported: the adapter is composed by
+  // each module that consumes it, never shared as a provider.
+  exports: [TargetService],
 })
 export class TargetModule {}
