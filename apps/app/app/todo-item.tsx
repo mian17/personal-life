@@ -108,7 +108,10 @@ export function TodoItem({
     // ponytail: a failure landing after a retick still drops the newer optimistic value —
     // the row shows server truth, which is the honest state. Add a per-press write id if a
     // flicker on that race ever gets reported.
-    if (baseline.current.version === attempted.version && baseline.current.done === attempted.done) {
+    if (
+      baseline.current.version === attempted.version &&
+      baseline.current.done === attempted.done
+    ) {
       baseline.current = serverState;
     }
     setIntent(null);

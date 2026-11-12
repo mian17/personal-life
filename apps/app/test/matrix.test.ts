@@ -4,12 +4,7 @@ import { groupByQuadrant, isUrgent, quadrantOf, QUADRANTS } from '@/lib/matrix';
 
 const TODAY = '2026-10-01';
 
-function todo(
-  id: string,
-  dueDate: string | null,
-  effectiveImportant: boolean,
-  done = false,
-): Todo {
+function todo(id: string, dueDate: string | null, effectiveImportant: boolean, done = false): Todo {
   return {
     id,
     title: id,

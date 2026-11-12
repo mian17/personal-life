@@ -86,7 +86,9 @@ async function renderScreen(): Promise<string> {
 describe('/todos list page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListTodos.mockResolvedValue(page([todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })]));
+    mockedListTodos.mockResolvedValue(
+      page([todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })]),
+    );
     mockedListLists.mockResolvedValue([
       {
         id: 'l1',
@@ -125,7 +127,11 @@ describe('/todos list page wiring', () => {
   it('walks the completion log whole, so the lookup is complete before any page renders', async () => {
     mockedListTodos.mockResolvedValue(page([todo()], 'todo-cursor-2', 2));
     mockedListTodoCompletions
-      .mockResolvedValueOnce({ completions: [completion({ id: 'c9' })], nextCursor: 'log-2', total: 2 })
+      .mockResolvedValueOnce({
+        completions: [completion({ id: 'c9' })],
+        nextCursor: 'log-2',
+        total: 2,
+      })
       .mockResolvedValueOnce({
         completions: [completion({ id: 'c1', todoId: 't1' })],
         nextCursor: null,
@@ -395,10 +401,27 @@ describe('/todos list row tint', () => {
   it('tints Overdue/Today rows by quadrant and leaves Done rows untinted', async () => {
     mockedListTodos.mockResolvedValue(
       page([
-        todo({ id: 'oi', title: 'Overdue important', dueDate: '2000-01-01', effectiveImportant: true }),
+        todo({
+          id: 'oi',
+          title: 'Overdue important',
+          dueDate: '2000-01-01',
+          effectiveImportant: true,
+        }),
         todo({ id: 'tn', title: 'Today not important', dueDate: TODAY, effectiveImportant: false }),
-        todo({ id: 'di', title: 'Done important', dueDate: '2000-01-01', effectiveImportant: true, done: true }),
-        todo({ id: 'dn', title: 'Done neither', dueDate: null, effectiveImportant: false, done: true }),
+        todo({
+          id: 'di',
+          title: 'Done important',
+          dueDate: '2000-01-01',
+          effectiveImportant: true,
+          done: true,
+        }),
+        todo({
+          id: 'dn',
+          title: 'Done neither',
+          dueDate: null,
+          effectiveImportant: false,
+          done: true,
+        }),
       ]),
     );
 

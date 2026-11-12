@@ -26,7 +26,11 @@ function todo(id: string, dueDate: string | null, done = false): Todo {
   };
 }
 
-function completion(id: string, todoId: string, completedAt = '2026-10-02T10:00:00.000Z'): TodoCompletion {
+function completion(
+  id: string,
+  todoId: string,
+  completedAt = '2026-10-02T10:00:00.000Z',
+): TodoCompletion {
   return {
     id,
     todoId,
@@ -128,9 +132,7 @@ describe('groupTodos', () => {
     )!;
     expect(withStray.todos).toEqual([]);
 
-    const noLog = groupTodos([todo('d', '2026-09-01', true)], TODAY).find(
-      (g) => g.key === 'done',
-    )!;
+    const noLog = groupTodos([todo('d', '2026-09-01', true)], TODAY).find((g) => g.key === 'done')!;
     expect(noLog.todos.map((t) => t.id)).toEqual(['d']);
   });
 

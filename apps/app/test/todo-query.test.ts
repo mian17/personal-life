@@ -41,9 +41,7 @@ describe('collectTodos', () => {
   it('stops at maxItems even when the service offers more', async () => {
     const all = await collectTodos(
       async (cursor) =>
-        cursor
-          ? { todos: [], nextCursor: null }
-          : { todos: [todo('one', null)], nextCursor: 'p2' },
+        cursor ? { todos: [], nextCursor: null } : { todos: [todo('one', null)], nextCursor: 'p2' },
       1,
     );
     expect(all).toHaveLength(1);
