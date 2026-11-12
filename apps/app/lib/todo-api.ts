@@ -79,6 +79,28 @@ export function deleteTodo(id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/todos/${id}`, { method: 'DELETE' });
 }
 
+/** One open task, as `GET /api/todos/origin/open` serves it to a consumer. */
+export interface OpenTask {
+  id: string;
+  title: string;
+  dueDate: string | null;
+  done: boolean;
+  version: number;
+  originService: string | null;
+}
+
+/**
+ * `GET /api/todos/origin/open` — the owner's open tasks, as this app's read grant
+ * reaches them (`SPEC-todo-origin`, read direction).
+ *
+ * Unpaged by design: a consumer picking one task must see them all, and open tasks are
+ * a user-scale set. A 403 here means no read grant, which the focus screen reads as "no
+ * task list" rather than an error — the timer works either way.
+ */
+export function listOpenTasks(): Promise<OpenTask[]> {
+  return call<OpenTask[]>('/api/todos/origin/open');
+}
+
 /** `GET /api/todos/trash` — cursor page of the owner's soft-deleted todos. */
 export function listTodoTrash(): Promise<TodoPage> {
   return call<TodoPage>('/api/todos/trash');

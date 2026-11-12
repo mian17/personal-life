@@ -1,9 +1,11 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { setPrefNumbers } from '@life/app-kit/preference-action';
 import { clampMinutes, isDailyGoal } from '@life/pomodoro';
-import { recordSession, setGoal } from '@/lib/focus-api';
+import { answerFocusQuestion, recordSession, setGoal } from '@/lib/focus-api';
+import { updateTodo } from '@/lib/todo-api';
 import { getToday } from '@/lib/today';
 
 /** The three form fields and the cookie each one persists. */
@@ -78,9 +80,43 @@ export async function setPomodoroGoal(formData: FormData): Promise<void> {
  * Keep one finished focus block in the owner's day (`POST /api/sessions`). The
  * day is resolved here by the shared `getToday()` owner, never by the browser
  * clock (lesson 0019), and a part-minute block is a block the day does not hold.
+ *
+ * `todoId` rides the same write when the owner picked a task. The service refuses an
+ * id the caller's read grant does not reach, so a stale pick fails the record rather
+ * than storing a reference nothing can resolve — which is why the answer is the
+ * stored row's id: the client cannot invent one.
  */
-export async function recordFocusSession(minutes: number): Promise<void> {
-  if (minutes < 1) return;
+export async function recordFocusSession(
+  minutes: number,
+  todoId?: string,
+): Promise<{ id: string } | null> {
+  if (minutes < 1) return null;
 
-  await recordSession(await getToday(), minutes);
+  const row = await recordSession(await getToday(), minutes, todoId);
+  return { id: row.id };
+}
+
+/** The two answers the "done?" question accepts. Both are answers; only one ticks. */
+export type FocusAnswer = 'done' | 'not-yet';
+
+/**
+ * Answer the question a recorded block's task raised, and tick the task when the answer
+ * is `Done`.
+ *
+ * The tick is the **owner's own** `PATCH /api/todos/:id`, made with the owner's token:
+ * the owner is the actor, so this is an ordinary edit and needs no write grant. Focus
+ * never writes a todo, and the producer origin-tick route is not involved (that one is
+ * for a service acting as itself).
+ *
+ * The answer is written either way, so the question is asked once — `Not yet` writes
+ * nothing further, and both answers stop it returning.
+ */
+export async function answerFocusQuestionAction(
+  sessionId: string,
+  todoId: string,
+  answer: FocusAnswer,
+): Promise<void> {
+  if (answer === 'done') await updateTodo(todoId, { done: true });
+  await answerFocusQuestion(sessionId);
+  revalidatePath('/pomodoro');
 }

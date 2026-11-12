@@ -8,6 +8,13 @@ export interface SessionRow {
   ownerSub: string | null;
   date: string;
   minutes: number;
+  /**
+   * The task this block worked on, as todo-service's id and nothing else — the row
+   * stores no title, date or done flag, so a reader resolves the id itself.
+   */
+  todoId: string | null;
+  /** When the owner answered the "done?" question; `null` means it is still owed. */
+  todoAnsweredAt: string | null;
   createdAt: string;
 }
 
@@ -45,11 +52,7 @@ function call<T>(path: string, init?: RequestInit): Promise<T> {
  * bucket window), so the range enters the query string rather than being derived
  * from a clock here; `cursor` is opaque and passed back untouched.
  */
-export function fetchSessionPage(
-  from: string,
-  to: string,
-  cursor?: string,
-): Promise<SessionPage> {
+export function fetchSessionPage(from: string, to: string, cursor?: string): Promise<SessionPage> {
   const query = new URLSearchParams({ from, to });
   if (cursor !== undefined) query.set('cursor', cursor);
   return call<SessionPage>(`/api/sessions?${query}`);
@@ -67,12 +70,31 @@ export function listSessions(from: string, to: string): Promise<SessionRow[]> {
   return collectSessionWindow(fetchSessionPage.bind(null, from, to));
 }
 
-/** `POST /api/sessions` — one recorded block for the caller's own day. */
-export function recordSession(date: string, minutes: number): Promise<SessionRow> {
+/**
+ * `POST /api/sessions` — one recorded block for the caller's own day, optionally
+ * naming the task it worked on.
+ *
+ * `todoId` is omitted rather than sent as `null` when no task was chosen: the service's
+ * DTO takes an optional bounded string, and an explicit null would be a second spelling
+ * of "no task" for no gain.
+ */
+export function recordSession(date: string, minutes: number, todoId?: string): Promise<SessionRow> {
   return call<SessionRow>('/api/sessions', {
     method: 'POST',
-    body: JSON.stringify({ date, minutes }),
+    body: JSON.stringify({ date, minutes, ...(todoId === undefined ? {} : { todoId }) }),
   });
+}
+
+/**
+ * `POST /api/sessions/:id/answer` — the owner answered, either way, the question this
+ * block's task raised.
+ *
+ * It records the answer only. Ticking the task is the owner's own
+ * `PATCH /api/todos/:id` (`todo-api.updateTodo`): the owner is the actor, so that needs
+ * no grant and focus-service never writes a todo.
+ */
+export function answerFocusQuestion(sessionId: string): Promise<SessionRow> {
+  return call<SessionRow>(`/api/sessions/${sessionId}/answer`, { method: 'POST' });
 }
 
 /**

@@ -27,10 +27,7 @@ export default async function PomodoroStatsRoute({
 
   // One fetch up to today, never just up to the shifted window: today's bar
   // measures today whatever period the owner is reading.
-  const [sessions, goals] = await Promise.all([
-    listSessions(statsWindow.from, today),
-    listGoals(),
-  ]);
+  const [sessions, goals] = await Promise.all([listSessions(statsWindow.from, today), listGoals()]);
 
   return (
     <StatsView
@@ -82,6 +79,9 @@ function pairDaysWithMinutes(days: string[], sessions: SessionRow[]): SessionRow
     ownerSub: null,
     date: day,
     minutes: minutes.get(day) ?? 0,
+    // A drawn day is a bucket, not a block: it names no task and raises no question.
+    todoId: null,
+    todoAnsweredAt: null,
     createdAt: `${day}T00:00:00.000Z`,
   }));
 }

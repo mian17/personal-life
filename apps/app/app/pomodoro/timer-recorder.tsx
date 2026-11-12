@@ -1,9 +1,10 @@
 'use client';
 
-import { PomodoroPage, type Durations } from '@life/pomodoro';
-import { useRef } from 'react';
+import { PomodoroPage, type Durations, type FocusTaskChoice } from '@life/pomodoro';
+import { useRef, useState } from 'react';
 import { useDebouncedCallback } from '@/lib/use-debounced-callback';
 import { recordFocusSession, setPomodoroBreakMinutes, setPomodoroFocusMinutes } from './actions';
+import { DonePrompt, type FocusQuestion } from './done-prompt';
 
 /**
  * How long a chip pick waits before it is written. Shorter than the toggle window
@@ -22,6 +23,10 @@ export interface TimerRecorderProps {
   todayMinutes?: number;
   /** Today's resolved goal, or `null` before the owner set one. */
   todayGoalMinutes?: number | null;
+  /** The owner's open tasks; empty draws no picker and no task can be named. */
+  tasks?: FocusTaskChoice[];
+  /** A block the service still owes an answer for — what a closed tab left behind. */
+  pendingQuestion?: FocusQuestion | null;
 }
 
 /**
@@ -38,6 +43,8 @@ export function TimerRecorder({
   durations,
   todayMinutes,
   todayGoalMinutes,
+  tasks = [],
+  pendingQuestion = null,
 }: Readonly<TimerRecorderProps>) {
   // What the server has been told, one baseline per length. A third of the point of the
   // baseline is the return trip: 25 → 50 → 25 leaves the server exactly where it already was,
@@ -60,6 +67,21 @@ export function TimerRecorder({
     long: settleLongBreak,
   };
 
+  // The task the next block will name. A pick made here rides the record call, so the
+  // block and the task it worked on are one write; unset is the ordinary case and stays
+  // fully valid.
+  const [todoId, setTodoId] = useState<string | null>(null);
+
+  // The question a recorded block raises, seeded from stored state so a tab closed at
+  // the boundary still asks on the next load. The id is the only thing the row holds,
+  // so the title is resolved here, against the task list this render already has.
+  const [question, setQuestion] = useState<FocusQuestion | null>(pendingQuestion);
+
+  /** The title a task id carries, for the prompt's sentence. */
+  function titleOf(taskId: string): string {
+    return tasks.find((task) => task.id === taskId)?.title ?? 'that task';
+  }
+
   /** Report a picked length once the taps stop, carrying the value its row settled on. */
   function reportLength(length: LengthKey, minutes: number): void {
     flushLength[length](() => {
@@ -75,16 +97,39 @@ export function TimerRecorder({
     });
   }
 
+  /**
+   * Record the block, then raise the question it earned.
+   *
+   * The same `minutes >= 1` condition is what `useFocusRecorded` already gates on, so
+   * both record moments (the boundary and a stop mid-focus) reach this one place: the
+   * prompt can neither appear without a saved block nor be missing after one. Only a
+   * block that named a task asks anything, and only the row the service stored names the
+   * session the answer is written against.
+   */
+  async function record(minutes: number): Promise<void> {
+    const chosen = todoId;
+    const saved = await recordFocusSession(minutes, chosen ?? undefined);
+    if (saved === null || chosen === null) return;
+
+    setQuestion({ sessionId: saved.id, todoId: chosen, minutes, title: titleOf(chosen) });
+  }
+
   return (
-    <PomodoroPage
-      durations={durations}
-      onFocusLengthChange={(minutes) => reportLength('focus', minutes)}
-      onBreakLengthChange={(phase, minutes) => reportLength(phase, minutes)}
-      // A finished block is a record of something that already happened, and it fires once,
-      // so it goes straight through: delaying it would delay the day's total for no burst.
-      onFocusBlockEnd={recordFocusSession}
-      todayMinutes={todayMinutes}
-      todayGoalMinutes={todayGoalMinutes}
-    />
+    <>
+      <PomodoroPage
+        durations={durations}
+        onFocusLengthChange={(minutes) => reportLength('focus', minutes)}
+        onBreakLengthChange={(phase, minutes) => reportLength(phase, minutes)}
+        // A finished block is a record of something that already happened, and it fires once,
+        // so it goes straight through: delaying it would delay the day's total for no burst.
+        onFocusBlockEnd={(minutes) => void record(minutes)}
+        todayMinutes={todayMinutes}
+        todayGoalMinutes={todayGoalMinutes}
+        tasks={tasks}
+        todoId={todoId}
+        onTodoIdChange={setTodoId}
+      />
+      <DonePrompt question={question} onAnswered={() => setQuestion(null)} />
+    </>
   );
 }

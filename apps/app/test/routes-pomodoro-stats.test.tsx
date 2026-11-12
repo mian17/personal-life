@@ -42,6 +42,8 @@ function sessionOn(date: string, minutes: number): SessionRow {
     ownerSub: 'owner-1',
     date,
     minutes,
+    todoId: null,
+    todoAnsweredAt: null,
     createdAt: `${date}T09:00:00.000Z`,
   };
 }
@@ -253,8 +255,10 @@ describe('/pomodoro/stats composition', () => {
       ['Month', '/pomodoro/stats?period=month'],
       ['Year', '/pomodoro/stats?period=year'],
     ]);
-    expect(segments(tree).filter((item) => item.active).map(({ label }) => label)).toEqual([
-      'Month',
-    ]);
+    expect(
+      segments(tree)
+        .filter((item) => item.active)
+        .map(({ label }) => label),
+    ).toEqual(['Month']);
   });
 });

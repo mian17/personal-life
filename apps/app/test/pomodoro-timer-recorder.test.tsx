@@ -29,31 +29,55 @@ const ReactModule = jest.requireActual<typeof import('react')>('react');
 
 /**
  * `TimerRecorder` runs the debounce hook three times — one settle window per length — plus its
- * own baseline ref. Outside React there is no dispatcher, so the two hooks it calls are spied:
- * `useRef` gets a position-keyed slot that survives re-renders, and `useEffect` records the
- * hook's cleanup so `unmount()` can run it.
+ * own baseline ref, the picked task and the question it raises. Outside React there is no
+ * dispatcher, so the hooks it calls are spied: `useRef` and `useState` get position-keyed
+ * slots that survive re-renders, `useTransition` runs its action synchronously, and
+ * `useEffect` records the hook's cleanup so `unmount()` can run it.
  */
 function mount() {
   const slots: Array<{ current: unknown }> = [];
+  const states: unknown[] = [];
   const cleanups: Array<() => void | (() => void)> = [];
   let nextSlot = 0;
+  let nextState = 0;
 
-  const refSpy = jest
-    .spyOn(ReactModule, 'useRef')
-    .mockImplementation(((initial: unknown) => {
-      const slot = (slots[nextSlot++] ??= { current: initial });
-      return slot;
-    }) as unknown as typeof ReactModule.useRef);
-  const effectSpy = jest
-    .spyOn(ReactModule, 'useEffect')
-    .mockImplementation(((fn: () => void | (() => void)) => {
-      cleanups.push(fn);
-    }) as unknown as typeof ReactModule.useEffect);
+  const refSpy = jest.spyOn(ReactModule, 'useRef').mockImplementation(((initial: unknown) => {
+    const slot = (slots[nextSlot++] ??= { current: initial });
+    return slot;
+  }) as unknown as typeof ReactModule.useRef);
+  const effectSpy = jest.spyOn(ReactModule, 'useEffect').mockImplementation(((
+    fn: () => void | (() => void),
+  ) => {
+    cleanups.push(fn);
+  }) as unknown as typeof ReactModule.useEffect);
+  const stateSpy = jest.spyOn(ReactModule, 'useState').mockImplementation(((initial: unknown) => {
+    const slot = nextState++;
+    states[slot] ??= typeof initial === 'function' ? (initial as () => unknown)() : initial;
+    const set = (next: unknown) => {
+      states[slot] =
+        typeof next === 'function' ? (next as (v: unknown) => unknown)(states[slot]) : next;
+    };
+    return [states[slot], set];
+  }) as unknown as typeof ReactModule.useState);
+  const transitionSpy = jest
+    .spyOn(ReactModule, 'useTransition')
+    .mockImplementation((() => [
+      (fn: () => void) => fn(),
+      false,
+    ]) as unknown as typeof ReactModule.useTransition);
 
   return {
+    /**
+     * The card's element, not the fragment around it: `TimerRecorder` now renders the
+     * card and the "done?" prompt as siblings, so the card is the fragment's first child.
+     */
     render(): RecorderTree {
       nextSlot = 0;
-      return TimerRecorder({ durations: DURATIONS }) as unknown as RecorderTree;
+      nextState = 0;
+      const tree = TimerRecorder({ durations: DURATIONS }) as unknown as {
+        props: { children: RecorderTree[] };
+      };
+      return tree.props.children[0];
     },
     /** Run every captured effect cleanup, which is what an unmount does. */
     unmount: () => {
@@ -65,6 +89,8 @@ function mount() {
     restore: () => {
       refSpy.mockRestore();
       effectSpy.mockRestore();
+      stateSpy.mockRestore();
+      transitionSpy.mockRestore();
     },
   };
 }
