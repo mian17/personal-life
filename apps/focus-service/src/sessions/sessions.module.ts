@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FOCUS_CACHE, createFocusCache } from '../cache/focus-cache.js';
+import { FocusTodosModule } from '../todos/focus-todos.module.js';
 import { Session } from './session.entity.js';
 import { SessionsController } from './sessions.controller.js';
 import { SessionsService } from './sessions.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Session])],
+  imports: [TypeOrmModule.forFeature([Session]), FocusTodosModule],
   controllers: [SessionsController],
   providers: [
     // Selection happens once at module init: no `REDIS_URL` keeps the direct-DB

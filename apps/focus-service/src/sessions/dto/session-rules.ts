@@ -14,3 +14,10 @@ export const SESSION_DATE_MAX = 10;
 
 /** Both bounds inclusive: `0` is a discarded block, `181` is an impossible one. */
 export const MINUTES_RANGE = { min: 1, max: 180 } as const;
+
+/**
+ * A todo id is todo-service's own uuid, so this is a sanity bound rather than the
+ * id's shape: the id's shape belongs to the service that mints it, and a second
+ * regex here would be a copy free to drift from it.
+ */
+export const SESSION_TODO_ID_MAX = 64;
