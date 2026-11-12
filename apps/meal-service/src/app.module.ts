@@ -13,16 +13,40 @@ import { SavedMeal } from './saved-meals/saved-meal.entity.js';
 import { SavedMealItem } from './saved-meals/saved-meal-item.entity.js';
 import { SavedMealsModule } from './saved-meals/saved-meals.module.js';
 import { MealBatchController } from './batch/meal-batch.controller.js';
+import { Outbox } from './outbox/outbox.entity.js';
+import { OutboxModule } from './outbox/outbox.module.js';
 import { Target } from './targets/target.entity.js';
 import { TargetModule } from './targets/target.module.js';
+
+/**
+ * How long a writer waits for a locked SQLite file before giving up. The outbox
+ * poller and the business writer share this one file, so the wait has to be
+ * generous enough to cover a sweep's short immediate transaction (`db-primaries.md` §2).
+ */
+const SQLITE_BUSY_TIMEOUT_MS = 5_000;
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db'),
-      entities: [UserKeys, Target, Food, Serving, Entry, SavedMeal, SavedMealItem, AuditEntry],
+      entities: [
+        UserKeys,
+        Target,
+        Food,
+        Serving,
+        Entry,
+        SavedMeal,
+        SavedMealItem,
+        AuditEntry,
+        Outbox,
+      ],
       synchronize: true,
+      // A busy file must make a writer wait, not fail: the outbox poller marks
+      // rows on the same file the request path writes (`db-primaries.md` §2).
+      prepareDatabase: (db: { pragma: (sql: string) => unknown }): void => {
+        db.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+      },
     }),
     KeysModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
     HealthModule.forRoot({ masterKeyEnv: MASTER_KEY_ENV }),
@@ -32,6 +56,7 @@ import { TargetModule } from './targets/target.module.js';
     SavedMealsModule,
     PhotoModule,
     AuditModule.forRoot(),
+    OutboxModule,
   ],
   // All eight batch routes live on one prefix-less controller (`SPEC-meal-service`
   // §5), registered here so their literal paths resolve ahead of every imported
