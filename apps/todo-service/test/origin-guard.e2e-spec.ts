@@ -89,10 +89,17 @@ describe('Origin write guards (service seam)', () => {
     // A grant is per owner: this owner granted producer-a `meal-service`, and a
     // second owner granted the same client `calendar-service`.
     await h.dataSource.getRepository(OriginGrant).insert([
-      { ownerSub: SUB, clientId: 'producer-a', originService: GRANTED, grantedAt: new Date() },
+      {
+        ownerSub: SUB,
+        clientId: 'producer-a',
+        direction: 'write',
+        originService: GRANTED,
+        grantedAt: new Date(),
+      },
       {
         ownerSub: OTHER_USER,
         clientId: 'producer-a',
+        direction: 'write',
         originService: OTHER_GRANTED,
         grantedAt: new Date(),
       },

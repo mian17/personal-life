@@ -33,6 +33,20 @@ export class TodosController {
   }
 
   /**
+   * The read surface a **read** grant opens (`SPEC-todo-origin`, read direction):
+   * the owner's open tasks, as narrowed by the caller's own grant.
+   *
+   * No `@Query()` and no `@Body()` on purpose. The reach is the grant's, decided by
+   * the origin the user enabled — a parameter here would be a request naming its own
+   * scope, which is how a consumer could ask for more than the screen offered. The
+   * owner comes from `@Principal()` like every other route.
+   */
+  @Get('origin/open')
+  findOpenForClient(@Principal() principal: Principal) {
+    return this.todos.findOpenForClient(principal);
+  }
+
+  /**
    * A user enabling a producer from that producer's own settings screen
    * (`SPEC-todo-origin` assumption 12) — the self-service grant the operator CLI is
    * no longer needed for. The body names only the origin; owner and grantee are the

@@ -62,17 +62,20 @@ describe('Origin API (e2e)', () => {
     await app.init();
     dataSource = app.get(DataSource);
     // A grant is per owner: two users may grant the same producer client, each with
-    // its own origin. Client B is granted by nobody.
+    // its own origin. Client B is granted by nobody. Both rows are **write** grants,
+    // the direction every row written before the column existed carries.
     await dataSource.getRepository(OriginGrant).insert([
       {
         ownerSub: APP_USER,
         clientId: PRODUCER_A,
+        direction: 'write',
         originService: GRANTED_ORIGIN,
         grantedAt: new Date(),
       },
       {
         ownerSub: OTHER_USER,
         clientId: PRODUCER_A,
+        direction: 'write',
         originService: OTHER_GRANTED_ORIGIN,
         grantedAt: new Date(),
       },

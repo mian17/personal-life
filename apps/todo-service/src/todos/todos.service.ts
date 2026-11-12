@@ -36,11 +36,17 @@ import {
   KeysService,
   paginate,
   runAtomicBatch,
+  type GrantDirection,
   type Principal,
+  type ReadGrant,
 } from '@life/service-kit';
 import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
-import { SELF_SERVICE_DISCLOSURE, type GrantOwnOriginDto } from './dto/grant-own-origin.dto.js';
+import {
+  SELF_SERVICE_DISCLOSURE,
+  SELF_SERVICE_GRANT,
+  type GrantOwnOriginDto,
+} from './dto/grant-own-origin.dto.js';
 import { ListsService } from '../lists/lists.service.js';
 import {
   TODO_ALL,
@@ -50,6 +56,36 @@ import {
   TODO_TRASH,
   TodosCache,
 } from '../cache/todo-cache.js';
+
+/**
+ * One open task on the read surface. The fields are the subset a consumer needs to
+ * display a task and later tick it by id — `originService`/`originId` so a producer
+ * recognises its own rows, `version` so a later write can be optimistic.
+ */
+export type OpenTask = Pick<
+  TodoDto,
+  'id' | 'title' | 'dueDate' | 'done' | 'version' | 'originService'
+> & { originId: string | null };
+
+/**
+ * Narrow a decoded todo, and the row it came from, to the read surface.
+ *
+ * `originId` is not on the wire `Todo` (`SPEC-todo-origin` §11 keeps the producer's
+ * own id off the app's DTO), but it is on the cached row this read already holds —
+ * so it is copied across here rather than added to the shared type, where the app
+ * would have no way to use it.
+ */
+function openTaskOf(dto: TodoDto, originId: string | null): OpenTask {
+  return {
+    id: dto.id,
+    title: dto.title,
+    dueDate: dto.dueDate,
+    done: dto.done,
+    version: dto.version,
+    originService: dto.originService,
+    originId,
+  };
+}
 
 /** A todo as a create carries it — the shape one `:batchCreate` item holds. */
 type TodoDraft = {
@@ -83,6 +119,7 @@ export type OwnGrantView = {
   ownerSub: string;
   clientId: string;
   originService: string;
+  direction: GrantDirection;
   grantedAt: Date;
 };
 
@@ -421,6 +458,7 @@ export class TodosService {
       repeatDays: row.repeatDays,
       reminderScheduledAt: row.reminderScheduledAt,
       listId: row.listId,
+      originService: row.originService,
       tagIds: [...row.tagIds],
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -688,6 +726,77 @@ export class TodosService {
   }
 
   /**
+   * The read grant this owner gave the caller's verified `client_id`, or 403.
+   *
+   * Fail closed for the same reason the write path does: no `client_id` means no
+   * grantee, and a grant is per owner. A missing read grant is a 403 and not an
+   * empty list — "you may not read this" and "you may read nothing" are different
+   * answers, and reporting the second for the first would tell a consumer its
+   * permission exists when it does not.
+   */
+  private async readGrant(ownerSub: string, clientId: string | null): Promise<ReadGrant> {
+    const grant = clientId === null ? null : await this.grants.findReadGrant(ownerSub, clientId);
+    if (grant === null) throw new ForbiddenException('No read grant for this client');
+    return grant;
+  }
+
+  /**
+   * `GET /api/todos/origin/open` — the owner's open tasks, as a **read** grant lets
+   * the caller's producer app see them (`SPEC-todo-origin`, read direction). That is
+   * the focus app's whole need: pick a task to work on. It cannot create, cannot
+   * tick, and cannot ask for anything the grant did not give it.
+   *
+   * The reach comes from the grant and nowhere else. `scope: 'all'` is every open
+   * task of the owner; `scope: 'own-origin'` is only the rows this producer itself
+   * created — the producer-read case, where a producer must be able to ask "did the
+   * user already tick my task?" or it re-creates a duplicate. No request field names
+   * a scope, an owner or an origin, so there is nothing to widen.
+   *
+   * Reads through the existing `todo:all` read-through entry rather than a new key:
+   * the cached value is the owner's serialized ciphertext row-set, one entry serving
+   * every filter, which is why no per-scope key exists to fragment (Contract 2 Rule
+   * 1 — the loader stays inside `getThrough`). Every write bumps the owner's
+   * generation, so a read after a tick is fresh; and where staleness would matter it
+   * cannot: a stale list shows a stale row, it never hands out a duplicate.
+   *
+   * The answer is unpaged and in the app's own domain order. Open tasks are a
+   * user-scale set and a consumer picking one must see them all, so a cursor here
+   * would be surface without a caller.
+   * ponytail: one unpaged response; add `limit`/`cursor` when a real open-task count
+   * makes a single body too large to send.
+   */
+  async findOpenForClient(principal: Principal): Promise<OpenTask[]> {
+    const grant = await this.readGrant(principal.sub, principal.clientId);
+    // `rawRows`' loader already guards `deletedAt IS NULL` (as `findOne` relies on),
+    // so "open" is the done flag plus the grant's reach — nothing else to filter.
+    const rows = (await this.rawRows(principal.sub)).filter(
+      (row) => !row.done && this.isWithinReadScope(row, grant),
+    );
+    const dek = await this.readDek(principal.sub, rows);
+    // One entry per row, carrying the row itself: the answer needs `originId`,
+    // which the decoded DTO does not hold.
+    const ordered = rows
+      .map((row) => ({
+        row,
+        dto: this.decodeCachedTodoRow(row, principal.sub, dek, this.effectiveImportant(row)),
+        due: dueSortKey(row.dueDate, this.tz),
+      }))
+      .sort(compareTodos);
+    return ordered.map(({ row, dto }) => openTaskOf(dto, row.originId));
+  }
+
+  /**
+   * Whether a read grant reaches this row: `'all'` reaches everything, and
+   * `'own-origin'` only the rows stamped with the grant's own origin. An
+   * unrecognised or absent scope is narrowed to the origin rather than widened,
+   * because a read path that fails open is an escalation.
+   */
+  private isWithinReadScope(row: CachedTodoRow, grant: ReadGrant): boolean {
+    if (grant.scope === 'all') return true;
+    return row.originService === grant.originService;
+  }
+
+  /**
    * `POST /api/todos/origin-grant` — a user grants their own producer app the origin
    * the producer's settings screen asked for (`SPEC-todo-origin` assumption 12).
    *
@@ -697,10 +806,15 @@ export class TodosService {
    * with it comes from this service's own table, so the caller picks the origin and
    * the service picks the consent text.
    *
-   * An upsert, because a grant is a current permission: enabling twice refreshes one
-   * row and its consent. The grant is read straight from the repository on every
-   * origin write and never cached (see `GrantsService`), so there is no cache entry
-   * to invalidate here.
+   * An upsert on the full key `(ownerSub, clientId, direction)`, because a grant is a
+   * current permission: enabling meals twice refreshes one row and its consent,
+   * while enabling focus beside it adds the read row and leaves the write row
+   * untouched — the two share the BFF's single `app` client id. The direction and
+   * read scope come from the origin itself (`SELF_SERVICE_GRANT`), never from the
+   * body: a request that could name either would be granting itself a capability no
+   * screen offered. The grant is read straight from the repository on every origin
+   * write and never cached (see `GrantsService`), so there is no cache entry to
+   * invalidate here.
    */
   async grantOwnOrigin(principal: Principal, dto: GrantOwnOriginDto): Promise<OwnGrantView> {
     if (principal.clientId === null) {
@@ -711,11 +825,13 @@ export class TodosService {
       principal.clientId,
       dto.originService,
       SELF_SERVICE_DISCLOSURE[dto.originService],
+      SELF_SERVICE_GRANT[dto.originService],
     );
     return {
       ownerSub: grant.ownerSub,
       clientId: grant.clientId,
       originService: grant.originService,
+      direction: grant.direction,
       grantedAt: grant.grantedAt,
     };
   }

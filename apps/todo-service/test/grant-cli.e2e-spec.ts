@@ -93,7 +93,7 @@ describe('grant-origin CLI', () => {
     });
   });
 
-  it('lists the rows it wrote as `ownerSub clientId originService grantedAt`', () => {
+  it('lists the rows it wrote as `ownerSub clientId originService grantedAt direction`', () => {
     const dbPath = emptyDb();
     capture(() =>
       main([
@@ -112,10 +112,12 @@ describe('grant-origin CLI', () => {
 
     expect(listed.code).toBe(0);
     expect(listed.out).toHaveLength(1);
-    const [ownerSub, clientId, originService, ...rest] = listed.out[0].split(' ');
-    expect([ownerSub, clientId, originService]).toEqual(['user-a', 'producer-a', 'meal-service']);
-    // `grantedAt` is stored in TypeORM's sqlite form: `YYYY-MM-DD HH:mm:ss.SSS`.
-    expect(rest.join(' ')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+    // Fixed shape on every line, the direction last: a format that changed width
+    // per row would be a parsing trap. `grantedAt` is one sqlite-form timestamp
+    // (`YYYY-MM-DD HH:mm:ss.SSS`), so it splits across two space-separated parts.
+    expect(listed.out[0]).toMatch(
+      /^user-a producer-a meal-service \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} write$/,
+    );
   });
 
   it('revokes a grant, then reports the second revoke as missing', () => {

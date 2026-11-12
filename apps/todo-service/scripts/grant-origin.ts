@@ -6,20 +6,23 @@ import { dirname, join, resolve } from 'node:path';
  * `grant-origin` — the human-run CLI that provisions `origin_grant` rows
  * (`SPEC-todo-origin` §9.12).
  *
- * A grant is one **user** allowing one **producer app** to write one origin, so
- * the row is keyed `(ownerSub, clientId)`. This script is the only sanctioned
- * writer of the table outside the service: no request creates a grant, and no
- * service code path ever calls it.
+ * A grant is one **user** allowing one **producer app** one capability — write the
+ * origin's todos, or read the user's tasks — so the row is keyed
+ * `(ownerSub, clientId, direction)`. This script is the only sanctioned writer of
+ * the table outside the service: no request creates a grant, and no service code
+ * path ever calls it.
  *
  * The table DDL below is written by hand and must stay byte-equal to the DDL
  * TypeORM's better-sqlite3 `synchronize` derives from `OriginGrant` —
  * `test/grant-cli.e2e-spec.ts` asserts exactly that, so the two cannot drift
- * unnoticed. It currently carries the two nullable consent columns (`disclosure`,
+ * unnoticed. It carries the `direction` column (in the primary key, defaulting to
+ * `'write'` so every row written before it existed is a write grant), the nullable
+ * `scope` a read grant uses, and the two nullable consent columns (`disclosure`,
  * `disclosureHash`) that `GrantsService.grantOwn` fills in when a user turns a
- * producer on; a grant this CLI provisions leaves them absent, which reads as
- * "not captured", never as "declined". A drift between the hand-written DDL and the
- * entity means the first boot after provisioning silently mutates the table this
- * CLI just wrote, so a later service boot must find nothing to change.
+ * producer on; a grant this CLI provisions leaves the consent pair absent, which
+ * reads as "not captured", never as "declined". A drift between the hand-written
+ * DDL and the entity means the first boot after provisioning silently mutates the
+ * table this CLI just wrote, so a later service boot must find nothing to change.
  *
  * Every echoed value is collapsed to one printable line and capped, because a flag
  * value is operator-supplied text and a newline in it would forge a log line.
@@ -27,21 +30,42 @@ import { dirname, join, resolve } from 'node:path';
 
 const ORIGIN_GRANT_DDL =
   'CREATE TABLE "origin_grant" ("ownerSub" text NOT NULL, "clientId" text NOT NULL, ' +
-  '"originService" text NOT NULL, "grantedAt" datetime NOT NULL, ' +
+  '"direction" text NOT NULL DEFAULT (\'write\'), "originService" text NOT NULL, ' +
+  '"scope" text, "grantedAt" datetime NOT NULL, ' +
   '"disclosure" text, "disclosureHash" text, ' +
-  'CONSTRAINT "UQ_origin_grant_owner_client" UNIQUE ("ownerSub", "clientId"), ' +
-  'PRIMARY KEY ("ownerSub", "clientId"))';
+  'CONSTRAINT "UQ_origin_grant_owner_client_direction" UNIQUE ' +
+  '("ownerSub", "clientId", "direction"), ' +
+  'PRIMARY KEY ("ownerSub", "clientId", "direction"))';
 
 const DEFAULT_DB_PATH = 'apps/todo-service/data/todo.db';
+
+/**
+ * The directions and read scopes this command line accepts.
+ *
+ * Restated here rather than imported from the entity on purpose: this script has
+ * no runtime dependency on `@life/service-kit` (it imports nothing from it), which
+ * is what lets an operator run it against a database the service is not running
+ * for. Drift is not left to memory — the DDL guard in `grant-cli.e2e-spec.ts`
+ * proves the table this script writes is the one TypeORM derives from the entity.
+ */
+const GRANT_DIRECTIONS = ['write', 'read'] as const;
+const GRANT_SCOPES = ['own-origin', 'all'] as const;
+
+type GrantDirection = (typeof GRANT_DIRECTIONS)[number];
+type GrantScope = (typeof GRANT_SCOPES)[number];
 
 /** Longest value this script will echo; the tail past it is dropped, not kept. */
 const MAX_ECHO = 64;
 
-/** The three values a grant carries, as the operator names them. */
+/** The values a grant carries, as the operator names them. */
 export interface GrantRequest {
   ownerSub: string;
   clientId: string;
   originService: string;
+  /** `write` (the default, and what every pre-existing row is) or `read`. */
+  direction?: GrantDirection;
+  /** How far a `read` grant reaches; ignored for a write grant, which is `null`. */
+  scope?: GrantScope | null;
 }
 
 /** One stored grant, as `--list` prints it and as the table holds it. */
@@ -100,32 +124,54 @@ function findGrant(
   db: Database.Database,
   ownerSub: string,
   clientId: string,
+  direction: GrantDirection,
 ): GrantRow | undefined {
   return db
     .prepare(
-      'SELECT "ownerSub", "clientId", "originService", "grantedAt" FROM "origin_grant" ' +
-        'WHERE "ownerSub" = ? AND "clientId" = ?',
+      'SELECT "ownerSub", "clientId", "direction", "originService", "grantedAt" ' +
+        'FROM "origin_grant" ' +
+        'WHERE "ownerSub" = ? AND "clientId" = ? AND "direction" = ?',
     )
-    .get(ownerSub, clientId) as GrantRow | undefined;
+    .get(ownerSub, clientId, direction) as GrantRow | undefined;
 }
 
 /**
- * Insert the grant, or overwrite the origin of an existing `(ownerSub, clientId)`.
- * A grant is a current permission, not an event log: re-granting the same pair a
- * different origin is an update, never a second row.
+ * Insert the grant, or overwrite the origin of an existing
+ * `(ownerSub, clientId, direction)`. A grant is a current permission, not an event
+ * log: re-granting the same triple a different origin is an update, never a second
+ * row — while a read grant for that same pair is a different triple, so it adds a
+ * row beside the write grant instead of replacing it.
  */
 export function grantOrigin(db: Database.Database, grant: GrantRequest): GrantOutcome {
-  const existed = findGrant(db, grant.ownerSub, grant.clientId) !== undefined;
+  const direction = grant.direction ?? 'write';
+  const existed = findGrant(db, grant.ownerSub, grant.clientId, direction) !== undefined;
   db.prepare(
-    'INSERT INTO "origin_grant" ("ownerSub", "clientId", "originService", "grantedAt") ' +
-      'VALUES (?, ?, ?, ?) ' +
-      'ON CONFLICT ("ownerSub", "clientId") DO UPDATE SET ' +
-      '"originService" = excluded."originService", "grantedAt" = excluded."grantedAt"',
-  ).run(grant.ownerSub, grant.clientId, grant.originService, sqliteDate(new Date()));
+    'INSERT INTO "origin_grant" ' +
+      '("ownerSub", "clientId", "direction", "originService", "scope", "grantedAt") ' +
+      'VALUES (?, ?, ?, ?, ?, ?) ' +
+      'ON CONFLICT ("ownerSub", "clientId", "direction") DO UPDATE SET ' +
+      '"originService" = excluded."originService", "scope" = excluded."scope", ' +
+      '"grantedAt" = excluded."grantedAt"',
+  ).run(
+    grant.ownerSub,
+    grant.clientId,
+    direction,
+    grant.originService,
+    // A write grant is already scoped by `originService`, so it carries no reach.
+    direction === 'read' ? (grant.scope ?? null) : null,
+    sqliteDate(new Date()),
+  );
   return existed ? 'updated' : 'created';
 }
 
-/** Delete the grant for one pair; a pair holding none is reported, not an error. */
+/**
+ * Delete the pair's grants; a pair holding none is reported, not an error.
+ *
+ * Every direction goes, because `--revoke` has always meant "this producer holds
+ * nothing for this user": leaving a read grant behind while the report says
+ * `revoked` would be a lie of omission, and a half-revoked producer is not a state
+ * an operator asked for.
+ */
 export function revokeGrant(
   db: Database.Database,
   ownerSub: string,
@@ -137,12 +183,13 @@ export function revokeGrant(
   return result.changes > 0 ? 'revoked' : 'missing';
 }
 
-/** Every grant, ordered by owner then client so a listing is stable. */
+/** Every grant, ordered by owner, client then direction so a listing is stable. */
 export function listGrants(db: Database.Database): GrantRow[] {
   return db
     .prepare(
-      'SELECT "ownerSub", "clientId", "originService", "grantedAt" FROM "origin_grant" ' +
-        'ORDER BY "ownerSub" ASC, "clientId" ASC',
+      'SELECT "ownerSub", "clientId", "direction", "originService", "grantedAt" ' +
+        'FROM "origin_grant" ' +
+        'ORDER BY "ownerSub" ASC, "clientId" ASC, "direction" ASC',
     )
     .all() as GrantRow[];
 }
@@ -217,14 +264,20 @@ function repositoryRoot(cwd: string): string {
 
 function usage(): string {
   return (
-    'usage: grant-origin --owner <sub> --client <clientId> --origin <originService> [--db <path>]\n' +
+    'usage: grant-origin --owner <sub> --client <clientId> --origin <originService>\n' +
+    '                    [--direction write|read] [--scope own-origin|all] [--db <path>]\n' +
     '       grant-origin --owner <sub> --client <clientId> --revoke [--db <path>]\n' +
     '       grant-origin --list [--db <path>]'
   );
 }
 
 /**
- * `--list`: one `ownerSub clientId originService grantedAt` line per grant.
+ * `--list`: one `ownerSub clientId originService grantedAt direction` line per
+ * grant.
+ *
+ * The direction is the fifth token, on **every** line, rather than present only
+ * for read grants: a format that changes width per row is a parsing trap, and this
+ * script has already shipped a defect where it lied silently.
  *
  * Two silences are told apart here. An `origin_grant` table that exists but holds
  * no rows is a real "this owner grants nothing": print nothing, exit 0. A database
@@ -241,7 +294,8 @@ function reportGrants(db: Database.Database, dbPath: string): void {
   for (const row of listGrants(db)) {
     console.log(
       `${sanitizeEcho(row.ownerSub)} ${sanitizeEcho(row.clientId)} ` +
-        `${sanitizeEcho(row.originService)} ${sanitizeEcho(String(row.grantedAt))}`,
+        `${sanitizeEcho(row.originService)} ${sanitizeEcho(String(row.grantedAt))} ` +
+        `${sanitizeEcho(row.direction ?? 'write')}`,
     );
   }
 }
@@ -291,8 +345,48 @@ function runCommand(db: Database.Database, argv: string[], dbPath: string): numb
     console.error(usage());
     return 1;
   }
+  const direction = directionFlag(argv);
+  if (direction === null) {
+    console.error(`--direction must be one of: ${GRANT_DIRECTIONS.join(', ')}`);
+    return 1;
+  }
+  const scope = scopeFlag(argv);
+  if (scope === null) {
+    console.error(`--scope must be one of: ${GRANT_SCOPES.join(', ')}`);
+    return 1;
+  }
   ensureOriginGrantTable(db);
-  const outcome = grantOrigin(db, { ownerSub, clientId, originService });
+  const outcome = grantOrigin(db, { ownerSub, clientId, originService, direction, scope });
   console.log(`${outcome} ${sanitizeEcho(ownerSub)} ${sanitizeEcho(clientId)}`);
   return 0;
+}
+
+/**
+ * `--direction`, defaulting to `write` — the direction every pre-existing row has,
+ * so a command line that does not mention direction keeps meaning what it meant.
+ * `null` is a bad value; `undefined` means the flag was not given.
+ */
+function directionFlag(argv: string[]): GrantDirection | undefined {
+  return closedFlag(argv, '--direction', GRANT_DIRECTIONS, 'write');
+}
+
+/** `--scope`, which only a read grant uses; omitted means the narrowest reach. */
+function scopeFlag(argv: string[]): GrantScope | null | undefined {
+  return closedFlag(argv, '--scope', GRANT_SCOPES, undefined);
+}
+
+/**
+ * One flag read against a closed set: `undefined` when absent (the caller's default
+ * applies), `null` when present but not a member — the two are different answers,
+ * so a mistyped direction is refused rather than silently taken as the default.
+ */
+function closedFlag<T extends string>(
+  argv: string[],
+  name: string,
+  allowed: readonly T[],
+  fallback: T | undefined,
+): T | null | undefined {
+  const raw = flagValue(argv, name);
+  if (raw === undefined) return fallback;
+  return (allowed as readonly string[]).includes(raw) ? (raw as T) : null;
 }

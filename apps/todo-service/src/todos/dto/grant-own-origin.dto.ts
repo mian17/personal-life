@@ -1,5 +1,10 @@
 import { IsIn, IsString } from 'class-validator';
-import { MEAL_TODO_DISCLOSURE } from '@life/service-kit';
+import {
+  FOCUS_TODO_DISCLOSURE,
+  MEAL_TODO_DISCLOSURE,
+  type GrantDirection,
+  type GrantScope,
+} from '@life/service-kit';
 
 /**
  * The origins a user may grant themselves through `POST /api/todos/origin-grant`
@@ -15,30 +20,54 @@ import { MEAL_TODO_DISCLOSURE } from '@life/service-kit';
  * the caller's own token, so a self-service grant can only ever name the client
  * that is actually asking.
  */
-export const SELF_SERVICE_ORIGINS = ['meal-service'] as const;
+export const SELF_SERVICE_ORIGINS = ['meal-service', 'focus-service'] as const;
 
 /** One origin a user may grant themselves. */
 export type SelfServiceOrigin = (typeof SELF_SERVICE_ORIGINS)[number];
+
+/**
+ * What each origin's grant allows. This table — not the request — is where the
+ * direction and the read scope come from.
+ *
+ * That is the whole defence of the route. A body carrying `direction` or `scope`
+ * would let the caller grant itself `all` when the screen offered something
+ * narrower, which is the escalation hole this route already closed once for
+ * `clientId`; so neither has a field on the DTO and the global
+ * `forbidNonWhitelisted` pipe refuses them. The origin names the capability:
+ * `meal-service` writes (`write`, no scope — a write grant is scoped by its
+ * origin), `focus-service` reads every open task (`read`/`all`) because a focus
+ * session is started from the whole list, not from one producer's rows.
+ */
+export const SELF_SERVICE_GRANT: Record<
+  SelfServiceOrigin,
+  { direction: GrantDirection; scope: GrantScope | null }
+> = {
+  'meal-service': { direction: 'write', scope: null },
+  'focus-service': { direction: 'read', scope: 'all' },
+};
 
 /**
  * The sentence each self-service origin records, keyed by origin so the message
  * cannot drift from the permission it describes: the body names an origin, and
  * this table says which sentence that origin's consent screen showed. The string
  * itself lives in `@life/service-kit` beside `OriginGrant`, because the row stores
- * it verbatim and `meal-service` stores the same value on its own toggle.
+ * it verbatim and each producer app stores the same value on its own toggle.
  */
 export const SELF_SERVICE_DISCLOSURE: Record<SelfServiceOrigin, string> = {
   'meal-service': MEAL_TODO_DISCLOSURE,
+  'focus-service': FOCUS_TODO_DISCLOSURE,
 };
 
 /**
  * Body of `POST /api/todos/origin-grant`.
  *
- * One field, because the other two are identity: `ownerSub` comes from the token's
- * `sub` and `clientId` from its verified `client_id`, so neither has a field here
- * and the global `forbidNonWhitelisted` pipe rejects a body declaring either — a
+ * One field, because everything else is identity or policy: `ownerSub` comes from
+ * the token's `sub`, `clientId` from its verified `client_id`, and the direction
+ * and scope from {@link SELF_SERVICE_GRANT}. None of the four has a field here, so
+ * the global `forbidNonWhitelisted` pipe rejects a body declaring any of them — a
  * self-service route that accepted a `clientId` would let any signed-in user hand
- * any producer app write access to their account.
+ * any producer app write access to their account, and one that accepted a
+ * `direction` would let it hand out a capability the screen never offered.
  *
  * The disclosure is not a field either: it comes from
  * {@link SELF_SERVICE_DISCLOSURE}, so the stored sentence is never a value the

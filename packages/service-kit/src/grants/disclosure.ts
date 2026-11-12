@@ -15,6 +15,18 @@ export const MEAL_TODO_DISCLOSURE =
   'dinner — and tick each one off as soon as you log something in that group.';
 
 /**
+ * The one sentence a user is shown when they let the focus app pick a task to work
+ * on from their todos (`SPEC-todo-origin` assumption 12, read direction).
+ *
+ * The asymmetry with the meals sentence is the point and is deliberate: focus may
+ * only **read**. It never creates a task and never ticks one on its own, so the
+ * sentence promises a list, not a write.
+ */
+export const FOCUS_TODO_DISCLOSURE =
+  'Let focus read your open tasks so you can pick one to work on. It never creates ' +
+  'tasks and never ticks them off on its own.';
+
+/**
  * The fingerprint stored beside the sentence: sha256 hex of the exact text.
  *
  * A consent row is evidence, and evidence has to survive a wording change: the
