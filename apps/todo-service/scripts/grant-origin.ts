@@ -11,11 +11,15 @@ import { dirname, join, resolve } from 'node:path';
  * writer of the table outside the service: no request creates a grant, and no
  * service code path ever calls it.
  *
- * The table DDL below is byte-equivalent to what TypeORM's better-sqlite3
- * `synchronize` generates from `OriginGrant` (verified against a live boot, and
- * asserted in `test/grant-cli.e2e-spec.ts`), so a later service boot finds nothing
- * to change. A drift between the two means the first boot after provisioning
- * mutates the table, which this CLI must never cause.
+ * The table DDL below is written by hand and must stay byte-equal to the DDL
+ * TypeORM's better-sqlite3 `synchronize` derives from `OriginGrant` —
+ * `test/grant-cli.e2e-spec.ts` asserts exactly that, so the two cannot drift
+ * unnoticed. It currently carries the two nullable consent columns (`disclosure`,
+ * `disclosureHash`) that `GrantsService.grantOwn` fills in when a user turns a
+ * producer on; a grant this CLI provisions leaves them absent, which reads as
+ * "not captured", never as "declined". A drift between the hand-written DDL and the
+ * entity means the first boot after provisioning silently mutates the table this
+ * CLI just wrote, so a later service boot must find nothing to change.
  *
  * Every echoed value is collapsed to one printable line and capped, because a flag
  * value is operator-supplied text and a newline in it would forge a log line.
@@ -24,6 +28,7 @@ import { dirname, join, resolve } from 'node:path';
 const ORIGIN_GRANT_DDL =
   'CREATE TABLE "origin_grant" ("ownerSub" text NOT NULL, "clientId" text NOT NULL, ' +
   '"originService" text NOT NULL, "grantedAt" datetime NOT NULL, ' +
+  '"disclosure" text, "disclosureHash" text, ' +
   'CONSTRAINT "UQ_origin_grant_owner_client" UNIQUE ("ownerSub", "clientId"), ' +
   'PRIMARY KEY ("ownerSub", "clientId"))';
 
