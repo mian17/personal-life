@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ServiceUnavailableException,
   Body,
   Controller,
   Delete,
@@ -218,10 +219,23 @@ export class MealTodoController {
   /**
    * The todo-service base URL this service calls. `MEAL_TODOS_API_URL` is the same
    * knob the outbox's delivery sender reads, so one variable points this service at
-   * one todo-service; the loopback default matches the dev stack's port.
+   * one todo-service.
+   *
+   * There is no fallback. A guessed port is worse than a refusal: the previous
+   * `http://127.0.0.1:3005` was todo-service's production port, while `dev:build`
+   * serves it on 3105, so every grant call silently dialled a closed door and the
+   * first-use flow half-succeeded — a toggle row with no grant and no tasks. The
+   * variable is written by `scripts/setup-dev-env.sh`, so a dev stack has it; a
+   * deployment that forgets it now fails loudly and names the variable.
    */
   private todosBaseUrl(): string {
-    return process.env[TODOS_API_URL_ENV] ?? 'http://127.0.0.1:3005';
+    const configured = process.env[TODOS_API_URL_ENV]?.trim();
+    if (!configured) {
+      throw new ServiceUnavailableException(
+        `${TODOS_API_URL_ENV} is unset: this service cannot reach todo-service`,
+      );
+    }
+    return configured;
   }
 }
 
