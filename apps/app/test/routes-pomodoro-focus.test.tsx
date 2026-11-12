@@ -55,6 +55,13 @@ async function recorderProps(): Promise<Record<string, unknown>> {
   return recorder.props;
 }
 
+/** Serve `rows` the way `focus-service` does: only the days inside the requested range. */
+function serveSessions(rows: SessionRow[]): void {
+  mockedListSessions.mockImplementation((from, to) =>
+    Promise.resolve(rows.filter((row) => row.date >= from && row.date <= to)),
+  );
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockedReadPref.mockResolvedValue(25);
@@ -81,6 +88,51 @@ describe('/pomodoro — the task picker', () => {
     // A failed read is not a failed focus session: no picker, and the card is there.
     expect(props.tasks).toEqual([]);
     expect(props.durations).toBeDefined();
+  });
+});
+
+describe('/pomodoro — the window the re-ask reads', () => {
+  const YESTERDAY = '2026-10-27';
+  const TOO_OLD = '2026-10-25';
+
+  it('asks about a block recorded yesterday whose answer never came', async () => {
+    // The closed-tab case the objective names: recorded last night, answered never,
+    // the owner's next load is this morning. A today-only read would lose it.
+    mockedListOpenTasks.mockResolvedValue([task('t1', 'Prep lunch')]);
+    serveSessions([session({ id: 'yesterday', date: YESTERDAY, todoId: 't1' })]);
+
+    const props = await recorderProps();
+
+    expect(props.pendingQuestion).toEqual({
+      sessionId: 'yesterday',
+      todoId: 't1',
+      minutes: 25,
+      title: 'Prep lunch',
+    });
+  });
+
+  it('reads back two days past today, so the day boundary is crossed', async () => {
+    await recorderProps();
+
+    const ranges = mockedListSessions.mock.calls.map(([from, to]) => `${from}..${to}`);
+    // One today-scoped read for the minutes, one widened read for the owed question.
+    expect(ranges).toEqual([`${TODAY}..${TODAY}`, `2026-10-26..${TODAY}`]);
+  });
+
+  it('asks nothing about a block older than the window', async () => {
+    mockedListOpenTasks.mockResolvedValue([task('t1', 'Prep lunch')]);
+    serveSessions([session({ id: 'stale', date: TOO_OLD, todoId: 't1' })]);
+
+    expect((await recorderProps()).pendingQuestion).toBeNull();
+  });
+
+  it('keeps the minutes total on today, even when yesterday held blocks', async () => {
+    serveSessions([
+      session({ id: 'yesterday', date: YESTERDAY, minutes: 50 }),
+      session({ id: 'today', minutes: 25 }),
+    ]);
+
+    expect((await recorderProps()).todayMinutes).toBe(25);
   });
 });
 
