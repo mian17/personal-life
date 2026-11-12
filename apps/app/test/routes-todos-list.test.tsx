@@ -45,6 +45,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     repeatDays: null,
     reminderScheduledAt: null,
     listId: null,
+    originService: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -278,6 +279,34 @@ describe('/todos list page wiring', () => {
 
     // The live repeating todo keeps its next occurrence open, also a TodoItem.
     expect(html).toContain('Mark Water plants done');
+  });
+
+  it("names a robot-made row's producer, and leaves the user's own rows unattributed", async () => {
+    // Dated today so both rows land in the shown Today group: an undated todo is in no
+    // group and renders nothing, which would make the absence assertion pass for the
+    // wrong reason.
+    mockedListTodos.mockResolvedValue(
+      page([
+        todo({ id: 'm1', title: 'Prep lunch', dueDate: todayIso(), originService: 'meal-service' }),
+        todo({ id: 'u1', title: 'Buy milk', dueDate: todayIso() }),
+      ]),
+    );
+
+    const html = await renderScreen();
+    const rowOf = (title: string): string => {
+      const row = html
+        .split('<li ')
+        .map((chunk) => chunk.slice(0, chunk.indexOf('</li>')))
+        .find((chunk) => chunk.includes(`>${title}<`));
+      if (!row) throw new Error(`no row rendered for "${title}"`);
+      return row;
+    };
+
+    // Attribution is the app's name for the producer, never the stored slug: a task
+    // meal-service created must not read as one the user wrote.
+    expect(rowOf('Prep lunch')).toContain('from Meals');
+    // The fixture's default origin is null — the user's own todo claims no producer.
+    expect(rowOf('Buy milk')).not.toContain('from ');
   });
 });
 

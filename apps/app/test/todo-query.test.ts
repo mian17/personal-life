@@ -14,6 +14,7 @@ function todo(id: string, dueDate: string | null): Todo {
     repeatDays: null,
     reminderScheduledAt: null,
     listId: null,
+    originService: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',

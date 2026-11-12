@@ -117,6 +117,8 @@ export interface Todo {
   repeatDays: number[] | null;
   reminderScheduledAt: string | null;
   listId: string | null;
+  /** The producer service that created this todo; null when the user made it. */
+  originService: string | null;
   tagIds: number[];
   createdAt: string;
   updatedAt: string;

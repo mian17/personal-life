@@ -18,6 +18,33 @@ import { TOGGLE_DEBOUNCE_MS, useDebouncedCallback } from '@/lib/use-debounced-ca
 const WRITE_FAILED_MESSAGE = "Couldn't save that change.";
 
 /**
+ * The producer services a todo can come from, by the string todo-service stores.
+ * Anyone reading the list is owed the app's name, not the service's slug —
+ * `meal-service` is "Meals" in every other screen.
+ */
+const ORIGIN_NAMES: Record<string, string> = {
+  'meal-service': 'Meals',
+  exercise: 'Exercise',
+};
+
+/**
+ * The sentence a robot-made row carries, or `null` for the user's own todos.
+ *
+ * Attribution is not decoration: an automatic task that looks hand-written is one
+ * the user will try to "fix" in the wrong app. An unknown producer still names
+ * itself (`other-service` → "Other") rather than rendering a bare slug or
+ * nothing, because a new producer shipping before this table learns its name must
+ * not make its tasks anonymous again.
+ */
+function originLabel(originService: string | null): string | null {
+  if (originService === null) return null;
+  const known = ORIGIN_NAMES[originService];
+  if (known !== undefined) return `from ${known}`;
+  const slug = originService.replace(/-service$/, '');
+  return `from ${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
+}
+
+/**
  * One todo row at two sizes, from one `ListItem variant="todo"`: a borderless
  * square checkbox LEADING the row (top-aligned with the title) and the title
  * clamped to two lines, with the signal due date. The row links to its edit
@@ -65,6 +92,7 @@ export function TodoItem({
 
   const list = lists.find((candidate) => candidate.id === todo.listId);
   const repeat = repeatLabel(todo.repeat, todo.dueDate, todo.repeatDays);
+  const origin = originLabel(todo.originService);
 
   /**
    * A rejected write must not leave the row looking saved. Drop the optimistic value so the
@@ -151,6 +179,7 @@ export function TodoItem({
           <DueDate dueDate={todo.dueDate} today={today} tone="signal" />
           {isDefault && repeat && <span>{repeat}</span>}
           {isDefault && list && <span>{list.name}</span>}
+          {isDefault && origin && <span>{origin}</span>}
         </>
       }
       snippet={isDefault ? (todo.note ?? undefined) : undefined}
