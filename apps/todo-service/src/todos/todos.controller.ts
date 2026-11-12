@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import type { TagUsage } from '@life/shared';
 import { Principal } from '@life/service-kit';
 import { CreateTodoDto } from './dto/create-todo.dto.js';
+import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
 import { ListTodosQuery } from './dto/list-todos.query.js';
@@ -32,8 +33,12 @@ export class TodosController {
 
   // `originId` is the producer's own id, never this service's todo id.
   @Post('origin/:originId/complete')
-  completeByOrigin(@Principal() principal: Principal, @Param('originId') originId: string) {
-    return this.todos.completeByOrigin(principal, originId);
+  completeByOrigin(
+    @Principal() principal: Principal,
+    @Param('originId') originId: string,
+    @Body() dto: CompleteByOriginDto,
+  ) {
+    return this.todos.completeByOrigin(principal, originId, dto);
   }
 
   @Get()

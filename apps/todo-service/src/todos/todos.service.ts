@@ -38,6 +38,7 @@ import {
   runAtomicBatch,
   type Principal,
 } from '@life/service-kit';
+import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import { ListsService } from '../lists/lists.service.js';
 import {
@@ -500,39 +501,49 @@ export class TodosService {
   }
 
   /**
-   * Advance-on-tick for a recurring todo: log the pre-advance due `D`, then move
-   * the todo strictly past it and forward to on/after now, remaining open.
+   * Advance-on-tick for a recurring todo: log `occurrence` — the value being
+   * ticked, in its stored shape: the pre-advance due `D` for the app's own tick,
+   * or the producer's pin for an origin tick — then move the todo strictly past
+   * it and forward to on/after now, remaining open. Answers whether this
+   * occurrence was logged: `false` means the log already held it, so the caller
+   * may discard the in-memory advance instead of saving it (`completeByOrigin`
+   * does; the app's own tick saves as before).
    */
   private async advanceOnTick(
     manager: EntityManager,
     sub: string,
     todo: Todo,
     id: string,
-  ): Promise<void> {
-    // Log the pre-advance due before overwriting it (occurrence = D).
-    const occurrence = todo.dueDate!;
+    occurrence: string = todo.dueDate!,
+  ): Promise<boolean> {
     const days = parseRepeatDays(todo.repeatDays);
-    const local = dueSortKey(todo.dueDate!, this.tz);
+    const local = dueSortKey(occurrence, this.tz);
     // Step strictly past the ticked occurrence first, then roll forward to
     // on/after now — a future-due repeat must not jam on its own due.
     const stepped = nextOccurrence(local, todo.repeat!, days);
     const next = advanceToOnOrAfter(stepped, todo.repeat!, this.nowLocal(), days);
-    await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+    const logged = await this.writeCompletion(manager, sub, id, occurrence);
     todo.dueDate = next.includes('T') ? localToUtc(next, this.tz).toISOString() : next;
     todo.reminderScheduledAt = this.reminderAt(todo.dueDate, this.tz);
     todo.done = false;
+    return logged;
   }
 
-  /** A non-recurring tick: log `occurrence = D ?? '~'` and close the todo. */
+  /**
+   * A non-recurring tick: log `occurrence` — `D ?? '~'` unless the tick is
+   * pinned — and close the todo, and answer whether the log took it (same
+   * contract as `advanceOnTick`).
+   */
   private async closeOnTick(
     manager: EntityManager,
     sub: string,
     todo: Todo,
     id: string,
-  ): Promise<void> {
-    const occurrence = todo.dueDate ?? '~';
-    await this.writeCompletion(manager, sub, id, occurrence, new Date().toISOString());
+    occurrence: string = todo.dueDate ?? '~',
+  ): Promise<boolean> {
+    const logged = await this.writeCompletion(manager, sub, id, occurrence);
     todo.done = true;
+    return logged;
   }
 
   /**
@@ -564,17 +575,23 @@ export class TodosService {
     todo.done = false;
   }
 
-  private async writeCompletion(
+  /**
+   * Log one completion occurrence, or answer `false` when it was already logged.
+   * Whether it was is the database's answer (`insertCompletionOnce` swallows the
+   * one UNIQUE violation), so a repeat tick moves nothing.
+   */
+  private writeCompletion(
     manager: EntityManager,
     sub: string,
     todoId: string,
     occurrence: string,
-    completedAt: string,
-  ): Promise<void> {
-    const repo = manager.getRepository(TodoCompletion);
-    const existing = await repo.findOne({ where: { todoId, occurrence } });
-    if (existing) return;
-    await this.insertCompletionOnce(manager, { ownerSub: sub, todoId, occurrence, completedAt });
+  ): Promise<boolean> {
+    return this.insertCompletionOnce(manager, {
+      ownerSub: sub,
+      todoId,
+      occurrence,
+      completedAt: new Date().toISOString(),
+    });
   }
 
   /**
@@ -659,23 +676,36 @@ export class TodosService {
   /**
    * `POST /api/todos/origin/:originId/complete` — a producer ticks off the todo
    * its own create made, so the user never repeats the work
-   * (`SPEC-todo-origin` §7). Idempotency is the database's, not a prior read's:
-   * the first call logs the completion and closes the todo, and the repeat is a
-   * swallowed UNIQUE violation that writes nothing, invalidates nothing, and
-   * answers the very state the first call left.
+   * (`SPEC-todo-origin` §7). A repeating todo advances exactly as the app's own
+   * tick does: the ticked occurrence is logged, the due moves forward and the
+   * todo stays open; a non-repeating todo closes. Either way one optional new
+   * title rides the tick, so a producer can refresh a changed target in place.
    *
-   * Recurrence never advances here (spec assumption 7): a producer closes an
-   * occurrence, it does not roll a repeating todo forward.
+   * The tick is occurrence-pinned when the body names one (assumption 16): the
+   * logged occurrence is the producer's pin, not the row's current due, so a
+   * redelivered tick for an occurrence already logged advances nothing. Without
+   * a pin the app's own semantics hold and a repeat call advances again.
+   *
+   * Idempotency is the database's, not a prior read's: the repeat call is a
+   * swallowed UNIQUE violation that writes nothing — title included — invalidates
+   * nothing, and answers the very state the first call left.
    */
-  async completeByOrigin(principal: Principal, originId: string): Promise<OriginatedTodo> {
+  async completeByOrigin(
+    principal: Principal,
+    originId: string,
+    dto: CompleteByOriginDto = {},
+  ): Promise<OriginatedTodo> {
+    const occurrence =
+      dto.occurrence === undefined ? undefined : this.normalizeDue(dto.occurrence, this.tz);
     const origin: OriginRef = {
       service: await this.grantedOrigin(principal.sub, principal.clientId),
       id: originId,
     };
     const todo = await this.loadOriginTodo(principal.sub, origin);
+    this.assertOccurrenceNotAhead(todo, occurrence);
     // The ownership resolve above is the only read; the write decides idempotency.
     const completed = await this.dataSource.transaction((manager) =>
-      this.completeTodoOnce(manager, todo),
+      this.completeTodoOnce(manager, todo, dto.title, occurrence),
     );
     if (completed === null) return this.originatedTodoView(todo);
     // Bump AFTER a write that happened; the swallowed no-op never reaches here.
@@ -702,22 +732,66 @@ export class TodosService {
   }
 
   /**
-   * Log this todo's completion occurrence and close it, or `null` when that
-   * occurrence was already logged. `occurrence = dueDate ?? '~'` is the same
-   * sentinel the app's non-recurring tick writes, so the completeness rule holds
-   * for a dated and an undated todo alike.
+   * A pinned occurrence later than the row's due is refused: a producer must not
+   * pre-tick a day that has not arrived. An occurrence at or before the due is
+   * accepted — a late delivery of an overdue occurrence is legitimate.
    */
-  private async completeTodoOnce(manager: EntityManager, todo: Todo): Promise<Todo | null> {
-    const logged = await this.insertCompletionOnce(manager, {
-      ownerSub: todo.ownerSub,
-      todoId: todo.id,
-      occurrence: todo.dueDate ?? '~',
-      completedAt: new Date().toISOString(),
-    });
-    if (!logged) return null;
-    todo.done = true;
+  private assertOccurrenceNotAhead(todo: Todo, occurrence: string | undefined): void {
+    if (occurrence === undefined || todo.dueDate === null) return;
+    if (dueSortKey(occurrence, this.tz) > dueSortKey(todo.dueDate, this.tz)) {
+      throw new BadRequestException("occurrence is after the todo's dueDate");
+    }
+  }
+
+  /**
+   * Tick this todo once, or `null` when its current occurrence was already
+   * logged. The branch is the app's own rule: a todo carrying both a repeat and
+   * a due advances and stays open, anything else closes. `advanceOnTick`/
+   * `closeOnTick` own that semantics, so this path only adds the optional rename
+   * and the row save.
+   */
+  private async completeTodoOnce(
+    manager: EntityManager,
+    todo: Todo,
+    newTitle?: string,
+    occurrence?: string,
+  ): Promise<Todo | null> {
+    const before = {
+      done: todo.done,
+      dueDate: todo.dueDate,
+      reminderScheduledAt: todo.reminderScheduledAt,
+    };
+    const sub = todo.ownerSub;
+    const recurring = todo.repeat !== null && todo.dueDate !== null;
+    const logged = recurring
+      ? await this.advanceOnTick(manager, sub, todo, todo.id, occurrence)
+      : await this.closeOnTick(manager, sub, todo, todo.id, occurrence);
+    if (!logged) return this.discardTentativeTick(todo, before);
+    if (newTitle !== undefined) todo.title = await this.sealedTitle(todo, newTitle);
     todo.updatedAt = new Date();
     return manager.save(todo);
+  }
+
+  /**
+   * The tick mutates the entity in memory before the log refuses a repeat, so
+   * put the stored values back: the answer is the state the first call left, and
+   * the discarded advance is never saved. `null` is the "nothing was written"
+   * signal the caller turns into a skipped cache bump.
+   */
+  private discardTentativeTick(
+    todo: Todo,
+    before: Pick<Todo, 'done' | 'dueDate' | 'reminderScheduledAt'>,
+  ): null {
+    todo.done = before.done;
+    todo.dueDate = before.dueDate;
+    todo.reminderScheduledAt = before.reminderScheduledAt;
+    return null;
+  }
+
+  /** The rename a tick carries, sealed under the owner's key exactly like a create. */
+  private async sealedTitle(todo: Todo, title: string): Promise<string> {
+    const dek = await this.keys.getOrCreateDek(todo.ownerSub);
+    return encryptField(dek, title, todoTitleAad(todo.ownerSub, todo.id));
   }
 
   /**
