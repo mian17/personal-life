@@ -33,6 +33,7 @@ const TEST_DIR = mkdtempSync(join(tmpdir(), 'meal-producer-'));
 const TEST_DB = join(TEST_DIR, 'test-producer.db');
 
 const SUB = 'user-a';
+const NO_TARGET_SUB = 'user-b';
 const DAY = '2026-09-03';
 const CALORIES = 2200.4;
 const DISCLOSURE = 'Meal logging will create and tick three daily todos.';
@@ -93,10 +94,29 @@ describe('Meal todo producer (e2e)', () => {
       todoProducer,
     );
 
-  /** The owner's consent row: its presence is what turns production on. */
-  const grant = () =>
-    dataSource.getRepository(MealTodoToggle).insert({
+  /** A target row, so a profile change can be simulated between two logs. */
+  const addTarget = (validFrom: string, calories: number) =>
+    dataSource.getRepository(Target).insert({
       ownerSub: SUB,
+      validFrom,
+      age: 30,
+      sex: 'female',
+      heightCm: 170,
+      weightKg: 65,
+      activity: 'moderate',
+      goal: 'maintain',
+      bmr: 1400,
+      tdee: calories,
+      calories,
+      proteinG: 120,
+      fatG: 70,
+      carbG: 250,
+    });
+
+  /** The owner's consent row: its presence is what turns production on. */
+  const grant = (ownerSub = SUB) =>
+    dataSource.getRepository(MealTodoToggle).insert({
+      ownerSub,
       enabledAt: new Date(),
       disclosure: DISCLOSURE,
       disclosureHash: createHash('sha256').update(DISCLOSURE).digest('hex'),
@@ -110,22 +130,7 @@ describe('Meal todo producer (e2e)', () => {
       synchronize: true,
     });
     await dataSource.initialize();
-    await dataSource.getRepository(Target).insert({
-      ownerSub: SUB,
-      validFrom: '2026-01-01',
-      age: 30,
-      sex: 'female',
-      heightCm: 170,
-      weightKg: 65,
-      activity: 'moderate',
-      goal: 'maintain',
-      bmr: 1400,
-      tdee: CALORIES,
-      calories: CALORIES,
-      proteinG: 120,
-      fatG: 70,
-      carbG: 250,
-    });
+    await addTarget('2026-01-01', CALORIES);
     producer = new MealTodoProducerService(
       new OutboxService(dataSource),
       targetService(dataSource),
@@ -137,6 +142,13 @@ describe('Meal todo producer (e2e)', () => {
     await dataSource.getRepository(Outbox).clear();
     await dataSource.getRepository(MealTodoToggle).clear();
     await dataSource.getRepository(Entry).clear();
+    // The base row is dated 2026-01-01; anything from DAY on is a test's change.
+    await dataSource
+      .createQueryBuilder()
+      .delete()
+      .from(Target)
+      .where('validFrom >= :day', { day: DAY })
+      .execute();
   });
 
   afterAll(async () => {
@@ -201,17 +213,48 @@ describe('Meal todo producer (e2e)', () => {
 
     const ticks = await payloads('todos.complete');
     expect(ticks).toHaveLength(1);
-    expect(ticks[0]).toEqual({ occurrence: DAY });
+    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
     expect(await payloads('todos.create')).toHaveLength(0);
   });
 
-  it('enqueues a second tick for a second entry the same day', async () => {
+  it('sends the same title on a second tick the same day', async () => {
     await grant();
 
     await entries.create(SUB, body({ mealGroup: 'breakfast' }));
     await entries.create(SUB, body({ mealGroup: 'breakfast' }));
 
-    expect(await payloads('todos.complete')).toHaveLength(2);
+    const ticks = await payloads('todos.complete');
+    expect(ticks).toHaveLength(2);
+    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
+    expect(ticks[1]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
+  });
+
+  it('still logs the meal when the owner has no target profile, but enqueues no tick', async () => {
+    await grant(NO_TARGET_SUB);
+
+    const created = await entries.create(NO_TARGET_SUB, body({ mealGroup: 'breakfast' }));
+    // The producer call is asserted directly as well as through the entry: only
+    // that pins the guard, since the entry path has a guard of its own above it.
+    await expect(
+      producer.noteEntryLogged(NO_TARGET_SUB, 'breakfast', DAY, dataSource.manager),
+    ).resolves.toBeUndefined();
+
+    expect(created.id).toBeDefined();
+    expect(await dataSource.getRepository(Entry).count()).toBe(1);
+    expect(await payloads('todos.complete')).toHaveLength(0);
+  });
+
+  it('carries the new calorie number when the target changes between two logs', async () => {
+    await grant();
+
+    await entries.create(SUB, body({ mealGroup: 'breakfast' }));
+    await addTarget(DAY, 2500);
+    await entries.create(SUB, body({ mealGroup: 'breakfast' }));
+
+    const ticks = await payloads('todos.complete');
+    expect(ticks).toHaveLength(2);
+    expect(ticks[0]).toEqual({ title: 'Eat Breakfast to reach 2200 kcal', occurrence: DAY });
+    expect(ticks[1]).toEqual({ title: 'Eat Breakfast to reach 2500 kcal', occurrence: DAY });
   });
 
   it('does not tick a snack, which has no daily task', async () => {

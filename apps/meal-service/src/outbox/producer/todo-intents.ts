@@ -33,6 +33,7 @@ export interface CreateIntent {
 
 /** `POST /api/todos/origin/:originId/complete` body. */
 export interface TickIntent {
+  title: string;
   occurrence: string;
 }
 
@@ -66,14 +67,21 @@ export function createIntent(group: TodoGroup, calories: number, today: string):
 /**
  * The tick intent for one group on one day.
  *
+ * It carries the title as well as the pin, so the tick does two jobs in one
+ * call: it logs the day's task and it refreshes the task's calorie number in
+ * place. Without the title a changed target reaches the todo row only when a
+ * create happens to be re-enqueued, which leaves the user a stale goal. The
+ * same `titleForGroup` sentence is used as on the create, so the two intents
+ * can never disagree.
+ *
  * The occurrence pin is what makes a redelivered tick safe: todo-service logs
  * the named occurrence and answers "already logged" as a no-op, so a second
  * delivery advances nothing. An unpinned tick would tick whatever is currently
  * due and walk the task a day forward per delivery — the one failure the pin
  * exists to prevent (`SPEC-todo-origin` §9.16).
  */
-export function tickIntent(group: TodoGroup, today: string): TickIntent {
-  return { occurrence: today };
+export function tickIntent(group: TodoGroup, calories: number, today: string): TickIntent {
+  return { title: titleForGroup(group, calories), occurrence: today };
 }
 
 /** Whether a logged entry's group has a task to tick. */

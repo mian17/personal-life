@@ -70,7 +70,9 @@ export class MealTodoProducerService {
 
   /**
    * Enqueue the tick for one logged entry. `snack` has no daily task, so it has
-   * nothing to tick and is skipped.
+   * nothing to tick and is skipped. The target read sits inside the guard: an
+   * owner with no target profile gets a `NotFoundException` from `getTarget`,
+   * and that must cost the tick, never the meal log.
    */
   async noteEntryLogged(
     ownerSub: string,
@@ -81,11 +83,8 @@ export class MealTodoProducerService {
     if (!isTodoGroup(group)) return;
     await this.degrading('entry tick', ownerSub, async () => {
       if (!(await this.isEnabled(ownerSub, manager))) return;
-      await this.outbox.enqueue(manager, {
-        ownerSub,
-        destination: TODOS_COMPLETE,
-        payload: JSON.stringify(tickIntent(group, today)),
-      });
+      const target = await this.targets.getTarget(ownerSub, today);
+      await this.enqueueTick(ownerSub, group, target.calories, today, manager);
     });
   }
 
@@ -107,6 +106,21 @@ export class MealTodoProducerService {
       ownerSub,
       destination: TODOS_CREATE,
       payload: JSON.stringify(createIntent(group, calories, today)),
+    });
+  }
+
+  /** One tick intent, in the caller's transaction. */
+  private enqueueTick(
+    ownerSub: string,
+    group: TodoGroup,
+    calories: number,
+    today: string,
+    manager: EntityManager,
+  ): Promise<string> {
+    return this.outbox.enqueue(manager, {
+      ownerSub,
+      destination: TODOS_COMPLETE,
+      payload: JSON.stringify(tickIntent(group, calories, today)),
     });
   }
 
