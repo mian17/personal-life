@@ -60,6 +60,8 @@ FEEDBACK_API_URL=http://127.0.0.1:3108
 MEAL_API_URL=http://127.0.0.1:3106
 # meal-service -> todo-service (the producer's delivery leg).
 MEAL_TODOS_API_URL=http://127.0.0.1:3105
+# focus-service -> todo-service (checking a task-linked session is readable).
+FOCUS_TODOS_API_URL=http://127.0.0.1:3105
 FOCUS_API_URL=http://127.0.0.1:3107
 
 # --- content-encryption master keys (per-service custody) -------------------
