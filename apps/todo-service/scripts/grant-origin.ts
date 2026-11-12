@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * `grant-origin` — the human-run CLI that provisions `origin_grant` rows
@@ -155,14 +155,59 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /**
- * The database this run targets: `--db`, else `DB_PATH`, else the repo-relative
- * default — resolved against `INIT_CWD ?? cwd`, because npm sets a workspace
- * script's cwd to the workspace while the documented command runs at the repo
- * root.
+ * The database this run targets. Three sources, three anchors — the default and
+ * the overrides are genuinely different paths, so they are not resolved alike:
+ *
+ *   1. `--db` is **caller-relative**: anchored at `INIT_CWD ?? cwd`, the directory
+ *      the operator typed the command in, so a path typed at the repo root keeps
+ *      meaning what they typed it to mean after npm moves the script's cwd.
+ *   2. `DB_PATH` is **workspace-relative**: anchored at the process cwd, which npm
+ *      sets to the workspace. `scripts/setup-dev-env.sh` publishes
+ *      `DB_PATH=data/scratch.db`, a path under `apps/todo-service` — resolving it at
+ *      `INIT_CWD` (the repo root) opens `<root>/data/scratch.db`, a different file.
+ *   3. `DEFAULT_DB_PATH` is **repository-relative** (`apps/todo-service/data/todo.db`),
+ *      anchored at the repository root found by walking up from the cwd. Anchoring
+ *      it at the cwd would look for `apps/todo-service/apps/todo-service/data/todo.db`
+ *      when run from inside the workspace.
+ *
+ * Rules 1 and 2 differ on purpose: `--db` is a path a human typed (their frame of
+ * reference), `DB_PATH` is a value the repository publishes (the workspace's).
+ * `cwd` is a test seam; every shipped caller takes the default.
  */
-export function resolveDbPath(argv: string[], env: Env): string {
-  const root = env.INIT_CWD ?? process.cwd();
-  return resolve(root, flagValue(argv, '--db') ?? env.DB_PATH ?? DEFAULT_DB_PATH);
+export function resolveDbPath(argv: string[], env: Env, cwd: string = process.cwd()): string {
+  const explicitDbPath = flagValue(argv, '--db');
+  if (explicitDbPath !== undefined) return resolve(env.INIT_CWD ?? cwd, explicitDbPath);
+  if (env.DB_PATH) return resolve(cwd, env.DB_PATH);
+  return resolve(repositoryRoot(cwd), DEFAULT_DB_PATH);
+}
+
+/**
+ * A `package.json` carrying a `workspaces` key marks the repository root the
+ * workspace belongs to. Unreadable or unparsable manifests never throw here: a
+ * walk that cannot confirm a root keeps looking, and {@link repositoryRoot} falls
+ * back to the cwd.
+ */
+function isRepositoryRoot(dir: string): boolean {
+  const manifest = join(dir, 'package.json');
+  if (!existsSync(manifest)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(manifest, 'utf8')) as { workspaces?: unknown };
+    return parsed.workspaces !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** The workspace repository root above `cwd`; an unmarked tree answers with `cwd` itself. */
+function repositoryRoot(cwd: string): string {
+  const start = resolve(cwd);
+  let dir = start;
+  while (!isRepositoryRoot(dir)) {
+    const parent = dirname(dir);
+    if (parent === dir) return start;
+    dir = parent;
+  }
+  return dir;
 }
 
 function usage(): string {
@@ -173,10 +218,21 @@ function usage(): string {
   );
 }
 
-/** `--list`: one `ownerSub clientId originService grantedAt` line per grant. */
-function reportGrants(db: Database.Database): void {
+/**
+ * `--list`: one `ownerSub clientId originService grantedAt` line per grant.
+ *
+ * Two silences are told apart here. An `origin_grant` table that exists but holds
+ * no rows is a real "this owner grants nothing": print nothing, exit 0. A database
+ * with no such table at all is either the wrong target or one never provisioned,
+ * and must say so — staying silent made a run against the wrong database
+ * indistinguishable from a run against an empty, correct one.
+ */
+function reportGrants(db: Database.Database, dbPath: string): void {
   // Read-only by contract: listing a database with no table writes nothing.
-  if (!tableExists(db)) return;
+  if (!tableExists(db)) {
+    console.log(`no "origin_grant" table in ${oneLine(dbPath)}; this database holds no grants`);
+    return;
+  }
   for (const row of listGrants(db)) {
     console.log(
       `${sanitizeEcho(row.ownerSub)} ${sanitizeEcho(row.clientId)} ` +
@@ -191,8 +247,8 @@ function reportGrants(db: Database.Database): void {
  * run, `1` for a bad command line, `2` for a database that is not there — never
  * created implicitly, because an absent file means the wrong target.
  */
-export function main(argv: string[], env: Env = process.env): number {
-  const dbPath = resolveDbPath(argv, env);
+export function main(argv: string[], env: Env = process.env, cwd: string = process.cwd()): number {
+  const dbPath = resolveDbPath(argv, env, cwd);
   if (!existsSync(dbPath)) {
     // The path is the whole point of the message, so it is only de-forged, never
     // capped — a truncated path names nothing.
@@ -201,15 +257,15 @@ export function main(argv: string[], env: Env = process.env): number {
   }
   const db = new Database(dbPath);
   try {
-    return runCommand(db, argv);
+    return runCommand(db, argv, dbPath);
   } finally {
     db.close();
   }
 }
 
-function runCommand(db: Database.Database, argv: string[]): number {
+function runCommand(db: Database.Database, argv: string[], dbPath: string): number {
   if (argv.includes('--list')) {
-    reportGrants(db);
+    reportGrants(db, dbPath);
     return 0;
   }
 

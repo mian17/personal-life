@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { OriginGrant } from '@life/service-kit';
-import { grantOrigin, main, type GrantRow } from '../scripts/grant-origin.js';
+import { grantOrigin, main, resolveDbPath, type GrantRow } from '../scripts/grant-origin.js';
 
 /**
  * `grant-origin` CLI suite (`SPEC-todo-origin` §9.12).
@@ -187,6 +187,78 @@ describe('grant-origin CLI', () => {
       ['user-b', 'calendar-service'],
       ['user-c', 'focus-service'],
     ]);
+  });
+
+  it('prints the file and exits 0 when the database has no origin_grant table', () => {
+    // An existing database that was never provisioned is not the same verdict as
+    // an owner holding no grants: silence here made a wrong --db target look fine.
+    const dbPath = emptyDb();
+
+    const listed = capture(() => main(['--list', '--db', dbPath]));
+
+    expect(listed.code).toBe(0);
+    expect(listed.err).toEqual([]);
+    expect(listed.out).toHaveLength(1);
+    expect(listed.out[0]).toContain(dbPath);
+    expect(listed.out[0]).toContain('origin_grant');
+  });
+
+  it('prints nothing when the table exists and holds no rows', () => {
+    const dbPath = emptyDb();
+    capture(() =>
+      main([
+        '--owner',
+        'user-a',
+        '--client',
+        'producer-a',
+        '--origin',
+        'meal-service',
+        '--db',
+        dbPath,
+      ]),
+    );
+    capture(() =>
+      main(['--owner', 'user-a', '--client', 'producer-a', '--revoke', '--db', dbPath]),
+    );
+
+    const listed = capture(() => main(['--list', '--db', dbPath]));
+
+    expect(listed.code).toBe(0);
+    expect(listed.out).toEqual([]);
+  });
+
+  it('resolves DB_PATH against the workspace cwd, not the directory npm was invoked from', () => {
+    // `npm run` from the repo root sets INIT_CWD=<repo root> while the script's cwd
+    // is the workspace, and DB_PATH=data/scratch.db is workspace-relative. Anchoring
+    // it at INIT_CWD opened a different database at the repo root.
+    const workspace = tempDb().dir;
+    const invokedFrom = tempDb().dir;
+    const workspaceDb = join(workspace, 'data', 'scratch.db');
+    const invokedFromDb = join(invokedFrom, 'data', 'scratch.db');
+    mkdirSync(join(workspace, 'data'), { recursive: true });
+    mkdirSync(join(invokedFrom, 'data'), { recursive: true });
+    new Database(workspaceDb).close();
+    new Database(invokedFromDb).close();
+    capture(() =>
+      main([
+        '--owner',
+        'user-a',
+        '--client',
+        'producer-a',
+        '--origin',
+        'workouts',
+        '--db',
+        workspaceDb,
+      ]),
+    );
+    const env = { DB_PATH: join('data', 'scratch.db'), INIT_CWD: invokedFrom };
+
+    const resolved = resolveDbPath([], env, workspace);
+    const listed = capture(() => main(['--list'], env, workspace));
+
+    expect(resolved).toBe(workspaceDb);
+    expect(listed.out).toHaveLength(1);
+    expect(listed.out[0]).toContain('user-a producer-a workouts');
   });
 
   it('creates a table byte-equivalent to what TypeORM generates from the entity', async () => {
