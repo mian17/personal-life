@@ -5,15 +5,16 @@
  * Three rules are mechanical, so they are checked here instead of in a review:
  *
  *   RULE 3 — one database per service. Two services may not resolve to the same
- *            store (the same host bind path, the same SQLite file inside it, or
- *            the same Postgres database name), and a directory named
- *            `apps/<name>-service` may not ship with no store at all.
+ *            store (the same mount holding the SQLite file, the same SQLite file
+ *            inside it, or the same Postgres database name), and a directory
+ *            named `apps/<name>-service` may not ship with no store at all.
  *   RULE 4 — the engine is the designated one. SQLite everywhere except the
  *            explicitly allowlisted Postgres services.
  *   RULE 5 — no service reaches into another service's store: no import of
  *            another service's source, no literal path to another service's
- *            database file. Diff-scoped, so a pre-existing violation on the base
- *            ref never fails an unrelated branch.
+ *            database file. A comment naming such a path is prose, not access, so
+ *            it is not reported. Diff-scoped, so a pre-existing violation on the
+ *            base ref never fails an unrelated branch.
  *
  * Rules 1 and 2 of AGENTS.md Contract 2 — every read flow goes through the cache's
  * `getThrough` loader, and the cache holds serialized rows (ciphertext), not
@@ -30,7 +31,7 @@
  * Run: node scripts/arch-check.mjs [--worktree <path>] [--base <git-ref>] [--json]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, normalize, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -106,7 +107,7 @@ function keyAndValue(body) {
 
 /** An empty compose service, filled in as its keys are read. */
 function newService(name) {
-  return { name, image: '', env: new Map(), hostMounts: [] };
+  return { name, image: '', env: new Map(), mounts: [] };
 }
 
 /** One `KEY: value` entry of an `environment:` block. */
@@ -115,10 +116,16 @@ function writeEnvironment(service, body) {
   if (key) service.env.set(key, unquote(value));
 }
 
-/** The host side of a `- host:container` volume line, normalized. */
+/**
+ * One `- host:container[:mode]` volume line. Both sides are kept: the host side
+ * identifies the store, and the container side is how the store is found — a
+ * service may mount a shared cache directory first and its own data directory
+ * second, so "the first mount" is not the one holding the database.
+ */
 function addMount(service, spec) {
-  const mount = normalize(unquote(spec.split(':')[0]));
-  if (mount) service.hostMounts.push(mount);
+  const [host, container] = spec.split(':');
+  const mount = { host: normalize(unquote(host)), container: normalize(unquote(container ?? '')) };
+  if (mount.host) service.mounts.push(mount);
 }
 
 /** A 6-space `- key: value` or `- host:container` line under the open key. */
@@ -173,9 +180,14 @@ function readCompose(path) {
   return state.services;
 }
 
-/** The one finding a rule reports when compose.yaml is not there at all. */
+/**
+ * The one finding a rule reports when compose.yaml is not a readable file. A
+ * directory of that name is not a compose file either, and reading it would
+ * throw a stack trace out of the process.
+ */
 function missingComposeFinding(worktree, rule) {
-  if (existsSync(join(worktree, 'compose.yaml'))) return null;
+  const path = join(worktree, 'compose.yaml');
+  if (existsSync(path) && statSync(path).isFile()) return null;
   const message = `compose.yaml is missing under ${worktree}; the topology is unreadable`;
   return finding('compose.yaml', 1, rule, message);
 }
@@ -240,11 +252,25 @@ function postgresStore(app, composeServices) {
   };
 }
 
+/** The mount whose container directory holds `dbPath`, or null when none does. */
+function mountHolding(service, dbPath) {
+  const mount = service?.mounts.find(
+    (candidate) =>
+      candidate.container &&
+      (dbPath === candidate.container || dbPath.startsWith(`${candidate.container}/`)),
+  );
+  return mount ?? null;
+}
+
 /**
  * The store a SQLite app resolves to. `fileKey` is the database file as the host
  * sees it — note-service and meal-service both write a file *called* `life.db`,
- * but into their own `apps/<service>/data` bind mount, so the full path is the
+ * but into their own `apps/<service>/data` mount, so the full path is the
  * identity and the basename alone is not.
+ *
+ * A path no mount holds (the module's own repo-relative default) stays under
+ * `apps/<service>/`, which is per-service by construction and so can never be a
+ * shared store: `bindKey` is null there rather than guessed.
  */
 function sqliteStore(app, composeServices) {
   const service = composeServices.get(app.name);
@@ -253,7 +279,7 @@ function sqliteStore(app, composeServices) {
   const dbPath = override ?? declaredDatabase(app.text);
   if (!dbPath) return null;
 
-  const bindKey = service?.hostMounts[0] ?? null;
+  const bindKey = mountHolding(service, dbPath)?.host ?? null;
   return {
     name: app.name,
     file: app.file,
@@ -286,7 +312,8 @@ function sharedStore(left, right) {
   const servers = sharedPostgres(left, right);
   if (servers) return servers;
   if (left.kind === 'postgres' || right.kind === 'postgres') return null;
-  if (left.bindKey && left.bindKey === right.bindKey) return `the host bind path ${left.bindKey}`;
+  // "Mount", not "host bind path": a named volume is as shared as a directory.
+  if (left.bindKey && left.bindKey === right.bindKey) return `the mount ${left.bindKey}`;
   if (left.fileKey === right.fileKey) return `the database file ${left.fileKey}`;
   return null;
 }
@@ -313,8 +340,22 @@ function storeFindings(app, composeServices) {
 
   const store = storeOf(app, composeServices);
   if (store) return [];
-  const message = `${app.name} declares no database; expected its own SQLite file or Postgres DB`;
-  return [finding(app.file, lineOf(app.text, 'type:'), 3, message)];
+
+  // A Postgres app behind no postgres server has declared its database and is
+  // missing the server; saying "declares no database" would send the reader
+  // looking at the wrong file. Rule 4 reports the engine separately, by design.
+  const query = declaredEngine(app.text) === 'postgres' ? engineMissingServer : noDatabase;
+  return [finding(app.file, lineOf(app.text, 'type:'), 3, query(app.name))];
+}
+
+/** Rule 3's message for a Postgres app compose gives no server to. */
+function engineMissingServer(name) {
+  return `${name} declares 'postgres' but compose.yaml names no postgres server for it`;
+}
+
+/** Rule 3's message for an app with neither an engine nor a database. */
+function noDatabase(name) {
+  return `${name} declares no database; expected its own SQLite file or Postgres DB`;
 }
 
 /** RULE 3 — every service owns its store, and no two own the same one. */
@@ -402,6 +443,19 @@ function serviceOfPath(file) {
 }
 
 /**
+ * True for a line that is all comment. Prose cannot import or open anything, so a
+ * doc comment naming another service's path — the usual shape of "this mirrors
+ * `apps/tags-service/src/tags/import.ts`" — is not a reach.
+ *
+ * ponytail: a *trailing* comment after live code is still judged, because telling
+ * it apart from a string literal needs a tokenizer; add one if that ever fires.
+ */
+function isComment(line) {
+  const trimmed = line.trimStart();
+  return trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*');
+}
+
+/**
  * RULE 5 findings in one file. A line the base ref already carries identically is
  * not this branch's doing, so only newly added lines are judged.
  */
@@ -410,7 +464,7 @@ export function findCrossServiceFindings({ file, content, baseContent }) {
   const baseLines = new Set(linesOf(baseContent));
 
   return linesOf(content).flatMap((line, index) => {
-    if (baseLines.has(line)) return [];
+    if (baseLines.has(line) || isComment(line)) return [];
     const target = crossedService(line);
     if (!target || target === importer) return [];
     const message = `${importer ?? file} reaches into ${target}: ${line.trim()}`;
@@ -482,9 +536,13 @@ function committedFiles(worktree, base) {
   });
 }
 
-/** The uncommitted `.ts` files of the same shape, renames followed to their new path. */
+/**
+ * The uncommitted `.ts` files of the same shape, renames followed to their new
+ * path. `-uall` is load-bearing: plain `status` reports a new directory as one
+ * untracked entry, so every file inside it would escape the rule.
+ */
 function uncommittedFiles(worktree) {
-  const report = reportedLines(git(worktree, ['status', '--porcelain']));
+  const report = reportedLines(git(worktree, ['status', '--porcelain', '-uall']));
   return report.flatMap((line) => {
     const file = stripQuotes(line.slice(3).split(' -> ').pop());
     return isJudgeable(line.slice(0, 2), file) ? [file] : [];
@@ -543,11 +601,20 @@ function report(findings, asJson) {
   }
 }
 
+/** The worktree to judge, refusing a path `git` could not be asked about. */
+function worktreeOf(raw) {
+  const worktree = resolve(raw);
+  if (!existsSync(worktree)) throw new InputError(`worktree does not exist: ${worktree}`);
+  if (!statSync(worktree).isDirectory()) {
+    throw new InputError(`worktree is not a directory: ${worktree}`);
+  }
+  return worktree;
+}
+
 function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const worktree = resolve(options.worktree);
-    if (!existsSync(worktree)) throw new InputError(`worktree does not exist: ${worktree}`);
+    const worktree = worktreeOf(options.worktree);
 
     const findings = runChecks({ worktree, base: options.base });
     report(findings, options.json);
