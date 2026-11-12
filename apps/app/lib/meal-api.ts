@@ -164,8 +164,7 @@ export type PhotoFailureReason = 'no-image' | 'could-not-read' | 'service-unavai
  * nothing to render but the reason.
  */
 export type PhotoEstimate =
-  | { readable: true; items: PhotoEstimateItem[] }
-  | { readable: false; reason: PhotoFailureReason };
+  { readable: true; items: PhotoEstimateItem[] } | { readable: false; reason: PhotoFailureReason };
 
 /** The image bytes, base64-encoded; they live only for the duration of the request. */
 export interface PhotoImage {
@@ -245,10 +244,7 @@ export function createMealEntry(input: CreateMealEntryInput): Promise<MealEntry>
   return call<MealEntry>('/api/entries', { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function updateMealEntry(
-  id: string,
-  input: UpdateMealEntryInput,
-): Promise<MealEntry> {
+export function updateMealEntry(id: string, input: UpdateMealEntryInput): Promise<MealEntry> {
   return call<MealEntry>(`/api/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
@@ -423,6 +419,28 @@ export function deleteMealFood(id: string): Promise<void> {
  */
 export function restoredFoodName(foodId: string, catalog: MealFood[]): string {
   return catalog.find((food) => food.id === foodId)?.name ?? foodId;
+}
+
+/**
+ * `GET /api/meal-todo` — whether this owner turned the todo integration on. The
+ * switch seeds from this rather than assuming off, so a page that renders after the
+ * user enabled it shows it enabled.
+ */
+export function getMealTodos(): Promise<{ enabled: boolean }> {
+  return call<{ enabled: boolean }>('/api/meal-todo');
+}
+
+/**
+ * `POST /api/meal-todo?date=` — turn the integration on (and seed the day's three
+ * tasks) or off. `date` is the **client's** resolved day, so the caller passes
+ * `getToday()`; the service never reads its own clock (lesson 0019).
+ */
+export function setMealTodos(enabled: boolean, date: string): Promise<{ enabled: boolean }> {
+  const query = new URLSearchParams({ date });
+  return call<{ enabled: boolean }>(`/api/meal-todo?${query}`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
 }
 
 export function createSavedMeal(input: CreateSavedMealInput): Promise<SavedMeal> {

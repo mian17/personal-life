@@ -18,6 +18,7 @@ import { MealTodoToggle } from './outbox/producer/meal-toggle.entity.js';
 import { OutboxModule } from './outbox/outbox.module.js';
 import { Target } from './targets/target.entity.js';
 import { TargetModule } from './targets/target.module.js';
+import { MealTodoController } from './meal-todo.controller.js';
 
 /**
  * How long a writer waits for a locked SQLite file before giving up. The outbox
@@ -62,7 +63,8 @@ const SQLITE_BUSY_TIMEOUT_MS = 5_000;
   ],
   // All eight batch routes live on one prefix-less controller (`SPEC-meal-service`
   // §5), registered here so their literal paths resolve ahead of every imported
-  // resource module's parameter route.
-  controllers: [MealBatchController],
+  // resource module's parameter route. The todo-integration switch rides here for
+  // the same reason: it is a route this module owns, not a resource of its own.
+  controllers: [MealBatchController, MealTodoController],
 })
 export class AppModule {}

@@ -23,6 +23,17 @@ export const TODOS_CREATE = 'todos.create';
 /** Logical destination for a tick intent. */
 export const TODOS_COMPLETE = 'todos.complete';
 
+/**
+ * The origin this service writes under, and the path it grants itself through.
+ *
+ * Both are stated once here: the origin is the value `POST /api/todos/origin-grant`
+ * is asked for, and the path is that route's own spelling. A producer that
+ * hard-coded either at its call site would be a second opinion about a fact that
+ * belongs to one place.
+ */
+export const MEAL_ORIGIN_SERVICE = 'meal-service';
+export const ORIGIN_GRANT_PATH = '/api/todos/origin-grant';
+
 /** `POST /api/todos/origin` body — the create-by-origin route's shape. */
 export interface CreateIntent {
   title: string;

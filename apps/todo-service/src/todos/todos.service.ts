@@ -40,6 +40,7 @@ import {
 } from '@life/service-kit';
 import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
+import { SELF_SERVICE_DISCLOSURE, type GrantOwnOriginDto } from './dto/grant-own-origin.dto.js';
 import { ListsService } from '../lists/lists.service.js';
 import {
   TODO_ALL,
@@ -70,6 +71,19 @@ type TodoDraft = {
 export type OriginatedTodo = TodoDto & {
   originService: string | null;
   originId: string | null;
+};
+
+/**
+ * A stored grant, as `POST /api/todos/origin-grant` answers it: who granted what,
+ * and whether it is granted yet. The consent columns are deliberately absent — the
+ * sentence and its hash are evidence kept for the record, not a read model the app
+ * renders.
+ */
+export type OwnGrantView = {
+  ownerSub: string;
+  clientId: string;
+  originService: string;
+  grantedAt: Date;
 };
 
 /** What a producer names: the origin service its grant allows, and its own todo id. */
@@ -671,6 +685,39 @@ export class TodosService {
       clientId === null ? null : await this.grants.findGrantedOrigin(ownerSub, clientId);
     if (originService === null) throw new ForbiddenException('No origin grant for this client');
     return originService;
+  }
+
+  /**
+   * `POST /api/todos/origin-grant` — a user grants their own producer app the origin
+   * the producer's settings screen asked for (`SPEC-todo-origin` assumption 12).
+   *
+   * Both halves of the key come from the verified token, never the body: `sub` is
+   * the owner, and `client_id` is the grantee — which is why a token without one is
+   * a 403, since a grant with no grantee authorizes nothing. The sentence stored
+   * with it comes from this service's own table, so the caller picks the origin and
+   * the service picks the consent text.
+   *
+   * An upsert, because a grant is a current permission: enabling twice refreshes one
+   * row and its consent. The grant is read straight from the repository on every
+   * origin write and never cached (see `GrantsService`), so there is no cache entry
+   * to invalidate here.
+   */
+  async grantOwnOrigin(principal: Principal, dto: GrantOwnOriginDto): Promise<OwnGrantView> {
+    if (principal.clientId === null) {
+      throw new ForbiddenException('This token names no client to grant');
+    }
+    const grant = await this.grants.grantOwn(
+      principal.sub,
+      principal.clientId,
+      dto.originService,
+      SELF_SERVICE_DISCLOSURE[dto.originService],
+    );
+    return {
+      ownerSub: grant.ownerSub,
+      clientId: grant.clientId,
+      originService: grant.originService,
+      grantedAt: grant.grantedAt,
+    };
   }
 
   /**

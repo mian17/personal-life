@@ -4,6 +4,7 @@ import { Principal } from '@life/service-kit';
 import { CreateTodoDto } from './dto/create-todo.dto.js';
 import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
+import { GrantOwnOriginDto } from './dto/grant-own-origin.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
 import { ListTodosQuery } from './dto/list-todos.query.js';
 import { TodosService } from './todos.service.js';
@@ -29,6 +30,17 @@ export class TodosController {
   @Post('origin')
   createWithOrigin(@Principal() principal: Principal, @Body() dto: CreateWithOriginDto) {
     return this.todos.createWithOrigin(principal, dto);
+  }
+
+  /**
+   * A user enabling a producer from that producer's own settings screen
+   * (`SPEC-todo-origin` assumption 12) — the self-service grant the operator CLI is
+   * no longer needed for. The body names only the origin; owner and grantee are the
+   * verified token's `sub` and `client_id`.
+   */
+  @Post('origin-grant')
+  grantOwnOrigin(@Principal() principal: Principal, @Body() dto: GrantOwnOriginDto) {
+    return this.todos.grantOwnOrigin(principal, dto);
   }
 
   // `originId` is the producer's own id, never this service's todo id.

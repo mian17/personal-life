@@ -14,6 +14,10 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
  * `disclosure` keeps the exact sentence the user was shown, and `disclosureHash`
  * its sha256 hex, so a later wording change is detectable against the consent
  * that was actually given rather than assumed.
+ *
+ * Both are NOT NULL, unlike `OriginGrant`'s nullable pair: this row exists only
+ * because a user turned the switch on, so no operator path could legitimately
+ * create one without a sentence, and a row carrying no consent cannot be written.
  */
 @Entity('meal_todo_toggle')
 export class MealTodoToggle {

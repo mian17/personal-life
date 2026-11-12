@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
+import { MEAL_TODO_DISCLOSURE, disclosureHash } from '@life/service-kit';
 import type { MealGroup } from '../../entries/dto/create-entry.dto.js';
 import { TargetService } from '../../targets/target.service.js';
 import { OutboxService } from '../outbox.service.js';
@@ -66,6 +67,48 @@ export class MealTodoProducerService {
         await this.enqueueCreate(ownerSub, group, target.calories, today, manager);
       }
     });
+  }
+
+  /**
+   * Record that `ownerSub` turned the integration on, with the sentence they were
+   * shown (`SPEC-todo-origin` assumption 12).
+   *
+   * An upsert, so enabling twice refreshes one row rather than adding a second, and
+   * the consent columns are rewritten with it — the sentence stored is always the
+   * one the screen showed on the run that turned it on. This write is deliberately
+   * **not** inside a `degrading` guard: a consent record that silently failed to
+   * persist would leave the user enabled with no evidence of what they agreed to.
+   * The enqueue that follows it keeps its own guard, because a failed intent costs
+   * a task and must never cost the consent row.
+   */
+  async recordConsent(ownerSub: string, manager: EntityManager): Promise<void> {
+    await manager.getRepository(MealTodoToggle).upsert(
+      {
+        ownerSub,
+        enabledAt: new Date(),
+        disclosure: MEAL_TODO_DISCLOSURE,
+        disclosureHash: disclosureHash(MEAL_TODO_DISCLOSURE),
+      },
+      ['ownerSub'],
+    );
+  }
+
+  /**
+   * Turn the integration off: the absence of the row is the off state.
+   *
+   * This deletes **only** this service's own record. `origin_grant` in todo-service
+   * is left standing on purpose — revoking a producer's origin grant is a separate,
+   * deliberate act (it is what stops the producer writing, in any app), so flipping
+   * this switch off stops meal-service producing without silently withdrawing a
+   * permission the user granted elsewhere.
+   */
+  async revoke(ownerSub: string, manager: EntityManager): Promise<void> {
+    await manager.getRepository(MealTodoToggle).delete({ ownerSub });
+  }
+
+  /** Whether this owner turned the integration on, for the settings switch to read. */
+  async isEnabledFor(ownerSub: string, manager: EntityManager): Promise<boolean> {
+    return this.isEnabled(ownerSub, manager);
   }
 
   /**

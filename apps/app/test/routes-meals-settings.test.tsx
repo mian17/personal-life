@@ -2,9 +2,19 @@ import { SettingsBlock, SettingsShell } from '@life/ui';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
+jest.mock('@/lib/meal-api', () => ({ getMealTodos: jest.fn() }));
+jest.mock('@/app/meal-todo-actions', () => ({ setMealTodosAction: jest.fn() }));
 
 import { submitFeedbackAction } from '@/app/feedback-actions';
+import { getMealTodos } from '@/lib/meal-api';
 import MealsSettingsPage from '@/app/(meals)/meals/settings/page';
+import { MealTodoSwitch } from '@/app/meal-todo-toggle';
+
+const mockedGetMealTodos = getMealTodos as jest.MockedFunction<typeof getMealTodos>;
+
+beforeEach(() => {
+  mockedGetMealTodos.mockResolvedValue({ enabled: false });
+});
 
 /** React children normalized to an array (single child or list). */
 function childList(node: any): any[] {
@@ -14,8 +24,8 @@ function childList(node: any): any[] {
 }
 
 describe('/meals/settings page wiring', () => {
-  it('composes one SettingsShell titled Settings, backed to /meals, wired to meals feedback', () => {
-    const page = MealsSettingsPage();
+  it('composes one SettingsShell titled Settings, backed to /meals, wired to meals feedback', async () => {
+    const page = await MealsSettingsPage();
 
     expect(page.type).toBe(SettingsShell);
     expect(page.props.title).toBe('Settings');
@@ -24,16 +34,16 @@ describe('/meals/settings page wiring', () => {
     expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('passes only the Meals group as app-specific children', () => {
-    const kids = childList(MealsSettingsPage());
+  it('passes only the Meals group as app-specific children', async () => {
+    const kids = childList(await MealsSettingsPage());
 
     expect(kids).toHaveLength(1);
     expect(kids[0].type).toBe(SettingsBlock);
     expect(kids[0].props.title).toBe('Meals');
   });
 
-  it('adds the Meals group: the target row with an Edit pill, then saved meals and foods', () => {
-    const html = renderToStaticMarkup(MealsSettingsPage());
+  it('adds the Meals group: the target row with an Edit pill, then saved meals and foods', async () => {
+    const html = renderToStaticMarkup(await MealsSettingsPage());
 
     expect(html).toContain('>Meals</h2>');
     for (const [label, href] of [
@@ -51,8 +61,39 @@ describe('/meals/settings page wiring', () => {
     expect(html.match(/>Send feedback</g)).toHaveLength(1);
   });
 
-  it('renders the Appearance group as one pressed segment, with no Theme row', () => {
-    const html = renderToStaticMarkup(MealsSettingsPage());
+  it('adds the Todos row with the integration switch as its control', async () => {
+    const page = await MealsSettingsPage();
+    const block = childList(page)[0];
+    const rows = childList(block);
+    const todosRow = rows.find((row) => row?.props?.label === 'Todos');
+
+    expect(todosRow).toBeDefined();
+    // A row with the switch as its control, and no `href`: the row acts, it does not route.
+    expect(todosRow.props.href).toBeUndefined();
+    expect(todosRow.props.control.type).toBe(MealTodoSwitch);
+  });
+
+  it('seeds the switch from the state the service reports', async () => {
+    mockedGetMealTodos.mockResolvedValue({ enabled: true });
+    const page = await MealsSettingsPage();
+    const rows = childList(childList(page)[0]);
+
+    expect(rows.find((row) => row?.props?.label === 'Todos').props.control.props.enabled).toBe(
+      true,
+    );
+  });
+
+  it('renders the switch from @life/ui, never a raw control', async () => {
+    const html = renderToStaticMarkup(await MealsSettingsPage());
+
+    expect(html).toContain('data-slot="switch"');
+    expect(html).toContain('aria-label="Create daily meal tasks"');
+    // The row is a bare label row plus a control: no anchor, so no chevron.
+    expect(html).toContain('>Todos<');
+  });
+
+  it('renders the Appearance group as one pressed segment, with no Theme row', async () => {
+    const html = renderToStaticMarkup(await MealsSettingsPage());
     const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
 
     expect(segment).not.toBe('');
@@ -63,16 +104,16 @@ describe('/meals/settings page wiring', () => {
     expect(html).not.toContain('System, light, or dark.');
   });
 
-  it('lays the appearance segment into the settings row: full width, no trough chrome', () => {
-    const html = renderToStaticMarkup(MealsSettingsPage());
+  it('lays the appearance segment into the settings row: full width, no trough chrome', async () => {
+    const html = renderToStaticMarkup(await MealsSettingsPage());
     const segment = html.match(/role="group" aria-label="Appearance"[^>]*/)?.[0] ?? '';
 
     expect(segment).toContain('w-full');
     expect(segment).not.toContain('bg-surface-sunken');
   });
 
-  it('renders the frozen copy and a back affordance targeting /meals', () => {
-    const html = renderToStaticMarkup(MealsSettingsPage());
+  it('renders the frozen copy and a back affordance targeting /meals', async () => {
+    const html = renderToStaticMarkup(await MealsSettingsPage());
 
     expect(html).toContain('Settings');
     expect(html).toContain('Reduce motion');
