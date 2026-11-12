@@ -6,16 +6,22 @@ import { EntriesModule } from './entries/entries.module.js';
 import { Food } from './foods/food.entity.js';
 import { FoodsModule } from './foods/foods.module.js';
 import { Serving } from './foods/serving.entity.js';
-import { AuditEntry, AuditModule, HealthModule, KeysModule, UserKeys } from '@life/service-kit';
+import {
+  AuditEntry,
+  AuditModule,
+  HealthModule,
+  KeysModule,
+  Outbox,
+  UserKeys,
+} from '@life/service-kit';
 import { MASTER_KEY_ENV } from './service-config.js';
 import { PhotoModule } from './photo/photo.module.js';
 import { SavedMeal } from './saved-meals/saved-meal.entity.js';
 import { SavedMealItem } from './saved-meals/saved-meal-item.entity.js';
 import { SavedMealsModule } from './saved-meals/saved-meals.module.js';
 import { MealBatchController } from './batch/meal-batch.controller.js';
-import { Outbox } from './outbox/outbox.entity.js';
-import { MealTodoToggle } from './outbox/producer/meal-toggle.entity.js';
-import { OutboxModule } from './outbox/outbox.module.js';
+import { MealTodoModule } from './meal-todo/meal-todo.module.js';
+import { MealTodoToggle } from './meal-todo/meal-toggle.entity.js';
 import { Target } from './targets/target.entity.js';
 import { TargetModule } from './targets/target.module.js';
 import { MealTodoController } from './meal-todo.controller.js';
@@ -59,7 +65,7 @@ const SQLITE_BUSY_TIMEOUT_MS = 5_000;
     SavedMealsModule,
     PhotoModule,
     AuditModule.forRoot(),
-    OutboxModule,
+    MealTodoModule,
   ],
   // All eight batch routes live on one prefix-less controller (`SPEC-meal-service`
   // §5), registered here so their literal paths resolve ahead of every imported

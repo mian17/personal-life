@@ -5,7 +5,7 @@ import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { MealCache, generationKey } from '../src/cache/meal-cache.js';
 import { EntriesCache } from '../src/entries/entries-cache.js';
 import { EntriesService } from '../src/entries/entries.service.js';
-import { MealTodoProducerService } from '../src/outbox/producer/meal-todo-producer.service.js';
+import { MealTodoProducerService } from '../src/meal-todo/meal-todo-producer.service.js';
 import { KeysService } from '@life/service-kit';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
 import type { Entry } from '../src/entries/entry.entity.js';

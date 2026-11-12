@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
-import { MEAL_TODO_DISCLOSURE, disclosureHash } from '@life/service-kit';
-import type { MealGroup } from '../../entries/dto/create-entry.dto.js';
-import { TargetService } from '../../targets/target.service.js';
-import { OutboxService } from '../outbox.service.js';
+import { MEAL_TODO_DISCLOSURE, OutboxService, disclosureHash } from '@life/service-kit';
+import type { MealGroup } from '../entries/dto/create-entry.dto.js';
+import { TargetService } from '../targets/target.service.js';
 import { MealTodoToggle } from './meal-toggle.entity.js';
 
 import {

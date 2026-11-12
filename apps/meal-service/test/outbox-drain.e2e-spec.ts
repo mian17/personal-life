@@ -4,9 +4,8 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { Outbox } from '../src/outbox/outbox.entity.js';
-import { OUTBOX_ERROR_MAX_CHARS, OUTBOX_SWEEP_BATCH } from '../src/outbox/outbox-poller.service.js';
-import { TODOS_CREATE } from '../src/outbox/producer/todo-intents.js';
+import { OUTBOX_ERROR_MAX_CHARS, OUTBOX_SWEEP_BATCH, Outbox } from '@life/service-kit';
+import { TODOS_CREATE } from '../src/meal-todo/todo-intents.js';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**

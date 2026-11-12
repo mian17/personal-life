@@ -4,10 +4,9 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { MEAL_TODO_DISCLOSURE, disclosureHash } from '@life/service-kit';
-import { MealTodoToggle } from '../src/outbox/producer/meal-toggle.entity.js';
-import { Outbox } from '../src/outbox/outbox.entity.js';
-import { MEAL_ORIGIN_SERVICE, TODOS_CREATE } from '../src/outbox/producer/todo-intents.js';
+import { MEAL_TODO_DISCLOSURE, Outbox, disclosureHash } from '@life/service-kit';
+import { MealTodoToggle } from '../src/meal-todo/meal-toggle.entity.js';
+import { MEAL_ORIGIN_SERVICE, TODOS_CREATE } from '../src/meal-todo/todo-intents.js';
 import { configureVerifierEnv, JwtTestHarness } from './jwt-harness.js';
 
 /**

@@ -68,3 +68,25 @@ export {
   sanitizeUserAgent,
   type CredentialPresence,
 } from './audit/audit-fields.js';
+export { OutboxModule, type OutboxOptions } from './outbox/outbox.module.js';
+export { Outbox } from './outbox/outbox.entity.js';
+export {
+  OutboxService,
+  type OutboxEntry,
+  type OutboxOutcome,
+  type PendingIntent,
+} from './outbox/outbox.service.js';
+export {
+  OUTBOX_ERROR_MAX_CHARS,
+  OUTBOX_POLL_INTERVAL_MS,
+  OUTBOX_SWEEP_BATCH,
+  OutboxPollerService,
+  oneLine,
+} from './outbox/outbox-poller.service.js';
+export {
+  OUTBOX_DELIVERY,
+  TODOS_API_URL_ENV,
+  createHttpDelivery,
+  type OutboxDelivery,
+  type OutboxMessage,
+} from './outbox/outbox-delivery.js';

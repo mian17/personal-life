@@ -24,13 +24,16 @@ import {
 } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Principal } from '@life/service-kit';
-import { OUTBOX_SWEEP_BATCH } from './outbox/outbox-poller.service.js';
-import { OutboxService, type PendingIntent } from './outbox/outbox.service.js';
-import { MealTodoProducerService } from './outbox/producer/meal-todo-producer.service.js';
-import { MealTodoStateDto } from './outbox/producer/meal-todo-state.dto.js';
-import { MEAL_ORIGIN_SERVICE, ORIGIN_GRANT_PATH } from './outbox/producer/todo-intents.js';
-import { TODOS_API_URL_ENV } from './outbox/outbox-delivery.js';
+import {
+  OUTBOX_SWEEP_BATCH,
+  Principal,
+  TODOS_API_URL_ENV,
+  OutboxService,
+  type PendingIntent,
+} from '@life/service-kit';
+import { MealTodoProducerService } from './meal-todo/meal-todo-producer.service.js';
+import { MealTodoStateDto } from './meal-todo/meal-todo-state.dto.js';
+import { MEAL_ORIGIN_SERVICE, ORIGIN_GRANT_PATH } from './meal-todo/todo-intents.js';
 
 /** `YYYY-MM-DD`, the wire form of the client's day. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

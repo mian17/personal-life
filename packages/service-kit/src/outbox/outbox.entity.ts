@@ -2,19 +2,25 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 /**
  * One "tell another service" intent, stored *in the same transaction* as the
- * meal row it belongs to (`docs/roadmap/research/outbox-atomicity.md` §1, §5).
+ * business row it belongs to (`docs/roadmap/research/outbox-atomicity.md` §1, §5).
  *
- * A row here is evidence that an event is owed: a committed meal write can
- * never lose its notification, and a rolled-back one can never send it. The
- * poller (`OutboxPollerService`) is the only reader and the only writer of
+ * A row here is evidence that an event is owed: a committed write can never lose
+ * its notification, and a rolled-back one can never send it. The poller
+ * (`OutboxPollerService`) is the only reader and the only writer of
  * `publishedAt`, so a crash between "sent" and "marked sent" re-sends rather
  * than loses — at-least-once, which is the whole point of the pattern.
+ *
+ * The table name is fixed and takes no option: every service owns its own
+ * database file, so one `outbox` table per file cannot collide with another
+ * service's, and a configurable name would be a parameter nobody could
+ * meaningfully set. `audit_log` (`audit/audit-entry.entity.ts`) already works
+ * exactly this way.
  *
  * `lastError` is one capped line, never a stack: the column is a retry
  * diagnostic, not a log sink.
  */
-@Entity('meal_outbox')
-@Index('IDX_meal_outbox_pending', ['publishedAt', 'createdAt'])
+@Entity('outbox')
+@Index('IDX_outbox_pending', ['publishedAt', 'createdAt'])
 export class Outbox {
   /** Service-generated (`randomUUID`) before insert — the id is the delivery identity. */
   @PrimaryColumn({ type: 'uuid' })

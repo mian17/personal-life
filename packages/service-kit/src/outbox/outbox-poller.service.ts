@@ -11,7 +11,7 @@ import { OUTBOX_DELIVERY, type OutboxDelivery, type OutboxMessage } from './outb
 import { Outbox } from './outbox.entity.js';
 
 /**
- * How long between sweeps. Short enough that a "tell todo-service" intent lands
+ * How long between sweeps. Short enough that a "tell another service" intent lands
  * within a user-visible beat, long enough that an idle service costs one query
  * per interval per service. There is no push wakeup yet; a sweep that finds
  * nothing is one indexed `LIMIT 20` read.

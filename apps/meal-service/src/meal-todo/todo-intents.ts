@@ -1,4 +1,4 @@
-import type { MealGroup } from '../../entries/dto/create-entry.dto.js';
+import type { MealGroup } from '../entries/dto/create-entry.dto.js';
 
 /**
  * The payloads meal-service owes todo-service, as pure functions — no I/O, no

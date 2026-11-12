@@ -42,10 +42,11 @@ export interface OutboxOutcome {
  * The writer half of the outbox (`docs/roadmap/research/outbox-atomicity.md` §1).
  *
  * `enqueue` takes an `EntityManager` **explicitly and by requirement**: the row
- * must be inserted through the caller's transaction, so the intent and the meal
- * row either both commit or both vanish. There is deliberately no overload that
- * falls back to the injected repository — a repository here would write outside
- * the caller's transaction and turn a rollback into a phantom notification.
+ * must be inserted through the caller's transaction, so the intent and the
+ * business row either both commit or both vanish. There is deliberately no
+ * overload that falls back to the injected repository — a repository here would
+ * write outside the caller's transaction and turn a rollback into a phantom
+ * notification.
  */
 @Injectable()
 export class OutboxService {

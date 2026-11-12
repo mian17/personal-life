@@ -9,11 +9,12 @@ import { Entry } from '../src/entries/entry.entity.js';
 import {
   OUTBOX_ERROR_MAX_CHARS,
   OUTBOX_SWEEP_BATCH,
+  Outbox,
   OutboxPollerService,
-} from '../src/outbox/outbox-poller.service.js';
-import type { OutboxDelivery, OutboxMessage } from '../src/outbox/outbox-delivery.js';
-import { Outbox } from '../src/outbox/outbox.entity.js';
-import { OutboxService } from '../src/outbox/outbox.service.js';
+  OutboxService,
+  type OutboxDelivery,
+  type OutboxMessage,
+} from '@life/service-kit';
 
 /**
  * The outbox contract (`docs/roadmap/research/outbox-atomicity.md` §1, §5, §3):

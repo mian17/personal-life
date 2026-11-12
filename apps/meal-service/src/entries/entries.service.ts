@@ -23,7 +23,7 @@ import { Entry } from './entry.entity.js';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto.js';
 import type { UpdateEntryDto } from './dto/update-entry.dto.js';
 import { EntriesCache, toCachedEntryRow, type CachedEntryRow } from './entries-cache.js';
-import { MealTodoProducerService } from '../outbox/producer/meal-todo-producer.service.js';
+import { MealTodoProducerService } from '../meal-todo/meal-todo-producer.service.js';
 
 /**
  * The wire shape of a diary entry. `ownerSub` is deliberately absent —

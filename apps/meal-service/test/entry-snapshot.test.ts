@@ -13,7 +13,7 @@ import {
 import type { Entry } from '../src/entries/entry.entity.js';
 import { EntriesCache } from '../src/entries/entries-cache.js';
 import { EntriesService, type EntryDto } from '../src/entries/entries.service.js';
-import type { MealTodoProducerService } from '../src/outbox/producer/meal-todo-producer.service.js';
+import type { MealTodoProducerService } from '../src/meal-todo/meal-todo-producer.service.js';
 import type { UpdateEntryDto } from '../src/entries/dto/update-entry.dto.js';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
