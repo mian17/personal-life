@@ -1249,10 +1249,13 @@ export class TodosService {
    * `GET /api/todos/completions` — the owner's completion log through the
    * read-through cache under the rest key `todo:completions` (one entry serves
    * every cursor/limit variant). Cached value = serialized completion rows as
-   * stored; the title/list join runs post-hit from the same cached `todo:all`
-   * row-set (`C7` — never a snapshot). A completion whose todo is no longer
-   * active (trashed) is omitted; a permanently deleted todo already cascaded
-   * its rows. Order `completedAt DESC, id DESC`, keyset-paginated in memory.
+   * stored, now including each row's sealed `title` snapshot (still ciphertext,
+   * still inside the at-rest boundary). The title read is the completion's own
+   * snapshot when a rename froze one, otherwise the live title from the same
+   * cached `todo:all` row-set — both are the same `enc.v1.` envelope under the
+   * todo title's AAD. A completion whose todo is no longer active (trashed) is
+   * omitted; a permanently deleted todo already cascaded its rows. Order
+   * `completedAt DESC, id DESC`, keyset-paginated in memory.
    */
   async findCompletions(
     sub: string,
