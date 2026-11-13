@@ -5,6 +5,7 @@ import { CreateTodoDto } from './dto/create-todo.dto.js';
 import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import { GrantOwnOriginDto } from './dto/grant-own-origin.dto.js';
+import { RenameByOriginDto } from './dto/rename-by-origin.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
 import { ListTodosQuery } from './dto/list-todos.query.js';
 import { TodosService } from './todos.service.js';
@@ -65,6 +66,20 @@ export class TodosController {
     @Body() dto: CompleteByOriginDto,
   ) {
     return this.todos.completeByOrigin(principal, originId, dto);
+  }
+
+  /**
+   * Refresh an open todo's title without ticking it (`SPEC-todo-origin` §9.15
+   * follow-up). Declared beside the tick and before the `:id` routes for the same
+   * reason: `origin/<originId>/...` is a literal path, not an id.
+   */
+  @Post('origin/:originId/rename')
+  renameByOrigin(
+    @Principal() principal: Principal,
+    @Param('originId') originId: string,
+    @Body() dto: RenameByOriginDto,
+  ) {
+    return this.todos.renameByOrigin(principal, originId, dto);
   }
 
   @Get()

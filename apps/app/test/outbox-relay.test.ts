@@ -39,6 +39,12 @@ const tickPayload = {
   originId: 'meal:breakfast',
 };
 
+/** A rename carries the new number and no day: it refreshes a row, it logs nothing. */
+const renamePayload = {
+  title: 'Eat Breakfast to reach 2500 kcal',
+  originId: 'meal:breakfast',
+};
+
 /**
  * Route the mocked transport by base URL and path, so the test states which call
  * failed rather than relying on call order for the outcomes.
@@ -200,6 +206,73 @@ test('a tick with no originId is skipped with a reason, never guessed at', async
   expect(todoCalls()).toEqual([]);
   expect(result).toEqual({ delivered: 0, failed: 1 });
   expect(reportedRecords()[0].lastError).toContain('originId');
+});
+
+test('a rename intent re-titles the task it names, and carries no occurrence', async () => {
+  routePending([intent('i10', 'todos.rename', renamePayload)]);
+
+  const result = await deliverPendingTodos();
+
+  expect(result).toEqual({ delivered: 1, failed: 0 });
+  expect(todoCalls()).toEqual(['/api/todos/origin/meal%3Abreakfast/rename']);
+  const [, , init] = mockCallService.mock.calls.find(
+    ([base]: [string]) => base === TODO_API_URL,
+  ) as [string, string, RequestInit];
+  expect(init.method).toBe('POST');
+  expect(JSON.parse(String(init.body))).toEqual({ title: 'Eat Breakfast to reach 2500 kcal' });
+  expect(reportedRecords()).toEqual([{ id: 'i10', published: true }]);
+});
+
+test('a 409 on a rename is published, because the task is done and must stay as it is', async () => {
+  mockCallService.mockImplementation((base: string, path: string) => {
+    if (base === MEAL_API_URL)
+      return Promise.resolve({ intents: [intent('i11', 'todos.rename', renamePayload)] });
+    if (path === '/api/meal-todo/published') return Promise.resolve({ updated: 1 });
+    return Promise.reject(
+      new ApiError(409, 'API 409 on /api/todos/origin/meal%3Abreakfast/rename'),
+    );
+  });
+
+  const result = await deliverPendingTodos();
+
+  // Retrying would spin on a finished task forever: done is a final answer.
+  expect(result).toEqual({ delivered: 1, failed: 0 });
+  expect(reportedRecords()).toEqual([{ id: 'i11', published: true }]);
+});
+
+test('a rename refused with 403 still closes the row as terminal', async () => {
+  mockCallService.mockImplementation((base: string, path: string) => {
+    if (base === MEAL_API_URL)
+      return Promise.resolve({ intents: [intent('i12', 'todos.rename', renamePayload)] });
+    if (path === '/api/meal-todo/published') return Promise.resolve({ updated: 1 });
+    return Promise.reject(
+      new ApiError(403, 'API 403 on /api/todos/origin/meal%3Abreakfast/rename'),
+    );
+  });
+
+  const result = await deliverPendingTodos();
+
+  expect(result).toEqual({ delivered: 1, failed: 0 });
+  const [record] = reportedRecords();
+  expect(record.published).toBe(true);
+  expect(record.lastError).toContain('403');
+});
+
+test('a bad rename row does not abort the intents behind it', async () => {
+  routePending([
+    intent('no-title', 'todos.rename', { originId: 'meal:breakfast' }),
+    intent('bad-row', 'todos.rename', { title: 'x' }),
+    intent('good', 'todos.rename', renamePayload),
+  ]);
+
+  const result = await deliverPendingTodos();
+
+  expect(result).toEqual({ delivered: 1, failed: 2 });
+  const records = reportedRecords();
+  expect(records.map((record) => record.id)).toEqual(['no-title', 'bad-row', 'good']);
+  expect(records[0].lastError).toContain('title');
+  expect(records[1].lastError).toContain('originId');
+  expect(records[2].published).toBe(true);
 });
 
 test('the whole batch is reported in one call, not one per row', async () => {

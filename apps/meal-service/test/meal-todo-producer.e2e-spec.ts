@@ -13,6 +13,7 @@ import { MealCache } from '../src/cache/meal-cache.js';
 import { MealTodoProducerService } from '../src/meal-todo/meal-todo-producer.service.js';
 import { MealTodoToggle } from '../src/meal-todo/meal-toggle.entity.js';
 import { Target } from '../src/targets/target.entity.js';
+import type { UpdateProfileDto } from '../src/targets/dto/update-profile.dto.js';
 import { TargetService } from '../src/targets/target.service.js';
 
 /**
@@ -57,6 +58,32 @@ function body(overrides: Partial<CreateEntryDto> = {}): CreateEntryDto {
 /** The target service, or one whose read always fails (the failure gate). */
 function targetService(dataSource: DataSource): TargetService {
   return new TargetService(dataSource.getRepository(Target), new MealCache(null));
+}
+
+/**
+ * The target service wired to a producer, as `TargetModule` wires the two: the
+ * profile write is what owes the rename intents. The producer is handed the
+ * repository's manager, which is the shape `updateProfile` passes.
+ */
+function targetServiceWith(
+  dataSource: DataSource,
+  producer: MealTodoProducerService,
+): TargetService {
+  return new TargetService(dataSource.getRepository(Target), new MealCache(null), producer);
+}
+
+/** A valid profile body; each case overrides only what it exercises. */
+function profile(overrides: Record<string, unknown> = {}) {
+  return {
+    age: 30,
+    sex: 'female',
+    heightCm: 170,
+    weightKg: 65,
+    activity: 'moderate',
+    goal: 'maintain',
+    date: DAY,
+    ...overrides,
+  } as UpdateProfileDto;
 }
 
 function failingTargets(): TargetService {
@@ -319,5 +346,70 @@ describe('Meal todo producer (e2e)', () => {
     await expect(degraded.ensureDailyTasks(SUB, DAY, dataSource.manager)).resolves.toBeUndefined();
 
     expect(await outboxRows()).toHaveLength(0);
+  });
+
+  describe('a profile change re-titles the open tasks', () => {
+    it('enqueues one rename per meal group, carrying the new number', async () => {
+      await grant();
+
+      await targetServiceWith(dataSource, producer).updateProfile(SUB, profile({ weightKg: 90 }));
+
+      const renames = await payloads('todos.rename');
+      const newCalories = (
+        await dataSource.getRepository(Target).findOneByOrFail({ ownerSub: SUB, validFrom: DAY })
+      ).calories;
+      expect(renames).toHaveLength(3);
+      expect(renames.map((payload) => payload.originId).sort()).toEqual([
+        'meal:breakfast',
+        'meal:dinner',
+        'meal:lunch',
+      ]);
+      expect(renames.map((payload) => payload.title).sort()).toEqual([
+        `Eat Breakfast to reach ${newCalories} kcal`,
+        `Eat Dinner to reach ${newCalories} kcal`,
+        `Eat Lunch to reach ${newCalories} kcal`,
+      ]);
+      // A rename names no day: it refreshes a row, it does not log one.
+      for (const payload of renames) expect(payload).not.toHaveProperty('occurrence');
+    });
+
+    it('enqueues no rename while the owner has not granted the integration', async () => {
+      const service = targetServiceWith(dataSource, producer);
+
+      const saved = await service.updateProfile(SUB, profile({ weightKg: 90 }));
+
+      expect(saved.weightKg).toBe(90);
+      expect(await payloads('todos.rename')).toEqual([]);
+    });
+
+    it('still saves the target when the producer cannot write its intents', async () => {
+      await grant();
+      const degraded = new MealTodoProducerService(failingOutbox(), targetService(dataSource));
+
+      const saved = await targetServiceWith(dataSource, degraded).updateProfile(
+        SUB,
+        profile({ weightKg: 90 }),
+      );
+
+      expect(saved.weightKg).toBe(90);
+      expect(await dataSource.getRepository(Target).count({ where: { ownerSub: SUB } })).toBe(2);
+      expect(await payloads('todos.rename')).toEqual([]);
+    });
+
+    it('still saves the target when the producer throws before its own guard', async () => {
+      const throwing = {
+        refreshTitles: () => {
+          throw new Error('producer seam exploded');
+        },
+      } as unknown as MealTodoProducerService;
+
+      const saved = await targetServiceWith(dataSource, throwing).updateProfile(
+        SUB,
+        profile({ weightKg: 90 }),
+      );
+
+      expect(saved.weightKg).toBe(90);
+      expect(await dataSource.getRepository(Target).count({ where: { ownerSub: SUB } })).toBe(2);
+    });
   });
 });

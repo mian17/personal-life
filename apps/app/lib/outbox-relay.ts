@@ -1,5 +1,6 @@
 import 'server-only';
 import { ApiError } from './api-error';
+import { callService } from './client';
 import {
   listPendingMealIntents,
   markMealIntents,
@@ -26,9 +27,21 @@ import { completeTodoByOrigin, createTodoWithOrigin, type TodoOriginCreateBody }
  *   best-effort, and a page must never fail because a todo could not be ticked.
  */
 
-/** The one destination this relay knows how to send. */
+/** The destinations this relay knows how to send. */
 const TODOS_CREATE = 'todos.create';
 const TODOS_COMPLETE = 'todos.complete';
+const TODOS_RENAME = 'todos.rename';
+
+/**
+ * The todo-service origin, spelled exactly as `lib/todo-api.ts` spells it.
+ *
+ * It is repeated here rather than imported because that module exports no base and
+ * its one helper for this route does not exist yet; a relay that could only reach
+ * the rename by widening `todo-api` would be a bigger change than the destination
+ * it needs. ponytail: one duplicated base; move the send into `lib/todo-api.ts`
+ * beside the create/tick helpers when that file is next open.
+ */
+const TODO_API_URL = process.env.TODO_API_URL ?? 'http://127.0.0.1:3005';
 
 /**
  * The reason recorded when todo-service answers `403`: the user revoked the grant or
@@ -56,6 +69,12 @@ type CreatePayload = Partial<TodoOriginCreateBody> & Record<string, unknown>;
 interface TickPayload {
   title?: string;
   occurrence?: string;
+  originId?: string;
+}
+
+/** The fields a rename needs: the task it names and the title it should carry. */
+interface RenamePayload {
+  title?: string;
   originId?: string;
 }
 
@@ -107,10 +126,15 @@ async function readPending(): Promise<PendingMealIntent[]> {
 }
 
 /**
- * One intent's attempt, as the outcome to report. `409` is success — a create is
- * idempotent by origin id, so a redelivered intent is the same task. `403` publishes
- * with the revocation reason (terminal). Anything else leaves the row pending with
- * its reason, so the next drain retries it.
+ * One intent's attempt, as the outcome to report.
+ *
+ * `409` is success, for two different reasons that are both "the row is already in
+ * the state this intent wanted": a create is idempotent by origin id, and a rename
+ * refuses a **done** task — the owner finished it, so the task is a record of what
+ * they did and must not be rewritten. Publishing either one is the honest outcome;
+ * retrying it would spin forever. `403` publishes with the revocation reason
+ * (terminal). Anything else leaves the row pending with its reason, so the next
+ * drain retries it.
  */
 async function attempt(intent: PendingMealIntent): Promise<MealIntentOutcome> {
   try {
@@ -138,6 +162,8 @@ async function send(intent: PendingMealIntent): Promise<void> {
       return sendCreate(intent.payload);
     case TODOS_COMPLETE:
       return sendTick(intent.payload);
+    case TODOS_RENAME:
+      return sendRename(intent.payload);
     default:
       throw new Error(`unknown destination: ${intent.destination}`);
   }
@@ -166,6 +192,27 @@ async function sendTick(raw: string): Promise<void> {
     ...(payload.title === undefined ? {} : { title: payload.title }),
     ...(payload.occurrence === undefined ? {} : { occurrence: payload.occurrence }),
   });
+}
+
+/**
+ * `POST /api/todos/origin/:originId/rename`, carrying the payload's title.
+ *
+ * A rename names a title or it is not one, so a payload without it is a skip with a
+ * logged reason rather than a request that would do nothing.
+ */
+async function sendRename(raw: string): Promise<void> {
+  const payload = parse<RenamePayload>(raw);
+  if (!payload.originId) {
+    throw new Error('rename intent carries no originId: skipped');
+  }
+  if (typeof payload.title !== 'string') {
+    throw new Error('rename intent is missing title');
+  }
+  await callService(
+    TODO_API_URL,
+    `/api/todos/origin/${encodeURIComponent(payload.originId)}/rename`,
+    { method: 'POST', body: JSON.stringify({ title: payload.title }) },
+  );
 }
 
 /** The report write, one call per batch. A failure here is logged, never thrown. */

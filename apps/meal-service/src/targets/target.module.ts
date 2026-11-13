@@ -1,12 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MEAL_CACHE, createMealCache } from '../cache/meal-cache.js';
+import { MealTodoModule } from '../meal-todo/meal-todo.module.js';
 import { TargetController } from './target.controller.js';
 import { Target } from './target.entity.js';
 import { TargetService } from './target.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Target])],
+  imports: [TypeOrmModule.forFeature([Target]), forwardRef(() => MealTodoModule)],
   controllers: [TargetController],
   providers: [
     // Selection happens once at module init: `REDIS_URL` unset keeps the

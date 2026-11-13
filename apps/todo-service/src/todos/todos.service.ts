@@ -41,6 +41,7 @@ import {
   type ReadGrant,
 } from '@life/service-kit';
 import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
+import { RenameByOriginDto } from './dto/rename-by-origin.dto.js';
 import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
 import {
   SELF_SERVICE_DISCLOSURE,
@@ -874,6 +875,54 @@ export class TodosService {
     // Bump AFTER a write that happened; the swallowed no-op never reaches here.
     await this.cache.bumpGeneration(principal.sub);
     return this.originatedTodoView(completed);
+  }
+
+  /**
+   * `POST /api/todos/origin/:originId/rename` — refresh the title of the todo this
+   * producer created, without touching the day it is due (`SPEC-todo-origin`
+   * §9.15 follow-up: a changed calorie target must reach an open task, not only
+   * the group the owner happens to log next).
+   *
+   * A **done** todo is refused with a 409 and written nowhere. A finished task is a
+   * record of what the owner did; rewriting its title would falsify that record —
+   * so the rule lives here, where every rename passes, and not in the caller, which
+   * cannot see this service's `done` flag at all.
+   *
+   * The seal is the tick's own `sealedTitle`, so a renamed title is the same
+   * `enc.v1.` envelope under the same AAD as one written by a create — and a
+   * refused rename seals nothing and bumps nothing, so the cache keeps answering
+   * the row that is really stored. `version` deliberately stays put: it is the
+   * app's optimistic-concurrency cursor, and the tick path already leaves it alone
+   * for the same reason (an origin write carries no `expectedVersion`).
+   */
+  async renameByOrigin(
+    principal: Principal,
+    originId: string,
+    dto: RenameByOriginDto,
+  ): Promise<OriginatedTodo> {
+    const origin: OriginRef = {
+      service: await this.grantedOrigin(principal.sub, principal.clientId),
+      id: originId,
+    };
+    const todo = await this.loadOriginTodo(principal.sub, origin);
+    if (todo.done) throw new ConflictException('cannot rename a completed todo');
+
+    // Conditional on `done = false` in the WHERE, so a tick that lands between the
+    // read above and this write cannot slip a finished task past the check: the
+    // database answers "nothing matched" and the refusal stands.
+    const sealed = await this.sealedTitle(todo, dto.title);
+    const updatedAt = new Date();
+    const written = await this.todos.update(
+      { id: todo.id, ownerSub: principal.sub, done: false },
+      { title: sealed, updatedAt },
+    );
+    if (!written.affected) throw new ConflictException('cannot rename a completed todo');
+
+    todo.title = sealed;
+    todo.updatedAt = updatedAt;
+    // Bump AFTER a write that happened: a refused rename never reaches here.
+    await this.cache.bumpGeneration(principal.sub);
+    return this.originatedTodoView(todo);
   }
 
   /**

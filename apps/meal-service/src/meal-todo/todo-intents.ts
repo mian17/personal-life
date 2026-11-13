@@ -1,3 +1,4 @@
+import type { EntityManager } from 'typeorm';
 import type { MealGroup } from '../entries/dto/create-entry.dto.js';
 
 /**
@@ -22,6 +23,12 @@ export const TODOS_CREATE = 'todos.create';
 
 /** Logical destination for a tick intent. */
 export const TODOS_COMPLETE = 'todos.complete';
+
+/**
+ * Logical destination for a rename intent: refresh an **open** task's title after
+ * the owner changed their calorie target (`SPEC-todo-origin` §9.15 follow-up).
+ */
+export const TODOS_RENAME = 'todos.rename';
 
 /**
  * The origin this service writes under, and the path it grants itself through.
@@ -51,6 +58,17 @@ export interface TickIntent {
    * delivering and has no other way to know which todo a bare tick names — the
    * route's own path parameter is built from this value.
    */
+  originId: string;
+}
+
+/**
+ * `POST /api/todos/origin/:originId/rename` body, plus the task it means.
+ *
+ * A rename is the tick's title refresh without the tick: same sentence, same task,
+ * no occurrence — because a rename has no day.
+ */
+export interface RenameIntent {
+  title: string;
   originId: string;
 }
 
@@ -103,6 +121,37 @@ export function tickIntent(group: TodoGroup, calories: number, today: string): T
     occurrence: today,
     originId: originIdForGroup(group),
   };
+}
+
+/**
+ * The rename intent for one group: the same title sentence a create would write,
+ * with no day attached.
+ *
+ * There is no `occurrence` here on purpose. A tick names a day because it logs one;
+ * a rename names nothing but the row, so it cannot be pinned to a day that does not
+ * exist and cannot move a due date. The task it means is `originIdForGroup`, which
+ * is stable forever, so the intent needs no other identity.
+ */
+export function renameIntent(group: TodoGroup, calories: number): RenameIntent {
+  return {
+    title: titleForGroup(group, calories),
+    originId: originIdForGroup(group),
+  };
+}
+
+/**
+ * DI token for the title refresh, declared here because this file sits on neither
+ * side of the cycle that forces it: the producer injects `TargetService`, so
+ * `TargetService` cannot import the producer's class — `emitDecoratorMetadata`
+ * would evaluate that class while its own module is still initialising, which is a
+ * reference error at boot. A token has no such problem: `TargetService` names only
+ * this constant and the shape below.
+ */
+export const TODOS_RENAME_PRODUCER = Symbol('TODOS_RENAME_PRODUCER');
+
+/** What a target write needs from the producer: re-title this owner's open tasks. */
+export interface TodoTitleRefresher {
+  refreshTitles(ownerSub: string, today: string, manager: EntityManager): Promise<void>;
 }
 
 /** Whether a logged entry's group has a task to tick. */

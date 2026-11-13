@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule, createHttpDelivery } from '@life/service-kit';
 import { TargetModule } from '../targets/target.module.js';
 import { MealTodoProducerService } from './meal-todo-producer.service.js';
 import { MealTodoToggle } from './meal-toggle.entity.js';
+import { TODOS_RENAME_PRODUCER } from './todo-intents.js';
 
 /**
  * What meal-service owes todo-service (`SPEC-todo-origin` §7): the producer that
@@ -26,13 +27,22 @@ import { MealTodoToggle } from './meal-toggle.entity.js';
   imports: [
     TypeOrmModule.forFeature([MealTodoToggle]),
     OutboxModule.forRoot({ delivery: createHttpDelivery() }),
-    TargetModule,
+    // `forwardRef` because `TargetService` now reports a profile change back to
+    // this producer: the two modules need each other, and a plain import pair is
+    // a circular one.
+    forwardRef(() => TargetModule),
   ],
-  providers: [MealTodoProducerService],
+  providers: [
+    MealTodoProducerService,
+    // The same instance under the token `TargetService` injects. The token exists
+    // because the producer injects that service, so importing this class over there
+    // would be a cycle its decorator metadata turns into a boot-time error.
+    { provide: TODOS_RENAME_PRODUCER, useExisting: MealTodoProducerService },
+  ],
   // `OutboxModule` is re-exported, not just imported: the routes that serve the
   // drain leg sit on `MealTodoController` in `AppModule`, and it injects
   // `OutboxService`. Re-exporting the module reuses this one instance — a second
   // `forRoot()` elsewhere would start a second poller on a second timer.
-  exports: [MealTodoProducerService, OutboxModule],
+  exports: [MealTodoProducerService, TODOS_RENAME_PRODUCER, OutboxModule],
 })
 export class MealTodoModule {}

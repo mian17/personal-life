@@ -8,9 +8,11 @@ import { MealTodoToggle } from './meal-toggle.entity.js';
 import {
   TODOS_COMPLETE,
   TODOS_CREATE,
+  TODOS_RENAME,
   TODO_GROUPS,
   createIntent,
   isTodoGroup,
+  renameIntent,
   tickIntent,
   type TodoGroup,
 } from './todo-intents.js';
@@ -29,6 +31,9 @@ function oneLine(err: unknown): string {
  * - the day's three creates, once the owner has enabled the integration;
  * - one tick per logged entry, so ticking the task in the todo app and logging
  *   the meal in this one are the same act.
+ *
+ * A third trigger rides the target write: a profile change re-titles the owner's
+ * open tasks, because the number in them came from the target that just changed.
  *
  * Three rules hold everywhere below:
  * - every method takes the caller's `EntityManager`, so an intent commits with
@@ -64,6 +69,30 @@ export class MealTodoProducerService {
       const target = await this.targets.getTarget(ownerSub, today);
       for (const group of TODO_GROUPS) {
         await this.enqueueCreate(ownerSub, group, target.calories, today, manager);
+      }
+    });
+  }
+
+  /**
+   * Enqueue one rename per meal group, after the owner saved a new target.
+   *
+   * **All three groups are sent, done or not.** This service cannot see
+   * todo-service's rows — the task's `done` flag is on the far side of the outbox —
+   * so guessing which groups are finished would either skip a live task or need a
+   * read this service has no grant for. todo-service therefore answers 409 for a
+   * done task and writes nothing, which is the honest answer: `SPEC-todo-origin`'s
+   * rename refuses history and the relay treats that 409 as the intended outcome.
+   *
+   * The signature takes `today` because `getTarget` is a dated read and the day is
+   * always the caller's (lesson 0019); the intent itself carries no day, since a
+   * rename names no occurrence.
+   */
+  async refreshTitles(ownerSub: string, today: string, manager: EntityManager): Promise<void> {
+    await this.degrading('title refresh', ownerSub, async () => {
+      if (!(await this.isEnabled(ownerSub, manager))) return;
+      const target = await this.targets.getTarget(ownerSub, today);
+      for (const group of TODO_GROUPS) {
+        await this.enqueueRename(ownerSub, group, target.calories, manager);
       }
     });
   }
@@ -163,6 +192,23 @@ export class MealTodoProducerService {
       ownerSub,
       destination: TODOS_COMPLETE,
       payload: JSON.stringify(tickIntent(group, calories, today)),
+    });
+  }
+
+  /**
+   * One rename intent, in the caller's transaction — the same envelope the tick's
+   * title refresh uses, minus the day.
+   */
+  private enqueueRename(
+    ownerSub: string,
+    group: TodoGroup,
+    calories: number,
+    manager: EntityManager,
+  ): Promise<string> {
+    return this.outbox.enqueue(manager, {
+      ownerSub,
+      destination: TODOS_RENAME,
+      payload: JSON.stringify(renameIntent(group, calories)),
     });
   }
 
