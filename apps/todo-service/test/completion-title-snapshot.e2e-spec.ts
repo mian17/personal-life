@@ -88,17 +88,26 @@ describe('Completion title snapshot (rename after tick)', () => {
     await h.todos.completeByOrigin(producer(), 'meal:lunch', {});
     await h.todos.renameByOrigin(producer(), 'meal:lunch', { title: NEW_TITLE });
 
-    // The next day's tick happens at the NEW number, so it must not inherit a
-    // snapshot: a NULL snapshot is the correct answer, and the read falls back.
+    // The next tick happens at the NEW number, so it must not inherit a snapshot:
+    // a NULL snapshot is the correct answer, and the read falls back to the live
+    // title. Which day that tick belongs to is NOT the 14th by construction: the
+    // tick logs the todo's current due, and `advanceOnTick` rolls the due forward
+    // to on/after *now* in `TODO_TIMEZONE`, so a run after local midnight skips a
+    // day (CI at 17:51 UTC is 00:51 the next day in Asia/Ho_Chi_Minh). Read the
+    // occurrence the service is actually going to tick instead of hardcoding it.
+    const [openBeforeSecondTick] = (await h.todos.findAll(SUB, {})).todos;
+    const tickedDay = openBeforeSecondTick.dueDate;
+    expect(tickedDay).not.toBe('2026-11-13');
+
     await h.todos.completeByOrigin(producer(), 'meal:lunch', {});
 
     const logged = await completions();
     expect(logged).toHaveLength(2);
     const byOccurrence = new Map(logged.map((row) => [row.occurrence, row.title]));
-    // The 13th was ticked at the old number; the 14th at the new one.
+    // The 13th was ticked at the old number; the ticked-open day at the new one.
     expect([...byOccurrence.values()].sort()).toEqual([NEW_TITLE, OLD_TITLE].sort());
     expect(byOccurrence.get('2026-11-13')).toBe(OLD_TITLE);
-    expect(byOccurrence.get('2026-11-14')).toBe(NEW_TITLE);
+    expect(byOccurrence.get(tickedDay!)).toBe(NEW_TITLE);
   });
 
   it('stores the snapshot as an enc.v1. envelope, never plaintext', async () => {
