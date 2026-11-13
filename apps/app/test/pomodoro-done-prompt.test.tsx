@@ -169,19 +169,21 @@ describe('the "done?" prompt', () => {
     await waitFor(() => expect(answerMock).toHaveBeenCalledWith('session-1', 't1', 'done'));
   });
 
-  it('puts both actions straight in the footer, so neither wraps the other', async () => {
+  it('puts both actions on one row, neither full width, so they sit side by side', async () => {
     await runOneFocusBlock();
 
     const notYet = await screen.findByRole('button', { name: 'Not yet' });
     const done = screen.getByRole('button', { name: 'Done' });
-    const parent = notYet.parentElement;
 
-    // One parent for both, and it is the dialog's own footer — not a wrapper row whose
-    // flex-wrap would let the full-width buttons take a line each.
-    expect(done.parentElement).toBe(parent);
-    expect(parent?.className).toContain('ui-dialog__footer');
-    expect(parent?.className).not.toContain('ui-row');
-    expect(parent?.childElementCount).toBe(2);
+    // jsdom lays nothing out, so the measurement is read off the class contract that
+    // produces it: `Button`'s default size carries `w-full`, and a full-width child of the
+    // wrapping footer takes a whole line and pushes its sibling down. Each button therefore
+    // overrides that width, and both live in one row.
+    expect(notYet.className).toContain('w-auto!');
+    expect(done.className).toContain('grow basis-0');
+    expect(done.parentElement).toBe(notYet.parentElement);
+    expect(notYet.parentElement?.className).toContain('ui-row');
+    expect(notYet.parentElement?.childElementCount).toBe(2);
   });
 
   it('writes nothing further on Not yet except the answer itself', async () => {

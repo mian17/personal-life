@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, Dialog } from '@life/ui';
+import { Button, Dialog, Row } from '@life/ui';
 import { answerFocusQuestionAction } from './actions';
 
 /** A recorded block whose task raised the question this prompt asks. */
@@ -66,16 +66,25 @@ export function DonePrompt({ question, onAnswered }: Readonly<DonePromptProps>) 
       }
       size="sheet"
       footer={
-        // The footer is already a flex row, so the buttons are its direct children: a
-        // full-width button inside another row fills the line and pushes its sibling down.
-        <>
-          <Button variant="ghost" disabled={pending} onClick={() => answer('not-yet')}>
+        // `Button`'s default size is `w-full`, and a full-width child of the wrapping footer
+        // takes the whole line and pushes its sibling down. The pomodoro page's action pair
+        // is the idiom that fixes it: one row, the width overridden on each button, because
+        // `className` merges last in `Button`'s `cx()`.
+        <Row>
+          {/* Secondary, so it keeps its own width instead of stretching. */}
+          <Button
+            variant="ghost"
+            className="w-auto!"
+            disabled={pending}
+            onClick={() => answer('not-yet')}
+          >
             Not yet
           </Button>
-          <Button disabled={pending} onClick={() => answer('done')}>
+          {/* The answer that does work fills what the secondary leaves, side by side. */}
+          <Button className="grow basis-0" disabled={pending} onClick={() => answer('done')}>
             Done
           </Button>
-        </>
+        </Row>
       }
     >
       {null}
