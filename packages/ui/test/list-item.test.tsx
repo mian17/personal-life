@@ -272,10 +272,11 @@ describe('ListItem', () => {
     expect(classes).not.toContain('[&>form>.ui-btn--danger]:min-w-0');
     // The glyph keeps its 18px inset paint; only the box around it grows.
     expect(classes).toContain('[&>form>.ui-btn--danger]:p-[var(--s2)]');
-    // The box is anchored on the row's end inset, so the floor grows it leftward and the glyph
-    // stays on the text column's edge. The compound selector outranks `Button`'s own
-    // `justify-center` (0,3,0 against 0,1,0), so no `!important` and no wrapper element is needed.
-    expect(classes).toContain('[&>form>.ui-btn--danger]:justify-end');
+    // The box is anchored on the row's end inset, so the floor grows it leftward. The glyph is
+    // centred in it, not pushed to the trailing edge: the box is transparent at rest and fills
+    // with `--danger-soft` on press, so end-alignment painted ~22px of wash left of the 18px
+    // glyph against 8px right of it. Centred, each side carries `(48 - 18) / 2` = 15px.
+    expect(classes).toContain('[&>form>.ui-btn--danger]:justify-center');
     // A `--tap` box in flow is taller than the row's own content box, so it hands 8px back over
     // each edge and the row keeps the height its text column asks for.
     expect(classes).toContain('[&>form>.ui-btn--danger]:-my-[var(--s2)]');
@@ -376,13 +377,7 @@ describe('ListItem', () => {
   it('spans the dense anchor over the whole row, so no band of the row is inert', () => {
     render(
       <ul>
-        <ListItem
-          href="/todos/1"
-          variant="todo"
-          size="dense"
-          title="Groceries"
-          meta="Today"
-        />
+        <ListItem href="/todos/1" variant="todo" size="dense" title="Groceries" meta="Today" />
       </ul>,
     );
     const row = classesOf(screen.getByRole('listitem'));
@@ -1132,7 +1127,7 @@ describe('ListItem', () => {
       </ul>,
     );
     expect(screen.getByRole('listitem').className).toBe(
-      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-end [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
+      'ui-list-item ui-list-item--todo ui-list-item--dense ui-list-item--done ui-list-item--collapsing ui-list-item--danger flex gap-[var(--s3)] overflow-hidden active:bg-press motion-safe:transition-[height,opacity] [interpolate-size:allow-keywords] relative min-h-[var(--tap)] ps-[var(--s3)] pe-[var(--s2)] [--checkbox-size:var(--s3)] [--checkbox-radius:var(--s1)] [&>.ui-checkbox]:absolute [&>.ui-checkbox]:start-[var(--s4)] [&>.ui-checkbox]:top-[var(--s2)] [&>.ui-checkbox]:justify-items-center [&>.ui-checkbox:active]:bg-transparent [&>.ui-checkbox>*]:-translate-y-[calc(var(--tap)/2-var(--s2)-var(--fs-meta)*var(--lh-row-title)/2)] items-start [&>form]:flex [&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)] [&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)] [&>form>.ui-btn--danger]:justify-center [&>form>.ui-btn--danger]:-my-[var(--s2)] [&>form>.ui-btn--danger]:p-[var(--s2)] [&>form>.ui-btn--danger]:rounded-[var(--r-md)] [&_.ui-icon-btn]:text-ink-3 [&_.ui-checkbox]:text-ink-3 [&_.ui-due-date]:text-ink-3 h-0 min-h-0 opacity-0 overflow-hidden legacy-hook',
     );
   });
 });

@@ -117,6 +117,8 @@ export interface Todo {
   repeatDays: number[] | null;
   reminderScheduledAt: string | null;
   listId: string | null;
+  /** The producer service that created this todo; null when the user made it. */
+  originService: string | null;
   tagIds: number[];
   createdAt: string;
   updatedAt: string;
@@ -176,7 +178,14 @@ export interface TodoCompletion {
   todoId: string; // link to the live definition (edit screen)
   occurrence: string; // the satisfied due, or '~' (undated one-off)
   completedAt: string; // canonical UTC instant of the tick
-  title: string; // DECRYPTED, joined at read time (C7 — never a snapshot)
+  /**
+   * DECRYPTED. The title this occurrence was **finished under**: the snapshot a
+   * rename froze when it re-titled the live task, or the live title when no rename
+   * has happened since this tick (a completion logged after a rename is genuinely
+   * done at the new number). Never plaintext at rest — both sources are the same
+   * `enc.v1.` envelope under the todo title's AAD.
+   */
+  title: string;
   listId: string | null; // the todo's list at read time
   listName: string | null; // DECRYPTED list name; null when unlisted
 }

@@ -26,6 +26,20 @@ export {
 export { KeysModule, createMasterKey } from './keys/keys.module.js';
 export { KeysService, MASTER_KEY, type KeysOptions } from './keys/keys.service.js';
 export { UserKeys } from './keys/user-keys.entity.js';
+export { GrantsModule } from './grants/grants.module.js';
+export { GrantsService, type ReadGrant } from './grants/grants.service.js';
+export {
+  FOCUS_TODO_DISCLOSURE,
+  MEAL_TODO_DISCLOSURE,
+  disclosureHash,
+} from './grants/disclosure.js';
+export {
+  GRANT_DIRECTIONS,
+  GRANT_SCOPES,
+  OriginGrant,
+  type GrantDirection,
+  type GrantScope,
+} from './grants/origin-grant.entity.js';
 export { runReadinessChecks, type HealthBody, type ReadinessChecks } from './readiness.js';
 export { AuditModule } from './audit/audit.module.js';
 export {
@@ -64,3 +78,25 @@ export {
   sanitizeUserAgent,
   type CredentialPresence,
 } from './audit/audit-fields.js';
+export { OutboxModule, type OutboxOptions } from './outbox/outbox.module.js';
+export { Outbox } from './outbox/outbox.entity.js';
+export {
+  OutboxService,
+  type OutboxEntry,
+  type OutboxOutcome,
+  type PendingIntent,
+} from './outbox/outbox.service.js';
+export {
+  OUTBOX_ERROR_MAX_CHARS,
+  OUTBOX_POLL_INTERVAL_MS,
+  OUTBOX_SWEEP_BATCH,
+  OutboxPollerService,
+  oneLine,
+} from './outbox/outbox-poller.service.js';
+export {
+  OUTBOX_DELIVERY,
+  TODOS_API_URL_ENV,
+  createHttpDelivery,
+  type OutboxDelivery,
+  type OutboxMessage,
+} from './outbox/outbox-delivery.js';

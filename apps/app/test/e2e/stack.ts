@@ -34,6 +34,39 @@ function hopRedirectUris(slot: number): string[] {
 }
 
 /**
+ * The producer clients the IdP registers (`PRODUCER_CLIENT_IDS` in
+ * `apps/idp/src/oidc/clients.ts`).
+ */
+const PRODUCER_CLIENT_IDS = ['producer-a', 'producer-b'] as const;
+
+/**
+ * A producer runs on the user's own machine, never in this harness, so no spec
+ * dials this callback — but a production boot refuses to start without one. The
+ * port and path are the dev default a producer callback uses, registered in both
+ * loopback spellings for the same reason as `OIDC_APP_REDIRECT_URIS` above.
+ */
+const PRODUCER_CALLBACK_PORT = 8080;
+const PRODUCER_CALLBACK_PATH = '/cb';
+
+/**
+ * One `OIDC_PRODUCER_<NAME>_REDIRECT_URIS` per producer client, with the setting
+ * name derived exactly as the IdP derives it (`producer-a` →
+ * `OIDC_PRODUCER_PRODUCER_A_REDIRECT_URIS`).
+ */
+function producerRedirectEnv(): NodeJS.ProcessEnv {
+  const callbacks = [
+    `http://localhost:${PRODUCER_CALLBACK_PORT}${PRODUCER_CALLBACK_PATH}`,
+    `http://127.0.0.1:${PRODUCER_CALLBACK_PORT}${PRODUCER_CALLBACK_PATH}`,
+  ].join(',');
+  return Object.fromEntries(
+    PRODUCER_CLIENT_IDS.map((clientId) => [
+      `OIDC_PRODUCER_${clientId.toUpperCase().replaceAll('-', '_')}_REDIRECT_URIS`,
+      callbacks,
+    ]),
+  );
+}
+
+/**
  * Shared launcher for the two e2e stacks.
  *
  *  - production mode: the real `next build` output (`standalone/server.js`), the
@@ -141,6 +174,9 @@ function idpEnv(cfg: StackConfig): NodeJS.ProcessEnv {
       ...hopRedirectUris(cfg.slot ?? 0),
       ...degradedRedirectUris(cfg.slot ?? 0),
     ].join(','),
+    // Production mode hard-requires a callback for every producer client, so the
+    // harness supplies one even though it never runs a producer itself.
+    ...producerRedirectEnv(),
     SEED_USERNAME: E2E_USER,
     SEED_PASSWORD: E2E_PASSWORD,
     // Shared ecosystem audience (SPEC-service-kernel): one token serves all
@@ -268,9 +304,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
     // stack, marked by this flag (NODE_ENV cannot mark it: `next build` forces
     // production). Production mode leaves it unset and exercises the gate for
     // real: Next sets x-forwarded-host and the context sends tailscale-user-login.
-    ...(cfg.mode === 'production'
-      ? { OWNER_LOGIN: E2E_OWNER }
-      : { APP_DEV_SKIP_ACCESS_GATE: '1' }),
+    ...(cfg.mode === 'production' ? { OWNER_LOGIN: E2E_OWNER } : { APP_DEV_SKIP_ACCESS_GATE: '1' }),
   };
 }
 

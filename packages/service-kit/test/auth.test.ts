@@ -63,7 +63,7 @@ describe('@life/service-kit AuthGuard', () => {
     const guard = new AuthGuard(ENV_NAMES, new Reflector());
     const req: Record<string, unknown> = { headers: {} };
     expect(guard.canActivate(contextFor(req))).toBe(true);
-    expect(req.principal).toEqual({ sub: 'dev-user' });
+    expect(req.principal).toEqual({ sub: 'dev-user', clientId: null });
   });
 });
 

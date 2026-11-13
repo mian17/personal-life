@@ -2,6 +2,10 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import type { TagUsage } from '@life/shared';
 import { Principal } from '@life/service-kit';
 import { CreateTodoDto } from './dto/create-todo.dto.js';
+import { CompleteByOriginDto } from './dto/complete-by-origin.dto.js';
+import { CreateWithOriginDto } from './dto/create-with-origin.dto.js';
+import { GrantOwnOriginDto } from './dto/grant-own-origin.dto.js';
+import { RenameByOriginDto } from './dto/rename-by-origin.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
 import { ListTodosQuery } from './dto/list-todos.query.js';
 import { TodosService } from './todos.service.js';
@@ -9,7 +13,7 @@ import { TodosService } from './todos.service.js';
 /**
  * The todo HTTP surface (`SPEC-todo-service` API).
  *
- * Route declaration order matters: the literal `tags`/`trash` routes are
+ * Route declaration order matters: the literal `origin`/`tags`/`trash` routes are
  * declared **before** any `:id` route so Nest does not shadow them (the
  * `GET`/`DELETE /api/todos/trash` verbs must not be read as an id), and the
  * `:id` suffix verbs (`restore`/`permanent`) before the plain `@Delete(':id')`.
@@ -21,6 +25,61 @@ export class TodosController {
   @Post()
   create(@Principal() principal: Principal, @Body() dto: CreateTodoDto) {
     return this.todos.create(principal.sub, dto);
+  }
+
+  // Literal routes declared before the `:id` routes.
+  @Post('origin')
+  createWithOrigin(@Principal() principal: Principal, @Body() dto: CreateWithOriginDto) {
+    return this.todos.createWithOrigin(principal, dto);
+  }
+
+  /**
+   * The read surface a **read** grant opens (`SPEC-todo-origin`, read direction):
+   * the owner's open tasks, as narrowed by the caller's own grant.
+   *
+   * No `@Query()` and no `@Body()` on purpose. The reach is the grant's, decided by
+   * the origin the user enabled — a parameter here would be a request naming its own
+   * scope, which is how a consumer could ask for more than the screen offered. The
+   * owner comes from `@Principal()` like every other route.
+   */
+  @Get('origin/open')
+  findOpenForClient(@Principal() principal: Principal) {
+    return this.todos.findOpenForClient(principal);
+  }
+
+  /**
+   * A user enabling a producer from that producer's own settings screen
+   * (`SPEC-todo-origin` assumption 12) — the self-service grant the operator CLI is
+   * no longer needed for. The body names only the origin; owner and grantee are the
+   * verified token's `sub` and `client_id`.
+   */
+  @Post('origin-grant')
+  grantOwnOrigin(@Principal() principal: Principal, @Body() dto: GrantOwnOriginDto) {
+    return this.todos.grantOwnOrigin(principal, dto);
+  }
+
+  // `originId` is the producer's own id, never this service's todo id.
+  @Post('origin/:originId/complete')
+  completeByOrigin(
+    @Principal() principal: Principal,
+    @Param('originId') originId: string,
+    @Body() dto: CompleteByOriginDto,
+  ) {
+    return this.todos.completeByOrigin(principal, originId, dto);
+  }
+
+  /**
+   * Refresh an open todo's title without ticking it (`SPEC-todo-origin` §9.15
+   * follow-up). Declared beside the tick and before the `:id` routes for the same
+   * reason: `origin/<originId>/...` is a literal path, not an id.
+   */
+  @Post('origin/:originId/rename')
+  renameByOrigin(
+    @Principal() principal: Principal,
+    @Param('originId') originId: string,
+    @Body() dto: RenameByOriginDto,
+  ) {
+    return this.todos.renameByOrigin(principal, originId, dto);
   }
 
   @Get()

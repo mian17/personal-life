@@ -149,7 +149,7 @@ describe('JWT auth principal seam (e2e)', () => {
 
   it('propagates the verified token sub as the principal', async () => {
     const res = await probe(await harness.sign({ subject: 'alice' })).expect(200);
-    expect(res.body).toEqual({ sub: 'alice' });
+    expect(res.body).toEqual({ sub: 'alice', clientId: null });
   });
 
   it('rejects a verified token with no sub claim', async () => {
@@ -165,7 +165,7 @@ describe('JWT auth principal seam (e2e)', () => {
   it('sets the dev-user principal under NODE_ENV=development', async () => {
     process.env.NODE_ENV = 'development';
     const res = await probe().expect(200);
-    expect(res.body).toEqual({ sub: 'dev-user' });
+    expect(res.body).toEqual({ sub: 'dev-user', clientId: null });
   });
 
   it('still rejects a missing or garbage token', async () => {

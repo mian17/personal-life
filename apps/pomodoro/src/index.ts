@@ -1,5 +1,5 @@
 export { PomodoroPage } from './pomodoro-page';
-export type { PomodoroPageProps } from './pomodoro-page';
+export type { FocusTaskChoice, PomodoroPageProps } from './pomodoro-page';
 
 export { Countdown } from './countdown';
 export type { CountdownProps } from './countdown';

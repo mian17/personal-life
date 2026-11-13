@@ -1,7 +1,30 @@
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NUTRIENTS, NUTRIENT_LABELS, UNKNOWN, format, type Nutrient, type NutrientVector } from '@life/nutrition';
-import { Autosuggest, Button, Dialog, EmptyState, Facts, FactsRow, FilePicker, IconButton, Input, Kpi, ListItem, SettingsRow, StatusText, Textarea, type AutosuggestOption } from '@life/ui';
+import {
+  NUTRIENTS,
+  NUTRIENT_LABELS,
+  UNKNOWN,
+  format,
+  type Nutrient,
+  type NutrientVector,
+} from '@life/nutrition';
+import {
+  Autosuggest,
+  Button,
+  Dialog,
+  EmptyState,
+  Facts,
+  FactsRow,
+  FilePicker,
+  IconButton,
+  Input,
+  Kpi,
+  ListItem,
+  SettingsRow,
+  StatusText,
+  Textarea,
+  type AutosuggestOption,
+} from '@life/ui';
 
 const mockBack = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -31,6 +54,25 @@ import {
 import { FoodSearch, type PickerFood } from '@/app/(meals)/meals/entry/[id]/food-picker';
 
 const mockCallService = callService as unknown as jest.Mock;
+
+/** One recorded `callService` invocation: the service base URL, the path, and its init. */
+type ServiceCall = [base: string, path: string, init: { method?: string; body: string }];
+
+/**
+ * The last `callService` call that hit an entries route.
+ *
+ * The save action kicks the outbox relay after its write, so the last call overall is
+ * the drain read rather than the entries write these cases assert. Selecting the
+ * entries call keeps the assertion on the write, without hiding the relay call.
+ */
+function lastEntryCall(): ServiceCall {
+  const calls = mockCallService.mock.calls as Array<[string, string, ServiceCall[2]?]>;
+  const entry = calls.filter((call) => call[1].startsWith('/api/entries')).at(-1);
+  if (entry === undefined || entry[2] === undefined) {
+    throw new Error('the action made no /api/entries call with a request body');
+  }
+  return [entry[0], entry[1], entry[2]];
+}
 
 // The compiled component reads its hooks off the raw `react` module exports at
 // call time, so spying there intercepts a direct `MealEditor(...)` call. State is
@@ -77,10 +119,25 @@ interface EditorTree extends ReactElement {
  */
 const GROUPS: { title: string; keys: Nutrient[] }[] = [
   { title: 'Macros', keys: ['calories', 'fat', 'carbohydrates', 'protein'] },
-  { title: 'Fat breakdown', keys: ['monounsaturatedFat', 'polyunsaturatedFat', 'saturatedFat', 'transFat'] },
+  {
+    title: 'Fat breakdown',
+    keys: ['monounsaturatedFat', 'polyunsaturatedFat', 'saturatedFat', 'transFat'],
+  },
   { title: 'Cholesterol & sodium', keys: ['cholesterol', 'sodium'] },
   { title: 'Carb breakdown', keys: ['fiber', 'sugar'] },
-  { title: 'Vitamins', keys: ['vitaminA', 'vitaminC', 'thiaminB1', 'riboflavinB2', 'niacinB3', 'folateB9', 'vitaminB6', 'vitaminB12'] },
+  {
+    title: 'Vitamins',
+    keys: [
+      'vitaminA',
+      'vitaminC',
+      'thiaminB1',
+      'riboflavinB2',
+      'niacinB3',
+      'folateB9',
+      'vitaminB6',
+      'vitaminB12',
+    ],
+  },
   { title: 'Minerals', keys: ['calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc'] },
   { title: 'Other', keys: ['caffeine'] },
 ];
@@ -113,17 +170,19 @@ function stateHarness() {
   // outside React, so stub it here — every render path needs it, not just the
   // save test. Captured messages are exposed for assertions.
   const shown: { message: string }[] = [];
-  const ctxSpy = jest
-    .spyOn(ReactModule, 'useContext')
-    .mockImplementation((() => ({
-      showSnackbar: (options: { message: string }) => shown.push(options),
-    })) as unknown as typeof ReactModule.useContext);
+  const ctxSpy = jest.spyOn(ReactModule, 'useContext').mockImplementation((() => ({
+    showSnackbar: (options: { message: string }) => shown.push(options),
+  })) as unknown as typeof ReactModule.useContext);
 
   function renderTree(
     initialEntry: MealEntry | null = null,
     date = '2026-10-03',
     foodName?: string,
-    extra: { door?: 'photo' | 'food' | null; foods?: PickerFood[]; defaultMealGroup?: MealGroup } = {},
+    extra: {
+      door?: 'photo' | 'food' | null;
+      foods?: PickerFood[];
+      defaultMealGroup?: MealGroup;
+    } = {},
   ): EditorTree {
     let index = 0;
     spy.mockImplementation(((initial: unknown) => {
@@ -132,7 +191,8 @@ function stateHarness() {
         store[i] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       }
       const set = (next: unknown) => {
-        store[i] = typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
+        store[i] =
+          typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
@@ -160,7 +220,8 @@ function stateHarness() {
         store[i] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       }
       const set = (next: unknown) => {
-        store[i] = typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
+        store[i] =
+          typeof next === 'function' ? (next as (prev: unknown) => unknown)(store[i]) : next;
       };
       return [store[i], set];
     }) as unknown as typeof ReactModule.useState);
@@ -219,7 +280,10 @@ function field(tree: EditorTree, label: string): ReactElement<Record<string, unk
   return found;
 }
 
-function button(tree: EditorTree, match: (el: ReactElement<Record<string, unknown>>) => boolean): ReactElement<Record<string, unknown>> {
+function button(
+  tree: EditorTree,
+  match: (el: ReactElement<Record<string, unknown>>) => boolean,
+): ReactElement<Record<string, unknown>> {
   const found = find(tree, Button, match) ?? find(tree, IconButton, match);
   if (!found) throw new Error('control not found');
   return found;
@@ -277,7 +341,9 @@ describe('MealEditor photo door', () => {
       const picker = find(first, FilePicker);
       if (!picker) throw new Error('no FilePicker mounted');
 
-      await (picker.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       expect(mockCallService).toHaveBeenCalledTimes(1);
       const [base, path, init] = mockCallService.mock.calls[0];
@@ -320,7 +386,9 @@ describe('MealEditor photo door', () => {
       const picker = find(first, FilePicker);
       if (!picker) throw new Error('no FilePicker mounted');
 
-      await (picker.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       const seeded = harness.renderTree();
       expect(field(seeded, 'Grams for Rice Bowl').props.value).toBe('300');
@@ -349,7 +417,9 @@ describe('MealEditor photo door', () => {
 
       const hinted = harness.renderTree();
       const picker = find(hinted, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       const body = JSON.parse(mockCallService.mock.calls[0][2].body);
       expect(body.hint).toBe('leftover from last night');
@@ -363,17 +433,21 @@ describe('MealEditor photo door', () => {
     // bytes with an empty `type`. Sending that empty name failed the service's mime
     // gate, which reads to the user as "couldn't read the photo". The JPEG signature
     // is the fact; the browser's silence is not.
-    const unnamedJpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])], 'IMG_0002.jpg', {
-      type: '',
-    });
+    const unnamedJpeg = new File(
+      [new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])],
+      'IMG_0002.jpg',
+      {
+        type: '',
+      },
+    );
     const harness = stateHarness();
     mockCallService.mockResolvedValue({ readable: false, reason: 'could-not-read' });
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)(
-        [unnamedJpeg] as unknown as FileList,
-      );
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        unnamedJpeg,
+      ] as unknown as FileList);
 
       expect(JSON.parse(mockCallService.mock.calls[0][2].body).mimeType).toBe('image/jpeg');
     } finally {
@@ -391,9 +465,9 @@ describe('MealEditor photo door', () => {
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)(
-        [unnamed] as unknown as FileList,
-      );
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        unnamed,
+      ] as unknown as FileList);
 
       expect(JSON.parse(mockCallService.mock.calls[0][2].body).mimeType).toBe('');
       const failed = harness.renderTree();
@@ -411,7 +485,9 @@ describe('MealEditor photo door', () => {
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       const failed = harness.renderTree();
       expect(field(failed, 'Food for item 1').props.value).toBe('');
@@ -427,7 +503,8 @@ describe('MealEditor photo door', () => {
       // neither save control is enabled.
       expect(button(failed, (el) => el.props.label === 'Save meal').props.disabled).toBe(true);
       expect(
-        find(failed, Button, (el) => text(el.props.children).includes('Save as meal'))!.props.disabled,
+        find(failed, Button, (el) => text(el.props.children).includes('Save as meal'))!.props
+          .disabled,
       ).toBe(true);
     } finally {
       harness.restore();
@@ -440,7 +517,9 @@ describe('MealEditor photo door', () => {
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       const failed = harness.renderTree();
       // A service outage reads as retry-later, never as "send a better photo".
@@ -480,7 +559,11 @@ describe('MealEditor manual door — search-first multi-add', () => {
 
   const DATE = '2026-10-03';
   const oat = pickerFood({ id: 'f-oat', name: 'Oatmeal', nutrients: vector({ calories: 389 }) });
-  const chicken = pickerFood({ id: 'f-chicken', name: 'Chicken', nutrients: vector({ calories: 165 }) });
+  const chicken = pickerFood({
+    id: 'f-chicken',
+    name: 'Chicken',
+    nutrients: vector({ calories: 165 }),
+  });
 
   /** The row `FoodSearch` offers for `name` — the `Autosuggest` option the block renders. */
   function listedRow(node: unknown, name: string) {
@@ -510,14 +593,20 @@ describe('MealEditor manual door — search-first multi-add', () => {
   it('starts empty and shows no suggestion rows before the query is typed', () => {
     const harness = stateHarness();
     try {
-      const tree = harness.renderTree(null, DATE, undefined, { door: 'food', foods: [oat, chicken] });
+      const tree = harness.renderTree(null, DATE, undefined, {
+        door: 'food',
+        foods: [oat, chicken],
+      });
       // Search-first: no pre-seeded blank row waits to be corrected.
       expect(findAll(tree, ListItem)).toHaveLength(0);
       expect(text(find(tree, EmptyState)!.props.body)).toBe(
         'Nothing logged yet. Search a food above to add it.',
       );
 
-      const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
+      const onPick = find(tree, FoodSearch)!.props.onPick as (
+        food: MealFood,
+        quantity: number,
+      ) => void;
       const search = harness.renderSearch([oat, chicken], onPick);
       // Nothing is listed while the query is empty — the catalog would bury the field.
       expect(listedRow(search, 'Oatmeal')).toBeUndefined();
@@ -532,7 +621,10 @@ describe('MealEditor manual door — search-first multi-add', () => {
     const foods = [oat, chicken];
     try {
       const tree = harness.renderTree(null, DATE, undefined, { door: 'food', foods });
-      const onPick = find(tree, FoodSearch)!.props.onPick as (food: MealFood, quantity: number) => void;
+      const onPick = find(tree, FoodSearch)!.props.onPick as (
+        food: MealFood,
+        quantity: number,
+      ) => void;
 
       // Pick `Oatmeal` through the block: type, then select the row it offers.
       const idle = harness.renderSearch(foods, onPick);
@@ -591,7 +683,8 @@ describe('MealEditor unknown affordance', () => {
       // An unconfirmed meal cannot be saved or frozen.
       expect(button(tree, (el) => el.props.label === 'Save meal').props.disabled).toBe(true);
       expect(
-        find(tree, Button, (el) => text(el.props.children).includes('Save as meal'))!.props.disabled,
+        find(tree, Button, (el) => text(el.props.children).includes('Save as meal'))!.props
+          .disabled,
       ).toBe(true);
     } finally {
       harness.restore();
@@ -607,7 +700,11 @@ describe('MealEditor toolbar', () => {
     try {
       const tree = harness.renderTree();
 
-      expect(tree.props.back).toEqual({ label: 'Back', variant: 'framed', onBack: expect.any(Function) });
+      expect(tree.props.back).toEqual({
+        label: 'Back',
+        variant: 'framed',
+        onBack: expect.any(Function),
+      });
 
       const save = button(tree, (el) => el.props.label === 'Save meal');
       expect(save.props.variant).toBe('framed');
@@ -630,7 +727,10 @@ describe('MealEditor save persists corrected values', () => {
       });
 
       const corrected = harness.renderTree(entry());
-      await (button(corrected, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(corrected, (el) => el.props.label === 'Save meal').props
+          .onClick as () => Promise<void>
+      )();
 
       expect(mockCallService).toHaveBeenCalledTimes(1);
       const [base, path, init] = mockCallService.mock.calls[0];
@@ -652,13 +752,27 @@ describe('MealEditor save persists corrected values', () => {
     const harness = stateHarness();
     // The log path lists the catalog first, then creates the missing food — the
     // create returns the id the entry POST carries.
-    const createdFood = { id: 'created-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') {
-        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
-      }
-      return Promise.resolve({});
-    });
+    const createdFood = {
+      id: 'created-food',
+      name: 'Toast',
+      unit: 'g',
+      servingGrams: 100,
+      nutrients: vector(),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+    };
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') {
+          return Promise.resolve(
+            init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null },
+          );
+        }
+        return Promise.resolve({});
+      },
+    );
     try {
       const first = harness.renderTree();
       (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
@@ -670,13 +784,16 @@ describe('MealEditor save persists corrected values', () => {
       });
 
       const ready = harness.renderTree();
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
-      const [base, path, init] = mockCallService.mock.calls.at(-1)!;
+      const [base, path, init] = lastEntryCall();
+      const body = JSON.parse(init.body);
       expect(base).toBe('http://127.0.0.1:3106');
       expect(path).toBe('/api/entries');
       expect(init.method).toBe('POST');
-      expect(JSON.parse(init.body)).toEqual({
+      expect(body).toEqual({
         date: '2026-10-03',
         mealGroup: 'lunch',
         foodId: 'created-food',
@@ -694,13 +811,27 @@ describe('MealEditor log-time catalog', () => {
 
   it('creates the food at 100 g with the base vector before logging a foodId:null item', async () => {
     const harness = stateHarness();
-    const createdFood = { id: 'new-food', name: 'Toast', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') {
-        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
-      }
-      return Promise.resolve({});
-    });
+    const createdFood = {
+      id: 'new-food',
+      name: 'Toast',
+      unit: 'g',
+      servingGrams: 100,
+      nutrients: vector(),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+    };
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') {
+          return Promise.resolve(
+            init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null },
+          );
+        }
+        return Promise.resolve({});
+      },
+    );
     try {
       const first = harness.renderTree();
       (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
@@ -715,7 +846,9 @@ describe('MealEditor log-time catalog', () => {
       });
 
       const ready = harness.renderTree();
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
       const paths = mockCallService.mock.calls.map((call) => call[1]);
       expect(paths[0]).toBe('/api/foods');
@@ -740,28 +873,43 @@ describe('MealEditor log-time catalog', () => {
     // catalog id the estimate resolved, so the log path posts no `/api/foods`
     // create — the food and entry POSTs carry that reused id.
     const harness = stateHarness();
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') return Promise.resolve({ foods: [], nextCursor: null });
-      if (path === '/api/entries') return Promise.resolve({});
-      return Promise.resolve({
-        readable: true,
-        items: [{ name: 'Omelette', grams: 100, foodId: 'omelette-id', fdcId: null, servingGrams: 100, nutrients: vector({ calories: 250 }) }],
-      });
-    });
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') return Promise.resolve({ foods: [], nextCursor: null });
+        if (path === '/api/entries') return Promise.resolve({});
+        return Promise.resolve({
+          readable: true,
+          items: [
+            {
+              name: 'Omelette',
+              grams: 100,
+              foodId: 'omelette-id',
+              fdcId: null,
+              servingGrams: 100,
+              nutrients: vector({ calories: 250 }),
+            },
+          ],
+        });
+      },
+    );
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
 
       const ready = harness.renderTree();
       expect(field(ready, 'Food for item 1').props.value).toBe('Omelette');
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
       const createCalls = mockCallService.mock.calls.filter(
         (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
       );
       expect(createCalls).toHaveLength(0);
-      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      const entryBody = JSON.parse(String(lastEntryCall()[2].body));
       expect(entryBody.foodId).toBe('omelette-id');
     } finally {
       harness.restore();
@@ -775,15 +923,27 @@ describe('MealEditor log-time catalog', () => {
     // case (case-fold). Only a real `nameKey` comparison reuses the row — a plain
     // `food.name === dish` creates a duplicate.
     const typedDish = '  chicken   breast  ';
-    const existing = { id: 'chicken-breast-id', name: 'Chicken Breast', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') {
-        return Promise.resolve(
-          init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
-        );
-      }
-      return Promise.resolve({});
-    });
+    const existing = {
+      id: 'chicken-breast-id',
+      name: 'Chicken Breast',
+      unit: 'g',
+      servingGrams: 100,
+      nutrients: vector({ calories: 165 }),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+    };
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') {
+          return Promise.resolve(
+            init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
+          );
+        }
+        return Promise.resolve({});
+      },
+    );
     try {
       const first = harness.renderTree();
       (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
@@ -795,13 +955,15 @@ describe('MealEditor log-time catalog', () => {
       });
 
       const ready = harness.renderTree();
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
       const createCalls = mockCallService.mock.calls.filter(
         (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
       );
       expect(createCalls).toHaveLength(0);
-      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      const entryBody = JSON.parse(String(lastEntryCall()[2].body));
       expect(entryBody.foodId).toBe('chicken-breast-id');
     } finally {
       harness.restore();
@@ -813,15 +975,27 @@ describe('MealEditor log-time catalog', () => {
     // The plain exact-match case: the typed `Chicken` equals the stored `Chicken`,
     // no normalization required. Kept separate from the normalized-key case so the
     // fixture that discriminates normalization is not the one that does not.
-    const existing = { id: 'chicken-id', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector({ calories: 165 }), servings: [], version: 0, createdAt: '', updatedAt: '' };
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') {
-        return Promise.resolve(
-          init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
-        );
-      }
-      return Promise.resolve({});
-    });
+    const existing = {
+      id: 'chicken-id',
+      name: 'Chicken',
+      unit: 'g',
+      servingGrams: 100,
+      nutrients: vector({ calories: 165 }),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+    };
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') {
+          return Promise.resolve(
+            init?.method === 'POST' ? existing : { foods: [existing], nextCursor: null },
+          );
+        }
+        return Promise.resolve({});
+      },
+    );
     try {
       const first = harness.renderTree();
       (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
@@ -833,13 +1007,15 @@ describe('MealEditor log-time catalog', () => {
       });
 
       const ready = harness.renderTree();
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
       const createCalls = mockCallService.mock.calls.filter(
         (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
       );
       expect(createCalls).toHaveLength(0);
-      const entryBody = JSON.parse(mockCallService.mock.calls.at(-1)![2].body);
+      const entryBody = JSON.parse(String(lastEntryCall()[2].body));
       expect(entryBody.foodId).toBe('chicken-id');
     } finally {
       harness.restore();
@@ -853,20 +1029,37 @@ describe('MealEditor log-time catalog', () => {
     // (keyed by the normalized key), not await a second create: exactly one
     // `POST /api/foods`, two `POST /api/entries` carrying that one created id.
     const secondDish = '  chicken  ';
-    const createdFood = { id: 'created-chicken', name: 'Chicken', unit: 'g', servingGrams: 100, nutrients: vector(), servings: [], version: 0, createdAt: '', updatedAt: '' };
-    mockCallService.mockImplementation((_base: string, path: string, init?: { method?: string }) => {
-      if (path === '/api/foods') {
-        return Promise.resolve(init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null });
-      }
-      return Promise.resolve({});
-    });
+    const createdFood = {
+      id: 'created-chicken',
+      name: 'Chicken',
+      unit: 'g',
+      servingGrams: 100,
+      nutrients: vector(),
+      servings: [],
+      version: 0,
+      createdAt: '',
+      updatedAt: '',
+    };
+    mockCallService.mockImplementation(
+      (_base: string, path: string, init?: { method?: string }) => {
+        if (path === '/api/foods') {
+          return Promise.resolve(
+            init?.method === 'POST' ? createdFood : { foods: [], nextCursor: null },
+          );
+        }
+        return Promise.resolve({});
+      },
+    );
     try {
       const first = harness.renderTree();
       (field(first, 'Food for item 1').props.onChange as (e: unknown) => void)({
         target: { value: 'Chicken' },
       });
       const oneNamed = harness.renderTree();
-      (button(oneNamed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
+      (
+        button(oneNamed, (el) => text(el.props.children).includes('Add item')).props
+          .onClick as () => void
+      )();
       const twoRows = harness.renderTree();
       (field(twoRows, 'Food for item 2').props.onChange as (e: unknown) => void)({
         target: { value: secondDish },
@@ -881,7 +1074,9 @@ describe('MealEditor log-time catalog', () => {
       });
 
       const ready = harness.renderTree();
-      await (button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>)();
+      await (
+        button(ready, (el) => el.props.label === 'Save meal').props.onClick as () => Promise<void>
+      )();
 
       const createCalls = mockCallService.mock.calls.filter(
         (call) => call[1] === '/api/foods' && call[2]?.method === 'POST',
@@ -983,7 +1178,10 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
       // Tapping the trigger runs its `onClick` — `setOpenNutrients(index)` —
       // through the same store the harness drives; the re-render then shows the
       // item's modal open.
-      (button(first, (el) => text(el.props.children).includes('All nutrients')).props.onClick as () => void)();
+      (
+        button(first, (el) => text(el.props.children).includes('All nutrients')).props
+          .onClick as () => void
+      )();
 
       const dialog = findAll(harness.renderTree(), Dialog).find((el) => el.props.open === true);
       expect(dialog).toBeDefined();
@@ -1032,7 +1230,9 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
       const tree = harness.renderTree();
 
       // The estimate's micro is a real number, not the em dash.
@@ -1081,7 +1281,9 @@ describe('MealEditor labelled fields and the all-nutrients region', () => {
     try {
       const first = harness.renderTree();
       const picker = find(first, FilePicker);
-      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([image] as unknown as FileList);
+      await (picker!.props.onFiles as (files: FileList) => Promise<void>)([
+        image,
+      ] as unknown as FileList);
       const tree = harness.renderTree();
 
       // The path-3 zero vector resolved nothing, so a non-headline field renders
@@ -1229,7 +1431,10 @@ describe('restored entry display name', () => {
         target: { value: '10' },
       });
       const oneConfirmed = harness.renderTree();
-      (button(oneConfirmed, (el) => text(el.props.children).includes('Add item')).props.onClick as () => void)();
+      (
+        button(oneConfirmed, (el) => text(el.props.children).includes('Add item')).props
+          .onClick as () => void
+      )();
       const twoRows = harness.renderTree();
       (field(twoRows, 'Protein for item 2').props.onChange as (e: unknown) => void)({
         target: { value: '5' },

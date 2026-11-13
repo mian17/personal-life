@@ -38,6 +38,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     repeatDays: null,
     reminderScheduledAt: null,
     listId: null,
+    originService: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -112,10 +113,7 @@ describe('/todos/matrix page wiring', () => {
     const itemsByQuadrant = Object.fromEntries(
       quadrants.map((q: any) => {
         expect(q.items.type).toBe(UiList);
-        return [
-          q.id,
-          asArray(q.items).map((row: any) => row.props.todo.id),
-        ];
+        return [q.id, asArray(q.items).map((row: any) => row.props.todo.id)];
       }),
     );
     expect(itemsByQuadrant).toEqual({
@@ -137,8 +135,7 @@ describe('/todos/matrix page wiring', () => {
     const quadrants = el.props.body.props.quadrants;
     const byId = Object.fromEntries(quadrants.map((q: any) => [q.id, q]));
 
-    const rowTone = (id: string) =>
-      asArray(byId[id].items)[0].props.tone;
+    const rowTone = (id: string) => asArray(byId[id].items)[0].props.tone;
 
     expect(rowTone('urgent-important')).toBe('danger');
     expect(rowTone('urgent-not-important')).toBe('amber');
@@ -168,7 +165,13 @@ describe('/todos/matrix page wiring', () => {
     mockedListTodos.mockResolvedValue({
       todos: [
         todo({ id: 'open-1', dueDate: TODAY, effectiveImportant: true }),
-        todo({ id: 'done-1', title: 'Done task', done: true, dueDate: TODAY, effectiveImportant: true }),
+        todo({
+          id: 'done-1',
+          title: 'Done task',
+          done: true,
+          dueDate: TODAY,
+          effectiveImportant: true,
+        }),
       ],
       nextCursor: null,
       total: 2,

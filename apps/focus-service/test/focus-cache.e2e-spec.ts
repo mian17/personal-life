@@ -60,7 +60,9 @@ async function openDatabase(databasePath: string): Promise<DataSource> {
  */
 async function persistedSessions(dataSource: DataSource): Promise<unknown[]> {
   return dataSource.query(
-    `SELECT id, "ownerSub", date, minutes, strftime('%Y-%m-%dT%H:%M:%fZ', "createdAt") AS "createdAt"
+    `SELECT id, "ownerSub", date, minutes, "todoId",
+            strftime('%Y-%m-%dT%H:%M:%fZ', "todoAnsweredAt") AS "todoAnsweredAt",
+            strftime('%Y-%m-%dT%H:%M:%fZ', "createdAt") AS "createdAt"
      FROM "focus_session" WHERE "ownerSub" = ? ORDER BY date ASC, "createdAt" ASC, id ASC`,
     [OWNER],
   );

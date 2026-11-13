@@ -30,6 +30,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     repeatDays: null,
     reminderScheduledAt: null,
     listId: 'l1',
+    originService: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -78,7 +79,9 @@ interface StubbedHookCalls {
 let realRender: StubbedHookCalls | null = null;
 
 const realHooks = {
-  useState: ReactModule.useState as unknown as (initial: unknown) => [unknown, (next: unknown) => void],
+  useState: ReactModule.useState as unknown as (
+    initial: unknown,
+  ) => [unknown, (next: unknown) => void],
   useContext: ReactModule.useContext as unknown as (context: unknown) => unknown,
   useRef: ReactModule.useRef as unknown as (initial: unknown) => { current: unknown },
   useEffect: ReactModule.useEffect as unknown as (effect: () => void | (() => void)) => void,
@@ -125,33 +128,32 @@ function snackbarHarness() {
   const ctxSpy = jest
     .spyOn(ReactModule, 'useContext')
     .mockImplementation((() => ({ showSnackbar })) as unknown as typeof ReactModule.useContext);
-  const stateSpy = jest
-    .spyOn(ReactModule, 'useState')
-    .mockImplementation(((initial: unknown) => {
-      if (!takesStub('useState')) return realHooks.useState(initial);
-      return [
-        intent,
-        (value: typeof intent) => {
-          intent = value;
-        },
-      ];
-    }) as unknown as typeof ReactModule.useState);
-  const refSpy = jest
-    .spyOn(ReactModule, 'useRef')
-    .mockImplementation(((initial: unknown) => {
-      if (realRender !== null) return realHooks.useRef(initial);
-      const slot = refIndex++;
-      if (!refs[slot]) refs[slot] = { current: initial };
-      return refs[slot];
-    }) as unknown as typeof ReactModule.useRef);
-  const effectSpy = jest
-    .spyOn(ReactModule, 'useEffect')
-    .mockImplementation(((fn: () => void | (() => void)) => {
-      if (realRender !== null) return realHooks.useEffect(fn);
-      effects.push(fn);
-    }) as unknown as typeof ReactModule.useEffect);
+  const stateSpy = jest.spyOn(ReactModule, 'useState').mockImplementation(((initial: unknown) => {
+    if (!takesStub('useState')) return realHooks.useState(initial);
+    return [
+      intent,
+      (value: typeof intent) => {
+        intent = value;
+      },
+    ];
+  }) as unknown as typeof ReactModule.useState);
+  const refSpy = jest.spyOn(ReactModule, 'useRef').mockImplementation(((initial: unknown) => {
+    if (realRender !== null) return realHooks.useRef(initial);
+    const slot = refIndex++;
+    if (!refs[slot]) refs[slot] = { current: initial };
+    return refs[slot];
+  }) as unknown as typeof ReactModule.useRef);
+  const effectSpy = jest.spyOn(ReactModule, 'useEffect').mockImplementation(((
+    fn: () => void | (() => void),
+  ) => {
+    if (realRender !== null) return realHooks.useEffect(fn);
+    effects.push(fn);
+  }) as unknown as typeof ReactModule.useEffect);
 
-  function renderTree(options?: { size?: 'default' | 'dense'; overrides?: Partial<Todo> }): ItemTree {
+  function renderTree(options?: {
+    size?: 'default' | 'dense';
+    overrides?: Partial<Todo>;
+  }): ItemTree {
     refIndex = 0;
     effects.length = 0;
     renderedVersion = todo(options?.overrides).version;
@@ -219,7 +221,8 @@ function doneToggle(tree: ItemTree): any {
   const found = findNode(
     tree.props.leading,
     undefined,
-    (el) => typeof (el.props as Record<string, unknown>).label === 'string' &&
+    (el) =>
+      typeof (el.props as Record<string, unknown>).label === 'string' &&
       String((el.props as Record<string, unknown>).label).startsWith('Mark '),
   );
   if (!found) throw new Error('no done toggle rendered in the todo item');
@@ -230,7 +233,9 @@ describe('TodoItem sizes', () => {
   it('dense: the done checkbox LEADS the row and links to the edit screen', () => {
     const html = markup('dense');
     // First child after the <li> open tag is the toggle button.
-    expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
+    expect(html).toMatch(
+      /<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/,
+    );
     expect(html).toContain('ui-checkbox');
     expect(html).not.toContain('ui-icon-btn');
     expect(html).toMatch(/<a[^>]*class="ui-list-item__link[^"]*"[^>]*href="\/todos\/t1\/edit"/);
@@ -266,7 +271,9 @@ describe('TodoItem sizes', () => {
 
   it('default: the square Checkbox LEADS the row (no lucide circle)', () => {
     const html = markup();
-    expect(html).toMatch(/<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/);
+    expect(html).toMatch(
+      /<li[^>]*ui-list-item[^>]*>\s*<button[^>]*aria-label="Mark Buy milk done"/,
+    );
     expect(html).toContain('ui-checkbox');
     expect(html).not.toContain('ui-icon-btn');
     expect(html).not.toContain('<circle');
@@ -522,50 +529,56 @@ describe('TodoItem tick keeps the row visible', () => {
   it.each([
     ['non-recurring', undefined],
     ['repeating', 'daily'],
-  ] as const)('coalesces a burst of presses into one write, reflecting the final state (%s)', (_label, repeat) => {
-    const harness = snackbarHarness();
-    updateMock.mockClear();
-    completeMock.mockClear();
-    try {
-      // on → off → on: only the final (done) request is sent, once.
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
+  ] as const)(
+    'coalesces a burst of presses into one write, reflecting the final state (%s)',
+    (_label, repeat) => {
+      const harness = snackbarHarness();
+      updateMock.mockClear();
+      completeMock.mockClear();
+      try {
+        // on → off → on: only the final (done) request is sent, once.
+        doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
+        doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
+        doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange();
 
-      expect(completeMock).not.toHaveBeenCalled();
-      expect(updateMock).not.toHaveBeenCalled();
+        expect(completeMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
 
-      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+        jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
 
-      expect(completeMock).toHaveBeenCalledTimes(1);
-      expect(completeMock).toHaveBeenCalledWith('t1', 0);
-      expect(updateMock).not.toHaveBeenCalled();
-    } finally {
-      harness.restore();
-    }
-  });
+        expect(completeMock).toHaveBeenCalledTimes(1);
+        expect(completeMock).toHaveBeenCalledWith('t1', 0);
+        expect(updateMock).not.toHaveBeenCalled();
+      } finally {
+        harness.restore();
+      }
+    },
+  );
 
   it.each([
     ['non-recurring', undefined],
     ['repeating', 'daily'],
-  ] as const)('sends nothing when a press is reversed back to the origin within the window (%s)', (_label, repeat) => {
-    const harness = snackbarHarness();
-    updateMock.mockClear();
-    completeMock.mockClear();
-    try {
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // on
-      doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // back off
+  ] as const)(
+    'sends nothing when a press is reversed back to the origin within the window (%s)',
+    (_label, repeat) => {
+      const harness = snackbarHarness();
+      updateMock.mockClear();
+      completeMock.mockClear();
+      try {
+        doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // on
+        doneToggle(harness.renderTree({ overrides: { repeat } })).props.onCheckedChange(); // back off
 
-      jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
+        jest.advanceTimersByTime(TOGGLE_DEBOUNCE_MS);
 
-      expect(completeMock).not.toHaveBeenCalled();
-      expect(updateMock).not.toHaveBeenCalled();
-      expect(harness.showSnackbar).not.toHaveBeenCalled();
-      expect(harness.completed).toBe(false);
-    } finally {
-      harness.restore();
-    }
-  });
+        expect(completeMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(harness.showSnackbar).not.toHaveBeenCalled();
+        expect(harness.completed).toBe(false);
+      } finally {
+        harness.restore();
+      }
+    },
+  );
 
   it('flushes a pending write when the row unmounts before the settle window', () => {
     const harness = snackbarHarness();

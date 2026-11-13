@@ -13,6 +13,7 @@ import {
 import type { Entry } from '../src/entries/entry.entity.js';
 import { EntriesCache } from '../src/entries/entries-cache.js';
 import { EntriesService, type EntryDto } from '../src/entries/entries.service.js';
+import type { MealTodoProducerService } from '../src/meal-todo/meal-todo-producer.service.js';
 import type { UpdateEntryDto } from '../src/entries/dto/update-entry.dto.js';
 import type { CreateEntryDto } from '../src/entries/dto/create-entry.dto.js';
 import type { CacheClient, CacheSetOptions } from '@life/cache';
@@ -36,6 +37,12 @@ import type { CacheClient, CacheSetOptions } from '@life/cache';
 const SUB = 'sub-1';
 const OTHER_SUB = 'sub-2';
 const DAY = '2026-09-03';
+
+/** No-op producer: this suite asserts the snapshot, not what an entry owes todo-service. */
+const NO_PRODUCER = {
+  ensureDailyTasks: async () => {},
+  noteEntryLogged: async () => {},
+} as unknown as MealTodoProducerService;
 
 /** Recording stand-in for the node-redis client: only the surface `@life/cache` uses. */
 class RecordingClient implements CacheClient {
@@ -125,7 +132,14 @@ function makeHarness(events: string[] = []) {
   const repo = new FakeEntryRepo(events);
   const userKeys = new FakeUserKeysRepo();
   const keys = new KeysService(userKeys as never, Buffer.alloc(32, 0x2c));
-  const service = new EntriesService(repo as never, new EntriesCache(new MealCache(client)), keys);
+  // A no-op producer is correct here: this suite asserts the stored snapshot's
+  // shape and immutability, not what a logged entry owes todo-service.
+  const service = new EntriesService(
+    repo as never,
+    new EntriesCache(new MealCache(client)),
+    keys,
+    NO_PRODUCER,
+  );
   return { service, repo, client, keys, events };
 }
 

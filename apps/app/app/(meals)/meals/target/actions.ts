@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { putMealProfile } from '@/lib/meal-api';
+import { kickPendingTodos } from '@/lib/outbox-relay';
 import { getToday } from '@/lib/today';
 
 /**
@@ -13,6 +14,14 @@ import { getToday } from '@/lib/today';
  * are never part of this body (the service's `forbidNonWhitelisted` pipe rejects
  * them). On success both the target page and the day view are revalidated, so
  * the new target shows immediately.
+ *
+ * The save also owes the owner's OPEN tasks a new number — meal-service enqueues one
+ * `todos.rename` per group inside the same write — and that queue is drained here, by
+ * the BFF, because `origin_grant` is keyed to this app's client id and no service
+ * holds a credential that could deliver it. Without this kick the intents sit pending
+ * until the owner happens to log a meal, so a changed target left the tasks naming the
+ * old one. Same best-effort contract as every other meal write: the save already
+ * succeeded, and a delivery that cannot run yet must not fail it.
  */
 export async function saveProfileAction(input: {
   age: number;
@@ -23,6 +32,7 @@ export async function saveProfileAction(input: {
   goal: string;
 }): Promise<void> {
   await putMealProfile({ ...input, date: await getToday() });
+  kickPendingTodos();
   revalidatePath('/meals/target');
   revalidatePath('/meals');
 }

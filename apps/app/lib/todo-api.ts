@@ -8,6 +8,7 @@ import type {
   Todo,
   TodoCompletionPage,
   TodoPage,
+  TodoRepeat,
   UpdateTodoInput,
 } from '@life/shared';
 import { withQuery } from '@life/app-kit';
@@ -76,6 +77,28 @@ export function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo> {
 
 export function deleteTodo(id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/todos/${id}`, { method: 'DELETE' });
+}
+
+/** One open task, as `GET /api/todos/origin/open` serves it to a consumer. */
+export interface OpenTask {
+  id: string;
+  title: string;
+  dueDate: string | null;
+  done: boolean;
+  version: number;
+  originService: string | null;
+}
+
+/**
+ * `GET /api/todos/origin/open` — the owner's open tasks, as this app's read grant
+ * reaches them (`SPEC-todo-origin`, read direction).
+ *
+ * Unpaged by design: a consumer picking one task must see them all, and open tasks are
+ * a user-scale set. A 403 here means no read grant, which the focus screen reads as "no
+ * task list" rather than an error — the timer works either way.
+ */
+export function listOpenTasks(): Promise<OpenTask[]> {
+  return call<OpenTask[]>('/api/todos/origin/open');
 }
 
 /** `GET /api/todos/trash` — cursor page of the owner's soft-deleted todos. */
@@ -176,5 +199,49 @@ export function unsubscribePush(endpoint: string): Promise<{ ok: true }> {
   return call<{ ok: true }>('/api/push/subscribe', {
     method: 'DELETE',
     body: JSON.stringify({ endpoint }),
+  });
+}
+
+/**
+ * The origin-create body a producer's intent already is: the ordinary todo fields
+ * plus the producer's own `originId`. `originService` is deliberately absent —
+ * todo-service takes it from the grant row of the token's `client_id`, so a body
+ * that named its own origin would be rejected as an unknown field.
+ */
+export interface TodoOriginCreateBody {
+  title: string;
+  originId: string;
+  dueDate?: string;
+  repeat?: TodoRepeat | null;
+}
+
+/** `POST /api/todos/origin/:originId/complete` body — the title refresh and the pin. */
+export interface TodoOriginTickBody {
+  title?: string;
+  occurrence?: string;
+}
+
+/**
+ * `POST /api/todos/origin` — create a todo on a producer's behalf
+ * (`SPEC-todo-origin` §7). Authorized by the origin grant the caller's token names,
+ * which is exactly why this call must carry the **user's** token: the grant is keyed
+ * to that token's `client_id`.
+ *
+ * Idempotent by origin: a redelivered intent answers `409` instead of creating a
+ * second task, so a caller treats `409` as success.
+ */
+export function createTodoWithOrigin(body: TodoOriginCreateBody): Promise<Todo> {
+  return call<Todo>('/api/todos/origin', { method: 'POST', body: JSON.stringify(body) });
+}
+
+/**
+ * `POST /api/todos/origin/:originId/complete` — tick the task a producer created,
+ * pinned to `occurrence` so a redelivered tick is a no-op rather than an advance
+ * (`SPEC-todo-origin` §9.16). `originId` is the producer's id, never a todo id.
+ */
+export function completeTodoByOrigin(originId: string, body: TodoOriginTickBody): Promise<Todo> {
+  return call<Todo>(`/api/todos/origin/${encodeURIComponent(originId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }

@@ -6,6 +6,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import type { TodoRepeat } from '@life/shared';
 import { List } from '../lists/list.entity.js';
@@ -24,10 +25,20 @@ import { TodoTag } from './todo-tag.entity.js';
  *   (they survive), which is the domain's detach semantics.
  * - `origin` is the reserved orchestrator-seam column (`SPEC-service-kernel`);
  *   nullable JSON `{service,id}`, nothing populates it in this chapter.
+ * - `(ownerSub, originService, originId)` is unique, so a producer's repeated create
+ *   for that **same owner** fails in the database rather than through a prior SELECT
+ *   (`SPEC-todo-origin`). Uniqueness is per owner, so two users may each hold the
+ *   same `(originService, originId)` pair without colliding. Both origin columns are
+ *   nullable and sqlite treats NULLs as distinct, so app-created todos — which carry
+ *   neither — never collide.
  * - `todo_tag` rows are association-only TagRefs (ids, no names) managed
  *   explicitly by `TodosService` (writes replace the set).
  */
 @Entity('todo')
+// The origin lookup queries exactly this key, owner first, so one composite index
+// serves both the per-owner uniqueness rule and the `loadOriginTodo` read.
+@Index('IDX_todo_owner_origin', ['ownerSub', 'originService', 'originId'])
+@Unique('UQ_todo_owner_origin', ['ownerSub', 'originService', 'originId'])
 @Index('IDX_todo_owner_sub', ['ownerSub'])
 @Index('IDX_todo_reminder_scheduled_at', ['reminderScheduledAt'])
 export class Todo {
@@ -84,6 +95,19 @@ export class Todo {
   @Column({ type: 'text', nullable: true })
   origin: string | null;
 
+  /**
+   * Plaintext origin identity: the producer service name granted to the caller's
+   * `client_id`. Stamped by the service from its grant row, never read from a
+   * request (`SPEC-todo-origin`). Mirrors `listId` — ids only, never
+   * `@life/crypto`-wrapped. `NULL` = created by the app itself.
+   */
+  @Column({ type: 'text', nullable: true })
+  originService: string | null;
+
+  /** The producer's own id for this todo. `NULL` = created by the app itself. */
+  @Column({ type: 'text', nullable: true })
+  originId: string | null;
+
   @Column({ type: 'text' })
   ownerSub: string;
 
@@ -99,7 +123,7 @@ export class Todo {
   @Column({ type: 'datetime', nullable: true })
   deletedAt: Date | null;
 
-  // Association-only (TagRefs by id). todo-service owns no tag vocabulary; tag
+  // Association-only (TagRefs by id). This service owns no tag vocabulary; tag
   // names live in `tags-service`. Join rows are managed explicitly by the
   // service (replace-the-set on writes).
   @OneToMany(() => TodoTag, (todoTag) => todoTag.todo)

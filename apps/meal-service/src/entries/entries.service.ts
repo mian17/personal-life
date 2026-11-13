@@ -23,6 +23,7 @@ import { Entry } from './entry.entity.js';
 import type { CreateEntryDto, MealGroup } from './dto/create-entry.dto.js';
 import type { UpdateEntryDto } from './dto/update-entry.dto.js';
 import { EntriesCache, toCachedEntryRow, type CachedEntryRow } from './entries-cache.js';
+import { MealTodoProducerService } from '../meal-todo/meal-todo-producer.service.js';
 
 /**
  * The wire shape of a diary entry. `ownerSub` is deliberately absent —
@@ -108,6 +109,9 @@ export class EntriesService {
     @InjectRepository(Entry) private readonly entries: Repository<Entry>,
     private readonly cache: EntriesCache,
     private readonly keys: KeysService,
+    // The todo producer: a logged entry owes todo-service a tick. Required, like
+    // every other dependency — a missing one is a wiring bug, not a mode.
+    private readonly todoProducer: MealTodoProducerService,
     // Optional only so the unit suites that build this service positionally keep
     // compiling; `EntriesModule` always provides the token, so a batch always
     // has the service's one cache adapter to bump.
@@ -304,7 +308,28 @@ export class EntriesService {
       deletedAt: null,
     });
     const saved = await entries.save(entry);
+    await this.noteTick(sub, dto, manager ?? this.entries.manager);
     return this.toDto(toCachedEntryRow(saved), sub, dek);
+  }
+
+  /**
+   * Tell the todo producer one entry was logged, in the caller's transaction so
+   * the tick commits with the row it describes.
+   *
+   * Guarded here as well as inside the producer, and deliberately so: the
+   * producer guards its own decides, while this guard covers the seam itself — a
+   * service built without a producer, or one whose hook throws before its own
+   * guard runs. Telling another service about a meal is never worth failing the
+   * user's meal log, so the failure becomes one ids-only line (`@Optional()` is
+   * not the tool here: an absent producer is a wiring bug worth logging, not a
+   * mode to accept silently).
+   */
+  private async noteTick(sub: string, dto: CreateEntryDto, manager: EntityManager): Promise<void> {
+    try {
+      await this.todoProducer?.noteEntryLogged(sub, dto.mealGroup, dto.date, manager);
+    } catch {
+      this.logger.warn(`todo tick skipped for ${sub}/${dto.mealGroup}/${dto.date}`);
+    }
   }
 
   /** `PATCH /api/entries/:id` — a stale `expectedVersion` is a 409. */

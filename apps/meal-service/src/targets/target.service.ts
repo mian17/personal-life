@@ -1,8 +1,17 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { MEAL_CACHE, type MealCache } from '../cache/meal-cache.js';
+import { TODOS_RENAME_PRODUCER, type TodoTitleRefresher } from '../meal-todo/todo-intents.js';
 import { DATE_ONLY, type UpdateProfileDto } from './dto/update-profile.dto.js';
 import { calculateTarget, type Goal } from './target.js';
 import type { ActivityLevel, Sex } from './target-calculator.js';
@@ -77,9 +86,27 @@ function requireDay(date: string | undefined): string {
  */
 @Injectable()
 export class TargetService {
+  private readonly logger = new Logger(TargetService.name);
+
   constructor(
     @InjectRepository(Target) private readonly targets: Repository<Target>,
     @Inject(MEAL_CACHE) private readonly cache: MealCache,
+    /**
+     * The todo producer the rename intents go through, reached by token rather than
+     * by class: the producer injects this service, so importing its class here would
+     * be a module cycle `emitDecoratorMetadata` turns into a boot-time reference
+     * error. `forwardRef` around the token closes the DI edge the token itself makes
+     * (token → producer → this service → token).
+     *
+     * Optional only so a hand-built service in a unit suite still constructs;
+     * `MealTodoModule` provides the token and `TargetModule` imports that module, so
+     * the shipped graph always resolves it. `@Optional()` keeps an absent token from
+     * failing boot, and `refreshTaskTitles` then warns **by token name** — so the gap
+     * is visible in the log and the owner's target save still succeeds.
+     */
+    @Optional()
+    @Inject(forwardRef(() => TODOS_RENAME_PRODUCER))
+    private readonly todoProducer?: TodoTitleRefresher,
   ) {}
 
   /**
@@ -139,6 +166,45 @@ export class TargetService {
     // generation and die here. A thrown save never bumps (cache stays honest),
     // and a bump error never blocks the write (fail open, `@life/cache`).
     await this.cache.bumpGeneration(sub);
+    // The open tasks still carry the old number, so the new target is not done
+    // until they are re-titled. The day handed over is the row's own `validFrom`:
+    // that is the date the new number applies from, so the read resolves to the row
+    // just saved and never to an older one (and no clock is read — lesson 0019).
+    await this.refreshTaskTitles(sub, saved.validFrom);
     return toDto(saved);
+  }
+
+  /**
+   * Tell the todo producer the target moved, in this service's own manager scope.
+   *
+   * Matched to `entries.service`'s `noteTick`: the producer is handed
+   * `this.targets.manager` (the same repository manager a singular entry write
+   * passes, not an enclosing transaction), and this seam keeps a guard of its own.
+   * The producer guards its own decides; this guard covers the seam itself — a
+   * producer that throws before its guard runs must still never fail the owner's
+   * target save. No transaction of this one's is needed because the row the
+   * intents describe is already committed, and each intent commits with the
+   * outbox write the producer issues.
+   *
+   * Neither failure is silent. An absent producer means the token went unprovided —
+   * a wiring bug, never a mode — and the warn names the token so the log says which
+   * one. A throwing producer is degraded, and the warn carries its message: a live
+   * run once saved a target with `?.` over an unprovided token and enqueued nothing,
+   * with no line anywhere to show it.
+   */
+  private async refreshTaskTitles(sub: string, today: string): Promise<void> {
+    const producer = this.todoProducer;
+    if (producer === undefined) {
+      this.logger.warn(
+        `todo title refresh skipped for ${sub}/${today}: TODOS_RENAME_PRODUCER is not provided`,
+      );
+      return;
+    }
+    try {
+      await producer.refreshTitles(sub, today, this.targets.manager);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`todo title refresh failed for ${sub}/${today}: ${message}`);
+    }
   }
 }
