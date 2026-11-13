@@ -98,7 +98,11 @@ describe('ConfirmButton', () => {
     const onClick = jest.fn(() => new Promise<void>(() => {}));
     jest.spyOn(window, 'confirm').mockReturnValue(true);
 
-    render(<ConfirmButton message="Delete?" onClick={onClick}>Delete</ConfirmButton>);
+    render(
+      <ConfirmButton message="Delete?" onClick={onClick}>
+        Delete
+      </ConfirmButton>,
+    );
     const button = screen.getByRole('button', { name: 'Delete' });
 
     // Both taps land before React renders the disabled state — the only shape a
@@ -132,6 +136,25 @@ describe('ConfirmButton', () => {
     expect(button.hasAttribute('disabled')).toBe(true);
 
     await settleSubmission(settlements);
+  });
+
+  it('does not disable itself from its own click: a disabled submit button drops the form submit', () => {
+    // A browser drops the default action of a click on a submit button that is disabled
+    // when it performs that action, so a latch painted from the click handler means the
+    // form never submits at all — no action, no request. jsdom cannot reproduce the drop,
+    // so the invariant is asserted directly: the click must not reach `disabled`.
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <form onSubmit={(event) => event.preventDefault()}>
+        <ConfirmButton message="Delete?">Delete</ConfirmButton>
+      </form>,
+    );
+    const button = screen.getByRole('button', { name: 'Delete' });
+
+    fireEvent.click(button);
+
+    expect(button.hasAttribute('disabled')).toBe(false);
   });
 
   it('submits a form action once when two taps land in the same frame', async () => {

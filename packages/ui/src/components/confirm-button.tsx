@@ -95,6 +95,11 @@ export async function runConfirmed(
  * A start that never comes (a prevented click, a validation stop) releases the latch
  * after `SUBMIT_START_GRACE_MS`.
  *
+ * Arming the form path is deliberately invisible: a `disabled` painted while the click is
+ * still being dispatched makes the browser drop that click's default action, so the form
+ * never submits and the write silently does not happen. The latch is therefore a ref, and
+ * the control greys only once `useFormStatus` reports the submission React did start.
+ *
  * The guard is local rather than `usePendingAction` from `@life/app-kit`: that package
  * depends on `@life/ui`, so importing back would close a dependency cycle.
  */
@@ -138,7 +143,10 @@ export function ConfirmButton({
   useEffect(() => () => window.clearTimeout(releaseTimer.current), []);
 
   function armSubmitLatch() {
-    gate.setPending(true);
+    // The ref only. This runs inside the click, and disabling the button here would make
+    // the browser cancel the click's own default action — the submit that carries the
+    // write. `submitting` greys the control a render later, after that action is under way.
+    inFlight.current = true;
     releaseTimer.current = window.setTimeout(() => gate.setPending(false), SUBMIT_START_GRACE_MS);
   }
 
