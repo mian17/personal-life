@@ -179,7 +179,7 @@ describe('Meal todo enablement (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ enabled: false });
     expect(await toggles()).toEqual([]);
-    expect((await creates()).length).toBe(before);
+    expect(await creates()).toHaveLength(before);
   });
 
   it('treats `enabled: false` exactly as DELETE', async () => {
