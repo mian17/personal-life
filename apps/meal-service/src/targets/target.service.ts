@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -98,10 +99,12 @@ export class TargetService {
      * (token → producer → this service → token).
      *
      * Optional only so a hand-built service in a unit suite still constructs;
-     * `TargetModule` always provides the token, and an absent one is a wiring bug
-     * that the warn below records rather than a mode to accept silently (the same
-     * stance `entries.service` takes at its own producer seam).
+     * `MealTodoModule` provides the token and `TargetModule` imports that module, so
+     * the shipped graph always resolves it. `@Optional()` keeps an absent token from
+     * failing boot, and `refreshTaskTitles` then warns **by token name** — so the gap
+     * is visible in the log and the owner's target save still succeeds.
      */
+    @Optional()
     @Inject(forwardRef(() => TODOS_RENAME_PRODUCER))
     private readonly todoProducer?: TodoTitleRefresher,
   ) {}
@@ -182,12 +185,26 @@ export class TargetService {
    * target save. No transaction of this one's is needed because the row the
    * intents describe is already committed, and each intent commits with the
    * outbox write the producer issues.
+   *
+   * Neither failure is silent. An absent producer means the token went unprovided —
+   * a wiring bug, never a mode — and the warn names the token so the log says which
+   * one. A throwing producer is degraded, and the warn carries its message: a live
+   * run once saved a target with `?.` over an unprovided token and enqueued nothing,
+   * with no line anywhere to show it.
    */
   private async refreshTaskTitles(sub: string, today: string): Promise<void> {
+    const producer = this.todoProducer;
+    if (producer === undefined) {
+      this.logger.warn(
+        `todo title refresh skipped for ${sub}/${today}: TODOS_RENAME_PRODUCER is not provided`,
+      );
+      return;
+    }
     try {
-      await this.todoProducer?.refreshTitles(sub, today, this.targets.manager);
-    } catch {
-      this.logger.warn(`todo title refresh skipped for ${sub}/${today}`);
+      await producer.refreshTitles(sub, today, this.targets.manager);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`todo title refresh failed for ${sub}/${today}: ${message}`);
     }
   }
 }
