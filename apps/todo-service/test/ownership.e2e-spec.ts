@@ -221,6 +221,7 @@ describe('Todos ownership (e2e)', () => {
       'important',
       'listId',
       'note',
+      'originService',
       'reminderScheduledAt',
       'repeat',
       'repeatDays',
