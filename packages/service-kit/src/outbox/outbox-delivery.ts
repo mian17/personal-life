@@ -51,13 +51,15 @@ export function createHttpDelivery(env: NodeJS.ProcessEnv = process.env): Outbox
   return {
     configured: Boolean(baseUrl),
 
-    async deliver(): Promise<void> {
+    deliver(): Promise<void> {
       if (!baseUrl) {
-        throw new Error(`outbox delivery disabled: ${TODOS_API_URL_ENV} is unset`);
+        return Promise.reject(new Error(`outbox delivery disabled: ${TODOS_API_URL_ENV} is unset`));
       }
       // The URL alone is not enough to send: a request without a credential
       // would be a 401 dressed up as a retryable failure.
-      throw new Error(`outbox delivery not configured: no producer credential for ${baseUrl}`);
+      return Promise.reject(
+        new Error(`outbox delivery not configured: no producer credential for ${baseUrl}`),
+      );
     },
   };
 }

@@ -24,6 +24,16 @@ export interface DonePromptProps {
 }
 
 /**
+ * The question as the sentence the dialog shows, or `undefined` when there is no question
+ * to ask. `1` is singular, every other count is plural, so the panel reads as English.
+ */
+function describeQuestion(question: FocusQuestion | null): string | undefined {
+  if (question === null) return undefined;
+  const unit = question.minutes === 1 ? 'minute' : 'minutes';
+  return `${question.minutes} focused ${unit} on “${question.title}”. Tick it off if you are done with it.`;
+}
+
+/**
  * The "done?" question a task-linked block asks, at both moments a block is recorded and
  * on the next load when the tab closed before it was answered.
  *
@@ -59,11 +69,7 @@ export function DonePrompt({ question, onAnswered }: Readonly<DonePromptProps>) 
         if (!open) answer('not-yet');
       }}
       title="Finished that task?"
-      description={
-        question === null
-          ? undefined
-          : `${question.minutes} focused ${question.minutes === 1 ? 'minute' : 'minutes'} on “${question.title}”. Tick it off if you are done with it.`
-      }
+      description={describeQuestion(question)}
       size="sheet"
       footer={
         // `Button`'s default size is `w-full`, and a full-width child of the wrapping footer

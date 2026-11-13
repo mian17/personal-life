@@ -173,7 +173,7 @@ async function send(intent: PendingMealIntent): Promise<void> {
 async function sendCreate(raw: string): Promise<void> {
   const payload = parse<CreatePayload>(raw);
   if (typeof payload.title !== 'string' || typeof payload.originId !== 'string') {
-    throw new Error('create intent is missing title or originId');
+    throw new TypeError('create intent is missing title or originId');
   }
   await createTodoWithOrigin(payload as TodoOriginCreateBody);
 }
@@ -206,7 +206,7 @@ async function sendRename(raw: string): Promise<void> {
     throw new Error('rename intent carries no originId: skipped');
   }
   if (typeof payload.title !== 'string') {
-    throw new Error('rename intent is missing title');
+    throw new TypeError('rename intent is missing title');
   }
   await callService(
     TODO_API_URL,
