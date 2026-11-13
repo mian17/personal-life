@@ -169,6 +169,21 @@ describe('the "done?" prompt', () => {
     await waitFor(() => expect(answerMock).toHaveBeenCalledWith('session-1', 't1', 'done'));
   });
 
+  it('puts both actions straight in the footer, so neither wraps the other', async () => {
+    await runOneFocusBlock();
+
+    const notYet = await screen.findByRole('button', { name: 'Not yet' });
+    const done = screen.getByRole('button', { name: 'Done' });
+    const parent = notYet.parentElement;
+
+    // One parent for both, and it is the dialog's own footer — not a wrapper row whose
+    // flex-wrap would let the full-width buttons take a line each.
+    expect(done.parentElement).toBe(parent);
+    expect(parent?.className).toContain('ui-dialog__footer');
+    expect(parent?.className).not.toContain('ui-row');
+    expect(parent?.childElementCount).toBe(2);
+  });
+
   it('writes nothing further on Not yet except the answer itself', async () => {
     await runOneFocusBlock();
 

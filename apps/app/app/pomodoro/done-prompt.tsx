@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, Dialog, Row } from '@life/ui';
+import { Button, Dialog } from '@life/ui';
 import { answerFocusQuestionAction } from './actions';
 
 /** A recorded block whose task raised the question this prompt asks. */
@@ -66,14 +66,16 @@ export function DonePrompt({ question, onAnswered }: Readonly<DonePromptProps>) 
       }
       size="sheet"
       footer={
-        <Row gap="md">
+        // The footer is already a flex row, so the buttons are its direct children: a
+        // full-width button inside another row fills the line and pushes its sibling down.
+        <>
           <Button variant="ghost" disabled={pending} onClick={() => answer('not-yet')}>
             Not yet
           </Button>
           <Button disabled={pending} onClick={() => answer('done')}>
             Done
           </Button>
-        </Row>
+        </>
       }
     >
       {null}
