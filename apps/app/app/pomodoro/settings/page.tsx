@@ -8,14 +8,11 @@ import {
   Stack,
   StatusText,
 } from '@life/ui';
-import {
-  DEFAULT_DURATIONS,
-  MINUTES_RANGE,
-  type Durations,
-} from '@life/pomodoro';
-import { listGoals } from '@/lib/focus-api';
+import { DEFAULT_DURATIONS, MINUTES_RANGE, type Durations } from '@life/pomodoro';
+import { listGoals, readGrantState } from '@/lib/focus-api';
 import { resolveGoal } from '@/lib/stats-buckets';
 import { getToday } from '@/lib/today';
+import { FocusGrantToggle } from '../../focus-grant-toggle';
 import { setPomodoroDurations, setPomodoroGoal } from '../actions';
 import { submitFeedbackAction } from '../../feedback-actions';
 
@@ -37,13 +34,21 @@ const GOAL_REJECTED_FLAG = 'rejected';
  * The shell draws the shared Appearance, Comfort, Support and closing line; this page adds the
  * timer's two groups between Comfort and Support. The timer's toolbar keeps its own feedback
  * icon entry, so the Support row is the same double entry the other apps already have.
+ *
+ * The Tasks row is the first-use enablement of the read grant (`SPEC-todo-origin`
+ * assumption 12) — without it only an operator CLI could let Focus read the owner's
+ * tasks. Its state is read here, at render, so the row shows what the service holds.
  */
 export default async function PomodoroSettingsRoute({
   searchParams,
 }: Readonly<{
   searchParams: Promise<{ goal?: string }>;
 }>) {
-  const [durations, dailyGoal] = await Promise.all([readDurations(), readDailyGoal()]);
+  const [durations, dailyGoal, grantState] = await Promise.all([
+    readDurations(),
+    readDailyGoal(),
+    readGrantState(),
+  ]);
   const goalRejected = (await searchParams).goal === GOAL_REJECTED_FLAG;
 
   return (
@@ -106,6 +111,14 @@ export default async function PomodoroSettingsRoute({
           ))}
         </SettingsBlock>
       </form>
+
+      <SettingsBlock title="Tasks">
+        <SettingsRow
+          label="Task list"
+          description="Read your open tasks so you can pick one to focus on. Focus never creates or ticks a task, and access cannot be revoked."
+          control={<FocusGrantToggle state={grantState} />}
+        />
+      </SettingsBlock>
     </SettingsShell>
   );
 }

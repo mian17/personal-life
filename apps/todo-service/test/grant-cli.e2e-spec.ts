@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
@@ -19,6 +20,11 @@ import { grantOrigin, main, resolveDbPath, type GrantRow } from '../scripts/gran
  * The DDL guard is the load-bearing test: the script creates `origin_grant` by
  * hand, so the table it writes must be the one TypeORM's `synchronize` would have
  * created from the entity, or the next service boot silently mutates it.
+ *
+ * One case does spawn the entry (`describe('grant-origin CLI entry')` below), because
+ * every other case here imports `main` in-process and so cannot see a failure in the
+ * *entry* itself — which is exactly how this CLI shipped unrunnable: ts-node refused
+ * the entry's module graph with a type error while the suite stayed 9/9 green.
  */
 
 const dirs: string[] = [];
@@ -289,6 +295,60 @@ describe('grant-origin CLI', () => {
     } finally {
       written.close();
     }
+  });
+});
+
+/**
+ * The entry, executed as a real process — the one thing the in-process cases cannot
+ * cover.
+ *
+ * The CLI is a ts-node script (`scripts/grant-origin.cli.ts`), so what is asserted is
+ * that Node + the loader can actually load it and run a command end to end, against a
+ * real sqlite file. `NODE_OPTIONS` is dropped from the child's environment: jest sets
+ * `--experimental-vm-modules` there, which belongs to the test runner, not to the CLI
+ * this case is measuring.
+ */
+describe('grant-origin CLI entry (child process)', () => {
+  it('runs `--list` as a real process and prints the stored grant with its direction', () => {
+    const { path } = tempDb();
+    writeFileSync(path, '');
+    const env = { ...process.env };
+    delete env.NODE_OPTIONS;
+    const cli = (...args: string[]): string =>
+      execFileSync(
+        process.execPath,
+        [
+          '--disable-warning=ExperimentalWarning',
+          '--loader',
+          'ts-node/esm',
+          'scripts/grant-origin.cli.ts',
+          ...args,
+          '--db',
+          path,
+        ],
+        // The workspace root: the `grant-origin` script's own cwd, so ts-node resolves
+        // the same tsconfig a developer's `npm run` does.
+        { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', env },
+      );
+
+    expect(
+      cli(
+        '--owner',
+        'user-a',
+        '--client',
+        'producer-a',
+        '--origin',
+        'focus-service',
+        '--direction',
+        'read',
+        '--scope',
+        'own-origin',
+      ),
+    ).toBe('created user-a producer-a\n');
+    // The direction is the fifth token on every line, so a read grant is visible as one.
+    expect(cli('--list')).toMatch(
+      /^user-a producer-a focus-service \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} read\n$/,
+    );
   });
 });
 

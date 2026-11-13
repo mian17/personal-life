@@ -366,7 +366,7 @@ function runCommand(db: Database.Database, argv: string[], dbPath: string): numb
  * so a command line that does not mention direction keeps meaning what it meant.
  * `null` is a bad value; `undefined` means the flag was not given.
  */
-function directionFlag(argv: string[]): GrantDirection | undefined {
+function directionFlag(argv: string[]): GrantDirection | null | undefined {
   return closedFlag(argv, '--direction', GRANT_DIRECTIONS, 'write');
 }
 

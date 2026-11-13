@@ -1,10 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import { setPrefNumbers } from '@life/app-kit/preference-action';
 import { clampMinutes, isDailyGoal } from '@life/pomodoro';
-import { answerFocusQuestion, recordSession, setGoal } from '@/lib/focus-api';
+import { answerFocusQuestion, grantFocusRead, recordSession, setGoal } from '@/lib/focus-api';
 import { updateTodo } from '@/lib/todo-api';
 import { getToday } from '@/lib/today';
 
@@ -120,3 +120,30 @@ export async function answerFocusQuestionAction(
   await answerFocusQuestion(sessionId);
   revalidatePath('/pomodoro');
 }
+
+/**
+ * Allow Focus to read the owner's open tasks — the settings screen's one-way action.
+ *
+ * A grant is not revocable: todo-service has no DELETE for it, so there is no "off"
+ * call here to offer, and the screen states that instead of drawing a switch that
+ * would move back and change nothing. The grantee is the caller's own verified
+ * `client_id` (todo-service takes it from the token), so pressing this cannot hand
+ * the permission to anyone else.
+ *
+ * Both screens are revalidated because the grant changes what each one can say:
+ * `/pomodoro` gains its task picker, `/pomodoro/settings` stops offering Allow.
+ */
+export async function grantFocusReadAction(): Promise<GrantResult> {
+  try {
+    await grantFocusRead();
+    revalidatePath('/pomodoro');
+    revalidatePath('/pomodoro/settings');
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    return { ok: false, message: "Couldn't allow task access. Try again." };
+  }
+}
+
+/** What the settings row needs back: whether the grant landed, and why not when it did not. */
+export type GrantResult = { ok: true } | { ok: false; message: string };

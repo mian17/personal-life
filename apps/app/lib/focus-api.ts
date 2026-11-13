@@ -1,5 +1,6 @@
 import 'server-only';
-import { callService } from './client';
+import { unstable_rethrow } from 'next/navigation';
+import { ApiError, callService } from './client';
 
 /** One recorded focus block, as `focus-service` serves it (`SPEC-focus-service` §1). */
 export interface SessionRow {
@@ -165,5 +166,86 @@ async function collectGoalHistory(
       return collected.slice(0, COLLECT_CEILING);
     }
     cursor = page.nextCursor;
+  }
+}
+
+/**
+ * The origin todo-service keys Focus's **read** grant to, and the self-service route
+ * that writes it (`SPEC-todo-origin` assumption 12).
+ *
+ * The grant row belongs to todo-service, not to this app: the settings screen asks
+ * todo-service for the permission, exactly as the meals switch does — the difference
+ * is only that meals asks through meal-service's relay, while Focus has no relay
+ * route and asks the owner's own `client_id` for it directly.
+ */
+export const FOCUS_ORIGIN_SERVICE = 'focus-service';
+
+/**
+ * todo-service's base URL — the same knob and default `lib/todo-api.ts` reads.
+ *
+ * Restated here because {@link grantFocusRead} and {@link readGrantState} are the
+ * Focus ↔ todos seam, and this is the only file the Focus feature owns; the grant
+ * cannot live in `todo-api.ts` without putting a Focus constant in the generic todo
+ * client. Same variable, so one dev env points both at one service.
+ */
+const TODO_API_URL = process.env.TODO_API_URL ?? 'http://127.0.0.1:3005';
+
+function todoCall<T>(path: string, init?: RequestInit): Promise<T> {
+  return callService<T>(TODO_API_URL, path, init);
+}
+
+/** The grant row `POST /api/todos/origin-grant` answers with (the service's `OwnGrantView`). */
+export interface OwnGrantView {
+  ownerSub: string;
+  clientId: string;
+  originService: string;
+  direction: string;
+  grantedAt: string;
+}
+
+/**
+ * `POST /api/todos/origin-grant` — allow Focus to read the owner's open tasks.
+ *
+ * The body names the origin and nothing else: the owner comes from the token's `sub`
+ * and the grantee from its verified `client_id`, and todo-service takes the direction,
+ * the read scope and the disclosure sentence from its own tables. There is no matching
+ * DELETE anywhere in the service — a grant is a one-way permission — so this call has
+ * no inverse and the screen says so rather than offering one.
+ */
+export function grantFocusRead(): Promise<OwnGrantView> {
+  return todoCall<OwnGrantView>('/api/todos/origin-grant', {
+    method: 'POST',
+    body: JSON.stringify({ originService: FOCUS_ORIGIN_SERVICE }),
+  });
+}
+
+/**
+ * Whether the owner's client already holds Focus's read grant — read from the service,
+ * never assumed.
+ *
+ * There is no `GET` for the grant itself, so the read that answers it is the one the
+ * grant *opens*: `GET /api/todos/origin/open` answers 403 exactly when no read grant
+ * exists (`TodosService.readGrant`), and any success means one does. That is a
+ * capability probe rather than a row read, which is the honest thing to render from —
+ * a grant the read cannot use is not a grant the screen should call granted.
+ *
+ * `'unknown'` is its own answer, not a folded-into-`'missing'` one: todo-service being
+ * down is not the same fact as the owner never having allowed it, and a screen that
+ * showed "Allow" after a failed check would invite a press that cannot land.
+ *
+ * `unstable_rethrow` comes first so a missing session still reaches its login redirect:
+ * `requireSession` signals that by throwing, and swallowing it here would turn "log in"
+ * into "task access is unknown".
+ */
+export type GrantState = 'granted' | 'missing' | 'unknown';
+
+export async function readGrantState(): Promise<GrantState> {
+  try {
+    await todoCall<unknown>('/api/todos/origin/open');
+    return 'granted';
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ApiError && error.status === 403) return 'missing';
+    return 'unknown';
   }
 }

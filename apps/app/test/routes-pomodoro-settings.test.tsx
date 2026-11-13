@@ -12,7 +12,12 @@ jest.mock('@life/app-kit', () => ({
   setPrefNumber: jest.fn(),
 }));
 /** The goal row reads the owner's goal rows and the request day through these two seams. */
-jest.mock('@/lib/focus-api', () => ({ listGoals: jest.fn(), setGoal: jest.fn() }));
+jest.mock('@/lib/focus-api', () => ({
+  listGoals: jest.fn(),
+  setGoal: jest.fn(),
+  readGrantState: jest.fn(),
+}));
+jest.mock('@/app/focus-grant-toggle', () => ({ FocusGrantToggle: jest.fn(() => null) }));
 jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
 jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }));
 /** A refused goal leaves the form by redirect; the page reads the flag the action set. */
@@ -20,15 +25,17 @@ jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
 
 import { readPrefNumber } from '@life/app-kit';
 import { DEFAULT_DURATIONS, MINUTES_RANGE } from '@life/pomodoro';
-import { listGoals, setGoal, type GoalRow } from '@/lib/focus-api';
+import { listGoals, readGrantState, setGoal, type GoalRow } from '@/lib/focus-api';
 import { getToday } from '@/lib/today';
 import { redirect } from 'next/navigation';
 import PomodoroSettingsPage from '@/app/pomodoro/settings/page';
+import { FocusGrantToggle } from '@/app/focus-grant-toggle';
 import { setPomodoroGoal } from '@/app/pomodoro/actions';
 import { submitFeedbackAction } from '@/app/feedback-actions';
 
 const mockedReadPrefNumber = readPrefNumber as jest.MockedFunction<typeof readPrefNumber>;
 const mockedListGoals = listGoals as jest.MockedFunction<typeof listGoals>;
+const mockedReadGrantState = readGrantState as jest.MockedFunction<typeof readGrantState>;
 const mockedSetGoal = setGoal as jest.MockedFunction<typeof setGoal>;
 const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 const mockedRedirect = redirect as jest.MockedFunction<typeof redirect>;
@@ -85,6 +92,7 @@ beforeEach(() => {
   mockedListGoals.mockResolvedValue([]);
   mockedGetToday.mockResolvedValue(TODAY);
   mockedSetGoal.mockResolvedValue(goal(TODAY, 40));
+  mockedReadGrantState.mockResolvedValue('missing');
 });
 
 describe('/pomodoro/settings page wiring', () => {
@@ -199,10 +207,8 @@ describe('/pomodoro/settings daily goal row', () => {
     mockedListGoals.mockResolvedValue([goal('2026-11-01', 50)]);
 
     const page = await renderPage();
-    const control = settingsRow(
-      settingsBlock(blockForm(page, 'Focus'), 'Focus'),
-      'Daily goal',
-    ).props.control;
+    const control = settingsRow(settingsBlock(blockForm(page, 'Focus'), 'Focus'), 'Daily goal')
+      .props.control;
 
     expect(control.props.defaultValue).toBeUndefined();
   });
@@ -243,3 +249,34 @@ function formData(values: Record<string, string>): FormData {
 
   return data;
 }
+
+describe('/pomodoro/settings Tasks row', () => {
+  it('adds a Tasks group with the grant control, no href: the row acts, it does not route', async () => {
+    const page = await renderPage();
+    const block = settingsBlock(page, 'Tasks');
+
+    expect(block).toBeDefined();
+    const row = settingsRow(block, 'Task list');
+    expect(row.props.href).toBeUndefined();
+    expect(row.props.control.type).toBe(FocusGrantToggle);
+    // The row states the limits itself, so the promise is on the screen before the press.
+    expect(String(row.props.description)).toContain('cannot be revoked');
+  });
+
+  it('seeds the control from the state the service reports, so a grant reads back as one', async () => {
+    mockedReadGrantState.mockResolvedValue('granted');
+
+    const row = settingsRow(settingsBlock(await renderPage(), 'Tasks'), 'Task list');
+
+    expect(mockedReadGrantState).toHaveBeenCalledTimes(1);
+    expect(row.props.control.props.state).toBe('granted');
+  });
+
+  it('renders the Allow action while the service reports no grant', async () => {
+    mockedReadGrantState.mockResolvedValue('missing');
+
+    const row = settingsRow(settingsBlock(await renderPage(), 'Tasks'), 'Task list');
+
+    expect(row.props.control.props.state).toBe('missing');
+  });
+});
