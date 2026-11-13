@@ -35,7 +35,7 @@ const GOAL_REJECTED_FLAG = 'rejected';
  * timer's two groups between Comfort and Support. The timer's toolbar keeps its own feedback
  * icon entry, so the Support row is the same double entry the other apps already have.
  *
- * The Tasks row is the first-use enablement of the read grant (`SPEC-todo-origin`
+ * The Todos row is the first-use enablement of the read grant (`SPEC-todo-origin`
  * assumption 12) — without it only an operator CLI could let Focus read the owner's
  * tasks. Its state is read here, at render, so the row shows what the service holds.
  */
@@ -112,10 +112,10 @@ export default async function PomodoroSettingsRoute({
         </SettingsBlock>
       </form>
 
-      <SettingsBlock title="Tasks">
+      <SettingsBlock title="Todos">
         <SettingsRow
-          label="Task list"
-          description="Read your open tasks so you can pick one to focus on. Focus never creates or ticks a task, and access cannot be revoked."
+          label="Todos"
+          description="Read your open todos so you can pick one to focus on. Focus never creates or ticks a todo, and access cannot be revoked."
           control={<FocusGrantToggle state={grantState} />}
         />
       </SettingsBlock>

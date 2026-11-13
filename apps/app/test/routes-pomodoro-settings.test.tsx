@@ -250,13 +250,13 @@ function formData(values: Record<string, string>): FormData {
   return data;
 }
 
-describe('/pomodoro/settings Tasks row', () => {
-  it('adds a Tasks group with the grant control, no href: the row acts, it does not route', async () => {
+describe('/pomodoro/settings Todos row', () => {
+  it('adds a Todos group with the grant control, no href: the row acts, it does not route', async () => {
     const page = await renderPage();
-    const block = settingsBlock(page, 'Tasks');
+    const block = settingsBlock(page, 'Todos');
 
     expect(block).toBeDefined();
-    const row = settingsRow(block, 'Task list');
+    const row = settingsRow(block, 'Todos');
     expect(row.props.href).toBeUndefined();
     expect(row.props.control.type).toBe(FocusGrantToggle);
     // The row states the limits itself, so the promise is on the screen before the press.
@@ -266,7 +266,7 @@ describe('/pomodoro/settings Tasks row', () => {
   it('seeds the control from the state the service reports, so a grant reads back as one', async () => {
     mockedReadGrantState.mockResolvedValue('granted');
 
-    const row = settingsRow(settingsBlock(await renderPage(), 'Tasks'), 'Task list');
+    const row = settingsRow(settingsBlock(await renderPage(), 'Todos'), 'Todos');
 
     expect(mockedReadGrantState).toHaveBeenCalledTimes(1);
     expect(row.props.control.props.state).toBe('granted');
@@ -275,7 +275,7 @@ describe('/pomodoro/settings Tasks row', () => {
   it('renders the Allow action while the service reports no grant', async () => {
     mockedReadGrantState.mockResolvedValue('missing');
 
-    const row = settingsRow(settingsBlock(await renderPage(), 'Tasks'), 'Task list');
+    const row = settingsRow(settingsBlock(await renderPage(), 'Todos'), 'Todos');
 
     expect(row.props.control.props.state).toBe('missing');
   });

@@ -29,7 +29,7 @@ describe('FocusGrantToggle', () => {
   it('renders a granted read-out, and says the grant cannot be switched off', () => {
     const markup = html('granted');
 
-    expect(markup).toContain('Allowed. Focus can read your open tasks');
+    expect(markup).toContain('Allowed. Focus can read your open todos');
     expect(markup).toContain('this cannot be switched off');
     // No control at all, and no `Switch` off position to press into a no-op.
     expect(markup).not.toContain('>Allow</button>');
@@ -40,7 +40,7 @@ describe('FocusGrantToggle', () => {
     const markup = html('unknown');
 
     // `renderToStaticMarkup` HTML-escapes the apostrophe, so the frame is asserted, not the quote.
-    expect(markup).toContain('check whether task access is allowed. Reload to try again.');
+    expect(markup).toContain('check whether todo access is allowed. Reload to try again.');
     expect(markup).not.toContain('>Allow</button>');
   });
 

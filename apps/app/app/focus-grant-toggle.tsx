@@ -46,14 +46,14 @@ export function FocusGrantToggle({ state }: Readonly<{ state: GrantState }>) {
   if (state === 'granted' || granted) {
     return (
       <StatusText>
-        {`Allowed. Focus can read your open tasks — this cannot be switched off.`}
+        {`Allowed. Focus can read your open todos — this cannot be switched off.`}
       </StatusText>
     );
   }
 
   if (state === 'unknown') {
     return (
-      <StatusText>{`Couldn't check whether task access is allowed. Reload to try again.`}</StatusText>
+      <StatusText>{`Couldn't check whether todo access is allowed. Reload to try again.`}</StatusText>
     );
   }
 
