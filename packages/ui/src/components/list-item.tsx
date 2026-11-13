@@ -131,11 +131,14 @@ const denseRowStyles =
  * declared on the variant, so both shapes in the slot inherit it: a `size="icon"` danger button
  * and the unsized `ConfirmButton` the trash screens render.
  *
- * The glyph itself does not move: the box is anchored on the row's end inset, so its trailing edge
- * is fixed, and `justify-end` puts the 18px glyph against that same trailing padding — its
- * position is identical in the 34px box and the `--tap` one; only the leading edge travelled. The
- * variant selector reaches the button with a class and an element, so it outranks the `Button`
- * base's own `justify-center` without needing `!important`.
+ * The box is still anchored on the row's end inset, so the floor grows it leftward, but the glyph
+ * is now centred in it. Measured in a browser at a 390px viewport: a 48x48 box from x=326 to
+ * x=374. The box is transparent at rest and paints `--danger-soft` across all 48px on press, so
+ * end-alignment showed the wash as 22px left of the 18px glyph against 8px right of it; centred,
+ * each side carries `(48 - 18) / 2` = 15px and the glyph's centre is the box's centre exactly. The
+ * cost is 7px: the glyph's trailing gap goes from 8px (`--s2`) to 15px. The variant selector
+ * reaches the button with a class and an element, so it outranks the `Button` base's own
+ * `justify-center` (0,3,0 against 0,1,0) without needing `!important` — the two now agree.
  *
  * The floor adds no row height because of the negative block margin: a `--tap` box in flow is
  * taller than the row's content box (`--row-min-height` less `2 × --s3` = 32px), so the box hands
@@ -145,7 +148,7 @@ const rowSlotStyles = cx(
   '[&>form]:flex',
   '[&>form>.ui-btn--danger]:h-auto [&>form>.ui-btn--danger]:min-h-[var(--tap)]',
   '[&>form>.ui-btn--danger]:w-auto [&>form>.ui-btn--danger]:min-w-[var(--tap)]',
-  '[&>form>.ui-btn--danger]:justify-end',
+  '[&>form>.ui-btn--danger]:justify-center',
   '[&>form>.ui-btn--danger]:-my-[var(--s2)]',
   '[&>form>.ui-btn--danger]:p-[var(--s2)]',
   '[&>form>.ui-btn--danger]:rounded-[var(--r-md)]',
@@ -354,11 +357,7 @@ function titleNodeFor(
         done && doneTitleStyles,
       )}
     >
-      {carriesAction ? (
-        <span className={actionTitleStylesFor(title)}>{title}</span>
-      ) : (
-        title
-      )}
+      {carriesAction ? <span className={actionTitleStylesFor(title)}>{title}</span> : title}
       {carriesAction && (
         <span className={cx('ui-list-item__title-action', actionStyles)}>{titleAction}</span>
       )}
@@ -559,19 +558,20 @@ export function ListItem({
     </span>
   );
 
-  const childBody = variant === 'nested' ? (
-    <span
-      className={cx(
-        'ui-list-item__nested-body',
-        nestedBodyStyles,
-        flags.carriesAction && nestedBodyActionInsetStyles,
-      )}
-    >
-      {children}
-    </span>
-  ) : (
-    children
-  );
+  const childBody =
+    variant === 'nested' ? (
+      <span
+        className={cx(
+          'ui-list-item__nested-body',
+          nestedBodyStyles,
+          flags.carriesAction && nestedBodyActionInsetStyles,
+        )}
+      >
+        {children}
+      </span>
+    ) : (
+      children
+    );
 
   return (
     <li className={cx(rowHookClassesFor(flags), rowStyleClassesFor(flags), className)} {...rest}>
