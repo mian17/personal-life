@@ -280,12 +280,18 @@ function decodeCiphertextTodoRowList(raw: unknown): CachedTodoRow[] {
   return raw;
 }
 
-/** The completion log's cached row shape — rows as persisted, no content column. */
+/**
+ * The completion log's cached row shape — rows as persisted, including the sealed
+ * `title` snapshot (`null` when no rename has happened since the tick). The snapshot
+ * is ciphertext exactly like `todo.title`, so it is inside the at-rest boundary the
+ * cache contract draws, and it carries no plaintext a Redis reader could read.
+ */
 interface CachedCompletionRow {
   id: string;
   todoId: string;
   occurrence: string;
   completedAt: string;
+  title: string | null;
 }
 
 function isCompletionRow(row: CachedCompletionRow): boolean {
@@ -293,7 +299,8 @@ function isCompletionRow(row: CachedCompletionRow): boolean {
     typeof row?.id === 'string' &&
     typeof row?.todoId === 'string' &&
     typeof row?.occurrence === 'string' &&
-    typeof row?.completedAt === 'string'
+    typeof row?.completedAt === 'string' &&
+    (row.title === null || typeof row.title === 'string')
   );
 }
 
@@ -304,13 +311,14 @@ function decodeCompletionRows(raw: unknown): CachedCompletionRow[] {
   return raw;
 }
 
-/** Serialize a completion entity into its cached row form (no content column). */
+/** Serialize a completion entity into its cached row form (rows as persisted). */
 function toCachedCompletionRow(completion: TodoCompletion): CachedCompletionRow {
   return {
     id: completion.id,
     todoId: completion.todoId,
     occurrence: completion.occurrence,
     completedAt: completion.completedAt,
+    title: completion.title ?? null,
   };
 }
 
@@ -907,6 +915,17 @@ export class TodosService {
     const todo = await this.loadOriginTodo(principal.sub, origin);
     if (todo.done) throw new ConflictException('cannot rename a completed todo');
 
+    // A repeating todo never reads `done = true` after a tick — it logs the
+    // occurrence and advances — so the guard above cannot see that a past day was
+    // already completed under this title. Snapshot it FIRST: every completion row of
+    // this todo that still carries no title takes the row's CURRENT sealed title,
+    // which is the number the owner was looking at when they ticked it. A row that
+    // already holds a snapshot is left alone (a rename never overwrites history it
+    // has already frozen), and a completion logged AFTER this rename stays NULL and
+    // therefore reads the live title — correct, because it happened at the new
+    // number.
+    await this.snapshotCompletionTitles(principal.sub, todo);
+
     // Conditional on `done = false` in the WHERE, so a tick that lands between the
     // read above and this write cannot slip a finished task past the check: the
     // database answers "nothing matched" and the refusal stands.
@@ -923,6 +942,29 @@ export class TodosService {
     // Bump AFTER a write that happened: a refused rename never reaches here.
     await this.cache.bumpGeneration(principal.sub);
     return this.originatedTodoView(todo);
+  }
+
+  /**
+   * Freeze the title a todo's done occurrences were finished under, for the rows that
+   * have not been frozen yet. Returns how many rows took a snapshot.
+   *
+   * Only NULL rows are written, so running this on every rename is idempotent and
+   * never rewrites a snapshot an earlier rename created. The value is the row's own
+   * stored envelope, copied verbatim — no re-seal, so it decrypts under the same AAD
+   * (`todoTitleAad(sub, todo.id)`) that `findCompletions` reads it with.
+   */
+  private async snapshotCompletionTitles(sub: string, todo: Todo): Promise<number> {
+    const written = await this.dataSource
+      .getRepository(TodoCompletion)
+      .createQueryBuilder()
+      .update(TodoCompletion)
+      .set({ title: todo.title })
+      .where('ownerSub = :sub AND todoId = :todoId AND title IS NULL', {
+        sub,
+        todoId: todo.id,
+      })
+      .execute();
+    return written.affected ?? 0;
   }
 
   /**
@@ -1269,12 +1311,18 @@ export class TodosService {
 
     const completions: TodoCompletionDto[] = page.map((row) => {
       const todo = byId.get(row.todoId)!;
+      // The title this occurrence was finished under: the snapshot a rename froze,
+      // or the live title when no rename has happened since (a completion logged
+      // after a rename is genuinely done at the new number, so NULL is correct).
+      // Both are the same `enc.v1.` envelope under the same AAD, so one decrypt
+      // covers either source.
+      const sealedTitle = row.title ?? todo.title;
       return {
         id: row.id,
         todoId: row.todoId,
         occurrence: row.occurrence,
         completedAt: row.completedAt,
-        title: this.openField(todo.title, dek!, todoTitleAad(sub, row.todoId), row.todoId),
+        title: this.openField(sealedTitle, dek!, todoTitleAad(sub, row.todoId), row.todoId),
         listId: todo.listId,
         listName: todo.listId !== null ? (names.get(todo.listId) ?? null) : null,
       };

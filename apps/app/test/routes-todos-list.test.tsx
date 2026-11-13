@@ -170,7 +170,9 @@ describe('/todos list page wiring', () => {
     );
     // The repeating todo's ticked occurrence is a done row with no `Todo` row of its own.
     mockedListTodoCompletions.mockResolvedValue({
-      completions: [completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' })],
+      completions: [
+        completion({ id: 'c1', todoId: 'rep', title: 'Water plants', occurrence: '2026-10-01' }),
+      ],
       nextCursor: null,
       total: 1,
     });
@@ -327,7 +329,14 @@ describe('/todos scroll island', () => {
   const loadPage = jest.fn<Promise<TodoPage>, [string]>();
 
   const repeating = todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: TODAY });
-  const ticked = completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' });
+  // The occurrence was ticked before any target change, so its frozen title is the same
+  // one the live row carried — the API serves the snapshot, and here they agree.
+  const ticked = completion({
+    id: 'c1',
+    todoId: 'rep',
+    occurrence: '2026-10-01',
+    title: 'Water plants',
+  });
 
   function island(props: { nextCursor: string | null; completions: TodoCompletion[] }): string {
     return renderToStaticMarkup(

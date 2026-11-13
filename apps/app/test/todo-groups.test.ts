@@ -120,6 +120,27 @@ describe('groupTodos', () => {
     });
   });
 
+  it('renders a done occurrence with the title it was finished under, not the live one', () => {
+    // A target change renames the live task; the occurrence the owner already ticked
+    // keeps the number it was ticked against, because rewriting it would falsify what
+    // they did (the completion's `title` is that frozen snapshot, served by the API).
+    const repeating = { ...todo('rep', '2026-11-14'), title: 'Eat Breakfast to reach 2500 kcal' };
+    const ticked = {
+      ...completion('c1', 'rep'),
+      occurrence: '2026-11-13',
+      title: 'Eat Breakfast to reach 2200 kcal',
+    };
+
+    const done = groupTodos([repeating], TODAY, [ticked]).find((g) => g.key === 'done')!;
+
+    expect(done.todos[0]).toMatchObject({
+      id: 'rep',
+      done: true,
+      dueDate: '2026-11-13',
+      title: 'Eat Breakfast to reach 2200 kcal',
+    });
+  });
+
   it("skips a done todo's completion (its own struck row is already there)", () => {
     const grouped = groupTodos([todo('d', '2026-09-01', true)], TODAY, [completion('c1', 'd')]);
     const done = grouped.find((g) => g.key === 'done')!;
