@@ -1,16 +1,17 @@
 # personal-life — Project Profile & Contracts
 
 ## Project Profile
-| Knob | Value |
-|---|---|
-| `typecheck` | `npm run typecheck` (workspace-aware; run in the touched workspace) |
-| `unit-test` | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace) |
-| `e2e-run` | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`) |
-| `max-test-runs` | 2 |
+
+| Knob              | Value                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typecheck`       | `npm run typecheck` (workspace-aware; run in the touched workspace)                                                                                                                                                                                                                                                                                        |
+| `unit-test`       | `npm run test:unit -- <file>` from the owning workspace (jest; every workspace exposes `typecheck`/`test:unit` — tasks add the scripts when they create or touch a workspace)                                                                                                                                                                              |
+| `e2e-run`         | `npx playwright test --config apps/app/playwright.config.ts <file> -g "<name>"` (dev mode: `playwright.dev.config.ts`)                                                                                                                                                                                                                                     |
+| `max-test-runs`   | 2                                                                                                                                                                                                                                                                                                                                                          |
 | `frozen-surfaces` | PWA constants (`public/manifest-*.json`, `viewport.themeColor`) — always frozen; e2e selector surface (roles, visible text, aria-labels, `button.trash-delete`) and token values (`packages/ui/test/tokens.test.ts` is the value table) — frozen by default, released per-run by an explicit intent that names them and moves the tests in the same commit |
-| `hard-lines` | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them) |
-| `lessons` | `docs/lessons/` |
-| `base-branch` | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main` |
+| `hard-lines`      | data directories, secrets, ports; production deploys and production data migrations (plan + document checklist — the human runs them)                                                                                                                                                                                                                      |
+| `lessons`         | `docs/lessons/`                                                                                                                                                                                                                                                                                                                                            |
+| `base-branch`     | `dev` — every branch is cut from `origin/dev` and every PR targets `dev`; never `main`                                                                                                                                                                                                                                                                     |
 
 Process rules (role, testing policy, delegation, template, review, skills, branch/autonomy,
 thinking discipline) are in the global protocol at `~/.pi/agent/AGENTS.md`.
@@ -24,14 +25,14 @@ itself lives there and is not copied here — a second copy drifts from the firs
 This repo contributes the values below and the two plan-field bullets from the
 contracts, so a lane never has to guess what a slot should say.
 
-| Template slot | Where the value comes from |
-|---|---|
-| `[VERIFICATION & TESTING RULES]` → `Permitted test command` | the profile's `unit-test` row — `npm run test:unit -- <file>` from the owning workspace |
-| `[VERIFICATION & TESTING RULES]` → `max test executions` | the profile's `max-test-runs` row, `2` |
-| `[DEFINITION OF DONE]` → typecheck box | the profile's `typecheck` row — `npm run typecheck` in the touched workspace |
-| `[IMPLEMENTATION REQUIREMENTS]` | the profile's `frozen-surfaces` row, named as paths the lane may not change, and the `hard-lines` row for anything the human has to run |
-| `[SCOPE & REPOSITORY CONTEXT]` | the profile's `base-branch` row — the worktree is cut from `origin/dev`, so the prompt names that branch and never `main` |
-| `[IMPLEMENTATION REQUIREMENTS]` → plan fields | Contract 1's delegation plan fields for a UI task (the primitive reuse plan) and Contract 2's for a backend service task (the cache plan) |
+| Template slot                                               | Where the value comes from                                                                                                                |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `[VERIFICATION & TESTING RULES]` → `Permitted test command` | the profile's `unit-test` row — `npm run test:unit -- <file>` from the owning workspace                                                   |
+| `[VERIFICATION & TESTING RULES]` → `max test executions`    | the profile's `max-test-runs` row, `2`                                                                                                    |
+| `[DEFINITION OF DONE]` → typecheck box                      | the profile's `typecheck` row — `npm run typecheck` in the touched workspace                                                              |
+| `[IMPLEMENTATION REQUIREMENTS]`                             | the profile's `frozen-surfaces` row, named as paths the lane may not change, and the `hard-lines` row for anything the human has to run   |
+| `[SCOPE & REPOSITORY CONTEXT]`                              | the profile's `base-branch` row — the worktree is cut from `origin/dev`, so the prompt names that branch and never `main`                 |
+| `[IMPLEMENTATION REQUIREMENTS]` → plan fields               | Contract 1's delegation plan fields for a UI task (the primitive reuse plan) and Contract 2's for a backend service task (the cache plan) |
 
 Two rules sit in every prompt's `[IMPLEMENTATION REQUIREMENTS]`, in addition to the
 slots above:
@@ -169,6 +170,7 @@ a visual element and Rule 3 applies.
 - No `.tsx` in `apps/*` re-implements a `packages/ui` component's markup.
 
 **Delegation plan fields (consumed by the global subagent template):**
+
 - UI task → include a "Primitive reuse plan": which `@life/ui` primitives compose this,
   element by element. Any gap goes upstream per Rule 3 of this contract — never patched
   around in the app, never solved with raw HTML.
@@ -243,6 +245,7 @@ improvised at implementation time.
   post-decrypt (`content-match.ts` pattern).
 
 **Delegation plan fields (consumed by the global subagent template):**
+
 - Backend service task → include a "Cache plan": the cached shapes, key composition,
   invalidation, and failure mode this task implements — or the spec's `## Cache Rules`
   section it fulfils. Any gap goes upstream per Rule 4 of this contract — never a
