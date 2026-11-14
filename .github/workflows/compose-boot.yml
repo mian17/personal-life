@@ -1,0 +1,179 @@
+# Boots the real Docker Compose stack and fails when any service does not reach
+# healthy. This is the only place in CI where the deployed artifact is exercised —
+# every other workflow tests source, not the thing that ships.
+#
+# Why it is worth 6-10 minutes of runner time: on 2026-11-14 three features shipped
+# dead in production despite a green test run, because nothing in CI had ever run
+# the deployment. `MEAL_TODOS_API_URL` and `FOCUS_TODOS_API_URL` were missing from
+# the deployed env (503 + an outbox poller that never delivered) and
+# `OIDC_PRODUCER_*` was missing from the IdP (it refused to boot under
+# NODE_ENV=production). A static check covers the first two — they are named
+# literally. It CANNOT cover the IdP one: the IdP composes the setting name at
+# runtime (`OIDC_PRODUCER_${producerName.toUpperCase().replaceAll('-', '_')}_REDIRECT_URIS`,
+# apps/idp/src/oidc/clients.ts), so no grep and no type error sees a missing value.
+# A boot crash is only visible by booting. That is this job's entire reason to exist.
+name: Compose boot
+
+on:
+  pull_request:
+    # Same pairing as Tests: a `dev -> main` promotion is a real PR carrying the
+    # same diff to the release line, and it is the only PR that reaches production.
+    branches: [dev, main]
+  # A push to the integration line re-proves the stack on what everyone will
+  # branch from next, which is where a bad merge would otherwise go unnoticed.
+  push:
+    branches: [dev]
+  # Manual run for reproducing a failure without pushing a commit.
+  workflow_dispatch:
+
+# One run per PR, the same shape as Tests. A new push supersedes the previous run,
+# which is pointless to finish and expensive to let run — this job builds eight
+# images. The group is per-PR so cancelling one run can never kill another PR's.
+concurrency:
+  group: compose-boot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot:
+    # GitHub-hosted runner: Docker and Compose v2 are preinstalled on
+    # `ubuntu-latest`, which is all this job needs. No self-hosted state, no
+    # secrets — the env file is generated from throwaway CI values below.
+    runs-on: ubuntu-latest
+    # Eight image builds plus a full-stack boot. Tight enough that a hung build
+    # cannot bill a long run, generous enough not to kill a slow one.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Matches Tests byte-for-byte so a dependency bump cannot pass one workflow
+      # and fail the other. Not load-bearing for the images themselves — each
+      # Dockerfile runs its own `npm ci` inside the build — so this step is the
+      # cheapest place to drop minutes if the job ever needs to shrink.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=60000 --fetch-timeout=300000
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_REPLACE_REGISTRY_HOST: always
+
+      # The stack fails fast on eight required variables, and two more compose
+      # forwards with an empty default that the services then reject at boot — see
+      # the generator's header for the full list and the rule it applies: every
+      # variable the stack is REQUIRED to have at boot, not merely every variable
+      # interpolation requires. Values are throwaway and never printed; the script
+      # emits the path it wrote so later steps use one deterministic file.
+      - name: Generate CI env file
+        id: env
+        run: |
+          env_file=$(scripts/ci-compose-env.sh)
+          echo "path=$env_file" >> "$GITHUB_OUTPUT"
+
+      # Cheapest possible failure: interpolation errors (a missing secret, a
+      # misparsed YAML anchor) surface in about a second, before anything is built.
+      - name: Validate compose configuration
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: docker compose --env-file "$ENV_FILE" config >/dev/null
+
+      # The eight built images. Split from `up` on purpose: a build failure reads
+      # as a build failure in the log, not as a boot timeout.
+      - name: Build images
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: docker compose --env-file "$ENV_FILE" build
+
+      # `--wait` is what turns "unhealthy" into a failed step: compose blocks until
+      # every service with a healthcheck reports healthy and exits non-zero
+      # otherwise. A sleep-then-curl would pass a stack that never became healthy,
+      # which is exactly the class of defect this job is here for.
+      - name: Boot the stack and wait for health
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: docker compose --env-file "$ENV_FILE" up -d --wait --wait-timeout 300
+
+      # `--wait` already gates on healthchecks, so this step is not redundant: it
+      # proves the services can reach EACH OTHER over the compose network (a
+      # container-local fetch), which a host-side curl cannot show. A stack where
+      # every container is healthy in isolation and cannot reach a peer is the
+      # 2026-11-14 shape.
+      - name: Assert every backend's own readiness from inside its container
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: |
+          set -uo pipefail
+          failed=0
+          for target in note-service:3001 tags-service:3004 todo-service:3005 \
+                        feedback-service:3008 meal-service:3106 focus-service:3107 idp:3003; do
+            service=${target%%:*}
+            port=${target##*:}
+            code=$(docker compose exec -T "$service" node -e \
+              "fetch('http://127.0.0.1:$port/health/ready').then((r)=>console.log(r.status)).catch(()=>console.log('no-response'))" \
+              2>/dev/null | tr -dc '0-9a-z-')
+            if [ "$code" = "200" ]; then
+              echo "ok    $service /health/ready $code"
+            else
+              echo "FAIL  $service /health/ready $code (want 200)"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      # The two endpoints published on host loopback. `app` declares no healthcheck
+      # (it is the last dependency, not a target), so a session-less request is the
+      # readiness proof that exists: the proxy answers 307 to /auth/login. Checking
+      # the code rather than "any response" is deliberate — a 500 means the BFF boot
+      # passed and its first request did not, which is the failure that shipped.
+      - name: Assert the host-published endpoints
+        run: |
+          set -uo pipefail
+          failed=0
+          check() {
+            got=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$1" || echo 000)
+            if [ "$got" = "$2" ]; then
+              echo "ok    $1 $got"
+            else
+              echo "FAIL  $1 $got (want $2)"
+              failed=1
+            fi
+          }
+          # 307: no session yet, so the app redirects to the login dance.
+          check http://127.0.0.1:3002/ 307
+          check http://127.0.0.1:3003/health/ready 200
+          exit "$failed"
+
+      # A red job that does not say why wastes the next person's hour, so this dump
+      # cannot be skipped by a failed earlier step: `if: always()` is what makes it
+      # run on every failure path. It prints on green runs too, which is the cost of
+      # never missing the one run that needed it. The health status dump is the part
+      # `ps` alone hides — a service can be `Up` and still report `unhealthy`.
+      - name: Dump diagnostics
+        if: always()
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: |
+          echo '--- docker compose ps ---'
+          docker compose ps || true
+          echo '--- health status per container ---'
+          for id in $(docker compose ps -q || true); do
+            docker inspect --format '{{.Name}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$id" || true
+          done
+          echo '--- logs (tail 200 per service) ---'
+          docker compose logs --tail=200 --no-color || true
+
+      # Teardown always runs, including after a failed boot, so a red run cannot
+      # hold runner resources or leak named volumes into a cached workspace. `-v`
+      # because the volumes hold throwaway state; keeping them would only make a
+      # re-run inherit a half-initialised Postgres.
+      - name: Tear down
+        if: always()
+        env:
+          ENV_FILE: ${{ steps.env.outputs.path }}
+        run: |
+          # Falls back to the default `.env` for the case where the generator step
+          # itself failed and produced no path. `|| true` on purpose: a teardown
+          # problem must never mask the failure that brought us here.
+          docker compose --env-file "${ENV_FILE:-.env}" down -v --remove-orphans || true
