@@ -590,7 +590,7 @@ const DOT_READ = /process\.env\.([A-Za-z_$][\w$]*)/g;
 const BRACKET_READ = /process\.env\[([A-Za-z_$][\w$]*)\]/g;
 
 /** `const NAME = 'VALUE'` — the only indirection a bracket read may resolve through. */
-const NAMED_CONSTANT = /const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*'([A-Za-z0-9_]+)'/g;
+const NAMED_CONSTANT = /const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*'(\w+)'/g;
 
 /** A `??` or `||` anywhere after the read gives it an answer, so it is not hard. */
 const FALLBACK = /\?\?|\|\|/;
@@ -601,7 +601,7 @@ const FALLBACK = /\?\?|\|\|/;
  * image (the Dockerfile copies `dist` only), and `node_modules`/`dist` are build
  * output.
  */
-const NOT_SHIPPED = ['node_modules', 'dist', 'test', 'scripts'];
+const NOT_SHIPPED = new Set(['node_modules', 'dist', 'test', 'scripts']);
 
 /** Every `.ts`/`.tsx` file an app ships, or none when it has none. */
 function sourceFiles(directory) {
@@ -609,7 +609,7 @@ function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      return NOT_SHIPPED.includes(entry.name) ? [] : sourceFiles(path);
+      return NOT_SHIPPED.has(entry.name) ? [] : sourceFiles(path);
     }
     return /\.tsx?$/.test(entry.name) ? [path] : [];
   });
