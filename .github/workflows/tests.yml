@@ -153,6 +153,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Architecture rules that a static read can prove (`scripts/arch-check.mjs`):
+      # one database per service, the designated engine, no cross-service store
+      # access, and every variable a service cannot boot without forwarded in
+      # compose.yaml. Build-free and reads `compose.yaml` plus sources, so it runs
+      # here in seconds — before the coverage run, whose suites take minutes. This
+      # is the only gate that reads compose.yaml: three production features shipped
+      # dead on 2026-11-14 (`MEAL_TODOS_API_URL`, `FOCUS_TODOS_API_URL`,
+      # `OIDC_PRODUCER_*`) because nothing in CI compared the code with the file.
+      - name: Architecture rules
+        run: npm run arch:check
+
       # Suites that boot a sqlite service need a writable data directory, and
       # those directories are gitignored, so a fresh checkout has none.
       - name: Prepare test data directories
