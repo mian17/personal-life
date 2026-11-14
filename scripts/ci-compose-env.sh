@@ -30,6 +30,10 @@
 #                              value also leaves the app without a callback
 #   IDP_ISSUER                 app rejects an unset issuer (requireAbsoluteUrl);
 #                              the IdP itself defaults, the app does not
+#   OWNER_LOGIN                the app's ACCESS gate compares the forwarded
+#                              `tailscale-user-login` against it. Undefined, the
+#                              gate refuses every request, so the assertion that
+#                              reaches the IDENTITY gate has nothing to match
 #
 # Destination is `<repo>/.env` and not a name of the caller's choosing:
 # compose.yaml pins `env_file: .env` on all eight built services, so any other
@@ -105,7 +109,14 @@ OIDC_PRODUCER_PRODUCER_B_REDIRECT_URIS=http://localhost:8080/cb,http://127.0.0.1
 # IdP defaults each of them, the app does not.
 OIDC_APP_REDIRECT_URI=http://127.0.0.1:3002/auth/callback
 IDP_ISSUER=http://127.0.0.1:3003
+
+# --- app: the owner the ACCESS gate admits --------------------------------
+# The app's Tailscale ACCESS gate compares the 'tailscale-user-login' header against
+# this value. It is a CI fixture, not a secret: nothing is served to it beyond the
+# gate's own answer, and the compose-boot job sends the matching header to prove the
+# gate lets the owner through to the IDENTITY gate instead of refusing.
+OWNER_LOGIN=ci-compose-boot@example.com
 EOF
 
-echo "wrote $DEST (13 variables, values not printed)" >&2
+echo "wrote $DEST (14 variables, values not printed)" >&2
 echo "$DEST"

@@ -146,25 +146,42 @@ jobs:
 
       # The two endpoints published on host loopback. `app` declares no healthcheck
       # (it is the last dependency, not a target), so its own response is the
-      # readiness proof that exists — and for the app the correct answer is 403, not
-      # 200. That is the security gate working, not a defect, so asserting 403 is a
-      # security assertion: the app must NOT be openly reachable from a machine that
-      # did not come through Tailscale Serve. An openly-200 app would be the failure.
-      # Checking the code rather than "any response" is deliberate — a 500 means the
-      # BFF boot passed and its first request did not, which is the failure that shipped.
+      # readiness proof that exists — and for the app the correct answer depends on
+      # which gate the request reaches. That is the security gate working, not a
+      # defect, so asserting codes here is a security assertion: the app must NOT be
+      # openly reachable from a machine that did not come through Tailscale Serve. An
+      # openly-200 `/` would be the failure. Checking the code rather than "any
+      # response" is deliberate — a 500 means the BFF boot passed and its first
+      # request did not, which is the failure that shipped.
+      #
+      # Two gates, in order (apps/app/lib/auth/gate.ts), so proving the second one
+      # needs a request that satisfies the first: `check` therefore takes extra curl
+      # args, and the identity assertions replay the header Tailscale Serve would set.
       - name: Assert the host-published endpoints
+        env:
+          # The value the container actually received, read back from the file compose
+          # loads as `env_file:` — not a copy pasted here, which would let the fixture
+          # and the assertion drift apart.
+          ENV_FILE: ${{ steps.env.outputs.path }}
         run: |
           set -uo pipefail
           failed=0
+          # Beyond URL and wanted code, everything is passed through to curl, so a
+          # call may add the `-H` headers a gated path needs. No redirect following:
+          # the app's 307 to /auth/login is the answer being asserted.
           check() {
-            got=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$1" || echo 000)
-            if [ "$got" = "$2" ]; then
-              echo "ok    $1 $got"
+            url=$1
+            want=$2
+            shift 2
+            got=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$@" "$url" || echo 000)
+            if [ "$got" = "$want" ]; then
+              echo "ok    $url $got${*:+ [$*]}"
             else
-              echo "FAIL  $1 $got (want $2)"
+              echo "FAIL  $url $got (want $want)${*:+ [$*]}"
               failed=1
             fi
           }
+          owner=$(sed -n 's/^OWNER_LOGIN=//p' "$ENV_FILE")
           # 403: compose runs the app with NODE_ENV=production, so Next sets
           # `x-forwarded-host` and the ACCESS gate arms (apps/app/lib/auth/gate.ts:66).
           # The gate then demands a `tailscale-user-login` matching OWNER_LOGIN, and a
@@ -172,13 +189,29 @@ jobs:
           # the deploy shape we want: traffic that skipped Tailscale Serve is refused.
           check http://127.0.0.1:3002/ 403
           check http://127.0.0.1:3003/health/ready 200
-          # Measured limitation, on purpose and not covered by this job: the app's
-          # IDENTITY gate (gate.ts:77 — redirect to /auth/login when there is no
-          # session) cannot be reached from here, because every request 403s at the
-          # ACCESS gate first. Reaching identity needs a login the app accepts, and
-          # `scripts/ci-compose-env.sh` writes no OWNER_LOGIN — so the container's
-          # ownerLogin is undefined whatever header CI sends. Proving identity here
-          # means the generator writing OWNER_LOGIN; that is a separate change.
+          # 307: the same request, now carrying what Tailscale Serve would forward. The
+          # ACCESS gate accepts the owner (gate.ts:69-70 no longer returns 'forbidden'),
+          # the path is not public, there is no session cookie, so the IDENTITY gate
+          # answers 'redirect-login' (gate.ts:77) and the app sends the visitor to
+          # /auth/login. A 403 here means OWNER_LOGIN did not reach the container — the
+          # ACCESS gate never saw an owner to match — not that identity is broken.
+          check http://127.0.0.1:3002/ 307 \
+            -H 'x-forwarded-host: localhost' \
+            -H "tailscale-user-login: $owner"
+          # 200: the same two headers, on a public path, so BOTH gates are genuinely
+          # evaluated and both say yes. `/icon.svg` is in `PUBLIC_EXACT` (gate.ts:33), so
+          # the IDENTITY gate returns 'next' with no session, and it exists in
+          # `apps/app/public/` so the static handler serves it. Which path matters: the
+          # proxy matcher (`apps/app/proxy.ts:66`) strips `favicon.ico` and `_next/*`
+          # BEFORE decideGate runs, so a path it excludes would answer without the gate
+          # ever deciding — that is why this is /icon.svg and not the favicon. (gate.ts:22
+          # still lists /favicon.ico, which is dead for the proxy but live for the unit
+          # test, so the unit suite does not catch that trap.) 307 on `/` plus 200 here
+          # reads as "access granted, identity required", and rules out the reading that
+          # the 307 came from a request that never got past ACCESS at all.
+          check http://127.0.0.1:3002/icon.svg 200 \
+            -H 'x-forwarded-host: localhost' \
+            -H "tailscale-user-login: $owner"
           exit "$failed"
 
       # A red job that does not say why wastes the next person's hour, so this dump
