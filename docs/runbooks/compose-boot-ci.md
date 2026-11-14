@@ -26,24 +26,47 @@ const setting = `OIDC_PRODUCER_${producerName.toUpperCase().replaceAll('-', '_')
 No grep, type check or lint sees a missing value there. A boot crash is only
 visible by booting, and this job is the only place in CI that boots.
 
-## Why the app assertion expects 403
+## What the app assertions prove
 
-The `Assert the host-published endpoints` step requires `403` from
-`http://127.0.0.1:3002/`. That is correct, and it is a **security** assertion
-rather than a smoke test. Compose sets `NODE_ENV=production` on the app, Next sets
-`x-forwarded-host` in that mode, so the ACCESS gate arms
-(`apps/app/lib/auth/gate.ts:66`) and demands a `tailscale-user-login` that matches
-`OWNER_LOGIN`. A CI curl sends no such header, so the gate returns `forbidden`.
-The app refuses traffic that did not arrive through Tailscale Serve, which is the
-fail-closed behavior we want. A stack where this request answered 200 would be the
-security failure, not a healthier deployment.
+The `Assert the host-published endpoints` step makes three assertions against
+`http://127.0.0.1:3002`, and together they separate the two gates that
+`apps/app/lib/auth/gate.ts` runs in order.
 
-**Known limitation:** the app's IDENTITY gate (redirect to `/auth/login` when a
-request has no session) is *not* proven here. Every request is refused at the
-ACCESS gate first, and it cannot be satisfied because
-`scripts/ci-compose-env.sh` writes no `OWNER_LOGIN` — the container's `ownerLogin`
-is undefined no matter which header CI sends. Covering identity needs the generator
-to write an `OWNER_LOGIN`; that is a separate change.
+| Request | Want | What it proves |
+|---|---|---|
+| `GET /`, no headers | **403** | ACCESS arms and fails closed. Compose sets `NODE_ENV=production`, Next sets `x-forwarded-host`, and the gate demands a `tailscale-user-login` matching `OWNER_LOGIN`; a CI curl sends none, so it returns `forbidden` (`gate.ts:66`, `gate.ts:69-70`). A 200 here would be the security failure. |
+| `GET /`, `x-forwarded-host: localhost`, `tailscale-user-login: <OWNER_LOGIN>` | **307** | ACCESS admits the owner, and IDENTITY redirects an unauthenticated visitor: the path is not public and there is no session cookie, so the gate answers `redirect-login` (`gate.ts:76-77`) and the app sends the browser to `/auth/login`. |
+| `GET /icon.svg`, the same two headers | **200** | Both gates are genuinely evaluated and both say yes. `/icon.svg` is in `PUBLIC_EXACT` (`gate.ts:33`), so IDENTITY returns `next` with no session, and the file exists in `apps/app/public/`, so the static handler serves it. 307 on `/` **plus** 200 here is the pair that reads as "access granted, identity required". |
+
+Which public path is used for the third assertion is not arbitrary. The proxy's matcher
+(`apps/app/proxy.ts:66`) excludes `favicon.ico` and `_next/*` before `decideGate` runs at
+all, so a path it excludes would answer without either gate deciding — a green result
+that proves nothing. That is why the assertion uses `/icon.svg` and not the favicon, and
+why `gate.ts`'s own `PUBLIC_EXACT` entry for `/favicon.ico` is dead for the proxy while
+remaining live for the unit suite (`apps/app/test/gate.test.ts:143`) — the unit test
+therefore cannot catch that trap.
+
+`OWNER_LOGIN` is written by `scripts/ci-compose-env.sh` as a throwaway CI fixture
+(`ci-compose-boot@example.com`) and reaches the container through the `env_file: .env`
+every service already declares, which `apps/app/proxy.ts:42` reads into the gate. No
+compose change was needed. The step reads the value back out of that generated file
+instead of duplicating the literal, so fixture and assertion cannot drift.
+
+A 403 on the second assertion does not mean identity is broken — it means
+`OWNER_LOGIN` did not reach the container, so ACCESS never had an owner to match. The
+comment above that assertion says so, because that is the half that would break after
+a fixture edit.
+
+All three are inert GETs: no session cookie is sent, no state is written, nothing is
+POSTed and the IdP is never asked for a token.
+
+## What is still not proven
+
+A **completed interactive login** is not exercised: no token exchange with the IdP, no
+session cookie written, no authenticated page served. Proving that needs a real browser
+or a scripted PKCE flow against the running IdP, which is out of scope for a job whose
+purpose is to boot the deployed shape and check its gates answer correctly. So this job
+proves the gates' *decisions*, not the sign-in journey.
 
 ## Cost
 
@@ -106,13 +129,21 @@ for s in note-service:3001 tags-service:3004 todo-service:3005 \
     "fetch('http://127.0.0.1:$p/health/ready').then(r=>console.log(r.status)).catch(()=>console.log('fail'))"
 done
 
-# 5. Host-published endpoints. The app's correct answer is 403, not a redirect:
-#    compose sets NODE_ENV=production, Next sets `x-forwarded-host`, and the ACCESS
-#    gate (apps/app/lib/auth/gate.ts:66) then refuses traffic with no
-#    `tailscale-user-login` — fail-closed. An openly-200 app would be the security
-#    failure this check exists to catch.
+# 5. Host-published endpoints, all three app gates. The first curl's correct answer is
+#    403, not 200: compose sets NODE_ENV=production, Next sets `x-forwarded-host`, and
+#    the ACCESS gate (apps/app/lib/auth/gate.ts:66) refuses traffic with no
+#    `tailscale-user-login` — fail-closed. The next two replay what Tailscale Serve would
+#    forward, using the OWNER_LOGIN your .env declares: 307 on `/` is IDENTITY asking for
+#    a login, 200 on /icon.svg (a public path, and not one the proxy matcher skips) is
+#    both gates letting it through. An openly-200 `/` would be the security failure this
+#    check catches.
 curl -s -o /dev/null -w 'app %{http_code}\n' http://127.0.0.1:3002/    # want 403
 curl -s -o /dev/null -w 'idp %{http_code}\n' http://127.0.0.1:3003/health/ready  # want 200
+owner=$(sed -n 's/^OWNER_LOGIN=//p' .env)
+curl -s -o /dev/null -w 'app %{http_code}\n' http://127.0.0.1:3002/ \
+  -H 'x-forwarded-host: localhost' -H "tailscale-user-login: $owner"          # want 307
+curl -s -o /dev/null -w 'app %{http_code}\n' http://127.0.0.1:3002/icon.svg \
+  -H 'x-forwarded-host: localhost' -H "tailscale-user-login: $owner"          # want 200
 
 # 6. Teardown. -v removes the throwaway volumes.
 docker compose down -v --remove-orphans
