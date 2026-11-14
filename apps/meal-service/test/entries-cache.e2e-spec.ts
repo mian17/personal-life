@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
 import { NotFoundException } from '@nestjs/common';
-import { ENC_PREFIX } from '@life/crypto';
+import { ENC_PREFIX, decryptField } from '@life/crypto';
 import { NUTRIENTS, type NutrientVector } from '@life/nutrition';
 import { MealCache, generationKey } from '../src/cache/meal-cache.js';
-import { EntriesCache } from '../src/entries/entries-cache.js';
+import { EntriesCache, type CachedEntryRow } from '../src/entries/entries-cache.js';
 import { EntriesService } from '../src/entries/entries.service.js';
 import { MealTodoProducerService } from '../src/meal-todo/meal-todo-producer.service.js';
 import { KeysService } from '@life/service-kit';
@@ -42,6 +42,70 @@ const NO_PRODUCER = {
   ensureDailyTasks: async () => {},
   noteEntryLogged: async () => {},
 } as unknown as MealTodoProducerService;
+
+/**
+ * The eleven fields a cached row carries, sorted. `toCachedEntryRow` in
+ * `src/entries/entries-cache.ts` is the authority: a field dropped there would
+ * leave the read path guessing, so the exact list is asserted, never sampled.
+ */
+const CACHED_ROW_KEYS = [
+  'createdAt',
+  'date',
+  'deletedAt',
+  'foodId',
+  'id',
+  'mealGroup',
+  'nutrients',
+  'ownerSub',
+  'quantity',
+  'updatedAt',
+  'version',
+];
+
+/**
+ * `vector({ calories: 777, protein: 12 })` written out: the sealed snapshot is
+ * total, so every one of the 27 nutrients is spelled here and equality against
+ * this object is what proves the content field is the confirmed vector.
+ */
+const SNAPSHOT: NutrientVector = {
+  calories: 777,
+  fat: 0,
+  monounsaturatedFat: 0,
+  polyunsaturatedFat: 0,
+  saturatedFat: 0,
+  transFat: 0,
+  cholesterol: 0,
+  sodium: 0,
+  carbohydrates: 0,
+  fiber: 0,
+  sugar: 0,
+  protein: 12,
+  vitaminA: 0,
+  vitaminC: 0,
+  thiaminB1: 0,
+  riboflavinB2: 0,
+  niacinB3: 0,
+  folateB9: 0,
+  vitaminB6: 0,
+  vitaminB12: 0,
+  calcium: 0,
+  iron: 0,
+  magnesium: 0,
+  phosphorus: 0,
+  potassium: 0,
+  zinc: 0,
+  caffeine: 0,
+};
+
+/**
+ * Every row a Redis value holds. The day key holds a list of rows and the one
+ * key a single row, but both are `JSON.stringify` of the same persisted shape,
+ * so the ciphertext gate walks them through one code path.
+ */
+function cachedRows(value: string): CachedEntryRow[] {
+  const parsed = JSON.parse(value) as CachedEntryRow | CachedEntryRow[];
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
 
 /** A complete nutrient vector: `overrides` on top of zeroes. */
 function vector(overrides: Partial<NutrientVector> = {}): NutrientVector {
@@ -209,7 +273,25 @@ describe('MealCache (read-through + generation invalidation)', () => {
         expect(value).toContain(ENC_PREFIX);
         // No known plaintext of the snapshot reaches Redis.
         expect(value).not.toContain('calories');
-        expect(value).not.toContain('777');
+      }
+
+      // Both values hold the same fixture row: once in the day's list, once on
+      // its own. Structural equality replaces searching for a short literal
+      // ('777'), which random hex ids and base64url envelopes can spell by
+      // chance — the flake CI run 43573767565 hit.
+      const rows = client.values.flatMap(({ value }) => cachedRows(value));
+      expect(rows.map((row) => row.id)).toEqual([created.id, created.id]);
+
+      const dek = await h.keys.getDekForRead(SUB);
+      for (const row of rows) {
+        expect(Object.keys(row).sort()).toEqual(CACHED_ROW_KEYS);
+        expect(row.nutrients).toMatch(/^enc\.v1\./);
+        // The AAD is `entryNutrientsAad`'s string, which is module-private, so
+        // it is reconstructed here exactly as `entry-snapshot.test.ts` does.
+        const plaintext = JSON.parse(
+          decryptField(dek, row.nutrients, `life.v1|${row.ownerSub}|meal|entry|${row.id}`),
+        );
+        expect(plaintext).toEqual(SNAPSHOT);
       }
     });
 
