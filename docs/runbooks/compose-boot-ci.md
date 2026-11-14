@@ -26,6 +26,25 @@ const setting = `OIDC_PRODUCER_${producerName.toUpperCase().replaceAll('-', '_')
 No grep, type check or lint sees a missing value there. A boot crash is only
 visible by booting, and this job is the only place in CI that boots.
 
+## Why the app assertion expects 403
+
+The `Assert the host-published endpoints` step requires `403` from
+`http://127.0.0.1:3002/`. That is correct, and it is a **security** assertion
+rather than a smoke test. Compose sets `NODE_ENV=production` on the app, Next sets
+`x-forwarded-host` in that mode, so the ACCESS gate arms
+(`apps/app/lib/auth/gate.ts:66`) and demands a `tailscale-user-login` that matches
+`OWNER_LOGIN`. A CI curl sends no such header, so the gate returns `forbidden`.
+The app refuses traffic that did not arrive through Tailscale Serve, which is the
+fail-closed behavior we want. A stack where this request answered 200 would be the
+security failure, not a healthier deployment.
+
+**Known limitation:** the app's IDENTITY gate (redirect to `/auth/login` when a
+request has no session) is *not* proven here. Every request is refused at the
+ACCESS gate first, and it cannot be satisfied because
+`scripts/ci-compose-env.sh` writes no `OWNER_LOGIN` — the container's `ownerLogin`
+is undefined no matter which header CI sends. Covering identity needs the generator
+to write an `OWNER_LOGIN`; that is a separate change.
+
 ## Cost
 
 6–10 minutes: eight image builds plus a full-stack `up --wait`. The concurrency
@@ -87,8 +106,12 @@ for s in note-service:3001 tags-service:3004 todo-service:3005 \
     "fetch('http://127.0.0.1:$p/health/ready').then(r=>console.log(r.status)).catch(()=>console.log('fail'))"
 done
 
-# 5. Host-published endpoints: app redirects a session-less request to login.
-curl -s -o /dev/null -w 'app %{http_code}\n' http://127.0.0.1:3002/    # want 307
+# 5. Host-published endpoints. The app's correct answer is 403, not a redirect:
+#    compose sets NODE_ENV=production, Next sets `x-forwarded-host`, and the ACCESS
+#    gate (apps/app/lib/auth/gate.ts:66) then refuses traffic with no
+#    `tailscale-user-login` — fail-closed. An openly-200 app would be the security
+#    failure this check exists to catch.
+curl -s -o /dev/null -w 'app %{http_code}\n' http://127.0.0.1:3002/    # want 403
 curl -s -o /dev/null -w 'idp %{http_code}\n' http://127.0.0.1:3003/health/ready  # want 200
 
 # 6. Teardown. -v removes the throwaway volumes.

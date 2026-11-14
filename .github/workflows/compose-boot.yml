@@ -145,10 +145,13 @@ jobs:
           exit "$failed"
 
       # The two endpoints published on host loopback. `app` declares no healthcheck
-      # (it is the last dependency, not a target), so a session-less request is the
-      # readiness proof that exists: the proxy answers 307 to /auth/login. Checking
-      # the code rather than "any response" is deliberate — a 500 means the BFF boot
-      # passed and its first request did not, which is the failure that shipped.
+      # (it is the last dependency, not a target), so its own response is the
+      # readiness proof that exists — and for the app the correct answer is 403, not
+      # 200. That is the security gate working, not a defect, so asserting 403 is a
+      # security assertion: the app must NOT be openly reachable from a machine that
+      # did not come through Tailscale Serve. An openly-200 app would be the failure.
+      # Checking the code rather than "any response" is deliberate — a 500 means the
+      # BFF boot passed and its first request did not, which is the failure that shipped.
       - name: Assert the host-published endpoints
         run: |
           set -uo pipefail
@@ -162,9 +165,20 @@ jobs:
               failed=1
             fi
           }
-          # 307: no session yet, so the app redirects to the login dance.
-          check http://127.0.0.1:3002/ 307
+          # 403: compose runs the app with NODE_ENV=production, so Next sets
+          # `x-forwarded-host` and the ACCESS gate arms (apps/app/lib/auth/gate.ts:66).
+          # The gate then demands a `tailscale-user-login` matching OWNER_LOGIN, and a
+          # CI curl sends no such header, so it fails CLOSED with 'forbidden'. This is
+          # the deploy shape we want: traffic that skipped Tailscale Serve is refused.
+          check http://127.0.0.1:3002/ 403
           check http://127.0.0.1:3003/health/ready 200
+          # Measured limitation, on purpose and not covered by this job: the app's
+          # IDENTITY gate (gate.ts:77 — redirect to /auth/login when there is no
+          # session) cannot be reached from here, because every request 403s at the
+          # ACCESS gate first. Reaching identity needs a login the app accepts, and
+          # `scripts/ci-compose-env.sh` writes no OWNER_LOGIN — so the container's
+          # ownerLogin is undefined whatever header CI sends. Proving identity here
+          # means the generator writing OWNER_LOGIN; that is a separate change.
           exit "$failed"
 
       # A red job that does not say why wastes the next person's hour, so this dump
