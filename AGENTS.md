@@ -83,6 +83,21 @@ are not restored wholesale — a run that needs a spec writes `docs/specs/SPEC-<
 (or `SPEC.md` at the root for a single capability) and an intent writes
 `docs/intent/<topic>.md`, so `agents-hard-gates` keeps working unchanged.
 
+## Releasing — a merged promotion is not a release
+
+A release is a tag plus a GitHub release, on the commit you ship. Promoting
+`dev` to `main` records the release line; it does not tag anything.
+
+```bash
+npm run release -- <version>        # tags, pushes the tag, creates the release
+```
+
+The script refuses unless the tree is clean, HEAD is `origin/dev` (or `--ref`),
+the tag is new, the notes file exists at `docs/releases/<version>.md`, and CI is
+green on that exact SHA. Never tag by hand: the hand-tagged path is the one that
+gets skipped. House style for the notes, and what the script deliberately leaves
+to you, are in `docs/runbooks/release.md`.
+
 ## Contract 1 — Shared UI Contract (`@life/ui`)
 
 Every frontend app (current and future) renders its UI from `@life/ui` (atoms + blocks)
