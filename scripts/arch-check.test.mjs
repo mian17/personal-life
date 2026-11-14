@@ -1,13 +1,16 @@
 /**
- * Guards the three mechanical architecture rules in `scripts/arch-check.mjs`.
+ * Guards the four mechanical architecture rules in `scripts/arch-check.mjs`.
  *
  * Rule 3 (one database per service) and rule 4 (the designated engine) judge the
  * topology on disk, so each is fed a throwaway worktree holding only the files
  * the assertion needs — plus the real checkout, to prove today's tree is clean.
  * Rule 5 (no cross-service reach) is judged on new lines only, so its cases differ
  * by the base content, by whether the line is code or comment, and by whether git
- * lists the file at all (a new directory). The usage cases drive the script as a
- * child process, because exit code and stderr are what they assert.
+ * lists the file at all (a new directory). Rule 6 (a required variable is
+ * forwarded) is fed fixtures too, one per read shape: dot access, bracket access
+ * through a constant (declared in the same app and in a workspace package), and a
+ * read that has a fallback and must stay silent. The usage cases drive the script
+ * as a child process, because exit code and stderr are what they assert.
  *
  * Run: npm run test:arch
  */
@@ -23,6 +26,7 @@ import {
   checkCrossServiceAccess,
   checkDatabasePerService,
   checkEngineIsDesignated,
+  checkEnvForwarding,
   findCrossServiceFindings,
 } from './arch-check.mjs';
 
@@ -297,4 +301,117 @@ test('rule 5: an import the base ref already carries is not this branch’s doin
 
   assert.equal(findCrossServiceFindings({ file, content: line, baseContent: '' }).length, 1);
   assert.deepEqual(findCrossServiceFindings({ file, content: line, baseContent: line }), []);
+});
+
+/** One compose service with an `environment:` block holding exactly `keys`. */
+function composeWithEnvironment(name, keys, image = 'node:24') {
+  const block = keys.map((key) => `      ${key}: from-env`).join('\n');
+  return ['services:', `  ${name}:`, `    image: ${image}`, '    environment:', block, ''].join(
+    '\n',
+  );
+}
+
+test('rule 6: a variable read with no fallback and never forwarded is a violation', () => {
+  const root = fixture({
+    'compose.yaml': composeWithEnvironment('meal-service', ['DB_PATH']),
+    'apps/meal-service/src/meal-todo.controller.ts': [
+      'export function baseUrl() {',
+      '  const configured = process.env.MEAL_TODOS_API_URL?.trim();',
+      '  return configured;',
+      '}',
+      '',
+    ].join('\n'),
+  });
+
+  try {
+    const findings = checkEnvForwarding(root);
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.equal(findings[0].rule, 6);
+    assert.equal(findings[0].file, join('apps', 'meal-service', 'src', 'meal-todo.controller.ts'));
+    assert.equal(findings[0].line, 2);
+    assert.match(findings[0].message, /meal-service reads MEAL_TODOS_API_URL with no fallback/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 6: the same variable is fine once compose forwards it', () => {
+  const root = fixture({
+    'compose.yaml': composeWithEnvironment('meal-service', ['MEAL_TODOS_API_URL']),
+    'apps/meal-service/src/main.ts': 'const url = process.env.MEAL_TODOS_API_URL;\n',
+  });
+
+  try {
+    assert.deepEqual(checkEnvForwarding(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 6: a bracket read resolves through a constant declared in a package', () => {
+  const root = fixture({
+    // Forwarding the constant's own name (`TODOS_API_URL_ENV`) must not count:
+    // the container needs the variable it names.
+    'compose.yaml': composeWithEnvironment('meal-service', ['TODOS_API_URL_ENV']),
+    'packages/service-kit/src/outbox/outbox-delivery.ts': [
+      "export const TODOS_API_URL_ENV = 'MEAL_TODOS_API_URL';",
+      '',
+    ].join('\n'),
+    'apps/meal-service/src/meal-todo.controller.ts': [
+      "import { TODOS_API_URL_ENV } from '@life/service-kit';",
+      '',
+      'export function baseUrl() {',
+      '  return process.env[TODOS_API_URL_ENV]?.trim();',
+      '}',
+      '',
+    ].join('\n'),
+  });
+
+  try {
+    const findings = checkEnvForwarding(root);
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.equal(findings[0].line, 4);
+    assert.match(findings[0].message, /reads MEAL_TODOS_API_URL with no fallback/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 6: a read that carries a fallback is the code having an answer', () => {
+  const root = fixture({
+    'compose.yaml': composeWithEnvironment('todo-service', ['DB_PATH']),
+    'apps/todo-service/src/todos/todos.service.ts': [
+      "const tz = process.env.TODO_TIMEZONE ?? 'Asia/Ho_Chi_Minh';",
+      "const host = process.env.HOST || '127.0.0.1';",
+      'const port = Number(process.env.PORT ?? 3005);',
+      '',
+    ].join('\n'),
+  });
+
+  try {
+    assert.deepEqual(checkEnvForwarding(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 6: a dev-only switch and NODE_ENV are not compose’s to forward', () => {
+  const root = fixture({
+    'compose.yaml': composeWithEnvironment('app', ['DB_PATH']),
+    'apps/app/src/gate.ts': [
+      "const devStack = process.env.APP_DEV_SKIP_ACCESS_GATE === '1';",
+      "const production = process.env.NODE_ENV === 'production';",
+      '',
+    ].join('\n'),
+  });
+
+  try {
+    assert.deepEqual(checkEnvForwarding(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 6: today’s tree forwards every variable the code cannot boot without', () => {
+  assert.deepEqual(checkEnvForwarding(REPO), []);
 });
