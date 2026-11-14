@@ -86,6 +86,28 @@ jobs:
           ENV_FILE: ${{ steps.env.outputs.path }}
         run: docker compose --env-file "$ENV_FILE" build
 
+      # Each service bind-mounts a host directory for its SQLite file, and `data/` is
+      # gitignored, so a fresh checkout has none of them. Docker creates a missing bind
+      # source as root and every image runs as uid 1000, so the service then cannot
+      # create its database ("SqliteError: unable to open database file"). The production
+      # runbook already lists this as a deploy prerequisite; a CI checkout is just
+      # another fresh machine, so the job does the same thing a human would. `Tear down`
+      # below removes containers and named volumes but NOT these host directories, so a
+      # rerun on the same runner can inherit root-owned leftovers — hence the chown.
+      - name: Prepare the bind-mount directories
+        run: |
+          set -euo pipefail
+          for service_dir in note-service tags-service todo-service meal-service focus-service idp; do
+            mkdir -p "apps/$service_dir/data"
+          done
+          # The checkout belongs to the runner user (not uid 1000), and Docker may have
+          # created these as root on a previous attempt, so the chown needs root. That is
+          # what makes a rerun after a failed boot work instead of inheriting the
+          # leftovers — the case `Tear down` cannot clean because it only touches
+          # containers and named volumes.
+          sudo chown -R 1000:1000 apps/*/data
+          ls -ld apps/*/data
+
       # `--wait` is what turns "unhealthy" into a failed step: compose blocks until
       # every service with a healthcheck reports healthy and exits non-zero
       # otherwise. A sleep-then-curl would pass a stack that never became healthy,

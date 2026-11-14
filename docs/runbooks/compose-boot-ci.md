@@ -49,6 +49,20 @@ required to have **at boot**. That is a wider set than interpolation requires:
 default, and the service then dies on it. Those variables are listed with their
 reasons in the script's header.
 
+## Prerequisites — the six bind-mount directories
+
+`compose.yaml` bind-mounts six host directories for the SQLite files:
+`./apps/{note,tags,todo,meal,focus}-service/data` and `./apps/idp/data`. `data/` is
+gitignored (`.gitignore:5`), so **a fresh checkout has none of them**. Docker creates a
+missing bind source as **root**, and every image runs as `USER node` (uid 1000), so the
+service then cannot create its database and dies with
+`SqliteError: unable to open database file`. The job therefore creates all six and
+chowns them to `1000:1000` in a step before booting — the same prerequisite
+`docs/runbooks/production-deploy.md` already lists for a human deploy, because a CI
+checkout is just another fresh machine. `Tear down` removes containers and named
+volumes but not these host directories, which is why the step also chowns: a rerun on
+the same runner would otherwise inherit root-owned leftovers from the failed attempt.
+
 ## Running the same sequence locally
 
 From the repo root, with a real `.env` already in place (the generator refuses to
@@ -94,3 +108,15 @@ the last 200 log lines of every service on failure. Read the health column first
 `unhealthy` (a healthcheck failing) and `exited` (a boot crash) have different
 causes. A log line naming `… is required` means the fixture is wrong, not the
 deployment; a stack trace means the deployment is wrong.
+
+### First real finding (2026-11-14, run 43600971651, head e483cd4)
+
+On its first real run the job failed where nothing else in CI had: step 8
+"Boot the stack and wait for health" went red, `focus-service` and `idp` logged
+`SqliteError: unable to open database file`, and compose reported
+`dependency failed to start: container personal-life-meal-service-1 is unhealthy`.
+That is the six missing bind-mount directories above — invisible to tests, lint and
+`docker compose config`. The `Dump diagnostics` step is what named it: it ran on the
+failure path and printed the service logs, so the cause was read straight out of the
+job instead of guessed from a red X. The fix is the directory-preparation step, and
+the job proved its own value on day one by catching a defect no static check could.
