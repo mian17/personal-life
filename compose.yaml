@@ -282,6 +282,13 @@ services:
       OIDC_APP_CLIENT_SECRET: ${OIDC_APP_CLIENT_SECRET:-}
       # Exact browser callback URL; must byte-match OIDC_APP_REDIRECT_URI on the app.
       OIDC_APP_REDIRECT_URIS: ${OIDC_APP_REDIRECT_URI:-}
+      # Required in production for each producer client the IdP registers
+      # (`PRODUCER_CLIENT_IDS` in apps/idp/src/oidc/clients.ts). A producer runs
+      # on the user's own machine, so its callback is loopback; production still
+      # refuses a placeholder, which is why the value must be supplied here
+      # rather than left to the code's dev default.
+      OIDC_PRODUCER_PRODUCER_A_REDIRECT_URIS: ${OIDC_PRODUCER_PRODUCER_A_REDIRECT_URIS:-}
+      OIDC_PRODUCER_PRODUCER_B_REDIRECT_URIS: ${OIDC_PRODUCER_PRODUCER_B_REDIRECT_URIS:-}
       # Audience/resource mapping (defaults preserve note-service).
       OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
       # Every registered resource maps to the shared ecosystem audience; each
