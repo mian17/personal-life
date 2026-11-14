@@ -84,8 +84,9 @@ export function groupTodos(
 
   // The completed occurrence of a repeating todo: a live (open) todo whose
   // completion log has an entry. It is rendered as a done row — the live todo
-  // spread with `done: true` and the satisfied `occurrence` as its due date — so
-  // Done is one row type (`TodoItem`). A done one-off already has its own struck
+  // spread with `done: true`, the satisfied `occurrence` as its due date, and the
+  // title the occurrence was **finished under**, so a rename after the tick cannot
+  // rewrite what the owner already did. A done one-off already has its own struck
   // row, so its completion is skipped (it still orders that row below); a
   // completion whose todo is not in this fetch (deleted/filtered) is skipped.
   const liveById = new Map(todos.map((todo) => [todo.id, todo]));
@@ -93,7 +94,12 @@ export function groupTodos(
   for (const [todoId, completion] of latestByTodo) {
     const live = liveById.get(todoId);
     if (!live || live.done) continue;
-    doneOccurrences.push({ ...live, done: true, dueDate: completion.occurrence });
+    doneOccurrences.push({
+      ...live,
+      done: true,
+      dueDate: completion.occurrence,
+      title: completion.title,
+    });
   }
 
   // Done by tick time, newest first (derived occurrence and done one-off alike);

@@ -8,6 +8,8 @@ function sessionOn(date: string, minutes: number, index = 0): SessionRow {
     ownerSub: 'owner-1',
     date,
     minutes,
+    todoId: null,
+    todoAnsweredAt: null,
     createdAt: `${date}T09:00:00.000Z`,
   };
 }

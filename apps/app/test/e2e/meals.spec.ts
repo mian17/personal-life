@@ -76,6 +76,13 @@ async function dayTotal(page: Page): Promise<number> {
  * have to be re-derived here, which is the drift this replaces.
  */
 async function listedEntryCalories(page: Page): Promise<number[]> {
+  // The day view is server-rendered and streams in after the URL matches, so
+  // reading straight after `waitForURL` can catch a page that has not painted a
+  // single row yet. Waiting for the first confirmed row — `×` is what marks one
+  // below — makes the read a paint, not a snapshot of the frame before it.
+  await expect(page.getByRole('listitem').filter({ hasText: '×' }).first()).toBeVisible({
+    timeout: 15_000,
+  });
   const rows = await page.getByRole('listitem').allInnerTexts();
   const figures: number[] = [];
   for (const row of rows) {
@@ -319,7 +326,9 @@ test.describe('meals manual log', () => {
     await page.goto('/meals');
     await expect(dayRow(page, '130', '2.5')).toBeVisible({ timeout: 15_000 });
     // The row still renders the deleted food's dish name, not the raw id.
-    await expect(page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal' })).toBeVisible({
+    await expect(
+      page.getByRole('listitem').filter({ hasText: FOOD }).filter({ hasText: '130 kcal' }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     expect(await listedEntryCalories(page)).toEqual(loggedFigures);
@@ -396,9 +405,9 @@ test.describe('meals day view', () => {
     await page.waitForURL(/\/meals$/, { timeout: 15_000 });
 
     // What the day view now reads back is the corrected figure, not the raw one.
-    await expect(
-      page.getByRole('listitem').filter({ hasText: '900 kcal' }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('listitem').filter({ hasText: '900 kcal' })).toBeVisible({
+      timeout: 15_000,
+    });
     expect(await listedEntryCalories(page)).toContain(900);
   });
 

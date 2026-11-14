@@ -1,7 +1,11 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { CreateSessionDto } from '../src/sessions/dto/create-session.dto.js';
 import { ListSessionsQuery } from '../src/sessions/dto/list-sessions.query.js';
-import { DATE_ONLY, MINUTES_RANGE } from '../src/sessions/dto/session-rules.js';
+import {
+  DATE_ONLY,
+  MINUTES_RANGE,
+  SESSION_TODO_ID_MAX,
+} from '../src/sessions/dto/session-rules.js';
 
 /**
  * `SPEC-focus-service` §1 / §9.2 — the session boundary's two rules, as the global
@@ -105,6 +109,42 @@ describe("ListSessionsQuery — both range bounds are the client's", () => {
 
   it('refuses a malformed bound', async () => {
     await expect(validateQuery({ from: '01-10-2026', to: '2026-10-31' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
+
+/**
+ * The task link's wire shape. Only the bound is asserted here: whether the caller's
+ * read grant actually reaches the id is a service question, answered against
+ * todo-service in `sessions-todo.e2e-spec.ts`.
+ */
+describe('CreateSessionDto — todoId', () => {
+  it('accepts a body with no task, which is the ordinary case', async () => {
+    const body = await validateBody({ date: A_DAY, minutes: 25 });
+    expect(body.todoId).toBeUndefined();
+  });
+
+  it('accepts a bounded task id', async () => {
+    await expect(
+      validateBody({ date: A_DAY, minutes: 25, todoId: 'b7c1e4f0-0000-4000-8000-000000000001' }),
+    ).resolves.toMatchObject({ todoId: 'b7c1e4f0-0000-4000-8000-000000000001' });
+  });
+
+  it('refuses an empty id, because it names no task', async () => {
+    await expect(validateBody({ date: A_DAY, minutes: 25, todoId: '' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('refuses an id past the column bound', async () => {
+    await expect(
+      validateBody({ date: A_DAY, minutes: 25, todoId: 'x'.repeat(SESSION_TODO_ID_MAX + 1) }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses a non-string id', async () => {
+    await expect(validateBody({ date: A_DAY, minutes: 25, todoId: 42 })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });

@@ -28,6 +28,8 @@ export interface SignOptions {
   expiresIn?: number;
   kid?: string;
   subject?: string;
+  /** The `client_id` claim to mint; omitted means the token carries none. */
+  clientId?: string;
   /** Mint a token with no `sub` claim at all (principal-seam 401 case). */
   omitSubject?: boolean;
 }
@@ -69,12 +71,13 @@ export class JwtTestHarness {
   /** Mints a token; defaults to the first (primary) key. */
   async sign(options: SignOptions = {}): Promise<string> {
     const key = options.kid
-      ? this.keys.find((k) => k.kid === options.kid) ?? this.keys[0]
+      ? (this.keys.find((k) => k.kid === options.kid) ?? this.keys[0])
       : this.keys[0];
     const now = Math.floor(Date.now() / 1000);
     const claims: Record<string, unknown> = options.omitSubject
       ? {}
       : { sub: options.subject ?? 'test-user' };
+    if (options.clientId !== undefined) claims.client_id = options.clientId;
     return new SignJWT(claims)
       .setProtectedHeader({ alg: 'EdDSA', kid: key.kid })
       .setIssuer(options.issuer ?? TEST_ISSUER)

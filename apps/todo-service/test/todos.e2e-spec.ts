@@ -115,6 +115,7 @@ describe('Todos API (e2e)', () => {
         'important',
         'listId',
         'note',
+        'originService',
         'reminderScheduledAt',
         'repeat',
         'repeatDays',

@@ -12,6 +12,7 @@ import {
   type CreateMealFoodInput,
   type UpdateMealFoodInput,
 } from '@/lib/meal-api';
+import { kickPendingTodos } from '@/lib/outbox-relay';
 import { getToday } from '@/lib/today';
 
 /**
@@ -44,6 +45,10 @@ export async function relogMealAction(id: string): Promise<void> {
       }),
     ),
   );
+  // Best-effort tick, after the write: a re-logged meal produces the same
+  // `todos.complete` intents a fresh log does, and the page must not wait on
+  // delivery or fail because of it.
+  kickPendingTodos();
   revalidatePath('/meals');
   redirect(`/meals/${date}`);
 }

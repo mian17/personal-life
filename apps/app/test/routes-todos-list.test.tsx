@@ -45,6 +45,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     repeatDays: null,
     reminderScheduledAt: null,
     listId: null,
+    originService: null,
     tagIds: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -85,7 +86,9 @@ async function renderScreen(): Promise<string> {
 describe('/todos list page wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListTodos.mockResolvedValue(page([todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })]));
+    mockedListTodos.mockResolvedValue(
+      page([todo({ id: 't1', title: 'Buy milk', listId: 'l1', tagIds: [1] })]),
+    );
     mockedListLists.mockResolvedValue([
       {
         id: 'l1',
@@ -124,7 +127,11 @@ describe('/todos list page wiring', () => {
   it('walks the completion log whole, so the lookup is complete before any page renders', async () => {
     mockedListTodos.mockResolvedValue(page([todo()], 'todo-cursor-2', 2));
     mockedListTodoCompletions
-      .mockResolvedValueOnce({ completions: [completion({ id: 'c9' })], nextCursor: 'log-2', total: 2 })
+      .mockResolvedValueOnce({
+        completions: [completion({ id: 'c9' })],
+        nextCursor: 'log-2',
+        total: 2,
+      })
       .mockResolvedValueOnce({
         completions: [completion({ id: 'c1', todoId: 't1' })],
         nextCursor: null,
@@ -163,7 +170,9 @@ describe('/todos list page wiring', () => {
     );
     // The repeating todo's ticked occurrence is a done row with no `Todo` row of its own.
     mockedListTodoCompletions.mockResolvedValue({
-      completions: [completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' })],
+      completions: [
+        completion({ id: 'c1', todoId: 'rep', title: 'Water plants', occurrence: '2026-10-01' }),
+      ],
       nextCursor: null,
       total: 1,
     });
@@ -279,6 +288,34 @@ describe('/todos list page wiring', () => {
     // The live repeating todo keeps its next occurrence open, also a TodoItem.
     expect(html).toContain('Mark Water plants done');
   });
+
+  it("names a robot-made row's producer, and leaves the user's own rows unattributed", async () => {
+    // Dated today so both rows land in the shown Today group: an undated todo is in no
+    // group and renders nothing, which would make the absence assertion pass for the
+    // wrong reason.
+    mockedListTodos.mockResolvedValue(
+      page([
+        todo({ id: 'm1', title: 'Prep lunch', dueDate: todayIso(), originService: 'meal-service' }),
+        todo({ id: 'u1', title: 'Buy milk', dueDate: todayIso() }),
+      ]),
+    );
+
+    const html = await renderScreen();
+    const rowOf = (title: string): string => {
+      const row = html
+        .split('<li ')
+        .map((chunk) => chunk.slice(0, chunk.indexOf('</li>')))
+        .find((chunk) => chunk.includes(`>${title}<`));
+      if (!row) throw new Error(`no row rendered for "${title}"`);
+      return row;
+    };
+
+    // Attribution is the app's name for the producer, never the stored slug: a task
+    // meal-service created must not read as one the user wrote.
+    expect(rowOf('Prep lunch')).toContain('from Meals');
+    // The fixture's default origin is null — the user's own todo claims no producer.
+    expect(rowOf('Buy milk')).not.toContain('from ');
+  });
 });
 
 /**
@@ -292,7 +329,14 @@ describe('/todos scroll island', () => {
   const loadPage = jest.fn<Promise<TodoPage>, [string]>();
 
   const repeating = todo({ id: 'rep', title: 'Water plants', repeat: 'daily', dueDate: TODAY });
-  const ticked = completion({ id: 'c1', todoId: 'rep', occurrence: '2026-10-01' });
+  // The occurrence was ticked before any target change, so its frozen title is the same
+  // one the live row carried — the API serves the snapshot, and here they agree.
+  const ticked = completion({
+    id: 'c1',
+    todoId: 'rep',
+    occurrence: '2026-10-01',
+    title: 'Water plants',
+  });
 
   function island(props: { nextCursor: string | null; completions: TodoCompletion[] }): string {
     return renderToStaticMarkup(
@@ -366,10 +410,27 @@ describe('/todos list row tint', () => {
   it('tints Overdue/Today rows by quadrant and leaves Done rows untinted', async () => {
     mockedListTodos.mockResolvedValue(
       page([
-        todo({ id: 'oi', title: 'Overdue important', dueDate: '2000-01-01', effectiveImportant: true }),
+        todo({
+          id: 'oi',
+          title: 'Overdue important',
+          dueDate: '2000-01-01',
+          effectiveImportant: true,
+        }),
         todo({ id: 'tn', title: 'Today not important', dueDate: TODAY, effectiveImportant: false }),
-        todo({ id: 'di', title: 'Done important', dueDate: '2000-01-01', effectiveImportant: true, done: true }),
-        todo({ id: 'dn', title: 'Done neither', dueDate: null, effectiveImportant: false, done: true }),
+        todo({
+          id: 'di',
+          title: 'Done important',
+          dueDate: '2000-01-01',
+          effectiveImportant: true,
+          done: true,
+        }),
+        todo({
+          id: 'dn',
+          title: 'Done neither',
+          dueDate: null,
+          effectiveImportant: false,
+          done: true,
+        }),
       ]),
     );
 

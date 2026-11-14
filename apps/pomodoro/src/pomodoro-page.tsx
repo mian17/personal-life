@@ -5,12 +5,14 @@ import {
   Button,
   Card,
   ConfirmButton,
+  Field,
   List,
   ListItem,
   Pill,
   ProgressBar,
   Row,
   Section,
+  Select,
   Stack,
   StatusText,
   cx,
@@ -85,6 +87,12 @@ const presetsStyles = 'mt-[var(--s1)]';
 const dotsStyles = 'mt-[var(--s2)]';
 const actionsStyles = 'mt-[var(--s2)]';
 
+/** One open task the owner may name for the block they are about to focus on. */
+export interface FocusTaskChoice {
+  id: string;
+  title: string;
+}
+
 export interface PomodoroPageProps {
   durations: Durations;
   /** Told the focus length a chip picked, so the choice survives a reload. */
@@ -97,6 +105,16 @@ export interface PomodoroPageProps {
   todayMinutes?: number;
   /** The day's goal in minutes: total focus for the whole day, not one block. */
   todayGoalMinutes?: number | null;
+  /**
+   * The owner's open tasks, as the read grant reaches them. Empty draws no picker, which
+   * is what a missing grant, a failed read and an owner with nothing open all look like —
+   * and naming no task has to stay the ordinary case, so none of those may cost the timer.
+   */
+  tasks?: readonly FocusTaskChoice[];
+  /** The task the next block will name, or `null` for none. */
+  todoId?: string | null;
+  /** Told the pick, so the next recorded block carries it. Absent draws the picker disabled. */
+  onTodoIdChange?: (todoId: string | null) => void;
 }
 
 export function PomodoroPage({
@@ -106,6 +124,9 @@ export function PomodoroPage({
   onFocusBlockEnd,
   todayMinutes,
   todayGoalMinutes,
+  tasks = [],
+  todoId = null,
+  onTodoIdChange,
 }: Readonly<PomodoroPageProps>) {
   // The chip choice starts as the stored one and then leads, so a tap re-seeds the timer
   // without waiting for the write to come back as a new prop. Memoised on the three
@@ -174,6 +195,27 @@ export function PomodoroPage({
             value={percentSpent(timer.remainingMs, timer.phase, chosen)}
             label="Session progress"
           />
+          {/* An optional task for the block in hand. No tasks means no control at all
+              (`tasks` is empty when the read failed or the grant is absent), and a
+              session with no task is the ordinary case — so this never gates the timer.
+              A run in flight shows it disabled rather than removing it: the choice was
+              made for the phase that is counting, so it cannot be re-made mid-block. */}
+          {tasks.length > 0 && (
+            <Field label="Working on" htmlFor="focus-task">
+              <Select
+                id="focus-task"
+                value={todoId ?? ''}
+                disabled={onTodoIdChange == null || timer.status === 'running'}
+                options={[
+                  { value: '', label: 'No task' },
+                  ...tasks.map((task) => ({ value: task.id, label: task.title })),
+                ]}
+                onChange={(event) =>
+                  onTodoIdChange?.(event.target.value === '' ? null : event.target.value)
+                }
+              />
+            </Field>
+          )}
           {/* ONE length row, and `presetsFor` is the only thing that decides which: a second
               row cannot exist by construction. A phase in flight keeps the row's box while it
               loses its paint (`visibility: hidden`), so the rows below it do not step up when
@@ -220,11 +262,7 @@ export function PomodoroPage({
             className={dotsStyles}
           />
           <Row className={actionsStyles}>
-            <Button
-              ref={timer.startRef}
-              className="grow basis-0"
-              onClick={timer.primaryAction}
-            >
+            <Button ref={timer.startRef} className="grow basis-0" onClick={timer.primaryAction}>
               {primaryLabel(timer.status, timer.nextPhase)}
             </Button>
             {/* Reset ends the whole cycle, so it asks first — and only where there is
@@ -274,9 +312,7 @@ function percentSpent(remainingMs: number, phase: Phase, durations: Durations): 
 }
 
 /** The one length row the card draws. `hidden` keeps the row's box while the paint goes. */
-type PresetRow =
-  | { kind: 'focus'; hidden: boolean }
-  | { kind: 'break'; phase: BreakPhase };
+type PresetRow = { kind: 'focus'; hidden: boolean } | { kind: 'break'; phase: BreakPhase };
 
 /**
  * The row the card draws, decided in one place: a length is configuration for the phase that

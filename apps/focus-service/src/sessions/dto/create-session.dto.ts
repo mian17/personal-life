@@ -1,5 +1,19 @@
-import { IsInt, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { DATE_ONLY, MINUTES_RANGE, SESSION_DATE_MAX } from './session-rules.js';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import {
+  DATE_ONLY,
+  MINUTES_RANGE,
+  SESSION_DATE_MAX,
+  SESSION_TODO_ID_MAX,
+} from './session-rules.js';
 
 /**
  * Body of `POST /api/sessions`: one recorded focus block.
@@ -19,4 +33,18 @@ export class CreateSessionDto {
   @Min(MINUTES_RANGE.min)
   @Max(MINUTES_RANGE.max)
   minutes: number;
+
+  /**
+   * The task this block worked on — todo-service's id, and only the id.
+   *
+   * Optional because a session with no task is the ordinary case. The shape check
+   * here is only a bound; whether the caller's read grant actually covers this id is
+   * decided by `SessionsService.create`, which asks todo-service with the caller's
+   * own token. A bounded-string check alone would store an arbitrary value.
+   */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(SESSION_TODO_ID_MAX)
+  todoId?: string;
 }

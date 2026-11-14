@@ -2,7 +2,7 @@ import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { KeysService, UserKeys } from '@life/service-kit';
+import { GrantsService, KeysService, OriginGrant, UserKeys } from '@life/service-kit';
 import { Todo } from '../src/todos/todo.entity.js';
 import { TodoCompletion } from '../src/todos/todo-completion.entity.js';
 import { TodoTag } from '../src/todos/todo-tag.entity.js';
@@ -42,7 +42,7 @@ export async function makeUnitHarness(
   const dataSource = new DataSource({
     type: 'better-sqlite3',
     database: join(dir, 'todo.db'),
-    entities: [Todo, TodoTag, List, UserKeys, TodoCompletion],
+    entities: [Todo, TodoTag, List, UserKeys, TodoCompletion, OriginGrant],
     synchronize: true,
     logging: options.logging ?? false,
     logger: {
@@ -59,12 +59,14 @@ export async function makeUnitHarness(
   await dataSource.initialize();
   const keys = new KeysService(dataSource.getRepository(UserKeys), TEST_MASTER_KEY);
   const lists = new ListsService(dataSource.getRepository(List), cache, keys);
+  const grants = new GrantsService(dataSource.getRepository(OriginGrant));
   const todos = new TodosService(
     dataSource.getRepository(Todo),
     dataSource.getRepository(TodoTag),
     cache,
     keys,
     lists,
+    grants,
     dataSource,
   );
   return { dataSource, keys, todos, lists, cache, dir, log };

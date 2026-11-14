@@ -12,7 +12,15 @@ function upstreamReturned(value: unknown): void {
 
 /** One session row keyed by id, for the paging cases. */
 function sessionOn(id: string, date: string): SessionRow {
-  return { id, ownerSub: 'owner-1', date, minutes: 25, createdAt: `${date}T09:00:00.000Z` };
+  return {
+    id,
+    ownerSub: 'owner-1',
+    date,
+    minutes: 25,
+    todoId: null,
+    todoAnsweredAt: null,
+    createdAt: `${date}T09:00:00.000Z`,
+  };
 }
 
 function lastCall(): [string, string, RequestInit | undefined] {
@@ -40,6 +48,8 @@ describe('listSessions', () => {
       ownerSub: 'owner-1',
       date: '2026-10-02',
       minutes: 25,
+      todoId: null,
+      todoAnsweredAt: null,
       createdAt: '2026-10-02T09:00:00.000Z',
     };
     upstreamReturned({ sessions: [row], nextCursor: null });
@@ -69,6 +79,8 @@ describe('listSessions', () => {
       ownerSub: null,
       date: '2026-10-03',
       minutes: 50,
+      todoId: null,
+      todoAnsweredAt: null,
       createdAt: '2026-10-03T09:00:00.000Z',
     };
     upstreamReturned({ sessions: [legacyRow], nextCursor: null });

@@ -14,6 +14,7 @@ import {
   type PhotoEstimate,
   type SavedMeal,
 } from '@/lib/meal-api';
+import { kickPendingTodos } from '@/lib/outbox-relay';
 import { isPhotoBlob, photoMimeType } from '@/lib/photo-mime';
 
 /**
@@ -53,10 +54,7 @@ export async function estimatePhotoAction(formData: FormData): Promise<PhotoEsti
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
     const mimeType = photoMimeType(bytes, file.type);
-    const result = await estimatePhoto(
-      { base64: bytes.toString('base64'), mimeType },
-      hint,
-    );
+    const result = await estimatePhoto({ base64: bytes.toString('base64'), mimeType }, hint);
     return result;
   } catch {
     return { readable: false, reason: 'service-unavailable' };
@@ -92,6 +90,9 @@ export async function saveEntryAction(
         nutrients: item.nutrients,
       });
     }
+    // Best-effort tick, after the write: logging a meal is what owes the tick, and
+    // the page must not wait on the network round trip or fail because of it.
+    kickPendingTodos();
     revalidatePath('/meals');
     return;
   }

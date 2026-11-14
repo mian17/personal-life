@@ -156,6 +156,28 @@ function schemaSnapshot(path: string): string[] {
   }
 }
 
+/**
+ * Drops the `audit_log` table and its `occurredAt` index from a snapshot.
+ *
+ * The audit module (`SPEC-audit-log`) is newer than this legacy fixture, so a
+ * database migrated before it existed gains that table and index on the first
+ * boot after the upgrade — a legitimate creation, not drift in a table that was
+ * already there. Applied to BOTH snapshots so the comparison stays symmetric and
+ * cannot hide a deletion; `newTableNames` below proves the one expected table
+ * appeared.
+ */
+function withoutAuditLogRows(rows: string[]): string[] {
+  return rows.filter((row) => !row.includes('audit_log'));
+}
+
+/** Names of `sqlite_master` tables present after the boot but not before it. */
+function newTableNames(before: string[], after: string[]): string[] {
+  const tableNames = (rows: string[]) =>
+    rows.filter((row) => row.startsWith('table|')).map((row) => row.split('|')[1]);
+  const alreadyPresent = new Set(tableNames(before));
+  return tableNames(after).filter((name) => !alreadyPresent.has(name));
+}
+
 function noteBodies(path: string): string[] {
   const db = open(path, true);
   try {
@@ -382,8 +404,12 @@ describe('owner-backfill (e2e)', () => {
       else process.env.NODE_ENV = savedNodeEnv;
     }
 
-    // `synchronize` had nothing left to do — the script's DDL is byte-equivalent.
-    expect(schemaSnapshot(life)).toEqual(before);
+    // `synchronize` had nothing left to do in any pre-existing table — the
+    // script's DDL is byte-equivalent. The `audit_log` creation is excluded
+    // because the audit module postdates this fixture (see `withoutAuditLogRows`).
+    const after = schemaSnapshot(life);
+    expect(withoutAuditLogRows(after)).toEqual(withoutAuditLogRows(before));
+    expect(newTableNames(before, after)).toEqual(['audit_log']);
   });
 
   it('aborts with zero backfill writes when the identity DB has no users', () => {

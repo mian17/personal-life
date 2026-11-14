@@ -196,6 +196,27 @@ CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT
     }
   }
 
+  /**
+   * Drops the `audit_log` table and its `occurredAt` index from a snapshot.
+   *
+   * The audit module (`SPEC-audit-log`) is newer than this fixture, so a database
+   * migrated before it existed gains that table and index on the first boot after
+   * the upgrade — a legitimate creation, not drift in a table that was already
+   * there. Applied to BOTH snapshots so the comparison stays symmetric and cannot
+   * hide a deletion; `newTableNames` below proves the one expected table appeared.
+   */
+  function withoutAuditLogRows(rows: string[]): string[] {
+    return rows.filter((row) => !row.includes('audit_log'));
+  }
+
+  /** Names of `sqlite_master` tables present after the boot but not before it. */
+  function newTableNames(before: string[], after: string[]): string[] {
+    const tableNames = (rows: string[]) =>
+      rows.filter((row) => row.startsWith('table|')).map((row) => row.split('|')[1]);
+    const alreadyPresent = new Set(tableNames(before));
+    return tableNames(after).filter((name) => !alreadyPresent.has(name));
+  }
+
   function noteTagDdl(path: string): string {
     const db = new Database(path, { readonly: true });
     try {
@@ -274,7 +295,9 @@ CREATE TABLE "user_keys" ("sub" text PRIMARY KEY NOT NULL, "wrappedDek" text NOT
       if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = savedNodeEnv;
     }
-    expect(snapshot(dbPath)).toEqual(before);
+    const after = snapshot(dbPath);
+    expect(withoutAuditLogRows(after)).toEqual(withoutAuditLogRows(before));
+    expect(newTableNames(before, after)).toEqual(['audit_log']);
   });
 
   it('cascades association rows when a note is permanently deleted', async () => {
