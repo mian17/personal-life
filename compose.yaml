@@ -6,7 +6,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3001"
+      PORT: '3001'
       HOST: 0.0.0.0
       DB_PATH: /data/life.db
       # JWT-only auth (Task 10). note-service verifies tokens offline against the
@@ -34,9 +34,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3001/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -52,7 +52,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3004"
+      PORT: '3004'
       HOST: 0.0.0.0
       DB_PATH: /data/tags.db
       IDP_ISSUER: ${IDP_ISSUER:-}
@@ -72,9 +72,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3004/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -90,7 +90,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3005"
+      PORT: '3005'
       HOST: 0.0.0.0
       DB_PATH: /data/todo.db
       IDP_ISSUER: ${IDP_ISSUER:-}
@@ -116,9 +116,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3005/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -134,7 +134,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3008"
+      PORT: '3008'
       HOST: 0.0.0.0
       # Postgres + RabbitMQ (feedback-infra). Compose injects the connection
       # strings over the internal network; .env keeps only the passwords.
@@ -163,9 +163,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3008/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -181,7 +181,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3106"
+      PORT: '3106'
       HOST: 0.0.0.0
       DB_PATH: /data/meal.db
       # JWT-only auth, same offline-JWKS pattern as note-service.
@@ -196,6 +196,11 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_API_BASE: ${GEMINI_API_BASE:-}
+      # todo-service base URL: the origin-grant call and the outbox delivery leg
+      # both read this one knob. No code fallback on purpose (see
+      # meal-todo.controller.ts `todosBaseUrl`), so a deployment that omits it
+      # fails loudly instead of dialling a guessed port.
+      MEAL_TODOS_API_URL: ${MEAL_TODOS_API_URL:-http://todo-service:3005}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-meal:6379
     volumes:
@@ -208,9 +213,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3106/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -226,7 +231,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3107"
+      PORT: '3107'
       HOST: 0.0.0.0
       # SQLite for the pomodoro session/goal rows (`SPEC-focus-service` Storage),
       # the note/tags/todo/meal shape: rows are numbers, dates and ids.
@@ -240,6 +245,10 @@ services:
       # Master key for the owner-key table (own custody, MAP M3). Fail-fast here;
       # the service also refuses to boot without it.
       FOCUS_MASTER_KEY: ${FOCUS_MASTER_KEY:?FOCUS_MASTER_KEY is required (openssl rand -base64 32)}
+      # todo-service base URL for task-linked sessions: focus only ever READS a
+      # task id here, it never creates or ticks one. No code fallback, same
+      # reasoning as MEAL_TODOS_API_URL.
+      FOCUS_TODOS_API_URL: ${FOCUS_TODOS_API_URL:-http://todo-service:3005}
       # Per-service read-through cache (fail-open). Injected here; .env unchanged.
       REDIS_URL: redis://redis-focus:6379
     volumes:
@@ -252,9 +261,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3107/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -270,7 +279,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3003"
+      PORT: '3003'
       HOST: 0.0.0.0
       DB_PATH: /data/idp.db
       # Browser-reachable issuer (set in .env): the public Tailscale Serve URL.
@@ -282,6 +291,13 @@ services:
       OIDC_APP_CLIENT_SECRET: ${OIDC_APP_CLIENT_SECRET:-}
       # Exact browser callback URL; must byte-match OIDC_APP_REDIRECT_URI on the app.
       OIDC_APP_REDIRECT_URIS: ${OIDC_APP_REDIRECT_URI:-}
+      # Required in production for each producer client the IdP registers
+      # (`PRODUCER_CLIENT_IDS` in apps/idp/src/oidc/clients.ts). A producer runs
+      # on the user's own machine, so its callback is loopback; production still
+      # refuses a placeholder, which is why the value must be supplied here
+      # rather than left to the code's dev default.
+      OIDC_PRODUCER_PRODUCER_A_REDIRECT_URIS: ${OIDC_PRODUCER_PRODUCER_A_REDIRECT_URIS:-}
+      OIDC_PRODUCER_PRODUCER_B_REDIRECT_URIS: ${OIDC_PRODUCER_PRODUCER_B_REDIRECT_URIS:-}
       # Audience/resource mapping (defaults preserve note-service).
       OIDC_DEFAULT_RESOURCE: ${OIDC_DEFAULT_RESOURCE:-https://note-service}
       # Every registered resource maps to the shared ecosystem audience; each
@@ -292,7 +308,7 @@ services:
     ports:
       # Published on host loopback only so `tailscale serve` can proxy to it
       # (the IdP itself stays off the tailnet/LAN). See README "Auth model".
-      - "127.0.0.1:3003:3003"
+      - '127.0.0.1:3003:3003'
     volumes:
       - ./apps/idp/data:/data
     depends_on:
@@ -303,9 +319,9 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
+          'CMD',
+          'node',
+          '-e',
           "fetch('http://127.0.0.1:3003/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
@@ -321,7 +337,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: "3002"
+      PORT: '3002'
       HOSTNAME: 0.0.0.0
       API_URL: http://note-service:3001
       # Ecosystem base URLs (SPEC-service-kernel transport contract). Without
@@ -351,7 +367,7 @@ services:
       # .env unchanged. AOF + named volume so sessions survive restarts.
       REDIS_URL: redis://redis-app:6379
     ports:
-      - "127.0.0.1:3002:3002"
+      - '127.0.0.1:3002:3002'
     depends_on:
       note-service:
         condition: service_healthy
@@ -386,7 +402,7 @@ services:
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -401,20 +417,20 @@ services:
     # written. List form keeps the empty `--save` argument unambiguous.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -428,20 +444,20 @@ services:
     # would otherwise write it to /data/dump.rdb. See compose decision 6.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -456,20 +472,20 @@ services:
     # write it to /data/dump.rdb. See compose decision 6.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -484,20 +500,20 @@ services:
     # write it to /data/dump.rdb. See compose decision 6.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -526,9 +542,9 @@ services:
     ports:
       # Host loopback only: the host-run dev service (3108) reaches Postgres here.
       # Production uses the internal compose network (`postgres-feedback:5432`).
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U feedback -d feedback"]
+      test: ['CMD-SHELL', 'pg_isready -U feedback -d feedback']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -548,9 +564,9 @@ services:
     ports:
       # Host loopback only: the host-run dev service (3108) reaches the broker here.
       # Production uses the internal compose network (`rabbitmq-feedback:5672`).
-      - "127.0.0.1:5672:5672"
+      - '127.0.0.1:5672:5672'
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -565,22 +581,22 @@ services:
     # default snapshot points would otherwise write it to /data/dump.rdb.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     volumes:
       - redis-feedback-data:/data
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -595,20 +611,20 @@ services:
     # write it to /data/dump.rdb. See compose decision 6.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -623,22 +639,22 @@ services:
     # them to /data/dump.rdb.
     command:
       [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxmemory",
-        "64mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     volumes:
       - redis-focus-data:/data
     networks:
       - life
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
