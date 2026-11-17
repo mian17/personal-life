@@ -164,6 +164,11 @@
   --max-press: #5b455c;
 }
 
+[data-app='meditation'] {
+  --max: #465a70;
+  --max-press: #38495a;
+}
+
 [data-theme='dark'] [data-app='notes'] {
   --max: #9fc0a3;
   --max-press: #b0cdb3;
@@ -187,6 +192,11 @@
 [data-theme='dark'] [data-app='feedback'] {
   --max: #c4a9c6;
   --max-press: #d0bacf;
+}
+
+[data-theme='dark'] [data-app='meditation'] {
+  --max: #a3b8cc;
+  --max-press: #b6cada;
 }
 
 /* §1 System: no attribute chosen, so the OS decides */
@@ -241,5 +251,10 @@
   :root:not([data-theme]) [data-app='feedback'] {
     --max: #c4a9c6;
     --max-press: #d0bacf;
+  }
+
+  :root:not([data-theme]) [data-app='meditation'] {
+    --max: #a3b8cc;
+    --max-press: #b6cada;
   }
 }

@@ -91,12 +91,14 @@ function dailyBuckets(rows: SessionRow[], goals: GoalRow[]): Bucket[] {
 }
 
 function monthlyBuckets(rows: SessionRow[], goals: GoalRow[]): Bucket[] {
-  return sortedGroups(groupRowsBy(rows, (row) => row.date.slice(0, 7))).map(([month, monthRows]) => {
-    const days = [...new Set(monthRows.map((row) => row.date))];
-    const target = monthTarget(days, goals);
-    const bucket: Bucket = { label: monthLabel(month), value: totalMinutes(monthRows) };
-    return target === undefined ? bucket : { ...bucket, target };
-  });
+  return sortedGroups(groupRowsBy(rows, (row) => row.date.slice(0, 7))).map(
+    ([month, monthRows]) => {
+      const days = [...new Set(monthRows.map((row) => row.date))];
+      const target = monthTarget(days, goals);
+      const bucket: Bucket = { label: monthLabel(month), value: totalMinutes(monthRows) };
+      return target === undefined ? bucket : { ...bucket, target };
+    },
+  );
 }
 
 /** A month's goal is its days' goals summed, one per day even with several sessions. */
@@ -145,7 +147,7 @@ const MONTH_NAMES = [
 
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-function monthLabel(month: string): string {
+export function monthLabel(month: string): string {
   const [year, monthNumber] = month.split('-').map(Number);
   return `${MONTH_NAMES[monthNumber - 1]} ${year}`;
 }

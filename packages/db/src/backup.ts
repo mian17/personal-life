@@ -43,7 +43,15 @@ export interface BackupResult {
   snapshots: ManifestEntry[];
 }
 
-const DATABASE_NAMES: readonly DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'];
+const DATABASE_NAMES: readonly DatabaseName[] = [
+  'life',
+  'tags',
+  'todo',
+  'idp',
+  'meal',
+  'focus',
+  'meditation',
+];
 const DEFAULT_KEEP = 10;
 
 /** Raised before anything is written; `paths` are the missing sources. */

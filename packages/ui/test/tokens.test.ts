@@ -100,6 +100,7 @@ const ACCENTS = {
   meals: { light: ['#8b5a45', '#744a38'], dark: ['#dca489', '#e4b39c'] },
   pomodoro: { light: ['#5a5285', '#4a4470'], dark: ['#b6aedc', '#c7c1e6'] },
   feedback: { light: ['#6f5570', '#5b455c'], dark: ['#c4a9c6', '#d0bacf'] },
+  meditation: { light: ['#465a70', '#38495a'], dark: ['#a3b8cc', '#b6cada'] },
 } as const;
 
 /** §4 one stack, eleven declared steps, two read-outs. */
@@ -186,9 +187,30 @@ const SCRIM_TOKENS = {
 
 /** Every distinct px literal the whole refactor is allowed to know about. */
 const FROZEN_PX = [
-  '1px', '1.5px', '2px', '4px', '8px', '11px', '12px', '12.5px', '13px', '13.5px',
-  '14px', '15px', '16px', '17px', '20px', '24px', '28px', '32px', '40px', '48px',
-  '56px', '64px', '414px', '999px',
+  '1px',
+  '1.5px',
+  '2px',
+  '4px',
+  '8px',
+  '11px',
+  '12px',
+  '12.5px',
+  '13px',
+  '13.5px',
+  '14px',
+  '15px',
+  '16px',
+  '17px',
+  '20px',
+  '24px',
+  '28px',
+  '32px',
+  '40px',
+  '48px',
+  '56px',
+  '64px',
+  '414px',
+  '999px',
 ];
 
 /**

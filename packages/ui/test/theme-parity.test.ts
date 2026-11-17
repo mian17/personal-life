@@ -25,7 +25,7 @@ const APP_LAYOUT = readFileSync(join(__dirname, '../../../apps/app/app/layout.ts
  * Every area layout, concatenated: the accent scope moved off the root script and onto each
  * segment's own layout, so the scopes the app paints are declared here (one `app="…"` per area).
  */
-const AREA_LAYOUTS = ['notes', 'todos', '(meals)/meals', 'pomodoro', 'feedback']
+const AREA_LAYOUTS = ['notes', 'todos', '(meals)/meals', 'pomodoro', 'feedback', 'meditation']
   .map((directory) =>
     readFileSync(join(__dirname, '../../../apps/app/app', directory, 'layout.tsx'), 'utf8'),
   )

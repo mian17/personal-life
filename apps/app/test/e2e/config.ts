@@ -34,6 +34,7 @@ export function testPorts(slot = 0) {
     mealPort: overriddenPort('E2E_MEAL_PORT', portInSlot(3106, slot)),
     feedbackPort: overriddenPort('E2E_FEEDBACK_PORT', portInSlot(3107, slot)),
     focusPort: overriddenPort('E2E_FOCUS_PORT', portInSlot(3109, slot)),
+    meditationPort: overriddenPort('E2E_MEDITATION_PORT', portInSlot(3102, slot)),
     appPort: overriddenPort('E2E_APP_PORT', portInSlot(3100, slot)),
   };
 }
@@ -56,6 +57,7 @@ export function devPorts(slot = 0) {
     mealPort: overriddenPort('E2E_DEV_MEAL_PORT', portInSlot(3206, slot)),
     feedbackPort: overriddenPort('E2E_DEV_FEEDBACK_PORT', portInSlot(3207, slot)),
     focusPort: overriddenPort('E2E_DEV_FOCUS_PORT', portInSlot(3209, slot)),
+    meditationPort: overriddenPort('E2E_DEV_MEDITATION_PORT', portInSlot(3202, slot)),
     appPort: overriddenPort('E2E_DEV_APP_PORT', portInSlot(3200, slot)),
   };
 }
