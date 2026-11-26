@@ -61,14 +61,16 @@ checklist; it is not authority to run it.
   Never run
   `rotate-master-key` as a deploy step — see the write-once rule in §2.
 
-- **One schema change lands with *this* deploy, by boot-time sync, not by hand:**
+- **The one schema change this line carried has landed, by boot-time sync, not by hand:**
   `food.unit` (`apps/meal-service/src/foods/food.entity.ts:45-46`, `text NOT NULL DEFAULT
-  'g'`) is absent from the live `meal.db`. It is additive-with-default only — no backfill,
-  and the table currently holds 0 rows.
-- **`db:backup:pg` is a working, already-used path.** `backup/` holds four pinned
-  `feedback.dump` snapshots and two `pre-restore-*` snapshots; the newest pinned pair is
-  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) beside `…12-34-39-247Z-pinned` (SQLite). So
-  feedback Postgres has been deployed before and dumped before — the dump is part of a
+  'g'`) is present in the live `meal.db` and was populated by that default — 14 foods, `g`
+  on 13 and `ml` on 1 — so it was additive-with-default only and no backfill is owed.
+- **`db:backup:pg` is a working, already-used path.** `backup/` holds 28 pinned snapshot
+  directories — 10 of them carrying `feedback.dump` — and two `pre-restore-*` snapshots
+  (counted 2026-11-26); the newest pinned pair is `…2026-11-14T09-33-58-574Z-pinned`
+  (Postgres) beside `…09-34-27-050Z-pinned` (SQLite), and the nightly cron has added
+  routine snapshots on top since. So feedback Postgres has been deployed before and dumped
+  before — the dump is part of a
   normal deploy, never a step to skip. Its schema is still boot-ensured rather than
   migrated: compose's `POSTGRES_DB: feedback` makes the database, `synchronize` makes its
   four tables (`feedback`, `feedback_event`, `feedback_cursor`, `user_keys`), and the
@@ -81,8 +83,10 @@ checklist; it is not authority to run it.
   `db:backup` covers the file from that point on, so no Postgres server, no
   `FOCUS_DB_PASSWORD` and no `db:backup:pg` step exists for it. `db:backup:pg` keeps
   dumping `feedback` only.
-- **No crontab is installed.** `backup/cron.log` does not exist, so neither §8 backup line
-  has ever fired here. Scheduled backups are a first-time setup, not a running fixture.
+- **Both §8 backup lines are installed and firing.** `crontab -l` carries them verbatim and
+  `backup/cron.log` holds their output — the last entry is a `db:backup:pg [routine]` line —
+  so scheduled backups are a running fixture here, not a first-time setup. Read the crontab
+  before adding anything.
 
 **Ordering is therefore: back up → migrate → boot. Never migrate after boot.**
 
@@ -509,17 +513,18 @@ done
 
 ## 8. Steady state
 
-- [ ] Install both backup crons, pointing at the primary checkout — **they are not installed
-      yet** (`backup/cron.log` does not exist, so neither line has ever fired here). Two
-      lines, added by hand with `crontab -e` (never auto-installed):
+- [ ] Both backup crons are installed on this host, pointing at the primary checkout —
+      **verify, do not re-install**: `crontab -l` carries the two lines below verbatim and
+      `backup/cron.log` shows them firing. If a host ever lacks them, add them by hand with
+      `crontab -e` (never auto-installed):
       ```cron
       0 3 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       0 4 * * * bash -lc 'cd /home/night/WebstormProjects/personal-life && mkdir -p backup && npm run db:backup:pg -w @life/db' >> /home/night/WebstormProjects/personal-life/backup/cron.log 2>&1
       ```
       The first covers the six SQLite databases, the second the one Postgres database
       (`feedback`).
-- [ ] Take a Postgres snapshot once the stack is healthy, so the newly installed cron is not
-      the first thing that ever exercises `db:backup:pg`:
+- [ ] Take a Postgres snapshot once the stack is healthy, so the nightly cron is not the
+      first thing that ever exercises `db:backup:pg`:
       `npm run db:backup:pg -w @life/db -- --pin`.
 - [ ] Retention: newest 10 routine snapshots per kind; pinned and pre-restore snapshots
       never auto-pruned.
@@ -549,8 +554,9 @@ Code and data roll back together: older code cannot read an arrangement it never
       `docker compose up -d --build`.
 - [ ] `meal.db` is additive on the way in, **not on the way back**: this deploy only adds
       the `food.unit` column, but TypeORM `synchronize` reconciles *down* as well, so older
-      code booting against the new file drops it again. No user data is at risk (the live
-      `food` table holds 0 rows). Leave the file in place; do not delete it, and do not
+      code booting against the new file drops it again. That column is not empty — 14 foods
+      carry a unit, one of them `ml` — so the drop costs that value, not nothing. Leave the
+      file in place; do not delete it, and do not
       delete `postgres-feedback-data` / `rabbitmq-feedback-data` / `redis-focus-data`.
 - [ ] **`feedback.status` is not additive on the way back either**, and this one *does* drop
       user-entered state: older code booting against the same Postgres makes `synchronize`
