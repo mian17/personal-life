@@ -28,13 +28,27 @@
 #
 # Then, in order, each verified before the next: bump root package.json's version
 # (so the tag and the manifest cannot drift) → annotated tag carrying the notes as
-# its message → push the commit → push the tag → create the GitHub release → verify.
+# its message → land the bump commit through a pull request → push the tag →
+# create the GitHub release → verify.
+#
+# The bump commit cannot be pushed to `dev`. The repository ruleset `Block default
+# branches` (id 25775908) targets `~DEFAULT_BRANCH` and `refs/heads/main`, requires
+# a pull request on both, and has no bypass actors — so a direct `git push` to
+# `dev` is refused with GH013 "Changes must be made through a pull request." The
+# commit lands the way v0.2.3 landed by hand: branch `chore/release-v<version>` →
+# `gh pr create --base dev` → `gh pr merge --merge`, then the tag. Always a merge
+# commit, never a squash: squashing rewrites the SHA, and the annotated tag is
+# already created on the bump commit, so a squashed `dev` would never contain the
+# commit the tag names.
 #
 # The notes file must already be COMMITTED: precondition 1 is a genuinely empty
-# `git status --porcelain`, and an uncommitted notes file is a dirty tree.
+# `git status --porcelain`, and an uncommitted notes file is a dirty tree. It must
+# also already be on `dev`, which means its own pull request — the same ruleset
+# applies to it.
 #
-# Usage: npm run release -- <version> [flags]        (e.g. npm run release -- 0.2.2)
-# Run it on `dev` — `git push origin HEAD` pushes the branch HEAD is on.
+# Usage: npm run release -- <version> [flags]        (e.g. npm run release -- 0.2.3)
+# Run it on `dev`, clean and level with `origin/dev`: the script cuts
+# `chore/release-v<version>` from the bump commit and merges that PR into `dev`.
 #
 # Flags:
 #   --notes <path>     notes file to use instead of docs/releases/<version>.md
@@ -51,6 +65,11 @@
 # Recovery, by half-state (the script prints the matching line when a step fails):
 #   commit missing    → git commit -m "chore: release v<x>" -- package.json
 #   tag not created   → git tag -a v<x> -F <notes>
+#   branch not pushed → git push -u origin chore/release-v<x>
+#   no PR opened      → gh pr create --base dev --head chore/release-v<x> \
+#                       --title "chore: release v<x>"
+#   PR open, unmerged → gh pr merge <n> --merge --subject "chore: release v<x> (#<n>)"
+#                       (never --squash: the tagged commit must stay on dev)
 #   tag local, not    → tag exists locally but not on the remote; retry with
 #   on the remote       `git push origin v<x>`
 #   no release record → tag is on the remote, no release record; retry with
@@ -197,12 +216,131 @@ create_tag() {
   printf 'tagged %s at %s\n' "v$V" "$(git rev-parse HEAD)"
 }
 
-push_commit() {
-  step "push the release commit"
-  if ! git push origin HEAD; then
-    printf 'failed at: push the release commit.\n  state: the commit and tag v%s exist locally; nothing is on the remote.\n  recover: git push origin HEAD\n' "$V" >&2
+# `dev` does not accept a push: ruleset `Block default branches` (25775908)
+# requires a pull request on `~DEFAULT_BRANCH` and `refs/heads/main` and has no
+# bypass actors, so pushing the branch a release commit sits on fails with GH013
+# no matter who runs it.
+#
+# The bump commit lands through a PR instead, on the branch v0.2.3 landed on by
+# hand: `chore/release-v<version>` → `gh pr create --base dev` → `gh pr merge
+# --merge`. The tag is pushed afterwards, so a landing that never happened leaves
+# a local tag and nothing on the remote — recoverable, not silent.
+
+# A squash merge rewrites the commit, and the annotated tag already points at the
+# bump commit; `dev` would then never contain the SHA the tag names. The body says
+# so, because the reviewer is the one who picks the merge strategy.
+release_pr_body() {
+  printf 'Version bump for v%s, with the notes in %s.\n\n' "$V" "$NOTES"
+  printf 'Merge this with a **merge commit**. Never squash it: tag v%s is created on\n' "$V"
+  printf 'the bump commit %s and has to stay reachable from `dev`, which a\n' "$(git rev-parse HEAD)"
+  printf 'squash would break by rewriting the SHA. The SHA must not change.\n'
+}
+
+require_release_branch_is_new() {
+  local local_sha remote_line remote_sha
+  if local_sha=$(git rev-parse --verify --quiet "refs/heads/$RELEASE_BRANCH"); then
+    printf 'failed at: create the release branch.\n  state: the bump commit and tag v%s exist locally; %s already exists at %s; nothing was pushed.\n  recover: git branch -D %s (stale branch), then rerun the release\n' \
+      "$V" "$RELEASE_BRANCH" "$local_sha" "$RELEASE_BRANCH" >&2
     exit 1
   fi
+  remote_line=$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")
+  if [ -n "$remote_line" ]; then
+    remote_sha=$(printf '%s' "$remote_line" | awk '{print $1}')
+    printf 'failed at: create the release branch.\n  state: the bump commit and tag v%s exist locally; %s already exists on origin at %s; nothing was pushed.\n  recover: git push origin --delete %s (stale branch), then rerun the release\n' \
+      "$V" "$RELEASE_BRANCH" "$remote_sha" "$RELEASE_BRANCH" >&2
+    exit 1
+  fi
+}
+
+create_release_branch() {
+  step "cut $RELEASE_BRANCH (the only way into dev is a pull request)"
+  require_release_branch_is_new
+  if ! git switch -c "$RELEASE_BRANCH"; then
+    printf 'failed at: cut the release branch.\n  state: the bump commit and tag v%s exist locally; nothing was pushed.\n  recover: git switch -c %s, then rerun the release\n' \
+      "$V" "$RELEASE_BRANCH" >&2
+    exit 1
+  fi
+}
+
+push_release_branch() {
+  step "push $RELEASE_BRANCH"
+  if ! git push -u origin HEAD; then
+    printf 'failed at: push the release branch.\n  state: the bump commit and tag v%s exist locally; %s is not on the remote; nothing further happened.\n  recover: git push -u origin %s\n' \
+      "$V" "$RELEASE_BRANCH" "$RELEASE_BRANCH" >&2
+    exit 1
+  fi
+}
+
+open_release_pr() {
+  step "open the pull request into dev"
+  local created url body
+  body=$(release_pr_body)
+  if ! created=$(gh pr create --base dev --head "$RELEASE_BRANCH" \
+    --title "chore: release v$V" --body "$body" 2>&1); then
+    printf '%s\n' "$created" >&2
+    printf 'failed at: open the pull request.\n  state: %s is pushed; no pull request exists, so dev is unchanged.\n  recover: gh pr create --base dev --head %s --title "chore: release v%s"\n' \
+      "$RELEASE_BRANCH" "$RELEASE_BRANCH" "$V" >&2
+    exit 1
+  fi
+  url=$(printf '%s\n' "$created" | grep -o 'https://[^[:space:]]*/pull/[0-9]*' | tail -1)
+  if [ -z "$url" ]; then
+    printf '%s\n' "$created" >&2
+    printf 'failed at: open the pull request.\n  state: %s is pushed but gh printed no PR URL, so no number can be merged.\n  recover: gh pr list --head %s --json number,url\n' \
+      "$RELEASE_BRANCH" "$RELEASE_BRANCH" >&2
+    exit 1
+  fi
+  PR_URL="$url"
+  PR_NUMBER="${url##*/}"
+  printf 'PR #%s %s\n' "$PR_NUMBER" "$PR_URL"
+}
+
+# `gh pr merge` can lose a race with GitHub still computing mergeability right
+# after the PR opens; one retry covers that, and a second failure is a real block
+# the caller has to see with the PR URL in hand.
+merge_release_pr() {
+  step "merge PR #$PR_NUMBER as a merge commit"
+  local out attempt
+  for attempt in 1 2; do
+    if out=$(gh pr merge "$PR_NUMBER" --merge --subject "chore: release v$V (#$PR_NUMBER)" 2>&1); then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    printf '%s\n' "$out" >&2
+    if [ "$attempt" -eq 1 ] && printf '%s' "$out" | grep -qEi 'not (yet )?mergeable|not ready|still (being )?(created|checked)|pending'; then
+      warn "PR #$PR_NUMBER is not mergeable yet; retrying the merge once"
+      sleep 10
+      continue
+    fi
+    break
+  done
+  printf 'failed at: merge the pull request.\n  state: %s is pushed and PR #%s is open at %s; the merge did not happen, so dev is unchanged and the tag is still local.\n  recover: gh pr merge %s --merge --subject "chore: release v%s (#%s)"\n' \
+    "$RELEASE_BRANCH" "$PR_NUMBER" "$PR_URL" "$PR_NUMBER" "$V" "$PR_NUMBER" >&2
+  exit 1
+}
+
+# Merged is a report; ancestry is a fact. Without this the tag could sit on a
+# squashed or never-landed commit and still satisfy every later check.
+prove_release_landed_on_dev() {
+  step "prove the bump commit landed on dev"
+  git fetch origin dev --quiet || {
+    printf 'failed at: prove the bump commit landed on dev.\n  state: PR #%s is merged, but origin/dev could not be fetched; the tag is still local.\n  recover: git fetch origin dev && git merge-base --is-ancestor %s origin/dev\n' \
+      "$PR_NUMBER" "$(git rev-parse HEAD)" >&2
+    exit 1
+  }
+  if ! git merge-base --is-ancestor HEAD origin/dev; then
+    printf 'failed at: prove the bump commit landed on dev.\n  state: PR #%s is merged but %s is not an ancestor of origin/dev, so the tag names a commit dev never had; no tag was pushed.\n  recover: git fetch origin dev && git merge-base --is-ancestor %s origin/dev   (if it still fails the PR was squashed: re-tag on a commit that is on dev)\n' \
+      "$PR_NUMBER" "$(git rev-parse HEAD)" "$(git rev-parse HEAD)" >&2
+    exit 1
+  fi
+  printf 'dev contains %s\n' "$(git rev-parse HEAD)"
+}
+
+land_bump_commit_through_pr() {
+  create_release_branch
+  push_release_branch
+  open_release_pr
+  merge_release_pr
+  prove_release_landed_on_dev
 }
 
 push_tag() {
@@ -223,7 +361,10 @@ create_release() {
 }
 
 # The tag, the remote tag and the release record are three separate facts and each
-# is checked against its own source — a local tag is not a published release.
+# is checked against its own source — a local tag is not a published release. The
+# tag must also be reachable from `dev`: that is what a release means here, and a
+# squashed landing is the one way to satisfy every other check and still ship a tag
+# nobody can check out.
 verify_release() {
   step "verify all three"
   local tag_sha head_sha remote_sha release_json url
@@ -231,6 +372,11 @@ verify_release() {
   head_sha=$(git rev-parse HEAD)
   [ "$tag_sha" = "$head_sha" ] || refuse "tag v$V points at $tag_sha but HEAD is $head_sha"
   printf 'tag    v%s -> %s (local HEAD)\n' "$V" "$tag_sha"
+
+  git fetch origin dev --quiet || refuse "could not fetch origin dev to prove the tag landed"
+  git merge-base --is-ancestor "$head_sha" origin/dev \
+    || refuse "tag v$V points at $head_sha, which origin/dev does not contain. A squash-merged release PR leaves the tag unreachable from dev"
+  printf 'dev    contains %s (reachable from origin/dev)\n' "$head_sha"
 
   remote_sha=$(git ls-remote --tags origin "refs/tags/$V" "refs/tags/v$V" | awk '!/\^\{\}/ {print $1}')
   [ "$remote_sha" = "$head_sha" ] || refuse "tag v$V is not on origin at $head_sha (got '${remote_sha:-nothing}')"
@@ -251,9 +397,18 @@ plan_the_rest() {
   step "dry run — nothing below was executed"
   printf 'would bump package.json "version" to %s and commit it:\n' "$V"
   printf '  git add package.json && git commit -m "chore: release v%s" -- package.json\n' "$V"
-  printf 'would tag and push:\n'
-  printf '  git tag -a v%s -F %s\n  git push origin HEAD\n  git push origin v%s\n' "$V" "$NOTES" "$V"
-  printf 'would create the release:\n'
+  printf 'would tag it (annotated, message = the notes):\n'
+  printf '  git tag -a v%s -F %s\n' "$V" "$NOTES"
+  printf 'would land the bump commit through a pull request — the ruleset refuses a push to dev:\n'
+  printf '  git switch -c %s\n' "$RELEASE_BRANCH"
+  printf '  git push -u origin %s\n' "$RELEASE_BRANCH"
+  printf '  gh pr create --base dev --head %s --title "chore: release v%s"\n' "$RELEASE_BRANCH" "$V"
+  printf '    --body "<version, notes file %s, and that the SHA must stay unchanged>"\n' "$NOTES"
+  printf '  gh pr merge <n> --merge --subject "chore: release v%s (#<n>)"\n' "$V"
+  printf '    (a merge commit, never --squash: the annotated tag must stay reachable from dev)\n'
+  printf '  git fetch origin dev && git merge-base --is-ancestor HEAD origin/dev\n'
+  printf 'would push the tag and create the release:\n'
+  printf '  git push origin v%s\n' "$V"
   printf '  gh release create v%s --title "%s" --notes-file %s\n' "$V" "$(release_title)" "$NOTES"
   printf 'to undo the one file this run wrote:\n  git checkout -- package.json\n'
 }
@@ -308,6 +463,12 @@ V=$(require_version "$VERSION_ARG")
 TAG="v$V"
 NOTES=${NOTES:-docs/releases/$V.md}
 
+# The branch the bump commit lands on, and the PR that carries it. Both are read
+# by the landing step and by verify_release's failure messages.
+RELEASE_BRANCH="chore/release-v$V"
+PR_NUMBER=""
+PR_URL=""
+
 # Which branch the CI runs are listed from. A SHA has no branch, so `dev` stands.
 CI_BRANCH=dev
 case "$REF" in
@@ -345,7 +506,7 @@ fi
 
 create_bump_commit
 create_tag
-push_commit
+land_bump_commit_through_pr
 push_tag
 create_release
 verify_release
