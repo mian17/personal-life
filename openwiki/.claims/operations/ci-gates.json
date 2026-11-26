@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:2ecbc420e617f97d74184c66ce6db4784c9cb4d99f85b1f44f9c1202033b2191",
+  "claims": [
+    {
+      "id": "claim_f73c3049f091416ea2bd9f9d39cd91a4",
+      "statement": "All four workflows run on GitHub-hosted `ubuntu-latest` runners with one concurrency group per PR: tests on PRs to dev/main, compose-boot on PRs plus pushes to dev, secrets on PRs plus pushes to dev, backmerge on pushes to main.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/backmerge.yml",
+          "version": "repo-file-v1:sha256:74a72e71fe1ac4a52fb128fab743854b941a14f7afd078630c518b43b24b19ab"
+        },
+        {
+          "resource": "repo://.github/workflows/compose-boot.yml",
+          "version": "repo-file-v1:sha256:e7669d69a19e7bb7fe39bea6852a5e2eab99560f7e5f22c31bb90503a3df388d"
+        },
+        {
+          "resource": "repo://.github/workflows/secrets.yml",
+          "version": "repo-file-v1:sha256:0e5a208592a5f97105c3faeeacade4cf06bb4785cb6c18ca5c9c954b9c1be80f"
+        },
+        {
+          "resource": "repo://.github/workflows/tests.yml",
+          "version": "repo-file-v1:sha256:cd7bc0333c9c38fc518d3eaaa93555b865c1e40679c1f0bd7f7a177047b48518"
+        }
+      ]
+    },
+    {
+      "id": "claim_5f0c7270b4a54c5a82107f51270b889b",
+      "statement": "tests.yml runs npm ci --ignore-scripts (rebuilding better-sqlite3 and argon2 explicitly), then audit:gate, lint, build, typecheck, arch:check and test:coverage against a throwaway postgres:17-alpine container; audit:gate fails on unlisted advisories, entries npm audit no longer reports, and expired reviewBy dates.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/tests.yml",
+          "version": "repo-file-v1:sha256:cd7bc0333c9c38fc518d3eaaa93555b865c1e40679c1f0bd7f7a177047b48518"
+        },
+        {
+          "resource": "repo://scripts/audit-gate.mjs",
+          "version": "repo-file-v1:sha256:e7e2e107ee61135c9972a1ff5d9a5e9117d6c3499330cc63912b996e7e0142a5"
+        }
+      ]
+    },
+    {
+      "id": "claim_a2f0827e08474343b268dc11be553def",
+      "statement": "compose-boot.yml builds and boots the real compose stack: it generates a throwaway env file with every variable required at boot, creates the bind-mount apps/*/data directories chowned to 1000:1000, asserts each backend's /health/ready from inside its own container, and always tears down with `down -v`.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/compose-boot.yml",
+          "version": "repo-file-v1:sha256:e7669d69a19e7bb7fe39bea6852a5e2eab99560f7e5f22c31bb90503a3df388d"
+        },
+        {
+          "resource": "repo://scripts/ci-compose-env.sh",
+          "version": "repo-file-v1:sha256:9417f7971066062c3fa56dfe158c495b5f68e9575f2c6b7e5cff577fd0ed85cb"
+        }
+      ]
+    },
+    {
+      "id": "claim_380ccd93f83a4f3387d5148ccf8e1a4c",
+      "statement": "secrets.yml scans every commit (fetch-depth 0) with gitleaks in a digest-pinned read-only image using --redact; .gitleaks.toml allowlists exactly one path (packages/crypto/test/envelope.test.ts, a published NIST vector), and npm run secrets runs the same scan locally.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/secrets.yml",
+          "version": "repo-file-v1:sha256:0e5a208592a5f97105c3faeeacade4cf06bb4785cb6c18ca5c9c954b9c1be80f"
+        },
+        {
+          "resource": "repo://.gitleaks.toml",
+          "version": "repo-file-v1:sha256:638f2bf93d3e85d57354a246b1c56f732015467dcf89e9ab067502c86b5bff0a"
+        }
+      ]
+    },
+    {
+      "id": "claim_6ac8187e09bf4569a83d9eef58617288",
+      "statement": "backmerge.yml opens a `-s ours` bookkeeping PR on every push to main so main stays an ancestor of dev after a squash promotion; it must be merged with a merge commit and requires the repo setting that allows Actions to create pull requests.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/backmerge.yml",
+          "version": "repo-file-v1:sha256:74a72e71fe1ac4a52fb128fab743854b941a14f7afd078630c518b43b24b19ab"
+        },
+        {
+          "resource": "repo://docs/ops/backmerge.md",
+          "version": "repo-file-v1:sha256:5428b18f6cd5bbfc2bd8657fd25f50c25df974c130a4f730796bfc3ff0414c34"
+        }
+      ]
+    },
+    {
+      "id": "claim_72a2e4fefbc4401aa495f435bb52f6c6",
+      "statement": "RULE 7 in scripts/arch-check.mjs fails when any workflow file names `self-hosted` (comments stripped, any trigger), and the repository's only self-hosted runner (fedora-sonarqube) was unregistered when the repo went public — the live count must stay 0.",
+      "evidence": [
+        {
+          "resource": "repo://docs/runbooks/public-repo.md",
+          "version": "repo-file-v1:sha256:bdb932ca34a427666642387d545a6223540e63d71a53e714e81eeb26843056b8"
+        },
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

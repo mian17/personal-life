@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:40f4b811840c36a03d940f57ae645a6763f1ddddc3d0333759a05755defda7be",
+  "claims": [
+    {
+      "id": "claim_a378e15a69c546b0ae7ac680722ac4e5",
+      "statement": "note-service exposes api/notes CRUD with trash semantics (soft delete, trash listing, restore, permanent delete, empty trash) plus escaped-colon batch routes and an api/tags registry.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes-batch.controller.ts",
+          "version": "repo-file-v1:sha256:edda2c31a90f336c6ec15ec34db4124d96d274502f3a2843637bb3a7e41d90f8"
+        },
+        {
+          "resource": "repo://apps/note-service/src/notes/notes.controller.ts",
+          "version": "repo-file-v1:sha256:f73fa7bed049f87c164b95648d3b09a472d9f93abb1caed899126ce210cae5fb"
+        }
+      ]
+    },
+    {
+      "id": "claim_7cb6bd51961b46cb919e335b71619961",
+      "statement": "contentUpdatedAt is bumped only by body writes, never by title or metadata edits.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/note.entity.ts",
+          "version": "repo-file-v1:sha256:7050924dbe47a82c951b217a58bbe3f83387cab73b512f5dab3fbe9bae610292"
+        }
+      ]
+    },
+    {
+      "id": "claim_68901ba23fa242cb95a6844bc3dd9a30",
+      "statement": "A create encrypts title/body under the owner's DEK, writes the row, then bumps the generation — a thrown insert never bumps.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes.service.ts",
+          "version": "repo-file-v1:sha256:e7cc5a27825257f49b092fca29996f24293d87d7071ad0ba9722e401cdd2541f"
+        },
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_359c8fcc6e7846c7ba843b597837cf4a",
+      "statement": "List reads decrypt in the request path and filter in memory via the LIKE-parity likeMatch from @life/shared (content-match.ts is a re-export shim), then page through the shared cursor seam.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/content-match.ts",
+          "version": "repo-file-v1:sha256:b6b4d09db5a1f8fa7ec18077c55b610df0ebb711433de94bc54bc13610ec34a7"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/paging.ts",
+          "version": "repo-file-v1:sha256:9fd91955757ed017c2176ac4a505e92855c0f31244cfb0ec68b5763b49b83812"
+        }
+      ]
+    },
+    {
+      "id": "claim_5eaad1765f124f39a307e65ddc961de2",
+      "statement": "Batch note operations run one transaction with one generation bump, and per-item results come back in submission order.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes.service.ts",
+          "version": "repo-file-v1:sha256:e7cc5a27825257f49b092fca29996f24293d87d7071ad0ba9722e401cdd2541f"
+        }
+      ]
+    },
+    {
+      "id": "claim_c978450d49da43178d191b351b0748ea",
+      "statement": "The Next.js BFF is the only API caller to note-service — no browser calls a domain service directly, which makes the single front-door gate model sufficient.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/proxy.ts",
+          "version": "repo-file-v1:sha256:6eedd550cc2230f98f81a640477fb18b7a39eaa08f0f1da5e41e8f1d5debb947"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

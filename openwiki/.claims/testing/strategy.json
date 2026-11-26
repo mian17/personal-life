@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:b8bb207942f6ca80a5bbd3cb98eaa7230c1b8f039fb8f644c763b03e37fc8b59",
+  "claims": [
+    {
+      "id": "claim_ace34d9e17624a1ab4b524be8b0668dc",
+      "statement": "Each workspace runs jest suites (unit tests plus e2e-specs against throwaway stores), and every service ships a health.e2e-spec.ts asserting the shared kernel health dialect — identical across services as deliberate conformance duplication.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/test/content-match.test.ts",
+          "version": "repo-file-v1:sha256:301747faf9c3bb0b003d1135f52f0f63b0668fccef3775537a654b007859a85f"
+        },
+        {
+          "resource": "repo://apps/note-service/test/health.e2e-spec.ts",
+          "version": "repo-file-v1:sha256:a6bb8373e79a047b97ba7414ef04616a7357fec9b64c0b724785dce76e262b99"
+        }
+      ]
+    },
+    {
+      "id": "claim_1e067eab22f24436b3d37b314f2edecb",
+      "statement": "The Playwright harness uses slot-owned infrastructure: ports derived as basePort + 10*slot (31xx production stack, 32xx dev stack, 33xx hop tests), per-slot containers redis-e2e-<slot>, feedback-pg-e2e-<slot>, rabbitmq-e2e-<slot>, and a per-worktree queue so concurrent worktrees never collide.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/test/e2e/config.ts",
+          "version": "repo-file-v1:sha256:30984ac346f6606bf9e32fef2effc527b5ab6d1f28e152d386a77dde8c4f5c73"
+        }
+      ]
+    },
+    {
+      "id": "claim_f90ae3a117bd45298d5c00891a78e12c",
+      "statement": "Explicit env overrides (E2E_*_PORT, TEST_REDIS_URL) always win over the slot-derived values, and the production-build and next-dev stacks run in separate Playwright invocations because they share apps/app/.next.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/test/e2e/config.ts",
+          "version": "repo-file-v1:sha256:30984ac346f6606bf9e32fef2effc527b5ab6d1f28e152d386a77dde8c4f5c73"
+        }
+      ]
+    },
+    {
+      "id": "claim_a73d28154e4b4299aacf11646d1f0661",
+      "statement": "scripts/coverage.mjs merges every jest and node --test suite's lcov into one repository-relative .coverage/lcov.info, rewriting SF: paths and keeping the most-covered run's hit counts for doubly-instrumented files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/coverage.mjs",
+          "version": "repo-file-v1:sha256:d66db00e88bc974fd239fb47145a3cbaa5a667a957d3518622c9bc9b3583c2fb"
+        }
+      ]
+    },
+    {
+      "id": "claim_11183570948549c8a9e3e6dc8c5ed0ed",
+      "statement": "Contract tripwires are real tests: UI token values live in packages/ui/test/tokens.test.ts and arch-check's rules are covered by scripts/arch-check.test.mjs under node --test.",
+      "evidence": [
+        {
+          "resource": "repo://packages/ui/test/tokens.test.ts",
+          "version": "repo-file-v1:sha256:c87b2bbcdcddfffe1cd14c4fe175a7d0b79f267353946f32fe6c2d89ff80700e"
+        },
+        {
+          "resource": "repo://scripts/arch-check.test.mjs",
+          "version": "repo-file-v1:sha256:e1fcd17d0071a6eb6894e802209db627185c829d9aa36900aa3755c10b1cd655"
+        }
+      ]
+    },
+    {
+      "id": "claim_b03ac0289b734dd1a6239076ab42543c",
+      "statement": "The arch-check suite proves its rules can fail: tests plant a violation (shared store, missing env forwarding, a self-hosted runner in a workflow) and assert the finding, and assert today's tree is clean.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/arch-check.test.mjs",
+          "version": "repo-file-v1:sha256:e1fcd17d0071a6eb6894e802209db627185c829d9aa36900aa3755c10b1cd655"
+        }
+      ]
+    },
+    {
+      "id": "claim_b2b61058e3724f8e88ca01b959676c3d",
+      "statement": "Cached-row discipline is asserted structurally (exact cached key list, enc.v1. on the payload, decrypt-and-compare), not by literal string search in ciphertext.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/test/entries-cache.e2e-spec.ts",
+          "version": "repo-file-v1:sha256:92afaeeb2432e64c2c152b99e472f8effba6e18f91eecbc202d45e94ccf0d39a"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

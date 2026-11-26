@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:6556b69fd3d68912827dde7f1ea7f4d410625b44f3c1b03ec5d1aa8b3ca5e653",
+  "claims": [
+    {
+      "id": "claim_e8029e04d40d4c9394bc7570a0844a67",
+      "statement": "Feedback events are a change log: the feedback_event row is written in the same transaction as the feedback, then a NOTIFY-triggered LISTEN dispatcher publishes to a durable topic exchange `feedback` with routing key `feedback.submitted` on a confirm channel.",
+      "evidence": [
+        {
+          "resource": "repo://apps/feedback-service/src/event/publisher.service.ts",
+          "version": "repo-file-v1:sha256:dad560aede19decbf540e25e3eeba2f0c1c6efbb7e2b9e62f9560ee46f94616b"
+        },
+        {
+          "resource": "repo://apps/feedback-service/src/feedback/feedback-event.entity.ts",
+          "version": "repo-file-v1:sha256:f8c3d10d40ca3cbdafc5a461439cc0034d11ea6b72164d31083c201ac5ce9473"
+        }
+      ]
+    },
+    {
+      "id": "claim_bbe491e1a4e94e1c8b7464b7b54cc864",
+      "statement": "The `feedback.submitted` wire body is metadata only (event_id, feedback_id, owner_sub, app, type, occurred_at) — neither title nor description travels, so the broker stays outside the at-rest boundary.",
+      "evidence": [
+        {
+          "resource": "repo://apps/feedback-service/src/event/publisher.service.ts",
+          "version": "repo-file-v1:sha256:dad560aede19decbf540e25e3eeba2f0c1c6efbb7e2b9e62f9560ee46f94616b"
+        }
+      ]
+    },
+    {
+      "id": "claim_ccd966c6a0b641569eb4982fe2f4676a",
+      "statement": "The publisher resolves only after the broker confirms (waitForConfirms) and is injected under the EVENT_SINK token so tests use a fake sink and the dispatcher never depends on amqplib.",
+      "evidence": [
+        {
+          "resource": "repo://apps/feedback-service/src/event/event.module.ts",
+          "version": "repo-file-v1:sha256:b87007dbc326e7d2826bfde452c604e172f66db52c1b1448efd6009eb4ba8ec0"
+        },
+        {
+          "resource": "repo://apps/feedback-service/src/event/publisher.service.ts",
+          "version": "repo-file-v1:sha256:dad560aede19decbf540e25e3eeba2f0c1c6efbb7e2b9e62f9560ee46f94616b"
+        }
+      ]
+    },
+    {
+      "id": "claim_f96f87fe17d541bcbf7488d99f4d7ed0",
+      "statement": "The live delivery leg of the domain outbox is the BFF's drain (apps/app/lib/outbox-relay.ts), not the service poller: origin_grant is keyed (ownerSub, clientId) for the user's own token, clientCredentials is disabled in the IdP, and the default createHttpDelivery sender is intentionally inert.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/outbox-relay.ts",
+          "version": "repo-file-v1:sha256:733d188d83fa55deb55b40b7009ddf500c8a93c20450e87a107e6f645c60047a"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/outbox/outbox-delivery.ts",
+          "version": "repo-file-v1:sha256:d384b352f8f036894f774c3bbfa58d4484858e6d3ef2447a0badf5066f3996c6"
+        }
+      ]
+    },
+    {
+      "id": "claim_28347b718f0746879ef936a7471dcef9",
+      "statement": "The BFF relay isolates each delivery attempt so one bad row never aborts the batch, records all outcomes in one report call (a stuck row keeps its lastError), and never throws into the page caller.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/outbox-relay.ts",
+          "version": "repo-file-v1:sha256:733d188d83fa55deb55b40b7009ddf500c8a93c20450e87a107e6f645c60047a"
+        }
+      ]
+    },
+    {
+      "id": "claim_2f2ae5fc47864c7ca1e6c106b349ae55",
+      "statement": "Cross-service calls are direct HTTP on the compose network with base URLs from env (MEAL_TODOS_API_URL, FOCUS_TODOS_API_URL) that deliberately have no code fallback; arch-check RULE 6 enforces that each is forwarded in the service's compose environment block.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo.controller.ts",
+          "version": "repo-file-v1:sha256:f0e561d276dd0a2b982477ba709633bd3cdbf318bd082675fa30c09a225913e4"
+        },
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    },
+    {
+      "id": "claim_83f7595f498c4d649dfdf8e7958e75f9",
+      "statement": "E2E runs use an ephemeral RabbitMQ on a loopback port with a per-worktree queue so concurrent worktrees never share the compose rabbitmq-feedback broker.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/test/e2e/config.ts",
+          "version": "repo-file-v1:sha256:30984ac346f6606bf9e32fef2effc527b5ab6d1f28e152d386a77dde8c4f5c73"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

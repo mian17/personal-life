@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:1c2aeb64e2b429c61454141372a14f26034a59a7d9323a4b4dbed4a42984ac8d",
+  "claims": [
+    {
+      "id": "claim_4b139d82bfe04536895cb51cce051f3f",
+      "statement": "A meal entry stores a scaled, confirmed nutrient snapshot as a single enc.v1. JSON envelope, so re-logging never re-queries and later food changes cannot rewrite history.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/entries/entry.entity.ts",
+          "version": "repo-file-v1:sha256:2cfe15808f6104b58493ed6c1d20969370e19dc7c2d57401d6dfba64075ba615"
+        }
+      ]
+    },
+    {
+      "id": "claim_db885c3a76404806843f84869bdfe168",
+      "statement": "The photo estimate is meal-service's only Gemini call (a plain fetch against the Generative Language API, no SDK), and its failures are named by owner: COULD_NOT_READ for photo/shape faults versus the model's own errors.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/photo/gemini.client.ts",
+          "version": "repo-file-v1:sha256:4795966979d8080788cec022dca378cdfe4eff54a571a892675e89c5a3837aff"
+        }
+      ]
+    },
+    {
+      "id": "claim_e083691cf07e420299a999405c2636b0",
+      "statement": "isEstimated is derived in the app's entry editor from the item's known nutrient-key set (a photo estimate seeds all 27 fields) — it is not a wire field and not a stored column.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/app/(meals)/meals/entry/%5Bid%5D/editor.tsx",
+          "version": "repo-file-v1:sha256:4993f74c703a40a7080c17fefe2a5cd912007c54549b30c6d1c1d81e3fe7bad7"
+        }
+      ]
+    },
+    {
+      "id": "claim_da55fa16c9884beeb11678b856b23a5f",
+      "statement": "The USDA integration is one HTTP boundary (usda.client.ts against FoodData Central) plus a pure mapping module; usda_search returns names and USDA ids only.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/usda/mapping.ts",
+          "version": "repo-file-v1:sha256:960e6e95f3c1ec83e9140c23348fc5f10d87b15c75a52736de86b5a9e599a2a5"
+        },
+        {
+          "resource": "repo://apps/meal-service/src/usda/usda.client.ts",
+          "version": "repo-file-v1:sha256:de82ee082dc02d3aeb7ae7a6fde32c179f313469b8e1b55a82e0c8c6fa7cd091"
+        }
+      ]
+    },
+    {
+      "id": "claim_b8fb8dfbd9ea4fe8bdcd396d3d7d3a38",
+      "statement": "@life/nutrition exports exactly five modules (nutrients, food, scale, sum, format) and does no I/O — the same math serves service, BFF and UI.",
+      "evidence": [
+        {
+          "resource": "repo://packages/nutrition/src/index.ts",
+          "version": "repo-file-v1:sha256:181f380b725eacc111b5ec327690f2111fec9b44d389daf7e0fbdfc5108c4f17"
+        }
+      ]
+    },
+    {
+      "id": "claim_f8cdf2aef1c34773a5f63382413ae110",
+      "statement": "food.unit is a text column with NOT NULL DEFAULT 'g', one of the additive schema changes boot-time sync applied.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/foods/food.entity.ts",
+          "version": "repo-file-v1:sha256:186290ae62ffb8f5d5030092320798135b409da0095e89785ed69df27fe7928b"
+        }
+      ]
+    },
+    {
+      "id": "claim_8732f707e70343b191cae7252b6dca54",
+      "statement": "The meal → todo bridge rides the transactional outbox and the BFF drain; its service-to-service URL (MEAL_TODOS_API_URL) has no code fallback.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo.controller.ts",
+          "version": "repo-file-v1:sha256:f0e561d276dd0a2b982477ba709633bd3cdbf318bd082675fa30c09a225913e4"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}
