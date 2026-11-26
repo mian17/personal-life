@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:ea2b712de2305302958fc5777be03a6653f0176faa49fb56ba4ce2e1211e91a7",
+  "claims": [
+    {
+      "id": "claim_b17bcf24048b432d9be98a9263b0e86e",
+      "statement": "todo-service's origin routes (create, open listing, grant-own-origin, complete-by-origin, rename-by-origin) are the surface outside surfaces use, and every one is enforced by the origin grant keyed (ownerSub, clientId).",
+      "evidence": [
+        {
+          "resource": "repo://apps/todo-service/src/todos/dto/create-with-origin.dto.ts",
+          "version": "repo-file-v1:sha256:cf23cceb4909e607161ee7f21a2091d4c50ef604f965c229efa83ef273f829ac"
+        },
+        {
+          "resource": "repo://apps/todo-service/src/todos/todos.controller.ts",
+          "version": "repo-file-v1:sha256:ddba1697363b6818fb662743da798c49fe010b637af545c41b40149b5bafe6c8"
+        }
+      ]
+    },
+    {
+      "id": "claim_ce4abdddec4840ef80857674bd44a7ea",
+      "statement": "The producer's own id (originId) is kept off the app's wire DTO; it lives on the row and the cached row only.",
+      "evidence": [
+        {
+          "resource": "repo://apps/todo-service/src/todos/todos.service.ts",
+          "version": "repo-file-v1:sha256:7eca25428115de8345bd24451b269adda7a3cda91642e4019991607ea3c1e7a7"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/grants/origin-grant.entity.ts",
+          "version": "repo-file-v1:sha256:430625da06b47df248a0d6d6da11ee613f761332470802caa7733a1c804eca35"
+        }
+      ]
+    },
+    {
+      "id": "claim_2b9cda2cc2654fa09bad1ff6672102ab",
+      "statement": "meal-service computes todo intent payloads as pure functions and inserts the outbox intent in the same transaction as the meal write, so a committed meal always owes its todo and a rolled-back one sends nothing.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo/meal-todo-producer.service.ts",
+          "version": "repo-file-v1:sha256:3d5328d4a68392ca49aa54feb3a22b4ddaa4e91025e84f21f6e1936ab444c846"
+        },
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo/todo-intents.ts",
+          "version": "repo-file-v1:sha256:6654d6a951864c840c941338e1cfa070f1547d1ab64746b83fae6cb25666f855"
+        }
+      ]
+    },
+    {
+      "id": "claim_35c4db88ad634c0c83c9be793e044715",
+      "statement": "Outbox delivery is sequential and the cursor advances only after delivery confirms: order is meaning for todos, and the poller-only cursor write makes the pattern at-least-once rather than lossy.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/outbox/outbox-poller.service.ts",
+          "version": "repo-file-v1:sha256:be7f82d6f20d9ce6e0784344d5e02b9946720c0976e1423c205678b4ec8f7e6f"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/outbox/outbox.entity.ts",
+          "version": "repo-file-v1:sha256:929c8896bd6e3e8fd5f4c4667f6dea3b8b8c1332b9587d99dcfd4d149a66505b"
+        }
+      ]
+    },
+    {
+      "id": "claim_d8c5815a77174d72bb7b0eb3410d88bc",
+      "statement": "Live delivery of meal intents runs in the BFF drain: it pulls meal-service's pending queue, sends each intent to todo-service's origin routes with the user's session, and reports all outcomes in one call.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/outbox-relay.ts",
+          "version": "repo-file-v1:sha256:733d188d83fa55deb55b40b7009ddf500c8a93c20450e87a107e6f645c60047a"
+        }
+      ]
+    },
+    {
+      "id": "claim_8b8fef055c564cdf982399d3fc17e6cd",
+      "statement": "focus-service calls todo-service directly over the compose network via FOCUS_TODOS_API_URL (and meal's outbox target via MEAL_TODOS_API_URL); both have no code fallback, so unset they fail loudly rather than half-succeed.",
+      "evidence": [
+        {
+          "resource": "repo://apps/focus-service/src/todos/focus-todos.client.ts",
+          "version": "repo-file-v1:sha256:9b5e5c39380143d775de8d32be3ef513cfdb163b1c6f50d20a12aa2a8caa8df4"
+        },
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo.controller.ts",
+          "version": "repo-file-v1:sha256:f0e561d276dd0a2b982477ba709633bd3cdbf318bd082675fa30c09a225913e4"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

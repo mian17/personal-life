@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:b767489c128064158baa112b343f5e93da3878a1ceea45bc20d8c4955e3fc117",
+  "claims": [
+    {
+      "id": "claim_38e50425069647e091dc4a680c7c5e8c",
+      "statement": "Every service exposes one health dialect: GET /health/live (process liveness), GET /health/ready (DB reachable + master key loads, 200 {\"status\":\"ok\"} or 503 {\"status\":\"degraded\"}), and a deprecated /health alias of readiness; all three are @Public and return only the status JSON.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/health.controller.ts",
+          "version": "repo-file-v1:sha256:bebcef2fa6046ba600953ff111ed897cb779654c9325d985be41abdae337dbf1"
+        }
+      ]
+    },
+    {
+      "id": "claim_a04075c4ea464a9bb0c0dcbf56c122e5",
+      "statement": "Readiness deliberately does not check Redis or RabbitMQ: both are fail-open on the HTTP path, so their outage must never take a service out of rotation.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/health.service.ts",
+          "version": "repo-file-v1:sha256:25c87da0f0c7422db7e9d0f3b7344792af9f4aaf81cc5d1db6f8f29788d23173"
+        }
+      ]
+    },
+    {
+      "id": "claim_5e9baad533aa42aeae9b068acdb8d295",
+      "statement": "AuthGuard verifies bearer tokens and installs the principal; @Public routes skip it, and the NODE_ENV=development bypass covers only credential-less requests — a presented token is always verified.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/auth/auth.guard.ts",
+          "version": "repo-file-v1:sha256:2ae0f1906ec80c1352d6f6c925d67d789de0831df581050e0dcaf26f69292a75"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/public.decorator.ts",
+          "version": "repo-file-v1:sha256:b203cba84ce4cf0cb027f7a1c08b455ed0cc081aadb7124f5c586fe64fb51564"
+        }
+      ]
+    },
+    {
+      "id": "claim_68f732e64a3b4398aaba988c908e2599",
+      "statement": "Cursor paging lives in one seam (opaque cursor codec, default limit 50, max 200); each caller supplies its own stable sort key and strictly-after test, and the module decrypts nothing and sorts nothing.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/paging.ts",
+          "version": "repo-file-v1:sha256:9fd91955757ed017c2176ac4a505e92855c0f31244cfb0ec68b5763b49b83812"
+        }
+      ]
+    },
+    {
+      "id": "claim_18edf9fba7454b76ace1089b1341c37f",
+      "statement": "An Outbox row is one 'tell another service' intent inserted in the same transaction as its business row, so a committed write can never lose its notification and a rolled-back one can never send it; delivery is at-least-once because publishedAt is written only by the poller.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/outbox/outbox.entity.ts",
+          "version": "repo-file-v1:sha256:929c8896bd6e3e8fd5f4c4667f6dea3b8b8c1332b9587d99dcfd4d149a66505b"
+        }
+      ]
+    },
+    {
+      "id": "claim_093142daa62b4ff599fb81307bfbfb74",
+      "statement": "The outbox poller delivers rows sequentially (one failing row cannot abort or reorder the batch) and advances its cursor only after the broker confirms; each sweep is bounded.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/outbox/outbox-poller.service.ts",
+          "version": "repo-file-v1:sha256:be7f82d6f20d9ce6e0784344d5e02b9946720c0976e1423c205678b4ec8f7e6f"
+        }
+      ]
+    },
+    {
+      "id": "claim_85ea66f7db804fd8adc46d903a9deae9",
+      "statement": "Origin grants are the enforcement point for outside surfaces creating/ticking todos: the grant is written before an intent is enqueued, and a toggle flag is convenience only.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/grants/origin-grant.entity.ts",
+          "version": "repo-file-v1:sha256:430625da06b47df248a0d6d6da11ee613f761332470802caa7733a1c804eca35"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

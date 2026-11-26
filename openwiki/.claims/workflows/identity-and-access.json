@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:85037298a0af1a5c8b131982128dfcabe8d0095f87c080b9714d12ce797f6d01",
+  "claims": [
+    {
+      "id": "claim_b3d52d26ca4646e1b4c11bd0312b42d5",
+      "statement": "Two independent gates run in order: ACCESS (Tailscale reachability — 403 without a tailscale-user-login matching OWNER_LOGIN) and IDENTITY (IdP session — 307-redirects an unauthenticated visitor into login); identity is never derived from the access gate.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/auth/gate.ts",
+          "version": "repo-file-v1:sha256:71fc4f35dca370699ce51a0cd20bd90ba4b542a11ad53ebc5941b02dfc6e732a"
+        },
+        {
+          "resource": "repo://apps/app/proxy.ts",
+          "version": "repo-file-v1:sha256:6eedd550cc2230f98f81a640477fb18b7a39eaa08f0f1da5e41e8f1d5debb947"
+        }
+      ]
+    },
+    {
+      "id": "claim_f58052c6c33049db9cce550af912c961",
+      "statement": "The access gate is fail-closed by default with exactly one switch, APP_DEV_SKIP_ACCESS_GATE=1 (a dev-stack flag, never a deployed env value, deliberately not NODE_ENV); the identity gate runs in every environment including localhost.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/auth/gate.ts",
+          "version": "repo-file-v1:sha256:71fc4f35dca370699ce51a0cd20bd90ba4b542a11ad53ebc5941b02dfc6e732a"
+        }
+      ]
+    },
+    {
+      "id": "claim_32d2b367518045c5aeec32a129f2b6ff",
+      "statement": "The middleware matcher excludes _next/static, _next/image and favicon.ico, so decideGate never runs on those paths — the favicon entry in gate.ts's PUBLIC_EXACT is dead for the proxy while live for the unit test.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/proxy.ts",
+          "version": "repo-file-v1:sha256:6eedd550cc2230f98f81a640477fb18b7a39eaa08f0f1da5e41e8f1d5debb947"
+        }
+      ]
+    },
+    {
+      "id": "claim_beec20f897344825bc84765f4b40cedf",
+      "statement": "Public paths are /auth/* prefixes plus a small PUBLIC_EXACT asset set; everything else requires both gates to pass.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/auth/gate.ts",
+          "version": "repo-file-v1:sha256:71fc4f35dca370699ce51a0cd20bd90ba4b542a11ad53ebc5941b02dfc6e732a"
+        }
+      ]
+    },
+    {
+      "id": "claim_251a75bec8394c66b166be490b73a15d",
+      "statement": "The IdP registers an app client (code + PKCE, secret required in production with no placeholder fallback) and one public PKCE client per producer, with redirect URIs from OIDC_PRODUCER_<NAME>_REDIRECT_URIS that production must supply or boot fails.",
+      "evidence": [
+        {
+          "resource": "repo://apps/idp/src/oidc/clients.ts",
+          "version": "repo-file-v1:sha256:a5f53b62b1ce2d61b2ff5ee3f4aeda44e5e7c4016e3816fdf5e1eae2a8f7e7bf"
+        }
+      ]
+    },
+    {
+      "id": "claim_c5e02750a65b4aa283b4fb032a172cf7",
+      "statement": "clientCredentials is disabled in the IdP, so no service can impersonate a user — the reason the outbox's live delivery leg is the BFF's drain.",
+      "evidence": [
+        {
+          "resource": "repo://apps/app/lib/outbox-relay.ts",
+          "version": "repo-file-v1:sha256:733d188d83fa55deb55b40b7009ddf500c8a93c20450e87a107e6f645c60047a"
+        },
+        {
+          "resource": "repo://apps/idp/src/oidc/clients.ts",
+          "version": "repo-file-v1:sha256:a5f53b62b1ce2d61b2ff5ee3f4aeda44e5e7c4016e3816fdf5e1eae2a8f7e7bf"
+        }
+      ]
+    },
+    {
+      "id": "claim_1ea5d667eaf842019f913dbbe0fbb49a",
+      "statement": "The compose-boot CI job asserts the gate answers directly: 403 header-less on /, 307 with matching owner headers, 200 on /icon.svg (a public path that passes both gates).",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/compose-boot.yml",
+          "version": "repo-file-v1:sha256:e7669d69a19e7bb7fe39bea6852a5e2eab99560f7e5f22c31bb90503a3df388d"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

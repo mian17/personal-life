@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:22d71a5788d42f28b6c821600043bef3cad931206ef1e8973d8d21402cca8339",
+  "claims": [
+    {
+      "id": "claim_ac65d47829ff4ed9856be03107090356",
+      "statement": "The wiki's two binding contracts are: all visuals come from @life/ui (apps own behavior only), and every domain service is BE → cache → DB with ciphertext at rest and in the cache.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:b5b4aef12748e1cc435c9ce46f1a1b3d1f23c410da139bf11e590c7a35c23e12"
+        }
+      ]
+    },
+    {
+      "id": "claim_19d95574220f49f48f6a5f49bea37894",
+      "statement": "The wiki is organized by task — understand the system, change data flow, add UI, modify a service, trace a feature, fix CI, ship, write tests — not by source directory.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:795e5c86c6f5f788b5b8cd7d008f6aab019a346cd916254e1f494d6d3478dbb6"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

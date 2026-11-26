@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "/openwiki/architecture/crypto-at-rest.md": {
+      "pageVersion": "sha256:f46b97bd50cad17f71bece7fe4e98cc7b4377796e9762c1c9f3e2705908ad3b1",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/architecture/data-layer.md": {
+      "pageVersion": "sha256:eab16bc1f7323935c3649715853df9682755b45b1a96a316ecbb76c7c5a7e7e8",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/architecture/overview.md": {
+      "pageVersion": "sha256:94be5d2bc5b4a8b70d3fca9b27dca6bbfe3379d2fb14591c33de58bfa61673ee",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/architecture/service-kernel.md": {
+      "pageVersion": "sha256:b767489c128064158baa112b343f5e93da3878a1ceea45bc20d8c4955e3fc117",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/architecture/ui-contract.md": {
+      "pageVersion": "sha256:057fa772986664032a64c0ca9e82b75482234fd524fa55a5657d60e82c4fae7d",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/integration/events-and-messaging.md": {
+      "pageVersion": "sha256:6556b69fd3d68912827dde7f1ea7f4d410625b44f3c1b03ec5d1aa8b3ca5e653",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/operations/ci-gates.md": {
+      "pageVersion": "sha256:2ecbc420e617f97d74184c66ce6db4784c9cb4d99f85b1f44f9c1202033b2191",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/operations/deployment.md": {
+      "pageVersion": "sha256:172306f9897c8291c5d4f6d51bea737efe26c0972c2acf26bfdce0c00af7806d",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/operations/release.md": {
+      "pageVersion": "sha256:aa6caa54e8b758447ef29dcc9e7c7c197d57e1f285f6507359cd19e599cdc911",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/quickstart.md": {
+      "pageVersion": "sha256:22d71a5788d42f28b6c821600043bef3cad931206ef1e8973d8d21402cca8339",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/testing/strategy.md": {
+      "pageVersion": "sha256:b8bb207942f6ca80a5bbd3cb98eaa7230c1b8f039fb8f644c763b03e37fc8b59",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/workflows/identity-and-access.md": {
+      "pageVersion": "sha256:85037298a0af1a5c8b131982128dfcabe8d0095f87c080b9714d12ce797f6d01",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/workflows/meals-and-nutrition.md": {
+      "pageVersion": "sha256:1c2aeb64e2b429c61454141372a14f26034a59a7d9323a4b4dbed4a42984ac8d",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/workflows/notes-lifecycle.md": {
+      "pageVersion": "sha256:40f4b811840c36a03d940f57ae645a6763f1ddddc3d0333759a05755defda7be",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    },
+    "/openwiki/workflows/todos-and-outbox.md": {
+      "pageVersion": "sha256:ea2b712de2305302958fc5777be03a6653f0176faa49fb56ba4ce2e1211e91a7",
+      "completedBy": "pi",
+      "completedRunId": "1cb09c1a-ee1d-4c83-9353-9263c516f2bd",
+      "gitHead": "ed3d4d4837d5873838dfd06b73237093d02b4f16",
+      "sourceFingerprint": "sha256:902fb2bd0e5b72b6504fca0840a08bae5789cd1dac3c0ef18d378017c520983d"
+    }
+  }
+}

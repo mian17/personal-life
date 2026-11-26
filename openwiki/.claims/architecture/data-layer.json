@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:eab16bc1f7323935c3649715853df9682755b45b1a96a316ecbb76c7c5a7e7e8",
+  "claims": [
+    {
+      "id": "claim_72ef4f43c1c84158a5719415c4796d27",
+      "statement": "Read flows go through `getThrough(sub, rest, loader)` and repository access lives inside the loader; writes go BE → DB and then `bumpGeneration(sub)`, so the cache never absorbs a write.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes.service.ts",
+          "version": "repo-file-v1:sha256:e7cc5a27825257f49b092fca29996f24293d87d7071ad0ba9722e401cdd2541f"
+        },
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_d4a5a75bcbfc472a82f2258ea33db650",
+      "statement": "Cache keys compose as `<service>:<sub>:v<gen>:<rest>` with a per-owner generation key `<service>:gen:<sub>`; there is no `DEL` on the client surface because a generation bump invalidates every entry of that owner at once.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c840a00fe0a41e8aa0282f4dfd2b391",
+      "statement": "Cached values are serialized rows as persisted — ciphertext for content — and the loader output is both returned to the caller and stored.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_b1a861fe51f540068de0d286a11643a3",
+      "statement": "Generation bumps happen after the DB mutation (bump-after), and a mutation that throws never bumps, so the cache keeps serving a view of a write that did not happen.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_79515020484e4ee08b0a27e177d61684",
+      "statement": "A stale-guard captures the generation before the loader runs and re-reads it after; a result computed while a write bumped the counter is never cached under the new generation.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_dc7b81fb092f485683086e5c6ed73696",
+      "statement": "Entries carry a 60-second TTL (`CACHE_TTL_SECONDS`) as a backstop, not as the invalidation mechanism.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_f572f42f29684d29af09766a911973cc",
+      "statement": "Every cache error fails open to the direct loader: a disconnected client, timeout, or unusable entry (including a legacy plaintext value refused by `cacheable`) is served from the DB, and the fallback never writes plaintext.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_75c01d8034eb4e22acd21f74e51e8fe6",
+      "statement": "`notes-cache.ts` is the reference adapter: it pins the `note` namespace over `@life/cache` and keeps the pre-extraction import surface so callers did not move; new services subclass `ReadThroughCache` with their own namespace instead of forking it.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes-cache.ts",
+          "version": "repo-file-v1:sha256:abe9a6d2e02310d2a67e495b9d67e1e61dbcedb0f51adbcdb89cbe24dfca0571"
+        }
+      ]
+    },
+    {
+      "id": "claim_9e1f4af534994873ac6ba8e0fbf24310",
+      "statement": "A batch write runs one transaction and performs exactly one generation bump, owned by the batch kernel rather than each row's insert.",
+      "evidence": [
+        {
+          "resource": "repo://apps/note-service/src/notes/notes.service.ts",
+          "version": "repo-file-v1:sha256:e7cc5a27825257f49b092fca29996f24293d87d7071ad0ba9722e401cdd2541f"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}
