@@ -2,6 +2,18 @@
 
 A self-owned personal API that centralizes life data. Domain #1 is **notes/journaling**.
 
+## Screens
+
+Five module index pages, dark theme, captured from a freshly seeded demo stack.
+
+| Screen                              | Preview                                           |
+| ----------------------------------- | ------------------------------------------------- |
+| **Notes** — note list               | ![Notes index page](docs/screens/notes.png)       |
+| **Todos** — today view              | ![Todos today view](docs/screens/todos.png)       |
+| **Meals** — today's meals           | ![Meals today page](docs/screens/meals.png)       |
+| **Pomodoro** — focus timer          | ![Pomodoro timer page](docs/screens/pomodoro.png) |
+| **Feedback** — inbox across modules | ![Feedback inbox page](docs/screens/feedback.png) |
+
 - `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
 - `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
 - `apps/idp` — NestJS OpenID Connect Identity Provider (users, login, sessions, OIDC).
