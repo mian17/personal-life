@@ -90,12 +90,17 @@ A release is a tag plus a GitHub release, on the commit you ship. Promoting
 `dev` to `main` records the release line; it does not tag anything.
 
 ```bash
-npm run release -- <version>        # tags, pushes the tag, creates the release
+npm run release -- <version>        # bump, PR into dev, wait for CI, tag, release
 ```
 
 The script refuses unless the tree is clean, HEAD is `origin/dev` (or `--ref`),
 the tag is new, the notes file exists at `docs/releases/<version>.md`, and CI is
-green on that exact SHA. Never tag by hand: the hand-tagged path is the one that
+green on that exact SHA. It then bumps `package.json`, lands that bump on
+`chore/release-v<x>` through a pull request into `dev` merged with `--merge`
+(never squashed — the tag names that commit), waits for every workflow on the
+bump commit's own SHA, and only then tags and runs `gh release create`. So CI has
+to be green twice over: on the pre-bump HEAD, and again on the bump commit.
+Never tag by hand: the hand-tagged path is the one that
 gets skipped. House style for the notes, and what the script deliberately leaves
 to you, are in `docs/runbooks/release.md`.
 

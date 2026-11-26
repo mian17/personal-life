@@ -5,10 +5,24 @@ A self-owned personal API that centralizes life data. Domain #1 is **notes/journ
 - `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
 - `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
 - `apps/idp` — NestJS OpenID Connect Identity Provider (users, login, sessions, OIDC).
-- `apps/tags-service`, `apps/todo-service` — NestJS + TypeORM/SQLite domain APIs.
+- `apps/tags-service` — NestJS + TypeORM/SQLite tag registry, shared by notes and todos.
+- `apps/todo-service` — NestJS + TypeORM/SQLite todos, lists, reminders and Web Push.
 - `apps/feedback-service` — NestJS + TypeORM/Postgres feedback ingest; a `feedback_event`
   change log publishes metadata-only `feedback.submitted` messages to RabbitMQ.
-- `packages/shared` — shared DTO/types.
+- `apps/meal-service` — NestJS + TypeORM/SQLite meals, foods and nutrition, including the
+  Gemini photo estimate.
+- `apps/focus-service` — NestJS + TypeORM/SQLite Pomodoro sessions and goals.
+- `apps/pomodoro` — focus-screen React components over `@life/ui`; no port, no server.
+- `packages/shared` — shared DTOs and types.
+- `packages/ui` — the visual language: atoms, blocks and `tokens.css`.
+- `packages/app-kit` — Next helpers: route layout, query suffix, preferences, pending actions.
+- `packages/crypto` — `enc.v1.` envelopes, `kw.v1.` DEK wrapping, master-key loading.
+- `packages/cache` — the read-through cache every service adapter extends.
+- `packages/service-kit` — `AuthGuard`, health, keys module, paging, batch.
+- `packages/nutrition` — nutrition math.
+- `packages/db` — backup and restore CLIs.
+- `packages/ops` — the data-operations registry and its `life-ops` CLI.
+- `packages/mcp-gateway` — one stdio MCP server over that registry.
 
 ## Requirements
 
@@ -37,9 +51,9 @@ client secret with `openssl rand -hex 32` (see the OIDC keys in `.env.example`).
 
 ## Production (Docker Compose)
 
-Docker Compose is the production path; `npm run start` is no longer used. Four services
+Docker Compose is the production path; `npm run start` is no longer used. Eight services
 run on the internal `life` network: `note-service`, `tags-service`, `todo-service`,
-`feedback-service` (no published ports), `idp` (published
+`feedback-service`, `meal-service`, `focus-service` (no published ports), `idp` (published
 on host loopback `127.0.0.1:3003` so Tailscale Serve can proxy to it), and `app`
 (published on host loopback `127.0.0.1:3002`).
 
@@ -112,14 +126,15 @@ tailscale serve status       # show the current Serve routes
 
 ```unknown
 npm run dev        # note-service :3101 + app :3100 + idp :3102 + tags :3104
-                    # + todo :3105 + feedback :3108 (all six)
+                    # + todo :3105 + meal :3106 + focus :3107 + feedback :3108
+                    # (all eight)
 npm run build      # compile all workspaces
 npm run lint
 npm test
 ```
 
 `npm run dev` loads the root `.env.development` (via Node's `--env-file-if-exists`), runs
-with `NODE_ENV=development`, and starts all six services in one command. It runs the
+with `NODE_ENV=development`, and starts all eight services in one command. It runs the
 Tailscale **network access gate** only in production (dev has no Tailscale header), so
 locally only this device reaches the app via loopback. The IdP **login/session gate is the
 app's real flow in every environment** — including localhost — so after seeding a dev user
@@ -146,7 +161,7 @@ SEED_USERNAME=you SEED_PASSWORD='…' npm run seed -w apps/idp
 ## Auth model
 
 Identity is owned by the self-hosted IdP (`apps/idp`). Tailscale is **access only** — it
-decides whether a device can reach the app, never *who* the user is.
+decides whether a device can reach the app, never _who_ the user is.
 
 1. **Access (Tailscale).** A tailnet ACL restricts the Serve ports to the owner's
    devices, and Next.js middleware requires the Serve-injected `Tailscale-User-Login`
@@ -182,8 +197,9 @@ decides whether a device can reach the app, never *who* the user is.
    The app cluster (`redis-app`, AOF + named volume) is the shared **session store** and
    cross-replica **refresh lock**; it **fails closed** (a Redis error means no session →
    login wall, never a per-instance fallback that would split state). `redis-idp`,
-   `redis-note`, `redis-tags` and `redis-todo` are **read-through caches** over their own
-   databases (LRU, unpersisted); they
+   `redis-note`, `redis-tags`, `redis-todo`, `redis-meal`, `redis-focus` and
+   `redis-feedback` are **read-through caches** over their own databases (LRU,
+   unpersisted); they
    **fail open** (a Redis error just falls back to the DB — degraded, never wrong). None
    of them publishes a host port, so Redis is reachable only between containers.
    Clients are cluster-ready (`createClient`/`createCluster` share one surface), so a
@@ -195,7 +211,7 @@ decides whether a device can reach the app, never *who* the user is.
 The redirect URI must be the **exact same string** in three places, or login fails
 closed at the callback:
 
-1. `.env` → `OIDC_APP_REDIRECT_URI` (used by the app *and* registered on the IdP as
+1. `.env` → `OIDC_APP_REDIRECT_URI` (used by the app _and_ registered on the IdP as
    `OIDC_APP_REDIRECT_URIS`), e.g. `https://<host>.<tailnet>.ts.net/auth/callback`.
 2. The Tailscale Serve route that maps the browser URL to `127.0.0.1:3002`.
 3. The URL the browser actually lands on after login — same scheme, host, **port**, and
@@ -244,8 +260,9 @@ on the host.
 ## Docs
 
 Planning docs (intent, specs, task plans) were removed in `d1f54c9`; recover any one
-with `git show d1f54c9^:<path>`. Kept: `AGENTS.md`, `docs/runbooks/`, `docs/lessons/`,
-`docs/research/`, `docs/reports/`.
+with `git show d1f54c9^:<path>`. Kept: `AGENTS.md`, `docs/runbooks/`, `docs/ops/`,
+`docs/lessons/`, `docs/research/`, `docs/releases/`, `docs/handoffs/`,
+`docs/design-systems/`.
 
 - Notes design (intent, spec, plan, tasks): `d1f54c9^:docs/intent/personal-life-api.md`,
   `d1f54c9^:docs/specs/SPEC-notes.md`, `d1f54c9^:tasks/plan.md`.

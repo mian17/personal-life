@@ -13,7 +13,7 @@ Read this **with** `docs/runbooks/production-deploy.md` (the baseline stack runb
 `docs/specs/MAP-meal-nutrition.md` (capabilities + Decision log).
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
-authority to run it. Do **not** merge to `master` unless asked explicitly.
+authority to run it. Do **not** merge to `main` unless asked explicitly.
 
 ## 0. What is new
 
@@ -58,7 +58,7 @@ makes every existing encrypted meal row undecryptable.
 **Fail-fast `MEAL_MASTER_KEY`:** compose interpolates it as
 `${MEAL_MASTER_KEY:?MEAL_MASTER_KEY is required (openssl rand -base64 32)}` — `docker
 compose up` refuses to start without it, and the service itself also refuses to boot
-(`apps/meal-service/src/keys/keys.service.ts`). Verify a key is 32 bytes before pasting:
+(`apps/meal-service/src/service-config.ts`). Verify a key is 32 bytes before pasting:
 `printf '%s' "$K" | base64 -d | wc -c` → `32`.
 
 ## 3. Pre-flight
@@ -103,7 +103,7 @@ docker compose up -d --build meal-service app
 
 ```bash
 npm run dev -w apps/meal-service      # single service, PORT default 3106
-npm run dev                           # repo root: all six processes incl. meal-service
+npm run dev                           # repo root: all eight processes incl. meal-service
 ```
 
 Built output runs as `node dist/main.js` (`npm start -w apps/meal-service` →
@@ -128,7 +128,7 @@ to `0.0.0.0` only in compose. Dev/e2e deliberately run **without** `MEAL_MASTER_
 ## Hard lines
 
 No one else does these: `docker compose down`, `db:backup`, `db:restore`, `docker compose up`
-against production, generating or rotating `MEAL_MASTER_KEY`, and any merge to `master`.
+against production, generating or rotating `MEAL_MASTER_KEY`, and any merge to `main`.
 
 ## Related
 

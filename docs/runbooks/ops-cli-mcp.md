@@ -59,9 +59,10 @@ so the chain holds only while each rotation is written back; once one is rejecte
 ## Two traps worth knowing
 
 **A dev-mode service proves nothing about auth.** `packages/service-kit/src/auth/auth.guard.ts`
-returns early when `NODE_ENV === 'development'` and sets principal `dev-user` without
-reading the token, so a bogus token and an absent one both answer `200`; restart with
-`NODE_ENV=test` for real `401`s. The comment claims "for localhost" but checks `NODE_ENV`.
+returns early when `NODE_ENV === 'development'` and the request presents no bearer token,
+setting principal `dev-user`; a request that does carry a token is verified in every
+environment, so a bogus one answers `401`, never `200`. Restart with `NODE_ENV=test` for a
+real `401` on an anonymous call.
 
 **The login callback is pinned to 8080 at `/cb`.** The seeded dev client registers only
 those redirect URIs, so busy 8080 must be freed, not routed around — any other port
@@ -71,4 +72,6 @@ returns `invalid_redirect_uri`, and the CLI names the port instead of falling ba
 
 - `no token found, run \`npm run ops -- login\` first` → run `npm run ops -- login`.
 - `invalid_redirect_uri` → 8080 is not free, or the IdP redirect list changed.
-- `notes_list` rejects a token the CLI accepted → service is in development mode.
+- `notes_list` rejects a token the CLI accepted → the service verifies it offline against
+  the IdP's JWKS, so check its JWKS and audience env (`*_IDP_JWKS_URL`, `OIDC_AUDIENCE_MAP`)
+  before blaming the login.

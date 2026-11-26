@@ -13,8 +13,6 @@ maintainer never has to run git locally for it.
   content that `dev` does not. The merge is pure bookkeeping — it makes `main` an ancestor of `dev`
   again so the next promotion PR stops conflicting textually. `dev` stays the source of truth.
 - **Merge the PR with "Create a merge commit", never squash** — squashing it recreates the problem.
-- The back-merge commit is content-neutral, so `sonarqube.yml` detects it by tree comparison and
-  skips the scan — there is nothing to analyse.
 **Precondition: the repo must allow Actions to open pull requests.** Settings → Actions → General →
 Workflow permissions → "Allow GitHub Actions to create and approve pull requests" must be enabled.
 The workflow's `GITHUB_TOKEN` carries `pull-requests: write`, but that permission is meaningless

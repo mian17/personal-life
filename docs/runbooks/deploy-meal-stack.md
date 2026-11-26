@@ -1,23 +1,23 @@
-# Deploy runbook — meal stack (deploy `master`)
+# Deploy runbook — meal stack (deploy `main`)
 
 > Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
 > recover any of them with `git show d1f54c9^:<path>`. New work still writes them
 > (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
 
-Deploy ref: **`master` after merging `feat/meal-ingredients`** (`77eb2c4`).
+Deploy ref: **`main` after merging `feat/meal-ingredients`** (`77eb2c4`).
 
 Runs entirely in the **primary checkout** — `/home/night/WebstormProjects/personal-life` —
 because that is where the live stack lives: `.env` (production secrets),
-`apps/*/data/*.db` (the four live databases), `backup/` (pinned snapshots) and
+`apps/*/data/*.db` (the six live databases, `focus.db` among them), `backup/` (pinned snapshots) and
 `compose.yaml`. No worktree, no second checkout, **no data file is moved**.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
 authority to run it.
 
-## 0. Prerequisite — merge the branch into `master`
+## 0. Prerequisite — merge the branch into `main`
 
-The branch is 100 commits ahead of `master` (`0260d4b`), has no remote, and is
-currently held by the worktree at `.worktrees/meal-ingredients`. Merging to `master`
+The branch is 100 commits ahead of `main` (`0260d4b`), has no remote, and is
+currently held by the worktree at `.worktrees/meal-ingredients`. Merging to `main`
 is **your** call and needs your explicit go-ahead; nothing in this runbook merges.
 
 ```bash
@@ -30,14 +30,14 @@ npm install                                # new workspaces (@life/nutrition,
                                            # apps/meal-service) + changed lockfile
 ```
 
-- [ ] The pre-merge `master` commit is recorded — §8 rolls back to it.
+- [ ] The pre-merge `main` commit is recorded — §8 rolls back to it.
 - [ ] Merge clean; `git status --short` shows only the untracked
       `docs/reference-repo/` and `pictures/` (leave both alone).
-- [ ] `.gitignore` on `master` now carries `.worktrees/` (the branch brought it, so
+- [ ] `.gitignore` on `main` now carries `.worktrees/` (the branch brought it, so
       the primary checkout's uncommitted copy of that same edit is satisfied).
 - [ ] `npm install` completed at the repo root.
 
-Until this merge lands, do not deploy: `master` has no `meal-service`, no
+Until this merge lands, do not deploy: `main` has no `meal-service`, no
 `packages/nutrition`, and no `meal` support in `packages/db`.
 
 ## 1. What this deploy changes on the host
@@ -60,13 +60,13 @@ Facts that decide the steps below:
   own TypeORM sync (`synchronize: true` in
   `apps/meal-service/src/app.module.ts`), which creates `meal.db` and its seven
   tables (`user_keys`, `target`, `food`, `serving`, `entry`, `saved_meal`,
-  `saved_meal_item`). The four existing databases are not touched — each service
+  `saved_meal_item`). The six existing databases are not touched — each service
   syncs only its own file.
 - The `import-tags` data migration in `production-deploy.md` §3 belongs to an earlier
   lane and **already ran on this host** — the `backup/2026-10-01T11-38-*-pinned`
   snapshots bracket it. Do not re-run it.
 - The other backends (`note-service`, `tags-service`, `todo-service`, `idp`) and the
-  five existing Redis instances are untouched — no block changes, no data moves. Only
+  eight existing Redis instances are untouched — no block changes, no data moves. Only
   `app` is rebuilt and reconfigured, and only `meal-service` and `redis-meal` are new.
 
 ## 2. Env (names only)
@@ -80,7 +80,7 @@ checkout's `.env` directly (compose reads it via `env_file: .env`).
 | `USDA_API_KEY` | yes in practice | FoodData Central key, from https://fdc.nal.usda.gov/api-key. Reaches the container through the block's `env_file: .env` — no compose edit needed. Unset ⇒ every USDA-side photo item falls to the absent vector: name and grams, **no numbers**, while everything else works. |
 | `USDA_API_BASE` | no | Leave unset unless a proxy fronts FDC (defaults to `https://api.nal.usda.gov/fdc`). |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE` | yes — all three, for photo | The model client is built on the first photo lookup and fails closed at construction: any one missing ⇒ every photo estimate answers its failure shape, while manual entry keeps working. Reaches the container through `env_file: .env`. Owned in detail by `deploy-meal-nutrition.md` §2. |
-| `OIDC_AUDIENCE_MAP` | verify | Must contain `https://meal-service=life-api` (already at `.env.example:43`). A `.env` carried from an older deploy 401s every meal request without it. |
+| `OIDC_AUDIENCE_MAP` | verify | Must contain `https://meal-service=life-api` (already at `.env.example:52`). A `.env` carried from an older deploy 401s every meal request without it. |
 
 - [ ] `MEAL_MASTER_KEY` generated and verified as 32 decoded bytes **before** pasting.
 - [ ] `USDA_API_KEY` present in `.env`.
@@ -107,14 +107,14 @@ cd /home/night/WebstormProjects/personal-life
       root-owned: `mkdir -p apps/meal-service/data`.
 - [ ] Port `3106` free on `127.0.0.1`.
 
-## 4. Back up — the four existing databases, pinned
+## 4. Back up — the existing databases, pinned
 
 A deliberate pre-deploy snapshot, so it is pinned (never auto-pruned). Run it from the
 repo root with **no path overrides**: the tool's defaults are repo-anchored
 (`packages/db/src/paths.ts`), so at this checkout they already point at the live files.
 
 `--only` is required **for this first deploy**: `meal.db` does not exist yet, and the
-default set of five would fail closed (D10) and abort the whole run before writing
+default set of six would fail closed (D10) and abort the whole run before writing
 anything.
 
 ```bash
@@ -124,7 +124,7 @@ npm run db:backup -w @life/db -- --pin --only life,tags,todo,idp
 - [ ] Four `quick_check=ok` lines and a new `backup/<stamp>-pinned/` directory with a
       `PINNED` marker. Rollback of the existing chapters depends entirely on this.
 - [ ] Do **not** continue otherwise.
-- [ ] From the next deploy on, `meal.db` exists and the bare form covers all five:
+- [ ] From the next deploy on, `meal.db` exists and the bare form covers all six:
       `npm run db:backup -w @life/db -- --pin`.
 
 ## 5. Deploy
@@ -135,12 +135,12 @@ docker compose up -d --build app meal-service
 
 Only `app` and `meal-service` are named: both changed (`app` gained `MEAL_API_URL` +
 `depends_on: meal-service`, `meal-service` is new), and naming them keeps the other
-five containers untouched. `redis-meal` comes up with them — `meal-service` depends on
+six containers untouched. `redis-meal` comes up with them — `meal-service` depends on
 it being healthy. `redis-app` (the session store, AOF + named volume) is never touched,
 so **existing logins survive** — nothing forces a re-login.
 
 - [ ] `docker compose ps` — `app`, `idp`, `note-service`, `tags-service`,
-      `todo-service`, `meal-service` (new), and the six Redis instances all up;
+      `todo-service`, `meal-service` (new), and the eight Redis instances all up;
       healthchecks green on every service that declares one (`/health/ready` on
       3001/3004/3005 note/tags/todo, 3106 meal, 3003 idp).
 - [ ] `docker compose logs meal-service --since 2m` — `MEAL_MASTER_KEY` accepted, no
@@ -190,7 +190,7 @@ Meals surface:
 
 ## 7. Steady state
 
-- [ ] The daily cron line is unchanged and now covers five databases —
+- [ ] The daily cron line is unchanged and now covers six databases —
       `npm run db:backup -w @life/db`. Confirm the installed line's checkout path is
       the primary checkout.
 - [ ] Future deploys: §3 → §6 from the repo root, with no `--only` needed on the
@@ -199,8 +199,8 @@ Meals surface:
 
 ## 8. Rollback
 
-- [ ] **Code:** `git checkout <the pre-merge master commit recorded in §0>` then
-      `docker compose up -d --build meal-service app`. The four existing databases
+- [ ] **Code:** `git checkout <the pre-merge main commit recorded in §0>` then
+      `docker compose up -d --build meal-service app`. The six existing databases
       were never converted, and `meal.db` only gained tables, so older code reads
       current data.
 - [ ] **Data:** the stack must be stopped first (`docker compose down` — never
@@ -216,7 +216,7 @@ Meals surface:
 
 ## Hard lines
 
-No one else does these: merging to `master`, stopping the stack, `db:backup`,
+No one else does these: merging to `main`, stopping the stack, `db:backup`,
 `db:restore`, `docker compose up` against production, generating a master key. A
 key's **value** never enters a doc, a log, or a chat — names only.
 

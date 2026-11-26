@@ -18,11 +18,9 @@ cd /home/night/WebstormProjects/personal-life
 ```
 
 Ref: the ref **you choose** — this runbook pins no hash. `dev` is the current line and
-`main` lags it: `origin/main` was 141 commits behind `origin/dev` when this was written,
-and every `apps/*/Dockerfile` on `main` builds `FROM node:22-bookworm-slim` while `dev`
-builds `node:24-bookworm-slim`. Deploying `main` therefore deploys an older runtime —
-check `git log --oneline -1 origin/dev` and the `FROM node:` line in the Dockerfile of
-the ref you mean to ship before choosing. Record the exact commit you deploy in §3.
+`main` lags it: `origin/main` was 141 commits behind `origin/dev` when this was written.
+Check `git log --oneline -1 origin/dev` and what the ref you mean to ship actually
+carries before choosing. Record the exact commit you deploy in §3.
 `compose.yaml` defines **18 services**: 8 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`,
 `focus-service`) plus 8 Redis instances, `postgres-feedback` and
@@ -38,26 +36,29 @@ checklist; it is not authority to run it.
 - **No migration framework or DDL files exist anywhere in the repo** — no `migrations/`
   directory, no `*.sql` outside `docs/reference-repo/`, no ormconfig, no migration
   `DataSource`. (Ad-hoc `new DataSource({...})` *does* appear in one-off note-service
-  scripts — `scripts/encrypt-backfill.ts`, `scripts/rotate-master-key.ts`,
-  `src/keys/backfill.ts` — none of which is a migration.) Schema is created at boot by
-  TypeORM `synchronize: true` in all
+  scripts — `apps/note-service/scripts/encrypt-backfill.ts`,
+  `apps/note-service/scripts/rotate-master-key.ts`,
+  `apps/note-service/src/keys/backfill.ts` — none of which is a migration.) Schema is
+  created at boot by TypeORM `synchronize: true` in all
   seven data services: `apps/note-service/src/app.module.ts:16`,
-  `apps/tags-service/src/app.module.ts:15`, `apps/todo-service/src/app.module.ts:24`,
-  `apps/meal-service/src/app.module.ts:24`, `apps/feedback-service/src/app.module.ts:23`,
-  `apps/focus-service/src/app.module.ts:23`,
+  `apps/tags-service/src/app.module.ts:15`, `apps/todo-service/src/app.module.ts:41`,
+  `apps/meal-service/src/app.module.ts:53`, `apps/feedback-service/src/app.module.ts:23`,
+  `apps/focus-service/src/app.module.ts:27`,
   `apps/idp/src/app.module.ts:18`.
 - **Human-run data migrations exist, and the one-shot ones below have already run on this
   host:**
 
 | Migration | Command | Status here |
 |---|---|---|
-| `import-tags` | `npm run import-tags -w @life/tags-service` (`apps/tags-service/package.json:13`) | **Applied.** `tags.db` holds 13 `tag` rows and `life.db` 15 `note_tag` refs; `backup/2026-10-01T11-38-29-059Z-pinned` (29 rows) brackets the import. Re-running is idempotent but pointless — do not. |
-| `cleanup-tags` | `npm run cleanup-tags -w @life/tags-service` (`apps/tags-service/package.json:14`) | **Applied, after the pinned backup.** `tags.db.pre-cleanup-2026-10-01T11-41-59-916Z` holds the 29 pre-cleanup rows; the live table has 13. Do not re-run, and **do not restore `backup/2026-10-01T11-38-29-059Z-pinned`** expecting current tags — it predates the cleanup and would resurrect 16 orphans. |
-| `backfill-content-updated-at` | `npm run backfill-content-updated-at -w @life/note-service` (`apps/note-service/package.json:11`) | **Applied.** `note.contentUpdatedAt` exists and no row is NULL. A re-run prints `stamped=0`. |
+| `import-tags` | `npm run import-tags -w @life/tags-service` (`apps/tags-service/package.json:14`) | **Applied.** `tags.db` holds 13 `tag` rows and `life.db` 15 `note_tag` refs; `backup/2026-10-01T11-38-29-059Z-pinned` (29 rows) brackets the import. Re-running is idempotent but pointless — do not. |
+| `cleanup-tags` | `npm run cleanup-tags -w @life/tags-service` (`apps/tags-service/package.json:15`) | **Applied, after the pinned backup.** `tags.db.pre-cleanup-2026-10-01T11-41-59-916Z` holds the 29 pre-cleanup rows; the live table has 13. Do not re-run, and **do not restore `backup/2026-10-01T11-38-29-059Z-pinned`** expecting current tags — it predates the cleanup and would resurrect 16 orphans. |
+| `backfill-content-updated-at` | `npm run backfill-content-updated-at -w @life/note-service` (`apps/note-service/package.json:12`) | **Applied.** `note.contentUpdatedAt` exists and no row is NULL. A re-run prints `stamped=0`. |
 
   Note-service also ships three more one-shot scripts that leave no dated artifact and are
-  not part of a deploy: `scripts/encrypt-backfill.ts`, `scripts/rotate-master-key.ts`,
-  `scripts/backfill-owner.ts` (`apps/note-service/package.json:9-12`). Never run
+  not part of a deploy: `apps/note-service/scripts/encrypt-backfill.ts`,
+  `apps/note-service/scripts/rotate-master-key.ts`,
+  `apps/note-service/scripts/backfill-owner.ts` (`apps/note-service/package.json:9-13`).
+  Never run
   `rotate-master-key` as a deploy step — see the write-once rule in §2.
 
 - **One schema change lands with *this* deploy, by boot-time sync, not by hand:**
@@ -152,16 +153,17 @@ reads the primary checkout's `.env` via `env_file: .env` (all eight built servic
 | `TODO_MASTER_KEY` | `compose.yaml:101` | idem |
 | `FEEDBACK_MASTER_KEY` | `compose.yaml:151` | idem |
 | `MEAL_MASTER_KEY` | `compose.yaml:193` | idem |
-| `FOCUS_MASTER_KEY` | `compose.yaml:242` | idem |
-| `FEEDBACK_DB_PASSWORD` | `compose.yaml:521` | Postgres role password (`POSTGRES_PASSWORD`) |
-| `FEEDBACK_RABBITMQ_PASSWORD` | `compose.yaml:543` | broker `feedback` user password |
+| `FOCUS_MASTER_KEY` | `compose.yaml:247` | idem |
+| `FEEDBACK_DB_PASSWORD` | `compose.yaml:537` | Postgres role password (`POSTGRES_PASSWORD`) |
+| `FEEDBACK_RABBITMQ_PASSWORD` | `compose.yaml:559` | broker `feedback` user password |
 
 Master-key rules, all six alike:
 
 - Generate with `openssl rand -base64 32` — **once per service**, six distinct values,
   independent custody.
 - Verify before pasting: `printf '%s' "$K" | base64 -d | wc -c` → `32`. The loader
-  (`packages/crypto/src/keys.ts:110-128`) fails closed on anything else.
+  (`loadMasterKeyFromEnv()` in `packages/crypto/src/keys.ts`) fails closed on
+  anything else.
 - **Write-once.** Changing a key makes that service's existing encrypted rows permanently
   undecryptable. Losing one loses that service's data.
 - Never regenerate `NOTE_MASTER_KEY`, `TAGS_MASTER_KEY`, `TODO_MASTER_KEY`,
@@ -185,19 +187,19 @@ Every other variable compose interpolates (names only):
 
 Two more reach containers through `env_file` without a compose default, so they are not in
 the interpolation list: `USDA_API_KEY` / `USDA_API_BASE` (meal photo→USDA path) and
-`OWNER_LOGIN` (app access gate, `apps/app/middleware.ts:42`).
+`OWNER_LOGIN` (app access gate, `apps/app/proxy.ts:42`).
 
 - [ ] All eight fail-fast names are set in `.env`.
 - [ ] Six master keys generated and verified as 32 decoded bytes, each distinct.
 - [ ] **`OIDC_AUDIENCE_MAP` contains `https://meal-service=life-api`** — the compose
-      default at `compose.yaml:291` now carries note/tags/todo/meal; a `.env` carried from
+      default at `compose.yaml:305` now carries note/tags/todo/meal; a `.env` carried from
       an older deploy stops at `todo-service` and every meal API call answers 401. Value
-      form (a **comma**-separated list) is at `.env.example:43`.
+      form (a **comma**-separated list) is at `.env.example:52`.
 - [ ] The optional trios are present if you want the features: `GEMINI_API_KEY`,
       `GEMINI_MODEL`, `GEMINI_API_BASE` (all three, or the photo door answers
       `service-unavailable`) and `TODO_VAPID_PUBLIC_KEY`, `TODO_VAPID_PRIVATE_KEY`,
       `TODO_VAPID_SUBJECT` (unset keeps the reminder sweep off). The VAPID trio is in
-      `.env.example:79-81`, commented out; **the `GEMINI_*` trio is not in
+      `.env.example:112-114`, commented out; **the `GEMINI_*` trio is not in
       `.env.example`** — its names appear in `docs/specs/SPEC-photo-identity.md:328` and in
       the `docs/runbooks/deploy-meal-{stack,nutrition,ingredients}.md` trio.
 - [ ] Redis needs no keys: compose injects `REDIS_URL` per service.
@@ -211,9 +213,8 @@ cd /home/night/WebstormProjects/personal-life
 ```
 
 - [ ] Ref chosen and recorded: `git log -1 --oneline` → record the commit you are
-      deploying. `dev` is the current line; `main` lags it (141 commits when this was
-      written) and still builds Node 22 images, so name the ref deliberately instead of
-      defaulting to `main`. It must contain the feedback status workflow — check with
+      deploying. `dev` is the current line and `main` lags it (141 commits when this
+      was written), so name the ref deliberately instead of defaulting to `main`. It must contain the feedback status workflow — check with
       `git log --oneline -1 d1f54c9^ -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
       "unknown revision"). `git status --short` shows only untracked `docs/reference-repo/`,
       `pictures/`, `.pi/`.
