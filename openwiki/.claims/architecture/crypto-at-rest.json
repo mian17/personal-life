@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:f46b97bd50cad17f71bece7fe4e98cc7b4377796e9762c1c9f3e2705908ad3b1",
+  "claims": [
+    {
+      "id": "claim_96a1d4cfd5694512b586bbb0bfe9ed8c",
+      "statement": "Content fields are sealed into `enc.v1.<nonce-b64url>.<ct-b64url>` envelopes with AES-256-GCM, a fresh 96-bit random nonce per encryption, AAD binding each envelope to its context.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/src/envelope.ts",
+          "version": "repo-file-v1:sha256:33b6760180af3b50ded5f4918f68748fdd5705d352c8eb55d94b0c70d53c6d23"
+        }
+      ]
+    },
+    {
+      "id": "claim_2e5c119f119e40dba1f5eedce4afa533",
+      "statement": "Wrapped DEKs use `kw.v1.<nonce-b64url>.<ct-b64url>`; the KEK is HKDF-SHA256(masterKey, salt='', info='life/dek-wrap/v1') and is used only for DEK wrapping, never for content.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/src/keys.ts",
+          "version": "repo-file-v1:sha256:5afeeb24cab934a90d8999344218ff54cd92d0f6b52a94962d48863333a90b1e"
+        }
+      ]
+    },
+    {
+      "id": "claim_a77b68ae1443460eabf69ba1efafaf0d",
+      "statement": "Master-key rotation rewraps the DEK (`rewrapDek`) and preserves the DEK bytes, so content ciphertexts are untouched and no re-encryption of stored rows is needed.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/src/keys.ts",
+          "version": "repo-file-v1:sha256:5afeeb24cab934a90d8999344218ff54cd92d0f6b52a94962d48863333a90b1e"
+        }
+      ]
+    },
+    {
+      "id": "claim_450d8697bef24104a376d3fcfe13a63f",
+      "statement": "Master keys are 32-byte base64 values loaded fail-closed from per-service `<SERVICE>_MASTER_KEY` env vars at boot; errors name the variable and never contain key material.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/src/errors.ts",
+          "version": "repo-file-v1:sha256:2935c50f7d4b9adc7a2d8eb83a17d738aba7cd96fac4e23154cbdd8ff4867bbc"
+        },
+        {
+          "resource": "repo://packages/crypto/src/keys.ts",
+          "version": "repo-file-v1:sha256:5afeeb24cab934a90d8999344218ff54cd92d0f6b52a94962d48863333a90b1e"
+        }
+      ]
+    },
+    {
+      "id": "claim_bef1bba3663b4746acdf5fb3cc0ec559",
+      "statement": "One `user_keys` row per owner stores the `kw.v1` wrapped DEK; writes provision lazily on first content write, reads never provision and fail closed on a missing row, and the plaintext DEK lives only in a process-local memo that is never serialized or logged.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/keys/keys.service.ts",
+          "version": "repo-file-v1:sha256:77a5b78e3a0e91e6396433dea4b6d374cc1b55a2b7db89bcd481c1ea5651d909"
+        },
+        {
+          "resource": "repo://packages/service-kit/src/keys/user-keys.entity.ts",
+          "version": "repo-file-v1:sha256:b53ebbf81d9dd915e1042f48d7e0a7cfd1ffa32d4d7120bfc7ce4f026a994497"
+        }
+      ]
+    },
+    {
+      "id": "claim_587a03d38baf43d78e5e9c969fd35616",
+      "statement": "Each service derives DEKs from its own master key, so two services' stores never share a KEK even though they share the `user_keys` table shape.",
+      "evidence": [
+        {
+          "resource": "repo://packages/service-kit/src/keys/user-keys.entity.ts",
+          "version": "repo-file-v1:sha256:b53ebbf81d9dd915e1042f48d7e0a7cfd1ffa32d4d7120bfc7ce4f026a994497"
+        }
+      ]
+    },
+    {
+      "id": "claim_093c897eaaaf4f0a9473a6da614b8e58",
+      "statement": "The cache is inside the at-rest boundary: it stores serialized rows as persisted (ciphertext for content) and refuses values without an `enc.v1.` envelope on write-back, so plaintext can never land in Redis.",
+      "evidence": [
+        {
+          "resource": "repo://packages/cache/src/index.ts",
+          "version": "repo-file-v1:sha256:06f91da35909124c209fc1fce03912ded2b715268b9d085d793a01ada785db8d"
+        }
+      ]
+    },
+    {
+      "id": "claim_01e6ef1216da4397a03b6ca3fd3785f5",
+      "statement": "The envelope implementation is pinned to published NIST CAVP AES-GCM known-answer vectors (gcmEncryptExtIV256.rsp) compared byte-for-byte.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/test/envelope.test.ts",
+          "version": "repo-file-v1:sha256:70ada4bddec52d47539d33c347a1a8f2eb6d6d3577ed5b5203384e50ddfea84a"
+        }
+      ]
+    },
+    {
+      "id": "claim_eac72bdea2e449dd8eea6d2d1a3cf73e",
+      "statement": "Any authentication failure (tamper, wrong key, AAD mismatch) surfaces as CryptoError; the open path never returns partial plaintext and no fallback plaintext exists anywhere in the design.",
+      "evidence": [
+        {
+          "resource": "repo://packages/crypto/src/envelope.ts",
+          "version": "repo-file-v1:sha256:33b6760180af3b50ded5f4918f68748fdd5705d352c8eb55d94b0c70d53c6d23"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

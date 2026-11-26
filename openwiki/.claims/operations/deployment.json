@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:172306f9897c8291c5d4f6d51bea737efe26c0972c2acf26bfdce0c00af7806d",
+  "claims": [
+    {
+      "id": "claim_045840d901b546b9b6e039dfa5a1d882",
+      "statement": "The production stack is one compose network of 18 services: eight built images, eight per-service Redis instances, postgres-feedback and rabbitmq-feedback, with data in bind-mounted apps/*/data directories and named volumes for infra.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml",
+          "version": "repo-file-v1:sha256:5036062611b708bead007a014952450854c8f20daa3c4bc9d7bc099075de65b1"
+        }
+      ]
+    },
+    {
+      "id": "claim_bacda09455bb45df84590a95073ad669",
+      "statement": "A fresh checkout has no apps/*/data directories (gitignored); they must exist and be owned by 1000:1000 before `up`, or Docker creates them root-owned and the uid-1000 images cannot open their SQLite files.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/compose-boot.yml",
+          "version": "repo-file-v1:sha256:e7669d69a19e7bb7fe39bea6852a5e2eab99560f7e5f22c31bb90503a3df388d"
+        },
+        {
+          "resource": "repo://docs/runbooks/production-deploy.md",
+          "version": "repo-file-v1:sha256:5a40fe1a8a4ac3cf6583d5b293c815c61e8e048472f8d0ed300c0b85a023ca96"
+        }
+      ]
+    },
+    {
+      "id": "claim_f5cefae1f4db44c8b2c56eee34872bad",
+      "statement": "Required env vars have no code fallback by design (a guessed port half-succeeds a write), so arch-check RULE 6 enforces that every variable a service reads is forwarded in its own compose environment block.",
+      "evidence": [
+        {
+          "resource": "repo://apps/meal-service/src/meal-todo.controller.ts",
+          "version": "repo-file-v1:sha256:f0e561d276dd0a2b982477ba709633bd3cdbf318bd082675fa30c09a225913e4"
+        },
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    },
+    {
+      "id": "claim_38c8a1e3405c41f6aa4b197667bbbb84",
+      "statement": "Backup/restore CLIs live in @life/db: db:backup/db:restore cover the six SQLite stores (with --pin producing backup/<utc-stamp>-pinned/ snapshots) and db:backup:pg/db:restore:pg cover the feedback Postgres database.",
+      "evidence": [
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:795e5c86c6f5f788b5b8cd7d008f6aab019a346cd916254e1f494d6d3478dbb6"
+        },
+        {
+          "resource": "repo://packages/db/src/backup-pg.ts",
+          "version": "repo-file-v1:sha256:9caa7da427257db75c7f1e8ad34bc6f09ca252b636fda1d0832eb42ac4e7953a"
+        },
+        {
+          "resource": "repo://packages/db/src/backup.ts",
+          "version": "repo-file-v1:sha256:104648fee145a453ae37311c7e88c80eb538453c62f40a0ba20edbd204e4f3e1"
+        }
+      ]
+    },
+    {
+      "id": "claim_45a5cb470e9e4930a6e32910c943f962",
+      "statement": "The deploy ordering rule is absolute: back up → migrate → boot, never migrate after boot, and never `docker compose down -v` during a backup window because -v removes redis-app-data (sessions).",
+      "evidence": [
+        {
+          "resource": "repo://docs/runbooks/production-deploy.md",
+          "version": "repo-file-v1:sha256:5a40fe1a8a4ac3cf6583d5b293c815c61e8e048472f8d0ed300c0b85a023ca96"
+        }
+      ]
+    },
+    {
+      "id": "claim_b14ee42fe1dc4caa885afd82fb5d5daa",
+      "statement": "Production deploys, data migrations, data directories, secrets and ports are human hard lines: run with the runbook's checklist, never automated.",
+      "evidence": [
+        {
+          "resource": "repo://docs/runbooks/production-deploy.md",
+          "version": "repo-file-v1:sha256:5a40fe1a8a4ac3cf6583d5b293c815c61e8e048472f8d0ed300c0b85a023ca96"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

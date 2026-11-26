@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:94be5d2bc5b4a8b70d3fca9b27dca6bbfe3379d2fb14591c33de58bfa61673ee",
+  "claims": [
+    {
+      "id": "claim_dfbdddc7716041549b2c340c08d93d8f",
+      "statement": "compose.yaml defines 18 services: 8 built app images (app, idp, note-service, tags-service, todo-service, feedback-service, meal-service, focus-service), 8 per-service Redis instances, postgres-feedback and rabbitmq-feedback.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml",
+          "version": "repo-file-v1:sha256:5036062611b708bead007a014952450854c8f20daa3c4bc9d7bc099075de65b1"
+        }
+      ]
+    },
+    {
+      "id": "claim_fc53a1e9553c42d883f843c565f90811",
+      "statement": "The monorepo holds nine apps and ten packages; the app-side Next.js server is the only API caller to domain services.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:b5b4aef12748e1cc435c9ce46f1a1b3d1f23c410da139bf11e590c7a35c23e12"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:795e5c86c6f5f788b5b8cd7d008f6aab019a346cd916254e1f494d6d3478dbb6"
+        }
+      ]
+    },
+    {
+      "id": "claim_71a91c02a50a4d959368e6d44af50fd3",
+      "statement": "Two hard contracts bind the apps: shared UI rendered from @life/ui (no raw visual HTML in app code) and the BE → cache → DB layering; requests reach the app through a Tailscale access gate before any of it.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://apps/app/proxy.ts",
+          "version": "repo-file-v1:sha256:6eedd550cc2230f98f81a640477fb18b7a39eaa08f0f1da5e41e8f1d5debb947"
+        }
+      ]
+    },
+    {
+      "id": "claim_6673296866dd4132960c2358e8e45b95",
+      "statement": "scripts/arch-check.mjs mechanically enforces five topology rules: one database per service (RULE 3), designated engine with feedback-service allowlisted for Postgres (RULE 4), no cross-service store access, diff-scoped (RULE 5), required env forwarded to each service's compose environment block (RULE 6), and no self-hosted runners in workflows (RULE 7).",
+      "evidence": [
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    },
+    {
+      "id": "claim_68fe37a1996d42b2aab26ce99a2858fd",
+      "statement": "Rules 3, 4 and 6 judge the resulting topology (compose + sources on disk), never the diff; rules 5 and 7 are diff-scoped or workflow-scoped respectively.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    },
+    {
+      "id": "claim_c1966f5ae7ad4b9aad5ebe8d4e38bc0c",
+      "statement": "Every non-feedback service is SQLite with one database file per service on a bind-mounted data directory; feedback-service is the only Postgres service.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml",
+          "version": "repo-file-v1:sha256:5036062611b708bead007a014952450854c8f20daa3c4bc9d7bc099075de65b1"
+        },
+        {
+          "resource": "repo://scripts/arch-check.mjs",
+          "version": "repo-file-v1:sha256:40196a01ecf47b5c9ce299eb060141049cc4ed5d9af62f9f8d7c0c3f92d10e82"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

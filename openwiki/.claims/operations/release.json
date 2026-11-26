@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:aa6caa54e8b758447ef29dcc9e7c7c197d57e1f285f6507359cd19e599cdc911",
+  "claims": [
+    {
+      "id": "claim_127c2f5051794093b632470a5b027db0",
+      "statement": "A release is a tag plus a GitHub release on the commit shipped; a promotion dev→main records the release line but does not tag — the distinction exists because v0.2.1 shipped untagged and had to be recovered by hand.",
+      "evidence": [
+        {
+          "resource": "repo://docs/runbooks/release.md",
+          "version": "repo-file-v1:sha256:a7ffa1e4c18db140f53d5c42973131d7d76927ba25407239961dc26a2174886a"
+        },
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_7adf70c41e9b4d329dabde68f6651412",
+      "statement": "release.sh refuses before any mutation unless five preconditions hold: clean tree, HEAD is origin/dev (or --ref), the tag is new locally and on origin, the committed non-blank notes file docs/releases/<version>.md exists, and every workflow on that exact SHA is completed/success.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_3815a3daeacf43749a9de953a136be21",
+      "statement": "The version bump is one package.json line, proven by `git diff --numstat` reading `1 1 package.json`, and the annotated tag carries the notes file as its message.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_0b24d8aa193141a4a3003eb7d349d38a",
+      "statement": "The bump commit is landed through a PR (branch chore/release-v<x>, `gh pr create --base dev`) merged with `--merge`, never a squash, so the tagged commit stays reachable from dev; ruleset 25775908 blocks direct pushes to dev/main.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_5e97a0910b3049d1a85e4602fbe53c1d",
+      "statement": "Before merging the landing PR the script waits for every workflow on the bump commit's own SHA (40 polls × 30s), refusing immediately on any completed non-success, because the ruleset requires a PR but no status checks.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_7716210b3e094c29aba7d38ba92ec10c",
+      "statement": "The release is verified as three separate facts: the tag points at local HEAD, origin carries the same tag, and the GitHub release record exists and is published.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:2e36c6eb27dac85db765ccf8155d1824a76851dd4ba403b427ac0049c9e6d9b4"
+        }
+      ]
+    },
+    {
+      "id": "claim_366f2ab19d0748b6b2d5931a2507f883",
+      "statement": "After a squash-merged promotion, backmerge.yml opens a `-s ours` bookkeeping PR that restores main as an ancestor of dev; it must be merged with a merge commit.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/backmerge.yml",
+          "version": "repo-file-v1:sha256:74a72e71fe1ac4a52fb128fab743854b941a14f7afd078630c518b43b24b19ab"
+        },
+        {
+          "resource": "repo://docs/ops/backmerge.md",
+          "version": "repo-file-v1:sha256:5428b18f6cd5bbfc2bd8657fd25f50c25df974c130a4f730796bfc3ff0414c34"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}

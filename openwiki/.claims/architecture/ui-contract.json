@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:057fa772986664032a64c0ca9e82b75482234fd524fa55a5657d60e82c4fae7d",
+  "claims": [
+    {
+      "id": "claim_31d6f4af547142da91a1b7fa541079af",
+      "statement": "Raw visual HTML in apps/* UI code is forbidden (Rule 1): bare button/input/textarea/select/a/img/label/progress and styled div/span are symptoms; only zero-visual-responsibility structural tags and non-rendering plumbing are exempt.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://apps/app/proxy.ts",
+          "version": "repo-file-v1:sha256:6eedd550cc2230f98f81a640477fb18b7a39eaa08f0f1da5e41e8f1d5debb947"
+        }
+      ]
+    },
+    {
+      "id": "claim_67ab2791564b47df9ffc1c4f233b7df3",
+      "statement": "When a primitive exists apps compose it (Rule 2): no hand-rolled recreation, no per-app copies, no second app-wide stylesheet, and styles use tokens only — hex/px/rem appear only in packages/ui/src/styles/tokens.css.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://packages/ui/src/styles/tokens.css",
+          "version": "repo-file-v1:sha256:5bc18065a59acdf59b9fd60c3bdaf5d3626fe90df356c03e3bce15bc71419003"
+        }
+      ]
+    },
+    {
+      "id": "claim_61f9e2ad442246cdbef553b76e49cedc",
+      "statement": "A missing primitive capability is fixed upstream in packages/ui behind a spec (Rule 3): prop/slot/variant first, a new atom/block only when genuinely reusable; app-specific behavior stays in apps/* but is composed from primitives.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        }
+      ]
+    },
+    {
+      "id": "claim_a11f578c1cb740bea665d33ee46969cf",
+      "statement": "Frozen surfaces require explicit user approval and move together with their guarding test: the e2e selector surface (roles, visible text, aria-labels, button.trash-delete), token values (packages/ui/test/tokens.test.ts is the value table), and PWA constants.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        },
+        {
+          "resource": "repo://packages/ui/test/tokens.test.ts",
+          "version": "repo-file-v1:sha256:c87b2bbcdcddfffe1cd14c4fe175a7d0b79f267353946f32fe6c2d89ff80700e"
+        }
+      ]
+    },
+    {
+      "id": "claim_3d2d00a8a3424efe8abad0c80fc2ddf4",
+      "statement": "Four mechanical greps enforce the contract at every UI review: zero raw form/media elements in apps, zero next/link in apps, raw colors only in tokens.css, and no domain words (note|trash|tag-chip) in packages/ui code.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d565cfde71c1c83f54c9e2a2f060e360c7906f6df062d99552ca69cbad14f522"
+        }
+      ]
+    },
+    {
+      "id": "claim_b260004aea48439f8198eb0f61d8e500",
+      "statement": "packages/ui/src/components holds the atoms and blocks, each with its own .test.tsx; a UI task's delegation plan must name a primitive-reuse plan element by element.",
+      "evidence": [
+        {
+          "resource": "repo://packages/ui/src/components/button.tsx",
+          "version": "repo-file-v1:sha256:358e26a87f79281664e4d954e26eb7a8ca32ad347e3e2a7c4aa309f809403037"
+        },
+        {
+          "resource": "repo://packages/ui/test/tokens.test.ts",
+          "version": "repo-file-v1:sha256:c87b2bbcdcddfffe1cd14c4fe175a7d0b79f267353946f32fe6c2d89ff80700e"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.9.0",
+    "at": "2026-11-26T10:12:12.781Z"
+  }
+}
