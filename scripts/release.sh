@@ -31,6 +31,13 @@
 # its message → land the bump commit through a pull request → push the tag →
 # create the GitHub release → verify.
 #
+# Precondition 5 is not enough on its own, because it measures the PRE-bump HEAD.
+# Nothing about a green `dev` says the bump commit's own workflows pass, and the
+# ruleset requires a pull request but no status checks — so after the release PR
+# opens, the script waits for every workflow on the bump commit's own SHA to be
+# `completed`/`success` before it merges. That wait is a refusal, not a warning:
+# without it a release lands while its own tests are still queued, running or red.
+#
 # The bump commit cannot be pushed to `dev`. The repository ruleset `Block default
 # branches` (id 25775908) targets `~DEFAULT_BRANCH` and `refs/heads/main`, requires
 # a pull request on both, and has no bypass actors — so a direct `git push` to
@@ -54,8 +61,11 @@
 #   --notes <path>     notes file to use instead of docs/releases/<version>.md
 #   --ref <ref>        tag this ref instead of origin/dev (must still be clean)
 #   --title <title>    release title instead of "v<version> — <first heading>"
-#   --skip-ci-check    downgrade precondition 5 to a printed warning and continue.
-#                      Use deliberately: a release after a flake must stay possible.
+#   --skip-ci-check    downgrade BOTH CI gates to a printed warning and continue:
+#                      precondition 5 on the pre-bump HEAD, and the wait on the bump
+#                      commit's own workflows. Both print the evidence they ignored
+#                      and say the gate was not enforced. Use deliberately: a
+#                      release after a flake must stay possible.
 #   --dry-run          check the preconditions, then print every remaining command.
 #                      No commit, no tag, no push, no release. The ONE thing it does
 #                      write is the package.json version line, so the one-line diff
@@ -68,6 +78,10 @@
 #   branch not pushed → git push -u origin chore/release-v<x>
 #   no PR opened      → gh pr create --base dev --head chore/release-v<x> \
 #                       --title "chore: release v<x>"
+#   PR open, CI not   → the release PR is open and the bump commit's workflows are
+#   green               red or still running; nothing merged, nothing tagged. Watch
+#                       them with `gh run list --branch chore/release-v<x>`, fix and
+#                       push to that branch, then rerun the release.
 #   PR open, unmerged → gh pr merge <n> --merge --subject "chore: release v<x> (#<n>)"
 #                       (never --squash: the tagged commit must stay on dev)
 #   tag local, not    → tag exists locally but not on the remote; retry with
@@ -127,17 +141,23 @@ require_notes() {
 # One gh call, and its --jq does the headSha filtering: `--commit <sha>` returns
 # nulls in this repo, so the run list is filtered by headSha instead. Emits
 # "none", or one TSV line per workflow reporting on that exact SHA.
+#
+# The branch is a parameter because a SHA has no branch. It is `dev` while the
+# pre-bump HEAD is checked, and the release branch once the bump commit is pushed:
+# `gh run list --branch <ref>` does list the runs of a pushed PR head branch, so
+# the one implementation serves both.
 ci_report() {
-  gh run list --branch "$CI_BRANCH" --limit 100 \
+  local sha="$1" branch="$2"
+  gh run list --branch "$branch" --limit 100 \
     --json headSha,workflowName,status,conclusion,url \
-    --jq "[.[] | select(.headSha == \"$1\")] | if length == 0 then \"none\" else (.[] | \"\(.workflowName)\t\(.status)\t\(.conclusion)\t\(.url)\") end"
+    --jq "[.[] | select(.headSha == \"$sha\")] | if length == 0 then \"none\" else (.[] | \"\(.workflowName)\t\(.status)\t\(.conclusion)\t\(.url)\") end"
 }
 
 require_ci_green() {
-  local sha="$1" report name status conclusion url failed=""
-  report=$(ci_report "$sha") || refuse "could not read CI runs from GitHub (gh run list failed). Check gh auth, or use --skip-ci-check deliberately"
+  local sha="$1" branch="$2" report name status conclusion url failed=""
+  report=$(ci_report "$sha" "$branch") || refuse "could not read CI runs from GitHub (gh run list failed). Check gh auth, or use --skip-ci-check deliberately"
   if [ "$report" = none ]; then
-    refuse "no CI run reports on $sha (branch $CI_BRANCH). Push the commit and wait for CI, or pass --skip-ci-check deliberately"
+    refuse "no CI run reports on $sha (branch $branch). Push the commit and wait for CI, or pass --skip-ci-check deliberately"
   fi
   while IFS=$'\t' read -r name status conclusion url; do
     [ -n "${name:-}" ] || continue
@@ -154,9 +174,9 @@ $failed""  Fix the workflow and push again, or pass --skip-ci-check deliberately
 
 # Every workflow on that SHA, printed as evidence, no verdict. The downgrade path.
 print_ci_evidence() {
-  local report
-  report=$(ci_report "$1") || report="(gh run list failed)"
-  printf 'CI evidence for %s (branch %s), NOT enforced:\n' "$1" "$CI_BRANCH"
+  local sha="$1" branch="$2" report
+  report=$(ci_report "$sha" "$branch") || report="(gh run list failed)"
+  printf 'CI evidence for %s (branch %s), NOT enforced:\n' "$sha" "$branch"
   if [ "$report" = none ]; then
     printf '  no run reports on this SHA\n'
   else
@@ -294,6 +314,69 @@ open_release_pr() {
   printf 'PR #%s %s\n' "$PR_NUMBER" "$PR_URL"
 }
 
+# The ruleset requires a pull request but no required status checks, so GitHub will
+# merge a release commit whose own workflows are still queued, running or red. This
+# is the only thing that stops it: the bump commit's own SHA has to be green before
+# `gh pr merge`.
+#
+# Why 20 minutes and not 5. Measured on `dev`: `Tests` takes ~9 minutes and `Compose
+# boot` ~6, and both do run on a pushed release branch (they ran on
+# `chore/release-v0.2.3` at 71f31ce). A shorter budget would expire while the slowest
+# workflow was still legitimately running, and the gate would start refusing healthy
+# releases — the fastest way to teach someone to reach for --skip-ci-check.
+BUMP_CI_WAIT_ATTEMPTS=40
+BUMP_CI_WAIT_SECONDS=30
+
+# One loop, one verdict per report shape: `none` means GitHub has not created the
+# runs yet (normal for a few seconds after a push) and is not a failure; anything
+# incomplete is waited on; a completed non-success stops the release at once, because
+# no amount of waiting turns red into green; all green returns.
+wait_for_green_on_the_bump_commit() {
+  local sha attempt report name status conclusion url failed unfinished
+  sha=$(git rev-parse HEAD)
+  step "wait for CI on the bump commit $sha (branch $RELEASE_BRANCH)"
+  if [ "$SKIP_CI_CHECK" -eq 1 ]; then
+    warn "--skip-ci-check: the CI gate on the bump commit is NOT enforced for this release"
+    print_ci_evidence "$sha" "$RELEASE_BRANCH"
+    return 0
+  fi
+  for attempt in $(seq 1 "$BUMP_CI_WAIT_ATTEMPTS"); do
+    report=$(ci_report "$sha" "$RELEASE_BRANCH") || report=""
+    if [ -z "$report" ]; then
+      warn "could not read CI runs for $sha (attempt $attempt/$BUMP_CI_WAIT_ATTEMPTS); retrying"
+    elif [ "$report" = none ]; then
+      printf 'no CI run reports on %s yet (branch %s); GitHub creates them seconds after the push, so waiting\n' "$sha" "$RELEASE_BRANCH"
+    else
+      failed=""
+      unfinished=""
+      while IFS=$'\t' read -r name status conclusion url; do
+        [ -n "${name:-}" ] || continue
+        if [ "$status" != completed ]; then
+          unfinished+="  $name — $status"$'\n'
+        elif [ "$conclusion" != success ]; then
+          failed+="  $name — $conclusion — $url"$'\n'
+        fi
+      done <<<"$report"
+      if [ -n "$failed" ]; then
+        printf 'failed at: wait for the bump commit CI, before the merge.\n  state: %s is pushed on %s but these workflows are not green; PR #%s is open and unmerged, so dev is unchanged and tag v%s is still local.\n  recover: fix the workflow and push the fix, or rerun with --skip-ci-check deliberately. Not green:\n%s' \
+          "$sha" "$RELEASE_BRANCH" "$PR_NUMBER" "$V" "$failed" >&2
+        exit 1
+      fi
+      if [ -z "$unfinished" ]; then
+        printf 'CI green on %s: %s\n' "$sha" "$(printf '%s' "$report" | cut -f1 | paste -sd ', ' -)"
+        return 0
+      fi
+      printf 'attempt %s/%s, still running:\n%s' "$attempt" "$BUMP_CI_WAIT_ATTEMPTS" "$unfinished"
+    fi
+    [ "$attempt" -lt "$BUMP_CI_WAIT_ATTEMPTS" ] || break
+    sleep "$BUMP_CI_WAIT_SECONDS"
+  done
+  printf 'failed at: wait for the bump commit CI, before the merge.\n  state: %s is pushed on %s; after %s attempts over %s minutes nothing turned fully green; PR #%s is open and unmerged, so dev is unchanged and tag v%s is still local.\n  recover: gh run list --branch %s --limit 100 to watch them, then rerun the release (or pass --skip-ci-check deliberately if this is a flake). Unfinished at the last check:\n%s' \
+    "$sha" "$RELEASE_BRANCH" "$BUMP_CI_WAIT_ATTEMPTS" "$((BUMP_CI_WAIT_ATTEMPTS * BUMP_CI_WAIT_SECONDS / 60))" \
+    "$PR_NUMBER" "$V" "$RELEASE_BRANCH" "${unfinished:-  (no run reports on this SHA)}" >&2
+  exit 1
+}
+
 # `gh pr merge` can lose a race with GitHub still computing mergeability right
 # after the PR opens; one retry covers that, and a second failure is a real block
 # the caller has to see with the PR URL in hand.
@@ -339,6 +422,7 @@ land_bump_commit_through_pr() {
   create_release_branch
   push_release_branch
   open_release_pr
+  wait_for_green_on_the_bump_commit
   merge_release_pr
   prove_release_landed_on_dev
 }
@@ -404,6 +488,9 @@ plan_the_rest() {
   printf '  git push -u origin %s\n' "$RELEASE_BRANCH"
   printf '  gh pr create --base dev --head %s --title "chore: release v%s"\n' "$RELEASE_BRANCH" "$V"
   printf '    --body "<version, notes file %s, and that the SHA must stay unchanged>"\n' "$NOTES"
+  printf 'would wait for CI on the bump commit itself, before merging anything (the ruleset requires a PR, not checks):\n'
+  printf '  gh run list --branch %s --limit 100 — poll up to %s times, %ss apart (~%s minutes)\n' "$RELEASE_BRANCH" "$BUMP_CI_WAIT_ATTEMPTS" "$BUMP_CI_WAIT_SECONDS" "$((BUMP_CI_WAIT_ATTEMPTS * BUMP_CI_WAIT_SECONDS / 60))"
+  printf '    every workflow on the bump commit: completed/success, or the script stops before the merge\n'
   printf '  gh pr merge <n> --merge --subject "chore: release v%s (#<n>)"\n' "$V"
   printf '    (a merge commit, never --squash: the annotated tag must stay reachable from dev)\n'
   printf '  git fetch origin dev && git merge-base --is-ancestor HEAD origin/dev\n'
@@ -491,9 +578,9 @@ require_notes
 printf 'notes: %s\n' "$NOTES"
 if [ "$SKIP_CI_CHECK" -eq 1 ]; then
   warn "--skip-ci-check: the CI gate is NOT enforced for this release"
-  print_ci_evidence "$HEAD_SHA"
+  print_ci_evidence "$HEAD_SHA" "$CI_BRANCH"
 else
-  require_ci_green "$HEAD_SHA"
+  require_ci_green "$HEAD_SHA" "$CI_BRANCH"
 fi
 
 step "bump package.json to $V"
