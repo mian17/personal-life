@@ -21,19 +21,22 @@ SonarQube container keeps its data and its MCP consumers but receives no CI scan
 so `docs/runbooks/sonar-autofix.md` describes a pipeline that is dormant until a
 scan is run by hand.
 
-The runner is still registered, at repository level, and that is the part to
-remember:
+The runner is unregistered, at repository level, and that is the part to keep
+true:
 
 ```bash
 gh api repos/mian17/personal-life/actions/runners
-# total_count 1 — fedora-sonarqube, online, labels: self-hosted, Linux, X64, sonarqube
+# total_count 0 — no runner registered on this repository
 ```
 
-**It must stay unregistered while the repository is public.** A registered runner
-is a runner any workflow may name, and of everything here it is the one mistake
-that cannot be undone afterwards: the code has already run. Remove it in Settings
-→ Actions → Runners → `fedora-sonarqube` → Remove, or with
-`gh api -X DELETE repos/mian17/personal-life/actions/runners/<id>`.
+`fedora-sonarqube` was unregistered on 2026-11-26 and its user unit,
+`github-runner-sonarqube.service`, was removed with it. **It must stay
+unregistered while the repository is public.** A registered runner is a runner any
+workflow may name, and of everything here it is the one mistake that cannot be
+undone afterwards: the code has already run. So the check is the command above —
+`total_count` has to read `0` — and if a runner ever appears, that one or any
+other, remove it in Settings → Actions → Runners → the runner's name → Remove, or
+with `gh api -X DELETE repos/mian17/personal-life/actions/runners/<id>`.
 
 ## The tripwire: RULE 7
 
