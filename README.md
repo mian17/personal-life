@@ -1,6 +1,47 @@
 # Personal Life
 
-A self-owned personal API that centralizes life data. Domain #1 is **notes/journaling**.
+A self-owned system that grows with your needs — one person's replacement for the Apple/Android
+app ecosystem, not another set of apps: notes, todos, meals, focus and feedback as modules of a
+single system.
+
+It is not built to do more things. It is built to understand you: what you are aiming at in your
+life, how your health is actually going, the skills you are trying to build — and to suggest the
+next improvement rather than hand you another dashboard. It optimises for wellbeing and health,
+not for throughput.
+
+It is built for one task at a time. Multitasking drains you, so the system carries the open
+threads and hands you the single next step instead of a wall of work.
+
+The data is yours. It lives in stores this system controls, encrypted at rest by it —
+server-side, with keys it holds — not encrypted on your behalf by somebody else's service.
+
+The friction it removes is the app switching. An event in one module resolves work in another:
+logging lunch ticks off the todo that said "eat lunch", without opening the todos app. More
+follows as it learns more — "I slept badly, move the unimportant todos to tomorrow" is the shape
+of the next one — driven by your own rules over the data the system holds, and growing as that
+data grows.
+
+Every module is agent-operable. Each ships its own CLI and its own MCP server, behind one
+ready-to-use MCP gateway, so an agent drives all of them through a single connection without
+carrying every module's tool surface in its context window. A coding agent can connect through
+that same gateway.
+
+This repository is at the infrastructure phase — the modules, the identity, the encrypted stores
+and the seams between them — while the target is the system described here.
+
+## What you can do
+
+- **Notes** — journal and notes, with tags, search and trash.
+- **Todos** — a Today list and a Matrix view, lists, tags, recurring todos and Web Push reminders.
+- **Meals** — a food catalog, saved meals and per-day entries, nutrition targets, USDA search
+  and a calorie/nutrient estimate from a photo.
+- **Pomodoro** — focus sessions with goals and stats.
+- **Feedback** — one inbox for bug reports and ideas across every module, and the module wired
+  back into the code: through the MCP gateway a coding agent picks up the feedback you filed and
+  turns it into the feature or the fix.
+- **On the phone** — an installable PWA, one manifest per module, that runs from the home screen
+  in light or dark theme. The interface is optimised for a phone and nothing else; there is no
+  desktop layout.
 
 ## Screens
 
@@ -13,28 +54,6 @@ Five module index pages, dark theme, captured from a freshly seeded demo stack.
 | **Meals** — today's meals           | ![Meals today page](docs/screens/meals.png)       |
 | **Pomodoro** — focus timer          | ![Pomodoro timer page](docs/screens/pomodoro.png) |
 | **Feedback** — inbox across modules | ![Feedback inbox page](docs/screens/feedback.png) |
-
-- `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
-- `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
-- `apps/idp` — NestJS OpenID Connect Identity Provider (users, login, sessions, OIDC).
-- `apps/tags-service` — NestJS + TypeORM/SQLite tag registry, shared by notes and todos.
-- `apps/todo-service` — NestJS + TypeORM/SQLite todos, lists, reminders and Web Push.
-- `apps/feedback-service` — NestJS + TypeORM/Postgres feedback ingest; a `feedback_event`
-  change log publishes metadata-only `feedback.submitted` messages to RabbitMQ.
-- `apps/meal-service` — NestJS + TypeORM/SQLite meals, foods and nutrition, including the
-  Gemini photo estimate.
-- `apps/focus-service` — NestJS + TypeORM/SQLite Pomodoro sessions and goals.
-- `apps/pomodoro` — focus-screen React components over `@life/ui`; no port, no server.
-- `packages/shared` — shared DTOs and types.
-- `packages/ui` — the visual language: atoms, blocks and `tokens.css`.
-- `packages/app-kit` — Next helpers: route layout, query suffix, preferences, pending actions.
-- `packages/crypto` — `enc.v1.` envelopes, `kw.v1.` DEK wrapping, master-key loading.
-- `packages/cache` — the read-through cache every service adapter extends.
-- `packages/service-kit` — `AuthGuard`, health, keys module, paging, batch.
-- `packages/nutrition` — nutrition math.
-- `packages/db` — backup and restore CLIs.
-- `packages/ops` — the data-operations registry and its `life-ops` CLI.
-- `packages/mcp-gateway` — one stdio MCP server over that registry.
 
 ## Requirements
 
@@ -269,12 +288,26 @@ to a throwaway `apps/note-service/data/scratch.db` and never touches your person
 Compose API sets `DB_PATH=/data/life.db`, bind-mounted to the real `apps/note-service/data/life.db`
 on the host.
 
-## Docs
+## Repo layout
 
-Planning docs (intent, specs, task plans) were removed in `d1f54c9`; recover any one
-with `git show d1f54c9^:<path>`. Kept: `AGENTS.md`, `docs/runbooks/`, `docs/ops/`,
-`docs/lessons/`, `docs/research/`, `docs/releases/`, `docs/handoffs/`,
-`docs/design-systems/`.
-
-- Notes design (intent, spec, plan, tasks): `d1f54c9^:docs/intent/personal-life-api.md`,
-  `d1f54c9^:docs/specs/SPEC-notes.md`, `d1f54c9^:tasks/plan.md`.
+- `apps/note-service` — NestJS + TypeORM/SQLite REST API (loopback only).
+- `apps/app` — Next.js App Router UI + PWA; the server-side BFF is the only API caller.
+- `apps/idp` — NestJS OpenID Connect Identity Provider (users, login, sessions, OIDC).
+- `apps/tags-service` — NestJS + TypeORM/SQLite tag registry, shared by notes and todos.
+- `apps/todo-service` — NestJS + TypeORM/SQLite todos, lists, reminders and Web Push.
+- `apps/feedback-service` — NestJS + TypeORM/Postgres feedback ingest; a `feedback_event`
+  change log publishes metadata-only `feedback.submitted` messages to RabbitMQ.
+- `apps/meal-service` — NestJS + TypeORM/SQLite meals, foods and nutrition, including the
+  Gemini photo estimate.
+- `apps/focus-service` — NestJS + TypeORM/SQLite Pomodoro sessions and goals.
+- `apps/pomodoro` — focus-screen React components over `@life/ui`; no port, no server.
+- `packages/shared` — shared DTOs and types.
+- `packages/ui` — the visual language: atoms, blocks and `tokens.css`.
+- `packages/app-kit` — Next helpers: route layout, query suffix, preferences, pending actions.
+- `packages/crypto` — `enc.v1.` envelopes, `kw.v1.` DEK wrapping, master-key loading.
+- `packages/cache` — the read-through cache every service adapter extends.
+- `packages/service-kit` — `AuthGuard`, health, keys module, paging, batch.
+- `packages/nutrition` — nutrition math.
+- `packages/db` — backup and restore CLIs.
+- `packages/ops` — the data-operations registry and its `life-ops` CLI.
+- `packages/mcp-gateway` — one stdio MCP server over that registry.
