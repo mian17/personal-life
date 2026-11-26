@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "CI gates"
+type: 'Reference'
+title: 'CI gates'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -26,7 +26,7 @@ sources:
     resource: repo://scripts/audit-gate.mjs
   - id: openwiki-source-a0b08eaec14a20c6d47f731f
     resource: repo://scripts/ci-compose-env.sh
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # CI gates
@@ -35,12 +35,12 @@ Four workflows, all on GitHub-hosted runners — nothing in CI runs on the owner
 machine. Every workflow file lives in `.github/workflows/`; `npm run arch:check`
 enforces that no workflow may ever name a `self-hosted` runner.
 
-| Workflow | Triggers | Runner | What it proves |
-|---|---|---|---|
-| `tests.yml` | PR → `dev`/`main`, manual | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage |
+| Workflow           | Triggers                              | Runner          | What it proves                                                                                                           |
+| ------------------ | ------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `tests.yml`        | PR → `dev`/`main`, manual             | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage                                     |
 | `compose-boot.yml` | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The deployment works: build the real stack, boot it, every backend answers `/health/ready` **from inside its container** |
-| `secrets.yml` | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The history carries no secret: gitleaks over every commit, redacted |
-| `backmerge.yml` | push `main`, manual | `ubuntu-latest` | Bookkeeping: opens the `-s ours` back-merge PR so `main` stays an ancestor of `dev` |
+| `secrets.yml`      | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The history carries no secret: gitleaks over every commit, redacted                                                      |
+| `backmerge.yml`    | push `main`, manual                   | `ubuntu-latest` | Bookkeeping: opens the `-s ours` back-merge PR so `main` stays an ancestor of `dev`                                      |
 
 One run per PR (a new push supersedes the previous run via a per-PR concurrency
 group). `SonarCloud Code Analysis` — a GitHub App, not a workflow — additionally
@@ -67,7 +67,7 @@ reports (a rotted exception hides the next one), and on any entry past its
 Nothing in CI had ever run the deployment when v0.2.1 shipped three dead
 features in production with a green test run. This job is the fix: generate a
 throwaway env file (`scripts/ci-compose-env.sh` writes every variable the stack
-*requires at boot* — not merely what `docker compose config` interpolates),
+_requires at boot_ — not merely what `docker compose config` interpolates),
 validate with `docker compose config`, build the eight images, create the
 bind-mount `apps/*/data` directories and chown them to `1000:1000` (a fresh
 checkout has none; Docker would create them root-owned while every image runs as

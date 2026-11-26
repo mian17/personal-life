@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Notes lifecycle"
+type: 'Reference'
+title: 'Notes lifecycle'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -22,7 +22,7 @@ sources:
     resource: repo://packages/cache/src/index.ts
   - id: openwiki-source-e2eb94b060f24aab62e34387
     resource: repo://packages/service-kit/src/paging.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Notes lifecycle

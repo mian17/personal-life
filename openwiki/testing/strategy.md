@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Testing strategy"
+type: 'Reference'
+title: 'Testing strategy'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -20,7 +20,7 @@ sources:
     resource: repo://scripts/arch-check.test.mjs
   - id: openwiki-source-c5e0fae3563fc9f18c9582d6
     resource: repo://scripts/coverage.mjs
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Testing strategy
@@ -55,7 +55,7 @@ slot**, never the compose services and never a real `data/` directory:
 - Every harness port is `basePort + 10 * slot` — production-build stack on
   31xx, dev-mode stack on 32xx, hop-test apps on 33xx — so two worktrees holding
   different slots cannot collide with each other or with a running `npm run
-  dev` on 300x.
+dev` on 300x.
 - Per-slot containers: `redis-e2e-<slot>`, `feedback-pg-e2e-<slot>`
   (`postgres:17-alpine` on an ephemeral loopback port),
   `rabbitmq-e2e-<slot>` (`rabbitmq:4.1-alpine`) — plus a per-worktree queue so
@@ -81,11 +81,11 @@ most-covered run.
 
 ## Guard tests: contracts with tripwires
 
-| Guard | File | Moves when |
-|---|---|---|
-| UI token values | `packages/ui/test/tokens.test.ts` | a deliberate theme change — same commit |
-| Arch topology rules (3–7) | `scripts/arch-check.test.mjs` (`npm run test:arch`) | the rule's behavior changes; proven to fail on planted violations |
-| E2E selector surface | Playwright specs (roles, visible text, aria-labels, `button.trash-delete`) | only with explicit user approval |
+| Guard                     | File                                                                       | Moves when                                                        |
+| ------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| UI token values           | `packages/ui/test/tokens.test.ts`                                          | a deliberate theme change — same commit                           |
+| Arch topology rules (3–7) | `scripts/arch-check.test.mjs` (`npm run test:arch`)                        | the rule's behavior changes; proven to fail on planted violations |
+| E2E selector surface      | Playwright specs (roles, visible text, aria-labels, `button.trash-delete`) | only with explicit user approval                                  |
 
 `scripts/arch-check.test.mjs` runs under `node --test` and includes tests that
 plant a violation (a shared store, a missing env forwarding, a `self-hosted`

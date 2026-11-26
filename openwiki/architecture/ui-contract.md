@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Shared UI contract"
+type: 'Reference'
+title: 'Shared UI contract'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -16,7 +16,7 @@ sources:
     resource: repo://packages/ui/src/styles/tokens.css
   - id: openwiki-source-4e84162612b175153d97c0a9
     resource: repo://packages/ui/test/tokens.test.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Shared UI contract

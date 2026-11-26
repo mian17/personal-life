@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Meals and nutrition"
+type: 'Reference'
+title: 'Meals and nutrition'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -22,7 +22,7 @@ sources:
     resource: repo://apps/meal-service/src/usda/usda.client.ts
   - id: openwiki-source-b3109f2a2e00083e2d96c75c
     resource: repo://packages/nutrition/src/index.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Meals and nutrition

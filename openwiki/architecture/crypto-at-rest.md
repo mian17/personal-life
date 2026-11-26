@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Crypto at rest"
+type: 'Reference'
+title: 'Crypto at rest'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -20,7 +20,7 @@ sources:
     resource: repo://packages/service-kit/src/keys/keys.service.ts
   - id: openwiki-source-7ba63ed7bd06d75dcb3dd5c5
     resource: repo://packages/service-kit/src/keys/user-keys.entity.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Crypto at rest
@@ -103,7 +103,7 @@ refuses rather than degrades:
 - Any authentication failure — tamper, wrong key, AAD mismatch — surfaces as
   `CryptoError` ("authentication or context mismatch"); the open path never
   returns partial plaintext.
-- `CryptoError` messages describe *what* failed and never include keys,
+- `CryptoError` messages describe _what_ failed and never include keys,
   plaintext, or AAD contents.
 
 ## Proof

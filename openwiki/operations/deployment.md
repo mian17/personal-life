@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Deployment and operations"
+type: 'Reference'
+title: 'Deployment and operations'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -22,7 +22,7 @@ sources:
     resource: repo://packages/db/src/backup.ts
   - id: openwiki-source-eed9fbfe3a39f063b4923686
     resource: repo://scripts/arch-check.mjs
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Deployment and operations

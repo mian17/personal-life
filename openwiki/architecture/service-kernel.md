@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Service kernel"
+type: 'Reference'
+title: 'Service kernel'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -22,7 +22,7 @@ sources:
     resource: repo://packages/service-kit/src/paging.ts
   - id: openwiki-source-5bf177f1ce836f6192004d88
     resource: repo://packages/service-kit/src/public.decorator.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Service kernel
@@ -68,7 +68,7 @@ bearer token is always verified, so a bogus token answers `401` even in dev.
 
 `paging.ts` is the one paging seam: opaque cursor codec, limit clamp (default
 50, max 200), slice, `hasMore`/`nextCursor` assembly. What stays per service is
-the *order* — the stable sort key and its strictly-after test are passed in by
+the _order_ — the stable sort key and its strictly-after test are passed in by
 each caller, because no shared comparator can express e.g. the todo order
 (`~`-undated first, then date buckets) without being cleverer than the code it
 replaces. The module decrypts nothing and sorts nothing: services hand it rows

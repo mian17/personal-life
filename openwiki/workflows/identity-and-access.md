@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Identity and access"
+type: 'Reference'
+title: 'Identity and access'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -16,7 +16,7 @@ sources:
     resource: repo://apps/app/proxy.ts
   - id: openwiki-source-a0293781c618fb2c0f7248d8
     resource: repo://apps/idp/src/oidc/clients.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Identity and access

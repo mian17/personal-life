@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Release and promotion"
+type: 'Reference'
+title: 'Release and promotion'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -14,7 +14,7 @@ sources:
     resource: repo://docs/runbooks/release.md
   - id: openwiki-source-76478c25db28b99104e23105
     resource: repo://scripts/release.sh
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Release and promotion
@@ -82,5 +82,7 @@ and its notes were removed rather than back-dated (tags read v0.2.1 → v0.2.3).
 ## See also
 
 - [CI gates](ci-gates.md) — the workflows preconditions 1 and 5 read.
+
 <!-- openwiki: broken internal link [../openwiki/quickstart.md] file "../openwiki/quickstart.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 - [Quickstart](../openwiki/quickstart.md) — where to start for other tasks.

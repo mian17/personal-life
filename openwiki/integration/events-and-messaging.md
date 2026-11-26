@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Events and messaging"
+type: 'Reference'
+title: 'Events and messaging'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -22,7 +22,7 @@ sources:
     resource: repo://packages/service-kit/src/outbox/outbox-delivery.ts
   - id: openwiki-source-eed9fbfe3a39f063b4923686
     resource: repo://scripts/arch-check.mjs
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Events and messaging
@@ -90,12 +90,12 @@ block.
 
 ## Queues and brokers, ownership summary
 
-| Resource | Owner | Durable? | Survives restart |
-|---|---|---|---|
-| `feedback` exchange + `feedback.submitted` routing key | feedback-service | yes (durable exchange, persistent messages) | yes — the change log + cursor replay anything unsent |
-| `feedback_event` log + `feedback_cursor` | feedback-service (Postgres) | yes | the source of truth for "what is owed" |
-| outbox rows | each producing service (its own DB) | yes | at-least-once via the poller; live delivery via the BFF drain |
-| e2e RabbitMQ | test harness, ephemeral port | no | never — see [Testing strategy](../testing/strategy.md) |
+| Resource                                               | Owner                               | Durable?                                    | Survives restart                                              |
+| ------------------------------------------------------ | ----------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| `feedback` exchange + `feedback.submitted` routing key | feedback-service                    | yes (durable exchange, persistent messages) | yes — the change log + cursor replay anything unsent          |
+| `feedback_event` log + `feedback_cursor`               | feedback-service (Postgres)         | yes                                         | the source of truth for "what is owed"                        |
+| outbox rows                                            | each producing service (its own DB) | yes                                         | at-least-once via the poller; live delivery via the BFF drain |
+| e2e RabbitMQ                                           | test harness, ephemeral port        | no                                          | never — see [Testing strategy](../testing/strategy.md)        |
 
 ## See also
 

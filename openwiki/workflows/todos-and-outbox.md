@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Todos and the transactional outbox"
+type: 'Reference'
+title: 'Todos and the transactional outbox'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -28,13 +28,13 @@ sources:
     resource: repo://packages/service-kit/src/outbox/outbox-poller.service.ts
   - id: openwiki-source-85235f2a74131932cd21d27e
     resource: repo://packages/service-kit/src/outbox/outbox.entity.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Todos and the transactional outbox
 
 Todos are the cross-service hub: notes and tags are single-service, but meals
-and focus sessions *produce* todos. That is where the transactional outbox
+and focus sessions _produce_ todos. That is where the transactional outbox
 exists — so a domain write and its "tell another service" intent are one atomic
 fact, and the tick can never be silently lost.
 
@@ -75,7 +75,7 @@ than loses: at-least-once, which is the whole point of the pattern.
 
 ## The delivery leg is the BFF's drain
 
-Live delivery does not run in a service: `origin_grant` needs the *user's*
+Live delivery does not run in a service: `origin_grant` needs the _user's_
 token and `clientCredentials` is disabled, so
 `apps/app/lib/outbox-relay.ts` drains meal-service's pending queue
 (`GET /api/meal-todo/pending`), sends each intent to todo-service's origin

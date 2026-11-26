@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Quickstart"
+type: 'Reference'
+title: 'Quickstart'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -12,7 +12,7 @@ sources:
     resource: repo://package.json
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Quickstart

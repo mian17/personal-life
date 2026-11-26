@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "System overview"
+type: 'Reference'
+title: 'System overview'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -18,7 +18,7 @@ sources:
     resource: repo://README.md
   - id: openwiki-source-eed9fbfe3a39f063b4923686
     resource: repo://scripts/arch-check.mjs
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # System overview
@@ -32,11 +32,11 @@ sessions, tags and feedback ride the same architecture.
 
 `compose.yaml` defines **18 services** on one internal `life` network:
 
-| Group | Services |
-|---|---|
-| Built images (8) | `app`, `idp`, `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`, `focus-service` |
-| Cache (8) | `redis-app`, `redis-idp`, `redis-note`, `redis-tags`, `redis-todo`, `redis-feedback`, `redis-meal`, `redis-focus` — one per service, no shared cache |
-| Stores & broker (2) | `postgres-feedback` (the one Postgres service), `rabbitmq-feedback` |
+| Group               | Services                                                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Built images (8)    | `app`, `idp`, `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`, `focus-service`                                    |
+| Cache (8)           | `redis-app`, `redis-idp`, `redis-note`, `redis-tags`, `redis-todo`, `redis-feedback`, `redis-meal`, `redis-focus` — one per service, no shared cache |
+| Stores & broker (2) | `postgres-feedback` (the one Postgres service), `rabbitmq-feedback`                                                                                  |
 
 Every other service is SQLite, one database file per service on a bind-mounted
 `data/` directory. Named volumes exist for the Redis/Postgres/RabbitMQ data.
@@ -85,7 +85,7 @@ CI) mechanically enforces the topology rules a static read can prove:
   PR-triggered code never runs on the owner's machine. See
   [CI gates](../operations/ci-gates.md).
 
-Rules 3, 4 and 6 judge the *topology* (compose + sources), not the diff; rule 5
+Rules 3, 4 and 6 judge the _topology_ (compose + sources), not the diff; rule 5
 is diff-scoped. The two cache rules (reads through `getThrough`, ciphertext in
 the cache) need a reader and are covered by review and the shared cache
 implementation instead.

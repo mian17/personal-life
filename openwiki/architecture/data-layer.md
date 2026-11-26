@@ -1,6 +1,6 @@
 ---
-type: "Reference"
-title: "Data layer: BE → cache → DB"
+type: 'Reference'
+title: 'Data layer: BE → cache → DB'
 openwiki_generated: true
 verified:
   - by: openwiki/0.9.0
@@ -12,7 +12,7 @@ sources:
     resource: repo://apps/note-service/src/notes/notes.service.ts
   - id: openwiki-source-aaa203a9bf25ac19f43fe44b
     resource: repo://packages/cache/src/index.ts
-generated: { by: "pi", at: "2026-11-26T10:12:12.781Z" }
+generated: { by: 'pi', at: '2026-11-26T10:12:12.781Z' }
 ---
 
 # Data layer: BE → cache → DB
@@ -43,7 +43,7 @@ never the source of truth and never absorbs a write silently.
 **Cached values are rows as persisted.** For content-bearing services that means
 ciphertext (`enc.v1.` envelopes): the loader returns the serialized DB row, the
 same value is returned to the caller and stored in Redis. Decrypt, assemble DTOs,
-filter and paginate happen *after* every cache hit, in the request path only.
+filter and paginate happen _after_ every cache hit, in the request path only.
 
 **The key reflects the fetch, not the request.**
 `<service>:<sub>:v<generation>:<rest>`, with per-owner isolation. Content
@@ -63,7 +63,7 @@ cache keeps serving a view of a write that did not happen. A batch write bumps
 once (the batch kernel owns the transaction and the single bump).
 
 **The stale-guard closes the read race.** `getThrough` captures the generation
-*before* running the loader and re-reads it *after*: if a write bumped the
+_before_ running the loader and re-reads it _after_: if a write bumped the
 counter while the DB query was in flight, the fresh query result is already
 stale, so it is never written under the new generation. The next read misses and
 observes the write.
