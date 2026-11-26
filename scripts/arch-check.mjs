@@ -2,7 +2,7 @@
 /**
  * Fail on an architecture violation that a static read can prove.
  *
- * Three rules are mechanical, so they are checked here instead of in a review:
+ * Four rules are mechanical, so they are checked here instead of in a review:
  *
  *   RULE 3 — one database per service. Two services may not resolve to the same
  *            store (the same mount holding the SQLite file, the same SQLite file
@@ -15,16 +15,20 @@
  *            database file. A comment naming such a path is prose, not access, so
  *            it is not reported. Diff-scoped, so a pre-existing violation on the
  *            base ref never fails an unrelated branch.
+ *   RULE 6 — a variable a service cannot boot without is forwarded to its
+ *            container: every read with no fallback that the service's own
+ *            compose service does not pass through is a violation.
  *
  * Rules 1 and 2 of AGENTS.md Contract 2 — every read flow goes through the cache's
  * `getThrough` loader, and the cache holds serialized rows (ciphertext), not
  * decrypted DTOs — need a reader, so they are not here, and there is no flag that
  * pretends otherwise. `.agents/skills/arch-boundary/SKILL.md` carries them.
  *
- * Rules 3 and 4 judge the resulting topology (compose.yaml plus every
- * `apps/<service>/src/app.module.ts` on disk), never the diff: a branch that moves
- * a service onto a shared file is a violation even when its own line looks
- * harmless.
+ * Rules 3, 4 and 6 judge the resulting topology (compose.yaml plus the sources on
+ * disk), never the diff: a branch that moves a service onto a shared file is a
+ * violation even when its own line looks harmless, and a variable compose.yaml
+ * never forwards is dead in the deployed artifact no matter which branch dropped
+ * it.
  *
  * Exit 0 clean, 1 violations, 2 bad usage or a failed `git` call.
  *
@@ -32,7 +36,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, join, normalize, resolve } from 'node:path';
+import { basename, join, normalize, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -560,12 +564,198 @@ export function checkCrossServiceAccess(worktree, base) {
   });
 }
 
-/** Every finding across the three rules, in rule order. */
+/**
+ * The variables a service reads without a fallback that compose.yaml is still right
+ * not to forward, each for a reason a reviewer can check:
+ *
+ *   NODE_ENV                    — the image sets it (`ENV NODE_ENV=production` in
+ *                                 every `apps/<name>/Dockerfile`), so compose
+ *                                 forwarding it would be the redundancy, not the fix.
+ *   APP_DEV_SKIP_ACCESS_GATE    — the dev-stack switch, documented in `apps/app/proxy.ts`
+ *                                 as "Set ONLY on a dev command line …, never in a
+ *                                 deployed service's environment". Forwarding it into a
+ *                                 container would drop the Tailscale gate.
+ *   OWNER_LOGIN                 — reaches the app container through its `env_file: .env`
+ *                                 (first line of `.env.example`, and the deploy runbook's
+ *                                 "two more reach containers through env_file"), so it is
+ *                                 forwarded; only not through the `environment:` block this
+ *                                 rule keys on. Adding it there would duplicate the source.
+ */
+export const NOT_FORWARDED_BY_DESIGN = ['NODE_ENV', 'APP_DEV_SKIP_ACCESS_GATE', 'OWNER_LOGIN'];
+
+/** A `process.env` read as far as this rule can see it: a name and where it is. */
+const DOT_READ = /process\.env\.([A-Za-z_$][\w$]*)/g;
+
+/** A read whose name lives in a constant: `process.env[TODOS_API_URL_ENV]`. */
+const BRACKET_READ = /process\.env\[([A-Za-z_$][\w$]*)\]/g;
+
+/** `const NAME = 'VALUE'` — the only indirection a bracket read may resolve through. */
+const NAMED_CONSTANT = /const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*'(\w+)'/g;
+
+/** A `??` or `||` anywhere after the read gives it an answer, so it is not hard. */
+const FALLBACK = /\?\?|\|\|/;
+
+/**
+ * The directories inside an app that are not the deployed service: tests never run
+ * in a container, host-side CLIs (`apps/<name>/scripts`) are never copied into an
+ * image (the Dockerfile copies `dist` only), and `node_modules`/`dist` are build
+ * output.
+ */
+const NOT_SHIPPED = new Set(['node_modules', 'dist', 'test', 'scripts']);
+
+/** Every `.ts`/`.tsx` file an app ships, or none when it has none. */
+function sourceFiles(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return NOT_SHIPPED.has(entry.name) ? [] : sourceFiles(path);
+    }
+    return /\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+/** Every `apps/<name>` that ships sources of its own, with those sources. */
+function appSources(worktree) {
+  const apps = join(worktree, 'apps');
+  if (!existsSync(apps)) return [];
+  return readdirSync(apps, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({ name: entry.name, files: sourceFiles(join(apps, entry.name)) }))
+    .filter((app) => app.files.length > 0);
+}
+
+/**
+ * The sources of every workspace package. A service may import the constant a
+ * bracket read uses — `TODOS_API_URL_ENV` comes from `@life/service-kit` — so the
+ * name is resolved where it is declared, not guessed from the read site.
+ */
+function sharedSources(worktree) {
+  const packages = join(worktree, 'packages');
+  if (!existsSync(packages)) return [];
+  return readdirSync(packages, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => sourceFiles(join(packages, entry.name, 'src')));
+}
+
+/** The string-valued constants declared in `files`, keyed by name. */
+function namedConstants(files) {
+  const constants = new Map();
+  for (const file of files) {
+    for (const match of readFileSync(file, 'utf8').matchAll(NAMED_CONSTANT)) {
+      constants.set(match[1], match[2]);
+    }
+  }
+  return constants;
+}
+
+/** True when the text after a read is an `??`/`||` fallback, not a bare concatenation. */
+function hasFallback(afterRead) {
+  return FALLBACK.test(afterRead);
+}
+
+/**
+ * The variables one line reads with no fallback. Two shapes, because the code has
+ * two: `process.env.NAME`, and `process.env[CONST]` where `CONST` is a string
+ * literal declared in the sources this run resolved. A constant this run cannot
+ * resolve is left alone rather than guessed at.
+ */
+function hardReadNames(line, constants) {
+  if (isComment(line)) return [];
+
+  const dotReads = [...line.matchAll(DOT_READ)]
+    .filter((match) => !hasFallback(line.slice(match.index + match[0].length)))
+    .map((match) => match[1]);
+  const bracketReads = [...line.matchAll(BRACKET_READ)]
+    .filter((match) => !hasFallback(line.slice(match.index + match[0].length)))
+    .map((match) => constants.get(match[1]))
+    .filter(Boolean);
+
+  return [...dotReads, ...bracketReads].filter((name) => !NOT_FORWARDED_BY_DESIGN.includes(name));
+}
+
+/** Rule 6's message: the service, the variable, and what compose owes it. */
+function refuserMessage(serviceName, variable) {
+  return `${serviceName} reads ${variable} with no fallback, but its compose service does not forward it`;
+}
+
+/**
+ * RULE 6 findings for one service: one per variable it cannot run without and its
+ * container never receives, reported at the first place it is read.
+ */
+function unforwardedFindings({ serviceName, files, constants, forwarded, worktree }) {
+  const firstRead = new Map();
+
+  for (const file of files) {
+    linesOf(readFileSync(file, 'utf8')).forEach((line, index) => {
+      for (const variable of hardReadNames(line, constants)) {
+        if (forwarded.has(variable) || firstRead.has(variable)) continue;
+        firstRead.set(variable, { file: relative(worktree, file), line: index + 1 });
+      }
+    });
+  }
+
+  return [...firstRead].map(([variable, site]) => {
+    return finding(site.file, site.line, 6, refuserMessage(serviceName, variable));
+  });
+}
+
+/**
+ * RULE 6 — a variable a service cannot boot without is forwarded to its
+ * container.
+ *
+ * Mechanical because both halves are text: the sources say which names the service
+ * reads with no fallback, compose.yaml says which names its container is handed,
+ * and either the name is a key in that service's `environment:` block or it is not.
+ * No runtime, no judgement.
+ *
+ * The bug it exists for, 2026-11-14: `MEAL_TODOS_API_URL`, `FOCUS_TODOS_API_URL`
+ * and `OIDC_PRODUCER_*` were read with no fallback, written into dev's env file,
+ * and never forwarded to the containers — three features dead in a shipped release
+ * while every check stayed green, because nothing in CI ever compared the code's
+ * requirements with compose.yaml.
+ *
+ * Topology-scoped like rules 3 and 4, not diff-scoped: the subject is the deployed
+ * artifact, so a variable compose.yaml never forwards is dead whichever branch
+ * dropped it, and an unrelated PR should not be the one to report it.
+ *
+ * One gap, stated rather than papered over: the IdP composes one setting name at
+ * runtime — `OIDC_PRODUCER_${name}_REDIRECT_URIS` in `apps/idp/src/oidc/clients.ts`
+ * — and no static read can see that. This rule judges statically-named hard reads
+ * only; dynamically-composed names and boot-time crashes are covered by the
+ * compose-boot CI job (a separate change).
+ */
+export function checkEnvForwarding(worktree) {
+  const missing = missingComposeFinding(worktree, 6);
+  if (missing) return [missing];
+
+  const composeServices = readCompose(join(worktree, 'compose.yaml'));
+  const shared = namedConstants(sharedSources(worktree));
+
+  return appSources(worktree).flatMap((app) => {
+    // A service this compose file does not deploy has no container to forward
+    // into; rule 3 is the one that reports an app shipping with no store.
+    const service = composeServices.get(app.name);
+    if (service === undefined) return [];
+
+    const constants = new Map([...shared, ...namedConstants(app.files)]);
+    return unforwardedFindings({
+      serviceName: app.name,
+      files: app.files,
+      constants,
+      forwarded: new Set(service.env.keys()),
+      worktree,
+    });
+  });
+}
+
+/** Every finding across the four rules, in rule order. */
 export function runChecks({ worktree, base }) {
   return [
     ...checkDatabasePerService(worktree),
     ...checkEngineIsDesignated(worktree),
     ...checkCrossServiceAccess(worktree, base),
+    ...checkEnvForwarding(worktree),
   ];
 }
 
