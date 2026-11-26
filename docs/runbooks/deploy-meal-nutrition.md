@@ -66,7 +66,7 @@ compose up` refuses to start without it, and the service itself also refuses to 
 - [ ] Working tree clean on the deploy ref: `git status --short && git log -1 --oneline`.
 - [ ] `.env` has the names from §2 set — at minimum `MEAL_MASTER_KEY` (the only hard
       requirement) plus `OIDC_AUDIENCE_MAP` containing `https://meal-service=life-api`
-      (already at `.env.example:43`; a `.env` carried over from an older deploy needs it
+      (already at `.env.example:52`; a `.env` carried over from an older deploy needs it
       added, or every `meal-service` request 401s).
 - [ ] Record the images you are about to replace (rollback target):
       `docker images --format '{{.ID}}  {{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | grep personal-life`
