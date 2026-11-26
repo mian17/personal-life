@@ -1,12 +1,4 @@
 {
   "comment": "Known advisories, production and dev, signed off with a review deadline. scripts/audit-gate.mjs fails CI on any high/critical advisory missing here, on any entry audit no longer reports, and on any entry past its reviewBy date. `reviewBy: null` means informational only — no deadline, never gating.",
-  "advisories": [
-    {
-      "id": "GHSA-gcqx-w48m-w2h4",
-      "package": "deepmerge",
-      "severity": "low",
-      "reviewBy": "2027-02-10",
-      "reason": "No patched release exists at any version, so there is nothing to upgrade to; npm can only offer a semver-major downgrade of jest. Reachable only through jest's devDependency tree (jest-config → deepmerge), never in a shipped build. Re-check by 2027-02-10: by then a patched release may exist, or jest may have taken a major that drops deepmerge."
-    }
-  ]
+  "advisories": []
 }
