@@ -14,7 +14,7 @@ A later slice on this branch (`df7f58b..2469ad4`, client-timezone "today" + a `c
 env line on `app`) is in `docs/runbooks/deploy-timezone-today.md`; deploy that after this one.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
-authority to run it. Do **not** merge to `master` unless asked explicitly — building the
+authority to run it. Do **not** merge to `main` unless asked explicitly — building the
 images from the branch is a separate, sufficient step.
 
 ## 0. What changes
@@ -150,7 +150,7 @@ Regressions this delta can touch (shared `@life/ui` + the todo row):
 ## Hard lines
 
 No one else does these: `docker compose down`, `db:backup`, `db:restore`, `docker compose up`
-against production, and any merge to `master`.
+against production, and any merge to `main`.
 
 ## Related
 

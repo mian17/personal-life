@@ -17,7 +17,7 @@ with `docs/specs/SPEC-photo-identity.md` (the resolution contract) and
 `docs/specs/SPEC-usda-source.md` (the USDA boundary).
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
-authority to run it. Do **not** merge to `master` unless asked explicitly.
+authority to run it. Do **not** merge to `main` unless asked explicitly.
 
 ## 0. What is new
 
@@ -44,7 +44,7 @@ docker compose exec meal-service sh -c 'printenv USDA_API_KEY >/dev/null && echo
 ## 1. Migration / schema verdict — none
 
 No migration files exist (repo-wide). Tables are created at boot by the service's
-own schema sync (`apps/meal-service/src/app.module.ts:21-26`) — this chapter adds
+own schema sync (`apps/meal-service/src/app.module.ts:53`) — this chapter adds
 no new entity, so booting the new build adds no table. **Never regenerate
 `MEAL_MASTER_KEY`**; it stays write-once from the meal-nutrition deploy.
 
@@ -58,7 +58,7 @@ no new entity, so booting the new build adds no table. **Never regenerate
 | `USDA_API_BASE` | Optional USDA base override | defaults to `https://api.nal.usda.gov/fdc`; only a proxy sets it |
 
 **Leak discipline:** the key rides in the USDA query string — the module header
-names it (`apps/meal-service/src/usda/usda.client.ts:29`) — so a logged URL is a
+names it (`apps/meal-service/src/usda/usda.client.ts:25-28`) — so a logged URL is a
 leaked key, and data.gov deactivates keys it finds published. The client therefore
 writes no request URL to a log — and neither should you: never paste a failing
 USDA URL into chat, an issue, or this doc.
@@ -166,7 +166,7 @@ estimate → catalog-create → grams-log path this chapter ships, against
 
 No one else does these: `docker compose down`, stopping a production service,
 backing up or restoring `meal.db`, `docker compose up` against production,
-generating or rotating `MEAL_MASTER_KEY`, and any merge to `master`. A key's
+generating or rotating `MEAL_MASTER_KEY`, and any merge to `main`. A key's
 **value** never enters a doc, a log, or a chat — names only.
 
 ## Related

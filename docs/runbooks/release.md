@@ -29,6 +29,18 @@ tag, `gh release create`, and the verification prints — local tag SHA, that th
 tagged commit is reachable from `origin/dev`, the tag on `origin`, the published
 release URL.
 
+Between opening that pull request and merging it, the script waits for **every
+workflow on the bump commit's own SHA** to be `completed`/`success`: it lists the
+runs from `chore/release-v<x>` up to 40 times, 30 seconds apart — 20 minutes,
+because `Tests` takes ~9 minutes here and `Compose boot` ~6. The reason it has to
+wait is that the ruleset requires a pull request but no status checks, so nothing
+else would stop the merge: without this the release would land while its own
+workflows were still queued, running or red. A run that completes red stops the
+release at once, before the merge, naming each workflow and its run URL; a budget
+that runs out stops it the same way and lists what was still unfinished. No run
+appearing yet is not a failure — GitHub creates them seconds after the push — so
+the script keeps polling.
+
 The bump commit cannot be pushed to `dev`. The ruleset `Block default branches`
 (id 25775908) targets `~DEFAULT_BRANCH` and `refs/heads/main`, requires a pull
 request on both, and has no bypass actors, so a direct push is refused with
@@ -46,10 +58,12 @@ dirty tree, and landing it on `dev` is its own pull request for the same ruleset
 reason.
 
 Flags: `--notes <path>`, `--ref <ref>`, `--title <t>`, `--skip-ci-check` (prints
-the CI evidence as a warning and continues — deliberate use only, for a release
-after a flake), `--dry-run` (preconditions only, then prints every remaining
-command; it writes nothing but the one-line `package.json` bump so the diff can
-be inspected, and prints the revert), `--help`.
+the CI evidence as a warning and continues — it downgrades **both** CI gates, the
+pre-bump precondition and the wait on the bump commit, and says so each time;
+deliberate use only, for a release after a flake), `--dry-run` (preconditions
+only, then prints every remaining command, wait step included; it writes nothing
+but the one-line `package.json` bump so the diff can be inspected, and prints the
+revert), `--help`.
 
 ## Notes house style
 
