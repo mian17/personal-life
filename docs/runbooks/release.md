@@ -7,8 +7,8 @@ why the procedure is a script and not a memory.
 
 ```bash
 git switch dev && git pull --ff-only origin dev
-# write docs/releases/0.2.2.md, commit it
-npm run release -- 0.2.2
+# write docs/releases/<version>.md, commit it, land it on dev through a PR
+npm run release -- <version>
 ```
 
 `scripts/release.sh` (`npm run release`) refuses unless all five preconditions
@@ -24,11 +24,26 @@ hold, then does the rest in order and proves each half:
 
 Then: bump `package.json`'s `version` (one line, `git diff --numstat` must read
 `1 1 package.json`), commit as `chore: release v<x>`, annotated tag with the
-notes as its message, push the commit, push the tag, `gh release create`, and
-three verification prints — local tag SHA, the tag on `origin`, the published
+notes as its message, **land the bump commit through a pull request**, push the
+tag, `gh release create`, and the verification prints — local tag SHA, that the
+tagged commit is reachable from `origin/dev`, the tag on `origin`, the published
 release URL.
 
-The notes file must already be committed; an uncommitted one is a dirty tree.
+The bump commit cannot be pushed to `dev`. The ruleset `Block default branches`
+(id 25775908) targets `~DEFAULT_BRANCH` and `refs/heads/main`, requires a pull
+request on both, and has no bypass actors, so a direct push is refused with
+`GH013: Changes must be made through a pull request.` The script lands it the way
+`v0.2.3` landed by hand: branch `chore/release-v<x>` → `gh pr create --base dev`
+→ `gh pr merge --merge --subject "chore: release v<x> (#<n>)"` → `git fetch
+origin dev` and `git merge-base --is-ancestor HEAD origin/dev`. A **merge commit,
+never a squash**: the annotated tag is already created on the bump commit, and a
+squash rewrites that SHA, so the tag would name a commit `dev` never had. If the
+merge reports the PR is not yet mergeable the script retries once, then stops
+with the PR URL so you can merge it yourself.
+
+The notes file must already be committed and on `dev`; an uncommitted one is a
+dirty tree, and landing it on `dev` is its own pull request for the same ruleset
+reason.
 
 Flags: `--notes <path>`, `--ref <ref>`, `--title <t>`, `--skip-ci-check` (prints
 the CI evidence as a warning and continues — deliberate use only, for a release
