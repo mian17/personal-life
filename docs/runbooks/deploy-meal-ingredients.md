@@ -69,7 +69,7 @@ USDA URL into chat, an issue, or this doc.
 - [ ] `.env` has the pair from §2 set — at minimum `USDA_API_KEY`; `USDA_API_BASE`
       stays unset unless a proxy fronts FDC.
 - [ ] `OIDC_AUDIENCE_MAP` contains `https://meal-service=life-api` (already at
-      `.env.example:43`; a stale `.env` 401s every meal request).
+      `.env.example:52`; a stale `.env` 401s every meal request).
 - [ ] Record the images you are about to replace (rollback target):
       `docker images --format '{{.ID}}  {{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | grep personal-life`
 - [ ] Baseline health: `docker compose ps` — `meal-service`, `app`, `idp` healthy.

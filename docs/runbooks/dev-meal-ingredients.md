@@ -190,7 +190,7 @@ Test it:
 ### What makes an item "estimated"
 
 `isEstimated` is **client-derived** from the item's `known` coverage
-(`editor.tsx:106`); it is **not** a wire field. Do not look for it in a network
+(`editor.tsx:116`); it is **not** a wire field. Do not look for it in a network
 response. A full 27-field estimate shows the `· 23 estimated` suffix; a path-3 or manual
 item keeps an empty `known` set and shows the em dash instead.
 
