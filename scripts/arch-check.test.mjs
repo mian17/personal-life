@@ -1,5 +1,5 @@
 /**
- * Guards the four mechanical architecture rules in `scripts/arch-check.mjs`.
+ * Guards the five mechanical architecture rules in `scripts/arch-check.mjs`.
  *
  * Rule 3 (one database per service) and rule 4 (the designated engine) judge the
  * topology on disk, so each is fed a throwaway worktree holding only the files
@@ -9,8 +9,12 @@
  * lists the file at all (a new directory). Rule 6 (a required variable is
  * forwarded) is fed fixtures too, one per read shape: dot access, bracket access
  * through a constant (declared in the same app and in a workspace package), and a
- * read that has a fallback and must stay silent. The usage cases drive the script
- * as a child process, because exit code and stderr are what they assert.
+ * read that has a fallback and must stay silent. Rule 7 (no self-hosted runner) is
+ * planted a workflow to fail on — under `pull_request` and under
+ * `workflow_dispatch`, because it bans the runner whatever the trigger — and
+ * checked against the real checkout, which carries the phrase in two doc comments
+ * and must stay clean. The usage cases drive the script as a child process,
+ * because exit code and stderr are what they assert.
  *
  * Run: npm run test:arch
  */
@@ -27,6 +31,7 @@ import {
   checkDatabasePerService,
   checkEngineIsDesignated,
   checkEnvForwarding,
+  checkNoSelfHostedRunners,
   findCrossServiceFindings,
 } from './arch-check.mjs';
 
@@ -415,3 +420,70 @@ test('rule 6: a dev-only switch and NODE_ENV are not compose’s to forward', ()
 test('rule 6: today’s tree forwards every variable the code cannot boot without', () => {
   assert.deepEqual(checkEnvForwarding(REPO), []);
 });
+
+/** One workflow file: a job under the given `on:` lines, on the runner it names. */
+function workflowSource(triggerLines, runner) {
+  return ['on:', ...triggerLines, 'jobs:', '  scan:', `    runs-on: ${runner}`, ''].join('\n');
+}
+
+test('rule 7: a pull_request job naming a self-hosted runner is a violation', () => {
+  const root = fixture({
+    '.github/workflows/scan.yml': workflowSource(
+      ['  pull_request:', '    branches: [dev]'],
+      '[self-hosted, sonarqube]',
+    ),
+  });
+
+  try {
+    const findings = checkNoSelfHostedRunners(root);
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.equal(findings[0].rule, 7);
+    assert.equal(findings[0].file, join('.github', 'workflows', 'scan.yml'));
+    assert.equal(findings[0].line, 6);
+    assert.match(findings[0].message, /names a self-hosted runner/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 7: the runner is banned under workflow_dispatch too, not just on PRs', () => {
+  const root = fixture({
+    // The tempting exemption: "it can only be started by hand". A job reachable by
+    // hand is still reachable, so the trigger is not consulted.
+    '.github/workflows/scan.yml': workflowSource(['  workflow_dispatch:'], 'self-hosted'),
+  });
+
+  try {
+    const findings = checkNoSelfHostedRunners(root);
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.equal(findings[0].rule, 7);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 7: the phrase in a comment is the rule being obeyed, not broken', () => {
+  const root = fixture({
+    '.github/workflows/scan.yml': [
+      '# No self-hosted state and no host-mounted service: this job needs neither.',
+      'on:',
+      '  pull_request:',
+      '  workflow_dispatch:',
+      'jobs:',
+      '  scan:',
+      '    runs-on: ubuntu-latest  # never self-hosted',
+      '',
+    ].join('\n'),
+  });
+
+  try {
+    assert.deepEqual(checkNoSelfHostedRunners(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rule 7: today’s tree runs every workflow on a GitHub-hosted runner', () => {
+  assert.deepEqual(checkNoSelfHostedRunners(REPO), []);
+});
+

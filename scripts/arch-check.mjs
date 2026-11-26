@@ -2,7 +2,7 @@
 /**
  * Fail on an architecture violation that a static read can prove.
  *
- * Four rules are mechanical, so they are checked here instead of in a review:
+ * Five rules are mechanical, so they are checked here instead of in a review:
  *
  *   RULE 3 — one database per service. Two services may not resolve to the same
  *            store (the same mount holding the SQLite file, the same SQLite file
@@ -18,6 +18,10 @@
  *   RULE 6 — a variable a service cannot boot without is forwarded to its
  *            container: every read with no fallback that the service's own
  *            compose service does not pass through is a violation.
+ *   RULE 7 — no workflow runs on a self-hosted runner: `runs-on` applies to a
+ *            pull request from a fork as well, so a `self-hosted` label would
+ *            hand a stranger the owner's machine. Comments are not judged, and
+ *            every trigger is — a job reachable by hand is still reachable.
  *
  * Rules 1 and 2 of AGENTS.md Contract 2 — every read flow goes through the cache's
  * `getThrough` loader, and the cache holds serialized rows (ciphertext), not
@@ -749,13 +753,50 @@ export function checkEnvForwarding(worktree) {
   });
 }
 
-/** Every finding across the four rules, in rule order. */
+/** Every workflow file under `.github/workflows/`, as repo-relative paths. */
+function workflowFiles(worktree) {
+  const directory = join(worktree, '.github', 'workflows');
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
+    .filter((entry) => entry.endsWith('.yml') || entry.endsWith('.yaml'))
+    .sort()
+    .map((entry) => join('.github', 'workflows', entry));
+}
+
+/**
+ * RULE 7 — no workflow runs on a self-hosted runner.
+ *
+ * The failure it prevents: `runs-on` applies to a pull request opened from a fork
+ * as much as to a branch of this repository, so a `self-hosted` label hands a
+ * stranger's commit the owner's machine — its SSH keys, its other checkouts, its
+ * network. Nothing in a green run's log shows that it happened. The one workflow
+ * that named a runner of the owner's (`.github/workflows/sonarqube.yml`) was
+ * deleted the day this repository went public.
+ *
+ * Every trigger is judged, `workflow_dispatch` included: a job reachable by hand is
+ * still reachable, and an allowlist of triggers is a second thing to get wrong. A
+ * comment is not judged — "no self-hosted state" in a doc comment is the rule being
+ * obeyed, not broken — so each line is read with its comment stripped.
+ */
+export function checkNoSelfHostedRunners(worktree) {
+  return workflowFiles(worktree).flatMap((file) => {
+    const lines = linesOf(readFileSync(join(worktree, file), 'utf8'));
+    return lines.flatMap((line, index) => {
+      if (!stripComment(line).includes('self-hosted')) return [];
+      const message = `${file} names a self-hosted runner; a PR-triggered job would run it on the owner's host`;
+      return [finding(file, index + 1, 7, message)];
+    });
+  });
+}
+
+/** Every finding across the five rules, in rule order. */
 export function runChecks({ worktree, base }) {
   return [
     ...checkDatabasePerService(worktree),
     ...checkEngineIsDesignated(worktree),
     ...checkCrossServiceAccess(worktree, base),
     ...checkEnvForwarding(worktree),
+    ...checkNoSelfHostedRunners(worktree),
   ];
 }
 

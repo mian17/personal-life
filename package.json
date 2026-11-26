@@ -1,6 +1,6 @@
 {
   "name": "personal-life",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "private": true,
   "workspaces": [
     "packages/shared",
@@ -43,6 +43,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "audit:gate": "node scripts/audit-gate.mjs",
     "arch:check": "node scripts/arch-check.mjs",
+    "secrets": "GIT=\"$(git rev-parse --path-format=absolute --git-common-dir)\"; docker run --rm -v \"$PWD:/repo:ro\" -v \"$GIT:$GIT:ro\" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source /repo --redact --no-banner --config /repo/.gitleaks.toml",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "db:backup": "npm run db:backup -w @life/db --",
