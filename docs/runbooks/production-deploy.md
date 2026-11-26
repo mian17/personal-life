@@ -18,9 +18,10 @@ cd /home/night/WebstormProjects/personal-life
 ```
 
 Ref: the ref **you choose** — this runbook pins no hash. `dev` is the current line and
-`main` lags it: `origin/main` was 141 commits behind `origin/dev` when this was written.
-Check `git log --oneline -1 origin/dev` and what the ref you mean to ship actually
-carries before choosing. Record the exact commit you deploy in §3.
+`main` lags it — measure the gap yourself rather than trusting a written number:
+`git rev-list --count origin/main..origin/dev`. Check `git log --oneline -1 origin/dev`
+and what the ref you mean to ship actually carries before choosing. Record the exact
+commit you deploy in §3.
 `compose.yaml` defines **18 services**: 8 built images (`app`, `idp`,
 `note-service`, `tags-service`, `todo-service`, `feedback-service`, `meal-service`,
 `focus-service`) plus 8 Redis instances, `postgres-feedback` and
@@ -217,11 +218,13 @@ cd /home/night/WebstormProjects/personal-life
 ```
 
 - [ ] Ref chosen and recorded: `git log -1 --oneline` → record the commit you are
-      deploying. `dev` is the current line and `main` lags it (141 commits when this
-      was written), so name the ref deliberately instead of defaulting to `main`. It must contain the feedback status workflow — check with
+      deploying. `dev` is the current line and `main` lags it (read the count with
+      `git rev-list --count origin/main..origin/dev`), so a `main` ref deploys an older
+      runtime — name the ref deliberately instead of defaulting to `main`. It must contain the feedback status workflow — check with
       `git log --oneline -1 d1f54c9^ -- docs/specs/SPEC-feedback-status.md` (a commit exists, not
-      "unknown revision"). `git status --short` shows only untracked `docs/reference-repo/`,
-      `pictures/`, `.pi/`.
+      "unknown revision"). `git status --short` may show untracked run scratch — that is
+      expected and ignorable; a **modified tracked file** in that output is what to stop
+      for.
 - [ ] Record the images you are about to replace (rollback reference):
       `docker compose images`.
 - [ ] Baseline the running stack: `docker compose ps` — the services you expect healthy
@@ -285,8 +288,8 @@ npm run db:backup -w @life/db -- --pin
   It is read-only against its inputs. `--only life,tags,todo,idp` narrows the set (needed
   only before `meal.db` exists — it does now).
 - Each run writes its own UTC-stamped directory, and `--pin` appends `-pinned` to the name.
-  The two kinds land seconds apart in separate directories — the newest pair here is
-  `…2026-10-16T12-34-08-493Z-pinned` (Postgres) and `…12-34-39-247Z-pinned` (SQLite).
+  The two kinds land seconds apart in separate directories; §0 names the newest pinned
+  pair on this host.
 - [ ] From `db:backup:pg`: one `-> … pg_restore_list=ok` line (for `feedback`) and a new
       `backup/<stamp>-pinned/` holding `feedback.dump`, `manifest.json` and a `PINNED`
       marker.

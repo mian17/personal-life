@@ -18,7 +18,7 @@ were graded as claims too, because a wrong line number sends a reader to the wro
 code. Historical narratives — a past run's step number, a past deploy's effect —
 were not graded.
 
-Verdicts over 115 rows: **40 STALE**, 75 VERIFIED, and three the audit's rules
+Verdicts over 118 rows: **40 STALE**, 75 VERIFIED, and three the audit's rules
 excluded (answered below). The 40 are verbatim from the audit report: one row per
 claim, the primary line first, repeats of the same claim inside one file listed in
 the same row.
@@ -91,8 +91,8 @@ these were left ungraded rather than guessed at. All three are answered now.
 
 ## Where this record lives
 
-`docs/reports/` is gitignored per-run scratch — `.gitignore` lists it, and
-`README.md` says as much — so the audit report is not committable, and a rewrite
+`docs/reports/` is gitignored per-run scratch — `.gitignore` carries the pattern
+`docs/reports/` — so the audit report is not committable, and a rewrite
 justified by it would rest on a file no reader can open. That is why this record
 is under `docs/handoffs/`, which is tracked, and why the table is reproduced here
 rather than linked to.
