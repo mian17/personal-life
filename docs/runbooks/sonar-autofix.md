@@ -110,25 +110,26 @@ unpushed branch. If the agent changes nothing, the run logs `no-changes` and end
 ## Why it cannot loop
 
 The receiver acts only on `branch.isMain` (an absent `branch` counts as main).
-A fix lands on `fix/sonar-*`, which the workflow never scans, so its push cannot
-trigger another run. Merging the draft PR into `dev` pushes `dev`, which scans
-once and may start the next legitimate run.
+A fix lands on `fix/sonar-*`, which no scan covers, so its push cannot trigger
+another run. Merging the draft PR into `dev` does not scan either — since v0.2.3
+the scan is run by hand — so the next run is one a person started.
 
 ## One caveat about the stored analysis
 
-SonarQube Community Build keeps a single analysis per project, and
-`.github/workflows/sonarqube.yml` scans only `dev`. Every scan therefore
-**replaces** the project's stored analysis, because the scanner does not set
-`sonar.branch.name` (Community Build ignores it).
+SonarQube Community Build keeps a single analysis per project, and the scan is
+manual since v0.2.3: `.github/workflows/sonarqube.yml` is deleted,
+`sonar-project.properties` is still the config and `SONAR_TOKEN` still comes from
+the container. Every scan therefore **replaces** the project's stored analysis,
+because the scanner does not set `sonar.branch.name` (Community Build ignores it).
 
 Consequences:
 
-- The gate-triggered run always describes the most recent scan, which is `dev` —
-  coherent, since fix branches are cut from `dev`.
-- `main` is not scanned at all. It is the release line and receives what `dev`
-  already analysed, so scanning the promotion would only duplicate it.
-- The workflow serialises scans (`concurrency: group: sonarqube`) so two pushes
-  cannot race to overwrite the same analysis.
+- The gate-triggered run describes the most recent scan, which is whichever branch
+  was scanned last by hand — `dev`, if that is the one you ran.
+- `main` is not scanned unless you scan it. It is the release line and receives
+  what `dev` already analysed, so scanning the promotion would only duplicate it.
+- Analyses, and therefore webhook events, arrive only when a scan is run: between
+  hand-run scans this pipeline sees nothing at all.
 
 If you ever need `main` and `dev` measured separately, that is a Developer
 Edition feature. Override the target branch with `SONAR_AUTOFIX_BASE_BRANCH` if

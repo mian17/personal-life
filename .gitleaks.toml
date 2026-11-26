@@ -1,0 +1,22 @@
+# Extends the default rule set rather than restating it: a rule added to gitleaks
+# arrives with the next image bump, and the single exception below stays readable
+# in one place instead of hiding inside a copied config.
+
+[extend]
+useDefault = true
+
+# One entry, narrowed to one path.
+#
+# The finding it silences is `generic-api-key` at
+# `packages/crypto/test/envelope.test.ts:17`, key `92e11dcd...`: a published
+# NIST/CAVP AES-GCM known-answer vector, mirrored from pyca/cryptography's
+# `gcmEncryptExtIV256.rsp` (that file cites the vector and its section above the
+# constant). It is test input, not a credential.
+#
+# A path and not a regex: a pattern that matched this key's shape, or that covered
+# `packages/crypto/` as a whole, would stop reporting a real key in the code it
+# is meant to protect. Anything else a scan reports is a finding to act on, not an
+# entry to add here.
+[[allowlists]]
+description = "published NIST CAVP AES-GCM known-answer vector, not a credential"
+paths = ['''packages/crypto/test/envelope\.test\.ts''']
