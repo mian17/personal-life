@@ -1,23 +1,23 @@
-# Deploy runbook — feedback stack (deploy `master`)
+# Deploy runbook — feedback stack (deploy `main`)
 
 > Specs, intents and task plans cited below were removed from the tree in `d1f54c9`;
 > recover any of them with `git show d1f54c9^:<path>`. New work still writes them
 > (`docs/intent/<topic>.md`, `SPEC.md`, `docs/specs/SPEC-*.md`).
 
-Deploy ref: **`master` after merging `feat/app-feedback`** (39 commits).
+Deploy ref: **`main` after merging `feat/app-feedback`** (39 commits).
 
 Runs entirely in the **primary checkout** — `/home/night/WebstormProjects/personal-life` —
 because that is where the live stack lives: `.env` (production secrets),
-`apps/*/data/*.db` (the five live SQLite databases), `backup/` (pinned snapshots) and
+`apps/*/data/*.db` (the six live SQLite databases), `backup/` (pinned snapshots) and
 `compose.yaml`. No worktree, no second checkout, **no data file is moved**.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
 authority to run it.
 
-## 0. Prerequisite — merge the branch into `master`
+## 0. Prerequisite — merge the branch into `main`
 
-The branch is 39 commits ahead of `master` (`5be262b`), has no remote, and is currently
-held by the worktree at `.worktrees/app-feedback`. Merging to `master` is **your** call and
+The branch is 39 commits ahead of `main` (`5be262b`), has no remote, and is currently
+held by the worktree at `.worktrees/app-feedback`. Merging to `main` is **your** call and
 needs your explicit go-ahead; nothing in this runbook merges.
 
 ```bash
@@ -29,12 +29,12 @@ git branch -d feat/app-feedback
 npm install                                       # new workspace apps/feedback-service
 ```
 
-- [ ] The pre-merge `master` commit is recorded — §8 rolls back to it.
+- [ ] The pre-merge `main` commit is recorded — §8 rolls back to it.
 - [ ] Merge clean; `git status --short` shows only the untracked `docs/reference-repo/`
       and `pictures/` (leave both alone).
 - [ ] `npm install` completed at the repo root.
 
-Until this merge lands, do not deploy: `master` has **no** `feedback-service`, no
+Until this merge lands, do not deploy: `main` has **no** `feedback-service`, no
 `postgres-feedback`/`rabbitmq-feedback`/`redis-feedback` compose services, and no `db:backup:pg`.
 
 ## 1. What this deploy changes on the host
@@ -56,7 +56,7 @@ Facts that decide the steps below:
 - **No migration files exist repo-wide.** The database named by `FEEDBACK_DB_URL` exists
   because Compose set `POSTGRES_DB: feedback`; the service's own TypeORM sync
   (`synchronize: true`) then creates the tables — `feedback`, `feedback_event`,
-  `feedback_cursor`, `user_keys` — inside it. The five SQLite databases are untouched; no
+  `feedback_cursor`, `user_keys` — inside it. The six SQLite databases are untouched; no
   service syncs another's store.
 - The `feedback` topic exchange and the `feedback_events` NOTIFY trigger are **boot-ensured**
   and idempotent (`assertExchange` on the durable exchange; `trigger-ddl.ts`). There is
@@ -126,7 +126,7 @@ cd /home/night/WebstormProjects/personal-life
       the Postgres named volume — there is no `apps/feedback-service/data/` bind mount, and
       nothing should be `mkdir`-ed for it.
 
-## 4. Back up — the five SQLite databases, pinned
+## 4. Back up — the six SQLite databases, pinned
 
 The feedback store does not exist yet on this checkout, so there is no feedback data to
 snapshot (§1). What the deploy *can* disturb is the existing chapters: `app` is rebuilt and
@@ -136,7 +136,7 @@ reconfigured, so take a deliberate, pinned snapshot first.
 npm run db:backup -w @life/db -- --pin
 ```
 
-- [ ] Five `quick_check=ok` lines and a new `backup/<stamp>-pinned/` directory with a
+- [ ] Six `quick_check=ok` lines and a new `backup/<stamp>-pinned/` directory with a
       `PINNED` marker. Rollback of the existing chapters depends entirely on this.
 - [ ] Do **not** continue otherwise.
 - [ ] Postgres is deliberately **not** covered here: `db:backup:pg` targets a live
@@ -222,7 +222,7 @@ Existing surface (prove the deploy did not regress what already worked):
 ## 7. Steady state
 
 - [ ] **Install the Postgres backup cron.** The SQLite cron from the earlier lane covers
-      the five SQLite databases only; `backup/` now also needs the feedback dump. Add this
+      the six SQLite databases only; `backup/` now also needs the feedback dump. Add this
       second line with `crontab -e` (documented, never auto-installed —
       `SPEC-feedback-infra.md` "Commands"):
       ```cron
@@ -289,7 +289,7 @@ Do the data steps **before** the code step: the pre-merge `compose.yaml` knows n
       There is no down-migration; a restore replaces the whole feedback database, and the
       tool banks a pinned pre-restore dump first.
 - [ ] **Code:** `git checkout <the pre-merge ref recorded in §0>`, then
-      `docker compose up -d --build app`. The five SQLite databases were never converted
+      `docker compose up -d --build app`. The six SQLite databases were never converted
       and the feedback store only ever gained rows, so older code reads current data.
 - [ ] **`postgres-feedback-data` / `rabbitmq-feedback-data`:** the `down`s never removed them — named
       volumes persist unless `-v` is passed. The restored feedback store sits in them,
@@ -301,7 +301,7 @@ Do the data steps **before** the code step: the pre-merge `compose.yaml` knows n
 
 ## Hard lines
 
-No one else does these: merging to `master`, stopping the stack, `db:backup` /
+No one else does these: merging to `main`, stopping the stack, `db:backup` /
 `db:backup:pg`, `db:restore` / `db:restore:pg`, `docker compose up` against production,
 installing the crontab, generating a master key. A key's **value** never enters a doc, a
 log, or a chat — names only.

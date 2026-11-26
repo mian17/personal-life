@@ -9,7 +9,7 @@ A later slice on this branch (`2469ad4..f86e32e`, Done ordering + quadrant tint 
 toggles) is in `docs/runbooks/deploy-todos-ux-refinements.md`; deploy that after this one.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist, not authority to run
-it. Do **not** merge to `master` unless asked explicitly.
+it. Do **not** merge to `main` unless asked explicitly.
 
 ## 0. What changes
 

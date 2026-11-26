@@ -33,8 +33,9 @@ grep -n "USDA_API_KEY\|USDA_API_BASE" .env.development.example    # the block yo
 
 - [ ] Working tree on the feature ref (`git log -1 --oneline`).
 - [ ] `openssl` on `PATH` (used to generate the master keys).
-- [ ] Ports **3100–3106** free. `dev:build` binds app `3100`, note-service `3101`,
-      idp `3102`, tags-service `3104`, todo-service `3105`, meal-service `3106`.
+- [ ] Ports **3100–3108** free. `dev:build` binds app `3100`, note-service `3101`,
+      idp `3102`, tags-service `3104`, todo-service `3105`, meal-service `3106`,
+      focus-service `3107`, feedback-service `3108`.
 - [ ] No Redis to install. `REDIS_URL` is **unset in dev by design**; meal-service then
       takes the direct-DB path (`deploy-meal-nutrition.md` §2). Do not start Redis for
       local work.
@@ -93,7 +94,7 @@ Create it first:
 cp .env.development.example .env.development
 ```
 
-1. Uncomment the four `*_MASTER_KEY` lines and paste the four keys from §2 — the
+1. Uncomment the `*_MASTER_KEY` lines and paste those keys from §2 — the
    `todo-ecosystem` block holds `TAGS_`/`TODO_`/`MEAL_`, and `NOTE_MASTER_KEY` sits in
    the data-privacy block.
 2. Uncomment `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE` in the meal-service
@@ -224,12 +225,12 @@ food, at `servingGrams: 100` with the confirmed vector un-scaled back to that ba
   finds published. The USDA client logs nothing — keep it that way.
 - `DEMO_KEY` is a documented public exploratory value, not a secret — but it is
   rate-limited (30/hour, 50/day per IP). Get a real key for anything past a first look.
-- Back up all four master keys outside the repo. Losing one makes its service's existing
+- Back up every master key outside the repo. Losing one makes its service's existing
   encrypted rows undecryptable.
 
 ## What you should see
 
-- [ ] `npm run dev:build` builds every workspace, seeds the dev user, and brings up six
+- [ ] `npm run dev:build` builds every workspace, seeds the dev user, and brings up eight
       processes; `curl -fsS http://127.0.0.1:3106/health/ready` returns 200.
 - [ ] `/meals` day view renders; the **Log meal from photo** FAB opens the **Log meal**
       editor at `/meals/entry/new?door=photo`.

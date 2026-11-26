@@ -14,7 +14,7 @@ five-lane **N/N PASS** (`tasks/five-lane-todo-completion-history.md`,
 `tasks/five-lane-todo-custom-repeat.md`).
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
-authority to run it. Do **not** merge to `master` unless you ask for that explicitly —
+authority to run it. Do **not** merge to `main` unless you ask for that explicitly —
 building the images from the branch is a separate, sufficient step.
 
 ## 0. What actually changes (verified 02-Oct, re-check before you run)
@@ -98,7 +98,7 @@ docker compose down            # NO -v : -v also removes redis-app-data (your se
 npm run db:backup -w @life/db -- --pin
 ```
 
-- [ ] All five databases snapshot — `life.db`, `tags.db`, `todo.db`, `idp.db`, `meal.db` — and every
+- [ ] All six databases snapshot — `life.db`, `tags.db`, `todo.db`, `idp.db`, `meal.db`, `focus.db` — and every
       line reports `quick_check=ok`. Do not continue otherwise; rollback depends on it.
 - [ ] Backups are readable: `sqlite3 apps/todo-service/data/todo.db 'PRAGMA integrity_check;'` → `ok`.
 - [ ] Optional subset form: `npm run db:backup -w @life/db -- --only todo` (this delta only
@@ -182,7 +182,7 @@ Regressions this delta can touch (shared `@life/shared` wire types + `@life/ui`)
 ## Hard lines
 
 No one else does these: `docker compose down`, `db:backup`, `db:restore`, `docker compose up`
-against production, and any merge to `master`.
+against production, and any merge to `main`.
 
 ## Related
 

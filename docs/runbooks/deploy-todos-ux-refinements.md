@@ -14,7 +14,7 @@ Read this **with** `docs/runbooks/deploy-timezone-today.md` (`df7f58b..2469ad4`)
 Deploy those first if they are not already live; this slice sits on top.
 
 **Run by a human. Deploy is a hard line.** This document is the checklist; it is not
-authority to run it. Do **not** merge to `master` unless asked explicitly.
+authority to run it. Do **not** merge to `main` unless asked explicitly.
 
 ## 0. What changes
 
@@ -142,14 +142,14 @@ No-regression smoke:
   `routes-settings`) and the Contract-1 mechanical greps (raw HTML / `next/link` / raw
   colors). **Not** a five-lane gate.
 - Independent fresh-context verification passed for the timezone slice; this slice was
-  reviewed by the Tech Lead over the integrated diff before the `master` fast-forward.
+  reviewed by the Tech Lead over the integrated diff before the `main` fast-forward.
 - The only E2E edit in the slice is the approved frozen-heading assertion; no E2E suite was
   added and none was run.
 
 ## Hard lines
 
 No one else does these: `docker compose down`, `db:backup`, `db:restore`, `docker compose up`
-against production, and any merge to `master`.
+against production, and any merge to `main`.
 
 ## Related
 
