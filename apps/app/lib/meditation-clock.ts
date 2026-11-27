@@ -72,6 +72,21 @@ export function goalProgressLine(progress: GoalProgress): string {
   return `${progress.liveMinutes} of ${goal} today · ${remaining} ${minuteUnit(remaining)} to go`;
 }
 
+/**
+ * The `ListShell` subtitle's one line: `15 minutes done · Today's goal is 30 minutes`.
+ *
+ * A day at or past its goal appends a check; a day with no goal set has nothing to reach, so the
+ * line drops the goal clause and says only what was sat.
+ */
+export function goalSubtitleLine(progress: GoalProgress): string {
+  const done = `${progress.liveMinutes} ${minuteUnit(progress.liveMinutes)} done`;
+  if (progress.goalMinutes === 0) return `${done} today`;
+
+  const goal = `Today's goal is ${progress.goalMinutes} ${minuteUnit(progress.goalMinutes)}`;
+  if (progress.liveMinutes >= progress.goalMinutes) return `${done} · ${goal} ✓`;
+  return `${done} · ${goal}`;
+}
+
 /** The schedule a running sitting rings from, or `null` when the bells are switched off. */
 export function bellScheduleFor(bells: BellChoice, plannedMinutes: number): BellSchedule | null {
   if (!bells.enabled) return null;

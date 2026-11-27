@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card, ConfirmButton, Kpi, Stack, StatusText } from '@life/ui';
 import { ringIntervalBells } from '@/lib/meditation-bells';
@@ -14,6 +13,7 @@ import {
   type BellChoice,
 } from '@/lib/meditation-clock';
 import { recordFinishedSitting, recordKeptSitting, type SittingReport } from './actions';
+import { IdleScreen } from './idle-screen';
 
 const MILLISECONDS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -24,6 +24,8 @@ const TICK_MS = MILLISECONDS_PER_SECOND;
 /** A sitting in flight: the instant it started, which is both the countdown's origin and the row's `startedAt`. */
 interface Sitting {
   startedAtMs: number;
+  /** The length the idle stepper chose: this sitting's own plan, never the stored one. */
+  plannedMinutes: number;
 }
 
 /** What a recorded sitting holds, which is all the completion screen shows. */
@@ -32,51 +34,50 @@ interface Recorded {
   completed: boolean;
 }
 
-/** One report's inputs: the sitting, how long it was planned for, and the seconds it sat. */
+/** One report's inputs: the sitting, and the seconds it sat. */
 interface SittingReportInputs {
   sitting: Sitting;
-  plannedMinutes: number;
   elapsedSeconds: number;
 }
 
 export interface SittingTimerProps {
-  /** The settings' planned length, which is also the ceiling on a kept sitting's minutes. */
+  /** The settings' planned length: the idle stepper's seed, clamped into the design's range. */
   plannedMinutes: number;
   bells: BellChoice;
-  /** The server-rendered day read-out, shown while no sitting is running. */
-  idle: ReactNode;
 }
 
 /**
  * A sitting's three screens in one client mount (`SPEC-meditation-app` §1, §5): idle, running,
  * and what it recorded.
  *
- * Nothing about a running sitting is persisted — a reload returns to idle, showing the day the
- * service reports rather than a countdown this tab can no longer honour (spec assumption 4). That
- * is why the day read-out arrives as a server-rendered node, and why every return to idle asks the
- * server to read it again.
+ * Nothing about a running sitting is persisted — a reload returns to idle rather than to a
+ * countdown this tab can no longer honour (spec assumption 4) — and every return to idle asks the
+ * server to read the day again, so the subtitle counts the sitting that just ended.
  */
-export function SittingTimer({ plannedMinutes, bells, idle }: Readonly<SittingTimerProps>) {
+export function SittingTimer({ plannedMinutes, bells }: Readonly<SittingTimerProps>) {
   const router = useRouter();
   const [sitting, setSitting] = useState<Sitting | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
 
-  function startSitting(): void {
+  function startSitting(minutes: number): void {
     setRecorded(null);
-    setSitting({ startedAtMs: Date.now() });
+    setSitting({ startedAtMs: Date.now(), plannedMinutes: minutes });
   }
 
   async function finishSitting(): Promise<void> {
     if (sitting === null) return;
-    const elapsedSeconds = plannedMinutes * SECONDS_PER_MINUTE;
-    await recordFinishedSitting(sittingRun({ sitting, plannedMinutes, elapsedSeconds }));
-    showRecorded({ minutes: plannedMinutes, completed: true });
+    const elapsedSeconds = sitting.plannedMinutes * SECONDS_PER_MINUTE;
+    await recordFinishedSitting(sittingRun({ sitting, elapsedSeconds }));
+    showRecorded({ minutes: sitting.plannedMinutes, completed: true });
   }
 
   async function keepSitting(elapsedSeconds: number): Promise<void> {
     if (sitting === null) return;
-    await recordKeptSitting(sittingRun({ sitting, plannedMinutes, elapsedSeconds }));
-    showRecorded({ minutes: cappedMinutes(elapsedSeconds, plannedMinutes), completed: false });
+    await recordKeptSitting(sittingRun({ sitting, elapsedSeconds }));
+    showRecorded({
+      minutes: cappedMinutes(elapsedSeconds, sitting.plannedMinutes),
+      completed: false,
+    });
   }
 
   /** Both endings leave the countdown first, so no bell can ring on a screen that has moved on. */
@@ -100,7 +101,7 @@ export function SittingTimer({ plannedMinutes, bells, idle }: Readonly<SittingTi
     return (
       <RunningSitting
         sitting={sitting}
-        plannedMinutes={plannedMinutes}
+        plannedMinutes={sitting.plannedMinutes}
         bells={bells}
         onFinish={() => void finishSitting()}
         onKeep={(elapsedSeconds) => void keepSitting(elapsedSeconds)}
@@ -111,14 +112,7 @@ export function SittingTimer({ plannedMinutes, bells, idle }: Readonly<SittingTi
 
   if (recorded !== null) return <RecordedSitting recorded={recorded} onDone={returnToIdle} />;
 
-  return (
-    <Stack gap="lg">
-      {idle}
-      <Button onClick={startSitting}>
-        {`Start ${plannedMinutes} ${minuteUnit(plannedMinutes)}`}
-      </Button>
-    </Stack>
-  );
+  return <IdleScreen plannedMinutes={plannedMinutes} bells={bells} onStart={startSitting} />;
 }
 
 interface RunningSittingProps {
@@ -196,12 +190,12 @@ function RecordedSitting({
  * for, and the seconds it sat. The ISO string is derived here rather than carried alongside the
  * millisecond origin, so the two can never name different instants.
  */
-function sittingRun({
-  sitting,
-  plannedMinutes,
-  elapsedSeconds,
-}: SittingReportInputs): SittingReport {
-  return { startedAt: new Date(sitting.startedAtMs).toISOString(), plannedMinutes, elapsedSeconds };
+function sittingRun({ sitting, elapsedSeconds }: SittingReportInputs): SittingReport {
+  return {
+    startedAt: new Date(sitting.startedAtMs).toISOString(),
+    plannedMinutes: sitting.plannedMinutes,
+    elapsedSeconds,
+  };
 }
 
 /** The browser's clock, read once a second while the countdown is mounted. */
