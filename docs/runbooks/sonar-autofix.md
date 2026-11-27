@@ -18,8 +18,10 @@ worth knowing before reading further:
   analyzes the whole project by default and ignores `sonar.sources`, `sonar.tests`
   and `sonar.test.inclusions` — it warns they are "configured but have no effect" —
   so the only lever that still restricts what Cloud measures is `sonar.exclusions`
-  in `sonar-project.properties`. The local container keeps honouring those three
-  properties, which is why they stay in the file unchanged.
+  in `sonar-project.properties`. All three were removed from that file for this
+  reason, so a hand-run scan by the local container now indexes the checkout root —
+  `.pi/worktrees`, `openwiki/` — instead of `apps,packages,scripts`. `docs/**` stays
+  out of it only because `sonar.exclusions` still names it.
 - **The CI scan's `SONAR_TOKEN` is a Cloud token**, not the local container's user
   token from the Install section below. The checked-in properties file carries the
   local project key, so the CI step overrides the identity on the command line
