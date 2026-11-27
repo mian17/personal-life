@@ -5,7 +5,7 @@ SonarQube webhook → host receiver → pi-sbx sandbox agent → draft pull requ
 This pipeline is fed by, and fixes against, the **local SonarQube container** — the
 edit-time / pre-commit gate. The repository's Cloud analysis is separate and
 **CI-based**: `.github/workflows/tests.yml` runs the scanner on every pull request
-into `dev`/`main` and on every push to them, and uploads coverage. Two consequences
+into `dev`/`main` and on every push to them, and uploads coverage. Four consequences
 worth knowing before reading further:
 
 - **Automatic Analysis must stay off** in SonarCloud. The CI scanner refuses to run
@@ -14,6 +14,16 @@ worth knowing before reading further:
 - **Cloud-only rules surface at PR time, not at edit time.** The local container has
   no taint analysis, so log-injection and XSS-style findings appear only in the CI
   scan's result on the pull request. A clean edit-time gate does not mean a clean PR.
+- **Cloud's scope is set by `sonar.exclusions` alone.** SonarCloud's analysis-scope UX
+  analyzes the whole project by default and ignores `sonar.sources`, `sonar.tests`
+  and `sonar.test.inclusions` — it warns they are "configured but have no effect" —
+  so the only lever that still restricts what Cloud measures is `sonar.exclusions`
+  in `sonar-project.properties`. The local container keeps honouring those three
+  properties, which is why they stay in the file unchanged.
+- **The CI scan's `SONAR_TOKEN` is a Cloud token**, not the local container's user
+  token from the Install section below. The checked-in properties file carries the
+  local project key, so the CI step overrides the identity on the command line
+  (`-Dsonar.projectKey=mian17_personal-life`) instead of editing the file.
 
 The receiver is the only long-running piece. It validates the webhook signature,
 filters to gate failures on `main` of this project, fetches the new-code issues,
