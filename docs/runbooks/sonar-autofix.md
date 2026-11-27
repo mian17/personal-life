@@ -2,6 +2,29 @@
 
 SonarQube webhook → host receiver → pi-sbx sandbox agent → draft pull request.
 
+This pipeline is fed by, and fixes against, the **local SonarQube container** — the
+edit-time / pre-commit gate. The repository's Cloud analysis is separate and
+**CI-based**: `.github/workflows/tests.yml` runs the scanner on every pull request
+into `dev`/`main` and on every push to them, and uploads coverage. Four consequences
+worth knowing before reading further:
+
+- **Automatic Analysis must stay off** in SonarCloud. The CI scanner refuses to run
+  against a project whose automatic analysis is enabled, so turning it back on
+  breaks every scan in the pipeline silently at PR time.
+- **Cloud-only rules surface at PR time, not at edit time.** The local container has
+  no taint analysis, so log-injection and XSS-style findings appear only in the CI
+  scan's result on the pull request. A clean edit-time gate does not mean a clean PR.
+- **Cloud's scope is set by `sonar.exclusions` alone.** SonarCloud's analysis-scope UX
+  analyzes the whole project by default and ignores `sonar.sources`, `sonar.tests`
+  and `sonar.test.inclusions` — it warns they are "configured but have no effect" —
+  so the only lever that still restricts what Cloud measures is `sonar.exclusions`
+  in `sonar-project.properties`. The local container keeps honouring those three
+  properties, which is why they stay in the file unchanged.
+- **The CI scan's `SONAR_TOKEN` is a Cloud token**, not the local container's user
+  token from the Install section below. The checked-in properties file carries the
+  local project key, so the CI step overrides the identity on the command line
+  (`-Dsonar.projectKey=mian17_personal-life`) instead of editing the file.
+
 The receiver is the only long-running piece. It validates the webhook signature,
 filters to gate failures on `main` of this project, fetches the new-code issues,
 and starts the sandbox agent in a fresh worktree cut from `dev`. The agent then
@@ -111,25 +134,31 @@ unpushed branch. If the agent changes nothing, the run logs `no-changes` and end
 
 The receiver acts only on `branch.isMain` (an absent `branch` counts as main).
 A fix lands on `fix/sonar-*`, which no scan covers, so its push cannot trigger
-another run. Merging the draft PR into `dev` does not scan either — since v0.2.3
-the scan is run by hand — so the next run is one a person started.
+another run. Merging the draft PR into `dev` does trigger the CI-based Cloud scan,
+but that scan does not reach this receiver — its webhook is registered on the local
+container only — so the next run is still one a person started.
 
 ## One caveat about the stored analysis
 
-SonarQube Community Build keeps a single analysis per project, and the scan is
-manual since v0.2.3: `.github/workflows/sonarqube.yml` is deleted,
-`sonar-project.properties` is still the config and `SONAR_TOKEN` still comes from
-the container. Every scan therefore **replaces** the project's stored analysis,
-because the scanner does not set `sonar.branch.name` (Community Build ignores it).
+SonarQube Community Build keeps a single analysis per project, and nothing in CI
+scans it: the Cloud analysis is CI-based, the container is only the edit-time gate,
+and `.github/workflows/sonarqube.yml` is gone. Full scans of the container are run
+by hand, if at all, with `sonar-project.properties` as config and `SONAR_TOKEN`
+from the container. Every such scan therefore **replaces** the project's stored
+analysis, because the scanner does not set `sonar.branch.name` (Community Build
+ignores it).
 
 Consequences:
 
-- The gate-triggered run describes the most recent scan, which is whichever branch
-  was scanned last by hand — `dev`, if that is the one you ran.
-- `main` is not scanned unless you scan it. It is the release line and receives
-  what `dev` already analysed, so scanning the promotion would only duplicate it.
-- Analyses, and therefore webhook events, arrive only when a scan is run: between
-  hand-run scans this pipeline sees nothing at all.
+- The gate-triggered run describes the most recent hand scan of the container,
+  which is whichever branch was scanned last by hand — `dev`, if that is the one
+  you ran.
+- `main` is not scanned in the container unless you scan it. It is the release line
+  and receives what `dev` already analysed, so scanning the promotion would only
+  duplicate it.
+- This pipeline receives webhooks only when a container scan is run by hand; the
+  CI-based Cloud analysis on `dev`/`main` is reported on the pull request itself and
+  never reaches the receiver.
 
 If you ever need `main` and `dev` measured separately, that is a Developer
 Edition feature. Override the target branch with `SONAR_AUTOFIX_BASE_BRANCH` if

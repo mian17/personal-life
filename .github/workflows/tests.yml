@@ -1,6 +1,7 @@
-# Gates pull requests into `dev`. The SonarQube workflow is the other half of the
-# split: it analyses `dev` *after* merge (push trigger) and is not run here, so a
-# PR is verified without needing the SonarQube container to be up.
+# The CI-based SonarCloud analysis for this repository. It runs on every pull
+# request into `dev`/`main` and on every push to them, and it is the only
+# analyser: Automatic Analysis must stay off for the scan step below to run. The
+# local SonarQube container is now only the edit-time / pre-commit gate.
 name: Tests
 
 on:
@@ -9,6 +10,11 @@ on:
     # the same diff to the release line: listing only `dev` leaves that one PR — the
     # only one that reaches production — running zero checks. Verifying it here is
     # what makes the release line as tested as the integration line.
+    branches: [dev, main]
+  # One analysis per merge keeps the branch timeline current, and CI-based
+  # analysis is the only mode that can ingest coverage — Automatic Analysis
+  # cannot read `.coverage/lcov.info` at all.
+  push:
     branches: [dev, main]
   # Manual run for reproducing a failure without pushing a commit.
   workflow_dispatch:
@@ -159,7 +165,7 @@ jobs:
       # compose.yaml. Build-free and reads `compose.yaml` plus sources, so it runs
       # here in seconds — before the coverage run, whose suites take minutes. This
       # is the only gate that reads compose.yaml: three production features shipped
-      # dead on 2026-11-14 (`MEAL_TODOS_API_URL`, `FOCUS_TODOS_API_URL`,
+      # dead on 2026-11-14 (`MEAL_*_API_URL`, `FOCUS_*_API_URL`,
       # `OIDC_PRODUCER_*`) because nothing in CI compared the code with the file.
       - name: Architecture rules
         run: npm run arch:check
@@ -184,3 +190,30 @@ jobs:
       # of truth. A failing suite fails the job, which is the entire point.
       - name: Test with coverage
         run: npm run test:coverage
+
+      # A missing or empty report must fail here, not publish a silent 0.0%. The
+      # scanner treats an absent `sonar.javascript.lcov.reportPaths` file as "no
+      # coverage data", not as an error, so the quality gate would go green on the
+      # strength of lines nobody measured.
+      - name: Check coverage report exists
+        run: |
+          if [ ! -s .coverage/lcov.info ]; then
+            echo "::error::.coverage/lcov.info is missing or empty. The scan would" \
+              "publish 0.0% coverage for every file. Fix the coverage run before" \
+              "retrying; do not skip this step."
+            exit 1
+          fi
+
+      # The analysis itself. Automatic Analysis (the GitHub App) must be OFF in
+      # SonarCloud, otherwise this step fails: the scanner refuses to run against
+      # a project whose automatic analysis is enabled. `SONAR_TOKEN` is a Cloud
+      # token, not the retired local-server one. The project key is overridden on
+      # the command line because the checked-in `sonar-project.properties` carries
+      # the LOCAL container's key, which the edit-time gate matches literally.
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@70bad232163b09d998ea0707ee80c0ec80798c16 # v8.5.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: -Dsonar.projectKey=mian17_personal-life -Dsonar.organization=mian17
