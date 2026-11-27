@@ -96,6 +96,7 @@ export function IntervalBellsSheet({
       }}
       size="sheet"
       bodyGap="s5"
+      grab={false}
       title="Interval bells"
       leadingAction={
         <Button variant="text" size="bare" onClick={onClose}>

@@ -59,4 +59,26 @@ describe('NavBar', () => {
     expect(classes).toContain('legacy-hook');
     expect(classes).toContain('ui-nav-bar');
   });
+
+  /**
+   * `.phead` opens the title on its own top edge: that is the shipped row for every list screen,
+   * and a bar that is not asked to centre must keep rendering exactly that.
+   */
+  it("opens the row on its slots' top edge by default", () => {
+    render(<NavBar />);
+    const classes = classesOf(screen.getByRole('navigation'));
+    expect(classes).toContain('items-start');
+    expect(classes).not.toContain('items-center');
+  });
+
+  it('levels the row on its middle when asked to centre', () => {
+    render(<NavBar align="center" trailing={<button type="button">Theme</button>} />);
+    const nav = screen.getByRole('navigation');
+    const classes = classesOf(nav);
+
+    // Exactly one alignment class: two would leave the winner to the generated sheet's order.
+    expect(classes).toContain('items-center');
+    expect(classes).not.toContain('items-start');
+    expect(nav.contains(screen.getByRole('button', { name: 'Theme' }))).toBe(true);
+  });
 });

@@ -24,6 +24,18 @@ export interface DialogProps {
   trailingAction?: ReactNode;
   /** `false` drops the grab handle and the close control: the confirm shape. Default `true`. */
   dismiss?: boolean;
+  /**
+   * `false` draws no grab handle on a dismissible sheet, and changes nothing else: the header keeps
+   * its title, its actions, its inset and its close control. The design's meditation sheet has no
+   * handle. Default `true`.
+   */
+  grab?: boolean;
+  /**
+   * Where the title sits in its header row: `start` for every shipped dialog, or `center` for the
+   * design's confirm, whose title is centred over the full-width column beneath it. The copy under
+   * the title stays at the start edge either way. Default `'start'`.
+   */
+  titleAlign?: 'start' | 'center';
   /** The body's own rhythm; the design's sheet spaces its groups one step wider. */
   bodyGap?: 's4' | 's5';
   className?: string;
@@ -136,6 +148,22 @@ const dialogTitle = cx(
 
 const dialogTitleBlock = cx('ui-dialog__title-block', 'flex flex-col');
 
+/**
+ * The title's own line, never the block's: a centred title centres its words, while the copy
+ * underneath keeps the column's start edge — which is where the design draws it.
+ */
+const titleAlignStyles: Record<NonNullable<DialogProps['titleAlign']>, string | undefined> = {
+  start: undefined,
+  center: 'text-center',
+};
+
+/**
+ * Centring needs the row's width. The two-part header is a flex line with the title at its start,
+ * so a centred title grows into the free space and leaves the trailing control on its edge. The
+ * three-column header already centres its middle cell, where growing the block adds nothing.
+ */
+const centredTitleBlockStyles = 'flex-1';
+
 /** §8's `.sheet__sub`: one `--s4` under the title, `14px` (`--fs-label`), the second ink tier. */
 const dialogDescription = cx(
   'ui-dialog__sub',
@@ -187,6 +215,8 @@ export function Dialog({
   leadingAction,
   trailingAction,
   dismiss = true,
+  grab = true,
+  titleAlign = 'start',
   bodyGap = 's4',
   className,
 }: Readonly<DialogProps>) {
@@ -201,6 +231,9 @@ export function Dialog({
   // A sheet that can be dismissed gives its padding to the slots and draws the grab; the confirm
   // shape keeps the panel's own inset, so a slot must not repeat it.
   const dismissibleSheet = size === 'sheet' && dismiss;
+  // The handle is a decoration on that sheet's top edge, so dropping it moves nothing else.
+  const showGrab = dismissibleSheet && grab;
+  const centredTitle = titleAlign === 'center';
   // A sheet's header opens on the panel's edge; the centred and full panels inset their own.
   const headerInsetStyles = size === 'sheet' ? undefined : panelHeaderInset;
   const headerSlotStyles = dismissibleSheet ? sheetHeaderStyles : headerInsetStyles;
@@ -238,13 +271,15 @@ export function Dialog({
             className,
           )}
         >
-          {dismissibleSheet && <div aria-hidden className={grabStyles} />}
+          {showGrab && <div aria-hidden className={grabStyles} />}
           <div
             className={cx(hasActionRow ? actionHeaderStyles : splitHeaderStyles, headerSlotStyles)}
           >
             {leadingAction != null && <div className="ui-dialog__leading">{leadingAction}</div>}
-            <div className={dialogTitleBlock}>
-              <DialogPrimitive.Title className={dialogTitle}>{title}</DialogPrimitive.Title>
+            <div className={cx(dialogTitleBlock, centredTitle && centredTitleBlockStyles)}>
+              <DialogPrimitive.Title className={cx(dialogTitle, titleAlignStyles[titleAlign])}>
+                {title}
+              </DialogPrimitive.Title>
               {description != null && <p className={dialogDescription}>{description}</p>}
             </div>
             {trailing}

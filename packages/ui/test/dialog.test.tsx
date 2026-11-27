@@ -327,3 +327,105 @@ describe('Dialog — header slots, dismiss and body rhythm', () => {
     expect(header).toContain('mt-[var(--s2)]');
   });
 });
+
+describe('Dialog — the optional grab handle and title alignment', () => {
+  /**
+   * The handle is the shipped default for every sheet: the design's meditation sheet is the one
+   * surface that draws none, and it says so with the prop rather than by changing the primitive.
+   */
+  it('draws the sheet grab handle by default', () => {
+    setup({ open: true, size: 'sheet' });
+    expect(document.querySelector('.ui-dialog__grab')).not.toBeNull();
+  });
+
+  it('leaves the grab handle off on request', () => {
+    setup({ open: true, size: 'sheet', grab: false });
+    expect(document.querySelector('.ui-dialog__grab')).toBeNull();
+  });
+
+  /**
+   * Dropping the handle must drop only the handle: the handle is positioned on the panel's edge,
+   * never in its flow, so the header's title, actions, inset and close control all stay put.
+   */
+  it('keeps the header, its actions, its inset and its close control when the handle goes', () => {
+    setup({ open: true, size: 'sheet', grab: false });
+    const panel = dialog();
+    const header = document.querySelector('.ui-dialog__head')!;
+    const body = document.querySelector('.ui-dialog__body')!;
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Custom repeat' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    expect(header.classList.contains('border-b')).toBe(true);
+    expect(panel.classList.contains('px-0')).toBe(true);
+    expect(panel.classList.contains('pt-0')).toBe(true);
+    expect(body.classList.contains('px-[var(--s4)]')).toBe(true);
+  });
+
+  it('keeps both actions on their edges when the handle is dropped', () => {
+    setup({
+      open: true,
+      size: 'sheet',
+      grab: false,
+      leadingAction: <button type="button">Cancel</button>,
+      trailingAction: <button type="button">Save</button>,
+    });
+    const header = document.querySelector('.ui-dialog__head')!;
+
+    expect(document.querySelector('.ui-dialog__leading')!.textContent).toBe('Cancel');
+    expect(header.contains(screen.getByRole('button', { name: 'Save' }))).toBe(true);
+    expect(header.lastElementChild!.textContent).toBe('Save');
+  });
+
+  it("leaves the title at the row's start by default", () => {
+    setup({ open: true, size: 'sheet', dismiss: false });
+    const title = screen.getByRole('heading', { level: 2, name: 'Custom repeat' });
+    const block = document.querySelector('.ui-dialog__title-block')!;
+
+    expect(title.classList.contains('text-center')).toBe(false);
+    expect(block.classList.contains('flex-1')).toBe(false);
+  });
+
+  it('centres the title, and only the title, on request', () => {
+    setup({
+      open: true,
+      size: 'sheet',
+      dismiss: false,
+      titleAlign: 'center',
+      description: 'The minutes you have sat are not saved.',
+    });
+
+    expect(
+      screen
+        .getByRole('heading', { level: 2, name: 'Custom repeat' })
+        .classList.contains('text-center'),
+    ).toBe(true);
+    expect(document.querySelector('.ui-dialog__title-block')!.classList.contains('flex-1')).toBe(
+      true,
+    );
+    // The copy under it keeps the column's start edge, which is where the design draws it.
+    expect(
+      screen.getByText('The minutes you have sat are not saved.').classList.contains('text-center'),
+    ).toBe(false);
+  });
+
+  /**
+   * The title is still what names the dialog when it moves, and a centred title in the three-column
+   * header leaves the leading and trailing cells exactly where they were.
+   */
+  it('keeps the title the labelled element and both actions at their edges when centred', () => {
+    setup({
+      open: true,
+      size: 'sheet',
+      titleAlign: 'center',
+      leadingAction: <button type="button">Cancel</button>,
+      trailingAction: <button type="button">Save</button>,
+    });
+    const title = screen.getByRole('heading', { level: 2, name: 'Custom repeat' });
+    const header = document.querySelector('.ui-dialog__head')!;
+
+    expect(dialog().getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
+    expect(header.classList.contains('grid-cols-[1fr_auto_1fr]')).toBe(true);
+    expect(header.firstElementChild!.classList.contains('ui-dialog__leading')).toBe(true);
+    expect(header.lastElementChild!.textContent).toBe('Save');
+  });
+});

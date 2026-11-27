@@ -272,4 +272,36 @@ describe('ListShell', () => {
     const classes = `${page.className} ${body.className}`;
     expect(classes).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(|\b\d+(?:\.\d+)?px\b/);
   });
+
+  /**
+   * Every list page opens its title on the title's top edge (§8's `.phead`). The row's alignment is
+   * opt-in, so a page that says nothing about it keeps rendering exactly that row.
+   */
+  it("opens the header row on the title's top edge by default", () => {
+    const { container } = render(<ListShell title="Notes" body={<span />} />);
+    const nav = container.querySelector('.ui-nav-bar')!;
+
+    expect(nav.classList.contains('items-start')).toBe(true);
+    expect(nav.classList.contains('items-center')).toBe(false);
+  });
+
+  it('levels the header row on its middle when the page asks for it', () => {
+    const { container } = render(
+      <ListShell
+        title="Meditation"
+        subtitle="Today's goal is 15 minutes"
+        navTrailing={<span data-testid="nav-trailing" />}
+        headerAlign="center"
+        body={<span />}
+      />,
+    );
+    const nav = container.querySelector('.ui-nav-bar')!;
+
+    expect(nav.classList.contains('items-center')).toBe(true);
+    expect(nav.classList.contains('items-start')).toBe(false);
+    // The row keeps its two slots: the title block first, the trailing controls second.
+    const heading = screen.getByRole('heading', { level: 1, name: 'Meditation' });
+    expect(nav.firstElementChild!.contains(heading)).toBe(true);
+    expect(nav.lastElementChild!.contains(screen.getByTestId('nav-trailing'))).toBe(true);
+  });
 });

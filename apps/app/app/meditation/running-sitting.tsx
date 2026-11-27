@@ -97,6 +97,7 @@ function StopConfirmSheet({ open, onOpenChange, onEnd }: Readonly<StopConfirmShe
       open={open}
       size="sheet"
       title="End this session?"
+      titleAlign="center"
       onOpenChange={onOpenChange}
     >
       <Stack gap="md">
