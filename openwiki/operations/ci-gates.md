@@ -35,12 +35,12 @@ Four workflows, all on GitHub-hosted runners — nothing in CI runs on the owner
 machine. Every workflow file lives in `.github/workflows/`; `npm run arch:check`
 enforces that no workflow may ever name a `self-hosted` runner.
 
-| Workflow           | Triggers                              | Runner          | What it proves                                                                                                           |
-| ------------------ | ------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `tests.yml`        | PR → `dev`/`main`, manual             | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage — plus SonarCloud's static analysis |
-| `compose-boot.yml` | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The deployment works: build the real stack, boot it, every backend answers `/health/ready` **from inside its container** |
-| `secrets.yml`      | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The history carries no secret: gitleaks over every commit, redacted                                                      |
-| `backmerge.yml`    | push `main`, manual                   | `ubuntu-latest` | Bookkeeping: opens the `-s ours` back-merge PR so `main` stays an ancestor of `dev`                                      |
+| Workflow           | Triggers                                     | Runner          | What it proves                                                                                                           |
+| ------------------ | -------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `tests.yml`        | PR → `dev`/`main`, push `dev`/`main`, manual | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage — plus SonarCloud's static analysis |
+| `compose-boot.yml` | PR → `dev`/`main`, push `dev`, manual        | `ubuntu-latest` | The deployment works: build the real stack, boot it, every backend answers `/health/ready` **from inside its container** |
+| `secrets.yml`      | PR → `dev`/`main`, push `dev`, manual        | `ubuntu-latest` | The history carries no secret: gitleaks over every commit, redacted                                                      |
+| `backmerge.yml`    | push `main`, manual                          | `ubuntu-latest` | Bookkeeping: opens the `-s ours` back-merge PR so `main` stays an ancestor of `dev`                                      |
 
 One run per PR (a new push supersedes the previous run via a per-PR concurrency
 group). Static analysis is a step inside `tests.yml`, not a separate workflow:
