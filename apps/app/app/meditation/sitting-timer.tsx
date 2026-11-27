@@ -14,6 +14,7 @@ import {
 } from '@/lib/meditation-clock';
 import { recordFinishedSitting, recordKeptSitting, type SittingReport } from './actions';
 import { IdleScreen } from './idle-screen';
+import type { SaveBells } from './interval-bells-sheet';
 
 const MILLISECONDS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -44,6 +45,11 @@ export interface SittingTimerProps {
   /** The settings' planned length: the idle stepper's seed, clamped into the design's range. */
   plannedMinutes: number;
   bells: BellChoice;
+  /**
+   * The interval bells sheet's write, handed straight to the idle screen: the settings `PUT` goes
+   * through the server route, because the service client answers on the server alone.
+   */
+  onSaveBells?: SaveBells;
 }
 
 /**
@@ -54,7 +60,7 @@ export interface SittingTimerProps {
  * countdown this tab can no longer honour (spec assumption 4) — and every return to idle asks the
  * server to read the day again, so the subtitle counts the sitting that just ended.
  */
-export function SittingTimer({ plannedMinutes, bells }: Readonly<SittingTimerProps>) {
+export function SittingTimer({ plannedMinutes, bells, onSaveBells }: Readonly<SittingTimerProps>) {
   const router = useRouter();
   const [sitting, setSitting] = useState<Sitting | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
@@ -112,7 +118,14 @@ export function SittingTimer({ plannedMinutes, bells }: Readonly<SittingTimerPro
 
   if (recorded !== null) return <RecordedSitting recorded={recorded} onDone={returnToIdle} />;
 
-  return <IdleScreen plannedMinutes={plannedMinutes} bells={bells} onStart={startSitting} />;
+  return (
+    <IdleScreen
+      plannedMinutes={plannedMinutes}
+      bells={bells}
+      onStart={startSitting}
+      onSaveBells={onSaveBells}
+    />
+  );
 }
 
 interface RunningSittingProps {

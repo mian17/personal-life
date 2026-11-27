@@ -1,8 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { recordSitting, type SittingOutcome } from '@/lib/meditation-api';
-import { cappedMinutes, minuteUnit } from '@/lib/meditation-clock';
+import {
+  fetchSettings,
+  recordSitting,
+  saveSettings,
+  type SittingOutcome,
+} from '@/lib/meditation-api';
+import { cappedMinutes, minuteUnit, type BellChoice } from '@/lib/meditation-clock';
 import { getToday } from '@/lib/today';
 
 /**
@@ -65,4 +70,20 @@ interface RecordedSittingLog {
  */
 function announceRecordedSitting({ day, minutes, outcome }: RecordedSittingLog): void {
   console.log(`meditation: recorded ${minutes} ${minuteUnit(minutes)} (${outcome}) for ${day}`);
+}
+
+/**
+ * The interval bells sheet's write: the `bells` the sheet saved, stored over the ones the settings
+ * already hold.
+ *
+ * Reading first is what keeps this write to the field it owns — the sheet edits the bells and
+ * nothing else, so the goal and the planned length go back to the service exactly as they came.
+ *
+ * A refused or unreachable service rejects here rather than resolving, which is how the sheet
+ * learns the save did not land: it keeps its draft open instead of reporting success.
+ */
+export async function saveIntervalBells(bells: BellChoice): Promise<void> {
+  const settings = await fetchSettings();
+  await saveSettings({ ...settings, bells });
+  revalidatePath('/meditation');
 }

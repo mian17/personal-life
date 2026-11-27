@@ -8,6 +8,7 @@ import {
 } from '@/lib/meditation-api';
 import { goalSubtitleLine } from '@/lib/meditation-clock';
 import { getToday } from '@/lib/today';
+import { saveIntervalBells } from './actions';
 import { SittingTimer } from './sitting-timer';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +42,13 @@ export default async function MeditationRoute() {
       title="Meditation"
       subtitle={day === null ? undefined : goalSubtitleLine(day)}
       navTrailing={navActions('meditation')}
-      body={<SittingTimer plannedMinutes={settings.plannedMinutes} bells={settings.bells} />}
+      body={
+        <SittingTimer
+          plannedMinutes={settings.plannedMinutes}
+          bells={settings.bells}
+          onSaveBells={saveIntervalBells}
+        />
+      }
     />
   );
 }
