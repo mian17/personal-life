@@ -96,5 +96,5 @@ function clampMinutes(minutes: number): number {
 function intervalBellsLabel(bells: BellChoice): string {
   if (!bells.enabled) return 'Off';
   const minutes = Math.round(bells.intervalSec / SECONDS_PER_MINUTE);
-  return `Every ${minutes} ${minuteUnit(minutes)}`;
+  return `Every ${minutes} min`;
 }

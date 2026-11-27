@@ -59,12 +59,7 @@ export function RunningSitting({
       <StatusText aria-live="polite" figure size="display">
         {formatClock(remaining)}
       </StatusText>
-      <ProgressBar
-        height="s1"
-        label="Session progress"
-        tone="line"
-        value={sessionProgressPercent(clock)}
-      />
+      <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
       <Button shape="pill" size="bare" variant="ghost" onClick={() => setConfirmingStop(true)}>
         Stop
       </Button>

@@ -9,6 +9,7 @@ import {
   NumberField,
   Row,
   Section,
+  Stack,
   Stepper,
   Switch,
   ValueRow,
@@ -42,10 +43,10 @@ import { repeatFrom, repeatValue } from '@/lib/meditation-repeat';
 /** The service's repeat choices (spec C3): ring until the sitting ends, or one to six bowls. */
 const REPEAT_CHOICES = [null, 1, 2, 3, 4, 5, 6];
 
-/** The chips as the design draws them: `∞` first, then `1×` … `6×`, each with its spoken name. */
+/** The chips as the design draws them: `∞` first, then `1` … `6`, each with its spoken name. */
 const REPEAT_OPTIONS: ChoiceChipOption[] = REPEAT_CHOICES.map((repeat) => ({
   value: repeatValue(repeat),
-  label: repeat === null ? '∞' : `${repeat}×`,
+  label: repeat === null ? '∞' : String(repeat),
   ariaLabel: repeatName(repeat),
 }));
 
@@ -143,10 +144,14 @@ interface ScheduleDetailsProps {
  * Groups 2 to 5, the whole block the switch owns: hidden together while the bells are off, which
  * is the preview's own `details.hidden` (`preview/app.js:404`) and what keeps the sheet's
  * collapsed shape to its header and the switch row.
+ *
+ * The block carries its own `--s2` rhythm, one step tighter than the sheet body's: the design nests
+ * these four groups in one child of the body (`#interval-details`), so the wider step lands between
+ * the switch row and this block, never between the groups themselves.
  */
 function ScheduleDetails({ draft, sessionMinutes, onChange }: Readonly<ScheduleDetailsProps>) {
   return (
-    <>
+    <Stack gap="md">
       <StartAfterGroup
         offsetSec={draft.offsetSec}
         onChange={(offsetSec) => onChange({ ...draft, offsetSec })}
@@ -159,7 +164,7 @@ function ScheduleDetails({ draft, sessionMinutes, onChange }: Readonly<ScheduleD
       <Caption size="meta" live>
         {describeSchedule(draft, sessionMinutes)}
       </Caption>
-    </>
+    </Stack>
   );
 }
 

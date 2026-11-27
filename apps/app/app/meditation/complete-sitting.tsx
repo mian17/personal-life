@@ -36,15 +36,15 @@ export function CompleteSitting({ result, onDone }: Readonly<CompleteSittingProp
 }
 
 /**
- * The design's `10 min` (`preview/index.html:111`): one display-size line, the number in full ink
- * and its unit in the second tier, so the unit reads as a unit and not as another digit.
+ * The design's `10 min` (`preview/index.html:111`): one display-size line in the full ink, the unit
+ * riding the same figure as the digits rather than dropping to the second tier beside it.
  */
 function MinutesFigure({ minutes }: Readonly<{ minutes: number }>) {
   return (
     <StatusText aria-live="off" figure size="display">
       {minutes}
-      {/* A unit is not a status: the inner line keeps the figure's size and drops the role. */}
-      <StatusText aria-live="off" role={undefined} size="display">
+      {/* A unit is not a status: the inner line keeps the figure's face and drops the role. */}
+      <StatusText aria-live="off" figure role={undefined} size="display">
         {' min'}
       </StatusText>
     </StatusText>
