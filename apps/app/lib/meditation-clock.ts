@@ -13,6 +13,7 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 const MILLISECONDS_PER_SECOND = 1000;
 const MINIMUM_RECORDED_MINUTES = 1;
+const FULL_PROGRESS = 100;
 
 /** A sitting's clock: when it started, what the wall clock says now, and how long it was planned for. */
 export interface RunningClock {
@@ -59,6 +60,16 @@ export function remainingSeconds(clock: RunningClock): number {
 export function cappedMinutes(elapsedSeconds: number, plannedMinutes: number): number {
   const elapsedMinutes = Math.ceil(elapsedSeconds / SECONDS_PER_MINUTE);
   return Math.min(Math.max(elapsedMinutes, MINIMUM_RECORDED_MINUTES), plannedMinutes);
+}
+
+/** How much of the planned length has been sat, as the progress bar's 0–100 percent. */
+export function sessionProgressPercent(clock: RunningClock): number {
+  const plannedMs = clock.plannedMinutes * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND;
+  // A plan with no length is over before it starts: full, rather than a divide by zero.
+  if (plannedMs <= 0) return FULL_PROGRESS;
+
+  const elapsedMs = clock.nowMs - clock.startedAtMs;
+  return Math.min(FULL_PROGRESS, Math.max(0, (elapsedMs / plannedMs) * FULL_PROGRESS));
 }
 
 /** Today against the goal: nothing yet, partway with what is left, or met. */

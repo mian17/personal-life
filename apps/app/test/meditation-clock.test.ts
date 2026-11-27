@@ -5,6 +5,7 @@ import {
   goalProgressLine,
   minuteUnit,
   remainingSeconds,
+  sessionProgressPercent,
 } from '@/lib/meditation-clock';
 
 /**
@@ -74,6 +75,44 @@ describe('cappedMinutes', () => {
 
   it('lands on the elapsed minutes between the two bounds', () => {
     expect(cappedMinutes(600, 15)).toBe(10);
+  });
+});
+
+describe('sessionProgressPercent', () => {
+  const startedAtMs = 1_000_000;
+
+  it('reads empty at the start and full at the planned length', () => {
+    expect(sessionProgressPercent({ startedAtMs, nowMs: startedAtMs, plannedMinutes: 10 })).toBe(0);
+    expect(
+      sessionProgressPercent({ startedAtMs, nowMs: startedAtMs + 10 * 60_000, plannedMinutes: 10 }),
+    ).toBe(100);
+  });
+
+  it('traces the share of the plan already sat', () => {
+    expect(
+      sessionProgressPercent({ startedAtMs, nowMs: startedAtMs + 200_000, plannedMinutes: 10 }),
+    ).toBeCloseTo(33.333, 3);
+    expect(
+      sessionProgressPercent({ startedAtMs, nowMs: startedAtMs + 60_000, plannedMinutes: 10 }),
+    ).toBe(10);
+  });
+
+  it('never reads past full when the clock overshoots', () => {
+    expect(
+      sessionProgressPercent({ startedAtMs, nowMs: startedAtMs + 3_600_000, plannedMinutes: 10 }),
+    ).toBe(100);
+  });
+
+  it('never reads below empty before the sitting started', () => {
+    expect(
+      sessionProgressPercent({ startedAtMs, nowMs: startedAtMs - 1_000, plannedMinutes: 10 }),
+    ).toBe(0);
+  });
+
+  it('reads full for a plan of no length rather than dividing by zero', () => {
+    expect(sessionProgressPercent({ startedAtMs, nowMs: startedAtMs, plannedMinutes: 0 })).toBe(
+      100,
+    );
   });
 });
 
