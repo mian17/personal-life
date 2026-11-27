@@ -1,11 +1,26 @@
 /**
- * The interval bells: the fire times a schedule yields, and the scheduler that rings
- * exactly those times and nothing of its own.
+ * The interval bells: the fire times a schedule yields, the sheet's own offset and interval
+ * arithmetic, the summary line it derives, and the scheduler that rings exactly those times
+ * and nothing of its own.
  *
  * Every boundary in `SPEC-meditation-app` §6 is asserted at its edge value, and the
  * scheduler is proven against the function's own output rather than a re-derivation.
  */
-import { intervalBellTimes, ringIntervalBells, type BellSchedule } from '@/lib/meditation-bells';
+import {
+  OFFSET_MAX_SEC,
+  bellsFrom,
+  describeSchedule,
+  draftFrom,
+  formatOffset,
+  intervalBellTimes,
+  offsetFromParts,
+  offsetParts,
+  ringIntervalBells,
+  stepInterval,
+  stepOffset,
+  type BellSchedule,
+  type BellsDraft,
+} from '@/lib/meditation-bells';
 
 /** A quarter-hour offset, ten-minute interval, three bowls at most. */
 const SAMPLE: BellSchedule = {
@@ -172,3 +187,111 @@ function recordBells(): { rung: number } {
 
   return bells;
 }
+
+describe('the offset the sheet edits', () => {
+  it('splits seconds into the three fields and back without losing one', () => {
+    expect(offsetParts(3661)).toEqual({ hours: 1, minutes: 1, seconds: 1 });
+    expect(offsetParts(OFFSET_MAX_SEC)).toEqual({ hours: 23, minutes: 59, seconds: 59 });
+    expect(offsetFromParts({ hours: 1, minutes: 1, seconds: 1 })).toBe(3661);
+    expect(offsetFromParts({ hours: 23, minutes: 59, seconds: 59 })).toBe(OFFSET_MAX_SEC);
+  });
+
+  it('clamps each part to its own bound before it can roll the one above it', () => {
+    expect(offsetFromParts({ hours: 0, minutes: 90, seconds: 0 })).toBe(59 * 60);
+    expect(offsetFromParts({ hours: 0, minutes: 0, seconds: 90 })).toBe(59);
+    expect(offsetFromParts({ hours: 24, minutes: 0, seconds: 0 })).toBe(23 * 3600);
+  });
+
+  it('steps a whole minute and stops at both ends of the day', () => {
+    expect(stepOffset(0, 1)).toBe(60);
+    expect(stepOffset(0, -1)).toBe(0);
+    expect(stepOffset(30, -1)).toBe(0);
+    expect(stepOffset(86340, 1)).toBe(OFFSET_MAX_SEC);
+    expect(stepOffset(OFFSET_MAX_SEC, 1)).toBe(OFFSET_MAX_SEC);
+  });
+
+  it('reads the offset in words, never as a clock', () => {
+    expect(formatOffset(0)).toBe('0 min');
+    expect(formatOffset(60)).toBe('1 min');
+    expect(formatOffset(90)).toBe('1 min 30 sec');
+    expect(formatOffset(3599)).toBe('59 min 59 sec');
+    expect(formatOffset(7200)).toBe('2 h');
+    expect(formatOffset(3661)).toBe('1 h 1 min 1 sec');
+  });
+});
+
+describe('the interval the sheet steps', () => {
+  it('moves in whole ten-minute steps over 10–120 minutes', () => {
+    expect(stepInterval(10, 1)).toBe(20);
+    expect(stepInterval(20, -1)).toBe(10);
+    expect(stepInterval(110, 1)).toBe(120);
+  });
+
+  it('clamps at both ends of the service grid instead of leaving it', () => {
+    expect(stepInterval(10, -1)).toBe(10);
+    expect(stepInterval(120, 1)).toBe(120);
+  });
+});
+
+describe('the draft and the stored bells', () => {
+  it('reads minutes out of the stored seconds, and puts them back at the save boundary', () => {
+    const stored = { enabled: true, offsetSec: 300, intervalSec: 1200, repeat: 3 };
+
+    expect(draftFrom(stored)).toEqual({
+      enabled: true,
+      offsetSec: 300,
+      intervalMin: 20,
+      repeat: 3,
+    });
+    expect(bellsFrom(draftFrom(stored))).toEqual(stored);
+  });
+
+  it('keeps the endless repeat as null through both directions', () => {
+    const stored = { enabled: true, offsetSec: 0, intervalSec: 600, repeat: null };
+
+    expect(draftFrom(stored).repeat).toBeNull();
+    expect(bellsFrom(draftFrom(stored)).repeat).toBeNull();
+  });
+});
+
+describe('describeSchedule', () => {
+  /** The draft the sheet opens on: bells off, nothing chosen yet. */
+  const OFF: BellsDraft = { enabled: false, offsetSec: 0, intervalMin: 10, repeat: null };
+
+  /** Ten-minute bowls from the start, ringing until the sitting ends. */
+  const UNLIMITED: BellsDraft = { enabled: true, offsetSec: 0, intervalMin: 10, repeat: null };
+
+  it('says the ending gong is all there is while the switch is off', () => {
+    expect(describeSchedule(OFF, 30)).toBe('No interval bells. Only the ending gong.');
+  });
+
+  it('names the interval, the offset in words, the repeat and the bowls it will sound', () => {
+    expect(describeSchedule(UNLIMITED, 30)).toBe(
+      'Bowl every 10 min, starting after 0 min, unlimited. 3 bowls this session.',
+    );
+  });
+
+  it('counts a single bowl in the singular', () => {
+    const once: BellsDraft = { enabled: true, offsetSec: 0, intervalMin: 10, repeat: 3 };
+
+    expect(describeSchedule(once, 5)).toBe(
+      'Bowl every 10 min, starting after 0 min, 3×. 1 bowl this session.',
+    );
+  });
+
+  it('caps the count at the repeat it was given', () => {
+    const twice: BellsDraft = { enabled: true, offsetSec: 300, intervalMin: 10, repeat: 2 };
+
+    expect(describeSchedule(twice, 30)).toBe(
+      'Bowl every 10 min, starting after 5 min, 2×. 2 bowls this session.',
+    );
+  });
+
+  it('says no bowl will sound when the offset lands at or past the sitting end', () => {
+    const late: BellsDraft = { enabled: true, offsetSec: 1200, intervalMin: 10, repeat: null };
+
+    expect(describeSchedule(late, 15)).toBe(
+      'Bowl every 10 min, starting after 20 min, unlimited — no bowl will sound in a 15 min session.',
+    );
+  });
+});
