@@ -43,7 +43,7 @@ const interactiveStyles = cx(
 
 const labelStyles = cx(
   'ui-value-row__label',
-  'text-[length:var(--fs-row-title)] leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)]',
+  'text-ink text-[length:var(--fs-row-title)] leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)]',
 );
 
 const valueStyles = cx(

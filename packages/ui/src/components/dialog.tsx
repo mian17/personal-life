@@ -96,14 +96,25 @@ function sheetPanelStyles(dismiss: boolean): string {
   );
 }
 
-/** §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. */
+/**
+ * §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. It is a
+ * decoration on the panel's top edge, not a row of its own, so it costs the sheet no height: the
+ * header behind it starts where the design's header starts, at the panel's own edge.
+ */
 const grabStyles = cx(
   'ui-dialog__grab',
-  'w-[calc(var(--s8)+var(--s1))] h-[var(--s1)] mt-[var(--s2)] mx-auto mb-0',
+  'absolute top-0 left-1/2 -translate-x-1/2',
+  'w-[calc(var(--s8)+var(--s1))] h-[var(--s1)]',
   'rounded-[var(--r-pill)] bg-line-strong',
 );
 
-const dialogHeader = 'ui-dialog__head mt-[var(--s2)]';
+const dialogHeader = 'ui-dialog__head';
+
+/**
+ * A centred or full panel insets its header from the panel's own `--s4`; a sheet gives the inset to
+ * the panel, so its header opens on the panel's edge and the design's fields sit one step higher.
+ */
+const panelHeaderInset = 'mt-[var(--s2)]';
 
 /** Two parts: the title block, then the close control. */
 const splitHeaderStyles = cx(dialogHeader, 'flex items-start justify-between gap-[var(--s2)]');
@@ -120,20 +131,24 @@ const sheetHeaderStyles = 'px-[var(--s2)] border-b border-line';
 const dialogTitle = cx(
   'ui-dialog__title',
   'm-0 text-[length:var(--fs-sheet-title)] leading-[var(--lh-sheet-title)]',
-  'tracking-[var(--tracking-sheet-title)] font-bold',
+  'tracking-[var(--tracking-sheet-title)] [font-weight:var(--fw-semibold)]',
 );
 
 const dialogTitleBlock = cx('ui-dialog__title-block', 'flex flex-col');
 
-/** §8's `.sheet__sub`: one `--s1` under the title, `14px` (`--fs-label`), the second ink tier. */
+/** §8's `.sheet__sub`: one `--s4` under the title, `14px` (`--fs-label`), the second ink tier. */
 const dialogDescription = cx(
   'ui-dialog__sub',
-  'm-0 mt-[var(--s1)] text-[length:var(--fs-label)] text-ink-2',
+  'm-0 mt-[var(--s4)] text-[length:var(--fs-label)] text-ink-2',
 );
 
 const dialogBody = 'ui-dialog__body flex flex-col mt-[var(--s4)]';
 
-/** The sheet's body inset; the panel carries none, so the body draws its own. */
+/**
+ * The sheet's body and footer insets. Only a dismissible sheet gives its padding to the slots: the
+ * confirm shape keeps its own panel inset, and a slot that repeated it would inset the content
+ * twice.
+ */
 const sheetBodyStyles = 'px-[var(--s4)] pb-[var(--s8)]';
 
 /** The body's own rhythm, one step per request; `s4` is the shipped spacing. */
@@ -183,7 +198,12 @@ export function Dialog({
     if (!open) openerRef.current?.focus();
   }, [open]);
 
-  const dragging = size === 'sheet' && dismiss;
+  // A sheet that can be dismissed gives its padding to the slots and draws the grab; the confirm
+  // shape keeps the panel's own inset, so a slot must not repeat it.
+  const dismissibleSheet = size === 'sheet' && dismiss;
+  // A sheet's header opens on the panel's edge; the centred and full panels inset their own.
+  const headerInsetStyles = size === 'sheet' ? undefined : panelHeaderInset;
+  const headerSlotStyles = dismissibleSheet ? sheetHeaderStyles : headerInsetStyles;
   // A dismissed surface has no header row for a trailing action to sit in, so that prop loses to
   // it; the title and its copy still render, because the title is what names the dialog.
   const trailing = dismiss
@@ -218,12 +238,9 @@ export function Dialog({
             className,
           )}
         >
-          {dragging && <div aria-hidden className={grabStyles} />}
+          {dismissibleSheet && <div aria-hidden className={grabStyles} />}
           <div
-            className={cx(
-              hasActionRow ? actionHeaderStyles : splitHeaderStyles,
-              dragging && sheetHeaderStyles,
-            )}
+            className={cx(hasActionRow ? actionHeaderStyles : splitHeaderStyles, headerSlotStyles)}
           >
             {leadingAction != null && <div className="ui-dialog__leading">{leadingAction}</div>}
             <div className={dialogTitleBlock}>
@@ -233,12 +250,12 @@ export function Dialog({
             {trailing}
           </div>
           <div
-            className={cx(dialogBody, bodyGapStyles[bodyGap], size === 'sheet' && sheetBodyStyles)}
+            className={cx(dialogBody, bodyGapStyles[bodyGap], dismissibleSheet && sheetBodyStyles)}
           >
             {children}
           </div>
           {footer != null && (
-            <div className={cx(dialogFooter, size === 'sheet' && sheetFooterStyles)}>{footer}</div>
+            <div className={cx(dialogFooter, dismissibleSheet && sheetFooterStyles)}>{footer}</div>
           )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

@@ -27,6 +27,13 @@ const sizeStyles: Record<NonNullable<CaptionProps['size']>, string> = {
 };
 
 /**
+ * The design's `h1, h2, p` reset, stated where the line lands: a caption is one line in a column
+ * whose gap owns the rhythm, so the UA's `1em` step above and below it is space the design never
+ * draws.
+ */
+const resetStyles = 'm-0';
+
+/**
  * The quiet line under a figure. Plain text by default — a line that never rewrites must not be
  * announced — and `live` adds exactly `aria-live="polite"` for the one line that does, so the
  * schedule a press produced is spoken without claiming a `status` role the caption never fills.
@@ -35,7 +42,7 @@ export function Caption({ size = 'label', live = false, children }: Readonly<Cap
   return (
     <p
       aria-live={live ? 'polite' : undefined}
-      className={cx('ui-caption', `ui-caption--${size}`, sizeStyles[size])}
+      className={cx('ui-caption', `ui-caption--${size}`, resetStyles, sizeStyles[size])}
     >
       {children}
     </p>

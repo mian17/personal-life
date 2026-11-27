@@ -78,12 +78,16 @@ const titleBlockStyles = 'mt-0 mb-0';
 
 /**
  * The header's leading slot: the title block — `<h1>` plus the optional sub-line — level with
- * the trailing controls, matching `.phead`'s `<div>` wrapper.
+ * the trailing controls, matching `.phead`'s `<div>` wrapper. The page title takes the design's
+ * `--fw-semibold` (`.phead__title` in both drawn previews) instead of the atom's `bold` default,
+ * which stays where it is for every other `PageTitle` caller.
  */
 function TitleBlock({ title, subtitle }: Readonly<Pick<ListShellProps, 'title' | 'subtitle'>>) {
   return (
     <div className="ui-list-shell__title-block">
-      <PageTitle className={titleBlockStyles}>{title}</PageTitle>
+      <PageTitle className={titleBlockStyles} weight="semibold">
+        {title}
+      </PageTitle>
       {subtitle != null && <p className={subtitleStyles}>{subtitle}</p>}
     </div>
   );

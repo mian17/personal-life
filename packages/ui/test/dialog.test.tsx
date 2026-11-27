@@ -32,6 +32,7 @@ function setup(props: Partial<Parameters<typeof Dialog>[0]> = {}) {
 
 const dialog = () => screen.getByRole('dialog');
 const overlay = () => document.querySelector('[data-slot="dialog-overlay"]')!;
+const classesOf = (el: Element) => el.className.split(/\s+/).filter(Boolean);
 
 describe('Dialog', () => {
   it('mounts no modal surface while closed', () => {
@@ -52,6 +53,25 @@ describe('Dialog', () => {
     expect(sub.classList.contains('ui-dialog__sub')).toBe(true);
     expect(sub.closest('.ui-dialog__head')).not.toBeNull();
     expect(sub.closest('.ui-dialog__title-block')).not.toBeNull();
+  });
+
+  /**
+   * The design's confirm is one column at `--s4`: the copy sits a full step under the title, not
+   * the hairline's own `--s1`. The step is stated on the line, so the title keeps `m-0` alone.
+   */
+  it('spaces the description a full --s4 under the title', () => {
+    setup({ open: true, description: 'One thing.' });
+    const classes = classesOf(screen.getByText('One thing.'));
+    expect(classes).toContain('mt-[var(--s4)]');
+    expect(classes).not.toContain('mt-[var(--s1)]');
+    expect(classes).toContain('m-0');
+  });
+
+  it("selects the sheet title's 600 weight rather than stacking it on the bold one", () => {
+    setup({ open: true });
+    const classes = classesOf(screen.getByRole('heading', { level: 2, name: 'Custom repeat' }));
+    expect(classes).toContain('[font-weight:var(--fw-semibold)]');
+    expect(classes).not.toContain('font-bold');
   });
 
   it('renders no description line when none is given', () => {
@@ -265,5 +285,45 @@ describe('Dialog — header slots, dismiss and body rhythm', () => {
 
     expect(panel.classList.contains('pt-[var(--s6)]')).toBe(true);
     expect(panel.classList.contains('px-[var(--s5)]')).toBe(true);
+  });
+
+  /**
+   * The confirm draws its own panel inset, so its body must not draw a second one: the actions
+   * would otherwise sit `--s4` inside the `--s5` the panel already applies.
+   */
+  it('insets the confirm body once, from the panel alone', () => {
+    setup({ open: true, size: 'sheet', dismiss: false });
+    const body = document.querySelector('.ui-dialog__body')!;
+
+    expect(body.classList.contains('px-[var(--s4)]')).toBe(false);
+    expect(body.classList.contains('pb-[var(--s8)]')).toBe(false);
+  });
+
+  /**
+   * The grab is a decoration on the panel's top edge, not a row: the design draws the header at the
+   * panel's edge, so a grab that took flow height would push every field a step down.
+   */
+  it('draws the grab over the panel edge instead of above the header', () => {
+    setup({ open: true, size: 'sheet' });
+    const classes = classesOf(document.querySelector('.ui-dialog__grab')!);
+
+    expect(classes).toContain('absolute');
+    expect(classes).toContain('top-0');
+    expect(classes.some((utility) => utility.startsWith('mt-'))).toBe(false);
+  });
+
+  /**
+   * A sheet's padding lives on its slots, so its header opens on the panel's edge; the centred and
+   * full panels keep their own `--s2` inset, which is what every shipped dialog renders.
+   */
+  it('opens the sheet header on the panel edge and keeps the inset on the centred panel', () => {
+    setup({ open: true, size: 'sheet' });
+    let header = classesOf(document.querySelector('.ui-dialog__head')!);
+    expect(header).not.toContain('mt-[var(--s2)]');
+    cleanup();
+
+    setup({ open: true });
+    header = classesOf(document.querySelector('.ui-dialog__head')!);
+    expect(header).toContain('mt-[var(--s2)]');
   });
 });

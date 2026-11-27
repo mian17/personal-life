@@ -17,7 +17,7 @@ describe('Button', () => {
     expect(button.classList.contains('ui-btn--primary')).toBe(true);
   });
 
-  it.each<ButtonVariant>(['primary', 'ghost', 'danger', 'quiet'])(
+  it.each<ButtonVariant>(['primary', 'ghost', 'filled', 'danger', 'quiet'])(
     'maps variant="%s" to its modifier class',
     (variant) => {
       render(<Button variant={variant}>x</Button>);
@@ -46,8 +46,9 @@ describe('Button', () => {
     const classes = classesOf(screen.getByRole('button'));
     expect(classes).toContain('min-h-[var(--tap)]');
     expect(classes).not.toContain('min-h-0');
-    // The quiet rhythm is unchanged: the horizontal inset still fits the label.
-    expect(classes).toContain('px-[var(--s3)]');
+    // The design's one button inset: a content-sized action is inset like every other button.
+    expect(classes).toContain('px-[var(--s6)]');
+    expect(classes).not.toContain('px-[var(--s3)]');
   });
 
   it.each<ButtonSize>(['default', 'bare', 'icon'])(
@@ -211,6 +212,31 @@ describe('Button — shape, the text face and the hero size', () => {
     const classes = classesOf(screen.getByRole('button'));
     expect(classes).toContain('rounded-[var(--r-sm)]!');
     expect(classes).toContain('px-[var(--s3)]!');
+  });
+
+  /**
+   * The word button is the design's `.text-button`, which states no weight at all: it reads at the
+   * body's 400, not at the semibold face the shared button paints.
+   */
+  it('drops the text face to the body weight, beating the shared semibold', () => {
+    render(<Button variant="text">Cancel</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('[font-weight:var(--fw-body)]!');
+    expect(classes).toContain('font-semibold');
+  });
+
+  it('adds variant="filled" as the surface face on a hairline, leaving every other face alone', () => {
+    render(<Button variant="filled">Keep going</Button>);
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('ui-btn--filled')).toBe(true);
+    const classes = classesOf(button);
+    expect(classes).toContain('bg-surface');
+    expect(classes).toContain('text-ink');
+    expect(classes).toContain('border-line');
+    expect(classes).toContain('active:bg-press');
+    expect(classes).not.toContain('bg-max');
+    expect(classes).not.toContain('text-on-max');
+    expect(classes).not.toContain('border-line-strong');
   });
 
   it('adds size="hero" as a union member on the fab floor, with no margin of its own', () => {

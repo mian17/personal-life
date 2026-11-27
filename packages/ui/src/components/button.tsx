@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'quiet' | 'text';
+export type ButtonVariant = 'primary' | 'ghost' | 'filled' | 'danger' | 'quiet' | 'text';
 export type ButtonSize = 'default' | 'bare' | 'icon' | 'hero';
 
 export interface ButtonProps extends ComponentPropsWithRef<'button'> {
@@ -15,7 +15,8 @@ export interface ButtonProps extends ComponentPropsWithRef<'button'> {
 
 /**
  * The revised `.btn` (REVISED-DESIGN §8): a full-width control on the 48px tap floor,
- * one accent fill and one pressed move. `ghost` is the outlined secondary, `danger` the
+ * one accent fill and one pressed move. `filled` is the design's `.button--quiet` — a
+ * `--surface` face on a `--line` hairline — `ghost` the outlined secondary, `danger` the
  * text-only destructive action, `quiet` the text-only accent action, `text` the sheet
  * header's quiet word button.
  *
@@ -36,13 +37,14 @@ export const buttonVariants = cva(
       variant: {
         primary: 'border border-max bg-max text-on-max active:border-max-press active:bg-max-press',
         ghost: 'border border-line-strong bg-transparent text-ink active:bg-press',
+        filled: 'border border-line bg-surface text-ink active:bg-press',
         danger: 'bg-transparent text-danger active:bg-danger-soft',
         quiet: 'bg-transparent text-max active:bg-press',
         text: 'bg-transparent text-ink-2 active:bg-press',
       },
       size: {
         default: 'w-full min-h-[var(--tap)] px-[var(--s5)]',
-        bare: 'w-auto min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)]',
+        bare: 'w-auto min-h-[var(--tap)] px-[var(--s6)] py-[var(--s2)]',
         icon: 'size-[var(--tap)] p-0',
         hero: 'w-full min-h-[var(--fab-size)] px-[var(--s6)]',
       },
@@ -55,10 +57,14 @@ export const buttonVariants = cva(
     compoundVariants: [
       // An icon-sized control draws one glyph, so the line box must not add height.
       { variant: 'danger', size: 'icon', class: 'text-xl leading-none' },
-      // The word button owns its own geometry: the small corner and one-step inset of §8's
-      // `.text-button` beat the `size` and `shape` it was not asked for. `!` because `cx` joins
-      // and never merges, so the selection has to be made before the two strings meet.
-      { variant: 'text', class: 'px-[var(--s3)]! rounded-[var(--r-sm)]!' },
+      // The word button owns its own geometry and its own weight: the small corner, one-step inset
+      // and body weight of §8's `.text-button` beat the `size`, `shape` and semibold face it was not
+      // asked for. `!` because `cx` joins and never merges, so the selection has to be made before
+      // the two strings meet.
+      {
+        variant: 'text',
+        class: 'px-[var(--s3)]! rounded-[var(--r-sm)]! [font-weight:var(--fw-body)]!',
+      },
     ],
     defaultVariants: { variant: 'primary', size: 'default', shape: 'rounded' },
   },

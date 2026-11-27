@@ -15,6 +15,16 @@ describe('Caption', () => {
     expect(line.hasAttribute('tabindex')).toBe(false);
   });
 
+  /**
+   * The design resets `p` to `margin: 0` and lets the screen's column gap own the rhythm. Without
+   * it the UA's `1em` above and below doubles the line's height in the panel.
+   */
+  it('carries the reset instead of the UA paragraph margins', () => {
+    render(<Caption>minutes sat</Caption>);
+
+    expect(classesOf(screen.getByText('minutes sat'))).toContain('m-0');
+  });
+
   it('defaults to the label tier: section-label tracking, never uppercased', () => {
     render(<Caption>minutes sat</Caption>);
 

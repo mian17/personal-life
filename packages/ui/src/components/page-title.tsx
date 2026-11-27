@@ -16,9 +16,13 @@ const headingStyles =
 
 /**
  * The page heading's own block margins, clear of the content below a page title. A title inside a
- * panel drops them: the panel's column gap already spaces it, and the two together would sit it low.
+ * panel owns none at all: the panel's column gap already spaces it, and the two together would sit
+ * it low.
  */
 const pageHeadingStyles = 'm-[var(--s2)_0_var(--s4)]';
+
+/** The panel title's whole margin: the design's `h1, h2, p` reset, stated where the title lands. */
+const panelHeadingStyles = 'm-0';
 
 /** The tier's weight, selected rather than stacked — two weights cannot share one declaration. */
 const weightStyles: Record<NonNullable<PageTitleProps['weight']>, string> = {
@@ -59,7 +63,7 @@ export function PageTitle({
       <Heading
         className={cx(
           'ui-page-title',
-          isPageHeading && pageHeadingStyles,
+          isPageHeading ? pageHeadingStyles : panelHeadingStyles,
           headingStyles,
           weightStyles[weight],
           isPageHeading && sub != null && headingWithSubStyles,

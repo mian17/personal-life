@@ -75,6 +75,8 @@ describe('PageTitle — headingLevel and weight', () => {
     const heading = screen.getByRole('heading', { level: 2 });
     expect(heading.tagName).toBe('H2');
     expect(heading.classList.contains(HEADING_MARGIN_UTILITY)).toBe(false);
+    // Zero, not absent: a `margin: 0` the design's reset draws, so no UA margin replaces the page's.
+    expect(classesOf(heading)).toContain('m-0');
     // The title tier itself does not move with the level.
     expect(classesOf(heading)).toContain(DISPLAY_SIZE_UTILITY);
     expect(classesOf(heading)).toContain('ui-page-title');

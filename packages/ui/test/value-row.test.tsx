@@ -113,4 +113,18 @@ describe('ValueRow', () => {
     expect(classes).toContain('active:bg-press');
     expect(classes).toContain('focus-visible:outline-[length:var(--focus-ring)]');
   });
+
+  /**
+   * A `<button>` hands its children the UA's `buttontext` ink, which is pure black and not the row's
+   * first tier. The label states the ink it paints, so the disclosure reads like the inert rows.
+   */
+  it('paints the label in the row ink in both modes', () => {
+    const { unmount } = render(<ValueRow label="Duration" value="10 min" />);
+    expect(classesOf(document.querySelector('.ui-value-row__label')!)).toContain('text-ink');
+    unmount();
+
+    render(<ValueRow label="Interval bells" value="Off" onClick={() => {}} popup="dialog" />);
+    expect(row().tagName).toBe('BUTTON');
+    expect(classesOf(document.querySelector('.ui-value-row__label')!)).toContain('text-ink');
+  });
 });
