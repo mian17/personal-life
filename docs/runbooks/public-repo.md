@@ -15,11 +15,36 @@ happened.
 
 Since v0.2.3 no workflow does that. `.github/workflows/sonarqube.yml` was the only
 one: it ran the scan against the SonarQube container on the same host, and it is
-deleted. Static analysis for pull requests continues through the SonarCloud GitHub
-App, which runs on Sonar's infrastructure and needs no runner of ours; the local
-SonarQube container keeps its data and its MCP consumers but receives no CI scan,
-so `docs/runbooks/sonar-autofix.md` describes a pipeline that is dormant until a
-scan is run by hand.
+deleted. Static analysis now runs inside `.github/workflows/tests.yml` on
+`ubuntu-latest`, with no host involved: `SonarSource/sonarqube-scan-action` pinned
+to `70bad232163b09d998ea0707ee80c0ec80798c16` (# v8.5.1), against
+`SONAR_HOST_URL=https://sonarcloud.io`, with
+`args: -Dsonar.projectKey=mian17_personal-life -Dsonar.organization=mian17`. It
+runs on every pull request into `dev` and `main`, and on every push to them,
+after a step that fails the job when `.coverage/lcov.info` is missing or empty:
+the scanner reads an absent report as "no coverage data" rather than as an error,
+so without the guard a broken coverage run would publish 0.0% and the gate would
+go green on lines nobody measured.
+
+Automatic Analysis is off in SonarCloud, so that step is the analyser. The
+`SonarCloud Code Analysis` GitHub App still posts its check on every pull
+request — app `sonarqubecloud`, measured on the head of #226 — but it no longer
+runs an analysis of its own: what it reports is the quality gate of the report
+the CI scan uploaded for that pull request.
+
+```bash
+gh api repos/mian17/personal-life/commits/89bdf7d/check-runs \
+  --jq '.check_runs[] | select(.app.slug == "sonarqubecloud") | .name'
+# SonarCloud Code Analysis
+```
+
+Cloud holds `dev` as this project's main branch, which matches how the repository
+is run — `dev` is the integration line every branch is cut from, `main` the
+release line that only receives promotions — so the timeline that accumulates is
+`dev`'s. A push to `main` still runs the scan; its report lands as a short-lived
+branch and is discarded. The local SonarQube container keeps its data and its MCP
+consumers but receives no CI scan, so `docs/runbooks/sonar-autofix.md` describes a
+pipeline that is dormant until a scan is run by hand.
 
 The runner is unregistered, at repository level, and that is the part to keep
 true:

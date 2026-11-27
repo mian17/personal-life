@@ -37,15 +37,25 @@ enforces that no workflow may ever name a `self-hosted` runner.
 
 | Workflow           | Triggers                              | Runner          | What it proves                                                                                                           |
 | ------------------ | ------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `tests.yml`        | PR → `dev`/`main`, manual             | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage                                     |
+| `tests.yml`        | PR → `dev`/`main`, manual             | `ubuntu-latest` | The code is clean: lint, dependency audit, arch rules, typecheck, full jest coverage — plus SonarCloud's static analysis |
 | `compose-boot.yml` | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The deployment works: build the real stack, boot it, every backend answers `/health/ready` **from inside its container** |
 | `secrets.yml`      | PR → `dev`/`main`, push `dev`, manual | `ubuntu-latest` | The history carries no secret: gitleaks over every commit, redacted                                                      |
 | `backmerge.yml`    | push `main`, manual                   | `ubuntu-latest` | Bookkeeping: opens the `-s ours` back-merge PR so `main` stays an ancestor of `dev`                                      |
 
 One run per PR (a new push supersedes the previous run via a per-PR concurrency
-group). `SonarCloud Code Analysis` — a GitHub App, not a workflow — additionally
-gates pull requests with taint analysis; the local SonarQube scan was deleted
-with v0.2.3 (see [Release and promotion](release.md)).
+group). Static analysis is a step inside `tests.yml`, not a separate workflow:
+`SonarSource/sonarqube-scan-action` pinned to
+`70bad232163b09d998ea0707ee80c0ec80798c16` (# v8.5.1), against
+`https://sonarcloud.io`, with
+`-Dsonar.projectKey=mian17_personal-life -Dsonar.organization=mian17`.
+Automatic Analysis is off in SonarCloud, so that step is the analyser. The
+`SonarCloud Code Analysis` GitHub App still posts its check on each pull request,
+and what it reports is the quality gate of the report the SonarCloud scan uploaded
+for it rather than an analysis the App ran itself. Cloud holds `dev` as this
+project's main branch, so the timeline that accumulates is `dev`'s: a push to
+`main` runs the scan as well, and its report is discarded as a short-lived branch.
+The local SonarQube scan was deleted with v0.2.3 (see
+[Release and promotion](release.md)).
 
 ## tests.yml
 
@@ -54,8 +64,13 @@ the two native modules `better-sqlite3` and `argon2` are rebuilt explicitly),
 `npm run audit:gate`, `npm run lint`, `npm run build`, `npm run typecheck`,
 `npm run arch:check`, then `npm run test:coverage` against a throwaway
 `postgres:17-alpine` container (pulled before the suite so a cold registry fetch
-cannot surface as a hook timeout). Workspace `@life/*` types exist only after a
-build, which is why build precedes typecheck and tests.
+cannot surface as a hook timeout), a guard that fails the job when
+`.coverage/lcov.info` is missing or empty, and the SonarCloud scan. The guard sits
+between the two because the scanner reads an absent report as no coverage data
+rather than as an error: without it a failed coverage run would publish 0.0% for
+every file and the gate would go green on lines nobody measured. Workspace
+`@life/*` types exist only after a build, which is why build precedes typecheck
+and tests.
 
 `audit:gate` (`scripts/audit-gate.mjs`) fails on any high/critical advisory not
 in `.github/audit-allowlist.json`, on any allowlist entry npm audit no longer
