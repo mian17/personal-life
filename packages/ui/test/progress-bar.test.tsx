@@ -45,7 +45,13 @@ describe('ProgressBar', () => {
   });
 
   it('draws its caption above the bar, without adding a second read-out role', () => {
-    render(<ProgressBar value={52} label="62 g of protein toward 120 g" caption="Protein · 62 / 120 g" />);
+    render(
+      <ProgressBar
+        value={52}
+        label="62 g of protein toward 120 g"
+        caption="Protein · 62 / 120 g"
+      />,
+    );
 
     expect(screen.getByText('Protein · 62 / 120 g')).toBeDefined();
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
@@ -94,7 +100,9 @@ describe('ProgressBar', () => {
   });
 
   it('keeps the pressed trough by default and takes the reference hairline on request', () => {
-    const { container: pressed } = render(<ProgressBar value={10} label="Today: 3 of 30 minutes" />);
+    const { container: pressed } = render(
+      <ProgressBar value={10} label="Today: 3 of 30 minutes" />,
+    );
     expect(classesOf(pressed.firstElementChild as HTMLElement)).toContain('bg-press');
 
     const { container: hairline } = render(
@@ -111,5 +119,38 @@ describe('ProgressBar', () => {
     expect(source).not.toContain('recharts');
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(source).not.toMatch(/rgba?\(/);
+  });
+});
+
+describe('ProgressBar — height', () => {
+  it("keeps the atom's two-step track by default", () => {
+    render(<ProgressBar value={40} label="Session progress" />);
+    const classes = classesOf(screen.getByRole('progressbar'));
+    expect(classes).toContain('h-[var(--s2)]');
+    expect(classes).not.toContain('h-[var(--s1)]');
+  });
+
+  it('selects the hairline track for the design, and only one height reaches the element', () => {
+    render(<ProgressBar value={40} label="Session progress" height="s1" tone="press" />);
+    const classes = classesOf(screen.getByRole('progressbar'));
+    expect(classes).toContain('h-[var(--s1)]');
+    expect(classes).not.toContain('h-[var(--s2)]');
+    // The trough wash, the radius and the fill are unchanged by the height.
+    expect(classes).toContain('bg-press');
+    expect(classes).toContain('rounded-[var(--r-pill)]');
+  });
+
+  it('leaves the caption and read-out shapes alone', () => {
+    render(
+      <ProgressBar
+        value={40}
+        label="Session progress"
+        height="s1"
+        caption="Session progress"
+        readout="4 of 10 min"
+      />,
+    );
+    expect(screen.getByText('Session progress')).toBeDefined();
+    expect(screen.getByText('4 of 10 min')).toBeDefined();
   });
 });

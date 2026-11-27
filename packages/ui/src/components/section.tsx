@@ -11,6 +11,10 @@ export interface SectionProps extends ComponentPropsWithRef<'section'> {
   headingLevel?: SectionHeadingLevel;
   actions?: ReactNode;
   gap?: StackGap;
+  /** `false` drops the section's own top margin, for a label inside a sheet body. Default `true`. */
+  margin?: boolean;
+  /** The label's ink tier. `ink-2` is every shipped section; `ink-3` is the sheet's quieter one. */
+  labelTone?: 'ink-2' | 'ink-3';
 }
 
 /** The section is the only element here carrying an outer margin — its Stack has none. */
@@ -24,15 +28,24 @@ const autoHideStyles = '[&:has(.ui-list):not(:has(.ui-list-item))]:hidden';
  * baseline. The type treatment rides the row's direct children, so the heading keeps its
  * `ui-section__heading` hook alone and the label markup stays exactly what locators read.
  */
-const headingRowStyles = cx(
+const labelStyles = cx(
   'flex items-baseline gap-[var(--s2)]',
   '[&>:is(h2,h3)]:m-0',
   '[&>:is(h2,h3)]:text-[length:var(--fs-section-label)]',
   '[&>:is(h2,h3)]:[font-weight:var(--fw-section-label)]',
   '[&>:is(h2,h3)]:tracking-[var(--tracking-section-label)]',
   '[&>:is(h2,h3)]:uppercase',
-  '[&>:is(h2,h3)]:text-ink-2',
 );
+
+/**
+ * The label's ink, one tier per tone. The ink rides a descendant selector on the heading row, so a
+ * second tier must replace that utility rather than join it: two of them would contest one colour
+ * and the stylesheet's order would decide which reads.
+ */
+const headingRowStyles: Record<NonNullable<SectionProps['labelTone']>, string> = {
+  'ink-2': cx(labelStyles, '[&>:is(h2,h3)]:text-ink-2'),
+  'ink-3': cx(labelStyles, '[&>:is(h2,h3)]:text-ink-3'),
+};
 
 /** The label's own bottom gap, so a section without a label is not pushed down by one. */
 const labelledStyles = 'mb-[var(--s2)]';
@@ -62,23 +75,24 @@ export function Section({
   headingLevel = 'h2',
   actions,
   gap = 'md',
+  margin = true,
+  labelTone = 'ink-2',
   className,
   children,
   ...rest
 }: Readonly<SectionProps>) {
   const Heading = headingLevel;
   return (
-    <section className={cx('ui-section', sectionStyles, autoHideStyles, className)} {...rest}>
+    <section
+      className={cx('ui-section', margin && sectionStyles, autoHideStyles, className)}
+      {...rest}
+    >
       {label != null && (
-        <div className={cx('ui-section__heading-row', headingRowStyles, labelledStyles)}>
+        <div className={cx('ui-section__heading-row', headingRowStyles[labelTone], labelledStyles)}>
           <Heading className="ui-section__heading">{label}</Heading>
           {count != null && (
             <span
-              className={cx(
-                'ui-section__count',
-                countStyles,
-                actions == null && countFarEndStyles,
-              )}
+              className={cx('ui-section__count', countStyles, actions == null && countFarEndStyles)}
             >
               {count}
             </span>

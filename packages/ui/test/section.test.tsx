@@ -215,11 +215,7 @@ describe('Section', () => {
   });
 
   it('merges className instead of replacing it', () => {
-    render(
-      <Section className="legacy-hook">
-        x
-      </Section>,
-    );
+    render(<Section className="legacy-hook">x</Section>);
     const classes = classesOf(document.querySelector('.ui-section')!);
     expect(classes).toContain('ui-section');
     expect(classes).toContain('legacy-hook');
@@ -247,3 +243,42 @@ describe('Section', () => {
 // The heading-level union is part of the public contract.
 const _levels: SectionHeadingLevel[] = ['h2', 'h3'];
 void _levels;
+
+describe('Section — margin and labelTone', () => {
+  it('keeps its own --s6 top margin by default, so every shipped section is unchanged', () => {
+    render(<Section label="Today">x</Section>);
+    expect(classesOf(document.querySelector('.ui-section')!)).toContain(SECTION_UTILITY);
+  });
+
+  it('drops the top margin inside a sheet body, where the Stack supplies the rhythm', () => {
+    render(
+      <Section label="Start after" margin={false}>
+        x
+      </Section>,
+    );
+    const classes = classesOf(document.querySelector('.ui-section')!);
+    expect(classes).toContain('ui-section');
+    expect(classes).not.toContain(SECTION_UTILITY);
+  });
+
+  it('keeps the second ink tier on the heading row by default', () => {
+    render(<Section label="Today">x</Section>);
+    const row = classesOf(document.querySelector('.ui-section__heading-row')!);
+    expect(row).toContain('[&>:is(h2,h3)]:text-ink-2');
+    expect(row).not.toContain('[&>:is(h2,h3)]:text-ink-3');
+  });
+
+  it('selects the quieter label tier instead of stacking a second ink on the same row', () => {
+    render(
+      <Section label="Repeat" labelTone="ink-3">
+        x
+      </Section>,
+    );
+    const row = classesOf(document.querySelector('.ui-section__heading-row')!);
+    expect(row).toContain('[&>:is(h2,h3)]:text-ink-3');
+    expect(row).not.toContain('[&>:is(h2,h3)]:text-ink-2');
+    // The label treatment itself is untouched: one tier of ink moved, nothing else.
+    expect(row).toContain('[&>:is(h2,h3)]:uppercase');
+    expect(row).toContain('[&>:is(h2,h3)]:tracking-[var(--tracking-section-label)]');
+  });
+});

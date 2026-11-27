@@ -42,11 +42,7 @@ describe('Button', () => {
    * still the touch minimum, so `--tap` (48px) is the floor and no negative min-height joins it.
    */
   it('keeps the tap floor on size="bare" instead of dropping it', () => {
-    render(
-      <Button size="bare">
-        x
-      </Button>,
-    );
+    render(<Button size="bare">x</Button>);
     const classes = classesOf(screen.getByRole('button'));
     expect(classes).toContain('min-h-[var(--tap)]');
     expect(classes).not.toContain('min-h-0');
@@ -168,6 +164,64 @@ describe('Button', () => {
     render(<Button>x</Button>);
     const button = screen.getByRole('button');
     expect(button.classList.contains('focus-visible:outline-solid')).toBe(true);
-    expect(button.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
+    expect(button.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(
+      true,
+    );
+  });
+});
+
+describe('Button — shape, the text face and the hero size', () => {
+  it('keeps the library --r-md corner by default', () => {
+    render(<Button>Start</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('rounded-[var(--r-md)]');
+    expect(classes).not.toContain('rounded-[var(--r-pill)]');
+  });
+
+  it('selects the pill corner instead of stacking a second radius', () => {
+    render(<Button shape="pill">Start</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('rounded-[var(--r-pill)]');
+    expect(classes).not.toContain('rounded-[var(--r-md)]');
+  });
+
+  it('adds variant="text" as a union member, leaving every shipped face alone', () => {
+    render(
+      <Button variant="text" size="bare">
+        Cancel
+      </Button>,
+    );
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('ui-btn--text')).toBe(true);
+    expect(button.classList.contains('ui-btn--primary')).toBe(false);
+    const classes = classesOf(button);
+    expect(classes).toContain('text-ink-2');
+    expect(classes).toContain('active:bg-press');
+    expect(classes).not.toContain('bg-max');
+    expect(classes).not.toContain('text-on-max');
+  });
+
+  /**
+   * The word button owns its box: `--r-sm` and an `--s3` inset are the design's numbers, and the
+   * `!` is what makes them win over the size and shape it was not asked for — `cx` joins and never
+   * merges, so a later declaration has to be beaten rather than assumed to be last.
+   */
+  it('gives the text face its own corner and inset', () => {
+    render(<Button variant="text">Cancel</Button>);
+    const classes = classesOf(screen.getByRole('button'));
+    expect(classes).toContain('rounded-[var(--r-sm)]!');
+    expect(classes).toContain('px-[var(--s3)]!');
+  });
+
+  it('adds size="hero" as a union member on the fab floor, with no margin of its own', () => {
+    render(<Button size="hero">Start</Button>);
+    const button = screen.getByRole('button');
+    expect(button.classList.contains('ui-btn--hero')).toBe(true);
+    const classes = classesOf(button);
+    expect(classes).toContain('min-h-[var(--fab-size)]');
+    expect(classes).toContain('w-full');
+    expect(classes).not.toContain('min-h-[var(--tap)]');
+    // A size is a metric, not a layout: the step above Start belongs to the call site.
+    expect(classes.some((utility) => utility.startsWith('mt-'))).toBe(false);
   });
 });

@@ -129,6 +129,42 @@ describe('IconButton', () => {
     render(<IconButton label="Back">{<span />}</IconButton>);
     const button = screen.getByRole('button');
     expect(button.classList.contains('focus-visible:outline-solid')).toBe(true);
-    expect(button.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(true);
+    expect(button.classList.contains('focus-visible:outline-[length:var(--focus-ring)]')).toBe(
+      true,
+    );
+  });
+});
+
+describe('IconButton — shape', () => {
+  it('keeps the library --r-md corner by default', () => {
+    render(<IconButton label="More actions">{<span />}</IconButton>);
+    const classes = screen.getByRole('button').classList;
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-pill)]')).toBe(false);
+  });
+
+  it('selects the pill corner for a header overflow control, never both corners', () => {
+    render(
+      <IconButton label="More actions" shape="pill">
+        {<span />}
+      </IconButton>,
+    );
+    const classes = screen.getByRole('button').classList;
+    expect(classes.contains('rounded-[var(--r-pill)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(false);
+    // The square is the shape's business, not the corner's.
+    expect(classes.contains('size-[var(--tap)]')).toBe(true);
+  });
+
+  it('leaves the face alone when only the corner moves', () => {
+    render(
+      <IconButton label="More actions" variant="framed" shape="pill">
+        {<span />}
+      </IconButton>,
+    );
+    const classes = screen.getByRole('button').classList;
+    expect(classes.contains('border-line')).toBe(true);
+    expect(classes.contains('bg-surface')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-pill)]')).toBe(true);
   });
 });

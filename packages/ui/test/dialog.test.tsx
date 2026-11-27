@@ -170,3 +170,100 @@ describe('Dialog', () => {
     expect(overlay().classList.contains('ui-dialog__scrim--sheet')).toBe(false);
   });
 });
+
+describe('Dialog — header slots, dismiss and body rhythm', () => {
+  it('draws the close control by default', () => {
+    setup({ open: true });
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+  });
+
+  it('replaces the drawn close control with a trailing action', () => {
+    setup({ open: true, trailingAction: <button type="button">Save</button> });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
+  it('keeps the title and its copy in the confirm shape, and removes the grab and the close', () => {
+    setup({
+      open: true,
+      size: 'sheet',
+      dismiss: false,
+      description: 'The minutes you have sat are not saved.',
+    });
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Custom repeat' })).toBeTruthy();
+    expect(screen.getByText('The minutes you have sat are not saved.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(document.querySelector('.ui-dialog__grab')).toBeNull();
+  });
+
+  it('lets dismiss={false} outrank a trailing action, because there is no row to sit in', () => {
+    setup({
+      open: true,
+      size: 'sheet',
+      dismiss: false,
+      trailingAction: <button type="button">Save</button>,
+    });
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('switches the header to the three-column line when an action is present', () => {
+    setup({ open: true, leadingAction: <button type="button">Cancel</button> });
+    const header = document.querySelector('.ui-dialog__head')!;
+
+    expect(header.classList.contains('grid')).toBe(true);
+    expect(header.classList.contains('grid-cols-[1fr_auto_1fr]')).toBe(true);
+    expect(document.querySelector('.ui-dialog__leading')!.textContent).toBe('Cancel');
+  });
+
+  it('leaves the two-part header alone when no action is given', () => {
+    setup({ open: true });
+    const header = document.querySelector('.ui-dialog__head')!;
+
+    expect(header.classList.contains('grid')).toBe(false);
+    expect(header.classList.contains('justify-between')).toBe(true);
+    expect(document.querySelector('.ui-dialog__leading')).toBeNull();
+  });
+
+  it('spaces the body one step wider on request, and at --s4 by default', () => {
+    setup({ open: true, bodyGap: 's5' });
+    let body = document.querySelector('.ui-dialog__body')!;
+    expect(body.classList.contains('gap-[var(--s5)]')).toBe(true);
+    expect(body.classList.contains('gap-[var(--s4)]')).toBe(false);
+    cleanup();
+
+    setup({ open: true });
+    body = document.querySelector('.ui-dialog__body')!;
+    expect(body.classList.contains('gap-[var(--s4)]')).toBe(true);
+    expect(body.classList.contains('gap-[var(--s5)]')).toBe(false);
+  });
+
+  /**
+   * The geometry move: the sheet's padding leaves the panel and lands on the slots, so a slot's
+   * rule — the header hairline — can reach the panel's edges.
+   */
+  it('moves the sheet padding from the panel to its slots', () => {
+    setup({ open: true, size: 'sheet' });
+    const panel = dialog();
+    const body = document.querySelector('.ui-dialog__body')!;
+
+    expect(panel.classList.contains('px-0')).toBe(true);
+    expect(
+      panel.classList.contains(
+        'p-[var(--s2)_var(--s4)_calc(var(--s6)+env(safe-area-inset-bottom))]',
+      ),
+    ).toBe(false);
+    expect(body.classList.contains('px-[var(--s4)]')).toBe(true);
+    expect(body.classList.contains('pb-[var(--s8)]')).toBe(true);
+    expect(document.querySelector('.ui-dialog__head')!.classList.contains('border-b')).toBe(true);
+  });
+
+  it('keeps the confirm inset on the panel, which has no header row to inset', () => {
+    setup({ open: true, size: 'sheet', dismiss: false });
+    const panel = dialog();
+
+    expect(panel.classList.contains('pt-[var(--s6)]')).toBe(true);
+    expect(panel.classList.contains('px-[var(--s5)]')).toBe(true);
+  });
+});
