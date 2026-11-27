@@ -97,7 +97,7 @@ jobs:
       - name: Prepare the bind-mount directories
         run: |
           set -euo pipefail
-          for service_dir in note-service tags-service todo-service meal-service focus-service idp; do
+          for service_dir in note-service tags-service todo-service meal-service focus-service meditation-service idp; do
             mkdir -p "apps/$service_dir/data"
           done
           # The checkout belongs to the runner user (not uid 1000), and Docker may have
