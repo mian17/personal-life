@@ -288,17 +288,17 @@ describe("the idle screen's Interval bells row", () => {
 
   it('keeps reading the saved bells while the draft is edited', () => {
     renderIdle();
-    expect(screen.getByText('Every 10 minutes')).toBeTruthy();
+    expect(screen.getByText('Every 10 min')).toBeTruthy();
 
     fireEvent.click(button(/^Interval bells/));
     fireEvent.click(button('Increase interval by one minute'));
 
     expect(screen.getByText('Every 20 min')).toBeTruthy();
-    expect(screen.getByText('Every 10 minutes')).toBeTruthy();
+    expect(screen.getByText('Every 10 min')).toBeTruthy();
 
     fireEvent.click(button('Cancel'));
 
-    expect(screen.getByText('Every 10 minutes')).toBeTruthy();
+    expect(screen.getByText('Every 10 min')).toBeTruthy();
     expect(screen.queryByText('Every 20 min')).toBeNull();
   });
 });
