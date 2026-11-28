@@ -130,6 +130,15 @@ const actionHeaderStyles = cx(
  */
 const sheetHeaderStyles = 'mt-[var(--s2)] px-[var(--s4)]';
 
+/**
+ * A sheet's header states its own inset; the confirm shape states none, because its panel is
+ * already inset. Every other size draws the shared `--s2`.
+ */
+function headerSlotStylesFor(size: DialogProps['size'], dismiss: boolean): string | undefined {
+  if (size !== 'sheet') return panelHeaderInset;
+  return dismiss ? sheetHeaderStyles : undefined;
+}
+
 const dialogTitle = cx(
   'ui-dialog__title',
   'm-0 text-[length:var(--fs-sheet-title)] leading-[var(--lh-sheet-title)]',
@@ -215,12 +224,7 @@ export function Dialog({
   // confirm shape keeps the panel's own inset, so a slot must not repeat it.
   const dismissibleSheet = size === 'sheet' && dismiss;
   const centredTitle = titleAlign === 'center';
-  // A sheet's header carries its own inset; the confirm shape has no header row to inset.
-  const headerSlotStyles = dismissibleSheet
-    ? sheetHeaderStyles
-    : size === 'sheet'
-      ? undefined
-      : panelHeaderInset;
+  const headerSlotStyles = headerSlotStylesFor(size, dismiss);
   // A dismissed surface has no header row for a trailing action to sit in, so that prop loses to
   // it; the title and its copy still render, because the title is what names the dialog.
   const trailing = dismiss
