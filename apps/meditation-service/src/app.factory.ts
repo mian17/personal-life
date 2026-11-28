@@ -1,8 +1,5 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { AuthGuard, ServiceLogger, resolveVerifierConfig } from '@life/service-kit';
+import type { INestApplication } from '@nestjs/common';
+import { createServiceApplication, resolveVerifierConfig } from '@life/service-kit';
 import { AppModule } from './app.module.js';
 import { resolveDatabasePath, VERIFIER_ENV } from './service-config.js';
 
@@ -12,17 +9,9 @@ import { resolveDatabasePath, VERIFIER_ENV } from './service-config.js';
  * directory exists before TypeORM opens the file.
  */
 export async function createApp(): Promise<INestApplication> {
-  createDatabaseDirectory();
   resolveVerifierConfig(VERIFIER_ENV);
-
-  const app = await NestFactory.create(AppModule, { logger: new ServiceLogger() });
-  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
-  );
-  return app;
-}
-
-function createDatabaseDirectory(): void {
-  mkdirSync(dirname(resolveDatabasePath()), { recursive: true });
+  return createServiceApplication(AppModule, {
+    sqlitePath: resolveDatabasePath(),
+    verifierEnv: VERIFIER_ENV,
+  });
 }

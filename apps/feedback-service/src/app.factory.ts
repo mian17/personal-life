@@ -1,7 +1,6 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
+import { createServiceApplication, resolveVerifierConfig } from '@life/service-kit';
 import { AppModule } from './app.module.js';
-import { AuthGuard, ServiceLogger, resolveVerifierConfig } from '@life/service-kit';
 import { VERIFIER_ENV } from './service-config.js';
 
 /**
@@ -12,10 +11,5 @@ import { VERIFIER_ENV } from './service-config.js';
  */
 export async function createApp(): Promise<INestApplication> {
   resolveVerifierConfig(VERIFIER_ENV);
-  const app = await NestFactory.create(AppModule, { logger: new ServiceLogger() });
-  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
-  );
-  return app;
+  return createServiceApplication(AppModule, { verifierEnv: VERIFIER_ENV });
 }

@@ -1,4 +1,10 @@
 import { jest } from '@jest/globals';
+import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AuthGuard, createServiceApplication } from '../src/index.js';
 import { SERVICE_LOG_LEVELS, ServiceLogger } from '../src/logging/service-logger.js';
 
 /** Collects everything the logger prints, so a test reads output instead of internals. */
@@ -48,5 +54,53 @@ describe('ServiceLogger (the shared service-kernel console level)', () => {
   it('forwards a log line from any other context', () => {
     expect(print(logger, 'log', 'NestFactory')).toContain('NestFactory speaking');
     expect(print(logger, 'log', 'NotesService')).toContain('NotesService speaking');
+  });
+});
+
+describe('createServiceApplication (the shared service kernel boot)', () => {
+  const verifierEnv = { jwksUrlEnv: 'TEST_IDP_JWKS_URL', audienceEnv: 'TEST_SERVICE_AUDIENCE' };
+  // One module class for the whole suite: NestFactory is spied, so its identity is
+  // the only thing the assertions read.
+  class TestModule {}
+
+  /** A stand-in for the Nest app, so the test sees the wiring calls and nothing else. */
+  function stubApp() {
+    return { useGlobalGuards: jest.fn(), useGlobalPipes: jest.fn() } as unknown as INestApplication;
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('applies the JWT guard and the whitelisting pipe every service shares', async () => {
+    const app = stubApp();
+    const create = jest.spyOn(NestFactory, 'create').mockResolvedValue(app as never);
+
+    await createServiceApplication(TestModule, { verifierEnv });
+
+    expect(create).toHaveBeenCalledWith(TestModule, { logger: expect.any(ServiceLogger) });
+    const [guard] = (app.useGlobalGuards as jest.Mock).mock.calls[0] as [AuthGuard];
+    expect(guard).toBeInstanceOf(AuthGuard);
+    const [pipe] = (app.useGlobalPipes as jest.Mock).mock.calls[0] as [ValidationPipe];
+    expect(pipe).toBeInstanceOf(ValidationPipe);
+    // Unknown fields are stripped when allowed and rejected outright when not, so a
+    // handler never reads a field its DTO did not declare.
+    expect(pipe.validatorOptions).toMatchObject({ whitelist: true, forbidNonWhitelisted: true });
+    expect(pipe.isTransformEnabled).toBe(true);
+  });
+
+  it('creates the SQLite directory before the module opens the file', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'service-kit-'));
+    const sqlitePath = join(root, 'data', 'test.db');
+    let directoryExistedAtCreate = false;
+    jest.spyOn(NestFactory, 'create').mockImplementation(async () => {
+      directoryExistedAtCreate = existsSync(join(root, 'data'));
+      return stubApp();
+    });
+
+    // The IdP's shape: a SQLite path and no verifier env, so no token guard at all.
+    const app = await createServiceApplication(TestModule, { sqlitePath });
+
+    expect(directoryExistedAtCreate).toBe(true);
+    expect(app.useGlobalGuards).not.toHaveBeenCalled();
+    rmSync(root, { recursive: true, force: true });
   });
 });

@@ -1,8 +1,6 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { AuthGuard, ServiceLogger, resolveVerifierConfig } from '@life/service-kit';
+import type { INestApplication } from '@nestjs/common';
+import { join } from 'node:path';
+import { createServiceApplication, resolveVerifierConfig } from '@life/service-kit';
 import { AppModule } from './app.module.js';
 import { VERIFIER_ENV } from './service-config.js';
 
@@ -13,14 +11,9 @@ import { VERIFIER_ENV } from './service-config.js';
  * enforced by `KeysModule`'s key factory.
  */
 export async function createApp(): Promise<INestApplication> {
-  mkdirSync(dirname(process.env.FOCUS_DB_PATH ?? join(process.cwd(), 'data', 'focus.db')), {
-    recursive: true,
-  });
   resolveVerifierConfig(VERIFIER_ENV);
-  const app = await NestFactory.create(AppModule, { logger: new ServiceLogger() });
-  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
-  );
-  return app;
+  return createServiceApplication(AppModule, {
+    sqlitePath: process.env.FOCUS_DB_PATH ?? join(process.cwd(), 'data', 'focus.db'),
+    verifierEnv: VERIFIER_ENV,
+  });
 }

@@ -1,9 +1,7 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import type { INestApplication } from '@nestjs/common';
+import { join } from 'node:path';
 import { json } from 'express';
-import { AuthGuard, ServiceLogger } from '@life/service-kit';
+import { createServiceApplication } from '@life/service-kit';
 import { AppModule } from './app.module.js';
 import { VERIFIER_ENV } from './service-config.js';
 
@@ -16,18 +14,17 @@ import { VERIFIER_ENV } from './service-config.js';
  */
 const JSON_BODY_LIMIT = '8mb';
 
+/**
+ * Build the application with the global kernel wiring, plus this service's own
+ * body parser: `bodyParser: false` keeps Nest's 100 kb default off, and the
+ * 8 MB JSON parser below replaces it so a meal photo fits.
+ */
 export async function createApp(): Promise<INestApplication> {
-  mkdirSync(dirname(process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db')), {
-    recursive: true,
-  });
-  const app = await NestFactory.create(AppModule, {
-    bodyParser: false,
-    logger: new ServiceLogger(),
+  const app = await createServiceApplication(AppModule, {
+    sqlitePath: process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db'),
+    verifierEnv: VERIFIER_ENV,
+    nestOptions: { bodyParser: false },
   });
   app.use(json({ limit: JSON_BODY_LIMIT }));
-  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
-  );
   return app;
 }
