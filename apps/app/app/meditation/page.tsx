@@ -1,5 +1,4 @@
 import { cookies } from 'next/headers';
-import { navActions } from '@life/app-kit';
 import { ListShell } from '@life/ui';
 import {
   fetchDayDone,
@@ -11,6 +10,7 @@ import { goalSubtitleLine } from '@/lib/meditation-clock';
 import { MEDITATION_LENGTH_KEY, parseStoredLength } from '@/lib/meditation-length';
 import { getToday } from '@/lib/today';
 import { saveIntervalBells } from './actions';
+import { MeditationNav } from './meditation-nav';
 import { SittingTimer } from './sitting-timer';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +47,7 @@ export default async function MeditationRoute() {
     <ListShell
       title="Meditation"
       subtitle={day === null ? undefined : goalSubtitleLine(day)}
-      navTrailing={navActions('meditation')}
+      navTrailing={<MeditationNav />}
       body={
         <SittingTimer
           plannedMinutes={settings.plannedMinutes}

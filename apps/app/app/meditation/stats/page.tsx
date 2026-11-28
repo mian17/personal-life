@@ -1,9 +1,10 @@
-import { filterHref, navActions } from '@life/app-kit';
+import { filterHref } from '@life/app-kit';
 import { BarChart, Card, Facts, FactsRow, Kpi, ListShell, Segmented, Stack } from '@life/ui';
 import { fetchSittingPage, type SittingRow } from '@/lib/meditation-api';
 import { minuteUnit } from '@/lib/meditation-clock';
 import { lensFor, type Lens, type LensSummary, type LensTotals } from '@/lib/meditation-stats';
 import { getToday } from '@/lib/today';
+import { MeditationNav } from '../meditation-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export default async function MeditationStatsRoute({
     <ListShell
       title="Stats"
       subtitle={windowLine(lens)}
-      navTrailing={navActions('meditation')}
+      navTrailing={<MeditationNav />}
       filters={<LensFilter lens={lens} />}
       body={<LensBody lens={lens} summary={summary} />}
     />
@@ -66,10 +67,16 @@ function LensFilter({ lens }: Readonly<{ lens: Lens }>) {
   );
 }
 
-/** The window's chart, then the numbers read beside it — both derived from the same bars. */
+/**
+ * The window's chart, then the numbers read beside it — both derived from the same bars.
+ *
+ * `ListShell` draws no step between its filter row and its body, so the stack opens on the section
+ * step itself; the sibling bodies that start on a `Section` get that step from the section's own
+ * top margin.
+ */
 function LensBody({ lens, summary }: Readonly<{ lens: Lens; summary: LensSummary }>) {
   return (
-    <Stack gap="lg">
+    <Stack gap="lg" className="mt-[var(--s6)]">
       <Card>
         <BarChart data={summary.bars} label={`Meditation minutes per ${barMeasure(lens)}`} />
       </Card>

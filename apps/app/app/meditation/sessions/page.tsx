@@ -1,4 +1,4 @@
-import { navActions, withQuery } from '@life/app-kit';
+import { withQuery } from '@life/app-kit';
 import {
   ButtonLink,
   EmptyState,
@@ -11,6 +11,7 @@ import {
 } from '@life/ui';
 import { fetchSittingPage, type SittingPage, type SittingRow } from '@/lib/meditation-api';
 import { minuteUnit } from '@/lib/meditation-clock';
+import { MeditationNav } from '../meditation-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,7 @@ export default async function SessionsRoute({
     <ListShell
       title="Sitting log"
       subtitle={sittingCountLine(page.total)}
-      navTrailing={navActions('meditation')}
+      navTrailing={<MeditationNav />}
       body={<SittingLog page={page} />}
     />
   );
