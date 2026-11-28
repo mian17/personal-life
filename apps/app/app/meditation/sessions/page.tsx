@@ -5,13 +5,12 @@ import {
   formatLongDate,
   List,
   ListItem,
-  ListShell,
+  ManagerBlock,
   Pill,
   Stack,
 } from '@life/ui';
 import { fetchSittingPage, type SittingPage, type SittingRow } from '@/lib/meditation-api';
 import { minuteUnit } from '@/lib/meditation-clock';
-import { MeditationNav } from '../meditation-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +32,13 @@ export default async function SessionsRoute({
   const page = await fetchSittingPage(cursor);
 
   return (
-    <ListShell
+    <ManagerBlock
       title="Sitting log"
-      subtitle={sittingCountLine(page.total)}
-      navTrailing={<MeditationNav />}
-      body={<SittingLog page={page} />}
-    />
+      backHref="/meditation/settings"
+      sub={sittingCountLine(page.total)}
+    >
+      <SittingLog page={page} />
+    </ManagerBlock>
   );
 }
 

@@ -18,6 +18,8 @@ export interface ManagerBlockProps {
    * sub-line the server computed. Omitted, the heading renders alone.
    */
   sub?: ReactNode;
+  /** Filter rows: `PillGroup` status pills and/or `TagFilterNav`, in render order. */
+  filters?: ReactNode;
   /** The manager surface: an app-composed `TagManager`/`ListManager` node. */
   children: ReactNode;
 }
@@ -27,6 +29,7 @@ export function ManagerBlock({
   backHref,
   backLabel = 'Back',
   sub,
+  filters,
   children,
 }: Readonly<ManagerBlockProps>): JSX.Element {
   return (
@@ -41,6 +44,7 @@ export function ManagerBlock({
 
       <PageTitle sub={sub}>{title}</PageTitle>
 
+      {filters}
       {children}
     </PageShell>
   );

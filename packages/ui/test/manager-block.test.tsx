@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { ManagerBlock } from '../src/components/manager-block';
 import { Card } from '../src/components/card';
 
+/** The shell's direct children, in render order, as tag names or test ids. */
+function mainChildren(): HTMLElement[] {
+  return Array.from(screen.getByRole('main').children) as HTMLElement[];
+}
+
 describe('ManagerBlock', () => {
   it('renders the title as the page heading', () => {
     render(
@@ -42,7 +47,9 @@ describe('ManagerBlock', () => {
       </ManagerBlock>,
     );
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Daily target');
-    expect(container.querySelector('.ui-page-title__sub')!.textContent).toBe('Computed on the server.');
+    expect(container.querySelector('.ui-page-title__sub')!.textContent).toBe(
+      'Computed on the server.',
+    );
     unmount();
 
     const bare = render(
@@ -51,6 +58,35 @@ describe('ManagerBlock', () => {
       </ManagerBlock>,
     );
     expect(bare.container.querySelector('.ui-page-title__sub')).toBeNull();
+  });
+
+  it('renders an optional filters slot between the heading and the children', () => {
+    render(
+      <ManagerBlock title="Stats" backHref="/meditation" filters={<span data-testid="filters" />}>
+        <span data-testid="panel" />
+      </ManagerBlock>,
+    );
+    // After the title, before the children: the slot's whole contract.
+    expect(mainChildren().map((node) => node.dataset.testid ?? node.tagName)).toEqual([
+      'NAV',
+      'H1',
+      'filters',
+      'panel',
+    ]);
+  });
+
+  it('renders no filters node at all when the prop is omitted', () => {
+    render(
+      <ManagerBlock title="Tags" backHref="/notes">
+        <span data-testid="panel" />
+      </ManagerBlock>,
+    );
+    // The frame alone: bar, heading, child — no empty wrapper where the slot would sit.
+    expect(mainChildren().map((node) => node.dataset.testid ?? node.tagName)).toEqual([
+      'NAV',
+      'H1',
+      'panel',
+    ]);
   });
 
   it('renders children inside the shell as-is, including a Card wrapper node', () => {
