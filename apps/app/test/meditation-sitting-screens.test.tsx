@@ -206,4 +206,16 @@ describe('a sitting driven end to end', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(button('Start')).toBeTruthy();
   });
+
+  it('sets the idle blocks on the section rhythm and the rows on their own nested one', () => {
+    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+
+    const setup = screen.getByRole('region', { name: 'Session setup' });
+    const [blocks] = Array.from(setup.children);
+    const rows = screen.getByText('Ending bell').closest('.ui-stack--md');
+
+    expect(blocks.classList.contains('ui-stack--lg')).toBe(true);
+    expect(rows).not.toBeNull();
+    expect(rows).not.toBe(blocks);
+  });
 });
