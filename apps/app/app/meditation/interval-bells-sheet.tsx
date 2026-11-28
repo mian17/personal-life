@@ -96,6 +96,7 @@ export function IntervalBellsSheet({
       }}
       size="sheet"
       title="Interval bells"
+      description="A bowl at a steady interval while you sit."
       footer={
         <Button disabled={onSave === undefined} onClick={() => void save()}>
           Save

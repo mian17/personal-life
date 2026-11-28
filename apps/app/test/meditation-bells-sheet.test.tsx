@@ -50,6 +50,7 @@ const field = (name: string) => screen.getByLabelText<HTMLInputElement>(name);
 const button = (name: string | RegExp) => screen.getByRole<HTMLButtonElement>('button', { name });
 const switchOf = () => screen.getByRole('switch', { name: 'Interval bells' });
 const summary = () => document.querySelector('.ui-caption')?.textContent;
+const description = () => document.querySelector('.ui-dialog__sub')?.textContent;
 
 afterEach(cleanup);
 
@@ -61,6 +62,7 @@ describe('the sheet', () => {
     expect(button('Close')).toBeTruthy();
     expect(button('Save')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Interval bells' })).toBeTruthy();
+    expect(description()).toBe('A bowl at a steady interval while you sit.');
     expect(document.querySelector('.ui-dialog__footer')!.contains(button('Save'))).toBe(true);
   });
 
