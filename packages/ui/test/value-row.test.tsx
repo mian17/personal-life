@@ -90,6 +90,23 @@ describe('ValueRow', () => {
     expect(row().tagName).toBe('DIV');
   });
 
+  /**
+   * A popup row has three children, and `justify-between` alone would float the read-out into the
+   * centre between the label and the chevron. The label takes the free space instead, so the value
+   * and the chevron are the row's last two children, at its end.
+   */
+  it('ends a popup row with its value and its chevron, the label taking the free space', () => {
+    render(<ValueRow label="Interval bells" value="Off" onClick={() => {}} popup="dialog" />);
+
+    const children = Array.from(row().children);
+    expect(children.map((child) => child.className.split(/\s+/).filter(Boolean)[0])).toEqual([
+      'ui-value-row__label',
+      'ui-value-row__value',
+      'ui-value-row__chevron',
+    ]);
+    expect(classesOf(children[0])).toContain('grow');
+  });
+
   it('selects one fill and one inset per tone', () => {
     const { unmount } = render(<ValueRow label="Duration" value="10 min" />);
     expect(classesOf(row())).toContain('bg-surface');
