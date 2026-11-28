@@ -98,6 +98,22 @@ describe('the running panel', () => {
     expect(countdown().textContent).toBe('9:00');
     expect(progress().getAttribute('aria-valuenow')).toBe('10');
   });
+
+  /**
+   * The panel is the centred `Stack`, named by the landmark above it: no layout class is stated
+   * here, and the centred mode is what puts the children on both axes.
+   */
+  it('lays the panel out as a centred Stack inside its named region', () => {
+    renderRunning();
+
+    const region = screen.getByRole('region', { name: 'Session in progress' });
+    const panel = region.querySelector('.ui-stack--centred');
+
+    expect(panel).not.toBeNull();
+    expect(region.className).toBe('');
+    expect(panel!.classList.contains('gap-[var(--s6)]')).toBe(true);
+    expect(panel!.classList.contains('py-[var(--s8)]')).toBe(true);
+  });
 });
 
 describe('the stop sheet', () => {
@@ -179,6 +195,18 @@ describe('the complete panel', () => {
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Session ended early');
     expect(figure().textContent).toBe('4 min');
     expect(screen.getByText('minutes sat')).toBeTruthy();
+  });
+
+  /** Its heading is the name, so the panel is the centred Stack itself and no landmark wraps it. */
+  it('lays the panel out as a centred Stack with no landmark around it', () => {
+    render(<CompleteSitting result={{ minutes: 10, completed: true }} onDone={jest.fn()} />);
+
+    const panel = screen.getByRole('heading', { level: 2 }).closest('.ui-stack--centred');
+
+    expect(panel).not.toBeNull();
+    expect(panel!.classList.contains('gap-[var(--s6)]')).toBe(true);
+    expect(panel!.classList.contains('py-[var(--s8)]')).toBe(true);
+    expect(screen.queryByRole('region')).toBeNull();
   });
 });
 

@@ -36,6 +36,9 @@ export interface RunningSittingProps {
  *
  * The countdown is the only live region, and it stays polite: the digits change at most once a
  * second, which is what the design's own timer asks for (`preview/index.html:96`).
+ *
+ * The name rides a bare `<section>`, because the landmark role is the section's alone; every
+ * visual rule inside it is the centred `Stack`'s, so this file holds no layout class.
  */
 export function RunningSitting({
   startedAtMs,
@@ -54,23 +57,22 @@ export function RunningSitting({
   useNaturalFinish(remaining, onFinish);
 
   return (
-    <section
-      aria-label="Session in progress"
-      className="flex flex-col items-center justify-center gap-[var(--s6)] py-[var(--s8)] text-center"
-    >
-      <Caption>{`Meditation · ${plannedMinutes} min`}</Caption>
-      <StatusText aria-live="polite" figure size="display">
-        {formatClock(remaining)}
-      </StatusText>
-      <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
-      <Button size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
-        Stop
-      </Button>
-      <StopConfirmSheet
-        open={confirmingStop}
-        onEnd={() => onEnd(elapsedSeconds)}
-        onOpenChange={setConfirmingStop}
-      />
+    <section aria-label="Session in progress">
+      <Stack centred gap="xl">
+        <Caption>{`Meditation · ${plannedMinutes} min`}</Caption>
+        <StatusText aria-live="polite" figure size="display">
+          {formatClock(remaining)}
+        </StatusText>
+        <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
+        <Button size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
+          Stop
+        </Button>
+        <StopConfirmSheet
+          open={confirmingStop}
+          onEnd={() => onEnd(elapsedSeconds)}
+          onOpenChange={setConfirmingStop}
+        />
+      </Stack>
     </section>
   );
 }

@@ -251,7 +251,6 @@ export function Dialog({
         />
         <DialogPrimitive.Content
           data-slot="dialog-content"
-          aria-describedby={undefined}
           onOpenAutoFocus={() => {
             openerRef.current = focusedElement();
           }}
@@ -272,7 +271,11 @@ export function Dialog({
               <DialogPrimitive.Title className={cx(dialogTitle, titleAlignStyles[titleAlign])}>
                 {title}
               </DialogPrimitive.Title>
-              {description != null && <p className={dialogDescription}>{description}</p>}
+              {description != null && (
+                <DialogPrimitive.Description className={dialogDescription}>
+                  {description}
+                </DialogPrimitive.Description>
+              )}
             </div>
             {trailing}
           </div>

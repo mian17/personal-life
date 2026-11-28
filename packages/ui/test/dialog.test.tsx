@@ -79,6 +79,27 @@ describe('Dialog', () => {
     expect(document.querySelector('.ui-dialog__sub')).toBeNull();
   });
 
+  /**
+   * The copy under the title is the panel's accessible description, not a decorative line: Radix
+   * only associates one when its own `Description` registers, which is why the atom renders that
+   * primitive inside the title block rather than a bare `<p>`.
+   */
+  it('reads the description line out as the panel’s accessible description', () => {
+    setup({ open: true, description: 'One thing.' });
+    const sub = screen.getByText('One thing.');
+
+    expect(dialog().getAttribute('aria-describedby')).toBe(sub.getAttribute('id'));
+    expect(screen.getByRole('dialog', { description: 'One thing.' })).toBe(dialog());
+  });
+
+  /** No copy, nothing to point at: an IDREF that names no element is worse than none at all. */
+  it('leaves aria-describedby off a panel that has no description', () => {
+    setup({ open: true });
+
+    expect(dialog().hasAttribute('aria-describedby')).toBe(false);
+    expect(screen.getByRole('dialog', { description: '' })).toBe(dialog());
+  });
+
   it('fires onOpenChange(false) from the Close icon button', () => {
     const { onOpenChange } = setup({ open: true });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
