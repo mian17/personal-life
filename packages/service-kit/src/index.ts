@@ -26,6 +26,7 @@ export {
 export { KeysModule, createMasterKey } from './keys/keys.module.js';
 export { KeysService, MASTER_KEY, type KeysOptions } from './keys/keys.service.js';
 export { UserKeys } from './keys/user-keys.entity.js';
+export { SERVICE_LOG_LEVELS, ServiceLogger } from './logging/service-logger.js';
 export { GrantsModule } from './grants/grants.module.js';
 export { GrantsService, type ReadGrant } from './grants/grants.service.js';
 export {
