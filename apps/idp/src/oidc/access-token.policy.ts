@@ -4,6 +4,13 @@ import type { ResourceServer } from 'oidc-provider';
 export const ACCESS_TOKEN_TTL_S = 600;
 
 /**
+ * ID-token lifetime: also 10 minutes. An ID token is presented in the same
+ * exchange as its access token, so it shares that token's lifetime rather than
+ * falling back to the library default.
+ */
+export const ID_TOKEN_TTL_S = 600;
+
+/**
  * Resource indicator used when a client does not send `resource` explicitly.
  * Resource indicators must be absolute URIs; the audience (`aud`) is resolved by
  * `audienceFor`. Configurable (`OIDC_DEFAULT_RESOURCE`) so `todo-service` can be
