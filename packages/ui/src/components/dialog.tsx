@@ -38,6 +38,13 @@ export interface DialogProps {
   titleAlign?: 'start' | 'center';
   /** The body's own rhythm; the design's sheet spaces its groups one step wider. */
   bodyGap?: 's4' | 's5';
+  /**
+   * A shared sheet's inset, which is the app's: `--s2` above the title and `--s4` at the sides.
+   * `design` gives a surface its own design's inset instead — the design's meditation sheet draws
+   * `--s2` inline and `--s4` in the body, with no inset above its header. Applies to a dismissible
+   * sheet only: the confirm shape insets its own panel. Default `'app'`.
+   */
+  sheetInset?: 'app' | 'design';
   className?: string;
 }
 
@@ -124,7 +131,7 @@ const dialogHeader = 'ui-dialog__head';
 
 /**
  * A centred or full panel insets its header from the panel's own `--s4`; a sheet gives the inset to
- * the panel, so its header opens on the panel's edge and the design's fields sit one step higher.
+ * the slots, so its own geometry lives in `sheetHeaderStyles`.
  */
 const panelHeaderInset = 'mt-[var(--s2)]';
 
@@ -137,8 +144,14 @@ const actionHeaderStyles = cx(
   'grid grid-cols-[1fr_auto_1fr] items-center gap-[var(--s2)]',
 );
 
-/** The sheet's own header hairline, drawn edge to edge because the panel no longer insets it. */
-const sheetHeaderStyles = 'px-[var(--s2)] border-b border-line';
+/**
+ * The sheet's own header inset and hairline. The hairline is a `border-b` on a full-width header
+ * with no inline padding on the panel, so it reaches both edges in either mode.
+ */
+const sheetHeaderStyles: Record<NonNullable<DialogProps['sheetInset']>, string> = {
+  app: 'pt-[var(--s2)] px-[var(--s4)] border-b border-line',
+  design: 'px-[var(--s2)] border-b border-line',
+};
 
 const dialogTitle = cx(
   'ui-dialog__title',
@@ -175,7 +188,7 @@ const dialogBody = 'ui-dialog__body flex flex-col mt-[var(--s4)]';
 /**
  * The sheet's body and footer insets. Only a dismissible sheet gives its padding to the slots: the
  * confirm shape keeps its own panel inset, and a slot that repeated it would inset the content
- * twice.
+ * twice. The body's top inset is `dialogBody`'s own `--s4` `mt`, which both sheet designs sit on.
  */
 const sheetBodyStyles = 'px-[var(--s4)] pb-[var(--s8)]';
 
@@ -218,6 +231,7 @@ export function Dialog({
   grab = true,
   titleAlign = 'start',
   bodyGap = 's4',
+  sheetInset = 'app',
   className,
 }: Readonly<DialogProps>) {
   // Radix would hand focus back to its own trigger, which a controlled surface never renders, so
@@ -236,7 +250,7 @@ export function Dialog({
   const centredTitle = titleAlign === 'center';
   // A sheet's header opens on the panel's edge; the centred and full panels inset their own.
   const headerInsetStyles = size === 'sheet' ? undefined : panelHeaderInset;
-  const headerSlotStyles = dismissibleSheet ? sheetHeaderStyles : headerInsetStyles;
+  const headerSlotStyles = dismissibleSheet ? sheetHeaderStyles[sheetInset] : headerInsetStyles;
   // A dismissed surface has no header row for a trailing action to sit in, so that prop loses to
   // it; the title and its copy still render, because the title is what names the dialog.
   const trailing = dismiss

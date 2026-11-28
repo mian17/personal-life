@@ -95,6 +95,7 @@ export function IntervalBellsSheet({
         if (!next) onClose();
       }}
       size="sheet"
+      sheetInset="design"
       bodyGap="s5"
       grab={false}
       title="Interval bells"

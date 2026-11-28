@@ -328,6 +328,71 @@ describe('Dialog — header slots, dismiss and body rhythm', () => {
   });
 });
 
+describe('Dialog — the sheet inset', () => {
+  /**
+   * A shared sheet's inset is the app's, not one app's design: `--s2` above the title, `--s4` at the
+   * sides, and the body `--s4` under the header with `--s8` below. That is what every sheet but
+   * meditation's renders, so every one of them is fixed by this default alone.
+   */
+  it("gives a default sheet the app's inset on its header and its body", () => {
+    setup({ open: true, size: 'sheet' });
+    const header = classesOf(document.querySelector('.ui-dialog__head')!);
+    const body = classesOf(document.querySelector('.ui-dialog__body')!);
+
+    expect(header).toContain('pt-[var(--s2)]');
+    expect(header).toContain('px-[var(--s4)]');
+    expect(body).toContain('mt-[var(--s4)]');
+    expect(body).toContain('px-[var(--s4)]');
+    expect(body).toContain('pb-[var(--s8)]');
+  });
+
+  /** The design's sheet is the one surface on its own inset: `--s2` inline, no inset above the title. */
+  it('gives a sheet on the design inset the design values instead', () => {
+    setup({ open: true, size: 'sheet', sheetInset: 'design' });
+    const header = classesOf(document.querySelector('.ui-dialog__head')!);
+    const body = classesOf(document.querySelector('.ui-dialog__body')!);
+
+    expect(header).toContain('px-[var(--s2)]');
+    expect(header).not.toContain('px-[var(--s4)]');
+    expect(header.some((utility) => utility.startsWith('pt-'))).toBe(false);
+    expect(body).toContain('px-[var(--s4)]');
+    expect(body).toContain('pb-[var(--s8)]');
+  });
+
+  /**
+   * The hairline is why the padding left the panel: the header draws `border-b` across the full panel
+   * width because the panel carries no inline padding, in either mode.
+   */
+  it('draws the header hairline across the panel in both modes', () => {
+    setup({ open: true, size: 'sheet' });
+    for (const mode of ['app', 'design'] as const) {
+      const panel = classesOf(dialog());
+      const header = classesOf(document.querySelector('.ui-dialog__head')!);
+
+      expect(panel).toContain('px-0');
+      expect(header).toContain('border-b');
+      expect(header).toContain('border-line');
+      cleanup();
+      setup({ open: true, size: 'sheet', sheetInset: mode });
+    }
+  });
+
+  /**
+   * The confirm shape has no header row to inset: it keeps `confirmPanelPadding`, so the prop must
+   * not reach it and neither must the hairline.
+   */
+  it('leaves the confirm shape on its own panel inset', () => {
+    setup({ open: true, size: 'sheet', dismiss: false, sheetInset: 'design' });
+    const panel = classesOf(dialog());
+    const header = classesOf(document.querySelector('.ui-dialog__head')!);
+
+    expect(panel).toContain('pt-[var(--s6)]');
+    expect(panel).toContain('px-[var(--s5)]');
+    expect(header).not.toContain('border-b');
+    expect(header.some((utility) => utility.startsWith('pt-'))).toBe(false);
+  });
+});
+
 describe('Dialog — the optional grab handle and title alignment', () => {
   /**
    * The handle is the shipped default for every sheet: the design's meditation sheet is the one
