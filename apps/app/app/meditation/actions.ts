@@ -61,15 +61,17 @@ interface RecordedSittingLog {
 }
 
 /**
- * The one line `next dev`'s console carries per recorded sitting — what Task 9's manual check
- * reads back, and the only place the minutes are visible before Task 10 adds the log screen.
+ * The one line a recorded sitting leaves — what Task 9's manual check reads back, and the only
+ * place the minutes are visible before Task 10 adds the log screen. It is `debug`, so it only
+ * prints when someone raises the console level; a production run keeps customer activity out of
+ * the log.
  *
  * The minutes are `cappedMinutes`, the same rule the stop dialog shows, so the log cannot
  * disagree with the number the sitter just confirmed. Logged after the write: this is the row
  * that landed, not the report that was sent.
  */
 function announceRecordedSitting({ day, minutes, outcome }: RecordedSittingLog): void {
-  console.log(`meditation: recorded ${minutes} ${minuteUnit(minutes)} (${outcome}) for ${day}`);
+  console.debug(`meditation: recorded ${minutes} ${minuteUnit(minutes)} (${outcome}) for ${day}`);
 }
 
 /**
