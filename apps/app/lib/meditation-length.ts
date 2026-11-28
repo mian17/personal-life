@@ -1,11 +1,15 @@
 /**
- * The length the sitter last started, remembered in this browser (`SPEC-meditation-app` §1).
+ * The length this browser last chose for a sitting (`SPEC-meditation-app` §1): the cookie that
+ * carries it back to the server, the step it moves by, and the browser's own write.
  *
- * A per-device preference belongs to the device: the settings row holds the plan a first visit
- * opens on, and this holds what this browser last chose. Every touch of storage is guarded —
- * private mode and a full quota throw, and neither may break the page or a running sitting.
+ * A per-device preference belongs to the device, and it has to be known before the first render:
+ * the settings row holds the plan a first visit opens on, a cookie holds what this browser last
+ * chose, so the server seeds the stepper with it instead of a reload correcting itself after
+ * paint. This module holds no request read, because the idle screen is a client component and
+ * imports it: the route reads the cookie, and only the browser writes it, here.
  */
 
+/** Cookie carrying this browser's last choice; written below, read by the meditation page. */
 export const MEDITATION_LENGTH_KEY = 'life.meditation.minutes';
 
 /**
@@ -14,29 +18,25 @@ export const MEDITATION_LENGTH_KEY = 'life.meditation.minutes';
  */
 export const MEDITATION_LENGTH_STEP = { floor: 1, ceiling: 1440, step: 1 } as const;
 
+/** A year, the lifetime the timezone cookie already uses. */
+const COOKIE_MAX_AGE_SECONDS = 31_536_000;
+
 /**
- * The remembered length, or `null` when this browser has nothing usable stored. Nothing is
- * clamped here: the stepper's own range is the caller's, and it applies it.
+ * The length a cookie value names, or `null` when it names nothing usable. Nothing is clamped
+ * here: the stepper's own range is the caller's, and it applies it.
  */
-export function readStoredLength(): number | null {
-  if (typeof window === 'undefined') return null;
+export function parseStoredLength(raw: string | null): number | null {
+  if (raw === null) return null;
 
-  try {
-    const stored = window.localStorage.getItem(MEDITATION_LENGTH_KEY);
-    if (stored === null) return null;
-
-    const minutes = Number(stored);
-    return Number.isInteger(minutes) && minutes > 0 ? minutes : null;
-  } catch {
-    return null;
-  }
+  const minutes = Number(raw);
+  return Number.isInteger(minutes) && minutes > 0 ? minutes : null;
 }
 
 /** Remember the length this browser starts next time; a browser that refuses simply forgets. */
 export function storeLength(minutes: number): void {
   try {
-    window.localStorage.setItem(MEDITATION_LENGTH_KEY, String(minutes));
+    document.cookie = `${MEDITATION_LENGTH_KEY}=${minutes};path=/;max-age=${COOKIE_MAX_AGE_SECONDS};samesite=lax`;
   } catch {
-    // Private mode or a full quota: the sitting is unaffected, and the next visit opens on the plan.
+    // Cookies refused: the sitting is unaffected, and the next visit opens on the plan.
   }
 }

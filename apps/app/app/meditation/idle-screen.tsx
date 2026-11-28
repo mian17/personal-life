@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button, Section, Stack, Stepper, ValueRow } from '@life/ui';
 import { minuteUnit, type BellChoice } from '@/lib/meditation-clock';
-import { MEDITATION_LENGTH_STEP, readStoredLength, storeLength } from '@/lib/meditation-length';
+import { MEDITATION_LENGTH_STEP, storeLength } from '@/lib/meditation-length';
 import { IntervalBellsSheet, type SaveBells } from './interval-bells-sheet';
 
 const SECONDS_PER_MINUTE = 60;
@@ -14,6 +14,11 @@ const INTERVAL_BELLS_SHEET_ID = 'interval-dialog';
 export interface IdleScreenProps {
   /** The settings' planned length: the first-visit default this browser has no memory to override. */
   plannedMinutes: number;
+  /**
+   * The length this browser last chose, read from its cookie before the render. It wins over the
+   * plan, which is only what a first visit opens on; `null` means this browser never chose.
+   */
+  rememberedMinutes?: number | null;
   bells: BellChoice;
   /** The chosen length, which becomes this sitting's `plannedMinutes`. */
   onStart: (minutes: number) => void;
@@ -29,21 +34,22 @@ export interface IdleScreenProps {
  * shape the sitting, and the start control.
  *
  * The stepper moves *this sitting's* length and nothing else: the plan a first visit opens on is
- * edited at `/meditation/settings`. Once this browser has started a sitting, its own memory wins
- * over that plan — the plan is only the first-visit default, and the stepper opens where this
- * browser last left off.
+ * edited at `/meditation/settings`. Once this browser has stepped a sitting, its own remembered
+ * length wins over that plan — the plan is only the first-visit default, and the stepper opens
+ * where this browser last left off, on the first frame, because the route read the cookie.
  *
  * The bells row's value is the saved bells, never the sheet's draft: the draft lives and dies
  * inside `IntervalBellsSheet`, so closing the sheet without Save leaves the row as it was.
  */
 export function IdleScreen({
   plannedMinutes,
+  rememberedMinutes = null,
   bells,
   onStart,
   onSaveBells,
 }: Readonly<IdleScreenProps>) {
-  // Read inside the initialiser, never at module scope: a server render has no storage to read.
-  const [minutes, setMinutes] = useState(() => clampMinutes(readStoredLength() ?? plannedMinutes));
+  // Seeded from the request, never from storage: the server render has to paint this same number.
+  const [minutes, setMinutes] = useState(() => clampMinutes(rememberedMinutes ?? plannedMinutes));
   const [bellsSheetOpen, setBellsSheetOpen] = useState(false);
 
   /** The sitting starts on the length on screen; every step already wrote it down. */
@@ -51,7 +57,7 @@ export function IdleScreen({
     onStart(minutes);
   }
 
-  /** One step of the stepper: clamp it, remember it, and show it — a refresh opens on it. */
+  /** One step of the stepper: clamp it, remember it in the cookie, and show it — a refresh opens on it. */
   function chooseLengthBy(step: number): void {
     const next = clampMinutes(minutes + step * MEDITATION_LENGTH_STEP.step);
     storeLength(next);

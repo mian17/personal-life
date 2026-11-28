@@ -40,6 +40,25 @@ const START_MS = 1_000_000;
 
 const PLANNED_MINUTES = 10;
 
+/** The timer as the route hands it in: a plan, and the length this browser chose when a case says so. */
+function renderTimer(rememberedMinutes: number | null = null) {
+  return render(
+    <SittingTimer
+      bells={BELLS_OFF}
+      plannedMinutes={PLANNED_MINUTES}
+      rememberedMinutes={rememberedMinutes}
+    />,
+  );
+}
+
+/** The length cookie as the browser kept it, so a step's write is read the way the server reads it. */
+function rememberedCookie(): string | null {
+  const entry = document.cookie
+    .split('; ')
+    .find((pair) => pair.startsWith(`${MEDITATION_LENGTH_KEY}=`));
+  return entry === undefined ? null : entry.slice(MEDITATION_LENGTH_KEY.length + 1);
+}
+
 const elapsed = 60_000;
 
 function renderRunning(overrides: Partial<RunningSittingProps> = {}) {
@@ -73,7 +92,7 @@ beforeEach(() => {
   jest.setSystemTime(START_MS);
   refresh.mockReset();
   recordKept.mockReset();
-  window.localStorage.clear();
+  document.cookie = `${MEDITATION_LENGTH_KEY}=;path=/;max-age=0`;
 });
 
 afterEach(() => {
@@ -214,7 +233,7 @@ describe('the complete panel', () => {
 
 describe('a sitting driven end to end', () => {
   it('records a stopped sitting as kept, completes it, and re-reads the day on Done', async () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     fireEvent.click(button('Start'));
     tick(elapsed);
@@ -238,52 +257,63 @@ describe('a sitting driven end to end', () => {
   });
 
   it('opens the stepper on the plan the first visit has no memory of', () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     expect(screen.getByText('10 min')).toBeTruthy();
   });
 
   it('opens the stepper where this browser last left off, the stored plan notwithstanding', () => {
-    window.localStorage.setItem(MEDITATION_LENGTH_KEY, '23');
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer(23);
 
     expect(screen.getByText('23 min')).toBeTruthy();
   });
 
+  /**
+   * The point of reading the cookie on the server: the first render already carries the remembered
+   * length, so no frame ever shows the plan and corrects itself.
+   */
+  it('shows the remembered length on its first render, with nothing in the browser to read', () => {
+    expect(rememberedCookie()).toBeNull();
+
+    renderTimer(21);
+
+    expect(screen.getByText('21 min')).toBeTruthy();
+    expect(button('Decrease duration by one minute')).toHaveProperty('disabled', false);
+  });
+
   it('opens on a remembered single minute, and on the floor when the memory is too small', () => {
-    window.localStorage.setItem(MEDITATION_LENGTH_KEY, '1');
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer(1);
 
     expect(screen.getByText('1 min')).toBeTruthy();
     expect(button('Decrease duration by one minute')).toHaveProperty('disabled', true);
   });
 
-  /** A refresh before Start must show the length last set, so a step writes itself down. */
+  /** A refresh before Start must show the length last set, so a step writes itself into the cookie. */
   it('remembers a stepped length the moment it changes, before any Start', () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     fireEvent.click(button('Increase duration by one minute'));
 
-    expect(window.localStorage.getItem(MEDITATION_LENGTH_KEY)).toBe('11');
+    expect(rememberedCookie()).toBe('11');
     expect(screen.getByText('11 min')).toBeTruthy();
   });
 
   it('remembers the length the sitter started in this browser, and starts the sitting', () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     fireEvent.click(button('Increase duration by one minute'));
     fireEvent.click(button('Start'));
 
-    expect(window.localStorage.getItem(MEDITATION_LENGTH_KEY)).toBe('11');
+    expect(rememberedCookie()).toBe('11');
     expect(countdown().textContent).toBe('11:00');
   });
 
   /** The sitting is the product; a browser that refuses to remember may not keep it from starting. */
   it('starts the sitting even when the browser refuses to remember the length', () => {
-    const refuse = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('quota exceeded');
+    const refuse = jest.spyOn(Document.prototype, 'cookie', 'set').mockImplementation(() => {
+      throw new Error('cookies refused');
     });
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     fireEvent.click(button('Start'));
 
@@ -294,7 +324,7 @@ describe('a sitting driven end to end', () => {
   });
 
   it('sets the idle blocks on the section rhythm and the rows on their own nested one', () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     const setup = screen.getByRole('region', { name: 'Session setup' });
     const [blocks] = Array.from(setup.children);
