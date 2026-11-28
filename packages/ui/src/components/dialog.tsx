@@ -102,10 +102,14 @@ function sheetPanelStyles(dismiss: boolean): string {
 /**
  * §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. It is a row of
  * its own, centred by `mx-auto`, costing the sheet its `--s2` and its `--s1` height.
+ *
+ * `shrink-0` because the panel scrolls: a flex child of a scrolling column gives up its height
+ * before the column overflows, so the handle collapses to 0px on any sheet taller than the
+ * viewport. It keeps its row rather than going `absolute`, which would lift the title.
  */
 const grabStyles = cx(
   'ui-dialog__grab',
-  'mt-[var(--s2)] mx-auto',
+  'shrink-0 mt-[var(--s2)] mx-auto',
   'w-[calc(var(--s8)+var(--s1))] h-[var(--s1)]',
   'rounded-[var(--r-pill)] bg-line-strong',
 );

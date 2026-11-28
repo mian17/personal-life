@@ -309,6 +309,23 @@ describe('Dialog — header slots, dismiss and body rhythm', () => {
   });
 
   /**
+   * The panel scrolls, and a flex child of a scrolling column shrinks before the column
+   * overflows: without `shrink-0` the 4px handle is laid out and compressed to `height: 0`, so a
+   * long sheet draws no affordance at all. The confirm shape has no handle to keep.
+   */
+  it('keeps the grab handle drawn when the sheet panel scrolls', () => {
+    setup({ open: true, size: 'sheet' });
+    const classes = classesOf(document.querySelector('.ui-dialog__grab')!);
+
+    expect(classes).toContain('h-[var(--s1)]');
+    expect(classes).toContain('shrink-0');
+
+    cleanup();
+    setup({ open: true, size: 'sheet', dismiss: false });
+    expect(document.querySelector('.ui-dialog__grab')).toBeNull();
+  });
+
+  /**
    * Every panel insets its header by `--s2`, so a sheet's title starts one grab-row-height below a
    * centred dialog's, and the sheet header draws no hairline.
    */
