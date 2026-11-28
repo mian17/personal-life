@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { KeysService } from '@life/service-kit';
 import { MEDITATION_CACHE, type MeditationCache } from '../cache/meditation-cache.js';
-import { clampGoal } from './goal.js';
+import { clampGoal, clampPlannedMinutes } from './goal.js';
 import { Settings } from './settings.entity.js';
 import { DEFAULT_SETTINGS, type SettingsContent, type SettingsDto } from './settings.dto.js';
 
@@ -88,14 +88,14 @@ export class SettingsService {
 }
 
 /**
- * The settings exactly as they will be stored: the goal clamped to the 15-minute
- * grid, the planned length clamped the same way and defaulting to the goal.
+ * The settings exactly as they will be stored: the goal on its fifteen-minute grid, the
+ * planned length on its own five-minute one and defaulting to the goal.
  */
 function clampedSettings(dto: SettingsDto): SettingsContent {
   const goalMinutes = clampGoal(dto.goalMinutes);
   return {
     goalMinutes,
-    plannedMinutes: clampGoal(dto.plannedMinutes ?? goalMinutes),
+    plannedMinutes: clampPlannedMinutes(dto.plannedMinutes ?? goalMinutes),
     bells: { ...dto.bells },
   };
 }

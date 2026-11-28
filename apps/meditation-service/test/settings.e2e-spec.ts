@@ -164,7 +164,7 @@ describe('Settings (e2e)', () => {
     });
     const tooLong = await putSettings(ownerToken, {
       goalMinutes: 30,
-      bells: { ...BELLS_OFF, intervalSec: 10_800 },
+      bells: { ...BELLS_OFF, intervalSec: 1450 * 60 },
     });
 
     expect([tooShort.status, tooLong.status]).toEqual([400, 400]);

@@ -13,14 +13,14 @@ import { DEFAULT_GOAL_MINUTES } from './goal.js';
 
 /**
  * The interval-bell bounds (`SPEC-meditation-app` §1): a start offset anywhere in a
- * day, an interval of 10 minutes to 2 hours in ten-minute steps, and 1–6 rings or
+ * day, an interval of 10 minutes to a day in ten-minute steps, and 1–6 rings or
  * `null` for ring-until-the-sitting-ends. An out-of-bounds bell is refused (400)
  * rather than clamped — unlike the goal, a bell that cannot exist is a caller's bug,
  * not a preference.
  */
 export const OFFSET_MAX_SEC = 23 * 60 * 60 + 59 * 60 + 59;
 export const INTERVAL_MIN_SEC = 10 * 60;
-export const INTERVAL_MAX_SEC = 120 * 60;
+export const INTERVAL_MAX_SEC = 1440 * 60;
 export const INTERVAL_STEP_SEC = 10 * 60;
 export const BELL_REPEAT_MIN = 1;
 export const BELL_REPEAT_MAX = 6;
@@ -58,7 +58,7 @@ export class BellsDto {
   @Max(OFFSET_MAX_SEC)
   offsetSec: number;
 
-  /** Seconds between bowls: 10–120 minutes, whole ten-minute steps. */
+  /** Seconds between bowls: 10 minutes to a day, whole ten-minute steps. */
   @IsInt()
   @Min(INTERVAL_MIN_SEC)
   @Max(INTERVAL_MAX_SEC)
@@ -78,9 +78,9 @@ export class BellsDto {
  * `ownerSub` is deliberately absent, so the global `forbidNonWhitelisted` pipe rejects
  * a body carrying it: ownership comes from `@Principal()` only.
  *
- * Both minutes fields accept any non-negative whole number and let `clampGoal` place
- * the value on the 15-minute grid, so 7 is stored as 15 and 495 as 480 instead of
- * being refused. A negative length is the one thing that cannot mean anything.
+ * Both minutes fields accept any non-negative whole number and are clamped into
+ * range on the way in, so 7 is stored as 15 and 495 as 480 instead of being refused.
+ * A negative length is the one thing that cannot mean anything.
  */
 export class SettingsDto {
   @IsInt()
