@@ -25,11 +25,13 @@ jest.mock('next/navigation', () => ({
 jest.mock('../app/meditation/actions', () => ({
   recordFinishedSitting: jest.fn(),
   recordKeptSitting: jest.fn(),
+  rememberSittingLength: jest.fn(),
 }));
 
-import { recordKeptSitting } from '../app/meditation/actions';
+import { recordKeptSitting, rememberSittingLength } from '../app/meditation/actions';
 
 const recordKept = recordKeptSitting as jest.Mock;
+const rememberLength = rememberSittingLength as jest.Mock;
 
 /** The bells off: this screen's cases are about the clock, not the bowls. */
 const BELLS_OFF: BellChoice = { enabled: false, offsetSec: 0, intervalSec: 600, repeat: null };
@@ -72,6 +74,8 @@ beforeEach(() => {
   jest.setSystemTime(START_MS);
   refresh.mockReset();
   recordKept.mockReset();
+  rememberLength.mockReset();
+  rememberLength.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -233,6 +237,29 @@ describe('a sitting driven end to end', () => {
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(button('Start')).toBeTruthy();
+  });
+
+  it('starts a sitting and remembers its length, without waiting for the write', () => {
+    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+
+    fireEvent.click(button('Start'));
+
+    expect(rememberLength).toHaveBeenCalledWith(PLANNED_MINUTES);
+    expect(countdown().textContent).toBe('10:00');
+  });
+
+  /** The sitting is the product; a failed write may not keep it from starting. */
+  it('starts the sitting even when remembering the length rejects', async () => {
+    rememberLength.mockRejectedValue(new Error('service unreachable'));
+    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+
+    fireEvent.click(button('Start'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(countdown().textContent).toBe('10:00');
+    expect(button('Stop')).toBeTruthy();
   });
 
   it('sets the idle blocks on the section rhythm and the rows on their own nested one', () => {

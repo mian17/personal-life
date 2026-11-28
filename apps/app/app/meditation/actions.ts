@@ -87,3 +87,13 @@ export async function saveIntervalBells(bells: BellChoice): Promise<void> {
   await saveSettings({ ...settings, bells });
   revalidatePath('/meditation');
 }
+
+/**
+ * The length the sitter last chose, stored as the next sitting's default. Reading first is what
+ * keeps this write to the field it owns: the goal and the bells go back exactly as they came.
+ */
+export async function rememberSittingLength(minutes: number): Promise<void> {
+  const settings = await fetchSettings();
+  await saveSettings({ ...settings, plannedMinutes: minutes });
+  revalidatePath('/meditation');
+}

@@ -3,7 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cappedMinutes, type BellChoice } from '@/lib/meditation-clock';
-import { recordFinishedSitting, recordKeptSitting, type SittingReport } from './actions';
+import {
+  recordFinishedSitting,
+  recordKeptSitting,
+  rememberSittingLength,
+  type SittingReport,
+} from './actions';
 import { CompleteSitting, type SittingResult } from './complete-sitting';
 import { IdleScreen } from './idle-screen';
 import type { SaveBells } from './interval-bells-sheet';
@@ -45,6 +50,11 @@ export function SittingTimer({ plannedMinutes, bells, onSaveBells }: Readonly<Si
   function startSitting(minutes: number): void {
     setResult(null);
     setSitting({ startedAtMs: Date.now(), plannedMinutes: minutes });
+    // Fire and forget: the sitting is the product, the remembered default is a convenience, so a
+    // failed or slow write may neither hold the countdown up nor cancel it. Nothing is shown either
+    // way — the stepper already holds the length the sitter chose, and it is the next visit that
+    // reads the write back.
+    void rememberSittingLength(minutes).catch(() => undefined);
   }
 
   async function finishSitting(): Promise<void> {
