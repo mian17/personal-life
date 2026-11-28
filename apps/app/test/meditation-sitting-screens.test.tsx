@@ -258,6 +258,16 @@ describe('a sitting driven end to end', () => {
     expect(button('Decrease duration by one minute')).toHaveProperty('disabled', true);
   });
 
+  /** A refresh before Start must show the length last set, so a step writes itself down. */
+  it('remembers a stepped length the moment it changes, before any Start', () => {
+    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+
+    fireEvent.click(button('Increase duration by one minute'));
+
+    expect(window.localStorage.getItem(MEDITATION_LENGTH_KEY)).toBe('11');
+    expect(screen.getByText('11 min')).toBeTruthy();
+  });
+
   it('remembers the length the sitter started in this browser, and starts the sitting', () => {
     render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
 

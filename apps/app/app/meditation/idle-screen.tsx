@@ -46,10 +46,16 @@ export function IdleScreen({
   const [minutes, setMinutes] = useState(() => clampMinutes(readStoredLength() ?? plannedMinutes));
   const [bellsSheetOpen, setBellsSheetOpen] = useState(false);
 
-  /** The chosen length is remembered before it is handed up, so the next visit opens on it. */
+  /** The sitting starts on the length on screen; every step already wrote it down. */
   function startSitting(): void {
-    storeLength(minutes);
     onStart(minutes);
+  }
+
+  /** One step of the stepper: clamp it, remember it, and show it — a refresh opens on it. */
+  function chooseLengthBy(step: number): void {
+    const next = clampMinutes(minutes + step * MEDITATION_LENGTH_STEP.step);
+    storeLength(next);
+    setMinutes(next);
   }
 
   return (
@@ -60,12 +66,8 @@ export function IdleScreen({
         readout={{ kind: 'text', value: String(minutes), unit: minuteUnit(minutes) }}
         decreaseLabel="Decrease duration by one minute"
         increaseLabel="Increase duration by one minute"
-        onDecrease={() =>
-          setMinutes((current) => clampMinutes(current - MEDITATION_LENGTH_STEP.step))
-        }
-        onIncrease={() =>
-          setMinutes((current) => clampMinutes(current + MEDITATION_LENGTH_STEP.step))
-        }
+        onDecrease={() => chooseLengthBy(-1)}
+        onIncrease={() => chooseLengthBy(1)}
         decreaseDisabled={minutes === MEDITATION_LENGTH_STEP.floor}
         increaseDisabled={minutes === MEDITATION_LENGTH_STEP.ceiling}
       />
