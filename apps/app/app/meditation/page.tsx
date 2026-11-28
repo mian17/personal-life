@@ -1,4 +1,4 @@
-import { navActions } from '@life/app-kit';
+import { cookies } from 'next/headers';
 import { ListShell } from '@life/ui';
 import {
   fetchDayDone,
@@ -7,8 +7,10 @@ import {
   type SettingsRow,
 } from '@/lib/meditation-api';
 import { goalSubtitleLine } from '@/lib/meditation-clock';
+import { MEDITATION_LENGTH_KEY, parseStoredLength } from '@/lib/meditation-length';
 import { getToday } from '@/lib/today';
 import { saveIntervalBells } from './actions';
+import { MeditationNav } from './meditation-nav';
 import { SittingTimer } from './sitting-timer';
 
 export const dynamic = 'force-dynamic';
@@ -31,26 +33,43 @@ const FALLBACK_SETTINGS: SettingsRow = {
  * The day is the client's own local day, resolved by the shared `getToday()` owner. The daily goal
  * lives in the subtitle alone, and only as `GET /sessions/days` reported it: a failed read leaves
  * the line off rather than inventing minutes for it.
+ *
+ * The stepper's length is read here rather than in the browser, so the first paint already shows
+ * the length this browser chose instead of the plan it then corrects away from.
  */
 export default async function MeditationRoute() {
   const today = await getToday();
   const settings = await readSettings();
+  const rememberedMinutes = await readRememberedLength();
   const day = await readDay(today);
 
   return (
     <ListShell
       title="Meditation"
       subtitle={day === null ? undefined : goalSubtitleLine(day)}
-      navTrailing={navActions('meditation')}
+      navTrailing={<MeditationNav />}
       body={
         <SittingTimer
           plannedMinutes={settings.plannedMinutes}
+          rememberedMinutes={rememberedMinutes}
           bells={settings.bells}
           onSaveBells={saveIntervalBells}
         />
       }
     />
   );
+}
+
+/**
+ * The length this browser last chose, or `null` when it chose none: outside a request scope the
+ * cookie read rejects, and that is the same answer as never having chosen.
+ */
+async function readRememberedLength(): Promise<number | null> {
+  try {
+    return parseStoredLength((await cookies()).get(MEDITATION_LENGTH_KEY)?.value ?? null);
+  } catch {
+    return null;
+  }
 }
 
 /** The owner's settings, or the service's own defaults when the service cannot answer. */

@@ -7,17 +7,18 @@ jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }))
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { SettingsBlock, SettingsShell } from '@life/ui';
+import { SettingsBlock, SettingsRow as SettingsRowItem, SettingsShell } from '@life/ui';
 import { submitFeedbackAction } from '@/app/feedback-actions';
 import { fetchSettings, saveSettings, type SettingsRow } from '@/lib/meditation-api';
 import MeditationSettingsPage from '@/app/meditation/settings/page';
 import { DailyGoalForm } from '@/app/meditation/settings/daily-goal-form';
 
 /**
- * `/meditation/settings` is the shared `SettingsShell` plus the one group the app owns: the daily
- * goal. The shell draws Appearance, Comfort and Support, so the page's own markup is a form around
- * a single `SettingsBlock` — no bells group and no sitting-length control, because the idle screen's
- * stepper and `/meditation`'s bells sheet own those two values now.
+ * `/meditation/settings` is the shared `SettingsShell` plus the two groups the app owns: the daily
+ * goal, and the sitting log's way in. The shell draws Appearance, Comfort and Support, so the page's
+ * own markup is a form around the goal's `SettingsBlock` and a second block holding one route row —
+ * no bells group and no sitting-length control, because the idle screen's stepper and
+ * `/meditation`'s bells sheet own those two values now.
  */
 
 const mockedFetchSettings = fetchSettings as jest.MockedFunction<typeof fetchSettings>;
@@ -67,21 +68,20 @@ function goalBlock(page: any): any {
   return childList(goalForm(page))[0];
 }
 
-/** The `<select>` a name addresses, as markup, so its options can be read. */
-function selectMarkup(html: string, name: string): string {
-  return new RegExp(`<select[^>]*name="${name}"[^>]*>(.*?)</select>`, 's').exec(html)?.[1] ?? '';
+/** The `<input>` a name addresses, as markup, so its attributes can be read. */
+function inputMarkup(html: string, name: string): string {
+  return new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? '';
 }
 
-/** The values one named select offers, in the order it offers them. */
-function offeredValues(html: string, name: string): string[] {
-  return [...selectMarkup(html, name).matchAll(/<option value="([^"]*)"/g)].map(([, v]) => v);
+/** The value the browser opens a named input on. */
+function inputValue(html: string, name: string): string | undefined {
+  return /value="([^"]*)"/.exec(inputMarkup(html, name))?.[1];
 }
 
-/** The value the browser opens the named select on. */
-function chosenValue(html: string, name: string): string | undefined {
-  return [...selectMarkup(html, name).matchAll(/<option[^>]*value="([^"]*)"[^>]*selected/g)].map(
-    ([, v]) => v,
-  )[0];
+/** The number of minutes one attribute of a named input holds, or `undefined` when absent. */
+function inputNumber(html: string, name: string, attribute: string): number | undefined {
+  const found = new RegExp(`${attribute}="([^"]*)"`).exec(inputMarkup(html, name))?.[1];
+  return found === undefined ? undefined : Number(found);
 }
 
 /** The `FormData` the browser would post for a one-field form. */
@@ -109,16 +109,27 @@ describe('/meditation/settings through the shared shell', () => {
     expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('adds exactly one app group: a Daily goal block, and no second block beside it', async () => {
+  it('adds two app groups: the Daily goal block, then the sitting log row beside it', async () => {
     const page = await renderPageElement();
 
-    expect(childList(page)).toHaveLength(1);
+    expect(childList(page)).toHaveLength(2);
     const block = goalBlock(page);
     expect(block.type).toBe(SettingsBlock);
     expect(block.props.title).toBe('Meditation');
     const rows = childList(block);
     expect(rows).toHaveLength(1);
     expect(rows[0].props.label).toBe('Daily goal');
+  });
+
+  it('reaches the sitting log from a route row, not from the toolbar', async () => {
+    const page = await renderPageElement();
+
+    const [logGroup] = childList(page).slice(1);
+    expect(logGroup.type).toBe(SettingsBlock);
+    const [logRow] = childList(logGroup);
+    expect(logRow.type).toBe(SettingsRowItem);
+    expect(logRow.props.label).toBe('Sitting log');
+    expect(logRow.props.href).toBe('/meditation/sessions');
   });
 
   it('leaves Appearance, Comfort and Support to the shell', async () => {
@@ -133,17 +144,14 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).toContain('Personal Life · prototype');
   });
 
-  it('offers the goal only on the fifteen-minute grid from 15 to 480', async () => {
-    const values = offeredValues(await renderPage(), 'goalMinutes');
+  it('takes the goal as a typed whole minute from 15 to 480', async () => {
+    const html = await renderPage();
+    const field = inputMarkup(html, 'goalMinutes');
 
-    expect(values).toHaveLength(32);
-    expect(values[0]).toBe('15');
-    expect(values[1]).toBe('30');
-    expect(values[values.length - 1]).toBe('480');
-    // Fifteens on purpose: a five-minute minimum stepped by fifteen would offer 5, 20, 35.
-    expect(values).not.toContain('5');
-    expect(values).not.toContain('20');
-    expect(values.every((value) => Number(value) % 15 === 0)).toBe(true);
+    expect(field).toContain('type="number"');
+    expect(inputNumber(html, 'goalMinutes', 'min')).toBe(15);
+    expect(inputNumber(html, 'goalMinutes', 'max')).toBe(480);
+    expect(inputNumber(html, 'goalMinutes', 'step')).toBe(1);
   });
 
   it('names the goal control and opens it on the stored minutes', async () => {
@@ -152,7 +160,7 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).toContain('name="goalMinutes"');
     expect(html).toContain('aria-label="Daily goal"');
     expect(html).toContain('Save goal');
-    expect(chosenValue(html, 'goalMinutes')).toBe('30');
+    expect(inputValue(html, 'goalMinutes')).toBe('30');
   });
 
   it('carries no bells control and no sitting-length control on the route', async () => {
@@ -164,8 +172,8 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).not.toContain('Rings');
     expect(html).not.toContain('Sitting length');
     expect(html).not.toMatch(/name="(plannedMinutes|offsetSec|intervalSec|repeat|bellsEnabled)"/);
-    // The goal is the screen's only control, so it is its only select.
-    expect(html.match(/<select/g)).toHaveLength(1);
+    // The goal is a typed field now, so the route draws no select at all.
+    expect(html).not.toContain('<select');
   });
 
   it('saves the goal over the row the service holds, sending plannedMinutes and bells back unchanged', async () => {
@@ -183,6 +191,25 @@ describe('/meditation/settings through the shared shell', () => {
       bells: STORED.bells,
     });
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/meditation/settings');
+  });
+
+  it('sends the typed minutes as typed, not as the fifteen they sit nearest', async () => {
+    const page = await renderPageElement();
+
+    await goalForm(page).props.action(formData({ goalMinutes: '23' }));
+
+    expect(mockedSaveSettings).toHaveBeenCalledWith({ ...STORED, goalMinutes: 23 });
+  });
+
+  it('refuses an empty or out-of-range field instead of writing it', async () => {
+    const page = await renderPageElement();
+
+    await goalForm(page).props.action(formData({ goalMinutes: '' }));
+    await goalForm(page).props.action(formData({ goalMinutes: '501' }));
+
+    expect(mockedSaveSettings).not.toHaveBeenCalled();
+    expect(mockedRedirect).toHaveBeenCalledTimes(2);
+    expect(mockedRedirect).toHaveBeenCalledWith('/meditation/settings?error=save');
   });
 
   it('sends a refused write back to the page flagged instead of reporting a save', async () => {

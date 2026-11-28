@@ -41,8 +41,13 @@ const interactiveStyles = cx(
   'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
 );
 
+/**
+ * The label takes the row's free space, so the read-out and the chevron stay at the row's end:
+ * `justify-between` alone would float a middle child (the value of a popup row) into the centre.
+ */
 const labelStyles = cx(
   'ui-value-row__label',
+  'grow',
   'text-ink text-[length:var(--fs-row-title)] leading-[var(--lh-row-title)] tracking-[var(--tracking-row-title)]',
 );
 

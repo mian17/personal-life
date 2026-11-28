@@ -6,10 +6,11 @@ function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean).sort();
 }
 
-const GAP_UTILITY: Record<StackGap, string> = {
+const GAP_UTILITY: Record<StackGap | 'xl', string> = {
   sm: 'gap-[var(--s1)]',
   md: 'gap-[var(--s2)]',
   lg: 'gap-[var(--s4)]',
+  xl: 'gap-[var(--s6)]',
 };
 
 const ALIGN_UTILITY: Record<Exclude<StackAlign, 'start'>, string> = {
@@ -32,10 +33,11 @@ describe('Stack', () => {
     expect(stack.contains(screen.getByTestId('b'))).toBe(true);
   });
 
-  it.each<[StackGap, string]>([
+  it.each<[StackGap | 'xl', string]>([
     ['sm', '--s1'],
     ['md', '--s2'],
     ['lg', '--s4'],
+    ['xl', '--s6'],
   ])('maps gap="%s" to the %s token utility', (gap, token) => {
     render(<Stack gap={gap}>x</Stack>);
     const stack = document.querySelector('.ui-stack')!;
@@ -104,5 +106,48 @@ describe('Stack', () => {
     render(<Stack ref={ref}>x</Stack>);
     expect(ref.current).toBe(document.querySelector('.ui-stack'));
     expect(ref.current?.tagName).toBe('DIV');
+  });
+});
+
+/**
+ * A centred screen (`ui-stack--centred`): the two meditation panels. It centres on both axes, so
+ * the display model has to change — a grid centres inline only — and it draws the screen's own
+ * `--s8` inset. Every value is a token; the mode adds nothing else.
+ */
+describe('Stack — a centred screen', () => {
+  it('centres its children on both axes and insets the screen at --s8', () => {
+    render(
+      <Stack centred gap="xl">
+        x
+      </Stack>,
+    );
+    const stack = document.querySelector('.ui-stack')!;
+    const classes = classesOf(stack);
+
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'ui-stack--centred',
+        'flex',
+        'flex-col',
+        'items-center',
+        'justify-center',
+        'text-center',
+        'py-[var(--s8)]',
+        'gap-[var(--s6)]',
+      ]),
+    );
+  });
+
+  /** The display model is the point: a grid has no block-axis centring, so centred drops it. */
+  it('drops the grid class that a default stack keeps', () => {
+    render(<Stack centred>x</Stack>);
+    expect(classesOf(document.querySelector('.ui-stack')!)).not.toContain('grid');
+  });
+
+  it('renders a default stack exactly as before: grid, gap, no centred hook', () => {
+    render(<Stack>x</Stack>);
+    const classes = classesOf(document.querySelector('.ui-stack')!);
+
+    expect(classes).toEqual(['gap-[var(--s2)]', 'grid', 'ui-stack', 'ui-stack--md']);
   });
 });

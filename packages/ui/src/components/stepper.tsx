@@ -1,5 +1,8 @@
+'use client';
+
 import { cx } from '../lib/cx';
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 
 export type StepperTone = 'card' | 'row' | 'bare';
 
@@ -22,6 +25,86 @@ export interface StepperProps {
   /** At the end of the range the button is inert, so it is also disabled. */
   decreaseDisabled?: boolean;
   increaseDisabled?: boolean;
+}
+
+/**
+ * How long a press must be held before it repeats: the ~450 ms the platforms give a long press, so a
+ * deliberate hold starts repeating without a tap that lingered a moment running away from you.
+ */
+const STEPPER_REPEAT_DELAY_MS = 450;
+
+/** The repeat rate once it starts: 80 ms is fast enough to cross a range, slow enough to stop on. */
+const STEPPER_REPEAT_INTERVAL_MS = 80;
+
+/** The handlers a ± button needs to step on press, keep stepping while held, and stop on release. */
+interface PressHandlers {
+  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: () => void;
+  onPointerCancel: () => void;
+  onPointerLeave: () => void;
+  onBlur: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+}
+
+/**
+ * Steps on press and repeats while the pointer stays down. A press counts on `pointerdown` alone: the
+ * click a pointer press emits carries a non-zero `detail`, so it is dropped, while the zero-detail
+ * click a keyboard or assistive activation emits still steps — once, since a held key already
+ * repeats on its own and a timer of ours would multiply it.
+ */
+function useRepeatingPress(onStep: () => void, disabled: boolean): PressHandlers {
+  const holding = useRef(false);
+  const latestOnStep = useRef(onStep);
+  const repeatDelay = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const repeatInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  // A repeat outlives the render it began in, and a caller may read its own value from that render,
+  // so every tick goes through the handler of the latest one.
+  useEffect(() => {
+    latestOnStep.current = onStep;
+  });
+
+  const stop = useCallback(() => {
+    holding.current = false;
+    clearTimeout(repeatDelay.current);
+    clearInterval(repeatInterval.current);
+    repeatDelay.current = undefined;
+    repeatInterval.current = undefined;
+  }, []);
+
+  const step = useCallback(() => {
+    if (!disabled) latestOnStep.current();
+  }, [disabled]);
+
+  const start = useCallback(() => {
+    if (disabled || holding.current) return;
+    holding.current = true;
+    step();
+    repeatDelay.current = setTimeout(() => {
+      repeatInterval.current = setInterval(step, STEPPER_REPEAT_INTERVAL_MS);
+    }, STEPPER_REPEAT_DELAY_MS);
+  }, [disabled, step]);
+
+  useEffect(() => stop, [stop]);
+
+  useEffect(() => {
+    if (disabled) stop();
+  }, [disabled, stop]);
+
+  return {
+    onPointerDown: (event) => {
+      if (event.button > 0) return;
+      start();
+    },
+    onPointerUp: stop,
+    onPointerCancel: stop,
+    onPointerLeave: stop,
+    onBlur: stop,
+    onClick: (event) => {
+      if (event.detail > 0) return;
+      step();
+    },
+  };
 }
 
 /** The one row all three tones draw; a tone adds the fill, the radius and its own gaps. */
@@ -96,6 +179,9 @@ export function Stepper({
   decreaseDisabled = false,
   increaseDisabled = false,
 }: Readonly<StepperProps>) {
+  const decreasePress = useRepeatingPress(onDecrease, decreaseDisabled);
+  const increasePress = useRepeatingPress(onIncrease, increaseDisabled);
+
   return (
     <div
       className={cx(
@@ -110,7 +196,7 @@ export function Stepper({
         aria-label={decreaseLabel}
         className={cx('ui-stepper__button', 'ui-stepper__button--decrease', discStyles)}
         disabled={decreaseDisabled}
-        onClick={onDecrease}
+        {...decreasePress}
       >
         <span aria-hidden>−</span>
       </button>
@@ -133,7 +219,7 @@ export function Stepper({
         aria-label={increaseLabel}
         className={cx('ui-stepper__button', 'ui-stepper__button--increase', discStyles)}
         disabled={increaseDisabled}
-        onClick={onIncrease}
+        {...increasePress}
       >
         <span aria-hidden>+</span>
       </button>

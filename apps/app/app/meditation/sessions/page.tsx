@@ -1,11 +1,11 @@
-import { navActions, withQuery } from '@life/app-kit';
+import { withQuery } from '@life/app-kit';
 import {
   ButtonLink,
   EmptyState,
   formatLongDate,
   List,
   ListItem,
-  ListShell,
+  ManagerBlock,
   Pill,
   Stack,
 } from '@life/ui';
@@ -32,12 +32,13 @@ export default async function SessionsRoute({
   const page = await fetchSittingPage(cursor);
 
   return (
-    <ListShell
+    <ManagerBlock
       title="Sitting log"
-      subtitle={sittingCountLine(page.total)}
-      navTrailing={navActions('meditation')}
-      body={<SittingLog page={page} />}
-    />
+      backHref="/meditation/settings"
+      sub={sittingCountLine(page.total)}
+    >
+      <SittingLog page={page} />
+    </ManagerBlock>
   );
 }
 

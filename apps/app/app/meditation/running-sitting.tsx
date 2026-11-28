@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Caption, Dialog, ProgressBar, Screen, Stack, StatusText } from '@life/ui';
-import { ringIntervalBells } from '@/lib/meditation-bells';
+import { Button, Caption, Dialog, ProgressBar, Stack, StatusText } from '@life/ui';
+import { ringGong, ringIntervalBells } from '@/lib/meditation-bells';
 import {
   bellScheduleFor,
   formatClock,
@@ -36,6 +36,9 @@ export interface RunningSittingProps {
  *
  * The countdown is the only live region, and it stays polite: the digits change at most once a
  * second, which is what the design's own timer asks for (`preview/index.html:96`).
+ *
+ * The name rides a bare `<section>`, because the landmark role is the section's alone; every
+ * visual rule inside it is the centred `Stack`'s, so this file holds no layout class.
  */
 export function RunningSitting({
   startedAtMs,
@@ -54,21 +57,23 @@ export function RunningSitting({
   useNaturalFinish(remaining, onFinish);
 
   return (
-    <Screen label="Session in progress" layout="centred">
-      <Caption>{`Meditation · ${plannedMinutes} min`}</Caption>
-      <StatusText aria-live="polite" figure size="display">
-        {formatClock(remaining)}
-      </StatusText>
-      <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
-      <Button shape="pill" size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
-        Stop
-      </Button>
-      <StopConfirmSheet
-        open={confirmingStop}
-        onEnd={() => onEnd(elapsedSeconds)}
-        onOpenChange={setConfirmingStop}
-      />
-    </Screen>
+    <section aria-label="Session in progress">
+      <Stack centred gap="xl">
+        <Caption>{`Meditation · ${plannedMinutes} min`}</Caption>
+        <StatusText aria-live="polite" figure size="display">
+          {formatClock(remaining)}
+        </StatusText>
+        <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
+        <Button size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
+          Stop
+        </Button>
+        <StopConfirmSheet
+          open={confirmingStop}
+          onEnd={() => onEnd(elapsedSeconds)}
+          onOpenChange={setConfirmingStop}
+        />
+      </Stack>
+    </section>
   );
 }
 
@@ -101,10 +106,10 @@ function StopConfirmSheet({ open, onOpenChange, onEnd }: Readonly<StopConfirmShe
       onOpenChange={onOpenChange}
     >
       <Stack gap="md">
-        <Button shape="pill" variant="filled" onClick={() => onOpenChange(false)}>
+        <Button variant="filled" onClick={() => onOpenChange(false)}>
           Keep going
         </Button>
-        <Button shape="pill" variant="danger" onClick={onEnd}>
+        <Button variant="danger" onClick={onEnd}>
           End session
         </Button>
       </Stack>
@@ -139,13 +144,18 @@ function useIntervalBells(bells: BellChoice, plannedMinutes: number): void {
   }, [enabled, offsetSec, intervalSec, repeat, plannedMinutes]);
 }
 
-/** A sitting that reaches its planned length records itself, exactly once. */
+/**
+ * A sitting that reaches its planned length records itself, exactly once, and rings the gong as
+ * it does. The gong starts on the page's own audio context before `onFinish`, so the panel
+ * unmounting right after cannot cut it off.
+ */
 function useNaturalFinish(remaining: number, onFinish: () => void): void {
   const finished = useRef(false);
 
   useEffect(() => {
     if (remaining > 0 || finished.current) return;
     finished.current = true;
+    ringGong();
     onFinish();
   }, [remaining, onFinish]);
 }

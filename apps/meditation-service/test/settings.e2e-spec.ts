@@ -117,7 +117,7 @@ describe('Settings (e2e)', () => {
     expect(row.content).not.toContain('plannedMinutes');
   });
 
-  it('clamps the goal at both edges and onto the fifteen-minute grid', async () => {
+  it('clamps the goal at both edges and keeps any whole minute between them', async () => {
     const storedGoal = async (goalMinutes: number): Promise<number> => {
       const response = await putSettings(ownerToken, { goalMinutes, bells: BELLS_OFF }).expect(200);
       return response.body.goalMinutes as number;
@@ -125,8 +125,8 @@ describe('Settings (e2e)', () => {
 
     expect(await storedGoal(7)).toBe(15);
     expect(await storedGoal(495)).toBe(480);
-    expect(await storedGoal(22)).toBe(15);
-    expect(await storedGoal(23)).toBe(30);
+    expect(await storedGoal(22)).toBe(22);
+    expect(await storedGoal(23)).toBe(23);
   });
 
   it('keeps the planned length it was given instead of the goal', async () => {
@@ -160,18 +160,18 @@ describe('Settings (e2e)', () => {
   it('rejects an out-of-bounds bell interval with 400 and stores nothing', async () => {
     const tooShort = await putSettings(ownerToken, {
       goalMinutes: 30,
-      bells: { ...BELLS_OFF, intervalSec: 60 },
+      bells: { ...BELLS_OFF, intervalSec: 59 },
     });
     const tooLong = await putSettings(ownerToken, {
       goalMinutes: 30,
-      bells: { ...BELLS_OFF, intervalSec: 10_800 },
+      bells: { ...BELLS_OFF, intervalSec: 1450 * 60 },
     });
 
     expect([tooShort.status, tooLong.status]).toEqual([400, 400]);
     expect(await storedRows()).toEqual([]);
   });
 
-  it('rejects an interval off the ten-minute grid with 400', async () => {
+  it('rejects an interval off the whole-minute grid with 400', async () => {
     const response = await putSettings(ownerToken, {
       goalMinutes: 30,
       bells: { ...BELLS_OFF, intervalSec: 601 },

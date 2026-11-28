@@ -11,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { MAX_PAGE_LIMIT } from '@life/service-kit';
+import { PLANNED_MIN_MINUTES, PLANNED_MAX_MINUTES } from '../settings/goal.js';
 import { SITTING_OUTCOMES, type SittingOutcome } from './sitting-minutes.js';
 
 /**
@@ -99,8 +100,10 @@ export class CreateSittingDto {
   @IsISO8601()
   endedAt: string;
 
+  /** The length the sitting was planned for: 5 minutes to a day, the range the app offers. */
   @IsInt()
-  @Min(1)
+  @Min(PLANNED_MIN_MINUTES)
+  @Max(PLANNED_MAX_MINUTES)
   plannedMinutes: number;
 
   /** Seconds actually sat; fractions are refused, so the rounding is the server's. */

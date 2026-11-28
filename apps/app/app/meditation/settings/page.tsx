@@ -1,13 +1,16 @@
-import { AlertBanner, SettingsShell } from '@life/ui';
+import { AlertBanner, SettingsBlock, SettingsRow, SettingsShell } from '@life/ui';
 import { submitFeedbackAction } from '@/app/feedback-actions';
-import { fetchSettings, type SettingsRow } from '@/lib/meditation-api';
+import { fetchSettings, type SettingsRow as StoredSettings } from '@/lib/meditation-api';
 import { DailyGoalForm, SAVE_FAILED_FLAG } from './daily-goal-form';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * `/meditation/settings` — the shell draws Appearance, Comfort and Support; the page adds the one
- * group it owns, the daily goal.
+ * `/meditation/settings` — the shell draws Appearance, Comfort and Support; the page adds the two
+ * groups it owns: the daily goal, and the sitting log's entry point.
+ *
+ * The log is a row rather than a toolbar icon, and it sits outside the goal's branch: it opens a
+ * page, so an unreachable service must not take it away with the form.
  *
  * The stored sitting length and the bells have no editor here: the idle screen's stepper picks the
  * length of the sitting being started, and `/meditation`'s bells sheet owns the bells. Both are
@@ -31,6 +34,13 @@ export default async function MeditationSettingsRoute({
       ) : (
         <DailyGoalForm goalMinutes={settings.goalMinutes} saveFailed={saveFailed} />
       )}
+      <SettingsBlock title="Sitting log">
+        <SettingsRow
+          label="Sitting log"
+          href="/meditation/sessions"
+          description="Every sitting you have kept, newest first."
+        />
+      </SettingsBlock>
     </SettingsShell>
   );
 }
@@ -45,7 +55,7 @@ function UnavailableSettings() {
 }
 
 /** The owner's configuration, or `null`: an unreachable service has nothing for a form to open on. */
-async function readSettings(): Promise<SettingsRow | null> {
+async function readSettings(): Promise<StoredSettings | null> {
   try {
     return await fetchSettings();
   } catch {

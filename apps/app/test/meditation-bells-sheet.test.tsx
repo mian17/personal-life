@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  *
  * The interval bells sheet, driven the way the owner drives it: the switch reveals the groups,
- * a field or a press rewrites the summary, Cancel discards and Save hands the draft on.
+ * a field or a press rewrites the summary, the close control discards and Save hands the draft on.
  *
  * The names asserted here are the preview's own (`preview/index.html:117-233`) — a paraphrase
  * would pass in code review and break the screen reader, so each is spelled out. Nothing is
@@ -50,18 +50,20 @@ const field = (name: string) => screen.getByLabelText<HTMLInputElement>(name);
 const button = (name: string | RegExp) => screen.getByRole<HTMLButtonElement>('button', { name });
 const switchOf = () => screen.getByRole('switch', { name: 'Interval bells' });
 const summary = () => document.querySelector('.ui-caption')?.textContent;
+const description = () => document.querySelector('.ui-dialog__sub')?.textContent;
 
 afterEach(cleanup);
 
 describe('the sheet', () => {
-  it('opens as a bottom sheet with Cancel, its title and an accent Save — and no close X', () => {
+  it('opens as a bottom sheet with its close control, its title and a Save in the footer', () => {
     renderSheet();
 
     expect(screen.getByRole('dialog').className).toContain('ui-dialog--sheet');
-    expect(button('Cancel')).toBeTruthy();
+    expect(button('Close')).toBeTruthy();
     expect(button('Save')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Interval bells' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(description()).toBe('A bowl at a steady interval while you sit.');
+    expect(document.querySelector('.ui-dialog__footer')!.contains(button('Save'))).toBe(true);
   });
 
   it('is the element the row announces, while it is mounted', () => {
@@ -114,25 +116,22 @@ describe('the sheet', () => {
     expect(field('Start offset seconds').value).toBe('0');
   });
 
-  it('reads the interval the service can store: every ten minutes, ten minutes a press', () => {
+  it('reads the interval the service stores: every ten minutes, a minute a press', () => {
     renderSheet();
 
     expect(screen.getByText('Every 10 min')).toBeTruthy();
-    expect(button('Decrease interval by one minute').disabled).toBe(true);
 
     fireEvent.click(button('Increase interval by one minute'));
-    expect(screen.getByText('Every 20 min')).toBeTruthy();
+    expect(screen.getByText('Every 11 min')).toBeTruthy();
     expect(button('Decrease interval by one minute').disabled).toBe(false);
   });
 
-  it('stops the interval at the top of the service grid', () => {
-    renderSheet();
-    for (let press = 0; press < 11; press += 1) {
-      fireEvent.click(button('Increase interval by one minute'));
-    }
+  it('stops the interval at the top of the service range', () => {
+    renderSheet({ bells: { ...SAVED_ON, intervalSec: 1440 * 60 } });
 
-    expect(screen.getByText('Every 120 min')).toBeTruthy();
+    expect(screen.getByText('Every 1440 min')).toBeTruthy();
     expect(button('Increase interval by one minute').disabled).toBe(true);
+    expect(button('Decrease interval by one minute').disabled).toBe(false);
   });
 
   it('moves the whole offset a minute with the pair, down to zero and no further', () => {
@@ -192,16 +191,16 @@ describe('the sheet', () => {
     expect(onSave).toHaveBeenCalledWith({
       enabled: true,
       offsetSec: 360,
-      intervalSec: 1200,
+      intervalSec: 660,
       repeat: 2,
     });
   });
 
-  it('discards the draft on Cancel: a reopen shows the saved bells again', () => {
+  it('discards the draft on a dismissal: a reopen shows the saved bells again', () => {
     const { onClose, rerender } = renderSheet();
 
     fireEvent.change(field('Start offset minutes'), { target: { value: '9' } });
-    fireEvent.click(button('Cancel'));
+    fireEvent.click(button('Close'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
 
@@ -224,7 +223,7 @@ describe('the sheet', () => {
     expect(button('Repeat: 2×').getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('closes as Cancel on Escape, writing nothing', () => {
+  it('closes on Escape as a dismissal, writing nothing', () => {
     const { onClose, onSave } = renderSheet();
 
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
@@ -293,12 +292,12 @@ describe("the idle screen's Interval bells row", () => {
     fireEvent.click(button(/^Interval bells/));
     fireEvent.click(button('Increase interval by one minute'));
 
-    expect(screen.getByText('Every 20 min')).toBeTruthy();
+    expect(screen.getByText('Every 11 min')).toBeTruthy();
     expect(screen.getByText('Every 10 min')).toBeTruthy();
 
-    fireEvent.click(button('Cancel'));
+    fireEvent.click(button('Close'));
 
     expect(screen.getByText('Every 10 min')).toBeTruthy();
-    expect(screen.queryByText('Every 20 min')).toBeNull();
+    expect(screen.queryByText('Every 11 min')).toBeNull();
   });
 });

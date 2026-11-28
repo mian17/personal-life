@@ -19,8 +19,13 @@ interface Sitting {
 }
 
 export interface SittingTimerProps {
-  /** The settings' planned length: the idle stepper's seed, clamped into the design's range. */
+  /** The settings' planned length: the first-visit default the stepper opens on. */
   plannedMinutes: number;
+  /**
+   * The length this browser last chose, read from its cookie by the route. It wins over the plan,
+   * which is only the default a first visit has no memory to override.
+   */
+  rememberedMinutes: number | null;
   bells: BellChoice;
   /**
    * The interval bells sheet's write, handed straight to the idle screen: the settings `PUT` goes
@@ -37,7 +42,12 @@ export interface SittingTimerProps {
  * countdown this tab can no longer honour (spec assumption 4) — and every return to idle asks the
  * server to read the day again, so the subtitle counts the sitting that just ended.
  */
-export function SittingTimer({ plannedMinutes, bells, onSaveBells }: Readonly<SittingTimerProps>) {
+export function SittingTimer({
+  plannedMinutes,
+  rememberedMinutes,
+  bells,
+  onSaveBells,
+}: Readonly<SittingTimerProps>) {
   const router = useRouter();
   const [sitting, setSitting] = useState<Sitting | null>(null);
   const [result, setResult] = useState<SittingResult | null>(null);
@@ -93,6 +103,7 @@ export function SittingTimer({ plannedMinutes, bells, onSaveBells }: Readonly<Si
     <IdleScreen
       bells={bells}
       plannedMinutes={plannedMinutes}
+      rememberedMinutes={rememberedMinutes}
       onSaveBells={onSaveBells}
       onStart={startSitting}
     />

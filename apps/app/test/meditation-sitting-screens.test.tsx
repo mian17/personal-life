@@ -15,6 +15,7 @@ import { CompleteSitting } from '@/app/meditation/complete-sitting';
 import { RunningSitting, type RunningSittingProps } from '@/app/meditation/running-sitting';
 import { SittingTimer } from '@/app/meditation/sitting-timer';
 import type { BellChoice } from '@/lib/meditation-clock';
+import { MEDITATION_LENGTH_KEY } from '@/lib/meditation-length';
 
 const refresh = jest.fn();
 
@@ -39,6 +40,25 @@ const START_MS = 1_000_000;
 
 const PLANNED_MINUTES = 10;
 
+/** The timer as the route hands it in: a plan, and the length this browser chose when a case says so. */
+function renderTimer(rememberedMinutes: number | null = null) {
+  return render(
+    <SittingTimer
+      bells={BELLS_OFF}
+      plannedMinutes={PLANNED_MINUTES}
+      rememberedMinutes={rememberedMinutes}
+    />,
+  );
+}
+
+/** The length cookie as the browser kept it, so a step's write is read the way the server reads it. */
+function rememberedCookie(): string | null {
+  const entry = document.cookie
+    .split('; ')
+    .find((pair) => pair.startsWith(`${MEDITATION_LENGTH_KEY}=`));
+  return entry === undefined ? null : entry.slice(MEDITATION_LENGTH_KEY.length + 1);
+}
+
 const elapsed = 60_000;
 
 function renderRunning(overrides: Partial<RunningSittingProps> = {}) {
@@ -52,6 +72,59 @@ function renderRunning(overrides: Partial<RunningSittingProps> = {}) {
   };
 
   return { props, ...render(<RunningSitting {...props} />) };
+}
+
+/** Drains the microtasks a strike's `fetch` → decode → play chain awaits on. */
+async function settle(): Promise<void> {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+}
+
+/**
+ * A stub Web Audio and `fetch` that record what a sitting asked to hear: jsdom ships neither, and
+ * real playback is not a test's business.
+ */
+function recordAudio(): { strikes: number; closed: number; requested: string[] } {
+  const audio = { strikes: 0, closed: 0, requested: [] as string[] };
+
+  class RecordingAudioContext {
+    state = 'running';
+    destination = {};
+
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect: () => undefined,
+        start: () => {
+          audio.strikes += 1;
+        },
+      };
+    }
+
+    createGain() {
+      return { connect: () => undefined, gain: { value: 1 } };
+    }
+
+    decodeAudioData() {
+      return Promise.resolve({ duration: 4.968 } as AudioBuffer);
+    }
+
+    resume(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    close(): Promise<void> {
+      audio.closed += 1;
+      return Promise.resolve();
+    }
+  }
+
+  (globalThis as { AudioContext?: unknown }).AudioContext = RecordingAudioContext;
+  (globalThis as { fetch?: unknown }).fetch = (url: string) => {
+    audio.requested.push(url);
+    return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
+  };
+
+  return audio;
 }
 
 const countdown = () => screen.getByRole('status');
@@ -72,11 +145,14 @@ beforeEach(() => {
   jest.setSystemTime(START_MS);
   refresh.mockReset();
   recordKept.mockReset();
+  document.cookie = `${MEDITATION_LENGTH_KEY}=;path=/;max-age=0`;
 });
 
 afterEach(() => {
   cleanup();
   jest.useRealTimers();
+  delete (globalThis as { AudioContext?: unknown }).AudioContext;
+  delete (globalThis as { fetch?: unknown }).fetch;
 });
 
 describe('the running panel', () => {
@@ -97,6 +173,55 @@ describe('the running panel', () => {
 
     expect(countdown().textContent).toBe('9:00');
     expect(progress().getAttribute('aria-valuenow')).toBe('10');
+  });
+
+  /**
+   * The ending bell the panel never had: the gong rings as the sitting reaches its length, and it
+   * has to outlive the panel, which the parent drops the instant it finishes. The strike starts on
+   * the page's own context, so the unmount clears no timer under it and closes nothing.
+   */
+  it('rings the ending gong as it completes, and the unmount does not stop it', async () => {
+    const audio = recordAudio();
+    const { props, unmount } = renderRunning({ onFinish: jest.fn() });
+
+    tick(PLANNED_MINUTES * 60_000);
+    unmount();
+
+    await settle();
+
+    expect(props.onFinish).toHaveBeenCalledTimes(1);
+    expect(audio.requested).toEqual(['/sounds/gong.mp3']);
+    expect(audio.strikes).toBe(1);
+    expect(audio.closed).toBe(0);
+  });
+
+  it('does not ring the gong for a sitting stopped before its length', async () => {
+    const audio = recordAudio();
+    renderRunning();
+
+    tick(elapsed);
+    fireEvent.click(button('Stop'));
+    fireEvent.click(button('End session'));
+
+    await settle();
+
+    expect(audio.requested).toEqual([]);
+  });
+
+  /**
+   * The panel is the centred `Stack`, named by the landmark above it: no layout class is stated
+   * here, and the centred mode is what puts the children on both axes.
+   */
+  it('lays the panel out as a centred Stack inside its named region', () => {
+    renderRunning();
+
+    const region = screen.getByRole('region', { name: 'Session in progress' });
+    const panel = region.querySelector('.ui-stack--centred');
+
+    expect(panel).not.toBeNull();
+    expect(region.className).toBe('');
+    expect(panel!.classList.contains('gap-[var(--s6)]')).toBe(true);
+    expect(panel!.classList.contains('py-[var(--s8)]')).toBe(true);
   });
 });
 
@@ -180,11 +305,23 @@ describe('the complete panel', () => {
     expect(figure().textContent).toBe('4 min');
     expect(screen.getByText('minutes sat')).toBeTruthy();
   });
+
+  /** Its heading is the name, so the panel is the centred Stack itself and no landmark wraps it. */
+  it('lays the panel out as a centred Stack with no landmark around it', () => {
+    render(<CompleteSitting result={{ minutes: 10, completed: true }} onDone={jest.fn()} />);
+
+    const panel = screen.getByRole('heading', { level: 2 }).closest('.ui-stack--centred');
+
+    expect(panel).not.toBeNull();
+    expect(panel!.classList.contains('gap-[var(--s6)]')).toBe(true);
+    expect(panel!.classList.contains('py-[var(--s8)]')).toBe(true);
+    expect(screen.queryByRole('region')).toBeNull();
+  });
 });
 
 describe('a sitting driven end to end', () => {
   it('records a stopped sitting as kept, completes it, and re-reads the day on Done', async () => {
-    render(<SittingTimer bells={BELLS_OFF} plannedMinutes={PLANNED_MINUTES} />);
+    renderTimer();
 
     fireEvent.click(button('Start'));
     tick(elapsed);
@@ -205,5 +342,84 @@ describe('a sitting driven end to end', () => {
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(button('Start')).toBeTruthy();
+  });
+
+  it('opens the stepper on the plan the first visit has no memory of', () => {
+    renderTimer();
+
+    expect(screen.getByText('10 min')).toBeTruthy();
+  });
+
+  it('opens the stepper where this browser last left off, the stored plan notwithstanding', () => {
+    renderTimer(23);
+
+    expect(screen.getByText('23 min')).toBeTruthy();
+  });
+
+  /**
+   * The point of reading the cookie on the server: the first render already carries the remembered
+   * length, so no frame ever shows the plan and corrects itself.
+   */
+  it('shows the remembered length on its first render, with nothing in the browser to read', () => {
+    expect(rememberedCookie()).toBeNull();
+
+    renderTimer(21);
+
+    expect(screen.getByText('21 min')).toBeTruthy();
+    expect(button('Decrease duration by one minute')).toHaveProperty('disabled', false);
+  });
+
+  it('opens on a remembered single minute, and on the floor when the memory is too small', () => {
+    renderTimer(1);
+
+    expect(screen.getByText('1 min')).toBeTruthy();
+    expect(button('Decrease duration by one minute')).toHaveProperty('disabled', true);
+  });
+
+  /** A refresh before Start must show the length last set, so a step writes itself into the cookie. */
+  it('remembers a stepped length the moment it changes, before any Start', () => {
+    renderTimer();
+
+    fireEvent.click(button('Increase duration by one minute'));
+
+    expect(rememberedCookie()).toBe('11');
+    expect(screen.getByText('11 min')).toBeTruthy();
+  });
+
+  it('remembers the length the sitter started in this browser, and starts the sitting', () => {
+    renderTimer();
+
+    fireEvent.click(button('Increase duration by one minute'));
+    fireEvent.click(button('Start'));
+
+    expect(rememberedCookie()).toBe('11');
+    expect(countdown().textContent).toBe('11:00');
+  });
+
+  /** The sitting is the product; a browser that refuses to remember may not keep it from starting. */
+  it('starts the sitting even when the browser refuses to remember the length', () => {
+    const refuse = jest.spyOn(Document.prototype, 'cookie', 'set').mockImplementation(() => {
+      throw new Error('cookies refused');
+    });
+    renderTimer();
+
+    fireEvent.click(button('Start'));
+
+    expect(countdown().textContent).toBe('10:00');
+    expect(button('Stop')).toBeTruthy();
+
+    refuse.mockRestore();
+  });
+
+  it('sets the idle blocks on the section rhythm and the rows on their own nested one', () => {
+    renderTimer();
+
+    const setup = screen.getByRole('region', { name: 'Session setup' });
+    const [blocks] = Array.from(setup.children);
+    const rows = screen.getByText('Ending bell').closest('.ui-stack--md');
+
+    expect(blocks.classList.contains('ui-stack--lg')).toBe(true);
+    expect(rows).not.toBeNull();
+    expect(rows).not.toBe(blocks);
   });
 });

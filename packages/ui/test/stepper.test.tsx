@@ -1,5 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Stepper } from '../src/components/stepper';
+
+const REPEAT_DELAY_MS = 450;
+const REPEAT_INTERVAL_MS = 80;
+
+function advance(ms: number) {
+  act(() => {
+    jest.advanceTimersByTime(ms);
+  });
+}
 
 function classesOf(el: Element): string[] {
   return el.className.split(/\s+/).filter(Boolean);
@@ -11,7 +20,7 @@ const increase = () => screen.getByRole('button', { name: 'Increase duration' })
 function renderDuration(overrides: Partial<Parameters<typeof Stepper>[0]> = {}) {
   const onDecrease = jest.fn();
   const onIncrease = jest.fn();
-  render(
+  const view = render(
     <Stepper
       tone="card"
       size="display"
@@ -23,7 +32,7 @@ function renderDuration(overrides: Partial<Parameters<typeof Stepper>[0]> = {}) 
       {...overrides}
     />,
   );
-  return { onDecrease, onIncrease };
+  return { ...view, onDecrease, onIncrease };
 }
 
 describe('Stepper', () => {
@@ -142,5 +151,129 @@ describe('Stepper', () => {
     expect(classes).toContain('active:bg-press');
     expect(classes).toContain('focus-visible:outline-[length:var(--focus-ring)]');
     expect(classes).toContain('disabled:opacity-50');
+  });
+
+  describe('holding a ± button', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('counts a tap as exactly one step, and not the click that follows it', () => {
+      const { onIncrease } = renderDuration();
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      fireEvent.pointerUp(increase());
+      fireEvent.click(increase(), { detail: 1 });
+
+      expect(onIncrease).toHaveBeenCalledTimes(1);
+    });
+
+    it('steps again after the initial delay, then once per interval', () => {
+      const { onIncrease } = renderDuration();
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      expect(onIncrease).toHaveBeenCalledTimes(1);
+
+      advance(REPEAT_DELAY_MS - 1);
+      expect(onIncrease).toHaveBeenCalledTimes(1);
+
+      advance(1 + REPEAT_INTERVAL_MS);
+      expect(onIncrease).toHaveBeenCalledTimes(2);
+
+      advance(REPEAT_INTERVAL_MS * 3);
+      expect(onIncrease).toHaveBeenCalledTimes(5);
+    });
+
+    it('stops on release, so no step lands afterwards', () => {
+      const { onIncrease } = renderDuration();
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      advance(REPEAT_DELAY_MS + REPEAT_INTERVAL_MS);
+      const atRelease = onIncrease.mock.calls.length;
+      fireEvent.pointerUp(increase());
+
+      advance(REPEAT_INTERVAL_MS * 10);
+      expect(onIncrease).toHaveBeenCalledTimes(atRelease);
+    });
+
+    it('stops when the pointer slides off the button', () => {
+      const { onIncrease } = renderDuration();
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      advance(REPEAT_DELAY_MS);
+      const atLeave = onIncrease.mock.calls.length;
+      fireEvent.pointerLeave(increase());
+
+      advance(REPEAT_INTERVAL_MS * 10);
+      expect(onIncrease).toHaveBeenCalledTimes(atLeave);
+    });
+
+    it('never steps from a disabled button', () => {
+      const { onIncrease } = renderDuration({ increaseDisabled: true });
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      advance(REPEAT_DELAY_MS + REPEAT_INTERVAL_MS * 5);
+      fireEvent.click(increase(), { detail: 0 });
+
+      expect(onIncrease).not.toHaveBeenCalled();
+    });
+
+    it('steps once from the keyboard and does not start a repeat of its own', () => {
+      const { onIncrease } = renderDuration();
+
+      fireEvent.click(increase(), { detail: 0 });
+      expect(onIncrease).toHaveBeenCalledTimes(1);
+
+      advance(REPEAT_DELAY_MS + REPEAT_INTERVAL_MS * 5);
+      expect(onIncrease).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears its timers on unmount, so a hold cannot step into a dead component', () => {
+      const { onIncrease, unmount } = renderDuration();
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      advance(REPEAT_DELAY_MS);
+      const atUnmount = onIncrease.mock.calls.length;
+      unmount();
+
+      advance(REPEAT_INTERVAL_MS * 10);
+      expect(onIncrease).toHaveBeenCalledTimes(atUnmount);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('stops repeating when the button is disabled mid-hold', () => {
+      const onIncrease = jest.fn();
+      const { rerender } = render(
+        <Stepper
+          readout={{ kind: 'text', value: '10' }}
+          decreaseLabel="Decrease duration"
+          increaseLabel="Increase duration"
+          onDecrease={() => {}}
+          onIncrease={onIncrease}
+        />,
+      );
+
+      fireEvent.pointerDown(increase(), { button: 0 });
+      advance(REPEAT_DELAY_MS);
+
+      rerender(
+        <Stepper
+          readout={{ kind: 'text', value: '10' }}
+          decreaseLabel="Decrease duration"
+          increaseLabel="Increase duration"
+          onDecrease={() => {}}
+          onIncrease={onIncrease}
+          increaseDisabled
+        />,
+      );
+
+      const atDisable = onIncrease.mock.calls.length;
+      advance(REPEAT_INTERVAL_MS * 10);
+      expect(onIncrease).toHaveBeenCalledTimes(atDisable);
+    });
   });
 });

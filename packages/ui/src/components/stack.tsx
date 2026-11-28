@@ -8,8 +8,19 @@ export type StackGap = 'sm' | 'md' | 'lg';
 export type StackAlign = 'start' | 'center' | 'end';
 
 export interface StackProps extends ComponentPropsWithRef<'div'> {
-  gap?: StackGap;
+  /**
+   * The rhythm between children: the three shared steps, plus `xl` — the `--s6` section step both
+   * meditation screens sit on. Default `'md'`.
+   */
+  gap?: StackGap | 'xl';
+  /** The grid's inline-axis alignment. A centred screen centres on both axes, so it rarely needs one. */
   align?: StackAlign;
+  /**
+   * A screen rather than a list: the children centre on both axes inside the height the parent
+   * gives them, the text centres with them, and the stack draws the screen's own `--s8` inset.
+   * Off by default, so every shipped stack keeps its grid.
+   */
+  centred?: boolean;
   as?: 'div';
 }
 
@@ -19,11 +30,19 @@ export interface StackProps extends ComponentPropsWithRef<'div'> {
  */
 const stackStyles = 'grid';
 
-/** The spacing steps: one per gap, `md` matching the base line height. */
-const gapStyles: Record<StackGap, string> = {
+/**
+ * A centred screen swaps the grid for a column. A grid centres its children on the inline axis
+ * alone, while a screen has to centre on the block axis too — which is the flex column's own
+ * `justify-content`. Only this mode changes the display model; a default stack stays a grid.
+ */
+const centredStyles = cx('flex flex-col items-center justify-center text-center', 'py-[var(--s8)]');
+
+/** The spacing steps: one per gap, `md` matching the base line height, `xl` the section rhythm. */
+const gapStyles: Record<StackGap | 'xl', string> = {
   sm: 'gap-[var(--s1)]',
   md: 'gap-[var(--s2)]',
   lg: 'gap-[var(--s4)]',
+  xl: 'gap-[var(--s6)]',
 };
 
 /**
@@ -39,6 +58,7 @@ const alignStyles: Record<StackAlign, string | undefined> = {
 export function Stack({
   gap = 'md',
   align = 'start',
+  centred = false,
   as = 'div',
   className,
   children,
@@ -51,7 +71,8 @@ export function Stack({
         'ui-stack',
         `ui-stack--${gap}`,
         alignHook(align),
-        stackStyles,
+        centred && 'ui-stack--centred',
+        centred ? centredStyles : stackStyles,
         gapStyles[gap],
         alignStyles[align],
         className,

@@ -1,6 +1,7 @@
 import 'server-only';
 import { callService } from './client';
 import type { BellChoice } from './meditation-clock';
+import { getToday } from './today';
 
 /**
  * The meditation-service client (`SPEC-meditation-app` §1): one owner's settings, the
@@ -50,6 +51,12 @@ export interface DayDoneRow {
   done: boolean;
 }
 
+/** One day's goal, as `GET /settings/goals` serves it: the day it took effect on, and its minutes. */
+export interface GoalRow {
+  validFrom: string;
+  minutes: number;
+}
+
 /** How a sitting ended: on its own planned length, or stopped early and kept. */
 export type SittingOutcome = 'finished' | 'kept';
 
@@ -76,9 +83,25 @@ export function fetchSettings(): Promise<SettingsRow> {
   return call<SettingsRow>('/settings');
 }
 
-/** `PUT /settings` — replace the owner's whole configuration; the goal clamps on the way in. */
-export function saveSettings(settings: SettingsRow): Promise<SettingsRow> {
-  return call<SettingsRow>('/settings', { method: 'PUT', body: JSON.stringify(settings) });
+/**
+ * `PUT /settings` — replace the owner's whole configuration; the goal clamps on the way in.
+ *
+ * The client's own day rides along, from the one owner of "today", so the service can file the
+ * goal into that day's history row: without it the settings row would answer today's aim while
+ * no past day had a goal to resolve. The answer is the settings content alone — the day is not
+ * part of it.
+ */
+export async function saveSettings(settings: SettingsRow): Promise<SettingsRow> {
+  const date = await getToday();
+  return call<SettingsRow>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ ...settings, date }),
+  });
+}
+
+/** `GET /settings/goals` — the owner's whole goal history, oldest first. */
+export function fetchGoals(): Promise<GoalRow[]> {
+  return call<GoalRow[]>('/settings/goals');
 }
 
 /** `POST /sessions` — record one finished sitting; the service answers with the row it stored. */

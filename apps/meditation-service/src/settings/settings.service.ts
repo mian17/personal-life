@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { ENC_PREFIX, decryptField, encryptField } from '@life/crypto';
 import { KeysService } from '@life/service-kit';
 import { MEDITATION_CACHE, type MeditationCache } from '../cache/meditation-cache.js';
-import { clampGoal } from './goal.js';
+import { GoalHistoryService, requireDay } from './goal-history.service.js';
+import { clampGoal, clampPlannedMinutes } from './goal.js';
 import { Settings } from './settings.entity.js';
 import { DEFAULT_SETTINGS, type SettingsContent, type SettingsDto } from './settings.dto.js';
 
@@ -58,6 +59,7 @@ export class SettingsService {
     @InjectRepository(Settings) private readonly settings: Repository<Settings>,
     @Inject(MEDITATION_CACHE) private readonly cache: MeditationCache,
     private readonly keys: KeysService,
+    private readonly goalHistory: GoalHistoryService,
   ) {}
 
   /** The owner's stored settings, or the fresh-owner defaults before the first write. */
@@ -69,14 +71,26 @@ export class SettingsService {
     return decodeSettingsContent(row, await this.keys.getDekForRead(ownerSub));
   }
 
-  /** Replace the owner's settings; the cached row dies with the owner's generation. */
+  /**
+   * Replace the owner's settings; the cached row dies with the owner's generation.
+   *
+   * The goal also enters the history for the day the caller names, because otherwise the two
+   * would disagree: `findOne` answers today's aim from this row, while every past day resolves
+   * from `meditation_goal`. A caller that names no day gets no history write — this service
+   * never reads its own clock for "today", so there is no day to write.
+   *
+   * The day is judged before either write, so an impossible one is a 400 that changed nothing.
+   */
   async replace(ownerSub: string, dto: SettingsDto): Promise<SettingsContent> {
     const content = clampedSettings(dto);
     const dek = await this.keys.getOrCreateDek(ownerSub);
     const row = toCachedRow(ownerSub, content, dek);
 
+    const day = dto.date === undefined ? undefined : requireDay(dto.date);
+
     await this.settings.save(row);
     await this.cache.bumpGeneration(ownerSub);
+    if (day !== undefined) await this.goalHistory.setGoal(ownerSub, day, content.goalMinutes);
     return content;
   }
 
@@ -88,14 +102,14 @@ export class SettingsService {
 }
 
 /**
- * The settings exactly as they will be stored: the goal clamped to the 15-minute
- * grid, the planned length clamped the same way and defaulting to the goal.
+ * The settings exactly as they will be stored: the goal and the planned length, each clamped
+ * into its own range on any whole minute, the planned length defaulting to the goal.
  */
 function clampedSettings(dto: SettingsDto): SettingsContent {
   const goalMinutes = clampGoal(dto.goalMinutes);
   return {
     goalMinutes,
-    plannedMinutes: clampGoal(dto.plannedMinutes ?? goalMinutes),
+    plannedMinutes: clampPlannedMinutes(dto.plannedMinutes ?? goalMinutes),
     bells: { ...dto.bells },
   };
 }

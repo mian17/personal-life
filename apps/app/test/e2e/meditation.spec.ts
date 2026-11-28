@@ -168,7 +168,7 @@ test.describe('meditation', () => {
 /** Writes the daily goal on `/meditation/settings` and waits for the write to land. */
 async function saveGoal(page: Page, minutes: number): Promise<void> {
   await page.goto('/meditation/settings');
-  await page.getByLabel('Daily goal').selectOption(String(minutes));
+  await page.getByLabel('Daily goal').fill(String(minutes));
 
   const saved = page.waitForResponse(serverActionOn('/meditation/settings'));
   await page.getByRole('button', { name: 'Save goal', exact: true }).click();
@@ -241,7 +241,7 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   await intervalBellsRow(page).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Interval bells', exact: true })).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
   // Off: the header and the switch row, and nothing the switch owns.
@@ -259,9 +259,10 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   ).toBeDisabled();
   await expect(sheet.getByRole('heading', { name: 'Every', exact: true })).toBeVisible();
   await expect(sheet.getByText('Every 10 min', { exact: true })).toBeVisible();
+  // The floor is a minute now, so the default ten is one decrement away from it.
   await expect(
     sheet.getByRole('button', { name: 'Decrease interval by one minute' }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await expect(sheet.getByRole('heading', { name: 'Repeat', exact: true })).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Repeat: unlimited' })).toHaveAttribute(
     'aria-pressed',
@@ -279,11 +280,11 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   // Each group rewrites the summary line as it is pressed, against this sitting's own length.
   await sheet.getByRole('button', { name: 'Increase interval by one minute' }).click();
   await expect(
-    sheet.getByText('Bowl every 20 min, starting after 0 min, unlimited. 1 bowl this session.'),
+    sheet.getByText('Bowl every 11 min, starting after 0 min, unlimited. 2 bowls this session.'),
   ).toBeVisible();
   await sheet.getByLabel('Start offset minutes').fill('5');
   await expect(
-    sheet.getByText('Bowl every 20 min, starting after 5 min, unlimited. 1 bowl this session.'),
+    sheet.getByText('Bowl every 11 min, starting after 5 min, unlimited. 1 bowl this session.'),
   ).toBeVisible();
   await sheet.getByRole('button', { name: 'Repeat: 3×' }).click();
   await expect(sheet.getByRole('button', { name: 'Repeat: 3×' })).toHaveAttribute(
@@ -293,18 +294,19 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   await sheet.getByLabel('Start offset hours').fill('1');
   await expect(
     sheet.getByText(
-      `Bowl every 20 min, starting after 1 h 5 min, 3× — no bowl will sound in a ${sessionMinutes} min session.`,
+      `Bowl every 11 min, starting after 1 h 5 min, 3× — no bowl will sound in a ${sessionMinutes} min session.`,
     ),
   ).toBeVisible();
 
-  await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByText('Off', { exact: true })).toBeVisible();
 }
 
 /**
- * Re-opens the sheet on the bells Cancel left behind, turns them on, saves a schedule whose first
- * bowl falls past the sitting, and reads the row back from a fresh render of the page.
+ * Re-opens the sheet on the bells the close control left behind, turns them on, saves a
+ * schedule whose first bowl falls past the sitting, and reads the row back from a fresh render of
+ * the page.
  *
  * The schedule's offset sits past the plan on purpose: the sitting rings nothing, so no case here
  * depends on Web Audio being available.
@@ -321,14 +323,14 @@ async function saveIntervalBells(page: Page): Promise<void> {
   await sheet.getByRole('switch', { name: 'Interval bells' }).click();
   await sheet.getByRole('button', { name: 'Increase interval by one minute' }).click();
   await sheet.getByLabel('Start offset hours').fill('1');
-  await expect(sheet.getByText(/^Bowl every 20 min, starting after 1 h,/)).toBeVisible();
+  await expect(sheet.getByText(/^Bowl every 11 min, starting after 1 h,/)).toBeVisible();
 
   await sheet.getByRole('button', { name: 'Save', exact: true }).click();
 
   // The sheet closes on a write that landed, and the row reads back what the service stored.
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await openMeditation(page);
-  await expect(intervalBellsRow(page)).toContainText('Every 20 min');
+  await expect(intervalBellsRow(page)).toContainText('Every 11 min');
 }
 
 /**

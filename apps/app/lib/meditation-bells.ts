@@ -1,11 +1,12 @@
 /**
- * The interval bells of a sitting (`SPEC-meditation-app` §5): when they ring, the sheet's
- * own arithmetic, and the thin Web Audio scheduler that rings them.
+ * The bells of a sitting (`SPEC-meditation-app` §5): when the interval bowls ring, the sheet's
+ * own arithmetic, and the recordings they play — a bowl for each interval, a gong when the
+ * sitting reaches its planned length.
  *
  * Fire times are absolute (`offset + n × interval`), never accumulated, so the n-th bowl
  * lands where the arithmetic says no matter how late a frame or a timer arrives.
  */
-import type { BellChoice } from './meditation-clock';
+import { MEDITATION_MINUTE_STEP, type BellChoice } from './meditation-clock';
 
 /** One sitting's bell settings: when the first rings, how often, and how many. */
 export interface BellSchedule {
@@ -31,9 +32,6 @@ export interface OffsetParts {
   seconds: number;
 }
 
-const BELL_FREQUENCY_HZ = 528;
-const BELL_DURATION_SECONDS = 0.4;
-
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 
@@ -45,12 +43,6 @@ export const OFFSET_MAX_SEC =
   OFFSET_PART_MAX.hours * SECONDS_PER_HOUR +
   OFFSET_PART_MAX.minutes * SECONDS_PER_MINUTE +
   OFFSET_PART_MAX.seconds;
-
-/**
- * The interval the service accepts (spec C1): whole ten-minute steps over 10–120 minutes.
- * The sheet multiplies by sixty at the save boundary and sends seconds.
- */
-export const INTERVAL_MINUTES = { floor: 10, ceiling: 120, step: 10 } as const;
 
 /** The fire times of the interval bells, in seconds after the sitting starts. */
 export function intervalBellTimes({
@@ -121,10 +113,10 @@ export function stepOffset(offsetSec: number, minutes: number): number {
   return Math.min(Math.max(moved, 0), OFFSET_MAX_SEC);
 }
 
-/** The interval one press moves: whole ten-minute steps, clamped to the service's grid. */
+/** The interval one press moves: one minute on the shared grid, clamped at either end of it. */
 export function stepInterval(intervalMin: number, steps: number): number {
-  const moved = intervalMin + steps * INTERVAL_MINUTES.step;
-  return Math.min(Math.max(moved, INTERVAL_MINUTES.floor), INTERVAL_MINUTES.ceiling);
+  const moved = intervalMin + steps * MEDITATION_MINUTE_STEP.step;
+  return Math.min(Math.max(moved, MEDITATION_MINUTE_STEP.floor), MEDITATION_MINUTE_STEP.ceiling);
 }
 
 /** The offset in words, for the summary: `2 h`, `1 min 30 sec`, `0 min` when it is nothing. */
@@ -176,25 +168,98 @@ export function ringIntervalBells(schedule: BellSchedule): () => void {
   return () => pendingTimers.forEach(clearTimeout);
 }
 
-/** A browser without Web Audio simply has no bell; the sitting never hears about it. */
-function ringBell(): void {
-  const context = openAudioContext();
-  if (context === null) return;
+/** The two recordings a sitting rings, served by Next from `public/sounds`. */
+const BOWL_RECORDING = '/sounds/bowl.mp3';
+const GONG_RECORDING = '/sounds/gong.mp3';
 
-  const oscillator = context.createOscillator();
-  oscillator.frequency.value = BELL_FREQUENCY_HZ;
-  oscillator.connect(context.destination);
-  oscillator.onended = () => void context.close();
-  oscillator.start();
-  oscillator.stop(context.currentTime + BELL_DURATION_SECONDS);
+type Recording = typeof BOWL_RECORDING | typeof GONG_RECORDING;
+
+/** The page's audio context and each recording's decoded buffer, kept for as long as it lives. */
+let pageContext: AudioContext | null | undefined;
+const decodedBuffers = new Map<Recording, Promise<AudioBuffer | null>>();
+
+/** The interval bell: one bowl. */
+function ringBell(): void {
+  void playRecording(BOWL_RECORDING);
 }
 
-function openAudioContext(): AudioContext | null {
+/**
+ * The ending bell: the gong a sitting rings as it reaches its planned length. It plays on the
+ * page's own audio context, so the panel unmounting the instant it rings cannot cut it off.
+ */
+export function ringGong(): void {
+  void playRecording(GONG_RECORDING);
+}
+
+/**
+ * Starts one strike and returns at once. The first strike of a recording fetches and decodes it;
+ * every later strike reuses the decoded buffer. A browser without Web Audio, or a fetch or decode
+ * that fails, is silence the sitting never hears about.
+ */
+async function playRecording(recording: Recording): Promise<void> {
+  const context = pageAudioContext();
+  if (context === null) return;
+
+  const buffer = await decodedBuffer(context, recording);
+  if (buffer === null) return;
+
   try {
-    return new AudioContext();
+    strike(context, buffer);
+  } catch {
+    return;
+  }
+}
+
+/** The page's one audio context, opened on the first strike and kept until the page goes. */
+function pageAudioContext(): AudioContext | null {
+  if (pageContext !== undefined) return pageContext;
+
+  try {
+    pageContext = new AudioContext();
+  } catch {
+    pageContext = null;
+  }
+
+  return pageContext;
+}
+
+/** Each recording decoded once: a one-minute interval never refetches a 296 KB bowl. */
+function decodedBuffer(context: AudioContext, recording: Recording): Promise<AudioBuffer | null> {
+  const cached = decodedBuffers.get(recording);
+  if (cached !== undefined) return cached;
+
+  // A failure is not cached: a later strike retries rather than staying silent for the page.
+  const loading = decodeRecording(context, recording).then((buffer) => {
+    if (buffer === null) decodedBuffers.delete(recording);
+    return buffer;
+  });
+  decodedBuffers.set(recording, loading);
+  return loading;
+}
+
+async function decodeRecording(
+  context: AudioContext,
+  recording: Recording,
+): Promise<AudioBuffer | null> {
+  try {
+    const response = await fetch(recording);
+    if (!response.ok) return null;
+    return await context.decodeAudioData(await response.arrayBuffer());
   } catch {
     return null;
   }
+}
+
+/** One strike is its own source node, so a bowl still ringing is never cut by the next strike. */
+function strike(context: AudioContext, buffer: AudioBuffer): void {
+  if (context.state === 'suspended') void context.resume().catch(() => undefined);
+
+  const source = context.createBufferSource();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  source.connect(gain);
+  gain.connect(context.destination);
+  source.start();
 }
 
 /** One field's part, on whole numbers inside its own bound: a typed 90 is its 59, not a roll-over. */
