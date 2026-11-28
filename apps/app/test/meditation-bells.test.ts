@@ -1,7 +1,7 @@
 /**
- * The interval bells: the fire times a schedule yields, the sheet's own offset and interval
- * arithmetic, the summary line it derives, and the scheduler that rings exactly those times
- * and nothing of its own.
+ * The bells: the fire times a schedule yields, the sheet's own offset and interval arithmetic,
+ * the summary line it derives, and the player that rings a bowl at exactly those times — and the
+ * gong a sitting rings as it ends.
  *
  * Every boundary in `SPEC-meditation-app` §6 is asserted at its edge value, and the
  * scheduler is proven against the function's own output rather than a re-derivation.
@@ -15,7 +15,6 @@ import {
   intervalBellTimes,
   offsetFromParts,
   offsetParts,
-  ringIntervalBells,
   stepInterval,
   stepOffset,
   type BellSchedule,
@@ -94,98 +93,306 @@ describe('ringIntervalBells', () => {
   afterEach(() => {
     jest.useRealTimers();
     delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    delete (globalThis as { fetch?: unknown }).fetch;
   });
 
-  it('rings only at the times intervalBellTimes returned', () => {
-    const bells = recordBells();
+  it('rings only at the times intervalBellTimes returned', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
     const schedule: BellSchedule = {
       durationSec: 1800,
       offsetSec: 300,
       intervalSec: 600,
       repeat: 2,
     };
-    const stopRinging = ringIntervalBells(schedule);
+    const stopRinging = bells.ringIntervalBells(schedule);
 
     expect(intervalBellTimes(schedule)).toEqual([300, 900]);
 
-    jest.advanceTimersByTime(299_999);
-    expect(bells.rung).toBe(0);
+    await jest.advanceTimersByTimeAsync(299_999);
+    await settle();
+    expect(audio.strikes).toBe(0);
 
-    jest.advanceTimersByTime(1);
-    expect(bells.rung).toBe(1);
+    await jest.advanceTimersByTimeAsync(1);
+    await settle();
+    expect(audio.strikes).toBe(1);
 
-    jest.advanceTimersByTime(599_999);
-    expect(bells.rung).toBe(1);
+    await jest.advanceTimersByTimeAsync(599_999);
+    await settle();
+    expect(audio.strikes).toBe(1);
 
-    jest.advanceTimersByTime(1);
-    expect(bells.rung).toBe(2);
+    await jest.advanceTimersByTimeAsync(1);
+    await settle();
+    expect(audio.strikes).toBe(2);
 
-    jest.advanceTimersByTime(1800 * 1000);
-    expect(bells.rung).toBe(2);
+    await jest.advanceTimersByTimeAsync(1800 * 1000);
+    await settle();
+    expect(audio.strikes).toBe(2);
 
     stopRinging();
   });
 
-  it('silences the bells still pending when the sitting stops', () => {
-    const bells = recordBells();
-    const stopRinging = ringIntervalBells(SAMPLE);
+  it('silences the bells still pending when the sitting stops', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
 
-    jest.advanceTimersByTime(600 * 1000);
-    expect(bells.rung).toBe(1);
+    await jest.advanceTimersByTimeAsync(600 * 1000);
+    await settle();
+    expect(audio.strikes).toBe(1);
 
     stopRinging();
-    jest.advanceTimersByTime(3600 * 1000);
-    expect(bells.rung).toBe(1);
+    await jest.advanceTimersByTimeAsync(3600 * 1000);
+    await settle();
+    expect(audio.strikes).toBe(1);
   });
 
-  it('rings nothing and throws nothing without Web Audio', () => {
-    jest.useFakeTimers();
+  it('plays the bowl recording for every bell', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
 
-    const stopRinging = ringIntervalBells(SAMPLE);
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+    await jest.advanceTimersByTimeAsync(1500 * 1000);
+    await settle();
 
-    expect(() => jest.advanceTimersByTime(3600 * 1000)).not.toThrow();
+    expect(audio.strikes).toBe(3);
+    expect(audio.requested).toEqual(['/sounds/bowl.mp3']);
+
+    stopRinging();
+  });
+
+  it('decodes the bowl once, so a one-minute interval never refetches it', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+    await jest.advanceTimersByTimeAsync(1500 * 1000);
+    await settle();
+
+    expect(audio.strikes).toBe(3);
+    expect(audio.requested).toHaveLength(1);
+    expect(audio.decoded).toBe(1);
+
+    stopRinging();
+  });
+
+  /** A bowl is 14.8 s long, so a strike that lands while the last one rings starts its own source. */
+  it('lets an overlapping strike play instead of cutting the bowl it landed on', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells({
+      durationSec: 60,
+      offsetSec: 0,
+      intervalSec: 30,
+      repeat: null,
+    });
+    await jest.advanceTimersByTimeAsync(30 * 1000);
+    await settle();
+
+    expect(audio.strikes).toBe(2);
+    expect(audio.stopped).toBe(0);
+
+    stopRinging();
+  });
+
+  it('rings nothing and throws nothing without Web Audio', async () => {
+    const audio = recordStrikes();
+    delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+
+    await expect(jest.advanceTimersByTimeAsync(3600 * 1000)).resolves.toBeUndefined();
+    await settle();
+    expect(audio.strikes).toBe(0);
+    expect(audio.requested).toHaveLength(0);
+
+    stopRinging();
+  });
+
+  it('is silence, not an error, when the recording cannot be read', async () => {
+    const audio = recordStrikes();
+    (globalThis as { fetch?: unknown }).fetch = () => Promise.resolve({ ok: false });
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+
+    await expect(jest.advanceTimersByTimeAsync(1500 * 1000)).resolves.toBeUndefined();
+    await settle();
+    expect(audio.strikes).toBe(0);
+
+    stopRinging();
+  });
+
+  it('is silence, not an error, when the browser rejects the recording', async () => {
+    const audio = recordStrikes();
+    (globalThis as { fetch?: unknown }).fetch = () => Promise.reject(new Error('offline'));
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+
+    await expect(jest.advanceTimersByTimeAsync(1500 * 1000)).resolves.toBeUndefined();
+    await settle();
+    expect(audio.strikes).toBe(0);
 
     stopRinging();
   });
 });
 
-/** A stub Web Audio that counts how many bells actually sounded. */
-function recordBells(): { rung: number } {
+describe('ringGong', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    delete (globalThis as { fetch?: unknown }).fetch;
+  });
+
+  it('plays the gong recording, not the bowl', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
+
+    bells.ringGong();
+    await settle();
+
+    expect(audio.strikes).toBe(1);
+    expect(audio.requested).toEqual(['/sounds/gong.mp3']);
+  });
+
+  it('rings nothing and throws nothing without Web Audio', async () => {
+    const audio = recordStrikes();
+    delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    const bells = loadBells();
+
+    expect(() => bells.ringGong()).not.toThrow();
+    await settle();
+
+    expect(audio.strikes).toBe(0);
+  });
+
+  /**
+   * The panel unmounts the instant the gong rings, so its source may not live on a context the
+   * panel owns: one page-level context, decoded buffers reused, never closed by a strike.
+   */
+  it('plays on one page-level context it never closes', async () => {
+    const audio = recordStrikes();
+    const bells = loadBells();
+
+    const stopRinging = bells.ringIntervalBells(SAMPLE);
+    await jest.advanceTimersByTimeAsync(1500 * 1000);
+    await settle();
+
+    expect(audio.contextCount).toBe(1);
+    expect(audio.closedCount).toBe(0);
+
+    stopRinging();
+  });
+
+  it('is silence, not an error, when the gong cannot be read', async () => {
+    const audio = recordStrikes();
+    (globalThis as { fetch?: unknown }).fetch = () => Promise.reject(new Error('offline'));
+    const bells = loadBells();
+
+    expect(() => bells.ringGong()).not.toThrow();
+    await settle();
+
+    expect(audio.strikes).toBe(0);
+  });
+});
+
+/**
+ * A fresh copy of the module, so each case gets a page with no context and no decoded recording:
+ * both are kept for the life of a real page, which is exactly what a test must start without.
+ */
+function loadBells(): typeof import('@/lib/meditation-bells') {
+  let bells!: typeof import('@/lib/meditation-bells');
+  jest.isolateModules(() => {
+    bells = require('@/lib/meditation-bells') as typeof import('@/lib/meditation-bells');
+  });
+  return bells;
+}
+
+/** Drains the microtasks a strike's `fetch` → decode → play chain awaits on. */
+async function settle(): Promise<void> {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+}
+
+/**
+ * A stub Web Audio and `fetch` that record every recording asked for and every strike played:
+ * jsdom has neither, and real playback is not a test's business.
+ */
+function recordStrikes(): {
+  strikes: number;
+  stopped: number;
+  decoded: number;
+  contextCount: number;
+  closedCount: number;
+  requested: string[];
+} {
   jest.useFakeTimers();
 
-  const bells = { rung: 0 };
+  const audio = {
+    strikes: 0,
+    stopped: 0,
+    decoded: 0,
+    contextCount: 0,
+    closedCount: 0,
+    requested: [] as string[],
+  };
 
-  class CountingOscillator {
-    frequency = { value: 0 };
-    onended: (() => void) | null = null;
+  class RecordingBufferSource {
+    buffer: unknown = null;
 
     connect(): void {
       return undefined;
     }
 
     start(): void {
-      bells.rung += 1;
+      audio.strikes += 1;
     }
 
-    stop(): void {}
+    stop(): void {
+      audio.stopped += 1;
+    }
   }
 
-  class CountingAudioContext {
-    currentTime = 0;
+  class RecordingAudioContext {
+    state = 'running';
     destination = {};
 
-    createOscillator(): CountingOscillator {
-      return new CountingOscillator();
+    constructor() {
+      audio.contextCount += 1;
+    }
+
+    createBufferSource(): RecordingBufferSource {
+      return new RecordingBufferSource();
+    }
+
+    createGain(): { connect(): void; gain: { value: number } } {
+      return { connect: () => undefined, gain: { value: 1 } };
+    }
+
+    decodeAudioData(): Promise<AudioBuffer> {
+      audio.decoded += 1;
+      return Promise.resolve({ duration: 14.832 } as AudioBuffer);
+    }
+
+    resume(): Promise<void> {
+      return Promise.resolve();
     }
 
     close(): Promise<void> {
+      audio.closedCount += 1;
       return Promise.resolve();
     }
   }
 
-  (globalThis as { AudioContext?: unknown }).AudioContext = CountingAudioContext;
+  (globalThis as { AudioContext?: unknown }).AudioContext = RecordingAudioContext;
+  (globalThis as { fetch?: unknown }).fetch = (url: string) => {
+    audio.requested.push(url);
+    return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
+  };
 
-  return bells;
+  return audio;
 }
 
 describe('the offset the sheet edits', () => {

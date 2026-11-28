@@ -74,6 +74,59 @@ function renderRunning(overrides: Partial<RunningSittingProps> = {}) {
   return { props, ...render(<RunningSitting {...props} />) };
 }
 
+/** Drains the microtasks a strike's `fetch` → decode → play chain awaits on. */
+async function settle(): Promise<void> {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+}
+
+/**
+ * A stub Web Audio and `fetch` that record what a sitting asked to hear: jsdom ships neither, and
+ * real playback is not a test's business.
+ */
+function recordAudio(): { strikes: number; closed: number; requested: string[] } {
+  const audio = { strikes: 0, closed: 0, requested: [] as string[] };
+
+  class RecordingAudioContext {
+    state = 'running';
+    destination = {};
+
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect: () => undefined,
+        start: () => {
+          audio.strikes += 1;
+        },
+      };
+    }
+
+    createGain() {
+      return { connect: () => undefined, gain: { value: 1 } };
+    }
+
+    decodeAudioData() {
+      return Promise.resolve({ duration: 4.968 } as AudioBuffer);
+    }
+
+    resume(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    close(): Promise<void> {
+      audio.closed += 1;
+      return Promise.resolve();
+    }
+  }
+
+  (globalThis as { AudioContext?: unknown }).AudioContext = RecordingAudioContext;
+  (globalThis as { fetch?: unknown }).fetch = (url: string) => {
+    audio.requested.push(url);
+    return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
+  };
+
+  return audio;
+}
+
 const countdown = () => screen.getByRole('status');
 /** The complete panel's figure: the same status element, written once as a result. */
 const figure = () => screen.getByRole('status');
@@ -98,6 +151,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   jest.useRealTimers();
+  delete (globalThis as { AudioContext?: unknown }).AudioContext;
+  delete (globalThis as { fetch?: unknown }).fetch;
 });
 
 describe('the running panel', () => {
@@ -118,6 +173,39 @@ describe('the running panel', () => {
 
     expect(countdown().textContent).toBe('9:00');
     expect(progress().getAttribute('aria-valuenow')).toBe('10');
+  });
+
+  /**
+   * The ending bell the panel never had: the gong rings as the sitting reaches its length, and it
+   * has to outlive the panel, which the parent drops the instant it finishes. The strike starts on
+   * the page's own context, so the unmount clears no timer under it and closes nothing.
+   */
+  it('rings the ending gong as it completes, and the unmount does not stop it', async () => {
+    const audio = recordAudio();
+    const { props, unmount } = renderRunning({ onFinish: jest.fn() });
+
+    tick(PLANNED_MINUTES * 60_000);
+    unmount();
+
+    await settle();
+
+    expect(props.onFinish).toHaveBeenCalledTimes(1);
+    expect(audio.requested).toEqual(['/sounds/gong.mp3']);
+    expect(audio.strikes).toBe(1);
+    expect(audio.closed).toBe(0);
+  });
+
+  it('does not ring the gong for a sitting stopped before its length', async () => {
+    const audio = recordAudio();
+    renderRunning();
+
+    tick(elapsed);
+    fireEvent.click(button('Stop'));
+    fireEvent.click(button('End session'));
+
+    await settle();
+
+    expect(audio.requested).toEqual([]);
   });
 
   /**

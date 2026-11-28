@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button, Caption, Dialog, ProgressBar, Stack, StatusText } from '@life/ui';
-import { ringIntervalBells } from '@/lib/meditation-bells';
+import { ringGong, ringIntervalBells } from '@/lib/meditation-bells';
 import {
   bellScheduleFor,
   formatClock,
@@ -144,13 +144,18 @@ function useIntervalBells(bells: BellChoice, plannedMinutes: number): void {
   }, [enabled, offsetSec, intervalSec, repeat, plannedMinutes]);
 }
 
-/** A sitting that reaches its planned length records itself, exactly once. */
+/**
+ * A sitting that reaches its planned length records itself, exactly once, and rings the gong as
+ * it does. The gong starts on the page's own audio context before `onFinish`, so the panel
+ * unmounting right after cannot cut it off.
+ */
 function useNaturalFinish(remaining: number, onFinish: () => void): void {
   const finished = useRef(false);
 
   useEffect(() => {
     if (remaining > 0 || finished.current) return;
     finished.current = true;
+    ringGong();
     onFinish();
   }, [remaining, onFinish]);
 }
