@@ -29,7 +29,15 @@ export interface RestoreResult {
   }>;
 }
 
-const DATABASE_NAMES: readonly DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'];
+const DATABASE_NAMES: readonly DatabaseName[] = [
+  'life',
+  'tags',
+  'todo',
+  'idp',
+  'meal',
+  'focus',
+  'meditation',
+];
 const STACK_PORTS: readonly number[] = [3002, 3003];
 const STACK_PROBE_TIMEOUT_MS = 1000;
 

@@ -272,6 +272,50 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  meditation-service:
+    build:
+      context: .
+      dockerfile: apps/meditation-service/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '3109'
+      HOST: 0.0.0.0
+      # SQLite for the meditation settings and sitting rows (`SPEC-meditation-app`
+      # Storage), the focus-service shape: rows are numbers, dates and ids.
+      MEDITATION_DB_PATH: /data/meditation.db
+      # JWT-only auth, same offline-JWKS pattern as the other file-backed
+      # services: `iss` must equal the IdP's browser-facing issuer, while the
+      # JWKS is fetched over the internal compose network.
+      IDP_ISSUER: ${IDP_ISSUER:-}
+      MEDITATION_IDP_JWKS_URL: ${MEDITATION_IDP_JWKS_URL:-http://idp:3003/jwks}
+      MEDITATION_SERVICE_AUDIENCE: ${MEDITATION_SERVICE_AUDIENCE:-life-api}
+      # Master key for the owner-key table (own custody, MAP M3). Fail-fast here;
+      # the service also refuses to boot without it.
+      MEDITATION_MASTER_KEY: ${MEDITATION_MASTER_KEY:?MEDITATION_MASTER_KEY is required (openssl rand -base64 32)}
+      # Per-service read-through cache (fail-open). Injected here; .env unchanged.
+      REDIS_URL: redis://redis-meditation:6379
+    volumes:
+      - ./apps/meditation-service/data:/data
+    depends_on:
+      redis-meditation:
+        condition: service_healthy
+    networks:
+      - life
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3109/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   idp:
     build:
       context: .
@@ -352,6 +396,9 @@ services:
       # Without this the pomodoro BFF falls back to container-local loopback and
       # every session/goal call dies inside the app container.
       FOCUS_API_URL: http://focus-service:3107
+      # Without this the meditation BFF falls back to container-local loopback and
+      # every settings/sitting call dies inside the app container.
+      MEDITATION_API_URL: http://meditation-service:3109
       # The app's fallback "today" zone, before the browser's `tz` cookie lands.
       # Must match the backend's TODO_TIMEZONE so SSR today agrees with storage.
       TODO_TIMEZONE: ${TODO_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -380,6 +427,8 @@ services:
       meal-service:
         condition: service_healthy
       focus-service:
+        condition: service_healthy
+      meditation-service:
         condition: service_healthy
       idp:
         condition: service_healthy
@@ -661,6 +710,36 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis-meditation:
+    image: redis:8-alpine
+    # Cache only, owned by meditation-service (one instance per service). `--save ""`
+    # + `--appendonly no` turn off both RDB and AOF: the cached rows never hit a
+    # second disk, and the image's default snapshot points would otherwise write
+    # them to /data/dump.rdb.
+    command:
+      [
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
+    volumes:
+      - redis-meditation-data:/data
+    networks:
+      - life
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
 networks:
   life:
     driver: bridge
@@ -672,3 +751,4 @@ volumes:
   rabbitmq-feedback-data:
   redis-feedback-data:
   redis-focus-data:
+  redis-meditation-data:

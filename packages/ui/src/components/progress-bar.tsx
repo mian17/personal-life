@@ -26,6 +26,8 @@ export interface ProgressBarProps {
    * colour never comes from the caller.
    */
   tone?: ProgressBarTone;
+  /** The trough's height: `s2` is the atom's, `s1` the design's hairline track. Default `s2`. */
+  height?: 's1' | 's2';
 }
 
 export type ProgressBarTone = 'press' | 'line';
@@ -35,7 +37,13 @@ const MAX_PERCENT = 100;
 
 /** The fill is the app accent on the pill radius; the trough's wash is the caller's `tone` (§6). */
 const trackStyles =
-  'ui-progress-track block h-[var(--s2)] w-full appearance-none overflow-hidden rounded-[var(--r-pill)] [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
+  'ui-progress-track block w-full appearance-none overflow-hidden rounded-[var(--r-pill)] [&::-moz-progress-bar]:rounded-[var(--r-pill)] [&::-moz-progress-bar]:bg-max [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-[var(--r-pill)] [&::-webkit-progress-value]:bg-max';
+
+/** One trough height per step: the atom's two-step track, or the design's hairline. */
+const heightStyles: Record<NonNullable<ProgressBarProps['height']>, string> = {
+  s1: 'h-[var(--s1)]',
+  s2: 'h-[var(--s2)]',
+};
 
 /** One trough wash per tone; `press` stays the default so existing bars do not move. */
 const troughStyles: Record<ProgressBarTone, string> = {
@@ -79,13 +87,19 @@ export function ProgressBar({
   readout,
   className,
   tone = 'press',
+  height = 's2',
 }: Readonly<ProgressBarProps>) {
   const percent = clampedPercent(value);
   const bar = (
     <progress
       aria-label={label}
       aria-valuenow={Math.round(percent)}
-      className={cx(trackStyles, troughStyles[tone], caption == null && className)}
+      className={cx(
+        trackStyles,
+        heightStyles[height],
+        troughStyles[tone],
+        caption == null && className,
+      )}
       max={MAX_PERCENT}
       value={percent}
     />

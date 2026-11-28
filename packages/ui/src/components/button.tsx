@@ -3,18 +3,22 @@ import { cva } from 'class-variance-authority';
 import type { ComponentPropsWithRef } from 'react';
 import { cx } from '../lib/cx';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'quiet';
-export type ButtonSize = 'default' | 'bare' | 'icon';
+export type ButtonVariant = 'primary' | 'ghost' | 'filled' | 'danger' | 'quiet' | 'text';
+export type ButtonSize = 'default' | 'bare' | 'icon' | 'hero';
 
 export interface ButtonProps extends ComponentPropsWithRef<'button'> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** `pill` is the design's action language; `rounded` is the library's `--r-md` corner. */
+  shape?: 'rounded' | 'pill';
 }
 
 /**
  * The revised `.btn` (REVISED-DESIGN §8): a full-width control on the 48px tap floor,
- * one accent fill and one pressed move. `ghost` is the outlined secondary, `danger` the
- * text-only destructive action, `quiet` the text-only accent action.
+ * one accent fill and one pressed move. `filled` is the design's `.button--quiet` — a
+ * `--surface` face on a `--line` hairline — `ghost` the outlined secondary, `danger` the
+ * text-only destructive action, `quiet` the text-only accent action, `text` the sheet
+ * header's quiet word button.
  *
  * Every length is a `--token`; the registry's utility scale is gone, so a theme change
  * moves this button without touching this file.
@@ -22,7 +26,7 @@ export interface ButtonProps extends ComponentPropsWithRef<'button'> {
 export const buttonVariants = cva(
   cx(
     'inline-flex items-center justify-center gap-[var(--s2)]',
-    'rounded-[var(--r-md)] font-semibold whitespace-nowrap',
+    'font-semibold whitespace-nowrap',
     'text-[length:var(--fs-button)] tracking-[var(--tracking-button)]',
     'cursor-pointer outline-none motion-safe:transition-colors',
     'focus-visible:outline-solid focus-visible:outline-[length:var(--focus-ring)] focus-visible:outline-offset-[var(--focus-ring)] focus-visible:outline-focus',
@@ -33,26 +37,43 @@ export const buttonVariants = cva(
       variant: {
         primary: 'border border-max bg-max text-on-max active:border-max-press active:bg-max-press',
         ghost: 'border border-line-strong bg-transparent text-ink active:bg-press',
+        filled: 'border border-line bg-surface text-ink active:bg-press',
         danger: 'bg-transparent text-danger active:bg-danger-soft',
         quiet: 'bg-transparent text-max active:bg-press',
+        text: 'bg-transparent text-ink-2 active:bg-press',
       },
       size: {
         default: 'w-full min-h-[var(--tap)] px-[var(--s5)]',
-        bare: 'w-auto min-h-[var(--tap)] px-[var(--s3)] py-[var(--s2)]',
+        bare: 'w-auto min-h-[var(--tap)] px-[var(--s6)] py-[var(--s2)]',
         icon: 'size-[var(--tap)] p-0',
+        hero: 'w-full min-h-[var(--fab-size)] px-[var(--s6)]',
+      },
+      /** The corner, selected rather than stacked: one radius reaches the element either way. */
+      shape: {
+        rounded: 'rounded-[var(--r-md)]',
+        pill: 'rounded-[var(--r-pill)]',
       },
     },
     compoundVariants: [
       // An icon-sized control draws one glyph, so the line box must not add height.
       { variant: 'danger', size: 'icon', class: 'text-xl leading-none' },
+      // The word button owns its own geometry and its own weight: the small corner, one-step inset
+      // and body weight of §8's `.text-button` beat the `size`, `shape` and semibold face it was not
+      // asked for. `!` because `cx` joins and never merges, so the selection has to be made before
+      // the two strings meet.
+      {
+        variant: 'text',
+        class: 'px-[var(--s3)]! rounded-[var(--r-sm)]! [font-weight:var(--fw-body)]!',
+      },
     ],
-    defaultVariants: { variant: 'primary', size: 'default' },
+    defaultVariants: { variant: 'primary', size: 'default', shape: 'rounded' },
   },
 );
 
 export function Button({
   variant = 'primary',
   size = 'default',
+  shape = 'rounded',
   type = 'button',
   className,
   children,
@@ -66,7 +87,8 @@ export function Button({
         'ui-btn',
         `ui-btn--${variant}`,
         `ui-btn--${size}`,
-        buttonVariants({ variant, size }),
+        `ui-btn--${shape}`,
+        buttonVariants({ variant, size, shape }),
         className,
       )}
       {...rest}

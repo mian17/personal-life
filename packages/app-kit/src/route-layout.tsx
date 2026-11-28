@@ -16,7 +16,7 @@ export function routeLayoutMetadata(manifest: string, title: string, icon: strin
 }
 
 /** The passthrough layout body every segment layout uses, carrying the area's accent scope. */
-export type AppScope = 'notes' | 'todos' | 'meals' | 'pomodoro' | 'feedback';
+export type AppScope = 'notes' | 'todos' | 'meals' | 'pomodoro' | 'feedback' | 'meditation';
 
 export interface RouteLayoutProps {
   /**

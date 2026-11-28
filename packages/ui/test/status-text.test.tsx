@@ -77,3 +77,39 @@ describe('StatusText', () => {
     expect(screen.getByRole('status').getAttribute('data-extra')).toBe('1');
   });
 });
+
+describe('StatusText — figure', () => {
+  it('keeps the second ink tier and no figure treatment by default', () => {
+    render(<StatusText size="display">10:00</StatusText>);
+    const classes = classesOf(screen.getByRole('status'));
+    expect(classes).toContain('text-ink-2');
+    expect(classes).not.toContain('text-ink');
+    expect(classes).not.toContain('leading-[var(--lh-kpi)]');
+    expect(classes).not.toContain('tracking-[var(--tracking-timer)]');
+  });
+
+  it('turns the display tier into a figure: full ink, the timer weight, leading and tracking', () => {
+    render(
+      <StatusText size="display" figure>
+        10:00
+      </StatusText>,
+    );
+    const classes = classesOf(screen.getByRole('status'));
+    expect(classes).toContain('text-ink');
+    expect(classes).not.toContain('text-ink-2');
+    expect(classes).toContain('[font-weight:var(--fw-semibold)]');
+    expect(classes).toContain('leading-[var(--lh-kpi)]');
+    expect(classes).toContain('tracking-[var(--tracking-timer)]');
+    // The size tier and the live region are untouched by the figure.
+    expect(classes).toContain('text-[length:var(--fs-timer)]');
+    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('ignores figure at the default tier, which has no figure to treat', () => {
+    render(<StatusText figure>Saved</StatusText>);
+    const classes = classesOf(screen.getByRole('status'));
+    expect(classes).toContain('text-ink-2');
+    expect(classes).not.toContain('text-ink');
+    expect(classes).not.toContain('[font-weight:var(--fw-semibold)]');
+  });
+});
