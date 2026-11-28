@@ -1,5 +1,26 @@
-import type { SittingRow } from '@/lib/meditation-api';
+import type { ReactElement } from 'react';
+import * as ui from '@life/ui';
+import { ProgressBar, Segmented, StatusText } from '@life/ui';
+
+jest.mock('@/lib/meditation-api', () => ({
+  fetchSittingPage: jest.fn(),
+  fetchDayDone: jest.fn(),
+}));
+jest.mock('@/lib/today', () => ({ getToday: jest.fn() }));
+
+import {
+  fetchDayDone,
+  fetchSittingPage,
+  type DayDoneRow,
+  type SittingRow,
+} from '@/lib/meditation-api';
 import { lensFor } from '@/lib/meditation-stats';
+import { getToday } from '@/lib/today';
+import MeditationStatsRoute from '@/app/meditation/stats/page';
+
+const mockedFetchSittingPage = fetchSittingPage as jest.MockedFunction<typeof fetchSittingPage>;
+const mockedFetchDayDone = fetchDayDone as jest.MockedFunction<typeof fetchDayDone>;
+const mockedGetToday = getToday as jest.MockedFunction<typeof getToday>;
 
 /** One live sitting of `minutes`, ending on `day` at the local time its `endedAt` carries. */
 function sittingOn(day: string, minutes: number, id = `${day}-${minutes}`): SittingRow {
@@ -115,5 +136,107 @@ describe('lensFor soft deletes', () => {
 
     expect(summary.bars.at(-1)?.value).toBe(10);
     expect(summary.totals).toEqual({ minutes: 10, sittings: 1, averageMinutes: 10 });
+  });
+});
+
+/** One day row as `GET /sessions/days` answers it: the day's live minutes against the current goal. */
+function dayRow(liveMinutes: number, goalMinutes: number): DayDoneRow {
+  return { date: TODAY, liveMinutes, goalMinutes, done: liveMinutes >= goalMinutes };
+}
+
+/** Every `@life/ui` primitive by value: the expansion below stops at these. */
+const PRIMITIVES = new Set<unknown>(Object.values(ui));
+
+type Node = ReactElement<Record<string, unknown>>;
+
+/** The route's `ManagerBlock` children, each expanded into the primitives it returns. */
+async function statsSections(): Promise<unknown[]> {
+  mockedFetchSittingPage.mockResolvedValue({
+    sessions: [sittingOn(TODAY, 10)],
+    nextCursor: null,
+    total: 1,
+  });
+  mockedGetToday.mockResolvedValue(TODAY);
+
+  const page = await MeditationStatsRoute({ searchParams: Promise.resolve({}) });
+  const children = expand(page).props.children as unknown;
+  return (Array.isArray(children) ? children : [children]).map(expand);
+}
+
+/** The route's output with the page's own components expanded, stopping at every primitive. */
+function expand(node: unknown): Node {
+  if (!isElement(node)) return node as unknown as Node;
+  if (typeof node.type === 'function' && !PRIMITIVES.has(node.type)) {
+    return expand((node.type as (props: unknown) => unknown)(node.props));
+  }
+
+  return node;
+}
+
+/** React elements only: a `null` child, a string or a plain value carries no component to expand. */
+function isElement(node: unknown): node is Node {
+  return typeof node === 'object' && node !== null && 'props' in node && 'type' in node;
+}
+
+/** The first element of `type` under `node`, props included: a composed node hides its primitive one level down. */
+function firstOfType<T>(node: unknown, type: unknown): T | undefined {
+  if (Array.isArray(node)) {
+    const found = node.find((child) => firstOfType<T>(child, type) !== undefined);
+    return found === undefined ? undefined : firstOfType<T>(found, type);
+  }
+  if (!isElement(node)) return undefined;
+  if (node.type === type) return node.props as T;
+
+  return Object.values(node.props)
+    .map((value) => firstOfType<T>(value, type))
+    .find(Boolean);
+}
+
+describe('/meditation/stats today progress', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedFetchDayDone.mockResolvedValue([dayRow(10, 30)]);
+  });
+
+  it("states today's minutes against the goal and fills the bar to that share", async () => {
+    const tree = await statsSections();
+
+    expect(firstOfType<{ children: unknown }>(tree, StatusText)?.children).toBe(
+      '10 of 30 minutes today',
+    );
+
+    const bar = firstOfType<{ value: number; label: string }>(tree, ProgressBar);
+    expect(bar?.value).toBeCloseTo(33.3, 1);
+    expect(bar?.label).toBe('Today: 10 of 30 minutes');
+  });
+
+  it('reads the day the same single-day call /meditation makes, for the day it already resolved', async () => {
+    await statsSections();
+
+    expect(mockedFetchDayDone).toHaveBeenCalledWith(TODAY, TODAY);
+    expect(mockedGetToday).toHaveBeenCalledTimes(1);
+  });
+
+  it('sits above the window control, the order /pomodoro/stats uses', async () => {
+    const [progress, filter] = await statsSections();
+
+    expect(firstOfType(progress, ProgressBar)).toBeDefined();
+    expect(firstOfType(filter, Segmented)).toBeDefined();
+  });
+
+  it('shows nothing when the day read fails, rather than inventing a target', async () => {
+    mockedFetchDayDone.mockRejectedValue(new Error('service down'));
+    const tree = await statsSections();
+
+    expect(firstOfType(tree, StatusText)).toBeUndefined();
+    expect(firstOfType(tree, ProgressBar)).toBeUndefined();
+  });
+
+  it('shows the minutes alone when no goal is set, with no bar and no division', async () => {
+    mockedFetchDayDone.mockResolvedValue([dayRow(10, 0)]);
+    const tree = await statsSections();
+
+    expect(firstOfType<{ children: unknown }>(tree, StatusText)?.children).toBe('10 minutes today');
+    expect(firstOfType(tree, ProgressBar)).toBeUndefined();
   });
 });

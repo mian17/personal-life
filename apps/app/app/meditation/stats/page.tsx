@@ -1,6 +1,22 @@
 import { filterHref } from '@life/app-kit';
-import { BarChart, Card, Facts, FactsRow, Kpi, ManagerBlock, Segmented, Stack } from '@life/ui';
-import { fetchSittingPage, type SittingRow } from '@/lib/meditation-api';
+import {
+  BarChart,
+  Card,
+  Facts,
+  FactsRow,
+  Kpi,
+  ManagerBlock,
+  ProgressBar,
+  Segmented,
+  Stack,
+  StatusText,
+} from '@life/ui';
+import {
+  fetchDayDone,
+  fetchSittingPage,
+  type DayDoneRow,
+  type SittingRow,
+} from '@/lib/meditation-api';
 import { minuteUnit } from '@/lib/meditation-clock';
 import { lensFor, type Lens, type LensSummary, type LensTotals } from '@/lib/meditation-stats';
 import { getToday } from '@/lib/today';
@@ -9,6 +25,12 @@ export const dynamic = 'force-dynamic';
 
 const STATS_PATH = '/meditation/stats';
 
+/** The title's quiet second line, the tier today's sentence sits on. */
+const subtitleStyles = 'block text-[length:var(--fs-chip)]';
+
+/** One step between today's sentence and the fill under it. */
+const todayBarStyles = 'mt-[var(--s3)]';
+
 const LENSES: readonly { value: Lens; label: string }[] = [
   { value: 'week', label: 'Week' },
   { value: 'month', label: 'Month' },
@@ -16,10 +38,10 @@ const LENSES: readonly { value: Lens; label: string }[] = [
 ];
 
 /**
- * `/meditation/stats` — the lens (`SPEC-meditation-app` §1): the period rides the URL
- * (`?period=month`), the client's own local day anchors the window, and every bar is derived
- * here from the owner's sittings. Nothing is fetched as an aggregate, so a bar and the day
- * read beside it cannot be summed from two different row sets.
+ * `/meditation/stats` — the lens (`SPEC-meditation-app` §1): today's progress against today's
+ * goal, then the period, which rides the URL (`?period=month`); the client's own local day anchors
+ * the window, and every bar is derived here from the owner's sittings. Nothing is fetched as an
+ * aggregate, so a bar and the day read beside it cannot be summed from two different row sets.
  */
 export default async function MeditationStatsRoute({
   searchParams,
@@ -27,18 +49,64 @@ export default async function MeditationStatsRoute({
   const { period } = await searchParams;
   const lens = parseLens(period);
   const [sittings, today] = await Promise.all([readEverySitting(), getToday()]);
+  const day = await readDay(today);
   const summary = lensFor(lens, sittings, today);
 
   return (
-    <ManagerBlock
-      title="Stats"
-      backHref="/meditation"
-      sub={windowLine(lens)}
-      filters={<LensFilter lens={lens} />}
-    >
+    <ManagerBlock title="Stats" backHref="/meditation" sub={windowLine(lens)}>
+      <TodayProgress day={day} />
+      <LensFilter lens={lens} />
       <LensBody lens={lens} summary={summary} />
     </ManagerBlock>
   );
+}
+
+/**
+ * Today against today's goal, the first thing under the title: the same sentence and fill
+ * `/pomodoro/stats` opens with, read from the same day row `/meditation` reads.
+ *
+ * No day row means no target: the line is left off rather than invented. A goal of `0` means
+ * the owner set none, so the minutes stand alone — no bar, no "of 0", nothing to divide by.
+ */
+function TodayProgress({ day }: Readonly<{ day: DayDoneRow | null }>) {
+  if (day === null) return null;
+
+  const { liveMinutes, goalMinutes } = day;
+  if (goalMinutes === 0) {
+    return (
+      <StatusText
+        className={subtitleStyles}
+      >{`${liveMinutes} ${minuteUnit(liveMinutes)} today`}</StatusText>
+    );
+  }
+
+  return (
+    <>
+      <StatusText
+        className={subtitleStyles}
+      >{`${liveMinutes} of ${goalMinutes} minutes today`}</StatusText>
+      <ProgressBar
+        value={percentOf(liveMinutes, goalMinutes)}
+        label={`Today: ${liveMinutes} of ${goalMinutes} minutes`}
+        className={todayBarStyles}
+      />
+    </>
+  );
+}
+
+/** How much of the goal the recorded minutes fill; the bar clamps it, the sentence says it plainly. */
+function percentOf(minutes: number, goal: number): number {
+  return (minutes / goal) * 100;
+}
+
+/** Today measured against the goal, or `null`: a failed read is a missing read-out, not a wrong one. */
+async function readDay(today: string): Promise<DayDoneRow | null> {
+  try {
+    const [day] = await fetchDayDone(today, today);
+    return day ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** An absent or unknown `?period=` reads as the week lens, so a hand-typed URL still renders. */
@@ -70,9 +138,8 @@ function LensFilter({ lens }: Readonly<{ lens: Lens }>) {
 /**
  * The window's chart, then the numbers read beside it — both derived from the same bars.
  *
- * `ManagerBlock` draws no step between its filter row and its body, so the stack opens on the
- * section step itself; the sibling bodies that start on a `Section` get that step from the
- * section's own top margin.
+ * `Segmented` carries no step below itself, so the stack opens on the section step itself; the
+ * sibling bodies that start on a `Section` get that step from the section's own top margin.
  */
 function LensBody({ lens, summary }: Readonly<{ lens: Lens; summary: LensSummary }>) {
   return (
