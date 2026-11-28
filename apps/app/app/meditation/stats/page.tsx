@@ -13,12 +13,15 @@ import {
 } from '@life/ui';
 import {
   fetchDayDone,
+  fetchGoals,
   fetchSittingPage,
   type DayDoneRow,
+  type GoalRow,
   type SittingRow,
 } from '@/lib/meditation-api';
 import { minuteUnit } from '@/lib/meditation-clock';
 import { lensFor, type Lens, type LensSummary, type LensTotals } from '@/lib/meditation-stats';
+import { resolveGoal } from '@/lib/stats-buckets';
 import { getToday } from '@/lib/today';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +33,12 @@ const subtitleStyles = 'block text-[length:var(--fs-chip)]';
 
 /** One step between today's sentence and the fill under it. */
 const todayBarStyles = 'mt-[var(--s3)]';
+
+/** The meta tier standing alone under the chart. No primitive draws static body copy (a
+ * `StatusText` would claim a live region), so this stays a structural `<p>` carrying the meta
+ * tier's token classes only — pomodoro's own treatment of the same note. */
+const goalNoteStyles =
+  'mt-[var(--s2)] text-ink-2 text-[length:var(--fs-meta)] leading-[var(--lh-meta)]';
 
 const LENSES: readonly { value: Lens; label: string }[] = [
   { value: 'week', label: 'Week' },
@@ -48,15 +57,16 @@ export default async function MeditationStatsRoute({
 }: Readonly<{ searchParams: Promise<{ period?: string }> }>) {
   const { period } = await searchParams;
   const lens = parseLens(period);
-  const [sittings, today] = await Promise.all([readEverySitting(), getToday()]);
+  const [sittings, goals, today] = await Promise.all([readEverySitting(), readGoals(), getToday()]);
   const day = await readDay(today);
-  const summary = lensFor(lens, sittings, today);
+  const summary = lensFor(lens, sittings, goals, today);
 
   return (
     <ManagerBlock title="Stats" backHref="/meditation" sub={windowLine(lens)}>
       <TodayProgress day={day} />
       <LensFilter lens={lens} />
       <LensBody lens={lens} summary={summary} />
+      <GoalNote summary={summary} todayGoal={resolveGoal(goals, today)} />
     </ManagerBlock>
   );
 }
@@ -152,6 +162,24 @@ function LensBody({ lens, summary }: Readonly<{ lens: Lens; summary: LensSummary
   );
 }
 
+/**
+ * The legend for the chart's stepped line, drawn only when one is there: a window in which no
+ * goal applied to any bar has nothing to explain, and the note is left off rather than pointing
+ * at a line that is not drawn.
+ *
+ * The number is today's goal, the same aim the sentence above reads — never a bar's target, which
+ * a year window sums over a month and a changed goal would name for the wrong day.
+ */
+function GoalNote({
+  summary,
+  todayGoal,
+}: Readonly<{ summary: LensSummary; todayGoal: number | null }>) {
+  const drawsTarget = summary.bars.some((bar) => bar.target !== undefined);
+  if (!drawsTarget || todayGoal === null) return null;
+
+  return <p className={goalNoteStyles}>{`Dashed line is the ${todayGoal} minute daily goal.`}</p>;
+}
+
 /** A year window's bars are months; a week's and a month's are days. */
 function barMeasure(lens: Lens): string {
   return lens === 'year' ? 'month' : 'day';
@@ -173,6 +201,18 @@ function TotalsCard({ totals }: Readonly<{ totals: LensTotals }>) {
       </Stack>
     </Card>
   );
+}
+
+/**
+ * The owner's whole goal history, oldest first. A failed read is no history rather than a wrong
+ * one: the chart then draws no goal line, which is exactly what an owner who set no goal sees.
+ */
+async function readGoals(): Promise<GoalRow[]> {
+  try {
+    return await fetchGoals();
+  } catch {
+    return [];
+  }
 }
 
 /**

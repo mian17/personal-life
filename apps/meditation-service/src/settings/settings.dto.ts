@@ -4,11 +4,14 @@ import {
   IsDivisibleBy,
   IsInt,
   IsOptional,
+  IsString,
+  Matches,
   Max,
   Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { DATE_ONLY } from './goal-history.dto.js';
 import { DEFAULT_GOAL_MINUTES } from './goal.js';
 
 /**
@@ -98,4 +101,18 @@ export class SettingsDto {
   @ValidateNested()
   @Type(() => BellsDto)
   bells: BellsDto;
+
+  /**
+   * The client's own day, `YYYY-MM-DD`, which the goal being saved takes effect on. It is what
+   * makes today's goal enter the history: with it, `PUT /settings` also writes that day's
+   * `meditation_goal` row. Absent means "no history write" — the service never reads its own
+   * clock for "today", so it would have no day to write.
+   *
+   * It is not part of the answer: `GET /settings` and `PUT /settings` both reply with the
+   * settings content alone, whose `goalMinutes` stays the owner's current aim.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(DATE_ONLY)
+  date?: string;
 }
