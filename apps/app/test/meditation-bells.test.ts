@@ -221,15 +221,15 @@ describe('the offset the sheet edits', () => {
 });
 
 describe('the interval the sheet steps', () => {
-  it('moves in whole ten-minute steps over 10–120 minutes', () => {
+  it('moves in whole ten-minute steps over 10 minutes to a day', () => {
     expect(stepInterval(10, 1)).toBe(20);
     expect(stepInterval(20, -1)).toBe(10);
-    expect(stepInterval(110, 1)).toBe(120);
+    expect(stepInterval(1430, 1)).toBe(1440);
   });
 
   it('clamps at both ends of the service grid instead of leaving it', () => {
     expect(stepInterval(10, -1)).toBe(10);
-    expect(stepInterval(120, 1)).toBe(120);
+    expect(stepInterval(1440, 1)).toBe(1440);
   });
 });
 

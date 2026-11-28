@@ -16,7 +16,7 @@ import {
   type ChoiceChipOption,
 } from '@life/ui';
 import {
-  INTERVAL_MINUTES,
+  MEDITATION_MINUTE_STEP,
   OFFSET_MAX_SEC,
   OFFSET_PART_MAX,
   bellsFrom,
@@ -250,8 +250,8 @@ function EveryGroup({ intervalMin, onChange }: Readonly<EveryGroupProps>) {
         increaseLabel="Increase interval by one minute"
         onDecrease={() => onChange(stepInterval(intervalMin, -1))}
         onIncrease={() => onChange(stepInterval(intervalMin, 1))}
-        decreaseDisabled={intervalMin === INTERVAL_MINUTES.floor}
-        increaseDisabled={intervalMin === INTERVAL_MINUTES.ceiling}
+        decreaseDisabled={intervalMin === MEDITATION_MINUTE_STEP.floor}
+        increaseDisabled={intervalMin === MEDITATION_MINUTE_STEP.ceiling}
       />
     </Section>
   );

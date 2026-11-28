@@ -128,13 +128,11 @@ describe('the sheet', () => {
   });
 
   it('stops the interval at the top of the service grid', () => {
-    renderSheet();
-    for (let press = 0; press < 11; press += 1) {
-      fireEvent.click(button('Increase interval by one minute'));
-    }
+    renderSheet({ bells: { ...SAVED_ON, intervalSec: 1440 * 60 } });
 
-    expect(screen.getByText('Every 120 min')).toBeTruthy();
+    expect(screen.getByText('Every 1440 min')).toBeTruthy();
     expect(button('Increase interval by one minute').disabled).toBe(true);
+    expect(button('Decrease interval by one minute').disabled).toBe(false);
   });
 
   it('moves the whole offset a minute with the pair, down to zero and no further', () => {

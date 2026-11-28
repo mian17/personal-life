@@ -47,10 +47,11 @@ export const OFFSET_MAX_SEC =
   OFFSET_PART_MAX.seconds;
 
 /**
- * The interval the service accepts (spec C1): whole ten-minute steps over 10–120 minutes.
- * The sheet multiplies by sixty at the save boundary and sends seconds.
+ * Every minute stepper in meditation: whole ten-minute steps over 10 minutes to a day. Both the
+ * sitting's length and the bell interval step by it, and the service refuses what it would not
+ * store — the bell interval as seconds, the sitting length as whole minutes.
  */
-export const INTERVAL_MINUTES = { floor: 10, ceiling: 120, step: 10 } as const;
+export const MEDITATION_MINUTE_STEP = { floor: 10, ceiling: 1440, step: 10 } as const;
 
 /** The fire times of the interval bells, in seconds after the sitting starts. */
 export function intervalBellTimes({
@@ -121,10 +122,10 @@ export function stepOffset(offsetSec: number, minutes: number): number {
   return Math.min(Math.max(moved, 0), OFFSET_MAX_SEC);
 }
 
-/** The interval one press moves: whole ten-minute steps, clamped to the service's grid. */
+/** The interval one press moves: whole ten-minute steps, clamped to the service's bounds. */
 export function stepInterval(intervalMin: number, steps: number): number {
-  const moved = intervalMin + steps * INTERVAL_MINUTES.step;
-  return Math.min(Math.max(moved, INTERVAL_MINUTES.floor), INTERVAL_MINUTES.ceiling);
+  const moved = intervalMin + steps * MEDITATION_MINUTE_STEP.step;
+  return Math.min(Math.max(moved, MEDITATION_MINUTE_STEP.floor), MEDITATION_MINUTE_STEP.ceiling);
 }
 
 /** The offset in words, for the summary: `2 h`, `1 min 30 sec`, `0 min` when it is nothing. */

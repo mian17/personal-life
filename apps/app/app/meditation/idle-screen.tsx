@@ -2,13 +2,9 @@
 
 import { useState } from 'react';
 import { Button, Section, Stack, Stepper, ValueRow } from '@life/ui';
+import { MEDITATION_MINUTE_STEP } from '@/lib/meditation-bells';
 import { minuteUnit, type BellChoice } from '@/lib/meditation-clock';
 import { IntervalBellsSheet, type SaveBells } from './interval-bells-sheet';
-
-/** The stepper's range (spec C4): one minute to two hours, one minute at a time. */
-const MINUTES_FLOOR = 1;
-const MINUTES_CEILING = 120;
-const MINUTES_STEP = 1;
 
 const SECONDS_PER_MINUTE = 60;
 
@@ -32,9 +28,9 @@ export interface IdleScreenProps {
  * The idle screen, in the design's order: the length as one large stepper, the three facts that
  * shape the sitting, and the start control.
  *
- * The stepper moves *this sitting's* length and nothing else. Spec C4: the service snaps a
- * written plan onto its fifteen-minute grid, so a one-minute value would be displayed here as a
- * number the server never stores. The stored plan is edited at `/meditation/settings`.
+ * The stepper moves *this sitting's* length and nothing else: the stored plan is edited at
+ * `/meditation/settings`. What it does remember is the length it started, so the next visit opens
+ * where the last one left off (`rememberSittingLength`, fired by the start it precedes).
  *
  * The bells row's value is the saved bells, never the sheet's draft: the draft lives and dies
  * inside `IntervalBellsSheet`, so closing the sheet without Save leaves the row as it was.
@@ -56,10 +52,14 @@ export function IdleScreen({
         readout={{ kind: 'text', value: String(minutes), unit: minuteUnit(minutes) }}
         decreaseLabel="Decrease duration by one minute"
         increaseLabel="Increase duration by one minute"
-        onDecrease={() => setMinutes((current) => clampMinutes(current - MINUTES_STEP))}
-        onIncrease={() => setMinutes((current) => clampMinutes(current + MINUTES_STEP))}
-        decreaseDisabled={minutes === MINUTES_FLOOR}
-        increaseDisabled={minutes === MINUTES_CEILING}
+        onDecrease={() =>
+          setMinutes((current) => clampMinutes(current - MEDITATION_MINUTE_STEP.step))
+        }
+        onIncrease={() =>
+          setMinutes((current) => clampMinutes(current + MEDITATION_MINUTE_STEP.step))
+        }
+        decreaseDisabled={minutes === MEDITATION_MINUTE_STEP.floor}
+        increaseDisabled={minutes === MEDITATION_MINUTE_STEP.ceiling}
       />
       <Stack gap="md">
         <ValueRow label="Duration" value={`${minutes} min`} />
@@ -87,9 +87,17 @@ export function IdleScreen({
   );
 }
 
-/** A whole minute inside the design's range, whichever end a step pushes past. */
+/**
+ * The length inside the stepper's range, on the minute it is already on: the stored plan may sit
+ * on a five-minute value such as 15, and snapping it onto the ten-minute grid would quietly
+ * rewrite the owner's saved choice. Stepping by ten from 15 lands on 5 or 25, which the service
+ * stores as they are.
+ */
 function clampMinutes(minutes: number): number {
-  return Math.min(Math.max(Math.round(minutes), MINUTES_FLOOR), MINUTES_CEILING);
+  return Math.min(
+    Math.max(Math.round(minutes), MEDITATION_MINUTE_STEP.floor),
+    MEDITATION_MINUTE_STEP.ceiling,
+  );
 }
 
 /** The interval row's words: the schedule the settings hold, or `Off` when it rings none. */
