@@ -5,7 +5,6 @@ import {
   GOAL_STEP_MINUTES,
   PLANNED_MAX_MINUTES,
   PLANNED_MIN_MINUTES,
-  PLANNED_STEP_MINUTES,
   clampGoal,
   clampPlannedMinutes,
 } from '../src/settings/goal.js';
@@ -57,26 +56,31 @@ describe('clampGoal', () => {
 });
 
 /**
- * The sitting-length grid: 5–1440 on fives, so the fifteen-minute default stays storable and a
- * ten-minute step from it lands on a value the service keeps.
+ * The sitting-length range: a minute to a day on any whole minute. The stepper moves it a minute
+ * at a time, so there is no grid — every value in range is stored exactly as given.
  */
 describe('clampPlannedMinutes', () => {
-  it('clamps into five minutes to a day', () => {
-    expect(clampPlannedMinutes(PLANNED_MIN_MINUTES)).toBe(5);
+  it('clamps into one minute to a day', () => {
+    expect(clampPlannedMinutes(PLANNED_MIN_MINUTES)).toBe(1);
     expect(clampPlannedMinutes(0)).toBe(PLANNED_MIN_MINUTES);
     expect(clampPlannedMinutes(PLANNED_MAX_MINUTES)).toBe(1440);
     expect(clampPlannedMinutes(10_000)).toBe(PLANNED_MAX_MINUTES);
   });
 
-  it('lands a non-grid value on the nearest five-minute step', () => {
-    expect(clampPlannedMinutes(17)).toBe(15);
-    expect(clampPlannedMinutes(18)).toBe(20);
+  it('keeps any whole minute in range exactly as it was given', () => {
+    expect(clampPlannedMinutes(17)).toBe(17);
+    expect(clampPlannedMinutes(18)).toBe(18);
+    expect(clampPlannedMinutes(11)).toBe(11);
   });
 
-  it('starts a fresh owner at the goal default and keeps every ten-minute step from it', () => {
+  it('rounds a fractional length to the nearest whole minute', () => {
+    expect(clampPlannedMinutes(17.4)).toBe(17);
+    expect(clampPlannedMinutes(17.6)).toBe(18);
+  });
+
+  it('starts a fresh owner at the goal default and keeps every single-minute step from it', () => {
     expect(clampPlannedMinutes(DEFAULT_GOAL_MINUTES)).toBe(DEFAULT_GOAL_MINUTES);
-    expect(clampPlannedMinutes(DEFAULT_GOAL_MINUTES - 10)).toBe(5);
-    expect(clampPlannedMinutes(DEFAULT_GOAL_MINUTES + 10)).toBe(25);
-    expect(PLANNED_STEP_MINUTES).toBe(5);
+    expect(clampPlannedMinutes(DEFAULT_GOAL_MINUTES - 1)).toBe(14);
+    expect(clampPlannedMinutes(DEFAULT_GOAL_MINUTES + 1)).toBe(16);
   });
 });
