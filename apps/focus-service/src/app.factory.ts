@@ -2,7 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { AuthGuard, resolveVerifierConfig } from '@life/service-kit';
+import { AuthGuard, ServiceLogger, resolveVerifierConfig } from '@life/service-kit';
 import { AppModule } from './app.module.js';
 import { VERIFIER_ENV } from './service-config.js';
 
@@ -17,7 +17,7 @@ export async function createApp(): Promise<INestApplication> {
     recursive: true,
   });
   resolveVerifierConfig(VERIFIER_ENV);
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: new ServiceLogger() });
   app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
