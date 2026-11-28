@@ -1,3 +1,5 @@
+'use client';
+
 import { cx } from '../lib/cx';
 import { useCallback, useEffect, useRef } from 'react';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
