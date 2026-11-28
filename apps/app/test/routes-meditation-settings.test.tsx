@@ -7,17 +7,18 @@ jest.mock('@/app/feedback-actions', () => ({ submitFeedbackAction: jest.fn() }))
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { SettingsBlock, SettingsShell } from '@life/ui';
+import { SettingsBlock, SettingsRow as SettingsRowItem, SettingsShell } from '@life/ui';
 import { submitFeedbackAction } from '@/app/feedback-actions';
 import { fetchSettings, saveSettings, type SettingsRow } from '@/lib/meditation-api';
 import MeditationSettingsPage from '@/app/meditation/settings/page';
 import { DailyGoalForm } from '@/app/meditation/settings/daily-goal-form';
 
 /**
- * `/meditation/settings` is the shared `SettingsShell` plus the one group the app owns: the daily
- * goal. The shell draws Appearance, Comfort and Support, so the page's own markup is a form around
- * a single `SettingsBlock` — no bells group and no sitting-length control, because the idle screen's
- * stepper and `/meditation`'s bells sheet own those two values now.
+ * `/meditation/settings` is the shared `SettingsShell` plus the two groups the app owns: the daily
+ * goal, and the sitting log's way in. The shell draws Appearance, Comfort and Support, so the page's
+ * own markup is a form around the goal's `SettingsBlock` and a second block holding one route row —
+ * no bells group and no sitting-length control, because the idle screen's stepper and
+ * `/meditation`'s bells sheet own those two values now.
  */
 
 const mockedFetchSettings = fetchSettings as jest.MockedFunction<typeof fetchSettings>;
@@ -108,16 +109,27 @@ describe('/meditation/settings through the shared shell', () => {
     expect(page.props.onSubmit).toBe(submitFeedbackAction);
   });
 
-  it('adds exactly one app group: a Daily goal block, and no second block beside it', async () => {
+  it('adds two app groups: the Daily goal block, then the sitting log row beside it', async () => {
     const page = await renderPageElement();
 
-    expect(childList(page)).toHaveLength(1);
+    expect(childList(page)).toHaveLength(2);
     const block = goalBlock(page);
     expect(block.type).toBe(SettingsBlock);
     expect(block.props.title).toBe('Meditation');
     const rows = childList(block);
     expect(rows).toHaveLength(1);
     expect(rows[0].props.label).toBe('Daily goal');
+  });
+
+  it('reaches the sitting log from a route row, not from the toolbar', async () => {
+    const page = await renderPageElement();
+
+    const [logGroup] = childList(page).slice(1);
+    expect(logGroup.type).toBe(SettingsBlock);
+    const [logRow] = childList(logGroup);
+    expect(logRow.type).toBe(SettingsRowItem);
+    expect(logRow.props.label).toBe('Sitting log');
+    expect(logRow.props.href).toBe('/meditation/sessions');
   });
 
   it('leaves Appearance, Comfort and Support to the shell', async () => {
