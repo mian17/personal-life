@@ -116,18 +116,17 @@ describe('the sheet', () => {
     expect(field('Start offset seconds').value).toBe('0');
   });
 
-  it('reads the interval the service can store: every ten minutes, ten minutes a press', () => {
+  it('reads the interval the service stores: every ten minutes, a minute a press', () => {
     renderSheet();
 
     expect(screen.getByText('Every 10 min')).toBeTruthy();
-    expect(button('Decrease interval by one minute').disabled).toBe(true);
 
     fireEvent.click(button('Increase interval by one minute'));
-    expect(screen.getByText('Every 20 min')).toBeTruthy();
+    expect(screen.getByText('Every 11 min')).toBeTruthy();
     expect(button('Decrease interval by one minute').disabled).toBe(false);
   });
 
-  it('stops the interval at the top of the service grid', () => {
+  it('stops the interval at the top of the service range', () => {
     renderSheet({ bells: { ...SAVED_ON, intervalSec: 1440 * 60 } });
 
     expect(screen.getByText('Every 1440 min')).toBeTruthy();
@@ -192,7 +191,7 @@ describe('the sheet', () => {
     expect(onSave).toHaveBeenCalledWith({
       enabled: true,
       offsetSec: 360,
-      intervalSec: 1200,
+      intervalSec: 660,
       repeat: 2,
     });
   });
@@ -293,12 +292,12 @@ describe("the idle screen's Interval bells row", () => {
     fireEvent.click(button(/^Interval bells/));
     fireEvent.click(button('Increase interval by one minute'));
 
-    expect(screen.getByText('Every 20 min')).toBeTruthy();
+    expect(screen.getByText('Every 11 min')).toBeTruthy();
     expect(screen.getByText('Every 10 min')).toBeTruthy();
 
     fireEvent.click(button('Close'));
 
     expect(screen.getByText('Every 10 min')).toBeTruthy();
-    expect(screen.queryByText('Every 20 min')).toBeNull();
+    expect(screen.queryByText('Every 11 min')).toBeNull();
   });
 });

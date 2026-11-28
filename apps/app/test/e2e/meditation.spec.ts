@@ -259,9 +259,10 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   ).toBeDisabled();
   await expect(sheet.getByRole('heading', { name: 'Every', exact: true })).toBeVisible();
   await expect(sheet.getByText('Every 10 min', { exact: true })).toBeVisible();
+  // The floor is a minute now, so the default ten is one decrement away from it.
   await expect(
     sheet.getByRole('button', { name: 'Decrease interval by one minute' }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await expect(sheet.getByRole('heading', { name: 'Repeat', exact: true })).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Repeat: unlimited' })).toHaveAttribute(
     'aria-pressed',
@@ -279,11 +280,11 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   // Each group rewrites the summary line as it is pressed, against this sitting's own length.
   await sheet.getByRole('button', { name: 'Increase interval by one minute' }).click();
   await expect(
-    sheet.getByText('Bowl every 20 min, starting after 0 min, unlimited. 1 bowl this session.'),
+    sheet.getByText('Bowl every 11 min, starting after 0 min, unlimited. 2 bowls this session.'),
   ).toBeVisible();
   await sheet.getByLabel('Start offset minutes').fill('5');
   await expect(
-    sheet.getByText('Bowl every 20 min, starting after 5 min, unlimited. 1 bowl this session.'),
+    sheet.getByText('Bowl every 11 min, starting after 5 min, unlimited. 1 bowl this session.'),
   ).toBeVisible();
   await sheet.getByRole('button', { name: 'Repeat: 3×' }).click();
   await expect(sheet.getByRole('button', { name: 'Repeat: 3×' })).toHaveAttribute(
@@ -293,7 +294,7 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   await sheet.getByLabel('Start offset hours').fill('1');
   await expect(
     sheet.getByText(
-      `Bowl every 20 min, starting after 1 h 5 min, 3× — no bowl will sound in a ${sessionMinutes} min session.`,
+      `Bowl every 11 min, starting after 1 h 5 min, 3× — no bowl will sound in a ${sessionMinutes} min session.`,
     ),
   ).toBeVisible();
 
@@ -322,14 +323,14 @@ async function saveIntervalBells(page: Page): Promise<void> {
   await sheet.getByRole('switch', { name: 'Interval bells' }).click();
   await sheet.getByRole('button', { name: 'Increase interval by one minute' }).click();
   await sheet.getByLabel('Start offset hours').fill('1');
-  await expect(sheet.getByText(/^Bowl every 20 min, starting after 1 h,/)).toBeVisible();
+  await expect(sheet.getByText(/^Bowl every 11 min, starting after 1 h,/)).toBeVisible();
 
   await sheet.getByRole('button', { name: 'Save', exact: true }).click();
 
   // The sheet closes on a write that landed, and the row reads back what the service stored.
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await openMeditation(page);
-  await expect(intervalBellsRow(page)).toContainText('Every 20 min');
+  await expect(intervalBellsRow(page)).toContainText('Every 11 min');
 }
 
 /**

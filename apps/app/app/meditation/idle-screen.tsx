@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Button, Section, Stack, Stepper, ValueRow } from '@life/ui';
-import { minuteUnit, type BellChoice } from '@/lib/meditation-clock';
-import { MEDITATION_LENGTH_STEP, storeLength } from '@/lib/meditation-length';
+import { minuteUnit, MEDITATION_MINUTE_STEP, type BellChoice } from '@/lib/meditation-clock';
+import { storeLength } from '@/lib/meditation-length';
 import { IntervalBellsSheet, type SaveBells } from './interval-bells-sheet';
 
 const SECONDS_PER_MINUTE = 60;
@@ -59,7 +59,7 @@ export function IdleScreen({
 
   /** One step of the stepper: clamp it, remember it in the cookie, and show it — a refresh opens on it. */
   function chooseLengthBy(step: number): void {
-    const next = clampMinutes(minutes + step * MEDITATION_LENGTH_STEP.step);
+    const next = clampMinutes(minutes + step * MEDITATION_MINUTE_STEP.step);
     storeLength(next);
     setMinutes(next);
   }
@@ -74,8 +74,8 @@ export function IdleScreen({
         increaseLabel="Increase duration by one minute"
         onDecrease={() => chooseLengthBy(-1)}
         onIncrease={() => chooseLengthBy(1)}
-        decreaseDisabled={minutes === MEDITATION_LENGTH_STEP.floor}
-        increaseDisabled={minutes === MEDITATION_LENGTH_STEP.ceiling}
+        decreaseDisabled={minutes === MEDITATION_MINUTE_STEP.floor}
+        increaseDisabled={minutes === MEDITATION_MINUTE_STEP.ceiling}
       />
       <Stack gap="md">
         <ValueRow label="Duration" value={`${minutes} min`} />
@@ -106,8 +106,8 @@ export function IdleScreen({
 /** The length inside the stepper's range, on the minute it is already on: a stored 15 stays 15. */
 function clampMinutes(minutes: number): number {
   return Math.min(
-    Math.max(Math.round(minutes), MEDITATION_LENGTH_STEP.floor),
-    MEDITATION_LENGTH_STEP.ceiling,
+    Math.max(Math.round(minutes), MEDITATION_MINUTE_STEP.floor),
+    MEDITATION_MINUTE_STEP.ceiling,
   );
 }
 

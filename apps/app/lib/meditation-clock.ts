@@ -15,6 +15,13 @@ const MILLISECONDS_PER_SECOND = 1000;
 const MINIMUM_RECORDED_MINUTES = 1;
 const FULL_PROGRESS = 100;
 
+/**
+ * The minute grid both `/meditation` steppers move on: the sitting's length and the bell interval
+ * alike, one minute a press between one minute and a day. The service stores either value as any
+ * whole minute, so this range is the whole rule and there is no grid to land on.
+ */
+export const MEDITATION_MINUTE_STEP = { floor: 1, ceiling: 1440, step: 1 } as const;
+
 /** A sitting's clock: when it started, what the wall clock says now, and how long it was planned for. */
 export interface RunningClock {
   startedAtMs: number;

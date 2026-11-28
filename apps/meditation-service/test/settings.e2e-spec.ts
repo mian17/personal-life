@@ -160,7 +160,7 @@ describe('Settings (e2e)', () => {
   it('rejects an out-of-bounds bell interval with 400 and stores nothing', async () => {
     const tooShort = await putSettings(ownerToken, {
       goalMinutes: 30,
-      bells: { ...BELLS_OFF, intervalSec: 60 },
+      bells: { ...BELLS_OFF, intervalSec: 59 },
     });
     const tooLong = await putSettings(ownerToken, {
       goalMinutes: 30,
@@ -171,7 +171,7 @@ describe('Settings (e2e)', () => {
     expect(await storedRows()).toEqual([]);
   });
 
-  it('rejects an interval off the ten-minute grid with 400', async () => {
+  it('rejects an interval off the whole-minute grid with 400', async () => {
     const response = await putSettings(ownerToken, {
       goalMinutes: 30,
       bells: { ...BELLS_OFF, intervalSec: 601 },

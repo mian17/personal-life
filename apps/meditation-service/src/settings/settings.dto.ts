@@ -13,17 +13,20 @@ import { DEFAULT_GOAL_MINUTES } from './goal.js';
 
 /**
  * The interval-bell bounds (`SPEC-meditation-app` §1): a start offset anywhere in a
- * day, an interval of 10 minutes to a day in ten-minute steps, and 1–6 rings or
+ * day, an interval of one minute to a day in whole-minute steps, and 1–6 rings or
  * `null` for ring-until-the-sitting-ends. An out-of-bounds bell is refused (400)
  * rather than clamped — unlike the goal, a bell that cannot exist is a caller's bug,
  * not a preference.
  */
 export const OFFSET_MAX_SEC = 23 * 60 * 60 + 59 * 60 + 59;
-export const INTERVAL_MIN_SEC = 10 * 60;
+export const INTERVAL_MIN_SEC = 60;
 export const INTERVAL_MAX_SEC = 1440 * 60;
-export const INTERVAL_STEP_SEC = 10 * 60;
+export const INTERVAL_STEP_SEC = 60;
 export const BELL_REPEAT_MIN = 1;
 export const BELL_REPEAT_MAX = 6;
+
+/** Where a fresh owner's bell interval starts: ten minutes, the design's opening schedule. */
+export const INTERVAL_DEFAULT_SEC = 10 * 60;
 
 /** The bell configuration as it is stored inside the settings envelope. */
 export interface BellSettings {
@@ -45,7 +48,7 @@ export interface SettingsContent {
 export const DEFAULT_SETTINGS: SettingsContent = {
   goalMinutes: DEFAULT_GOAL_MINUTES,
   plannedMinutes: DEFAULT_GOAL_MINUTES,
-  bells: { enabled: false, offsetSec: 0, intervalSec: INTERVAL_MIN_SEC, repeat: null },
+  bells: { enabled: false, offsetSec: 0, intervalSec: INTERVAL_DEFAULT_SEC, repeat: null },
 };
 
 export class BellsDto {
@@ -58,7 +61,7 @@ export class BellsDto {
   @Max(OFFSET_MAX_SEC)
   offsetSec: number;
 
-  /** Seconds between bowls: 10 minutes to a day, whole ten-minute steps. */
+  /** Seconds between bowls: one minute to a day, whole-minute steps. */
   @IsInt()
   @Min(INTERVAL_MIN_SEC)
   @Max(INTERVAL_MAX_SEC)

@@ -1,6 +1,7 @@
 /**
  * The length this browser last chose for a sitting (`SPEC-meditation-app` §1): the cookie that
- * carries it back to the server, the step it moves by, and the browser's own write.
+ * carries it back to the server and the browser's own write. The step it moves by is the shared
+ * minute grid in `meditation-clock.ts`.
  *
  * A per-device preference belongs to the device, and it has to be known before the first render:
  * the settings row holds the plan a first visit opens on, a cookie holds what this browser last
@@ -11,12 +12,6 @@
 
 /** Cookie carrying this browser's last choice; written below, read by the meditation page. */
 export const MEDITATION_LENGTH_KEY = 'life.meditation.minutes';
-
-/**
- * The sitting length's own range: single-minute steps over a minute to a day. The service stores
- * a length range-only, so there is no grid to land on and every step from the default is legal.
- */
-export const MEDITATION_LENGTH_STEP = { floor: 1, ceiling: 1440, step: 1 } as const;
 
 /** A year, the lifetime the timezone cookie already uses. */
 const COOKIE_MAX_AGE_SECONDS = 31_536_000;

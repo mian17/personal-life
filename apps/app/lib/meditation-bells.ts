@@ -5,7 +5,7 @@
  * Fire times are absolute (`offset + n × interval`), never accumulated, so the n-th bowl
  * lands where the arithmetic says no matter how late a frame or a timer arrives.
  */
-import type { BellChoice } from './meditation-clock';
+import { MEDITATION_MINUTE_STEP, type BellChoice } from './meditation-clock';
 
 /** One sitting's bell settings: when the first rings, how often, and how many. */
 export interface BellSchedule {
@@ -45,13 +45,6 @@ export const OFFSET_MAX_SEC =
   OFFSET_PART_MAX.hours * SECONDS_PER_HOUR +
   OFFSET_PART_MAX.minutes * SECONDS_PER_MINUTE +
   OFFSET_PART_MAX.seconds;
-
-/**
- * The bell interval's range: whole ten-minute steps over 10 minutes to a day. The service refuses
- * a length off this grid, so a client that stepped by one would let the sheet build a value Save
- * cannot store — the sitting's length is a different range, held by `meditation-length.ts`.
- */
-export const BELL_INTERVAL_STEP = { floor: 10, ceiling: 1440, step: 10 } as const;
 
 /** The fire times of the interval bells, in seconds after the sitting starts. */
 export function intervalBellTimes({
@@ -122,10 +115,10 @@ export function stepOffset(offsetSec: number, minutes: number): number {
   return Math.min(Math.max(moved, 0), OFFSET_MAX_SEC);
 }
 
-/** The interval one press moves: whole ten-minute steps, clamped to the service's grid. */
+/** The interval one press moves: one minute on the shared grid, clamped at either end of it. */
 export function stepInterval(intervalMin: number, steps: number): number {
-  const moved = intervalMin + steps * BELL_INTERVAL_STEP.step;
-  return Math.min(Math.max(moved, BELL_INTERVAL_STEP.floor), BELL_INTERVAL_STEP.ceiling);
+  const moved = intervalMin + steps * MEDITATION_MINUTE_STEP.step;
+  return Math.min(Math.max(moved, MEDITATION_MINUTE_STEP.floor), MEDITATION_MINUTE_STEP.ceiling);
 }
 
 /** The offset in words, for the summary: `2 h`, `1 min 30 sec`, `0 min` when it is nothing. */

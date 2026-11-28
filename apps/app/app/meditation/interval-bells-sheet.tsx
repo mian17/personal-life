@@ -16,7 +16,6 @@ import {
   type ChoiceChipOption,
 } from '@life/ui';
 import {
-  BELL_INTERVAL_STEP,
   OFFSET_MAX_SEC,
   OFFSET_PART_MAX,
   bellsFrom,
@@ -28,7 +27,7 @@ import {
   stepOffset,
   type BellsDraft,
 } from '@/lib/meditation-bells';
-import type { BellChoice } from '@/lib/meditation-clock';
+import { MEDITATION_MINUTE_STEP, type BellChoice } from '@/lib/meditation-clock';
 import { repeatFrom, repeatValue } from '@/lib/meditation-repeat';
 
 /**
@@ -239,7 +238,7 @@ interface EveryGroupProps {
   onChange: (intervalMin: number) => void;
 }
 
-/** Group 3 — Every: the sunken bar's − / read-out / +, a whole ten minutes a press (spec C1). */
+/** Group 3 — Every: the sunken bar's − / read-out / +, a whole minute a press (spec C1). */
 function EveryGroup({ intervalMin, onChange }: Readonly<EveryGroupProps>) {
   return (
     <Section label="Every" headingLevel="h3" labelTone="ink-3" margin={false}>
@@ -250,8 +249,8 @@ function EveryGroup({ intervalMin, onChange }: Readonly<EveryGroupProps>) {
         increaseLabel="Increase interval by one minute"
         onDecrease={() => onChange(stepInterval(intervalMin, -1))}
         onIncrease={() => onChange(stepInterval(intervalMin, 1))}
-        decreaseDisabled={intervalMin === BELL_INTERVAL_STEP.floor}
-        increaseDisabled={intervalMin === BELL_INTERVAL_STEP.ceiling}
+        decreaseDisabled={intervalMin === MEDITATION_MINUTE_STEP.floor}
+        increaseDisabled={intervalMin === MEDITATION_MINUTE_STEP.ceiling}
       />
     </Section>
   );
