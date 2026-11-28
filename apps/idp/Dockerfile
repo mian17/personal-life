@@ -20,11 +20,13 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --ignore-scripts
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/crypto ./packages/crypto
+COPY packages/cache ./packages/cache
 COPY packages/service-kit ./packages/service-kit
 COPY apps/idp ./apps/idp
 
 RUN npm run build -w @life/shared \
   && npm run build -w @life/crypto \
+  && npm run build -w @life/cache \
   && npm run build -w @life/service-kit \
   && npm run build -w @life/idp \
   && npm prune --omit=dev
