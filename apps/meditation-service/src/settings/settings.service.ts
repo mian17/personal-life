@@ -88,8 +88,8 @@ export class SettingsService {
 }
 
 /**
- * The settings exactly as they will be stored: the goal on its fifteen-minute grid, the
- * planned length on its own five-minute one and defaulting to the goal.
+ * The settings exactly as they will be stored: the goal and the planned length, each clamped
+ * into its own range on any whole minute, the planned length defaulting to the goal.
  */
 function clampedSettings(dto: SettingsDto): SettingsContent {
   const goalMinutes = clampGoal(dto.goalMinutes);

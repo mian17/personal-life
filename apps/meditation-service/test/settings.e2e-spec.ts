@@ -117,7 +117,7 @@ describe('Settings (e2e)', () => {
     expect(row.content).not.toContain('plannedMinutes');
   });
 
-  it('clamps the goal at both edges and onto the fifteen-minute grid', async () => {
+  it('clamps the goal at both edges and keeps any whole minute between them', async () => {
     const storedGoal = async (goalMinutes: number): Promise<number> => {
       const response = await putSettings(ownerToken, { goalMinutes, bells: BELLS_OFF }).expect(200);
       return response.body.goalMinutes as number;
@@ -125,8 +125,8 @@ describe('Settings (e2e)', () => {
 
     expect(await storedGoal(7)).toBe(15);
     expect(await storedGoal(495)).toBe(480);
-    expect(await storedGoal(22)).toBe(15);
-    expect(await storedGoal(23)).toBe(30);
+    expect(await storedGoal(22)).toBe(22);
+    expect(await storedGoal(23)).toBe(23);
   });
 
   it('keeps the planned length it was given instead of the goal', async () => {
