@@ -28,7 +28,7 @@ export function CompleteSitting({ result, onDone }: Readonly<CompleteSittingProp
       </PageTitle>
       <MinutesFigure minutes={result.minutes} />
       <Caption>minutes sat</Caption>
-      <Button shape="pill" size="bare" variant="primary" onClick={onDone}>
+      <Button size="bare" variant="primary" onClick={onDone}>
         Done
       </Button>
     </Screen>

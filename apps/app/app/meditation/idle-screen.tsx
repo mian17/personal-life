@@ -72,7 +72,7 @@ export function IdleScreen({
         />
         <ValueRow label="Ending bell" value="Gong" />
       </Stack>
-      <Button size="hero" shape="pill" className="mt-[var(--s2)]" onClick={() => onStart(minutes)}>
+      <Button size="hero" className="mt-[var(--s2)]" onClick={() => onStart(minutes)}>
         Start
       </Button>
       <IntervalBellsSheet

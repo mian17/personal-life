@@ -60,7 +60,7 @@ export function RunningSitting({
         {formatClock(remaining)}
       </StatusText>
       <ProgressBar height="s1" label="Session progress" value={sessionProgressPercent(clock)} />
-      <Button shape="pill" size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
+      <Button size="bare" variant="filled" onClick={() => setConfirmingStop(true)}>
         Stop
       </Button>
       <StopConfirmSheet
@@ -101,10 +101,10 @@ function StopConfirmSheet({ open, onOpenChange, onEnd }: Readonly<StopConfirmShe
       onOpenChange={onOpenChange}
     >
       <Stack gap="md">
-        <Button shape="pill" variant="filled" onClick={() => onOpenChange(false)}>
+        <Button variant="filled" onClick={() => onOpenChange(false)}>
           Keep going
         </Button>
-        <Button shape="pill" variant="danger" onClick={onEnd}>
+        <Button variant="danger" onClick={onEnd}>
           End session
         </Button>
       </Stack>
