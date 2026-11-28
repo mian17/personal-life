@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Button, Section, Stack, Stepper, ValueRow } from '@life/ui';
-import { MEDITATION_MINUTE_STEP } from '@/lib/meditation-bells';
 import { minuteUnit, type BellChoice } from '@/lib/meditation-clock';
+import { MEDITATION_LENGTH_STEP, readStoredLength, storeLength } from '@/lib/meditation-length';
 import { IntervalBellsSheet, type SaveBells } from './interval-bells-sheet';
 
 const SECONDS_PER_MINUTE = 60;
@@ -12,7 +12,7 @@ const SECONDS_PER_MINUTE = 60;
 const INTERVAL_BELLS_SHEET_ID = 'interval-dialog';
 
 export interface IdleScreenProps {
-  /** The settings' planned length: where the stepper opens, clamped into range. */
+  /** The settings' planned length: the first-visit default this browser has no memory to override. */
   plannedMinutes: number;
   bells: BellChoice;
   /** The chosen length, which becomes this sitting's `plannedMinutes`. */
@@ -28,9 +28,10 @@ export interface IdleScreenProps {
  * The idle screen, in the design's order: the length as one large stepper, the three facts that
  * shape the sitting, and the start control.
  *
- * The stepper moves *this sitting's* length and nothing else: the stored plan is edited at
- * `/meditation/settings`. What it does remember is the length it started, so the next visit opens
- * where the last one left off (`rememberSittingLength`, fired by the start it precedes).
+ * The stepper moves *this sitting's* length and nothing else: the plan a first visit opens on is
+ * edited at `/meditation/settings`. Once this browser has started a sitting, its own memory wins
+ * over that plan — the plan is only the first-visit default, and the stepper opens where this
+ * browser last left off.
  *
  * The bells row's value is the saved bells, never the sheet's draft: the draft lives and dies
  * inside `IntervalBellsSheet`, so closing the sheet without Save leaves the row as it was.
@@ -41,8 +42,15 @@ export function IdleScreen({
   onStart,
   onSaveBells,
 }: Readonly<IdleScreenProps>) {
-  const [minutes, setMinutes] = useState(() => clampMinutes(plannedMinutes));
+  // Read inside the initialiser, never at module scope: a server render has no storage to read.
+  const [minutes, setMinutes] = useState(() => clampMinutes(readStoredLength() ?? plannedMinutes));
   const [bellsSheetOpen, setBellsSheetOpen] = useState(false);
+
+  /** The chosen length is remembered before it is handed up, so the next visit opens on it. */
+  function startSitting(): void {
+    storeLength(minutes);
+    onStart(minutes);
+  }
 
   return (
     <Section aria-label="Session setup" gap="lg">
@@ -53,13 +61,13 @@ export function IdleScreen({
         decreaseLabel="Decrease duration by one minute"
         increaseLabel="Increase duration by one minute"
         onDecrease={() =>
-          setMinutes((current) => clampMinutes(current - MEDITATION_MINUTE_STEP.step))
+          setMinutes((current) => clampMinutes(current - MEDITATION_LENGTH_STEP.step))
         }
         onIncrease={() =>
-          setMinutes((current) => clampMinutes(current + MEDITATION_MINUTE_STEP.step))
+          setMinutes((current) => clampMinutes(current + MEDITATION_LENGTH_STEP.step))
         }
-        decreaseDisabled={minutes === MEDITATION_MINUTE_STEP.floor}
-        increaseDisabled={minutes === MEDITATION_MINUTE_STEP.ceiling}
+        decreaseDisabled={minutes === MEDITATION_LENGTH_STEP.floor}
+        increaseDisabled={minutes === MEDITATION_LENGTH_STEP.ceiling}
       />
       <Stack gap="md">
         <ValueRow label="Duration" value={`${minutes} min`} />
@@ -72,7 +80,7 @@ export function IdleScreen({
         />
         <ValueRow label="Ending bell" value="Gong" />
       </Stack>
-      <Button size="hero" onClick={() => onStart(minutes)}>
+      <Button size="hero" onClick={() => startSitting()}>
         Start
       </Button>
       <IntervalBellsSheet
@@ -87,16 +95,11 @@ export function IdleScreen({
   );
 }
 
-/**
- * The length inside the stepper's range, on the minute it is already on: the stored plan may sit
- * on a five-minute value such as 15, and snapping it onto the ten-minute grid would quietly
- * rewrite the owner's saved choice. Stepping by ten from 15 lands on 5 or 25, which the service
- * stores as they are.
- */
+/** The length inside the stepper's range, on the minute it is already on: a stored 15 stays 15. */
 function clampMinutes(minutes: number): number {
   return Math.min(
-    Math.max(Math.round(minutes), MEDITATION_MINUTE_STEP.floor),
-    MEDITATION_MINUTE_STEP.ceiling,
+    Math.max(Math.round(minutes), MEDITATION_LENGTH_STEP.floor),
+    MEDITATION_LENGTH_STEP.ceiling,
   );
 }
 
