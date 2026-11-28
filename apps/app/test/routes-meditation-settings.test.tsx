@@ -67,21 +67,20 @@ function goalBlock(page: any): any {
   return childList(goalForm(page))[0];
 }
 
-/** The `<select>` a name addresses, as markup, so its options can be read. */
-function selectMarkup(html: string, name: string): string {
-  return new RegExp(`<select[^>]*name="${name}"[^>]*>(.*?)</select>`, 's').exec(html)?.[1] ?? '';
+/** The `<input>` a name addresses, as markup, so its attributes can be read. */
+function inputMarkup(html: string, name: string): string {
+  return new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(html)?.[0] ?? '';
 }
 
-/** The values one named select offers, in the order it offers them. */
-function offeredValues(html: string, name: string): string[] {
-  return [...selectMarkup(html, name).matchAll(/<option value="([^"]*)"/g)].map(([, v]) => v);
+/** The value the browser opens a named input on. */
+function inputValue(html: string, name: string): string | undefined {
+  return /value="([^"]*)"/.exec(inputMarkup(html, name))?.[1];
 }
 
-/** The value the browser opens the named select on. */
-function chosenValue(html: string, name: string): string | undefined {
-  return [...selectMarkup(html, name).matchAll(/<option[^>]*value="([^"]*)"[^>]*selected/g)].map(
-    ([, v]) => v,
-  )[0];
+/** The number of minutes one attribute of a named input holds, or `undefined` when absent. */
+function inputNumber(html: string, name: string, attribute: string): number | undefined {
+  const found = new RegExp(`${attribute}="([^"]*)"`).exec(inputMarkup(html, name))?.[1];
+  return found === undefined ? undefined : Number(found);
 }
 
 /** The `FormData` the browser would post for a one-field form. */
@@ -133,17 +132,14 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).toContain('Personal Life · prototype');
   });
 
-  it('offers the goal only on the fifteen-minute grid from 15 to 480', async () => {
-    const values = offeredValues(await renderPage(), 'goalMinutes');
+  it('takes the goal as a typed whole minute from 15 to 480', async () => {
+    const html = await renderPage();
+    const field = inputMarkup(html, 'goalMinutes');
 
-    expect(values).toHaveLength(32);
-    expect(values[0]).toBe('15');
-    expect(values[1]).toBe('30');
-    expect(values[values.length - 1]).toBe('480');
-    // Fifteens on purpose: a five-minute minimum stepped by fifteen would offer 5, 20, 35.
-    expect(values).not.toContain('5');
-    expect(values).not.toContain('20');
-    expect(values.every((value) => Number(value) % 15 === 0)).toBe(true);
+    expect(field).toContain('type="number"');
+    expect(inputNumber(html, 'goalMinutes', 'min')).toBe(15);
+    expect(inputNumber(html, 'goalMinutes', 'max')).toBe(480);
+    expect(inputNumber(html, 'goalMinutes', 'step')).toBe(1);
   });
 
   it('names the goal control and opens it on the stored minutes', async () => {
@@ -152,7 +148,7 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).toContain('name="goalMinutes"');
     expect(html).toContain('aria-label="Daily goal"');
     expect(html).toContain('Save goal');
-    expect(chosenValue(html, 'goalMinutes')).toBe('30');
+    expect(inputValue(html, 'goalMinutes')).toBe('30');
   });
 
   it('carries no bells control and no sitting-length control on the route', async () => {
@@ -164,8 +160,8 @@ describe('/meditation/settings through the shared shell', () => {
     expect(html).not.toContain('Rings');
     expect(html).not.toContain('Sitting length');
     expect(html).not.toMatch(/name="(plannedMinutes|offsetSec|intervalSec|repeat|bellsEnabled)"/);
-    // The goal is the screen's only control, so it is its only select.
-    expect(html.match(/<select/g)).toHaveLength(1);
+    // The goal is a typed field now, so the route draws no select at all.
+    expect(html).not.toContain('<select');
   });
 
   it('saves the goal over the row the service holds, sending plannedMinutes and bells back unchanged', async () => {
@@ -183,6 +179,25 @@ describe('/meditation/settings through the shared shell', () => {
       bells: STORED.bells,
     });
     expect(mockedRevalidatePath).toHaveBeenCalledWith('/meditation/settings');
+  });
+
+  it('sends the typed minutes as typed, not as the fifteen they sit nearest', async () => {
+    const page = await renderPageElement();
+
+    await goalForm(page).props.action(formData({ goalMinutes: '23' }));
+
+    expect(mockedSaveSettings).toHaveBeenCalledWith({ ...STORED, goalMinutes: 23 });
+  });
+
+  it('refuses an empty or out-of-range field instead of writing it', async () => {
+    const page = await renderPageElement();
+
+    await goalForm(page).props.action(formData({ goalMinutes: '' }));
+    await goalForm(page).props.action(formData({ goalMinutes: '501' }));
+
+    expect(mockedSaveSettings).not.toHaveBeenCalled();
+    expect(mockedRedirect).toHaveBeenCalledTimes(2);
+    expect(mockedRedirect).toHaveBeenCalledWith('/meditation/settings?error=save');
   });
 
   it('sends a refused write back to the page flagged instead of reporting a save', async () => {

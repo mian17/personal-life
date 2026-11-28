@@ -168,7 +168,7 @@ test.describe('meditation', () => {
 /** Writes the daily goal on `/meditation/settings` and waits for the write to land. */
 async function saveGoal(page: Page, minutes: number): Promise<void> {
   await page.goto('/meditation/settings');
-  await page.getByLabel('Daily goal').selectOption(String(minutes));
+  await page.getByLabel('Daily goal').fill(String(minutes));
 
   const saved = page.waitForResponse(serverActionOn('/meditation/settings'));
   await page.getByRole('button', { name: 'Save goal', exact: true }).click();

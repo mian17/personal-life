@@ -2,7 +2,6 @@ import {
   DEFAULT_GOAL_MINUTES,
   GOAL_MAX_MINUTES,
   GOAL_MIN_MINUTES,
-  GOAL_STEP_MINUTES,
   PLANNED_MAX_MINUTES,
   PLANNED_MIN_MINUTES,
   clampGoal,
@@ -10,9 +9,9 @@ import {
 } from '../src/settings/goal.js';
 
 /**
- * The goal grid (`SPEC-meditation-app` §1): default 15, step 15, clamped 15–480.
- * Every bound is asserted at its exact edge value — the clamp is the only thing
- * standing between a stored goal and a goal the app cannot render.
+ * The goal range (`SPEC-meditation-app` §1): default 15, any whole minute 15–480. Every
+ * bound is asserted at its exact edge value — the clamp is the only thing standing between
+ * a stored goal and a goal the app cannot render.
  */
 describe('clampGoal', () => {
   it('starts a fresh owner at fifteen minutes', () => {
@@ -36,20 +35,21 @@ describe('clampGoal', () => {
     expect(clampGoal(GOAL_MAX_MINUTES)).toBe(480);
   });
 
-  it('lands a non-grid value on the nearest fifteen-minute step', () => {
-    expect(clampGoal(22)).toBe(15);
-    expect(clampGoal(23)).toBe(30);
-    expect(clampGoal(37)).toBe(30);
-    expect(clampGoal(38)).toBe(45);
-    expect(clampGoal(200)).toBe(195);
+  it('stores a typed minute as typed, with no grid to snap to', () => {
+    expect(clampGoal(22)).toBe(22);
+    expect(clampGoal(23)).toBe(23);
+    expect(clampGoal(37)).toBe(37);
+    expect(clampGoal(38)).toBe(38);
+    expect(clampGoal(200)).toBe(200);
   });
 
-  it('leaves a grid value untouched', () => {
-    for (
-      let minutes = GOAL_MIN_MINUTES;
-      minutes <= GOAL_MAX_MINUTES;
-      minutes += GOAL_STEP_MINUTES
-    ) {
+  it('rounds a fractional goal to the nearest whole minute', () => {
+    expect(clampGoal(23.4)).toBe(23);
+    expect(clampGoal(23.6)).toBe(24);
+  });
+
+  it('leaves every whole minute in range untouched', () => {
+    for (let minutes = GOAL_MIN_MINUTES; minutes <= GOAL_MAX_MINUTES; minutes += 1) {
       expect(clampGoal(minutes)).toBe(minutes);
     }
   });
