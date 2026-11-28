@@ -5,6 +5,7 @@ import { SigningKeyService } from '../crypto/signing-key.service.js';
 import { OidcAdapterService } from './adapter/oidc-adapter.service.js';
 import {
   ACCESS_TOKEN_TTL_S,
+  ID_TOKEN_TTL_S,
   defaultResource,
   resourceServerPolicy,
 } from './access-token.policy.js';
@@ -106,11 +107,13 @@ export class OidcService {
         scopes: ['openid'],
         pkce: { required: () => true },
         // Access-token policy: JWT format, 10-minute TTL, audience-scoped via RFC 8707.
+        // The id token is presented in the same exchange, so it takes that same 10 minutes.
         // Refresh tokens: 30 days, rotated on every use, with reuse detection.
         // Session/Grant must outlive the refresh token, or grant validation would
         // cut the refresh chain short before its own TTL.
         ttl: {
           AccessToken: ACCESS_TOKEN_TTL_S,
+          IdToken: ID_TOKEN_TTL_S,
           RefreshToken: REFRESH_TOKEN_TTL_S,
           Session: SESSION_TTL_S,
           Grant: GRANT_TTL_S,

@@ -1,19 +1,17 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import type { INestApplication } from '@nestjs/common';
+import { join } from 'node:path';
+import { createServiceApplication } from '@life/service-kit';
 import { AppModule } from './app.module.js';
-import { AuthGuard } from '@life/service-kit';
 import { VERIFIER_ENV } from './service-config.js';
 
+/**
+ * Build the application with the global kernel wiring: the shared logger, the JWT
+ * guard and the whitelisting validation pipe. The SQLite directory exists before
+ * TypeORM opens the file, and `NOTE_MASTER_KEY` is enforced by `KeysModule`.
+ */
 export async function createApp(): Promise<INestApplication> {
-  mkdirSync(dirname(process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db')), {
-    recursive: true,
+  return createServiceApplication(AppModule, {
+    sqlitePath: process.env.DB_PATH ?? join(process.cwd(), 'data', 'life.db'),
+    verifierEnv: VERIFIER_ENV,
   });
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalGuards(new AuthGuard(VERIFIER_ENV));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
-  );
-  return app;
 }

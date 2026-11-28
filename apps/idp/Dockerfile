@@ -19,9 +19,15 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --ignore-scripts
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
+COPY packages/crypto ./packages/crypto
+COPY packages/cache ./packages/cache
+COPY packages/service-kit ./packages/service-kit
 COPY apps/idp ./apps/idp
 
 RUN npm run build -w @life/shared \
+  && npm run build -w @life/crypto \
+  && npm run build -w @life/cache \
+  && npm run build -w @life/service-kit \
   && npm run build -w @life/idp \
   && npm prune --omit=dev
 
@@ -35,6 +41,10 @@ WORKDIR /app
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /repo/packages/shared/dist ./packages/shared/dist
+COPY --from=build /repo/packages/crypto/package.json ./packages/crypto/package.json
+COPY --from=build /repo/packages/crypto/dist ./packages/crypto/dist
+COPY --from=build /repo/packages/service-kit/package.json ./packages/service-kit/package.json
+COPY --from=build /repo/packages/service-kit/dist ./packages/service-kit/dist
 COPY --from=build /repo/apps/idp/package.json ./package.json
 COPY --from=build /repo/apps/idp/dist ./dist
 
