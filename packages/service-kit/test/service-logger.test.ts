@@ -55,6 +55,16 @@ describe('ServiceLogger (the shared service-kernel console level)', () => {
     expect(print(logger, 'log', 'NestFactory')).toContain('NestFactory speaking');
     expect(print(logger, 'log', 'NotesService')).toContain('NotesService speaking');
   });
+
+  it('prints a line Nest passes without a context or a level', () => {
+    const { read } = capturePrinted();
+    // Nest calls printMessages with the context and level omitted at some call
+    // sites, so both defaults have to print instead of throwing or swallowing.
+    (logger as unknown as { printMessages: (messages: unknown[]) => void }).printMessages([
+      'line without a context',
+    ]);
+    expect(read()).toContain('line without a context');
+  });
 });
 
 describe('createServiceApplication (the shared service kernel boot)', () => {
@@ -85,6 +95,17 @@ describe('createServiceApplication (the shared service kernel boot)', () => {
     // handler never reads a field its DTO did not declare.
     expect(pipe.validatorOptions).toMatchObject({ whitelist: true, forbidNonWhitelisted: true });
     expect(pipe.isTransformEnabled).toBe(true);
+  });
+
+  it('boots with the shared logger and pipe when a service passes no options', async () => {
+    const app = stubApp();
+    const create = jest.spyOn(NestFactory, 'create').mockResolvedValue(app as never);
+
+    await createServiceApplication(TestModule);
+
+    expect(create).toHaveBeenCalledWith(TestModule, { logger: expect.any(ServiceLogger) });
+    expect(app.useGlobalGuards).not.toHaveBeenCalled();
+    expect(app.useGlobalPipes).toHaveBeenCalledWith(expect.any(ValidationPipe));
   });
 
   it('creates the SQLite directory before the module opens the file', async () => {
