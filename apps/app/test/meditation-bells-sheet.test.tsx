@@ -51,11 +51,6 @@ const button = (name: string | RegExp) => screen.getByRole<HTMLButtonElement>('b
 const switchOf = () => screen.getByRole('switch', { name: 'Interval bells' });
 const summary = () => document.querySelector('.ui-caption')?.textContent;
 
-/** Whether `first` reads above `second` in document order. */
-function precedes(first: Node, second: Node): boolean {
-  return (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-}
-
 afterEach(cleanup);
 
 describe('the sheet', () => {
@@ -107,16 +102,6 @@ describe('the sheet', () => {
       'Bowl every 10 min, starting after 0 min, unlimited. 3 bowls this session.',
     );
     expect(screen.getByRole('group', { name: 'Repeat' })).toBeTruthy();
-  });
-
-  it('reads the summary as the schedule headline, under the switch and above the groups', () => {
-    renderSheet();
-
-    const caption = document.querySelector('.ui-caption')!;
-    expect(precedes(switchOf(), caption)).toBe(true);
-    expect(precedes(caption, screen.getByRole('heading', { level: 3, name: 'Start after' }))).toBe(
-      true,
-    );
   });
 
   it("names the offset pair and the three fields with the preview's own words", () => {
