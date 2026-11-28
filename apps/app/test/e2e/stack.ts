@@ -9,11 +9,13 @@ import {
   E2E_OWNER,
   E2E_PASSWORD,
   E2E_USER,
+  devPorts,
   feedbackMqContainer,
   feedbackPgContainer,
   hopPorts,
   redisContainer,
   repoRoot,
+  testPorts,
   testRedisUrl,
 } from './config';
 
@@ -266,6 +268,34 @@ function mealEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   };
 }
 
+/**
+ * meditation-service's port on this stack's own band: the slot's 3102, or the dev band's
+ * 3202. Read from the slot rather than from `StackConfig`, so every caller of `startStack`
+ * gets the service without naming a port of its own — the slot already decided it.
+ */
+function meditationPortFor(cfg: StackConfig): number {
+  const ports = cfg.mode === 'production' ? testPorts(cfg.slot ?? 0) : devPorts(cfg.slot ?? 0);
+  return ports.meditationPort;
+}
+
+/**
+ * meditation-service: the focus-service shape, one band slot over — its own SQLite file in
+ * the harness state dir, the harness IdP, and no Redis, so reads take the direct-DB path.
+ */
+function meditationEnv(cfg: StackConfig): NodeJS.ProcessEnv {
+  return {
+    NODE_ENV: 'production',
+    PORT: String(meditationPortFor(cfg)),
+    HOST: '127.0.0.1',
+    MEDITATION_DB_PATH: `${cfg.stateDir}/meditation-service.db`,
+    IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
+    MEDITATION_IDP_JWKS_URL: `http://127.0.0.1:${cfg.idpPort}/jwks`,
+    MEDITATION_SERVICE_AUDIENCE: 'life-api',
+    MEDITATION_MASTER_KEY: HARNESS_MASTER_KEY,
+    REDIS_URL: undefined,
+  };
+}
+
 function focusEnv(cfg: StackConfig): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'production',
@@ -294,6 +324,7 @@ function appEnv(cfg: StackConfig): NodeJS.ProcessEnv {
       : {}),
     MEAL_API_URL: `http://127.0.0.1:${cfg.mealPort}`,
     FOCUS_API_URL: `http://127.0.0.1:${cfg.focusPort}`,
+    MEDITATION_API_URL: `http://127.0.0.1:${meditationPortFor(cfg)}`,
     IDP_ISSUER: `http://127.0.0.1:${cfg.idpPort}`,
     OIDC_APP_CLIENT_ID: 'app',
     OIDC_APP_CLIENT_SECRET: E2E_APP_SECRET,
@@ -548,6 +579,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
     await ensurePortFree(cfg.feedbackPort, 'feedback-service', host);
   }
   await ensurePortFree(cfg.focusPort, 'focus-service', host);
+  await ensurePortFree(meditationPortFor(cfg), 'meditation-service', host);
 
   rmSync(cfg.stateDir, { recursive: true, force: true });
   mkdirSync(cfg.stateDir, { recursive: true });
@@ -580,6 +612,17 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
         args: ['dist/main.js'],
         cwd: `${repoRoot()}/apps/focus-service`,
         env: focusEnv(cfg),
+      }),
+    );
+
+    await build('apps/meditation-service');
+    services.push(
+      await spawnService({
+        name: 'meditation-service',
+        command: 'node',
+        args: ['dist/main.js'],
+        cwd: `${repoRoot()}/apps/meditation-service`,
+        env: meditationEnv(cfg),
       }),
     );
 
@@ -653,6 +696,7 @@ export async function startStack(cfg: StackConfig): Promise<SpawnedService[]> {
       await waitForHttp(`http://127.0.0.1:${cfg.feedbackPort}/health/live`, 60_000);
     }
     await waitForHttp(`http://127.0.0.1:${cfg.focusPort}/health/ready`, 60_000);
+    await waitForHttp(`http://127.0.0.1:${meditationPortFor(cfg)}/health/ready`, 60_000);
     await waitForHttp(`${cfg.appOrigin}/auth/login`, 90_000);
 
     return services;

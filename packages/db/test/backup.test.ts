@@ -17,7 +17,7 @@ import { main } from '../src/backup.js';
 import { defaultDatabasePaths, resolvePaths } from '../src/paths.js';
 
 /**
- * Path-resolution contract for the backup/restore CLIs (plan T2): the six
+ * Path-resolution contract for the backup/restore CLIs (plan T2): the seven
  * repo-anchored defaults, `resolvePaths` delegation to `@life/shared`'s
  * `resolveDbPath`, and `selectPaths`' `--only` subset. Every assertion is a
  * string comparison; no database under `apps/*\/data/**` is opened.
@@ -37,11 +37,20 @@ const DEFAULT_TODO_DB_PATH = DEFAULTS.todo;
 const DEFAULT_IDP_DB_PATH = DEFAULTS.idp;
 const DEFAULT_MEAL_DB_PATH = DEFAULTS.meal;
 const DEFAULT_FOCUS_DB_PATH = DEFAULTS.focus;
+const DEFAULT_MEDITATION_DB_PATH = DEFAULTS.meditation;
 
 describe('resolvePaths / selectPaths', () => {
-  it('returns the six databases in order with their env names', () => {
+  it('returns the seven databases in order with their env names', () => {
     const paths = resolvePaths({}, DEFAULTS);
-    expect(paths.map((p) => p.name)).toEqual(['life', 'tags', 'todo', 'idp', 'meal', 'focus']);
+    expect(paths.map((p) => p.name)).toEqual([
+      'life',
+      'tags',
+      'todo',
+      'idp',
+      'meal',
+      'focus',
+      'meditation',
+    ]);
     expect(paths.map((p) => p.envName)).toEqual([
       'NOTE_DB_PATH',
       'TAGS_DB_PATH',
@@ -49,6 +58,7 @@ describe('resolvePaths / selectPaths', () => {
       'IDP_DB_PATH',
       'MEAL_DB_PATH',
       'FOCUS_DB_PATH',
+      'MEDITATION_DB_PATH',
     ]);
   });
 
@@ -60,6 +70,7 @@ describe('resolvePaths / selectPaths', () => {
     expect(paths[3].source).toBe(DEFAULT_IDP_DB_PATH);
     expect(paths[4].source).toBe(DEFAULT_MEAL_DB_PATH);
     expect(paths[5].source).toBe(DEFAULT_FOCUS_DB_PATH);
+    expect(paths[6].source).toBe(DEFAULT_MEDITATION_DB_PATH);
     expect(DEFAULT_NOTE_DB_PATH.endsWith(join('apps', 'note-service', 'data', 'life.db'))).toBe(
       true,
     );
@@ -76,6 +87,11 @@ describe('resolvePaths / selectPaths', () => {
     expect(DEFAULT_FOCUS_DB_PATH.endsWith(join('apps', 'focus-service', 'data', 'focus.db'))).toBe(
       true,
     );
+    expect(
+      DEFAULT_MEDITATION_DB_PATH.endsWith(
+        join('apps', 'meditation-service', 'data', 'meditation.db'),
+      ),
+    ).toBe(true);
   });
 
   it('honours a MEAL_DB_PATH override', () => {
@@ -143,7 +159,7 @@ function seedDatabase(path: string, rows: number): void {
   }
 }
 
-/** A repo-root stand-in: `backup/` plus six seeded `apps/<svc>/data/<name>.db` sources. */
+/** A repo-root stand-in: `backup/` plus seven seeded `apps/<svc>/data/<name>.db` sources. */
 function makeBackupFixture(): BackupFixture {
   const root = mkdtempSync(join(tmpdir(), 'life-db-backup-'));
   dirs.push(root);
@@ -154,6 +170,7 @@ function makeBackupFixture(): BackupFixture {
     idp: join(root, 'apps', 'idp', 'data', 'idp.db'),
     meal: join(root, 'apps', 'meal-service', 'data', 'meal.db'),
     focus: join(root, 'apps', 'focus-service', 'data', 'focus.db'),
+    meditation: join(root, 'apps', 'meditation-service', 'data', 'meditation.db'),
   };
   for (const name of Object.keys(sources) as DatabaseName[]) {
     seedDatabase(sources[name], 2);
@@ -164,7 +181,7 @@ function makeBackupFixture(): BackupFixture {
 /** The env seam: `INIT_CWD` anchors `backup/` and every override resolves against it. */
 function envFor(
   fixture: BackupFixture,
-  only: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus'],
+  only: DatabaseName[] = ['life', 'tags', 'todo', 'idp', 'meal', 'focus', 'meditation'],
 ) {
   const env: NodeJS.ProcessEnv = { INIT_CWD: fixture.root };
   const vars: Record<DatabaseName, string> = {
@@ -174,6 +191,7 @@ function envFor(
     idp: 'IDP_DB_PATH',
     meal: 'MEAL_DB_PATH',
     focus: 'FOCUS_DB_PATH',
+    meditation: 'MEDITATION_DB_PATH',
   };
   for (const name of only) env[vars[name]] = fixture.sources[name];
   return env;
@@ -223,6 +241,7 @@ describe('db:backup run', () => {
       'idp',
       'meal',
       'focus',
+      'meditation',
     ]);
 
     for (const snapshot of result.snapshots) {
@@ -252,6 +271,7 @@ describe('db:backup run', () => {
       'idp',
       'meal',
       'focus',
+      'meditation',
     ]);
     expect(existsSync(join(result.destination, 'PINNED'))).toBe(false);
   });
@@ -381,7 +401,7 @@ describe('db:backup run', () => {
     } finally {
       console.log = original;
     }
-    expect(print).toHaveBeenCalledTimes(6);
+    expect(print).toHaveBeenCalledTimes(7);
     expect(print.mock.calls[0][0]).toContain('db:backup [routine] life.db -> ');
     expect(print.mock.calls[0][0]).toContain('quick_check=ok');
   });

@@ -12,8 +12,8 @@ const FILL_BODY_UTILITIES = [
 ];
 
 function order(root: Element): string[] {
-  return Array.from(root.children).map((child) =>
-    child.getAttribute('data-testid') ?? child.tagName.toLowerCase(),
+  return Array.from(root.children).map(
+    (child) => child.getAttribute('data-testid') ?? child.tagName.toLowerCase(),
   );
 }
 
@@ -44,7 +44,7 @@ describe('ListShell', () => {
     ]);
   });
 
-  it('renders the title block as the header\'s leading slot, one row with the trailing controls', () => {
+  it("renders the title block as the header's leading slot, one row with the trailing controls", () => {
     const { container } = render(
       <ListShell
         title="Notes"
@@ -115,6 +115,22 @@ describe('ListShell', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading.tagName).toBe('H1');
     expect(heading.textContent).toBe('Todos');
+  });
+
+  /**
+   * `.phead__title` is `--fw-semibold` in both drawn previews, so the block states the weight it
+   * draws rather than leaving the atom's `bold` default in place. `PageTitle`'s own default is
+   * untouched, so its other callers keep rendering exactly as they did.
+   */
+  it("draws the page title at the design's 600 weight", () => {
+    render(<ListShell title="Notes" body={<span />} />);
+    const classes = screen
+      .getByRole('heading', { level: 1 })
+      .className.split(/\s+/)
+      .filter(Boolean);
+
+    expect(classes).toContain('[font-weight:var(--fw-semibold)]');
+    expect(classes).not.toContain('font-bold');
   });
 
   it('renders no FabLink when the fab props are omitted', () => {
@@ -194,19 +210,15 @@ describe('ListShell', () => {
     const { container } = render(<ListShell title="Pomodoro" body={<span />} fill />);
 
     const page = container.querySelector('.ui-page')!;
-    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
-      true,
-    );
+    expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(true);
   });
 
-  it('reserves the fab band with fabBand when the fab is the page\'s own control', () => {
+  it("reserves the fab band with fabBand when the fab is the page's own control", () => {
     const { container } = render(<ListShell title="Meals" body={<span />} fabBand />);
 
     const page = container.querySelector('.ui-page')!;
     expect(
-      page.classList.contains(
-        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]!',
-      ),
+      page.classList.contains('pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]!'),
     ).toBe(true);
     expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
       false,
@@ -227,9 +239,7 @@ describe('ListShell', () => {
 
     const page = container.querySelector('.ui-page')!;
     expect(
-      page.classList.contains(
-        'pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]',
-      ),
+      page.classList.contains('pb-[calc(var(--fab-size)+var(--s8)+env(safe-area-inset-bottom))]'),
     ).toBe(true);
     expect(page.classList.contains('pb-[calc(var(--s6)+env(safe-area-inset-bottom))]!')).toBe(
       false,
@@ -261,5 +271,37 @@ describe('ListShell', () => {
     // Guard: the fill geometry resolves through keywords/tokens, never a raw px/hex/rgb value.
     const classes = `${page.className} ${body.className}`;
     expect(classes).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(|\b\d+(?:\.\d+)?px\b/);
+  });
+
+  /**
+   * Every list page opens its title on the title's top edge (§8's `.phead`). The row's alignment is
+   * opt-in, so a page that says nothing about it keeps rendering exactly that row.
+   */
+  it("opens the header row on the title's top edge by default", () => {
+    const { container } = render(<ListShell title="Notes" body={<span />} />);
+    const nav = container.querySelector('.ui-nav-bar')!;
+
+    expect(nav.classList.contains('items-start')).toBe(true);
+    expect(nav.classList.contains('items-center')).toBe(false);
+  });
+
+  it('levels the header row on its middle when the page asks for it', () => {
+    const { container } = render(
+      <ListShell
+        title="Meditation"
+        subtitle="Today's goal is 15 minutes"
+        navTrailing={<span data-testid="nav-trailing" />}
+        headerAlign="center"
+        body={<span />}
+      />,
+    );
+    const nav = container.querySelector('.ui-nav-bar')!;
+
+    expect(nav.classList.contains('items-center')).toBe(true);
+    expect(nav.classList.contains('items-start')).toBe(false);
+    // The row keeps its two slots: the title block first, the trailing controls second.
+    const heading = screen.getByRole('heading', { level: 1, name: 'Meditation' });
+    expect(nav.firstElementChild!.contains(heading)).toBe(true);
+    expect(nav.lastElementChild!.contains(screen.getByTestId('nav-trailing'))).toBe(true);
   });
 });

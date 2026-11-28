@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { resolveDbPath } from '@life/shared/node';
 
-export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal' | 'focus';
+export type DatabaseName = 'life' | 'tags' | 'todo' | 'idp' | 'meal' | 'focus' | 'meditation';
 
 export interface ResolvedPath {
   name: DatabaseName;
@@ -9,7 +9,7 @@ export interface ResolvedPath {
   source: string;
 }
 
-/** The six databases' env var names, in the order every CLI reports them. */
+/** The seven databases' env var names, in the order every CLI reports them. */
 const ENV_NAMES: Readonly<Record<DatabaseName, string>> = {
   life: 'NOTE_DB_PATH',
   tags: 'TAGS_DB_PATH',
@@ -17,6 +17,7 @@ const ENV_NAMES: Readonly<Record<DatabaseName, string>> = {
   idp: 'IDP_DB_PATH',
   meal: 'MEAL_DB_PATH',
   focus: 'FOCUS_DB_PATH',
+  meditation: 'MEDITATION_DB_PATH',
 };
 
 const DATABASE_NAMES = Object.keys(ENV_NAMES) as DatabaseName[];
@@ -29,13 +30,14 @@ const DATABASE_FILES: Readonly<Record<DatabaseName, string>> = {
   idp: join('apps', 'idp', 'data', 'idp.db'),
   meal: join('apps', 'meal-service', 'data', 'meal.db'),
   focus: join('apps', 'focus-service', 'data', 'focus.db'),
+  meditation: join('apps', 'meditation-service', 'data', 'meditation.db'),
 };
 
-/** The six repo-anchored defaults, as `resolvePaths` wants them. */
+/** The seven repo-anchored defaults, as `resolvePaths` wants them. */
 export type DatabasePaths = Readonly<Record<DatabaseName, string>>;
 
 /**
- * The six package-anchored defaults for one repository root, so the documented repo-root command
+ * The seven package-anchored defaults for one repository root, so the documented repo-root command
  * opens the right files regardless of cwd.
  *
  * The anchor is a parameter, not `__dirname`: this module is imported by tests, which ts-jest

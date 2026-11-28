@@ -61,3 +61,48 @@ describe('PageTitle', () => {
     expect(classesOf(screen.getByRole('heading', { level: 1 }))).not.toContain('mb-0');
   });
 });
+
+describe('PageTitle — headingLevel and weight', () => {
+  it('stays an <h1> with the page margins by default', () => {
+    render(<PageTitle>Meditation</PageTitle>);
+    const classes = classesOf(screen.getByRole('heading', { level: 1 }));
+    expect(classes).toContain(HEADING_MARGIN_UTILITY);
+    expect(classes).toContain('font-bold');
+  });
+
+  it('renders an h2 inside a panel and drops the page margins with the level', () => {
+    render(<PageTitle headingLevel="h2">Session complete</PageTitle>);
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading.tagName).toBe('H2');
+    expect(heading.classList.contains(HEADING_MARGIN_UTILITY)).toBe(false);
+    // Zero, not absent: a `margin: 0` the design's reset draws, so no UA margin replaces the page's.
+    expect(classesOf(heading)).toContain('m-0');
+    // The title tier itself does not move with the level.
+    expect(classesOf(heading)).toContain(DISPLAY_SIZE_UTILITY);
+    expect(classesOf(heading)).toContain('ui-page-title');
+  });
+
+  it('keeps the page margins on an h1 that carries a sub-line', () => {
+    render(<PageTitle sub="One quiet line.">Meditation</PageTitle>);
+    expect(classesOf(screen.getByRole('heading', { level: 1 }))).toContain(HEADING_MARGIN_UTILITY);
+    expect(screen.getByText('One quiet line.')).toBeDefined();
+  });
+
+  it("selects the design's 600 weight instead of stacking it on the bold one", () => {
+    render(<PageTitle weight="semibold">Meditation</PageTitle>);
+    const classes = classesOf(screen.getByRole('heading', { level: 1 }));
+    expect(classes).toContain('[font-weight:var(--fw-semibold)]');
+    expect(classes).not.toContain('font-bold');
+  });
+
+  it('drops to 600 without losing the tier it sits in', () => {
+    render(
+      <PageTitle headingLevel="h2" weight="semibold">
+        Session complete
+      </PageTitle>,
+    );
+    const classes = classesOf(screen.getByRole('heading', { level: 2 }));
+    expect(classes).toContain('tracking-[var(--tracking-title)]');
+    expect(classes).toContain('leading-[var(--lh-title)]');
+  });
+});

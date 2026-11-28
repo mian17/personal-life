@@ -144,7 +144,14 @@ export { TagManager } from './components/tag-manager';
 export type { TagManagerProps } from './components/tag-manager';
 
 export { DueDatePill, dueDateState, todayIso } from './components/due-date-pill';
-export { dueDay, isoWeekday, localTimePart, todayIsoInZone, weekdayShort, WEEKDAY_SHORT } from './lib/date-parts';
+export {
+  dueDay,
+  isoWeekday,
+  localTimePart,
+  todayIsoInZone,
+  weekdayShort,
+  WEEKDAY_SHORT,
+} from './lib/date-parts';
 export type { DueDatePillProps, DueDateState } from './components/due-date-pill';
 
 export { DueDate } from './components/due-date';
@@ -155,6 +162,24 @@ export type { ListManagerProps, TodoListOption } from './components/list-manager
 
 export { Menu, MenuItem } from './components/menu';
 export type { MenuItemProps, MenuProps } from './components/menu';
+
+export { Screen } from './components/screen';
+export type { ScreenProps } from './components/screen';
+
+export { Stepper } from './components/stepper';
+export type { StepperProps, StepperReadout, StepperTone } from './components/stepper';
+
+export { ValueRow } from './components/value-row';
+export type { ValueRowProps } from './components/value-row';
+
+export { Caption } from './components/caption';
+export type { CaptionProps } from './components/caption';
+
+export { ChoiceChips } from './components/choice-chips';
+export type { ChoiceChipOption, ChoiceChipsProps } from './components/choice-chips';
+
+export { NumberField } from './components/number-field';
+export type { NumberFieldProps } from './components/number-field';
 
 export { TrashBlock } from './components/trash-block';
 export type { TrashBlockItem, TrashBlockProps, TrashFormAction } from './components/trash-block';

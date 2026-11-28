@@ -34,6 +34,12 @@ export interface ListShellProps {
    */
   fabBand?: boolean;
   /**
+   * Where the header row lines up: `start` opens the title on its own top edge, as every list page
+   * draws it; `center` levels the row on its middle, which is the design's single-line
+   * `.app__header`. Default `'start'`.
+   */
+  headerAlign?: 'start' | 'center';
+  /**
    * Opt into a full-viewport-height page: the `body` slot grows to fill the
    * remaining space, for a full-height body such as the matrix. Off by default,
    * so other pages are unchanged.
@@ -78,12 +84,16 @@ const titleBlockStyles = 'mt-0 mb-0';
 
 /**
  * The header's leading slot: the title block — `<h1>` plus the optional sub-line — level with
- * the trailing controls, matching `.phead`'s `<div>` wrapper.
+ * the trailing controls, matching `.phead`'s `<div>` wrapper. The page title takes the design's
+ * `--fw-semibold` (`.phead__title` in both drawn previews) instead of the atom's `bold` default,
+ * which stays where it is for every other `PageTitle` caller.
  */
 function TitleBlock({ title, subtitle }: Readonly<Pick<ListShellProps, 'title' | 'subtitle'>>) {
   return (
     <div className="ui-list-shell__title-block">
-      <PageTitle className={titleBlockStyles}>{title}</PageTitle>
+      <PageTitle className={titleBlockStyles} weight="semibold">
+        {title}
+      </PageTitle>
       {subtitle != null && <p className={subtitleStyles}>{subtitle}</p>}
     </div>
   );
@@ -115,6 +125,7 @@ export function ListShell({
   fabLabel,
   fabIcon,
   fabBand,
+  headerAlign,
   fill,
 }: Readonly<ListShellProps>): JSX.Element {
   return (
@@ -124,7 +135,11 @@ export function ListShell({
         fabHref == null && (fabBand ? fabBandPageStyles : fablessPageStyles),
       )}
     >
-      <NavBar leading={<TitleBlock title={title} subtitle={subtitle} />} trailing={navTrailing} />
+      <NavBar
+        align={headerAlign}
+        leading={<TitleBlock title={title} subtitle={subtitle} />}
+        trailing={navTrailing}
+      />
       {tabs}
       {search}
       {filters}

@@ -40,6 +40,8 @@ describe('slot-derived harness ports', () => {
     delete process.env.E2E_DEV_APP_PORT;
     delete process.env.E2E_FOCUS_PORT;
     delete process.env.E2E_DEV_FOCUS_PORT;
+    delete process.env.E2E_MEDITATION_PORT;
+    delete process.env.E2E_DEV_MEDITATION_PORT;
     delete process.env.E2E_HOP_A_PORT;
     delete process.env.E2E_DEGRADED_APP_PORT;
     delete process.env.E2E_HOP;
@@ -58,6 +60,7 @@ describe('slot-derived harness ports', () => {
       mealPort: 3106,
       feedbackPort: 3107,
       focusPort: 3109,
+      meditationPort: 3102,
       appPort: 3100,
     });
     expect(devPorts(0)).toEqual({
@@ -68,6 +71,7 @@ describe('slot-derived harness ports', () => {
       mealPort: 3206,
       feedbackPort: 3207,
       focusPort: 3209,
+      meditationPort: 3202,
       appPort: 3200,
     });
     expect(hopPorts(0)).toEqual({ appAPort: 3310, appBPort: 3311 });
@@ -152,6 +156,8 @@ describe('slot-derived harness ports', () => {
     process.env.E2E_DEV_APP_PORT = '4200';
     process.env.E2E_FOCUS_PORT = '4109';
     process.env.E2E_DEV_FOCUS_PORT = '4209';
+    process.env.E2E_MEDITATION_PORT = '4102';
+    process.env.E2E_DEV_MEDITATION_PORT = '4202';
     process.env.E2E_HOP_A_PORT = '4310';
     process.env.E2E_DEGRADED_APP_PORT = '4108';
     process.env.E2E_FEEDBACK_PG_CONTAINER = 'feedback-pg-e2e-pinned';
@@ -162,6 +168,8 @@ describe('slot-derived harness ports', () => {
     expect(devPorts(3).appPort).toBe(4200);
     expect(testPorts(3).focusPort).toBe(4109);
     expect(devPorts(3).focusPort).toBe(4209);
+    expect(testPorts(3).meditationPort).toBe(4102);
+    expect(devPorts(3).meditationPort).toBe(4202);
     expect(hopPorts(3).appAPort).toBe(4310);
     expect(degradedAppPort(3)).toBe(4108);
     expect(feedbackPgContainer(3)).toBe('feedback-pg-e2e-pinned');

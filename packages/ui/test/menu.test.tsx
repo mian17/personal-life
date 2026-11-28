@@ -173,3 +173,91 @@ describe('Menu', () => {
     expect((trigger() as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+function RowItemHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Menu label="Note actions" open={open} onOpenChange={setOpen}>
+      <MenuItem size="row">
+        <button type="button">Reset settings</button>
+      </MenuItem>
+    </Menu>
+  );
+}
+
+function DensityHarness({ density }: Readonly<{ density: 'default' | 'compact' }>) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Menu
+      label="Actions for Groceries"
+      summary="Groceries"
+      open={open}
+      onOpenChange={setOpen}
+      density={density}
+    >
+      <MenuItem>
+        <button type="button">Rename</button>
+      </MenuItem>
+    </Menu>
+  );
+}
+
+describe('Menu — trigger shape, panel density and item size', () => {
+  it('keeps the library --r-md corner on the trigger by default', () => {
+    render(<SoloHarness />);
+    const classes = screen.getByRole('button', { name: 'Note actions' }).classList;
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-pill)]')).toBe(false);
+  });
+
+  it('matches a header overflow control to the action language with triggerShape="pill"', () => {
+    render(
+      <Menu label="More actions" open={false} onOpenChange={() => {}} triggerShape="pill">
+        <MenuItem>
+          <button type="button">Reset settings</button>
+        </MenuItem>
+      </Menu>,
+    );
+    const classes = screen.getByRole('button', { name: 'More actions' }).classList;
+    expect(classes.contains('rounded-[var(--r-pill)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(false);
+    expect(classes.contains('size-[var(--tap)]')).toBe(true);
+  });
+
+  it('keeps the raised --r-lg/--s2 panel by default', () => {
+    render(<DensityHarness density="default" />);
+    press(trigger());
+    const classes = document.querySelector('.ui-menu__panel')!.classList;
+    expect(classes.contains('p-[var(--s2)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-lg)]')).toBe(true);
+  });
+
+  it('selects the tighter secondary surface at density="compact", never two of each', () => {
+    render(<DensityHarness density="compact" />);
+    press(trigger());
+    const classes = document.querySelector('.ui-menu__panel')!.classList;
+    expect(classes.contains('p-[var(--s1)]')).toBe(true);
+    expect(classes.contains('rounded-[var(--r-md)]')).toBe(true);
+    expect(classes.contains('p-[var(--s2)]')).toBe(false);
+    expect(classes.contains('rounded-[var(--r-lg)]')).toBe(false);
+  });
+
+  it('paints the tap-height row on a row-sized item', () => {
+    render(<RowItemHarness />);
+    press(screen.getByRole('button', { name: 'Note actions' }));
+    const item = screen.getByRole('menuitem', { name: 'Reset settings' });
+    expect(item.classList.contains('min-h-[var(--tap)]')).toBe(true);
+    expect(item.classList.contains('px-[var(--s4)]')).toBe(true);
+    expect(item.classList.contains('rounded-[var(--r-sm)]')).toBe(true);
+    expect(item.classList.contains('text-start')).toBe(true);
+  });
+
+  it('adds nothing to a bare item, which still draws itself', () => {
+    render(<ItemHarness />);
+    press(trigger());
+    const item = screen.getByRole('menuitem', { name: 'Delete note' });
+    expect(item.classList.contains('px-[var(--s4)]')).toBe(false);
+    expect(item.classList.contains('rounded-[var(--r-sm)]')).toBe(false);
+    expect(item.classList.contains('min-h-[var(--tap)]')).toBe(true);
+  });
+});

@@ -17,6 +17,7 @@
 #   MEAL_MASTER_KEY            idem
 #   FOCUS_MASTER_KEY           idem
 #   FEEDBACK_MASTER_KEY        idem
+#   MEDITATION_MASTER_KEY      idem
 #   FEEDBACK_DB_PASSWORD       Postgres role password (URL-safe hex — it is
 #                              interpolated into FEEDBACK_DB_URL); compose fails
 #                              without it
@@ -92,6 +93,7 @@ TODO_MASTER_KEY=$(master_key)
 MEAL_MASTER_KEY=$(master_key)
 FOCUS_MASTER_KEY=$(master_key)
 FEEDBACK_MASTER_KEY=$(master_key)
+MEDITATION_MASTER_KEY=$(master_key)
 
 # --- feedback service: its Postgres role and RabbitMQ user -------------------
 FEEDBACK_DB_PASSWORD=$(url_safe_secret)
