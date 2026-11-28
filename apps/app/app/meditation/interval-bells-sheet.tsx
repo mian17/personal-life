@@ -129,17 +129,21 @@ interface ScheduleDetailsProps {
 }
 
 /**
- * Groups 2 to 5, the whole block the switch owns: hidden together while the bells are off, which
- * is the preview's own `details.hidden` (`preview/app.js:404`) and what keeps the sheet's
- * collapsed shape to its header and the switch row.
+ * The summary line and groups 2 to 4, the whole block the switch owns: hidden together while the
+ * bells are off, which is the preview's own `details.hidden` (`preview/app.js:404`) and what keeps
+ * the sheet's collapsed shape to its header and the switch row.
  *
- * The block carries its own `--s2` rhythm, one step tighter than the sheet body's: the design nests
- * these four groups in one child of the body (`#interval-details`), so the wider step lands between
- * the switch row and this block, never between the groups themselves.
+ * The summary opens the block rather than closing it, so the schedule reads as its headline before
+ * the controls that shape it. The block carries its own `--s2` rhythm, one step tighter than the
+ * sheet body's: the design nests these groups in one child of the body (`#interval-details`), so
+ * the wider step lands between the switch row and this block, never between the groups themselves.
  */
 function ScheduleDetails({ draft, sessionMinutes, onChange }: Readonly<ScheduleDetailsProps>) {
   return (
     <Stack gap="md">
+      <Caption size="meta" live>
+        {describeSchedule(draft, sessionMinutes)}
+      </Caption>
       <StartAfterGroup
         offsetSec={draft.offsetSec}
         onChange={(offsetSec) => onChange({ ...draft, offsetSec })}
@@ -149,9 +153,6 @@ function ScheduleDetails({ draft, sessionMinutes, onChange }: Readonly<ScheduleD
         onChange={(intervalMin) => onChange({ ...draft, intervalMin })}
       />
       <RepeatGroup repeat={draft.repeat} onChange={(repeat) => onChange({ ...draft, repeat })} />
-      <Caption size="meta" live>
-        {describeSchedule(draft, sessionMinutes)}
-      </Caption>
     </Stack>
   );
 }
