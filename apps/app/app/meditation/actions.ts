@@ -62,15 +62,16 @@ interface RecordedSittingLog {
 
 /**
  * The one line a recorded sitting leaves — what Task 9's manual check reads back, and the only
- * place the minutes are visible before Task 10 adds the log screen. It is `debug`, so it only
- * prints when someone raises the console level; a production run keeps customer activity out of
- * the log.
+ * place the minutes are visible before Task 10 adds the log screen. The line is debug-level and
+ * skipped in production: it only prints when someone raises the console level outside a
+ * production run, so customer activity never reaches the production log.
  *
  * The minutes are `cappedMinutes`, the same rule the stop dialog shows, so the log cannot
  * disagree with the number the sitter just confirmed. Logged after the write: this is the row
  * that landed, not the report that was sent.
  */
 function announceRecordedSitting({ day, minutes, outcome }: RecordedSittingLog): void {
+  if (process.env.NODE_ENV === 'production') return;
   console.debug(`meditation: recorded ${minutes} ${minuteUnit(minutes)} (${outcome}) for ${day}`);
 }
 
