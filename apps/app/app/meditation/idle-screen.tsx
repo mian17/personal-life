@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Screen, Stack, Stepper, ValueRow } from '@life/ui';
+import { Button, Section, Stack, Stepper, ValueRow } from '@life/ui';
 import { minuteUnit, type BellChoice } from '@/lib/meditation-clock';
 import { IntervalBellsSheet, type SaveBells } from './interval-bells-sheet';
 
@@ -49,19 +49,19 @@ export function IdleScreen({
   const [bellsSheetOpen, setBellsSheetOpen] = useState(false);
 
   return (
-    <Screen label="Session setup">
-      <Stepper
-        tone="card"
-        size="display"
-        readout={{ kind: 'text', value: String(minutes), unit: minuteUnit(minutes) }}
-        decreaseLabel="Decrease duration by one minute"
-        increaseLabel="Increase duration by one minute"
-        onDecrease={() => setMinutes((current) => clampMinutes(current - MINUTES_STEP))}
-        onIncrease={() => setMinutes((current) => clampMinutes(current + MINUTES_STEP))}
-        decreaseDisabled={minutes === MINUTES_FLOOR}
-        increaseDisabled={minutes === MINUTES_CEILING}
-      />
+    <Section aria-label="Session setup">
       <Stack gap="md">
+        <Stepper
+          tone="card"
+          size="display"
+          readout={{ kind: 'text', value: String(minutes), unit: minuteUnit(minutes) }}
+          decreaseLabel="Decrease duration by one minute"
+          increaseLabel="Increase duration by one minute"
+          onDecrease={() => setMinutes((current) => clampMinutes(current - MINUTES_STEP))}
+          onIncrease={() => setMinutes((current) => clampMinutes(current + MINUTES_STEP))}
+          decreaseDisabled={minutes === MINUTES_FLOOR}
+          increaseDisabled={minutes === MINUTES_CEILING}
+        />
         <ValueRow label="Duration" value={`${minutes} min`} />
         <ValueRow
           label="Interval bells"
@@ -71,10 +71,10 @@ export function IdleScreen({
           controls={INTERVAL_BELLS_SHEET_ID}
         />
         <ValueRow label="Ending bell" value="Gong" />
+        <Button size="hero" onClick={() => onStart(minutes)}>
+          Start
+        </Button>
       </Stack>
-      <Button size="hero" className="mt-[var(--s2)]" onClick={() => onStart(minutes)}>
-        Start
-      </Button>
       <IntervalBellsSheet
         id={INTERVAL_BELLS_SHEET_ID}
         open={bellsSheetOpen}
@@ -83,7 +83,7 @@ export function IdleScreen({
         onSave={onSaveBells}
         onClose={() => setBellsSheetOpen(false)}
       />
-    </Screen>
+    </Section>
   );
 }
 

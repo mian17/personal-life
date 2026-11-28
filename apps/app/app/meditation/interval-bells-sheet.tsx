@@ -95,23 +95,9 @@ export function IntervalBellsSheet({
         if (!next) onClose();
       }}
       size="sheet"
-      sheetInset="design"
-      bodyGap="s5"
-      grab={false}
       title="Interval bells"
-      leadingAction={
-        <Button variant="text" size="bare" onClick={onClose}>
-          Cancel
-        </Button>
-      }
-      trailingAction={
-        <Button
-          variant="quiet"
-          size="bare"
-          className="justify-self-end"
-          disabled={onSave === undefined}
-          onClick={() => void save()}
-        >
+      footer={
+        <Button disabled={onSave === undefined} onClick={() => void save()}>
           Save
         </Button>
       }

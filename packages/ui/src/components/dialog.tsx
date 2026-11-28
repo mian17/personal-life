@@ -25,26 +25,11 @@ export interface DialogProps {
   /** `false` drops the grab handle and the close control: the confirm shape. Default `true`. */
   dismiss?: boolean;
   /**
-   * `false` draws no grab handle on a dismissible sheet, and changes nothing else: the header keeps
-   * its title, its actions, its inset and its close control. The design's meditation sheet has no
-   * handle. Default `true`.
-   */
-  grab?: boolean;
-  /**
    * Where the title sits in its header row: `start` for every shipped dialog, or `center` for the
    * design's confirm, whose title is centred over the full-width column beneath it. The copy under
    * the title stays at the start edge either way. Default `'start'`.
    */
   titleAlign?: 'start' | 'center';
-  /** The body's own rhythm; the design's sheet spaces its groups one step wider. */
-  bodyGap?: 's4' | 's5';
-  /**
-   * A shared sheet's inset, which is the app's: `--s2` above the title and `--s4` at the sides.
-   * `design` gives a surface its own design's inset instead — the design's meditation sheet draws
-   * `--s2` inline and `--s4` in the body, with no inset above its header. Applies to a dismissible
-   * sheet only: the confirm shape insets its own panel. Default `'app'`.
-   */
-  sheetInset?: 'app' | 'design';
   className?: string;
 }
 
@@ -81,11 +66,10 @@ const centredPanel = cx(
 const fullPanel = 'inset-0 h-[100dvh] w-full rounded-none p-[var(--s4)]';
 
 /**
- * A sheet gives its padding to the slots, so a slot's rule can reach the panel's edges — a header
- * hairline cannot be inset on each side and still read as a sheet. Only the safe area stays on the
- * panel, because nothing inside it knows where the home indicator is.
+ * A sheet gives its inline padding to the slots, so a slot can reach both panel edges. Its block
+ * inset stays on the panel: `--s2` above the grab, and the safe area plus `--s6` below.
  */
-const sheetPanelPadding = 'px-0 pt-0 pb-[env(safe-area-inset-bottom)]';
+const sheetPanelPadding = 'px-0 pt-[var(--s2)] pb-[calc(var(--s6)+env(safe-area-inset-bottom))]';
 
 /** The confirm shape has no header row to inset, so the panel keeps the confirm's own inset. */
 const confirmPanelPadding =
@@ -116,23 +100,19 @@ function sheetPanelStyles(dismiss: boolean): string {
 }
 
 /**
- * §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. It is a
- * decoration on the panel's top edge, not a row of its own, so it costs the sheet no height: the
- * header behind it starts where the design's header starts, at the panel's own edge.
+ * §8's `.sheet__grab`: the one affordance that says the panel can be dragged away. It is a row of
+ * its own, centred by `mx-auto`, costing the sheet its `--s2` and its `--s1` height.
  */
 const grabStyles = cx(
   'ui-dialog__grab',
-  'absolute top-0 left-1/2 -translate-x-1/2',
+  'mt-[var(--s2)] mx-auto',
   'w-[calc(var(--s8)+var(--s1))] h-[var(--s1)]',
   'rounded-[var(--r-pill)] bg-line-strong',
 );
 
 const dialogHeader = 'ui-dialog__head';
 
-/**
- * A centred or full panel insets its header from the panel's own `--s4`; a sheet gives the inset to
- * the slots, so its own geometry lives in `sheetHeaderStyles`.
- */
+/** Every centred or full panel puts `--s2` between its top edge and the header. */
 const panelHeaderInset = 'mt-[var(--s2)]';
 
 /** Two parts: the title block, then the close control. */
@@ -145,18 +125,15 @@ const actionHeaderStyles = cx(
 );
 
 /**
- * The sheet's own header inset and hairline. The hairline is a `border-b` on a full-width header
- * with no inline padding on the panel, so it reaches both edges in either mode.
+ * The sheet's header inset: the panel gives it inline padding only, so the header states its own
+ * `--s4` either side. No hairline — the sheet has no rule under its title.
  */
-const sheetHeaderStyles: Record<NonNullable<DialogProps['sheetInset']>, string> = {
-  app: 'pt-[var(--s2)] px-[var(--s4)] border-b border-line',
-  design: 'px-[var(--s2)] border-b border-line',
-};
+const sheetHeaderStyles = 'mt-[var(--s2)] px-[var(--s4)]';
 
 const dialogTitle = cx(
   'ui-dialog__title',
   'm-0 text-[length:var(--fs-sheet-title)] leading-[var(--lh-sheet-title)]',
-  'tracking-[var(--tracking-sheet-title)] [font-weight:var(--fw-semibold)]',
+  'tracking-[var(--tracking-sheet-title)] [font-weight:var(--fw-bold)]',
 );
 
 const dialogTitleBlock = cx('ui-dialog__title-block', 'flex flex-col');
@@ -177,26 +154,21 @@ const titleAlignStyles: Record<NonNullable<DialogProps['titleAlign']>, string | 
  */
 const centredTitleBlockStyles = 'flex-1';
 
-/** §8's `.sheet__sub`: one `--s4` under the title, `14px` (`--fs-label`), the second ink tier. */
+/** §8's `.sheet__sub`: one `--s1` under the title, `14px` (`--fs-label`), the second ink tier. */
 const dialogDescription = cx(
   'ui-dialog__sub',
-  'm-0 mt-[var(--s4)] text-[length:var(--fs-label)] text-ink-2',
+  'm-0 mt-[var(--s1)] text-[length:var(--fs-label)] text-ink-2',
 );
 
-const dialogBody = 'ui-dialog__body flex flex-col mt-[var(--s4)]';
+/** One rhythm for every body: `--s4` between the groups, `--s4` under the header. */
+const dialogBody = 'ui-dialog__body flex flex-col mt-[var(--s4)] gap-[var(--s4)]';
 
 /**
- * The sheet's body and footer insets. Only a dismissible sheet gives its padding to the slots: the
- * confirm shape keeps its own panel inset, and a slot that repeated it would inset the content
- * twice. The body's top inset is `dialogBody`'s own `--s4` `mt`, which both sheet designs sit on.
+ * The sheet's body and footer insets. Only a dismissible sheet gives its inline padding to the
+ * slots: the confirm shape keeps its own panel inset, and a slot that repeated it would inset the
+ * content twice.
  */
 const sheetBodyStyles = 'px-[var(--s4)] pb-[var(--s8)]';
-
-/** The body's own rhythm, one step per request; `s4` is the shipped spacing. */
-const bodyGapStyles: Record<NonNullable<DialogProps['bodyGap']>, string> = {
-  s4: 'gap-[var(--s4)]',
-  s5: 'gap-[var(--s5)]',
-};
 
 const dialogFooter = cx(
   'ui-dialog__footer',
@@ -228,10 +200,7 @@ export function Dialog({
   leadingAction,
   trailingAction,
   dismiss = true,
-  grab = true,
   titleAlign = 'start',
-  bodyGap = 's4',
-  sheetInset = 'app',
   className,
 }: Readonly<DialogProps>) {
   // Radix would hand focus back to its own trigger, which a controlled surface never renders, so
@@ -242,15 +211,16 @@ export function Dialog({
     if (!open) openerRef.current?.focus();
   }, [open]);
 
-  // A sheet that can be dismissed gives its padding to the slots and draws the grab; the confirm
-  // shape keeps the panel's own inset, so a slot must not repeat it.
+  // A sheet that can be dismissed gives its inline padding to the slots and draws the grab; the
+  // confirm shape keeps the panel's own inset, so a slot must not repeat it.
   const dismissibleSheet = size === 'sheet' && dismiss;
-  // The handle is a decoration on that sheet's top edge, so dropping it moves nothing else.
-  const showGrab = dismissibleSheet && grab;
   const centredTitle = titleAlign === 'center';
-  // A sheet's header opens on the panel's edge; the centred and full panels inset their own.
-  const headerInsetStyles = size === 'sheet' ? undefined : panelHeaderInset;
-  const headerSlotStyles = dismissibleSheet ? sheetHeaderStyles[sheetInset] : headerInsetStyles;
+  // A sheet's header carries its own inset; the confirm shape has no header row to inset.
+  const headerSlotStyles = dismissibleSheet
+    ? sheetHeaderStyles
+    : size === 'sheet'
+      ? undefined
+      : panelHeaderInset;
   // A dismissed surface has no header row for a trailing action to sit in, so that prop loses to
   // it; the title and its copy still render, because the title is what names the dialog.
   const trailing = dismiss
@@ -285,7 +255,7 @@ export function Dialog({
             className,
           )}
         >
-          {showGrab && <div aria-hidden className={grabStyles} />}
+          {dismissibleSheet && <div aria-hidden className={grabStyles} />}
           <div
             className={cx(hasActionRow ? actionHeaderStyles : splitHeaderStyles, headerSlotStyles)}
           >
@@ -298,11 +268,7 @@ export function Dialog({
             </div>
             {trailing}
           </div>
-          <div
-            className={cx(dialogBody, bodyGapStyles[bodyGap], dismissibleSheet && sheetBodyStyles)}
-          >
-            {children}
-          </div>
+          <div className={cx(dialogBody, dismissibleSheet && sheetBodyStyles)}>{children}</div>
           {footer != null && (
             <div className={cx(dialogFooter, dismissibleSheet && sheetFooterStyles)}>{footer}</div>
           )}

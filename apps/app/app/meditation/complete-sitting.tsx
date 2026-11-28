@@ -1,4 +1,4 @@
-import { Button, Caption, PageTitle, Screen, StatusText } from '@life/ui';
+import { Button, Caption, PageTitle, StatusText } from '@life/ui';
 
 /** What a recorded sitting left behind: the minutes it counts, and whether it ran its whole plan. */
 export interface SittingResult {
@@ -16,13 +16,13 @@ export interface CompleteSittingProps {
  * The complete panel (`SPEC-ui-meditation-primitives` §1, §4, §11, §13): the design's title, the
  * figure it recorded, the line that names the figure, and the one way out.
  *
- * The panel carries no `label` because its title is a real heading — a hidden duplicate would give
- * the section two names — and the figure is a result, not a ticking region, so its live region is
- * off (`:111`), while the `minutes sat` line beneath stays plain text.
+ * The section carries no `aria-label` because its title is a real heading — a second name would give
+ * it two — and the figure is a result, not a ticking region, so its live region is off (`:111`),
+ * while the `minutes sat` line beneath stays plain text.
  */
 export function CompleteSitting({ result, onDone }: Readonly<CompleteSittingProps>) {
   return (
-    <Screen layout="centred">
+    <section className="flex flex-col items-center justify-center gap-[var(--s6)] py-[var(--s8)] text-center">
       <PageTitle headingLevel="h2" weight="semibold">
         {headlineFor(result)}
       </PageTitle>
@@ -31,7 +31,7 @@ export function CompleteSitting({ result, onDone }: Readonly<CompleteSittingProp
       <Button size="bare" variant="primary" onClick={onDone}>
         Done
       </Button>
-    </Screen>
+    </section>
   );
 }
 

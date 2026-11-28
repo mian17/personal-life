@@ -163,9 +163,6 @@ export type { ListManagerProps, TodoListOption } from './components/list-manager
 export { Menu, MenuItem } from './components/menu';
 export type { MenuItemProps, MenuProps } from './components/menu';
 
-export { Screen } from './components/screen';
-export type { ScreenProps } from './components/screen';
-
 export { Stepper } from './components/stepper';
 export type { StepperProps, StepperReadout, StepperTone } from './components/stepper';
 

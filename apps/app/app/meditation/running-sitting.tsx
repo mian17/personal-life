@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Caption, Dialog, ProgressBar, Screen, Stack, StatusText } from '@life/ui';
+import { Button, Caption, Dialog, ProgressBar, Stack, StatusText } from '@life/ui';
 import { ringIntervalBells } from '@/lib/meditation-bells';
 import {
   bellScheduleFor,
@@ -54,7 +54,10 @@ export function RunningSitting({
   useNaturalFinish(remaining, onFinish);
 
   return (
-    <Screen label="Session in progress" layout="centred">
+    <section
+      aria-label="Session in progress"
+      className="flex flex-col items-center justify-center gap-[var(--s6)] py-[var(--s8)] text-center"
+    >
       <Caption>{`Meditation · ${plannedMinutes} min`}</Caption>
       <StatusText aria-live="polite" figure size="display">
         {formatClock(remaining)}
@@ -68,7 +71,7 @@ export function RunningSitting({
         onEnd={() => onEnd(elapsedSeconds)}
         onOpenChange={setConfirmingStop}
       />
-    </Screen>
+    </section>
   );
 }
 

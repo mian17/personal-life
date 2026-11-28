@@ -241,7 +241,7 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
   await intervalBellsRow(page).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Interval bells', exact: true })).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
   // Off: the header and the switch row, and nothing the switch owns.
@@ -297,14 +297,15 @@ async function expectBellsSheetToDiscard(page: Page, sessionMinutes: number): Pr
     ),
   ).toBeVisible();
 
-  await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByText('Off', { exact: true })).toBeVisible();
 }
 
 /**
- * Re-opens the sheet on the bells Cancel left behind, turns them on, saves a schedule whose first
- * bowl falls past the sitting, and reads the row back from a fresh render of the page.
+ * Re-opens the sheet on the bells the close control left behind, turns them on, saves a
+ * schedule whose first bowl falls past the sitting, and reads the row back from a fresh render of
+ * the page.
  *
  * The schedule's offset sits past the plan on purpose: the sitting rings nothing, so no case here
  * depends on Web Audio being available.
