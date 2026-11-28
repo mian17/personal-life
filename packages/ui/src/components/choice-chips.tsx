@@ -19,7 +19,11 @@ export interface ChoiceChipsProps {
   disabled?: boolean;
 }
 
-const groupStyles = 'ui-choice-chips flex flex-wrap gap-[var(--s2)]';
+/**
+ * The `fieldset` reset: the UA draws a groove border, a padding and an inline margin on it, and
+ * `base.css` does not reset either. `min-w-0` keeps a flex item from refusing to shrink.
+ */
+const groupStyles = 'ui-choice-chips m-0 min-w-0 border-0 p-0 flex flex-wrap gap-[var(--s2)]';
 
 /**
  * The chip: `Pill`'s language — the pill radius, the chip size, semibold, the `--tap` floor —
@@ -50,7 +54,9 @@ const chipFaceStyles: Record<'unpressed' | 'pressed', string> = {
  * seven stops is a short enough run to Tab across.
  *
  * The group's name is `aria-label` because the visible caption belongs to `Section`: the run is a
- * set, and the seven names each begin "Repeat:".
+ * set, and the seven names each begin "Repeat:". The container is a `<fieldset>` for the same
+ * reason — it carries the `group` role natively, so the name needs no `role` attribute — and it
+ * carries no `<legend>`, which would repeat the caption `Section` already renders.
  */
 export function ChoiceChips({
   label,
@@ -60,7 +66,7 @@ export function ChoiceChips({
   disabled = false,
 }: Readonly<ChoiceChipsProps>) {
   return (
-    <div role="group" aria-label={label} className={groupStyles}>
+    <fieldset aria-label={label} className={groupStyles}>
       {options.map((option) => {
         const pressed = option.value === value;
         return (
@@ -77,6 +83,6 @@ export function ChoiceChips({
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }

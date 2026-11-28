@@ -6,7 +6,7 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends g++ make python3 \
   && rm -rf /var/lib/apt/lists/*
 
 # shared dependency layer (SPEC-compose-build) ----------------------------
@@ -17,7 +17,7 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY --parents apps/*/package.json packages/*/package.json ./
 
-RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci
+RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --ignore-scripts
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared

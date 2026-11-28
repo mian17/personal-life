@@ -38,6 +38,8 @@ describe('ChoiceChips', () => {
     render(<ChoiceChips label="Repeat" options={REPEATS} value="" onChange={() => {}} />);
 
     const group = screen.getByRole('group', { name: 'Repeat' });
+    expect(group.tagName).toBe('FIELDSET');
+    expect(group.hasAttribute('role')).toBe(false);
     expect(group.querySelectorAll('button')).toHaveLength(REPEATS.length);
   });
 
